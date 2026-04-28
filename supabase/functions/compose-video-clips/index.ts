@@ -241,6 +241,23 @@ serve(async (req) => {
     const negativeFor = (isImageToVideo: boolean): string =>
       isImageToVideo ? (NEGATIVE_PROMPT_PARAM + NEGATIVE_PROMPT_I2V_EXTRA) : NEGATIVE_PROMPT_PARAM;
 
+    // Provider-specific lead-in trim defaults (seconds). i2v models hold the
+    // reference image static for a few frames before motion starts — these
+    // values are cut from the start of the clip during preview & stitching.
+    // Calibrated conservatively so we never cut into real motion.
+    const I2V_TRIM_DEFAULTS: Record<string, number> = {
+      'ai-hailuo': 0.25,
+      'ai-kling': 0.15,
+      'ai-wan': 0.20,
+      'ai-seedance': 0.15,
+      'ai-luma': 0.10,
+      'ai-veo': 0.10,
+      'ai-sora': 0.15,
+    };
+    const computeLeadInTrim = (clipSource: string, hasReference: boolean): number =>
+      hasReference ? (I2V_TRIM_DEFAULTS[clipSource] ?? 0) : 0;
+
+
     const results: Array<{ sceneId: string; status: string; predictionId?: string; clipUrl?: string; error?: string }> = [];
 
     // Helper: extract a useful error message from Replicate / generic errors
