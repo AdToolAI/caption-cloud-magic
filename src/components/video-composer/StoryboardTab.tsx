@@ -176,7 +176,7 @@ export default function StoryboardTab({
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto">
+    <div className="space-y-4 max-w-4xl mx-auto min-w-0">
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">

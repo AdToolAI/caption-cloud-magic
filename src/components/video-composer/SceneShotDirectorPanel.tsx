@@ -72,17 +72,17 @@ export default function SceneShotDirectorPanel({ value, onChange, language }: Pr
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`h-auto py-1.5 px-2 flex flex-col items-start gap-0.5 text-left whitespace-normal ${
+                  className={`h-auto min-w-0 w-full py-1.5 px-2 flex flex-col items-start gap-0.5 text-left whitespace-normal overflow-hidden ${
                     selected ? 'border-primary/60 bg-primary/10' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-1 w-full">
+                  <div className="flex items-center gap-1 w-full min-w-0">
                     <Icon className={`h-3 w-3 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground truncate">
                       {meta.title[lang]}
                     </span>
                   </div>
-                  <span className={`text-[10px] leading-tight ${selected ? 'text-primary font-medium' : 'text-foreground/60'}`}>
+                  <span className={`text-[10px] leading-tight w-full truncate ${selected ? 'text-primary font-medium' : 'text-foreground/60'}`}>
                     {selected ? selected.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
                   </span>
                 </Button>

@@ -44,7 +44,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false 
         </span>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full">
         {CINEMATIC_STYLE_PRESETS.map((preset) => (
           <PresetCard
             key={preset.id}
@@ -78,7 +78,7 @@ function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProp
       title={preset.description[lang]}
       className={cn(
         'shrink-0 relative rounded-lg border bg-card/40 backdrop-blur-sm overflow-hidden text-left transition-all group',
-        compact ? 'w-[120px] p-2' : 'w-[140px] p-2.5',
+        compact ? 'w-[104px] p-1.5' : 'w-[140px] p-2.5',
         isActive
           ? 'border-primary ring-1 ring-primary/50 bg-primary/5'
           : 'border-border/60 hover:border-primary/40',
@@ -97,7 +97,7 @@ function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProp
         </div>
       )}
       <div className="relative">
-        <div className={cn('leading-none', compact ? 'text-xl mb-1' : 'text-2xl mb-1.5')}>{preset.emoji}</div>
+        <div className={cn('leading-none', compact ? 'text-lg mb-0.5' : 'text-2xl mb-1.5')}>{preset.emoji}</div>
         <div
           className={cn(
             'font-medium leading-tight',

@@ -267,9 +267,9 @@ export default function SceneCard({
   };
 
   return (
-    <Card ref={cardRef as any} className="border-border/40 bg-card/80 group">
-      <CardContent className="p-4">
-        <div className="flex gap-3">
+    <Card ref={cardRef as any} className="border-border/40 bg-card/80 group overflow-hidden">
+      <CardContent className="p-4 overflow-hidden">
+        <div className="flex gap-3 min-w-0">
           {/* Drag handle + order */}
           <div className="flex flex-col items-center gap-1 pt-1">
             <GripVertical className="h-4 w-4 text-muted-foreground/40" />
@@ -285,7 +285,7 @@ export default function SceneCard({
           </div>
 
           {/* Content */}
-          <div className="flex-1 space-y-3">
+          <div className="flex-1 min-w-0 space-y-3">
             {/* Top row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
