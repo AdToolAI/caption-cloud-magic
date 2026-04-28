@@ -76,10 +76,18 @@ export function useMotionStudioLibrary() {
   // ── Characters ──────────────────────────────────────────────────────────
   const createCharacter = useCallback(
     async (draft: CharacterDraft): Promise<MotionStudioCharacter | null> => {
-      if (!user) return null;
+      // Resolve user defensively — context may lag right after sign-in.
+      const {
+        data: { user: liveUser },
+      } = await supabase.auth.getUser();
+      const effectiveUser = user ?? liveUser ?? null;
+      if (!effectiveUser) {
+        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        return null;
+      }
       const { data, error } = await supabase
         .from('motion_studio_characters')
-        .insert({ ...draft, user_id: user.id })
+        .insert({ ...draft, user_id: effectiveUser.id })
         .select()
         .single();
       if (error) {
@@ -87,11 +95,17 @@ export function useMotionStudioLibrary() {
         return null;
       }
       const created = data as MotionStudioCharacter;
-      setCharacters((prev) => [created, ...prev]);
+      // Optimistic + authoritative refetch so the UI never lies.
+      setCharacters((prev) => {
+        if (prev.some((c) => c.id === created.id)) return prev;
+        return [created, ...prev];
+      });
       toast.success(`„${created.name}" wurde gespeichert`);
+      // Fire-and-forget reconciliation
+      loadAll();
       return created;
     },
-    [user]
+    [user, loadAll]
   );
 
   const updateCharacter = useCallback(
