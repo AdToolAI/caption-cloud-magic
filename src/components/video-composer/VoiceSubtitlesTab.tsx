@@ -33,6 +33,7 @@ import type {
   SubtitlesConfig,
   SubtitleSegment,
   GlobalTextOverlay,
+  ComposerBriefing,
 } from '@/types/video-composer';
 import { DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -45,6 +46,7 @@ interface VoiceSubtitlesTabProps {
   assemblyConfig: AssemblyConfig;
   onUpdateAssembly: (config: Partial<AssemblyConfig>) => void;
   language: string;
+  briefing?: ComposerBriefing;
   onGoToAudio: () => void;
 }
 
@@ -63,6 +65,7 @@ export default function VoiceSubtitlesTab({
   assemblyConfig,
   onUpdateAssembly,
   language,
+  briefing,
   onGoToAudio,
 }: VoiceSubtitlesTabProps) {
   const { t } = useTranslation();
@@ -106,6 +109,9 @@ export default function VoiceSubtitlesTab({
   // ── Voiceover state ──────────────────────────────────────────────
   const [generatingVo, setGeneratingVo] = useState(false);
   const [scriptGenOpen, setScriptGenOpen] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoError, setAutoError] = useState(false);
+  const autoTriedRef = useRef(false);
 
   // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
   const [speed, setSpeed] = useState<number>(voiceover?.speed ?? 1.0);
@@ -149,6 +155,99 @@ export default function VoiceSubtitlesTab({
       toast({ title: t('videoComposer.noOverlayTextsForScript'), variant: 'destructive' });
     }
   };
+
+  // ── Auto-generate script from briefing + scenes on first visit ───
+  const mapBriefingTone = (tn?: string): string => {
+    switch (tn) {
+      case 'excited':
+      case 'energetic':
+        return 'enthusiastic';
+      case 'professional':
+      case 'corporate':
+        return 'professional';
+      case 'inspiring':
+      case 'visionary':
+        return 'inspiring';
+      case 'playful':
+      case 'witty':
+        return 'playful';
+      case 'serious':
+      case 'authoritative':
+        return 'authoritative';
+      default:
+        return 'friendly';
+    }
+  };
+
+  const buildBriefingIdea = (): string => {
+    if (!briefing) return '';
+    const parts: string[] = [];
+    if (briefing.productName?.trim()) parts.push(briefing.productName.trim());
+    if (briefing.productDescription?.trim()) parts.push(briefing.productDescription.trim());
+    if (Array.isArray(briefing.usps) && briefing.usps.length > 0) {
+      const usps = briefing.usps.map(u => u?.trim()).filter(Boolean).slice(0, 5);
+      if (usps.length) parts.push(`Key benefits: ${usps.join(', ')}`);
+    }
+    if (briefing.targetAudience?.trim()) parts.push(`Target audience: ${briefing.targetAudience.trim()}`);
+    return parts.join('. ');
+  };
+
+  useEffect(() => {
+    if (autoTriedRef.current) return;
+    if (!voiceover?.enabled) return;
+    if (voiceover.script && voiceover.script.trim().length > 0) return;
+    if (!scenes || scenes.length === 0) return;
+
+    autoTriedRef.current = true;
+    setAutoError(false);
+    setAutoGenerating(true);
+
+    const idea = buildBriefingIdea();
+    const tone = mapBriefingTone(briefing?.tone);
+    const sceneInputs = scenes.map((s, i) => ({
+      order: typeof s.orderIndex === 'number' ? s.orderIndex : i,
+      durationSeconds: Math.max(0.5, Number(s.durationSeconds) || 0),
+      description: s.aiPrompt || s.textOverlay?.text || undefined,
+      sceneType: s.sceneType,
+    }));
+
+    const fallbackIdea =
+      language === 'en'
+        ? 'Tell a coherent story that matches the storyboard scenes.'
+        : language === 'es'
+        ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
+        : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.';
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('generate-voiceover-script', {
+          body: {
+            mode: 'from_scenes',
+            idea: idea || fallbackIdea,
+            tone,
+            language,
+            scenes: sceneInputs,
+          },
+        });
+        if (error) throw error;
+        const script: string | undefined = data?.script;
+        if (!script || !script.trim()) throw new Error('Empty script');
+        const cur = voiceoverRef.current;
+        if (cur && !(cur.script && cur.script.trim().length > 0)) {
+          onUpdateAssembly({
+            voiceover: { ...cur, script, autoScriptGenerated: true },
+          });
+        }
+      } catch (err) {
+        console.warn('[VoiceSubtitlesTab] auto script generation failed:', err);
+        setAutoError(true);
+      } finally {
+        setAutoGenerating(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceover?.enabled, scenes.length]);
+
 
   const handleGenerateVoiceover = async () => {
     if (!voiceover?.script?.trim()) {
@@ -529,7 +628,12 @@ export default function VoiceSubtitlesTab({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">{t('videoComposer.voScript')}</Label>
+                <Label className="text-xs flex items-center gap-1.5">
+                  {t('videoComposer.voScript')}
+                  {autoGenerating && (
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  )}
+                </Label>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={() => setScriptGenOpen(true)}>
                     <Sparkles className="h-3 w-3 mr-1" />
@@ -543,11 +647,17 @@ export default function VoiceSubtitlesTab({
               </div>
               <Textarea
                 value={voiceover.script}
-                onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value } })}
-                placeholder={t('videoComposer.voScriptPlaceholder')}
+                onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value, autoScriptGenerated: false } })}
+                placeholder={autoGenerating ? t('videoComposer.autoScriptLoading') : t('videoComposer.voScriptPlaceholder')}
                 rows={4}
+                disabled={autoGenerating}
                 className="bg-background/50 resize-none text-sm"
               />
+              {autoError && !voiceover.script.trim() && !autoGenerating && (
+                <p className="text-[10px] text-amber-500/90">
+                  {t('videoComposer.autoScriptError')}
+                </p>
+              )}
               <p className="text-[10px] text-muted-foreground">
                 {voiceover.script.split(/\s+/).filter(Boolean).length} {t('videoComposer.words')} · ~{Math.ceil(voiceover.script.split(/\s+/).filter(Boolean).length / 150 * 60)}s
               </p>

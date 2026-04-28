@@ -341,6 +341,9 @@ export interface VoiceoverConfig {
   /** Estimated VO duration in seconds — used by the renderer to extend the
    *  composition timeline so crossfade overlap doesn't cut off audio. */
   durationSeconds?: number;
+  /** True when the script was auto-generated from briefing+scenes on first
+   *  Voiceover-tab visit (used to avoid re-running and to allow safe re-fills). */
+  autoScriptGenerated?: boolean;
 }
 
 export interface MusicConfig {
