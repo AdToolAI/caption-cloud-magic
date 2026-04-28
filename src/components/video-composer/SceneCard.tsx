@@ -796,6 +796,29 @@ export default function SceneCard({
               />
             )}
 
+            {/* Universal Reference Image — available in every clip-source mode */}
+            <div className="space-y-1.5 pt-1 border-t border-border/30">
+              <div className="text-[10px] text-muted-foreground/80 leading-snug">
+                {scene.clipSource.startsWith('ai-')
+                  ? (lang === 'de'
+                      ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
+                      : lang === 'es'
+                      ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
+                      : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
+                  : (lang === 'de'
+                      ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
+                      : lang === 'es'
+                      ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
+                      : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
+              </div>
+              <SceneReferenceImageUpload
+                projectId={projectId}
+                sceneId={scene.id}
+                referenceImageUrl={scene.referenceImageUrl}
+                onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
+              />
+            </div>
+
             {/* Transitions disabled in Composer — handled in Director's Cut */}
             <div
               className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
