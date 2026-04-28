@@ -513,24 +513,31 @@ serve(async (req) => {
 
         } else if (scene.clipSource === 'ai-seedance') {
           // Seedance 1 Lite via Replicate
+          const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-seedance', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
           // Seedance Lite supports 5 or 10 seconds — snap to nearest allowed value
           const seedDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const seedInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt),
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
             duration: seedDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
           console.log(`[compose-video-clips] Seedance scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${seedDuration}s`);
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             seedInput.image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Seedance scene ${scene.id} uses i2v reference`);
+            console.log(`[compose-video-clips] Seedance scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim('ai-seedance', true)}s)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: 'bytedance/seedance-1-lite',
@@ -548,27 +555,34 @@ serve(async (req) => {
 
         } else if (scene.clipSource === 'ai-luma') {
           // Luma Ray 2 via Replicate — supports start_image
+          const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-luma', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
           // Luma Ray 2 only supports 5 or 9 seconds — snap to nearest allowed value
           const lumaDuration = snapDuration(scene.durationSeconds, [5, 9]);
           const lumaInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt),
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
             duration: lumaDuration,
             aspect_ratio: '16:9',
           };
           console.log(`[compose-video-clips] Luma scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${lumaDuration}s`);
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             lumaInput.start_image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe`);
+            console.log(`[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe (lead-in trim ${computeLeadInTrim('ai-luma', true)}s)`);
           }
           if (scene.endReferenceImageUrl) {
             lumaInput.end_image = scene.endReferenceImageUrl;
             console.log(`[compose-video-clips] Luma scene ${scene.id} uses end_image keyframe (backward extend / bridge)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: 'luma/ray-2-720p',
@@ -587,9 +601,15 @@ serve(async (req) => {
         } else if (scene.clipSource === 'ai-veo') {
           // Google Veo 3.1 via Replicate — native audio
           // standard → google/veo-3.1-fast (Lite, $0.05/s 720p) | pro → google/veo-3.1 (Premium 1080p, $0.40/s)
+          const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-veo', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
           const veoModel = quality === 'pro' ? 'google/veo-3.1' : 'google/veo-3.1-fast';
@@ -598,15 +618,16 @@ serve(async (req) => {
           const veoDuration = scene.durationSeconds >= 7 ? 8 : scene.durationSeconds >= 5 ? 6 : 4;
 
           const veoInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt),
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
             duration: veoDuration,
             aspect_ratio: '16:9',
             resolution: veoResolution,
           };
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             veoInput.image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Veo scene ${scene.id} uses i2v reference (${veoModel})`);
+            console.log(`[compose-video-clips] Veo scene ${scene.id} uses i2v reference (${veoModel}, lead-in trim ${computeLeadInTrim('ai-veo', true)}s)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: veoModel,
@@ -625,24 +646,31 @@ serve(async (req) => {
         } else if (scene.clipSource === 'ai-sora') {
           // OpenAI Sora 2 via Replicate — standard or pro tier.
           // Sora 2 only supports 4 / 8 / 12 second clips.
+          const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-sora', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
           const soraModel = quality === 'pro' ? 'openai/sora-2-pro' : 'openai/sora-2';
           const soraDuration = snapDuration(scene.durationSeconds, [4, 8, 12]);
           const soraInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt, scene.characterShot),
+            prompt: enrichPrompt(scene.aiPrompt, scene.characterShot, isI2V),
             duration: soraDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
           console.log(`[compose-video-clips] Sora scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${soraDuration}s (${soraModel})`);
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             soraInput.image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Sora scene ${scene.id} uses i2v reference`);
+            console.log(`[compose-video-clips] Sora scene ${scene.id} uses i2v reference (lead-in trim ${computeLeadInTrim('ai-sora', true)}s)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: soraModel,
