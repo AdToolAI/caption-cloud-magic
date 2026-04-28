@@ -1,70 +1,75 @@
-## Problem
+# Continuity Guardian — Falsche „Bruch"-Meldungen beheben
 
-Im Motion Studio (Video Composer) ist das Skript-Feld im Tab **Voiceover & Untertitel** beim ersten Aufruf **leer**. Der Nutzer muss aktiv „KI-Generator" klicken, einen Dialog ausfüllen und „Aus Szenen generieren" auswählen. Erwartet wird: Das Feld ist bereits **automatisch vorbefüllt** mit einem Skript, das
+## Das Problem (sichtbar im Screenshot)
 
-- am **Briefing** orientiert ist (Produktname, Beschreibung, USPs, Zielgruppe, Tonalität),
-- an den **Szenen** entlang erzählt,
-- ca. **2–3 Sekunden kürzer** als das Gesamtvideo ist (Outro-Buffer).
+Der Guardian meldet auf jedem Cut hohe Drift-Werte (85, 75, 90) mit Labels wie *„different character, framing, lighting, and scene"*.
 
-Die Edge Function `generate-voiceover-script` kann das alles schon (Modus `from_scenes`, Pro-Szene-Wortbudget, Outro-Buffer 2,5s). Nur das **Auto-Triggering aus dem Tab heraus** fehlt – und das Briefing wird derzeit gar nicht an den Generator weitergereicht.
+Das ist **kein Bug im Vergleich**, sondern eine falsche Grundannahme:
 
-## Was passieren soll
+- Der Guardian vergleicht den **letzten Frame von Szene N** mit dem **ersten Frame von Szene N+1** und bewertet wie ein Film-Continuity-Supervisor: 0 = identisch, 100 = anderer Charakter/anderes Setting.
+- In einem typischen Marketing-/Storytelling-Video sind aufeinanderfolgende Szenen **absichtlich** verschieden (Hook → Problem → Lösung, andere Räume, andere Close-ups). Daraus folgt: jeder echte Cut wird als „Bruch" gewertet.
+- Ergebnis: Der Guardian ist zu 100 % Noise und der „Alle reparieren"-Button würde sinnlose Re-Renders auslösen.
 
-1. **Beim ersten Öffnen** des Voiceover-Tabs (Skript leer + Voiceover aktiv + Szenen vorhanden):
-   - Automatisch ein Skript generieren via `generate-voiceover-script` (Modus `from_scenes`).
-   - Die Briefing-Daten (Produkt, Beschreibung, USPs, Zielgruppe, Tonalität) werden als `idea` mitgeschickt, damit das Skript thematisch passt – nicht nur generisch „erzähl eine Story".
-   - Ziel-Sprechdauer = `Σ Szenendauer − 2.5s` (übernimmt die Edge Function bereits aus den Szenen).
-   - `tone` aus `briefing.tone` mappen (z. B. `excited` → `enthusiastic`, sonst `friendly`).
-2. Während der Generierung wird im Skript-Feld ein dezenter Lade-Hinweis gezeigt (Placeholder „KI schreibt dein Skript …" + disabled Textarea + kleiner Spinner neben „Skript"-Label).
-3. **Stille bei Fehler**: Wenn die Generierung fehlschlägt (Rate-Limit, Netzwerk), bleibt das Feld leer – kein roter Toast, nur ein kleiner Inline-Hinweis „Auto-Skript fehlgeschlagen – nutze ‚KI-Generator'". Der Nutzer kann jederzeit selbst tippen.
-4. **Nicht erneut auto-generieren**, wenn:
-   - der Nutzer das Skript bereits selbst geschrieben oder geändert hat,
-   - bereits ein Skript vorhanden ist (auch aus früherem Auto-Run),
-   - der Voiceover-Switch deaktiviert ist,
-   - keine Szenen existieren.
-5. Ein neues Flag `assemblyConfig.voiceover.autoScriptGenerated` markiert das automatische Ergebnis. Wenn der Nutzer dann das Briefing oder die Szenen ändert und das Skript noch unverändert ist (ein Hash/String-Vergleich gegen den letzten Auto-Output), erlauben wir eine **stille Re-Generierung** beim nächsten Tab-Öffnen.
+## Was wir ändern
 
-## Technische Umsetzung
+### 1. Guardian nur auf „continuity-relevante" Paare anwenden
 
-### 1) `src/components/video-composer/VoiceSubtitlesTab.tsx`
-- Prop `briefing: ComposerBriefing` hinzufügen (wird in `VideoComposerDashboard.tsx` aus `project.briefing` weitergereicht).
-- Neuer Effekt `useEffect`, der bei Mount/Tab-Eintritt prüft:
-  ```
-  if (voiceover?.enabled && !voiceover.script?.trim() && scenes.length > 0 && !autoTriedRef.current) → autoGenerate()
-  ```
-  `autoTriedRef` (useRef) verhindert Mehrfach-Trigger pro Mount.
-- Neue async-Funktion `autoGenerateScript()`:
-  - baut `idea` aus Briefing (Produktname + Beschreibung + USPs + Zielgruppe, kompakt zusammengefügt),
-  - mappt `briefing.tone` → Generator-Tone,
-  - ruft `supabase.functions.invoke('generate-voiceover-script', { body: { mode: 'from_scenes', idea, language, tone, scenes: scenes.map(...) } })` auf,
-  - bei Erfolg: `onUpdateAssembly({ voiceover: { ...voiceover, script: data.script, autoScriptGenerated: true } })`,
-  - bei Fehler: kleinen Inline-Hinweis (lokaler State `autoError: boolean`) setzen.
-- Lade-State `autoGenerating: boolean` für Spinner + Placeholder.
-- Bestehender `VoiceoverScriptGenerator`-Dialog bleibt unverändert verfügbar (Button „KI-Generator" für manuelle Re-Generierung mit eigener Idee/Ton).
-- Vorhandene Funktion `generateScriptFromScenes` (zieht Text aus Overlays) bleibt als zweiter Quick-Button „Aus Szenen" erhalten.
+Aktuell prüft der Guardian **jedes** AI-Szenen-Paar. Wir prüfen nur noch Paare, bei denen Continuity tatsächlich gewollt ist:
 
-### 2) `src/components/video-composer/VideoComposerDashboard.tsx`
-- Beim Render von `<VoiceSubtitlesTab … />` zusätzlich `briefing={project.briefing}` durchreichen.
+- **Geteilter Charakter**: Beide Szenen referenzieren dieselbe `characterId` aus dem Briefing (`ComposerCharacter`).
+- **Explizit gelockte Anker**: Die Folgeszene hat eine `referenceImageUrl` oder `continuityLocked = true` — d. h. der User/AI will hier sichtbar Konsistenz.
+- **Selber Szenentyp + grenzwertiger Cut**: z. B. zwei aufeinanderfolgende `talking-head`-Szenen.
 
-### 3) `src/types/video-composer.ts`
-- Im Interface `VoiceoverConfig` (oder analoges Voiceover-Objekt unter `AssemblyConfig.voiceover`) optionales Feld ergänzen: `autoScriptGenerated?: boolean`. Reine Markierung, keine Migration nötig (Drafts werden lokal/in DB als JSON gehalten).
+Alle anderen Paare (intentionaler Cut zu neuem Subjekt) werden **ausgeblendet** — kein Chip, keine Warnung.
 
-### 4) Übersetzungen `src/lib/translations.ts`
-Neue Keys (DE / EN / ES):
-- `videoComposer.autoScriptLoading` – „KI schreibt dein Skript …" / „AI is writing your script …" / „La IA está escribiendo tu guion …"
-- `videoComposer.autoScriptError` – „Auto-Skript fehlgeschlagen – nutze ‚KI-Generator' rechts oben." (+ EN/ES)
+### 2. Bewertungsrubrik im Edge-Function-Prompt entschärfen
 
-### 5) Keine DB-Änderungen, keine Edge-Function-Änderungen
-Die Edge Function `generate-voiceover-script` unterstützt `mode: 'from_scenes'` mit `idea` + `scenes` bereits vollständig – inklusive Pro-Szene-Wortbudget und 2,5s Outro-Buffer.
+`detect-scene-drift` bekommt einen neuen Prompt, der zwischen **„geplanter Cut"** und **„unbeabsichtigter Drift"** unterscheidet. Wir geben dem Modell zusätzlichen Kontext mit (Szenentyp, ob ein gemeinsamer Charakter erwartet wird, der Prompt-Text der Folgeszene), damit es nicht stumpf Pixel vergleicht, sondern fragt: „Wäre dieser Wechsel für einen Zuschauer ein Continuity-Fehler?"
 
-## Geänderte Dateien
+Neue Skala:
+- **0–25**: Cut wirkt natürlich (egal ob gleich oder anders) → grün
+- **26–55**: Auffälliger, aber vertretbarer Cut → gelb (nur Hinweis)
+- **56–100**: Echter Continuity-Bruch (Charakter wechselt mitten im Dialog, Lighting springt im selben Raum) → rot
 
-- `src/components/video-composer/VoiceSubtitlesTab.tsx` – Auto-Generierung, Lade-/Fehler-States, neue `briefing`-Prop
-- `src/components/video-composer/VideoComposerDashboard.tsx` – `briefing` durchreichen
-- `src/types/video-composer.ts` – Feld `autoScriptGenerated?: boolean`
-- `src/lib/translations.ts` – 2 neue Keys × 3 Sprachen
+### 3. UI-Default: leise statt laut
 
-## Out of scope (bewusst nicht jetzt)
+- Wenn keine Paare nach den neuen Filterkriterien übrigbleiben, rendert die Strip-Komponente `null` (heute schon vorhanden) — also **gar kein Guardian-Block** auf solchen Projekten.
+- Gibt es Paare, ist der Default-Status `unknown` (grau), nicht „Bruch". Erst nach „Alles prüfen" kommen Farben.
+- Der „Alle reparieren"-Button erscheint nur, wenn mindestens ein Paar wirklich rot (`broken`) ist — gelb („drift") triggert ihn nicht mehr.
 
-- Re-Generierung „on the fly", wenn das Briefing nachträglich geändert wird, während der Voiceover-Tab schon einmal besucht wurde – das würde versehentlich vom Nutzer geschriebene Skripte überschreiben. Stattdessen kann der Nutzer den „KI-Generator"-Button manuell nutzen.
-- Änderungen an Stimme, Untertitel-Generierung, Audio-Tab.
+### 4. Klarere Sprache & Hinweis im Header
+
+Der kleine Untertitel im Header wird ergänzt um eine Erklärung:
+> „Prüft nur Cuts, in denen derselbe Charakter oder Anker erscheint."
+
+So versteht der User sofort, warum manche Szenen im Guardian fehlen.
+
+## Technische Details
+
+**Frontend — `ContinuityGuardianStrip.tsx`**
+- `pairs`-Memo erweitern: zusätzliche Filter `sharesCharacter(prev, next)`, `hasLockedAnchor(next)`, `sameSceneType(prev, next)`.
+- `repairAllBroken` filtert auf `score >= 56` (statt `>= 36`).
+- Header-Untertitel-Text aktualisieren.
+
+**Edge Function — `supabase/functions/detect-scene-drift/index.ts`**
+- `RequestBody` um `context?: { sceneType?: string; expectsSameCharacter?: boolean; nextPrompt?: string }` erweitern.
+- `SYSTEM_PROMPT` umschreiben: explizit zwischen „intentional cut" und „continuity break" unterscheiden, neue Skala.
+- `safeParseDrift`-Schwellen anpassen (`>=56` → `hard-repair`, `>=26` → `soft-repair`).
+
+**Hook — `useContinuityDrift.ts`**
+- `driftSeverity`-Schwellen synchron zur neuen Skala anpassen (15→25, 35→55, 65→… entsprechend).
+
+**Aufrufer — `checkPair` / `checkAll`**
+- Übergeben den neuen `context`-Block an die Edge Function.
+
+## Was sich für den User ändert
+
+- Auf dem aktuellen Projekt im Screenshot würde der Guardian-Block **komplett verschwinden**, weil keine zwei Szenen denselben Charakter teilen und nichts gelockt ist.
+- Sobald der User einen Brand-Charakter ins Briefing legt oder eine Szene per „🔒 Anker verriegeln" verbindet, taucht der Guardian wieder auf — diesmal mit aussagekräftigen Werten.
+- Keine falschen „Alle reparieren"-Aktionen mehr, die unnötig Credits verbrennen.
+
+## Aus Scope raus
+
+- Wir bauen **kein** zusätzliches Modell und keinen neuen Provider — nur Prompt- und Filter-Logik.
+- Bestehende `composer_drift_checks`-History bleibt unverändert.
+- Migrations sind nicht nötig.
