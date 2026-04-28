@@ -46,7 +46,7 @@ export function ModelSelector({ value, onChange, currency, hasSora2Access, model
 
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger className="h-14 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors">
+      <SelectTrigger className={className ?? "h-14 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors"}>
         <SelectValue placeholder="Modell wählen…">
           {selected && (
             <div className="flex items-center gap-3 text-left">
