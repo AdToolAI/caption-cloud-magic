@@ -54,6 +54,9 @@ interface ClipScene {
   clipSource: string;
   clipQuality?: Quality;
   aiPrompt?: string;
+  /** Negative phrases extracted client-side by composePromptLayers (Phase 3).
+   *  Merged into the provider's `negative_prompt` API parameter. */
+  negativePrompt?: string;
   stockKeywords?: string;
   uploadUrl?: string;
   /** Optional image used as visual guide for AI sources (image-to-video). */
@@ -250,8 +253,18 @@ serve(async (req) => {
       }
       return result;
     };
-    const negativeFor = (isImageToVideo: boolean): string =>
-      isImageToVideo ? (NEGATIVE_PROMPT_PARAM + NEGATIVE_PROMPT_I2V_EXTRA) : NEGATIVE_PROMPT_PARAM;
+    const negativeFor = (isImageToVideo: boolean, sceneNegative?: string): string => {
+      const base = isImageToVideo ? (NEGATIVE_PROMPT_PARAM + NEGATIVE_PROMPT_I2V_EXTRA) : NEGATIVE_PROMPT_PARAM;
+      const extra = (sceneNegative || '').trim();
+      if (!extra) return base;
+      // De-dup: only append phrases that aren't already covered by base.
+      const baseLower = base.toLowerCase();
+      const extras = extra
+        .split(/,\s*/)
+        .map((s) => s.trim())
+        .filter((s) => s && !baseLower.includes(s.toLowerCase()));
+      return extras.length > 0 ? `${base}, ${extras.join(', ')}` : base;
+    };
 
     // Provider-specific lead-in trim defaults (seconds). i2v models hold the
     // reference image static for a few frames before motion starts — these
@@ -368,7 +381,7 @@ serve(async (req) => {
 
           const hailuoInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-            negative_prompt: negativeFor(isI2V),
+            negative_prompt: negativeFor(isI2V, scene.negativePrompt),
             duration: duration,
             resolution: resolution,
           };
@@ -503,7 +516,7 @@ serve(async (req) => {
           const wanDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const wanInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-            negative_prompt: negativeFor(isI2V),
+            negative_prompt: negativeFor(isI2V, scene.negativePrompt),
             duration: wanDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',

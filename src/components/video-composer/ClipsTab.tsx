@@ -22,10 +22,9 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
-import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
-import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
-import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
   DndContext,
   closestCenter,
@@ -68,6 +67,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
   // Library for @-mention resolution at generation time
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const { characters: brandChars } = useBrandCharacters();
+  // Phase 2 — auto-inject the user's favorite Brand Character (if any).
+  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
+  const brandCharacterInput = activeBrandChar
+    ? {
+        name: activeBrandChar.name,
+        identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
+        referenceImageUrl: activeBrandChar.reference_image_url,
+      }
+    : undefined;
 
   /**
    * Frame-to-Shot Continuity:
@@ -281,24 +290,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       const scenesPayload = pScenes
         .filter(s => s.clipStatus !== 'ready' && !(s.clipSource === 'upload' && s.uploadUrl))
         .map(s => {
-          // Phase 4 — resolve @character / @location mentions against library
-          const resolved = resolveMentions(s.aiPrompt || '', libCharacters, libLocations);
-          // Phase 3 — apply director modifiers on top of the resolved prompt
-          const withMods = s.directorModifiers
-            ? applyDirectorModifiers(resolved.prompt, s.directorModifiers)
-            : resolved.prompt;
-          // Shot Director — append per-scene cinematography suffix (English)
-          const shotSuffix = buildShotPromptSuffix(s.shotDirector || {});
-          const finalPrompt = shotSuffix ? `${withMods} ${shotSuffix}` : withMods;
+          // Centralized prompt composer (Phase 1) — replaces the previous
+          // resolveMentions + applyDirectorModifiers + buildShotPromptSuffix
+          // chain. Resolves axis conflicts, injects brand character, and
+          // splits negative phrases out of the positive prompt.
+          const composed = composePromptLayers({
+            rawPrompt: s.aiPrompt || '',
+            directorModifiers: s.directorModifiers,
+            shotDirector: s.shotDirector,
+            cinematicStylePresetId: (s as any).cinematicStylePresetId,
+            brandCharacter: brandCharacterInput,
+            libraryCharacters: libCharacters,
+            libraryLocations: libLocations,
+          });
           return {
             id: s.id,
             clipSource: s.clipSource,
             clipQuality: s.clipQuality || 'standard',
-            aiPrompt: finalPrompt,
+            aiPrompt: composed.finalPrompt,
+            negativePrompt: composed.negativePrompt || undefined,
             stockKeywords: s.stockKeywords,
             uploadUrl: s.uploadUrl,
-            // Prefer scene-level reference, fall back to single-mention auto-ref
-            referenceImageUrl: s.referenceImageUrl || resolved.referenceImageUrl,
+            referenceImageUrl: s.referenceImageUrl || composed.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
             durationSeconds: s.durationSeconds,
             characterShot: s.characterShot,
             withAudio: s.withAudio !== false,
@@ -392,13 +405,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(optimistic);
       }
 
-      // Phase 4 — resolve @character / @location mentions
-      const resolvedSingle = resolveMentions(targetScene.aiPrompt || '', libCharacters, libLocations);
-      const withModsSingle = targetScene.directorModifiers
-        ? applyDirectorModifiers(resolvedSingle.prompt, targetScene.directorModifiers)
-        : resolvedSingle.prompt;
-      const shotSuffixSingle = buildShotPromptSuffix(targetScene.shotDirector || {});
-      const finalSinglePrompt = shotSuffixSingle ? `${withModsSingle} ${shotSuffixSingle}` : withModsSingle;
+      // Centralized prompt composer (Phase 1)
+      const composedSingle = composePromptLayers({
+        rawPrompt: targetScene.aiPrompt || '',
+        directorModifiers: targetScene.directorModifiers,
+        shotDirector: targetScene.shotDirector,
+        cinematicStylePresetId: (targetScene as any).cinematicStylePresetId,
+        brandCharacter: brandCharacterInput,
+        libraryCharacters: libCharacters,
+        libraryLocations: libLocations,
+      });
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
@@ -409,10 +425,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             id: targetScene.id,
             clipSource: targetScene.clipSource,
             clipQuality: targetScene.clipQuality || 'standard',
-            aiPrompt: finalSinglePrompt,
+            aiPrompt: composedSingle.finalPrompt,
+            negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: targetScene.referenceImageUrl || resolvedSingle.referenceImageUrl,
+            referenceImageUrl: targetScene.referenceImageUrl || composedSingle.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
