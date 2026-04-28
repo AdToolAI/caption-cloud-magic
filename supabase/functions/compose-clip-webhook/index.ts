@@ -26,7 +26,8 @@ serve(async (req) => {
     );
 
     const payload = await req.json();
-    console.log(`[compose-clip-webhook] Scene: ${sceneId}, Status: ${payload.status}`);
+    // v2 — archive every AI clip to Media Library (KI tab)
+    console.log(`[compose-clip-webhook v2] Scene: ${sceneId}, Status: ${payload.status}`);
 
     const { id: predictionId, status, output, error: predError } = payload;
 
@@ -78,7 +79,7 @@ serve(async (req) => {
 
         const { data: projectMeta } = await supabase
           .from('composer_projects')
-          .select('user_id, name')
+          .select('user_id, title')
           .eq('id', projectId)
           .single();
 
@@ -114,7 +115,7 @@ serve(async (req) => {
           const newMetadata = {
             source: 'motion-studio-clip',
             project_id: projectId,
-            project_name: projectMeta.name ?? null,
+            project_name: projectMeta.title ?? null,
             scene_id: sceneId,
             scene_order: sceneFull.order_index ?? 0,
             prompt: sceneFull.ai_prompt ?? '',
