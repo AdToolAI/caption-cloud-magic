@@ -58,7 +58,41 @@ export default function ContinuityGuardianStrip({
   const [historyOpen, setHistoryOpen] = useState(false);
 
   // Only compute pairs where BOTH sides are AI-generated and READY
+  // AND the cut is "continuity-relevant" — i.e. the user/AI actually
+  // wants the two shots to look connected. Pure creative cuts to a
+  // brand-new subject are filtered out so we don't drown the user
+  // in false "Bruch" warnings.
   const pairs: PairState[] = useMemo(() => {
+    const isContinuityRelevant = (prev: ComposerScene, next: ComposerScene) => {
+      // 1. Next scene has a locked anchor or explicit reference image →
+      //    user has expressed intent that this cut should match.
+      if (next.continuityLocked) return true;
+      if (next.lockReferenceUrl) return true;
+      if (next.referenceImageUrl) return true;
+      if (prev.continuityLocked) return true;
+
+      // 2. Both scenes share the SAME character (via characterShot.characterId)
+      //    and neither side hides the character — the viewer expects the
+      //    same person to look the same.
+      const prevChar = prev.characterShot?.characterId;
+      const nextChar = next.characterShot?.characterId;
+      const prevAbsent = prev.characterShot?.shotType === 'absent';
+      const nextAbsent = next.characterShot?.shotType === 'absent';
+      if (
+        prevChar &&
+        nextChar &&
+        prevChar === nextChar &&
+        !prevAbsent &&
+        !nextAbsent
+      ) {
+        return true;
+      }
+
+      // 3. Otherwise this is treated as an intentional creative cut →
+      //    not monitored.
+      return false;
+    };
+
     const out: PairState[] = [];
     for (let i = 0; i < scenes.length - 1; i++) {
       const prev = scenes[i];
@@ -71,10 +105,29 @@ export default function ContinuityGuardianStrip({
         next.clipStatus === 'ready' &&
         (next.clipUrl || next.uploadUrl) &&
         next.clipSource.startsWith('ai-');
-      if (prevReady && nextReady) out.push({ prev, next });
+      if (prevReady && nextReady && isContinuityRelevant(prev, next)) {
+        out.push({ prev, next });
+      }
     }
     return out;
   }, [scenes]);
+
+  const buildContext = (pair: PairState) => {
+    const prevChar = pair.prev.characterShot?.characterId;
+    const nextChar = pair.next.characterShot?.characterId;
+    const expectsSameCharacter =
+      !!prevChar &&
+      !!nextChar &&
+      prevChar === nextChar &&
+      pair.prev.characterShot?.shotType !== 'absent' &&
+      pair.next.characterShot?.shotType !== 'absent';
+    return {
+      sceneType: pair.prev.sceneType,
+      nextSceneType: pair.next.sceneType,
+      expectsSameCharacter,
+      nextPrompt: pair.next.aiPrompt,
+    };
+  };
 
   const checkPair = async (pair: PairState) => {
     let anchorUrl = pair.prev.lastFrameUrl;
