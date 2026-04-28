@@ -16,11 +16,13 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
+import type { Scene } from '@/types/scene';
 
 interface ContentVoiceStepProps {
   value: ContentConfig | null;
   onChange: (config: ContentConfig) => void;
   projectId: string;
+  scenes?: Scene[];
 }
 
 interface Voice {
