@@ -89,8 +89,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   const clipCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
   const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
-  const renderCost = 0.10;
-  const totalCost = clipCost + voCost + renderCost;
+  const renderCost = 0;
+  const totalCost = clipCost + voCost;
 
   const readyClips = scenes.filter(s => s.clipStatus === 'ready' && s.clipUrl);
   const allReady = readyClips.length === scenes.length && scenes.length > 0;
