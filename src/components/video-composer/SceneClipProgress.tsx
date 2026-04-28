@@ -30,7 +30,27 @@ export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
         </div>
       );
     }
-    return <video src={scene.clipUrl} className="w-full h-full object-cover" muted controls />;
+    const trim = Math.max(0, Number(scene.clipLeadInTrimSeconds ?? 0));
+    return (
+      <video
+        src={scene.clipUrl}
+        className="w-full h-full object-cover"
+        muted
+        controls
+        onLoadedMetadata={(e) => {
+          // Skip the frozen reference-image opening frames produced by i2v
+          // providers (Hailuo, Kling, Wan, Seedance, Luma, Veo, Sora).
+          if (trim > 0) {
+            try {
+              const el = e.currentTarget;
+              if (isFinite(el.duration) && trim < el.duration - 0.1) {
+                el.currentTime = trim;
+              }
+            } catch { /* noop */ }
+          }
+        }}
+      />
+    );
   }
 
   // GENERATING → animated skeleton
