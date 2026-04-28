@@ -1,68 +1,74 @@
-## Ziel
+# Hintergrundmusik im Export sichtbar & hörbar machen
 
-Der Voiceover-Skriptgenerator im Universal Creator (Schritt "Voiceover & Untertitel") soll sich automatisch an den vorher definierten **Storyboard-Szenen** orientieren. Egal ob der Nutzer den "KI-Generator" oder den "Aus Szenen"-Modus wählt – das Ergebnis ist ein zusammenhängendes Skript, das
+## Diagnose
 
-1. die **Gesamtgeschichte** der Szenen widerspiegelt (Hook → Mitte → Ende),
-2. **zeitlich pro Szene passt** (Wortanzahl-Budget je Szene basierend auf 2,5 Wörter/Sek),
-3. als ein **flüssiger Sprechtext** ausgegeben wird (mit unsichtbaren Szenen-Markern, damit Untertitel später passen).
+Die Hintergrundmusik **wird** technisch in den Export übertragen — die Datenkette ist intakt:
 
-## Aktueller Stand (kurz)
+```text
+AudioTab (assemblyConfig.music)
+  → updateAssembly() debounced DB-Write (800ms)
+  → Render-Klick: persistAssemblyConfig() flush vor Edge-Call
+  → compose-video-assemble liest assembly_config aus DB
+  → inputProps.backgroundMusicUrl + backgroundMusicVolume
+  → Lambda rendert ComposedAdVideo mit <Audio src={backgroundMusicUrl} />
+```
 
-- Storyboard-Szenen (`Scene[]`) aus `useSceneManager` werden im `UniversalCreator` gehalten, aber **nicht** an `ContentVoiceStep` durchgereicht.
-- `VoiceoverScriptGenerator.tsx` ruft `generate-voiceover-script` nur mit `idea`, `targetDuration`, `tone`, `language` auf — kein Szenen-Kontext.
-- Die Edge Function generiert daher generische Texte, die zeitlich oft nicht zur Sequenz passen.
+**Das wirkliche Problem**: Im Export-Step gibt es **keinerlei UI-Hinweis**, dass eine Musik ausgewählt ist. Die Vorschau im Export-Step spielt zudem nur das Voiceover ab, nicht die Musik. Dadurch entsteht der Eindruck, die Musik sei verloren — sie ist im finalen MP4 aber drin.
 
-## Änderungen
+Drei Lücken konkret:
+1. `AssemblyTab.tsx` zeigt keine Musik-Zusammenfassung (Track-Name, Volume).
+2. `ComposerSequencePreview.tsx` mischt nur das Voiceover, nicht die BGM.
+3. `CostEstimationPanel` listet Musik nicht als aktiven Bestandteil auf.
 
-### 1. Szenen an den Voiceover-Step durchreichen
-- `ContentVoiceStepProps` um `scenes?: Scene[]` erweitern.
-- In `UniversalCreator.tsx` (Step "content") `scenes={scenes}` übergeben.
-- Props nach unten an `<VoiceoverScriptGenerator scenes={scenes} ... />` durchreichen.
+## Lösung
 
-### 2. `VoiceoverScriptGenerator` erweitert
-- Neue Prop: `scenes?: Scene[]`.
-- Wenn `scenes.length > 0`:
-  - Default-Dauer ergibt sich aus der **Summe der Szenen-Dauern** (statt `defaultDuration`).
-  - Neuer Hinweis-Block oben: „Skript wird auf deine X Szenen (Σ Y s) abgestimmt".
-  - Idea-Feld bleibt optional; wenn leer und Szenen vorhanden, wird "Erzähle eine zusammenhängende Geschichte basierend auf den Szenen" als Default benutzt.
-- Body-Payload um `scenes` (nur die für den Text relevanten Felder: `order`, `duration`, optionale Beschreibung aus `background`/`textOverlay`) erweitern.
+### 1. Musik-Zusammenfassung im Export-Step (AssemblyTab)
 
-### 3. Kleiner "Aus Szenen"-Direktmodus
-- Neuer Button im Generator: **„Direkt aus Szenen generieren"** (überspringt Idea-Eingabe, nutzt Szenen + gewählten Ton).
-- Setzt intern `idea = ""` und ruft mit `mode: 'from_scenes'` auf.
+Neue kompakte Card direkt unter "Color Grading", die liest:
 
-### 4. Edge Function `generate-voiceover-script` erweitern
-- Akzeptiert neu: `scenes?: { order: number; durationSeconds: number; description?: string }[]` und `mode?: 'from_idea' | 'from_scenes'`.
-- Wenn `scenes` vorhanden:
-  - **Pro Szene** wird ein Wort-Budget berechnet: `wordsPerScene = round(durationSeconds * 2.5)` (mit ±10 % Toleranz).
-  - System-Prompt wird ergänzt um eine **Szenen-Tabelle** (Szene 1: Xs / ~Y Wörter, …) und die Anweisung:
-    - „Schreibe einen einzigen, zusammenhängenden Sprechtext."
-    - „Halte dich pro Szene an das Wort-Budget (±10 %)."
-    - „Markiere Szenenwechsel mit `[[scene:N]]` im Text — diese Marker werden vor der Sprachausgabe entfernt."
-    - Hook in Szene 1, Resolution/CTA in der letzten Szene.
-- Tool-Schema erweitert um optionales `sceneScripts: { order:number; text:string; words:number }[]` (Hauptausgabe bleibt `script`, kompatibel zu bestehender UI).
-- Vor der Rückgabe werden `[[scene:N]]`-Marker für die Anzeige entfernt; `sceneScripts` wird zusätzlich zurückgegeben (für spätere Subtitle-Sync, optional in der UI als Vorschau pro Szene).
+- Aktiv / Inaktiv (mit Switch zum Schnell-Stummschalten ohne den Audio-Tab zu verlassen)
+- Track-Name (z.B. "Beach Sunset — Lofi Artist")
+- Volume in % (mit Slider 0–100, gespiegelt aus `assemblyConfig.music.volume`)
+- Mini-Play-Button für 10-Sekunden-Preview des Tracks
+- Link "Im Audio-Tab ändern" → wechselt zurück zum Audio-Tab
 
-### 5. UI-Vorschau pro Szene (optional, klein)
-- Wenn `sceneScripts` vorhanden, unter dem generierten Skript eine kompakte Liste „Pro Szene" anzeigen (Szene N · Xs · "…"), damit der Nutzer sieht, dass das Skript szenengetreu ist.
+Wenn keine Musik gesetzt ist: dezenter Hinweis "Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen."
 
-## Technische Details
+### 2. Musik im Vorschau-Player abspielen
 
-- **Wort-Budget-Formel:** `targetWords(scene) = clamp(round(duration * 2.5), 4, 80)`; gesamt = Σ.
-- **Marker-Cleanup:** `script.replace(/\s*\[\[scene:\d+\]\]\s*/g, ' ').trim()`.
-- **Backward-Compatible:** Wenn keine `scenes` gesendet werden, verhält sich die Edge Function exakt wie vorher.
-- **Keine neuen Tabellen / Migrations** nötig.
+`ComposerSequencePreview.tsx` erweitern:
+
+- Zweites verstecktes `<audio>`-Element für `backgroundMusicUrl`
+- Sync-Logik analog zum Voiceover (play/pause/seek an `globalTime` gekoppelt)
+- Volume aus `assemblyConfig.music.volume / 100` (clamped 0..1)
+- Loop aktiv, falls Track kürzer als Gesamtvideo
+- Mute-Button im Player wirkt auf beide Spuren
+
+Neue Props an `ComposerSequencePreview`: `backgroundMusicUrl?: string | null`, `backgroundMusicVolume?: number`.
+
+### 3. Musik in CostEstimationPanel listen
+
+Eine zusätzliche Zeile "Hintergrundmusik" — kostet 0 € (Stock-Library), aber sie taucht als aktiver Bestandteil auf, damit der User sieht, dass sie mitläuft.
+
+### 4. Defensive Logging im Render-Pfad
+
+In `handleRender` (AssemblyTab) eine kurze Konsolen-Log-Ausgabe vor dem Edge-Call:
+
+```text
+[Composer] Render payload check: music=<trackName or "none"> vol=<%>
+```
+
+Hilft dem User & uns bei künftigem Debugging, sofort zu sehen, ob die Musik die Render-Stufe erreicht.
 
 ## Geänderte Dateien
 
-```text
-src/pages/UniversalCreator/UniversalCreator.tsx        (scenes an ContentVoiceStep durchreichen)
-src/components/universal-creator/steps/ContentVoiceStep.tsx   (scenes-Prop + an Generator weiterreichen)
-src/components/universal-creator/VoiceoverScriptGenerator.tsx (scenes-Prop, "Aus Szenen"-Button, Vorschau)
-supabase/functions/generate-voiceover-script/index.ts  (scenes-Kontext, Wort-Budget pro Szene, Marker)
-```
+- `src/components/video-composer/AssemblyTab.tsx` — neue MusicSummaryCard, Props an Preview, Pre-Render-Log
+- `src/components/video-composer/ComposerSequencePreview.tsx` — zweite Audio-Spur für BGM, Sync + Mute
+- `src/components/video-composer/CostEstimationPanel.tsx` — Zeile für Musik
+- (optional) neue kleine Komponente `src/components/video-composer/MusicSummaryCard.tsx`
 
-## Out of Scope
+Keine Änderungen an Edge-Funktion oder Remotion-Template nötig — die Render-Pipeline ist korrekt.
 
-- Composer (`VoiceSubtitlesTab`) — der hat bereits `generateScriptFromScenes()` aus Overlays. Kann in einem späteren Schritt analog erweitert werden, wenn gewünscht.
-- Automatisches Re-Generieren bei nachträglicher Szenen-Änderung (bleibt manueller Klick).
+## Ergebnis
+
+Im Export-Step sieht und hört der User klar, dass die Hintergrundmusik Teil des finalen Videos ist. Die tatsächliche Übergabe an Lambda war bereits korrekt; dieser Plan schließt die UX-Lücke, die das Vertrauen in das Feature untergräbt.
