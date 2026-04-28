@@ -381,7 +381,7 @@ serve(async (req) => {
 
           const hailuoInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-            negative_prompt: negativeFor(isI2V),
+            negative_prompt: negativeFor(isI2V, scene.negativePrompt),
             duration: duration,
             resolution: resolution,
           };
@@ -516,7 +516,7 @@ serve(async (req) => {
           const wanDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const wanInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-            negative_prompt: negativeFor(isI2V),
+            negative_prompt: negativeFor(isI2V, scene.negativePrompt),
             duration: wanDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
