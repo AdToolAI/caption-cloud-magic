@@ -1,59 +1,77 @@
+# Per-Szene "KI-Modell"-Dropdown im Video Composer
+
 ## Problem
 
-Wenn du im **Storyboard** den KI-Prompt (oder Prompt-Slots / Shot-Director / Director-Modifiers) einer Szene manuell bearbeitest, landet die Änderung **nur im lokalen React-State**. Sie wird nicht in die Datenbank geschrieben. Folgen:
+Im Storyboard hat jede Szene aktuell eine Reihe von 7 Buttons (`Stock Video`, `Stock Bild`, `KI (Hailuo)`, `KI (Kling)`, `KI (Veo 3.1)`, `KI Bild (Gemini)`, `Eigenes Video`). Das ist:
+- **Visuell überladen** und drückt andere Controls (Quality, Prompt) nach unten.
+- **Unvollständig**: Wan, Luma, Seedance werden im Backend (`compose-video-clips`) bereits unterstützt, sind aber per Szene nicht wählbar — der User kann sie nur global im AI Video Toolkit nutzen.
 
-1. **Beim Wechsel zu „Clips" → „Generieren"**: Der erste Render benutzt noch den lokalen Wert (richtig), aber die DB bleibt veraltet.
-2. **Beim Zurückwechseln ins Storyboard** (oder Reload): Der `VideoComposerDashboard` synchronisiert Szenen aus der DB. Da `ai_prompt` dort noch den alten Wert hat, **überschreibt die DB-Hydration deine Änderung** und du siehst wieder den ursprünglichen Prompt.
+## Lösung — 3 kompakte Source-Tabs + 1 Modell-Dropdown
 
-### Ursache (technisch)
+```text
+┌─ Quelle ────────────────────────────────────────┐
+│  [🎁 Stock]   [🤖 KI-Generiert]   [⬆ Eigenes]   │
+└─────────────────────────────────────────────────┘
+   │
+   ├─ Stock         → Untertabs: [Video] [Bild]   (öffnet Stock Browser)
+   │
+   ├─ KI-Generiert  → ┌────────────────────────────────────┐
+   │                  │ Modell:  [▼ Hailuo 2.3 Standard]   │  ← ein einziger Dropdown
+   │                  │   ⭐ Empfohlen                       │
+   │                  │     • Hailuo Standard / Pro         │
+   │                  │     • Kling 3 Standard / Pro        │
+   │                  │     • Luma Ray 2 Standard / Pro     │
+   │                  │     • Seedance Standard / Pro       │
+   │                  │   🎵 Mit Native Audio                │
+   │                  │     • Veo 3.1 Lite / Fast / Pro     │
+   │                  │   ⚡ Schnell & Günstig               │
+   │                  │     • Wan 2.6 Standard / Pro        │
+   │                  │   🖼 Bild (statisch + Ken-Burns)    │
+   │                  │     • Gemini Image                  │
+   │                  │ Kosten: €0.15/s · 768p              │
+   │                  └────────────────────────────────────┘
+   │
+   └─ Eigenes       → Upload-Komponente
+```
 
-- `setScenes` in `VideoComposerDashboard.tsx` aktualisiert nur `useState`, kein DB-Write.
-- `ensureProject()` in `ClipsTab.tsx` macht ein Short-Circuit, sobald `projectId` existiert — es ruft `ensureProjectPersisted` (das `ai_prompt` updaten würde) **nicht erneut** auf.
-- Die Hydration-Logik in `VideoComposerDashboard.tsx` (Zeilen 285–331) bevorzugt DB-Werte: `aiPrompt: row.ai_prompt ?? local?.aiPrompt` — der DB-Wert gewinnt also immer.
+Die existierende `ModelSelector`-Komponente (`src/components/ai-video/ModelSelector.tsx`) wird wiederverwendet — sie kann bereits gruppiert anzeigen, Preise pro Sekunde rendern und Sora-2-Locks behandeln. Sora und Grok bleiben **ausgeblendet**, da `compose-video-clips` sie nicht unterstützt (würde sonst silent zu Hailuo gefallback).
 
-## Lösung
+## Verhalten
 
-Storyboard-Edits müssen **debounced** in die DB geschrieben werden, sobald ein Projekt persistiert ist. Außerdem soll vor jedem „Generieren"-Klick sichergestellt werden, dass die DB den aktuellen Stand kennt.
+1. **Source-Tabs** ersetzen die 7 Buttons. Active-State + Free-Badge bleiben für Stock erhalten.
+2. **Mode-Presets**: Beim Wechsel des Composer-Mode (product-ad, storytelling…) wird ein sinnvolles Default-Modell pro Szene gesetzt — z. B. `kling-3-standard` für storytelling, `hailuo-standard` für product-ad, `veo-3.1-fast` wenn Mode "with-audio".
+3. **Quality-Tier wird obsolet**: Standard/Pro sind jetzt eigene Modell-Einträge im Dropdown (z. B. `hailuo-standard` vs. `hailuo-pro`). Damit verschwindet die separate "Qualität: Standard / Pro"-Reihe.
+4. **Migration alter Szenen**: Vorhandene `clipSource` (z. B. `ai-hailuo`) + `clipQuality` werden beim Mounten zu einer `aiModelId` gemappt (`ai-hailuo` + `pro` → `hailuo-pro`). Persist auf der DB erfolgt über die bereits vorhandene Debounced-Save-Logik.
+5. **Backend-Mapping**: `compose-video-clips` erwartet weiter `clipSource` + `clipQuality`. Vor dem Save wird das gewählte `aiModelId` zurück in das Pärchen gemappt (`hailuo-pro` → `clipSource='ai-hailuo'`, `clipQuality='pro'`). Damit bleibt der Render-Pfad unverändert.
 
-### 1. Debounced Scene-Persistence im Dashboard
+## Technische Änderungen
 
-In `src/components/video-composer/VideoComposerDashboard.tsx`:
+### Frontend
+- **`src/types/video-composer.ts`**: Optionales Feld `aiModelId?: string` auf `ComposerScene` (für UI-State; nicht zwingend persistiert).
+- **`src/components/video-composer/SceneCard.tsx`** (Zeilen 442–541):
+  - Ersetze 7-Button-Row + Quality-Row durch:
+    - Tab-Group (Stock / KI / Upload).
+    - Bei KI: `<ModelSelector>` aus `@/components/ai-video/ModelSelector.tsx` (gefiltert auf composer-fähige Familien: hailuo, kling, wan, seedance, luma, veo + image).
+    - Bei Stock: kleiner Toggle Video/Bild.
+  - `onChange(modelId)` ruft Helper `modelIdToClipSourceAndQuality(modelId)` und schreibt `{ clipSource, clipQuality }` via `onUpdate`.
+- **Neue Helper-Datei `src/lib/video-composer/modelMapping.ts`**:
+  - `modelIdToClipSourceAndQuality(id)`  → `{ clipSource, clipQuality }`
+  - `clipSourceQualityToModelId(src, q)` → `id`
+  - `COMPOSER_AVAILABLE_MODELS` — gefilterte Liste aus `AI_VIDEO_TOOLKIT_MODELS` (ohne Sora/Grok/LTX) + ein synthetischer Eintrag für `ai-image`.
+- **`src/components/ai-video/ModelSelector.tsx`**: Akzeptiere optionalen `models?: ToolkitModel[]`-Prop, um die composer-Subliste zu übergeben (Default = volle Liste). Keine Logik-Änderung sonst.
+- **Mode-Presets**: In `VideoComposerDashboard` beim Erzeugen neuer Szenen / Wechsel des Modes Default-`clipSource`/`clipQuality` setzen — nutzt denselben Helper.
 
-- Neuen `setScenes`-Callback so erweitern, dass er — analog zur bestehenden `updateAssembly`-Logik (`assemblyPersistTimer`) — einen Timer (`scenesPersistTimer`, ~600ms) startet.
-- Nach Ablauf des Timers werden für alle Szenen mit echter UUID die editierbaren Felder per `supabase.from('composer_scenes').update(...)` geschrieben:
-  - `ai_prompt`, `prompt_slots`, `prompt_mode`, `prompt_slot_order`
-  - `director_modifiers`, `shot_director`, `applied_style_preset_id`, `cinematic_preset_slug`
-  - `reference_image_url`, `text_overlay`, `transition_type`, `transition_duration`
-  - `duration_seconds`, `clip_source`, `clip_quality`, `stock_keywords`, `character_shot`
-- **Wichtig**: `clip_url` und `clip_status` werden hier **nicht** überschrieben (die kommen aus dem Render-Webhook).
-- Persistenz nur auslösen, wenn `project.id` existiert (sonst still im LocalState halten — wird beim ersten „Generieren" via `ensureProjectPersisted` einmalig komplett geschrieben).
+### Backend
+- **Keine Änderungen.** `compose-video-clips` versteht bereits alle 7 Quellen. Wan/Luma/Seedance werden nun durch UI freigegeben.
 
-### 2. Force-Persist vor Clip-Generierung
-
-In `src/components/video-composer/ClipsTab.tsx` `ensureProject()`:
-
-- Short-Circuit `if (projectId) return { projectId, scenes }` entfernen.
-- Stattdessen **immer** `onEnsurePersisted()` aufrufen, damit die aktuellen Storyboard-Edits garantiert in der DB liegen, bevor `compose-video-clips` läuft.
-- Falls keine UUID vorhanden ist, läuft der bestehende Insert-Pfad; falls vorhanden, läuft der Update-Pfad in `useComposerPersistence`.
-
-### 3. Sofortiges Flush beim Tab-Wechsel
-
-In `VideoComposerDashboard.handleTabChange`:
-
-- Bevor der bestehende Re-Fetch beim Wechsel auf `'clips'` läuft, eventuell offene `scenesPersistTimer` **synchron flushen** (Timer canceln + Persist sofort ausführen). So überschreibt der nachfolgende `select('clip_status, clip_url, cost_euros')` den Prompt nicht versehentlich (er liest diese Felder ohnehin nicht — aber so ist garantiert, dass DB & Lokal übereinstimmen).
-- Optional gleicher Flush beim Wechsel **weg vom Storyboard** und beim Unmount, damit `saveDraft`/Hydration-Reihenfolge konsistent bleibt.
-
-### 4. (Defensiv) Hydration-Konflikt entschärfen
-
-In der DB-Hydration in `VideoComposerDashboard.tsx`: Da nach Schritt 1–3 DB & Local immer synchron sind, ist die bisherige `row.ai_prompt ?? local?.aiPrompt`-Regel unkritisch. Keine Änderung nötig.
+### Tests
+- Manuell: pro Mode (product-ad, storytelling, custom) eine Szene anlegen → Default-Modell stimmt.
+- Storyboard → Modell-Wechsel auf jede Familie → Clips Tab generiert ohne Fallback-Warning im Edge-Function-Log.
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Debounced Scene-Persist + Flush-on-tab-change
-- `src/components/video-composer/ClipsTab.tsx` — `ensureProject` ruft `onEnsurePersisted` immer auf
-
-## Verifikation
-
-1. Prompt im Storyboard bearbeiten → ~1s warten → kurz weg vom Tab und zurück → Prompt bleibt erhalten.
-2. Prompt bearbeiten → direkt zu „Clips" → „Neu generieren" → neuer Render benutzt die Änderung.
-3. Browser-Reload nach Edit → Storyboard zeigt den editierten Prompt.
+- `src/components/video-composer/SceneCard.tsx` (Source-Buttons → Tabs + Dropdown)
+- `src/components/ai-video/ModelSelector.tsx` (optionaler `models`-Prop)
+- `src/types/video-composer.ts` (optionales UI-Feld)
+- `src/lib/video-composer/modelMapping.ts` (neu)
+- `src/components/video-composer/VideoComposerDashboard.tsx` (Mode-basiertes Default-Modell beim Anlegen neuer Szenen)

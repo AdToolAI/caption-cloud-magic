@@ -53,6 +53,8 @@ import {
   type PromptSlots,
 } from '@/lib/motion-studio/structuredPromptStitcher';
 import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
+import { ModelSelector } from '@/components/ai-video/ModelSelector';
+import { COMPOSER_AVAILABLE_MODELS, modelIdToSource, sourceToModelId } from '@/lib/video-composer/modelMapping';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
@@ -439,59 +441,110 @@ export default function SceneCard({
                 </Button>
               </div>
             )}
-            {/* Clip source — Stock first as Free Tier hero */}
-            <div className="flex flex-wrap gap-2">
-              {(['stock', 'stock-image', 'ai-hailuo', 'ai-kling', 'ai-veo', 'ai-image', 'upload'] as ClipSource[]).map((src) => {
-                const label =
-                  src === 'upload'
-                    ? 'Eigenes Video'
-                    : CLIP_SOURCE_LABELS[src]?.de || src;
-                const isAiImage = src === 'ai-image';
-                const isStockImage = src === 'stock-image';
-                const isStockVideo = src === 'stock';
-                const isStock = isStockVideo || isStockImage;
-                const isSelected = scene.clipSource === src;
-                const handleClick = () => {
-                  if (isStock) {
-                    onUpdate({ clipSource: src });
-                    setStockBrowserOpen(true);
-                  } else {
-                    onUpdate({ clipSource: src });
-                  }
-                };
-                return (
-                  <button
-                    key={src}
-                    onClick={handleClick}
-                    title={
-                      isStock
-                        ? '🎁 Kostenlos · 2M+ Stock-Assets von Pexels & Pixabay — 0 Credits'
-                        : undefined
-                    }
-                    className={`px-2 py-1 rounded text-[10px] border transition-all flex items-center gap-1 ${
-                      isSelected
-                        ? isStock
-                          ? 'border-emerald-500/70 bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30'
-                          : isAiImage
-                            ? 'border-green-500/60 bg-green-500/10 text-green-300'
-                            : 'border-primary bg-primary/10 text-primary'
-                        : isStock
-                          ? 'border-emerald-500/40 bg-emerald-500/5 text-emerald-300/90 hover:border-emerald-500/70 hover:bg-emerald-500/10'
-                          : 'border-border/40 text-muted-foreground hover:border-border'
-                    }`}
-                  >
-                    {isStock && <span className="leading-none">🎁</span>}
-                    {(isAiImage || isStockImage) && <ImageIcon className="h-2.5 w-2.5" />}
-                    {label}
-                    {isStock && (
-                      <span className="ml-0.5 px-1 rounded bg-emerald-500/20 text-emerald-200 text-[8px] font-semibold uppercase tracking-wide">
-                        Free
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Clip source — 3 compact tabs (Stock / KI / Upload) + KI-Modell-Dropdown */}
+            {(() => {
+              const isAi = scene.clipSource.startsWith('ai-');
+              const isStockImage = scene.clipSource === 'stock-image';
+              const isUpload = scene.clipSource === 'upload';
+              const sourceMode: 'stock' | 'ai' | 'upload' = isAi ? 'ai' : isUpload ? 'upload' : 'stock';
+              const currentModelId = isAi ? sourceToModelId(scene.clipSource, scene.clipQuality) : '';
+
+              const tabs: Array<{ id: 'stock' | 'ai' | 'upload'; label: string }> = [
+                { id: 'stock',  label: lang === 'de' ? '🎁 Stock'        : lang === 'es' ? '🎁 Stock' : '🎁 Stock' },
+                { id: 'ai',     label: lang === 'de' ? '🤖 KI-Generiert' : lang === 'es' ? '🤖 IA'    : '🤖 AI-Generated' },
+                { id: 'upload', label: lang === 'de' ? '⬆ Eigenes'      : lang === 'es' ? '⬆ Propio' : '⬆ Upload' },
+              ];
+
+              const handleTabChange = (id: 'stock' | 'ai' | 'upload') => {
+                if (id === 'stock') {
+                  const next: ClipSource = isStockImage ? 'stock-image' : 'stock';
+                  onUpdate({ clipSource: next });
+                  setStockBrowserOpen(true);
+                } else if (id === 'upload') {
+                  onUpdate({ clipSource: 'upload' });
+                } else if (!isAi) {
+                  onUpdate({ clipSource: 'ai-hailuo', clipQuality: scene.clipQuality ?? 'standard' });
+                }
+              };
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex gap-1.5 p-1 rounded-lg bg-card/40 border border-border/40">
+                    {tabs.map((tab) => {
+                      const active = sourceMode === tab.id;
+                      const isStockTab = tab.id === 'stock';
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => handleTabChange(tab.id)}
+                          className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                            active
+                              ? isStockTab
+                                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40'
+                                : tab.id === 'ai'
+                                  ? 'bg-primary/15 text-primary ring-1 ring-primary/40'
+                                  : 'bg-muted text-foreground ring-1 ring-border'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
+                          }`}
+                        >
+                          {tab.label}
+                          {isStockTab && active && (
+                            <span className="ml-0.5 px-1 rounded bg-emerald-500/25 text-emerald-200 text-[8px] font-semibold uppercase tracking-wide">
+                              Free
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {sourceMode === 'stock' && (
+                    <div className="flex gap-1.5">
+                      {([
+                        { src: 'stock' as ClipSource,       label: lang === 'de' ? 'Video' : lang === 'es' ? 'Vídeo' : 'Video', icon: Video },
+                        { src: 'stock-image' as ClipSource, label: lang === 'de' ? 'Bild'  : lang === 'es' ? 'Imagen' : 'Image', icon: ImageIcon },
+                      ]).map((opt) => {
+                        const active = scene.clipSource === opt.src;
+                        const Icon = opt.icon;
+                        return (
+                          <button
+                            key={opt.src}
+                            onClick={() => { onUpdate({ clipSource: opt.src }); setStockBrowserOpen(true); }}
+                            className={`px-2.5 py-1 rounded-md text-[10px] border transition-all flex items-center gap-1.5 ${
+                              active
+                                ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
+                                : 'border-border/40 text-muted-foreground hover:border-border'
+                            }`}
+                          >
+                            <Icon className="h-2.5 w-2.5" />
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {sourceMode === 'ai' && (
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        {lang === 'de' ? 'KI-Modell · Qualität & Preis im Dropdown' : lang === 'es' ? 'Modelo IA' : 'AI Model'}
+                      </Label>
+                      <ModelSelector
+                        value={currentModelId}
+                        onChange={(modelId) => {
+                          const next = modelIdToSource(modelId);
+                          onUpdate({ clipSource: next.clipSource, clipQuality: next.clipQuality });
+                        }}
+                        currency="EUR"
+                        hasSora2Access={false}
+                        models={COMPOSER_AVAILABLE_MODELS}
+                        className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Effects badges (AI-selected procedural effects layered above the clip) */}
             {scene.effects && scene.effects.length > 0 && (
@@ -509,34 +562,6 @@ export default function SceneCard({
                     {eff.id}
                   </Badge>
                 ))}
-              </div>
-            )}
-
-            {/* Quality Tier — only for AI sources */}
-            {scene.clipSource.startsWith('ai-') && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <Label className="text-[10px] text-muted-foreground">Qualität:</Label>
-                <div className="flex gap-1">
-                  {(['standard', 'pro'] as ClipQuality[]).map((q) => {
-                    const isActive = (scene.clipQuality || 'standard') === q;
-                    const rate = getClipRate(scene.clipSource, q);
-                    return (
-                      <button
-                        key={q}
-                        onClick={() => onUpdate({ clipQuality: q })}
-                        className={`px-2 py-1 rounded text-[10px] border transition-all ${
-                          isActive
-                            ? q === 'pro'
-                              ? 'border-amber-500/60 bg-amber-500/10 text-amber-400'
-                              : 'border-primary bg-primary/10 text-primary'
-                            : 'border-border/40 text-muted-foreground hover:border-border'
-                        }`}
-                      >
-                        {QUALITY_LABELS[scene.clipSource][q]} — €{rate.toFixed(2)}/s
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             )}
 
