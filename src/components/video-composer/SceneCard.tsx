@@ -16,7 +16,7 @@ import {
 import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
-  ArrowRight, ArrowLeft, Link2, Palette,
+  ArrowRight, ArrowLeft, Link2, Palette, Volume2, VolumeX,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
@@ -55,6 +55,7 @@ import {
 import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
 import { ModelSelector } from '@/components/ai-video/ModelSelector';
 import { COMPOSER_AVAILABLE_MODELS, modelIdToSource, sourceToModelId } from '@/lib/video-composer/modelMapping';
+import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
@@ -540,6 +541,49 @@ export default function SceneCard({
                         models={COMPOSER_AVAILABLE_MODELS}
                         className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
                       />
+                      {(() => {
+                        const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === currentModelId);
+                        if (!selectedModel?.capabilities?.audio) return null;
+                        const withAudio = scene.withAudio !== false;
+                        const onLabel = lang === 'de' ? 'Mit Sound' : lang === 'es' ? 'Con sonido' : 'With sound';
+                        const offLabel = lang === 'de' ? 'Ohne Sound' : lang === 'es' ? 'Sin sonido' : 'No sound';
+                        const tooltip = lang === 'de'
+                          ? 'Natives KI-Audio aus dem Modell verwenden — sonst stumm.'
+                          : lang === 'es'
+                            ? 'Usar audio nativo del modelo IA — si no, silenciado.'
+                            : 'Use native AI audio from the model — otherwise muted.';
+                        return (
+                          <div
+                            className="flex gap-1 mt-1.5 p-0.5 rounded-md bg-card/40 border border-border/40 w-fit"
+                            title={tooltip}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => onUpdate({ withAudio: true })}
+                              className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
+                                withAudio
+                                  ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <Volume2 className="h-2.5 w-2.5" />
+                              {onLabel}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onUpdate({ withAudio: false })}
+                              className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
+                                !withAudio
+                                  ? 'bg-muted text-foreground ring-1 ring-border'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              <VolumeX className="h-2.5 w-2.5" />
+                              {offLabel}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
