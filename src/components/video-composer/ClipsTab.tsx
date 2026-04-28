@@ -405,13 +405,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(optimistic);
       }
 
-      // Phase 4 — resolve @character / @location mentions
-      const resolvedSingle = resolveMentions(targetScene.aiPrompt || '', libCharacters, libLocations);
-      const withModsSingle = targetScene.directorModifiers
-        ? applyDirectorModifiers(resolvedSingle.prompt, targetScene.directorModifiers)
-        : resolvedSingle.prompt;
-      const shotSuffixSingle = buildShotPromptSuffix(targetScene.shotDirector || {});
-      const finalSinglePrompt = shotSuffixSingle ? `${withModsSingle} ${shotSuffixSingle}` : withModsSingle;
+      // Centralized prompt composer (Phase 1)
+      const composedSingle = composePromptLayers({
+        rawPrompt: targetScene.aiPrompt || '',
+        directorModifiers: targetScene.directorModifiers,
+        shotDirector: targetScene.shotDirector,
+        cinematicStylePresetId: (targetScene as any).cinematicStylePresetId,
+        brandCharacter: brandCharacterInput,
+        libraryCharacters: libCharacters,
+        libraryLocations: libLocations,
+      });
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
@@ -422,10 +425,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             id: targetScene.id,
             clipSource: targetScene.clipSource,
             clipQuality: targetScene.clipQuality || 'standard',
-            aiPrompt: finalSinglePrompt,
+            aiPrompt: composedSingle.finalPrompt,
+            negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: targetScene.referenceImageUrl || resolvedSingle.referenceImageUrl,
+            referenceImageUrl: targetScene.referenceImageUrl || composedSingle.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
