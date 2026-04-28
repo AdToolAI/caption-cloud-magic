@@ -26,10 +26,16 @@ export function useMotionStudioLibrary() {
   const [loading, setLoading] = useState(true);
 
   const loadAll = useCallback(async () => {
-    if (!user) {
-      setCharacters([]);
-      setLocations([]);
-      setLoading(false);
+    // Resolve current auth state directly from Supabase to avoid races where
+    // the AuthContext user is still null right after a hard reload.
+    const {
+      data: { user: liveUser },
+    } = await supabase.auth.getUser();
+    const effectiveUser = user ?? liveUser ?? null;
+
+    if (!effectiveUser) {
+      // Don't flip to "empty" while auth is still booting — keep loading=true
+      // so we don't flash the empty state and lose data on first paint.
       return;
     }
     setLoading(true);
@@ -58,15 +64,30 @@ export function useMotionStudioLibrary() {
 
   useEffect(() => {
     loadAll();
+    // Re-fetch whenever auth state changes (sign-in after hard reload, token refresh, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        loadAll();
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [loadAll]);
 
   // ── Characters ──────────────────────────────────────────────────────────
   const createCharacter = useCallback(
     async (draft: CharacterDraft): Promise<MotionStudioCharacter | null> => {
-      if (!user) return null;
+      // Resolve user defensively — context may lag right after sign-in.
+      const {
+        data: { user: liveUser },
+      } = await supabase.auth.getUser();
+      const effectiveUser = user ?? liveUser ?? null;
+      if (!effectiveUser) {
+        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        return null;
+      }
       const { data, error } = await supabase
         .from('motion_studio_characters')
-        .insert({ ...draft, user_id: user.id })
+        .insert({ ...draft, user_id: effectiveUser.id })
         .select()
         .single();
       if (error) {
@@ -74,11 +95,17 @@ export function useMotionStudioLibrary() {
         return null;
       }
       const created = data as MotionStudioCharacter;
-      setCharacters((prev) => [created, ...prev]);
+      // Optimistic + authoritative refetch so the UI never lies.
+      setCharacters((prev) => {
+        if (prev.some((c) => c.id === created.id)) return prev;
+        return [created, ...prev];
+      });
       toast.success(`„${created.name}" wurde gespeichert`);
+      // Fire-and-forget reconciliation
+      loadAll();
       return created;
     },
-    [user]
+    [user, loadAll]
   );
 
   const updateCharacter = useCallback(
@@ -113,10 +140,17 @@ export function useMotionStudioLibrary() {
   // ── Locations ───────────────────────────────────────────────────────────
   const createLocation = useCallback(
     async (draft: LocationDraft): Promise<MotionStudioLocation | null> => {
-      if (!user) return null;
+      const {
+        data: { user: liveUser },
+      } = await supabase.auth.getUser();
+      const effectiveUser = user ?? liveUser ?? null;
+      if (!effectiveUser) {
+        toast.error('Nicht angemeldet — bitte erneut einloggen');
+        return null;
+      }
       const { data, error } = await supabase
         .from('motion_studio_locations')
-        .insert({ ...draft, user_id: user.id })
+        .insert({ ...draft, user_id: effectiveUser.id })
         .select()
         .single();
       if (error) {
@@ -124,11 +158,15 @@ export function useMotionStudioLibrary() {
         return null;
       }
       const created = data as MotionStudioLocation;
-      setLocations((prev) => [created, ...prev]);
+      setLocations((prev) => {
+        if (prev.some((l) => l.id === created.id)) return prev;
+        return [created, ...prev];
+      });
       toast.success(`„${created.name}" wurde gespeichert`);
+      loadAll();
       return created;
     },
-    [user]
+    [user, loadAll]
   );
 
   const updateLocation = useCallback(
