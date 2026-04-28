@@ -379,7 +379,7 @@ Create the storyboard now.`;
     sceneType: s.scene_type,
     durationSeconds: Number(s.duration_seconds),
     aiPrompt: String(s.ai_prompt),
-    recommendedEngine: allowedEngines.includes(s.recommended_engine) ? s.recommended_engine : allowedEngines[0],
+    recommendedEngine: normalizeEngine(allowedEngines.includes(s.recommended_engine) ? s.recommended_engine : allowedEngines[0]),
     textOverlay: s.text_overlay && s.text_overlay.text ? {
       text: String(s.text_overlay.text),
       position: (['top','center','bottom'].includes(s.text_overlay.position) ? s.text_overlay.position : 'bottom') as 'top'|'center'|'bottom',
