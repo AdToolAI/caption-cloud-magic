@@ -7,6 +7,16 @@ function snapDuration(seconds: number, allowed: number[]): number {
     Math.abs(val - seconds) < Math.abs(best - seconds) ? val : best
   , allowed[0]);
 }
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Extract retry_after seconds from a Replicate 429 error body, default 8s. */
+function parseRetryAfter(msg: string): number {
+  const m = msg.match(/"retry_after"\s*:\s*(\d+)/);
+  if (m) return Math.max(parseInt(m[1], 10), 1);
+  const m2 = msg.match(/retry_after"?\s*:\s*(\d+)/);
+  return m2 ? Math.max(parseInt(m2[1], 10), 1) : 8;
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
