@@ -4405,6 +4405,7 @@ export type Database = {
           updated_at: string
           upload_type: string | null
           upload_url: string | null
+          with_audio: boolean
         }
         Insert: {
           ai_prompt?: string | null
@@ -4464,6 +4465,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          with_audio?: boolean
         }
         Update: {
           ai_prompt?: string | null
@@ -4523,6 +4525,7 @@ export type Database = {
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
+          with_audio?: boolean
         }
         Relationships: [
           {
