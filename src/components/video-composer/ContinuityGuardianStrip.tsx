@@ -418,7 +418,7 @@ export default function ContinuityGuardianStrip({
               Verlauf
             </Button>
           )}
-          {summary.warn + summary.broken > 0 && (
+          {summary.broken > 0 && (
             <Button
               size="sm"
               onClick={repairAllBroken}
