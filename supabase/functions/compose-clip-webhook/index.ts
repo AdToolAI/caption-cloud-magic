@@ -115,7 +115,7 @@ serve(async (req) => {
           const newMetadata = {
             source: 'motion-studio-clip',
             project_id: projectId,
-            project_name: projectMeta.name ?? null,
+            project_name: projectMeta.title ?? null,
             scene_id: sceneId,
             scene_order: sceneFull.order_index ?? 0,
             prompt: sceneFull.ai_prompt ?? '',
