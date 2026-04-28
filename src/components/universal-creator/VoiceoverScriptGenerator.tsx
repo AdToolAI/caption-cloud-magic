@@ -1,14 +1,25 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Sparkles, Loader2, CheckCircle2, Lightbulb, AlertTriangle } from "lucide-react";
+import { Sparkles, Loader2, CheckCircle2, Lightbulb, AlertTriangle, Film, Wand2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/hooks/useTranslation";
+
+/**
+ * Lightweight scene shape accepted by the script generator.
+ * Compatible with both `ComposerScene` (video-composer) and `Scene` (universal-creator).
+ */
+export interface SceneContextItem {
+  order: number;
+  durationSeconds: number;
+  description?: string;
+  sceneType?: string;
+}
 
 interface VoiceoverScriptGeneratorProps {
   open: boolean;
@@ -16,6 +27,12 @@ interface VoiceoverScriptGeneratorProps {
   onScriptGenerated: (script: string) => void;
   /** Total video length (seconds) — used to derive the speaking target with a 2-3s outro buffer. */
   defaultDuration?: number;
+  /**
+   * Optional storyboard scenes. When provided the AI receives a per-scene word
+   * budget and produces ONE flowing script that fits every scene's duration
+   * while telling a coherent story (hook in scene 1, CTA in last scene).
+   */
+  scenes?: SceneContextItem[];
 }
 
 // Trailing silence buffer so the VO ends 2-3s before the video.
@@ -27,12 +44,24 @@ function deriveSpeakingTarget(videoTotal: number | undefined): { speakingSec: nu
   return { speakingSec, videoSec };
 }
 
-export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, defaultDuration }: VoiceoverScriptGeneratorProps) {
-  const { speakingSec: initialSpeaking, videoSec: initialVideo } = useMemo(
-    () => deriveSpeakingTarget(defaultDuration),
-    [defaultDuration]
+interface SceneScript {
+  order: number;
+  text: string;
+  words: number;
+}
+
+export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, defaultDuration, scenes }: VoiceoverScriptGeneratorProps) {
+  const sceneTotalDuration = useMemo(
+    () => (scenes && scenes.length > 0 ? scenes.reduce((s, sc) => s + (sc.durationSeconds || 0), 0) : 0),
+    [scenes]
   );
-  const hasVideoContext = typeof defaultDuration === 'number' && defaultDuration > 0;
+  const effectiveDuration = sceneTotalDuration > 0 ? sceneTotalDuration : defaultDuration;
+  const { speakingSec: initialSpeaking, videoSec: initialVideo } = useMemo(
+    () => deriveSpeakingTarget(effectiveDuration),
+    [effectiveDuration]
+  );
+  const hasVideoContext = typeof effectiveDuration === 'number' && effectiveDuration > 0;
+  const hasScenes = !!scenes && scenes.length > 0;
 
   const [idea, setIdea] = useState("");
   const [tone, setTone] = useState("friendly");
@@ -42,24 +71,51 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
   const [wordCount, setWordCount] = useState(0);
   const [estimatedDuration, setEstimatedDuration] = useState(0);
   const [tips, setTips] = useState<string[]>([]);
+  const [sceneScripts, setSceneScripts] = useState<SceneScript[]>([]);
   const { toast } = useToast();
   const { t, language } = useTranslation();
 
-  const handleGenerate = async () => {
-    if (!idea.trim()) {
+  // Keep target duration in sync when scenes change (dialog re-opened with new scenes).
+  useEffect(() => {
+    if (open) setTargetDuration(initialSpeaking);
+  }, [open, initialSpeaking]);
+
+  const runGenerate = async (mode: 'from_idea' | 'from_scenes') => {
+    if (mode === 'from_idea' && !idea.trim()) {
       toast({ title: t('uc.ideaRequired'), description: t('uc.ideaRequiredDesc'), variant: "destructive" });
       return;
     }
     setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-voiceover-script', {
-        body: { idea, targetDuration, tone, language }
+        body: {
+          idea: mode === 'from_scenes' && !idea.trim()
+            ? (language === 'en'
+                ? 'Tell a coherent story that matches the storyboard scenes below.'
+                : language === 'es'
+                ? 'Cuenta una historia coherente que coincida con las escenas del guion gráfico.'
+                : 'Erzähle eine zusammenhängende Geschichte, die zu den Storyboard-Szenen passt.')
+            : idea,
+          targetDuration,
+          tone,
+          language,
+          mode,
+          scenes: hasScenes
+            ? scenes!.map((s) => ({
+                order: s.order,
+                durationSeconds: Math.max(0.5, Number(s.durationSeconds) || 0),
+                description: s.description,
+                sceneType: s.sceneType,
+              }))
+            : undefined,
+        },
       });
       if (error) throw error;
       setGeneratedScript(data.script);
       setWordCount(data.wordCount);
       setEstimatedDuration(data.estimatedDuration);
       setTips(data.tips || []);
+      setSceneScripts(Array.isArray(data.sceneScripts) ? data.sceneScripts : []);
       toast({ title: t('uc.scriptGenerated'), description: t('uc.scriptGeneratedDesc') });
     } catch (error) {
       console.error('Error generating script:', error);
@@ -67,10 +123,13 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
     } finally { setIsGenerating(false); }
   };
 
+  const handleGenerate = () => runGenerate('from_idea');
+  const handleGenerateFromScenes = () => runGenerate('from_scenes');
+
   const handleApply = () => { if (generatedScript) { onScriptGenerated(generatedScript); handleClose(); } };
 
   const handleClose = () => {
-    setIdea(""); setGeneratedScript(""); setWordCount(0); setEstimatedDuration(0); setTips([]);
+    setIdea(""); setGeneratedScript(""); setWordCount(0); setEstimatedDuration(0); setTips([]); setSceneScripts([]);
     onClose();
   };
 
@@ -85,6 +144,14 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
       : `Sprechdauer: ${targetDuration}s (Video: ${initialVideo}s, ~${OUTRO_BUFFER_SEC}s Puffer)`
     : `${t('uc.targetDuration')}: ${targetDuration}s`;
 
+  const sceneBannerText = hasScenes
+    ? language === 'en'
+      ? `Script will be tuned to your ${scenes!.length} scene${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). Hook lands in scene 1, CTA in the last scene.`
+      : language === 'es'
+      ? `El guion se ajustará a tus ${scenes!.length} escena${scenes!.length === 1 ? '' : 's'} (Σ ${sceneTotalDuration.toFixed(1)}s). El gancho va en la escena 1, el CTA en la última.`
+      : `Skript wird auf deine ${scenes!.length} Szene${scenes!.length === 1 ? '' : 'n'} (Σ ${sceneTotalDuration.toFixed(1)}s) abgestimmt. Hook in Szene 1, CTA in der letzten Szene.`
+    : '';
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -97,8 +164,22 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
         </DialogHeader>
 
         <div className="space-y-4 mt-4">
+          {hasScenes && (
+            <div className="flex items-start gap-2 p-3 rounded-md border border-primary/30 bg-primary/5 text-xs">
+              <Film className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              <p className="text-foreground/90">{sceneBannerText}</p>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label htmlFor="idea">{t('uc.yourIdea')}</Label>
+            <Label htmlFor="idea">
+              {t('uc.yourIdea')}
+              {hasScenes && (
+                <span className="text-muted-foreground font-normal ml-1">
+                  {language === 'en' ? '(optional)' : language === 'es' ? '(opcional)' : '(optional)'}
+                </span>
+              )}
+            </Label>
             <Textarea id="idea" placeholder={t('uc.ideaPlaceholder')} value={idea} onChange={(e) => setIdea(e.target.value)} rows={3} className="resize-none" />
           </div>
 
@@ -116,13 +197,27 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
             </div>
             <div className="space-y-2">
               <Label htmlFor="duration" className="text-xs">{durationLabel}</Label>
-              <Slider id="duration" min={8} max={180} step={1} value={[targetDuration]} onValueChange={(value) => setTargetDuration(value[0])} className="mt-2" />
+              <Slider id="duration" min={8} max={180} step={1} value={[targetDuration]} onValueChange={(value) => setTargetDuration(value[0])} className="mt-2" disabled={hasScenes} />
+              {hasScenes && (
+                <p className="text-[10px] text-muted-foreground">
+                  {language === 'en' ? 'Locked to scene total.' : language === 'es' ? 'Bloqueado al total de escenas.' : 'An Szenen-Gesamtdauer gekoppelt.'}
+                </p>
+              )}
             </div>
           </div>
 
-          <Button onClick={handleGenerate} disabled={isGenerating || !idea.trim()} className="w-full">
-            {isGenerating ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('uc.generatingScript')}</>) : (<><Sparkles className="w-4 h-4 mr-2" />{t('uc.generateScriptBtn')}</>)}
-          </Button>
+          <div className={hasScenes ? "grid grid-cols-2 gap-2" : ""}>
+            <Button onClick={handleGenerate} disabled={isGenerating || !idea.trim()} className="w-full" variant={hasScenes ? "outline" : "default"}>
+              {isGenerating ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('uc.generatingScript')}</>) : (<><Sparkles className="w-4 h-4 mr-2" />{t('uc.generateScriptBtn')}</>)}
+            </Button>
+            {hasScenes && (
+              <Button onClick={handleGenerateFromScenes} disabled={isGenerating} className="w-full">
+                {isGenerating ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /></>) : (<><Wand2 className="w-4 h-4 mr-2" />
+                  {language === 'en' ? 'Generate from scenes' : language === 'es' ? 'Generar desde escenas' : 'Aus Szenen generieren'}
+                </>)}
+              </Button>
+            )}
+          </div>
 
           {generatedScript && (
             <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
@@ -156,6 +251,35 @@ export function VoiceoverScriptGenerator({ open, onClose, onScriptGenerated, def
                 <Label htmlFor="generated">{t('uc.generatedScriptEditable')}</Label>
                 <Textarea id="generated" value={generatedScript} onChange={(e) => setGeneratedScript(e.target.value)} rows={8} className="resize-none font-mono text-sm" />
               </div>
+
+              {sceneScripts.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Film className="w-4 h-4 text-primary" />
+                    <span>
+                      {language === 'en' ? 'Per scene' : language === 'es' ? 'Por escena' : 'Pro Szene'}
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 text-xs">
+                    {sceneScripts.map((s) => {
+                      const sc = scenes?.find((x) => x.order === s.order);
+                      return (
+                        <li key={s.order} className="p-2 rounded bg-background/60 border border-border/40">
+                          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                            <span>
+                              {(language === 'en' ? 'Scene' : language === 'es' ? 'Escena' : 'Szene')} {s.order + 1}
+                              {sc ? ` · ${sc.durationSeconds.toFixed(1)}s` : ''}
+                            </span>
+                            <span>{s.words} {t('uc.words')}</span>
+                          </div>
+                          <p className="text-foreground/80 leading-snug">{s.text}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+
               {tips.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-sm font-medium">

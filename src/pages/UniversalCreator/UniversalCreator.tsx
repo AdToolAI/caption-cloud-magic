@@ -277,7 +277,7 @@ export function UniversalCreator() {
       stepContent = <FormatSelectionStep value={formatConfig} onChange={setFormatConfig} />;
       break;
     case 'content':
-      stepContent = <ContentVoiceStep value={contentConfig} onChange={setContentConfig} projectId={projectId || ''} />;
+      stepContent = <ContentVoiceStep value={contentConfig} onChange={setContentConfig} projectId={projectId || ''} scenes={scenes} />;
       break;
     case 'scenes':
       stepContent = (

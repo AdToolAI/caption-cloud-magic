@@ -16,11 +16,13 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { sortVoicesPremiumFirst } from '@/lib/elevenlabs-voices';
 import { VoicePreviewButton } from '@/components/voices/VoicePreviewButton';
 import type { ContentConfig, VoiceoverConfig } from '@/types/universal-creator';
+import type { Scene } from '@/types/scene';
 
 interface ContentVoiceStepProps {
   value: ContentConfig | null;
   onChange: (config: ContentConfig) => void;
   projectId: string;
+  scenes?: Scene[];
 }
 
 interface Voice {
@@ -42,7 +44,7 @@ interface Voice {
   supportedLanguages?: string[];
 }
 
-export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {
+export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const { t, language } = useTranslation();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -350,6 +352,12 @@ export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceSte
           <VoiceoverScriptGenerator
             open={showScriptGenerator}
             onClose={() => setShowScriptGenerator(false)}
+            scenes={scenes && scenes.length > 0 ? scenes.map((s) => ({
+              order: s.order,
+              durationSeconds: s.duration,
+              description: s.background?.imageUrl || s.background?.videoUrl || s.background?.color,
+            })) : undefined}
+            defaultDuration={scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + s.duration, 0) : undefined}
             onScriptGenerated={(script) => { handleScriptChange(script); setShowScriptGenerator(false); }}
           />
         </>

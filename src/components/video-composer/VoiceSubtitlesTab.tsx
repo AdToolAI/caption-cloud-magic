@@ -830,6 +830,12 @@ export default function VoiceSubtitlesTab({
         open={scriptGenOpen}
         onClose={() => setScriptGenOpen(false)}
         defaultDuration={totalSceneDuration}
+        scenes={scenes.map((s, i) => ({
+          order: typeof s.orderIndex === 'number' ? s.orderIndex : i,
+          durationSeconds: s.durationSeconds || 0,
+          description: s.aiPrompt || s.textOverlay?.text || undefined,
+          sceneType: s.sceneType,
+        }))}
         onScriptGenerated={(script) => {
           if (voiceover) {
             onUpdateAssembly({ voiceover: { ...voiceover, script } });
