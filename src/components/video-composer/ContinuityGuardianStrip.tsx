@@ -327,10 +327,11 @@ export default function ContinuityGuardianStrip({
   };
 
   const repairAllBroken = async () => {
+    // Only auto-repair true breaks (>= 76). Yellow "drift" cuts stay manual.
     const broken = pairs.filter(
       (p) =>
         typeof p.next.continuityDriftScore === 'number' &&
-        p.next.continuityDriftScore! >= 36
+        p.next.continuityDriftScore! >= 76
     );
     if (broken.length === 0) {
       toast.info('Keine kaputten Cuts zu reparieren');
@@ -347,8 +348,9 @@ export default function ContinuityGuardianStrip({
     (acc, p) => {
       const s = p.next.continuityDriftScore;
       if (s == null) acc.unknown++;
-      else if (s <= 35) acc.ok++;
-      else if (s <= 65) acc.warn++;
+      // Aligned with new driftSeverity buckets (25 / 55 / 75).
+      else if (s <= 55) acc.ok++;
+      else if (s <= 75) acc.warn++;
       else acc.broken++;
       return acc;
     },
@@ -365,7 +367,7 @@ export default function ContinuityGuardianStrip({
           <div>
             <div className="font-semibold text-sm">Continuity Guardian</div>
             <div className="text-[11px] text-muted-foreground">
-              Reference-Chaining 2.0 · {pairs.length} Cut
+              Prüft nur Cuts mit gleichem Charakter oder verriegeltem Anker · {pairs.length} Cut
               {pairs.length === 1 ? '' : 's'} überwacht
             </div>
           </div>
