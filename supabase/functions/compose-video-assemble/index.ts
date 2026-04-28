@@ -287,6 +287,10 @@ serve(async (req) => {
         transitionDuration,
         // Block R: Smart Reframe position-track (only when source≠target aspect)
         positionTrack: positionTrack && positionTrack.length > 0 ? positionTrack : undefined,
+        // "With sound / no sound" toggle — when true, the renderer keeps the
+        // native AI audio track (Sora/Veo/Kling). Default = false (muted) so
+        // legacy projects keep playing silently.
+        withAudio: s.with_audio === true,
       };
     });
 

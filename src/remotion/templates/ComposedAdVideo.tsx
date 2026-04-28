@@ -98,6 +98,11 @@ export const ComposedAdVideoSchema = z.object({
       xPct: z.number(),
       yPct: z.number(),
     })).optional(),
+    /** When false, the scene's native video audio track is muted in the final
+     *  composition (used for AI models like Sora 2 that always emit audio).
+     *  Default = false (legacy behaviour: composer videos played silently and
+     *  audio came exclusively from voiceover/music tracks). */
+    withAudio: z.boolean().optional(),
   })),
   colorGrading: z.enum(['none', 'cinematic-warm', 'cool-blue', 'vintage-film', 'high-contrast', 'moody-dark']).default('none'),
   kineticText: z.boolean().default(false),
@@ -133,7 +138,8 @@ const Scene: React.FC<{
   kineticText: boolean;
   effects?: SceneEffectConfig[];
   positionTrack?: ComposedAdVideoProps['scenes'][0]['positionTrack'];
-}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects, positionTrack }) => {
+  withAudio?: boolean;
+}> = ({ videoUrl, isImage, durationInFrames, sceneIndex, textOverlay, kineticText, effects, positionTrack, withAudio }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -182,7 +188,10 @@ const Scene: React.FC<{
           <Video
             src={videoUrl}
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition }}
-            muted
+            // Native scene audio (Sora/Veo/Kling) only when the per-scene
+            // "With sound" toggle is on. Default = muted to keep voiceover/
+            // music tracks unobstructed and preserve legacy behaviour.
+            muted={withAudio !== true}
             // Lock playback rate to 1.0 — prevents implicit speed warping when
             // Sequence/Video durations diverge.
             playbackRate={1}
@@ -330,6 +339,7 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
                   kineticText={kineticText}
                   effects={scene.effects}
                   positionTrack={scene.positionTrack}
+                  withAudio={scene.withAudio}
                 />
               </TransitionSeries.Sequence>
               {i < scenes.length - 1 && (

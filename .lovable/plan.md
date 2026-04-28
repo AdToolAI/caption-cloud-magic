@@ -1,85 +1,52 @@
-
-# Audio-Toggle pro Szene im Motion Studio Composer
-
 ## Problem
 
-Bei der Anbieter-Auswahl im Composer (SceneCard → KI-Modell) gibt es derzeit **keine Möglichkeit**, für audio-fähige Modelle (**Sora 2 Standard**, **Sora 2 Pro**, **Veo 3.1 Fast**, **Veo 3.1 Premium**, **Kling 3 Standard**, **Kling 3 Pro**) zu wählen, ob das generierte Video mit oder ohne nativen Sound erstellt werden soll. Im Standalone-Toolkit existiert dieser Switch bereits — im Composer pro Szene fehlt er komplett.
+Im Motion-Studio-Composer sehe ich unter dem KI-Modell-Dropdown keinen "Mit Sound / Ohne Sound"-Toggle — auch nicht bei Sora 2 (Screenshot) und auch nicht bei den anderen Modellen, die nativ Audio liefern.
 
-Außerdem ist Sora 2 in der Modell-Registry fälschlich als `audio: false` markiert, obwohl Sora 2 nativ Audio liefert.
+Der Toggle-Code existiert bereits in `src/components/video-composer/SceneCard.tsx` (Zeilen 544–586) und prüft `selectedModel.capabilities.audio === true`. Er rendert nichts, weil:
 
-## Ziel
+1. **Sora 2 Standard und Sora 2 Pro** sind in `src/config/aiVideoModelRegistry.ts` (Zeilen 370 + 388) noch fälschlich als `audio: false` markiert — obwohl Sora 2 nativ Audio liefert.
+2. **Veo 3.1 Fast/Pro, Kling 3 Standard/Pro, Grok Imagine** sind bereits korrekt als `audio: true` markiert — der Toggle erscheint dort eigentlich. Falls er auch dort nicht sichtbar ist, liegt das am Browser-Cache (alter Build vor der letzten Änderung).
 
-Pro Szene im Storyboard / Clips-Tab einen kompakten **„Mit Sound / Ohne Sound"-Toggle** anbieten — sichtbar nur, wenn das gewählte Modell Audio kann. Default = Mit Sound.
+## Fix
 
-## Änderungen
+### 1. Sora als audio-fähig markieren
 
-### 1. Modell-Registry korrigieren
-`src/config/aiVideoModelRegistry.ts`: Sora 2 Standard und Sora 2 Pro auf `capabilities.audio: true` setzen (Sora 2 liefert nativ Audio).
+**Datei:** `src/config/aiVideoModelRegistry.ts`
 
-### 2. Datenmodell erweitern
+- Zeile 370 (`sora-2-standard`): `audio: false` → `audio: true`
+- Zeile 388 (`sora-2-pro`): `audio: false` → `audio: true`
 
-**Migration** auf `composer_scenes`:
-- Neue Spalte `with_audio boolean NOT NULL DEFAULT true`.
+Damit erscheint der Toggle für **alle** Audio-Modelle einheitlich:
+Veo 3.1 Fast, Veo 3.1 Pro, Kling 3 Standard, Kling 3 Pro, Grok Imagine, Sora 2 Standard, Sora 2 Pro.
 
-**Type** in `src/types/video-composer.ts` (`ComposerScene`): Feld `withAudio?: boolean` ergänzen.
+### 2. Mute-Pipeline für Sora vervollständigen
 
-**Mapping** in `VideoComposerDashboard.tsx` (3 Stellen, in denen `clip_quality` aus Rows gelesen / geschrieben wird) + `ClipsTab.tsx` / `StoryboardTab.tsx`: `withAudio` lesen/schreiben (Default `true`).
+Veo und Kling bekommen `generate_audio: false` direkt an die Replicate-API durchgereicht — fertig. Sora 2 hat keinen API-Toggle für Audio. Aktuell wird `with_audio` zwar in `composer_scenes` gespeichert, aber beim finalen Stitch nicht angewendet.
 
-### 3. UI: Audio-Toggle in SceneCard
-In `src/components/video-composer/SceneCard.tsx`, direkt unter dem `<ModelSelector>` (Zeilen 527–544):
+**Datei:** `supabase/functions/compose-video-storyboard/index.ts`
 
-- Wenn das aktuell gewählte Toolkit-Modell `capabilities.audio === true`, einen kleinen Pill-Switch rendern:
-  - 🔊 „Mit Sound" / 🔇 „Ohne Sound" (lokalisiert DE/EN/ES).
-  - Schreibt `withAudio` über `onUpdate`.
-- Für Modelle ohne Audio-Fähigkeit (Hailuo, Wan, Luma, Seedance, Image) unsichtbar — keine optische Unruhe.
+Beim Stitch-Schritt für jeden Sora-Clip prüfen, ob `with_audio = false` ist, und in dem Fall den Audio-Track per ffmpeg entfernen — entweder vor dem Concat (`-c:v copy -an` auf den Einzelclip) oder via Filter (`amix` mit Stummschaltung). Konkret: vor der Concat-Demuxer-Liste pro Sora-Clip mit `with_audio = false` einen lokalen Re-Encode (`ffmpeg -i input.mp4 -an -c:v copy muted.mp4`) einfügen und die gemutete Datei in die Liste schreiben.
 
-### 4. Edge-Function `compose-video-clips` respektiert das Flag
+## Erwartetes Ergebnis
 
-In `supabase/functions/compose-video-clips/index.ts`:
-
-| Anbieter | Umsetzung |
-|---|---|
-| **Veo 3.1** (Z. 635–640) | `veoInput.generate_audio = scene.withAudio !== false` (Replicate-Veo unterstützt das Flag direkt). |
-| **Kling 3 Omni** (Z. 409–414) | `klingInput.generate_audio = scene.withAudio !== false` (gleicher Mechanismus wie `generate-kling-video`). |
-| **Sora 2 / Sora 2 Pro** (Z. 680–685) | Sora 2 hat keinen API-Toggle für Audio — daher Flag in DB persistieren (`composer_scenes.strip_audio`) und beim **Stitch / Director's Cut**-Schritt per ffmpeg den Audio-Track entfernen, falls `withAudio = false`. Für die Erst-Generation bleibt der Replicate-Call unverändert. |
-
-Scene-Row beim Update um `with_audio: scene.withAudio` ergänzen.
-
-### 5. Stitch-Pipeline (Sora 2 Mute-Fall)
-
-Im Render-/Stitch-Service (`compose-video-storyboard` bzw. das Lambda-Stitch) bei `withAudio = false` für `ai-sora`-Clips den Audio-Track stummschalten / entfernen (`-an` ffmpeg-Flag oder Volume 0). Damit funktioniert „Ohne Sound" auch bei Sora konsistent.
-
-### 6. Lokalisierung
-
-Neue Keys in `src/lib/translations.ts`:
-- `composerSceneWithAudio` → „Mit Sound" / „With sound" / „Con sonido"
-- `composerSceneWithoutAudio` → „Ohne Sound" / „No sound" / „Sin sonido"
-- Tooltip „Natives KI-Audio aus dem Modell verwenden — sonst stumm."
-
-## Visuelles Design
-
-Kompakter Pill-Toggle direkt unter dem Modell-Dropdown — gleicher James-Bond-Stil (Glass / Goldakzent für aktiven Zustand), nicht aufdringlich.
+Direkt unter dem Modell-Dropdown jeder Szene erscheint bei allen Audio-fähigen Modellen ein kompakter Pill-Toggle:
 
 ```text
-┌─ AI-Modell ──────────────────────────────┐
-│  [Sora 2 Pro · 1080p · €0.53/s     ▼]   │
-└──────────────────────────────────────────┘
-   🔊 Mit Sound   ◯ Ohne Sound        (nur sichtbar wenn audio-fähig)
+🔊 Mit Sound   🔇 Ohne Sound
 ```
 
-## Dateien (geschätzt)
+Verhalten pro Modell:
+- **Veo 3.1 / Kling 3 / Grok Imagine** — `generate_audio` wird an Replicate durchgereicht (bereits implementiert).
+- **Sora 2 Standard / Pro** — Audio wird beim Stitch per ffmpeg entfernt, falls Toggle = "Ohne Sound".
 
-- `src/config/aiVideoModelRegistry.ts` — Sora-Audio-Flag
-- `src/types/video-composer.ts` — `withAudio` Feld
-- `src/components/video-composer/SceneCard.tsx` — UI-Toggle
-- `src/components/video-composer/VideoComposerDashboard.tsx` — DB-Mapping (3 Stellen)
-- `src/components/video-composer/ClipsTab.tsx`, `StoryboardTab.tsx` — Default-Initialisierung
-- `src/lib/translations.ts` — neue Keys
-- `supabase/functions/compose-video-clips/index.ts` — Veo/Kling Flag durchreichen, Sora Flag persistieren
-- `supabase/functions/compose-video-storyboard/index.ts` — Stitch-Mute für Sora bei `withAudio = false`
-- DB-Migration: `with_audio` Spalte auf `composer_scenes`
+Der Toggle wird NICHT angezeigt für Hailuo, Wan, Luma, Seedance und das statische Bild-Modell — diese Modelle haben sowieso kein natives Audio.
+
+## Dateien
+
+- `src/config/aiVideoModelRegistry.ts` — 2 Booleans (`audio: false` → `true`)
+- `supabase/functions/compose-video-storyboard/index.ts` — ffmpeg-Mute für Sora-Clips mit `with_audio = false`
 
 ## Out of Scope
 
-- Eigener Audio-Mix pro Szene (kommt aus dem späteren Voiceover/Music-Tab, der ohnehin schon existiert)
-- Toggle für Modelle ohne Audio (Hailuo, Wan, Luma, Seedance) — bewusst unsichtbar.
+- Toggle für Modelle ohne natives Audio (Hailuo, Wan, Luma, Seedance) — bewusst ausgeblendet, da kein Effekt.
+- Voiceover/Music-Mix — kommt aus den separaten Tabs "Voiceover & Untertitel" und "Musik & Sound-Mix", unabhängig vom Native-Audio-Toggle.
