@@ -54,6 +54,8 @@ export default function ComposerSequencePreview({
   subtitles,
   globalTextOverlays,
   voiceoverUrl,
+  backgroundMusicUrl,
+  backgroundMusicVolume = 0.3,
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
