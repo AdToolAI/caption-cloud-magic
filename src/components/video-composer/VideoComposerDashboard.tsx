@@ -977,6 +977,7 @@ export default function VideoComposerDashboard() {
               assemblyConfig={project.assemblyConfig}
               onUpdateAssembly={updateAssembly}
               language={project.language}
+              briefing={project.briefing}
               onGoToAudio={() => setActiveTab('audio')}
             />
           </TabsContent>
