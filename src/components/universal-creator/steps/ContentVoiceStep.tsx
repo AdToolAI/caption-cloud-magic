@@ -352,6 +352,12 @@ export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: Content
           <VoiceoverScriptGenerator
             open={showScriptGenerator}
             onClose={() => setShowScriptGenerator(false)}
+            scenes={scenes && scenes.length > 0 ? scenes.map((s) => ({
+              order: s.order,
+              durationSeconds: s.duration,
+              description: s.background?.imageUrl || s.background?.videoUrl || s.background?.color,
+            })) : undefined}
+            defaultDuration={scenes && scenes.length > 0 ? scenes.reduce((a, s) => a + s.duration, 0) : undefined}
             onScriptGenerated={(script) => { handleScriptChange(script); setShowScriptGenerator(false); }}
           />
         </>
