@@ -732,6 +732,16 @@ export default function ComposerSequencePreview({
             className="hidden"
           />
         )}
+
+        {/* Hidden background music audio — looped under the timeline */}
+        {backgroundMusicUrl && (
+          <audio
+            ref={musicRef}
+            src={backgroundMusicUrl}
+            preload="auto"
+            className="hidden"
+          />
+        )}
       </div>
 
       {/* Controls */}
