@@ -44,7 +44,7 @@ interface Voice {
   supportedLanguages?: string[];
 }
 
-export const ContentVoiceStep = ({ value, onChange, projectId }: ContentVoiceStepProps) => {
+export const ContentVoiceStep = ({ value, onChange, projectId, scenes }: ContentVoiceStepProps) => {
   const { toast } = useToast();
   const { t, language } = useTranslation();
   const [isGenerating, setIsGenerating] = useState(false);
