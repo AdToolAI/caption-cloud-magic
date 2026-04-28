@@ -38,6 +38,12 @@ export function useContinuityDrift() {
       sceneId: string;
       anchorSceneId?: string;
       projectId?: string;
+      context?: {
+        sceneType?: string;
+        nextSceneType?: string;
+        expectsSameCharacter?: boolean;
+        nextPrompt?: string;
+      };
     }): Promise<DriftCheckResult | null> => {
       setCheckingPairId(params.sceneId);
       try {
@@ -92,6 +98,12 @@ export function useContinuityDrift() {
         sceneId: string;
         anchorSceneId?: string;
         projectId?: string;
+        context?: {
+          sceneType?: string;
+          nextSceneType?: string;
+          expectsSameCharacter?: boolean;
+          nextPrompt?: string;
+        };
       }>,
       concurrency = 3
     ): Promise<Array<{ sceneId: string; result: DriftCheckResult | null }>> => {
@@ -182,21 +194,23 @@ export function driftSeverity(score: number | null | undefined): {
 } {
   if (score == null)
     return { level: 'ok', color: 'text-muted-foreground', bg: 'bg-muted/40', label: '—' };
-  if (score <= 15)
+  // New, more forgiving rubric — only flags actual continuity breaks, not
+  // intentional cuts between different shots/subjects.
+  if (score <= 25)
     return {
       level: 'ok',
       color: 'text-emerald-400',
       bg: 'bg-emerald-500/10 border-emerald-500/30',
       label: 'Konsistent',
     };
-  if (score <= 35)
+  if (score <= 55)
     return {
       level: 'minor',
       color: 'text-sky-400',
       bg: 'bg-sky-500/10 border-sky-500/30',
       label: 'Akzeptabel',
     };
-  if (score <= 65)
+  if (score <= 75)
     return {
       level: 'warn',
       color: 'text-amber-400',

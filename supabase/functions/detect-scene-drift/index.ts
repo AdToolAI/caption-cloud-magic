@@ -31,6 +31,14 @@ interface RequestBody {
   anchorSceneId?: string;
   /** Optional composer project id for history logging. */
   projectId?: string;
+  /** Optional context — helps the model distinguish intentional cuts
+   *  from real continuity errors. */
+  context?: {
+    sceneType?: string;
+    nextSceneType?: string;
+    expectsSameCharacter?: boolean;
+    nextPrompt?: string;
+  };
 }
 
 interface DriftResult {
@@ -39,15 +47,30 @@ interface DriftResult {
   recommendation: "ok" | "soft-repair" | "hard-repair";
 }
 
-const SYSTEM_PROMPT = `You are a film continuity supervisor. You will see two stills:
-IMAGE A = the LAST frame of the previous shot
-IMAGE B = the FIRST frame of the next shot
+const SYSTEM_PROMPT = `You are a film editor judging whether a CUT between two
+consecutive shots will feel jarring to a viewer. You will see two stills:
+  IMAGE A = the LAST frame of the previous shot
+  IMAGE B = the FIRST frame of the next shot
 
-Score the visual continuity drift on a scale 0-100:
-  0-15   = perfectly consistent (same character, identical lighting, similar framing)
-  16-35  = acceptable cut (minor drift in lighting/angle, same scene & cast)
-  36-65  = noticeable drift (different framing, lighting changed, props moved)
-  66-100 = broken continuity (different character, different scene, style mismatch)
+CRITICAL: Most ad / story videos intentionally cut to different shots, settings
+and subjects. Different ≠ broken. Only flag a real continuity ERROR — not an
+intentional creative cut.
+
+Score 0-100 (lower = better):
+  0-25   = Cut feels natural. Either visually consistent OR a clean creative
+            cut to a new subject/setting that any viewer would accept.
+  26-55  = Slightly rough cut. Could be tightened (lighting jump, awkward
+            composition) but not broken.
+  56-75  = Noticeable continuity issue. Same scene/character is meant to
+            continue but something visibly drifted (props moved, character
+            looks different, lighting jumps mid-action).
+  76-100 = Clear continuity ERROR — same character is supposed to be on
+            screen but is now a different person, or an obvious mid-action
+            jump-cut that would confuse the viewer.
+
+If the user context says \`expectsSameCharacter: false\` OR the two scenes are
+clearly different shot types / subjects, default to the 0-25 range unless
+something is genuinely wrong.
 
 Respond ONLY with strict minified JSON, no prose, no markdown:
 {"driftScore": <int 0-100>, "label": "<max 8 words diff summary>", "recommendation": "ok"|"soft-repair"|"hard-repair"}`;
@@ -83,9 +106,9 @@ function safeParseDrift(raw: string): DriftResult {
       parsed.recommendation === "hard-repair" ||
       parsed.recommendation === "soft-repair"
         ? parsed.recommendation
-        : driftScore >= 66
+        : driftScore >= 76
           ? "hard-repair"
-          : driftScore >= 36
+          : driftScore >= 56
             ? "soft-repair"
             : "ok";
     return { driftScore, label, recommendation: rec };
@@ -165,7 +188,25 @@ serve(async (req) => {
                 },
                 {
                   type: "text",
-                  text: "Return only the JSON.",
+                  text: (() => {
+                    const ctx = body.context ?? {};
+                    const lines: string[] = [];
+                    if (ctx.sceneType || ctx.nextSceneType) {
+                      lines.push(
+                        `Scene types: prev="${ctx.sceneType ?? "?"}", next="${ctx.nextSceneType ?? "?"}".`
+                      );
+                    }
+                    lines.push(
+                      `expectsSameCharacter: ${ctx.expectsSameCharacter ? "true" : "false"}.`
+                    );
+                    if (ctx.nextPrompt) {
+                      lines.push(
+                        `Next-shot intent: ${String(ctx.nextPrompt).slice(0, 240)}`
+                      );
+                    }
+                    lines.push("Return only the JSON.");
+                    return lines.join("\n");
+                  })(),
                 },
               ],
             },
