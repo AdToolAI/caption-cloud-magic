@@ -931,6 +931,16 @@ export default function VideoComposerDashboard() {
         open={showAutoDirector}
         onOpenChange={setShowAutoDirector}
         defaultLanguage={project.language}
+        onProjectCreated={(newProjectId) => {
+          // Belt & Suspenders: even if the wizard's navigate() loses the
+          // query params, swap state directly so the user sees their new
+          // project + scenes immediately. The DB-hydration effect then
+          // backfills briefing/scenes from Supabase.
+          clearDraft();
+          setProject({ ...defaultProject, id: newProjectId });
+          didInitialSyncRef.current = false; // re-arm the hydration effect
+          setActiveTab('clips');
+        }}
       />
 
       <AdDirectorWizard
