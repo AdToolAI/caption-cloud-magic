@@ -1,39 +1,33 @@
-Ich behebe das Dialog-Layout des Ad Director Mode so, dass keine Felder mehr unten abgeschnitten werden und alle Schritte zuverlässig scrollbar sind.
+## Ziel
 
-Umsetzung:
-1. Dialog-Höhe stabilisieren
-   - Den Ad-Director-Dialog auf eine feste, viewport-basierte Höhe setzen statt nur `max-h`.
-   - Dadurch bekommt der mittlere Inhaltsbereich eine echte berechenbare Höhe.
+Aktuell ist der **Referenzbild-Upload** (`SceneReferenceImageUpload`) in der `SceneCard` nur sichtbar, wenn `scene.clipSource` mit `ai-` beginnt (Hailuo, Kling, Veo, Sora, AI-Image). In **Stock-Video**, **Stock-Image**, **Upload** und **anderen** Modi gibt es keine Möglichkeit, manuell ein Referenzbild zu setzen oder auszutauschen — obwohl das Bild u. a. für Continuity-Guardian, Brand-Character-Lock und spätere Engine-Wechsel relevant bleibt.
 
-2. Header, Fortschrittsleiste und Footer fix lassen
-   - Header und Step-Indikator bleiben oben.
-   - Zurück/Weiter bzw. Spot-generieren bleiben unten sichtbar.
-   - Nur der eigentliche Schritt-Inhalt scrollt.
+## Änderung
 
-3. ScrollArea korrekt für Flex-Layouts machen
-   - `ScrollArea` mit `min-h-0`, `overflow-y-auto` und ausreichendem Bottom-Padding ausstatten.
-   - Den inneren Content ebenfalls mit Bottom-Padding versehen, damit die letzten Karten/Felder nicht vom Footer verdeckt werden.
+### `src/components/video-composer/SceneCard.tsx`
 
-4. Alle betroffenen Schritte abdecken
-   - Story-Framework
-   - Tonalität / Schritt 3 inklusive Joyful und Trustworthy
-   - A/B Script-Varianten
-   - Kampagnen-Skalierung
-   - Compliance / Zusammenfassung
+1. **`SceneReferenceImageUpload` aus dem AI-Block herauslösen** (aktuell innerhalb des `scene.clipSource.startsWith('ai-')`-Blocks bei Zeile 730).
+2. Stattdessen **unterhalb** des modusspezifischen Blocks (AI / Stock / Upload) als **eigenständigen, immer sichtbaren Abschnitt** rendern.
+3. **Visuelle Anpassung**: Klar als optionaler universeller Reference-Slot beschriften, mit kurzem Hinweistext je nach Modus:
+   - AI-Modi: „Die KI orientiert sich am Bild (Image-to-Video)."
+   - Stock/Upload: „Wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet."
+4. Lokalisierung (DE/ES/EN) analog zu bestehenden Strings im File.
 
-Technische Details:
-- Hauptänderung in `src/components/video-composer/AdDirectorWizard.tsx`.
-- Voraussichtlich Änderung von:
-  - `DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col"`
-  - `ScrollArea className="flex-1 min-h-0 pr-2"`
-- Zielstruktur:
-```text
-DialogContent: h-[min(92vh,...)] overflow-hidden flex flex-col
-  Header: shrink-0
-  Progress: shrink-0
-  ScrollArea: flex-1 min-h-0 overflow-y-auto
-    Step content: pb-large
-  Footer: shrink-0
-```
+### Verhalten
 
-Nach der Änderung sollten alle Felder in jedem Schritt sichtbar bzw. per Scroll erreichbar sein, ohne unten abgeschnitten zu werden.
+- Upload-, Drag&Drop- und Remove-Logik bleiben unverändert (keine Änderung in `SceneReferenceImageUpload.tsx` nötig).
+- `scene.referenceImageUrl` wird weiter über `onUpdate({ referenceImageUrl })` persistiert.
+- Bestehende Continuity-Guardian- und Style-Reference-Flows funktionieren unverändert.
+
+## Technische Details
+
+- **Datei**: `src/components/video-composer/SceneCard.tsx`
+- **Entfernen**: `<SceneReferenceImageUpload … />` Block bei ~Zeile 730–735 innerhalb des AI-Conditional.
+- **Neu einfügen**: nach dem Schließen der drei modusspezifischen Blöcke (AI, Stock, Upload — endet ~Zeile 820), als gemeinsamer Footer-Bereich der Scene-Card.
+- Wrapper-Div mit dezentem Border (`border-dashed border-border/50`) und Mode-aware Hinweistext.
+
+## Nicht im Scope
+
+- Keine Änderungen an Edge Functions, Composer-Engine oder Datenbank.
+- Keine Änderungen am Continuity-Guardian-Strip oder Brand-Character-Lock.
+- Keine UX-Änderung für AI-Wizard / Auto-Director — nur die Scene-Card-Ansicht im Storyboard/Clips-Tab.
