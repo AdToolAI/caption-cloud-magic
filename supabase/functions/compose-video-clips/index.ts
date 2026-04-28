@@ -1,5 +1,12 @@
-// compose-video-clips v2.2.0 — visual style injection
+// compose-video-clips v2.3.0 — duration snap for Luma/Wan/Seedance
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+
+/** Snap an arbitrary duration (seconds) to the nearest provider-allowed discrete value. */
+function snapDuration(seconds: number, allowed: number[]): number {
+  return allowed.reduce((best, val) =>
+    Math.abs(val - seconds) < Math.abs(best - seconds) ? val : best
+  , allowed[0]);
+}
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Replicate from "https://esm.sh/replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
@@ -424,13 +431,16 @@ serve(async (req) => {
           const wanModel = scene.referenceImageUrl
             ? 'wan-video/wan-2.5-i2v'
             : 'wan-video/wan-2.5-t2v';
+          // Wan 2.5 only supports 5 or 10 seconds — snap to nearest allowed value
+          const wanDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const wanInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
             negative_prompt: NEGATIVE_PROMPT_PARAM,
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: wanDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
+          console.log(`[compose-video-clips] Wan scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${wanDuration}s`);
           if (scene.referenceImageUrl) {
             wanInput.image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Wan scene ${scene.id} uses i2v reference`);
@@ -457,12 +467,15 @@ serve(async (req) => {
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Seedance Lite supports 5 or 10 seconds — snap to nearest allowed value
+          const seedDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const seedInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: seedDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
+          console.log(`[compose-video-clips] Seedance scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${seedDuration}s`);
           if (scene.referenceImageUrl) {
             seedInput.image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Seedance scene ${scene.id} uses i2v reference`);
@@ -489,11 +502,14 @@ serve(async (req) => {
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Luma Ray 2 only supports 5 or 9 seconds — snap to nearest allowed value
+          const lumaDuration = snapDuration(scene.durationSeconds, [5, 9]);
           const lumaInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: lumaDuration,
             aspect_ratio: '16:9',
           };
+          console.log(`[compose-video-clips] Luma scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${lumaDuration}s`);
           if (scene.referenceImageUrl) {
             lumaInput.start_image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Luma scene ${scene.id} uses start_image keyframe`);
