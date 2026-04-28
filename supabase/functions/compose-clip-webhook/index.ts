@@ -252,7 +252,25 @@ serve(async (req) => {
           .single();
 
         if (project) {
-          const costPerSec = sceneData.clip_source === 'ai-kling' ? 0.15 : 0.15;
+          // Cost-per-second by source × quality tier — synced with compose-video-clips.
+          const CLIP_COSTS: Record<string, { standard: number; pro: number }> = {
+            'ai-hailuo':   { standard: 0.15, pro: 0.20 },
+            'ai-kling':    { standard: 0.15, pro: 0.21 },
+            'ai-sora':     { standard: 0.25, pro: 0.53 },
+            'ai-wan':      { standard: 0.10, pro: 0.18 },
+            'ai-seedance': { standard: 0.12, pro: 0.20 },
+            'ai-luma':     { standard: 0.20, pro: 0.32 },
+            'ai-veo':      { standard: 0.20, pro: 1.40 },
+            'ai-image':    { standard: 0.01, pro: 0.015 },
+          };
+          // Re-fetch quality tier for accurate refund
+          const { data: sceneFull } = await supabase
+            .from('composer_scenes')
+            .select('clip_quality')
+            .eq('id', sceneId)
+            .single();
+          const tier: 'standard' | 'pro' = sceneFull?.clip_quality === 'pro' ? 'pro' : 'standard';
+          const costPerSec = CLIP_COSTS[sceneData.clip_source]?.[tier] ?? 0.15;
           const refundAmount = sceneData.duration_seconds * costPerSec;
           try {
             await supabase.rpc('refund_ai_video_credits', {
@@ -260,7 +278,7 @@ serve(async (req) => {
               p_amount_euros: refundAmount,
               p_generation_id: sceneId,
             });
-            console.log(`[compose-clip-webhook] Refunded €${refundAmount.toFixed(2)}`);
+            console.log(`[compose-clip-webhook] Refunded €${refundAmount.toFixed(2)} (${sceneData.clip_source}/${tier})`);
           } catch (refundErr) {
             console.error('[compose-clip-webhook] Refund failed:', refundErr);
           }
