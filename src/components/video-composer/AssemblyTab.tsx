@@ -40,7 +40,7 @@ const FALLBACKS: Record<string, string> = {
   lambdaStarting: 'Lambda startet …',
   framesRendering: 'Frames werden gerendert …',
   encodingUploading: 'Video wird kodiert & hochgeladen …',
-  renderingPercent: 'Video wird gerendert … {{percent}}%',
+  renderingPercent: 'Video wird gerendert … {percent}%',
   videoReady: 'Dein Video ist fertig',
   videoReadyDesc: 'Vorschau, Download oder direkt in der Mediathek öffnen.',
   download: 'Herunterladen',
@@ -56,6 +56,13 @@ const FALLBACKS: Record<string, string> = {
   generateClipsFirst: 'Bitte generiere zuerst alle Clips im Clips-Tab.',
   renderStarted: 'Video-Rendering gestartet! 🎬',
   renderVideo: 'Video rendern',
+  backgroundMusic: 'Hintergrundmusik',
+  musicSelectedFallback: 'Track ausgewählt',
+  musicWillBeMixed: 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.',
+  musicVolume: 'Lautstärke',
+  editInAudioTab: 'Im Audio-Tab ändern',
+  musicEnabledNoTrack: 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.',
+  musicDisabledHint: 'Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen.',
 };
 
 export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly, scenes, onMasterRenderComplete }: AssemblyTabProps) {
@@ -381,7 +388,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Music className="h-4 w-4 text-primary" />
-              {t('videoComposer.backgroundMusic') || 'Hintergrundmusik'}
+              {tt('backgroundMusic')}
             </CardTitle>
             {assemblyConfig.music?.enabled && assemblyConfig.music?.trackUrl ? (
               <Switch
@@ -404,16 +411,16 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                 <CheckCircle className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {assemblyConfig.music.trackName || t('videoComposer.musicSelectedFallback') || 'Track ausgewählt'}
+                    {assemblyConfig.music.trackName || tt('musicSelectedFallback')}
                   </p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {t('videoComposer.musicWillBeMixed') || 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.'}
+                    {tt('musicWillBeMixed')}
                   </p>
                 </div>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">
-                  {t('videoComposer.musicVolume') || 'Lautstärke'}
+                  {tt('musicVolume')}
                 </span>
                 <span className="tabular-nums font-medium">
                   {Math.round(assemblyConfig.music.volume ?? 30)}%
@@ -428,7 +435,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                   window.dispatchEvent(ev);
                 }}
               >
-                {t('videoComposer.editInAudioTab') || 'Im Audio-Tab ändern'}
+                {tt('editInAudioTab')}
               </Button>
             </div>
           ) : (
@@ -436,8 +443,8 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
               <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
               <div className="flex-1 text-xs text-muted-foreground">
                 {assemblyConfig.music?.enabled
-                  ? (t('videoComposer.musicEnabledNoTrack') || 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.')
-                  : (t('videoComposer.musicDisabledHint') || 'Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen.')}
+                  ? tt('musicEnabledNoTrack')
+                  : tt('musicDisabledHint')}
               </div>
             </div>
           )}
