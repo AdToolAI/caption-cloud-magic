@@ -62,6 +62,8 @@ interface ClipScene {
   endReferenceImageUrl?: string;
   durationSeconds: number;
   characterShot?: { characterId: string; shotType: CharacterShotType };
+  /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
+  withAudio?: boolean;
 }
 
 interface ClipRequest {
@@ -411,6 +413,7 @@ serve(async (req) => {
             duration: klingDuration,
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
+            generate_audio: scene.withAudio !== false,
           };
           // Image-to-Video: optional start/end image
           if (isI2V) {
@@ -637,6 +640,7 @@ serve(async (req) => {
             duration: veoDuration,
             aspect_ratio: '16:9',
             resolution: veoResolution,
+            generate_audio: scene.withAudio !== false,
           };
           if (isI2V) {
             veoInput.image = scene.referenceImageUrl;
