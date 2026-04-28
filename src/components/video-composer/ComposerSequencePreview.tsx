@@ -128,6 +128,8 @@ export default function ComposerSequencePreview({
   const rafRef = useRef<number | null>(null);
   const imageStartRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  /** Background music audio element — independent linear track, looped under VO. */
+  const musicRef = useRef<HTMLAudioElement>(null);
 
   const playableRef = useRef(playable);
   const startOffsetsRef = useRef(startOffsets);
