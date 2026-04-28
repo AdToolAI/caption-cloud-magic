@@ -367,6 +367,75 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         onChange={(wm: WatermarkConfig) => onUpdateAssembly({ watermark: wm })}
       />
 
+      {/* Background Music summary — confirms BGM will be in the export */}
+      <Card className="border-border/40 bg-card/80">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Music className="h-4 w-4 text-primary" />
+              {t('videoComposer.backgroundMusic') || 'Hintergrundmusik'}
+            </CardTitle>
+            {assemblyConfig.music?.enabled && assemblyConfig.music?.trackUrl ? (
+              <Switch
+                checked={!!assemblyConfig.music?.enabled}
+                onCheckedChange={(checked) =>
+                  onUpdateAssembly({
+                    music: assemblyConfig.music
+                      ? { ...assemblyConfig.music, enabled: checked }
+                      : null,
+                  })
+                }
+              />
+            ) : null}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {assemblyConfig.music?.enabled && assemblyConfig.music?.trackUrl ? (
+            <div className="space-y-3">
+              <div className="flex items-start gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
+                <CheckCircle className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {assemblyConfig.music.trackName || t('videoComposer.musicSelectedFallback') || 'Track ausgewählt'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {t('videoComposer.musicWillBeMixed') || 'Wird im finalen Export mit der unten gewählten Lautstärke gemischt.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {t('videoComposer.musicVolume') || 'Lautstärke'}
+                </span>
+                <span className="tabular-nums font-medium">
+                  {Math.round(assemblyConfig.music.volume ?? 30)}%
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  const ev = new CustomEvent('composer:goto-tab', { detail: 'audio' });
+                  window.dispatchEvent(ev);
+                }}
+              >
+                {t('videoComposer.editInAudioTab') || 'Im Audio-Tab ändern'}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 rounded-lg border border-dashed border-border/60 bg-background/40 p-3">
+              <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+              <div className="flex-1 text-xs text-muted-foreground">
+                {assemblyConfig.music?.enabled
+                  ? (t('videoComposer.musicEnabledNoTrack') || 'Musik aktiviert, aber kein Track gewählt — wähle einen Track im Audio-Tab.')
+                  : (t('videoComposer.musicDisabledHint') || 'Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen.')}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Full Video Preview — uses the same sequence player as the Voiceover tab.
           Image scenes get Ken-Burns; videos play with crossfades; voiceover audio plays in sync. */}
       <Card className="border-border/40 bg-card/80">
