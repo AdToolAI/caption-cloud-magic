@@ -636,8 +636,7 @@ export default function VideoComposerDashboard() {
   const scenesPersistTimer = useRef<number | null>(null);
   const pendingScenesRef = useRef<ComposerScene[] | null>(null);
 
-  const isUuid = (val?: string) =>
-    !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+  // (uses top-level isUuid helper)
 
   const persistScenesToDb = useCallback(async (projectId: string, scenes: ComposerScene[]) => {
     const targets = scenes.filter(s => isUuid(s.id));
