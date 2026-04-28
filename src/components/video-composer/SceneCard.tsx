@@ -126,6 +126,18 @@ export default function SceneCard({
     : undefined;
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
+  const { characters: brandChars } = useBrandCharacters();
+  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
+  const brandCharacterInput = activeBrandChar
+    ? {
+        name: activeBrandChar.name,
+        identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
+        referenceImageUrl: activeBrandChar.reference_image_url,
+      }
+    : undefined;
+  // Phase 6 — Live Prompt Preview expanded state.
+  const [promptPreviewOpen, setPromptPreviewOpen] = useState(false);
   // Stock browser open state
   const [stockBrowserOpen, setStockBrowserOpen] = useState(false);
   // Block K — Style Preset Picker open state
