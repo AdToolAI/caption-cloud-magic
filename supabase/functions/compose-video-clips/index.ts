@@ -314,20 +314,21 @@ serve(async (req) => {
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
         } else if (scene.clipSource === 'ai-kling') {
-          // Kling via Replicate — Kling 2.1
+          // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
           await supabaseAdmin
             .from('composer_scenes')
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Kling 3 Omni accepts 3..15 seconds (integer)
+          const klingDuration = Math.min(15, Math.max(3, Math.round(scene.durationSeconds)));
           const klingInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            negative_prompt: NEGATIVE_PROMPT_PARAM,
-            duration: Math.min(scene.durationSeconds, 10),
+            duration: klingDuration,
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
           };
-          // Image-to-Video: Kling 2.1 supports start_image AND end_image
+          // Image-to-Video: optional start/end image
           if (scene.referenceImageUrl) {
             klingInput.start_image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Kling scene ${scene.id} uses start_image`);
@@ -338,7 +339,7 @@ serve(async (req) => {
           }
 
           const prediction = await replicate.predictions.create({
-            model: "kwaivgi/kling-v2.1",
+            model: "kwaivgi/kling-v3-omni-video",
             input: klingInput,
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
