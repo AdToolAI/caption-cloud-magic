@@ -1,4 +1,4 @@
-import { User, Footprints, Hand, Eye, Sun, Minus, UserSquare2 } from 'lucide-react';
+import { User, Footprints, Hand, Eye, Sun, Minus, UserSquare2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -7,7 +7,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import type { CharacterShot, CharacterShotType, ComposerCharacter } from '@/types/video-composer';
+
+type Lang = 'en' | 'de' | 'es';
+const REMOVE_LABEL: Record<Lang, string> = {
+  en: 'Remove character from this scene',
+  de: 'Charakter aus dieser Szene entfernen',
+  es: 'Quitar personaje de esta escena',
+};
 
 export const SHOT_TYPE_META: Record<
   CharacterShotType,
