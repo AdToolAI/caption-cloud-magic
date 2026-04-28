@@ -179,25 +179,31 @@ Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo 
     return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}`;
   }).join('\n');
 
-  return `🎭 SMART CHARACTER CONSISTENCY (the user defined recurring characters):
-Each AI video scene is generated INDEPENDENTLY — exact face identity between scenes is technically impossible. Instead we use the "Sherlock Holmes effect": the AI is reliable at repeating CLOTHING and OBJECTS but unreliable at faces, so we vary camera framing across scenes and lean on signatureItems as the visual anchor of the character.
+  return `🎭 SMART CHARACTER USAGE (the user defined recurring characters):
+Each AI video scene is generated INDEPENDENTLY — exact face identity between scenes is technically impossible. Use the "Sherlock Holmes effect": the AI is reliable at repeating CLOTHING and OBJECTS but unreliable at faces, so we lean on signatureItems as the visual anchor whenever the character actually appears.
 
 Available characters:
 ${charList}
 
-DISTRIBUTION RULES (over the full storyboard, vary the shotType per scene):
-- 1-2 scenes → shotType="full": full character visible (establishing / hero shots). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
-- 2-3 scenes → shotType="profile" OR "back" OR "silhouette": indirect view (side-profile from distance, over-the-shoulder, back-shot, gegenlicht silhouette). Include ONLY signatureItems verbatim — omit appearance.
-- 1-2 scenes → shotType="detail": detail framing (just the eyes, just the hands holding an object, just the feet walking). Include ONLY the relevant body part + 1 matching signature item.
-- 1-2 scenes → shotType="pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
-- Remaining scenes → shotType="absent": environment / object focus, no character. Include 1 signature item if it would naturally be in the scene (e.g. crown sitting on a table), otherwise omit.
+CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
+- The character is a recurring NARRATIVE ANCHOR, NOT the subject of every shot. The story comes first.
+- DEFAULT for every scene = NO character (shotType="absent" or omit characterShot entirely).
+- Only feature the character in scenes where the storyline genuinely calls for them. Environmental, atmospheric, product, location, b-roll and metaphorical scenes are equally valuable and should NOT be forced to include the character.
+- Aim for the character to actually appear in roughly 30–50% of the scenes — not more. The remaining majority of scenes focus on world, mood, objects, environments, action without the character, abstract beats, or the product itself.
 
-CRITICAL:
-- ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor that makes the viewer perceive continuity.
-- DO NOT have the same shotType in two consecutive scenes. Vary to keep the cinematography dynamic.
-- DO NOT reference "the same person" or use continuity pronouns — the consistency comes from the repeated signatureItems, not from claiming identity.
+WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
+- "full": full character visible (rare — reserve for 1, maybe 2 hero/establishing moments). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
+- "profile" / "back" / "silhouette": indirect view (side-profile from distance, over-the-shoulder, back-shot, gegenlicht). Include ONLY signatureItems verbatim — omit appearance.
+- "detail": detail framing (just the eyes, just the hands holding an object, just the feet). Include ONLY the relevant body part + 1 matching signature item.
+- "pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
+
+CRITICAL RULES:
+- If a scene works narratively without the character, ALWAYS prefer "absent" / no characterShot. Do not invent reasons to insert the character.
+- Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
+- ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
+- DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
 - For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
-- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent").
+- For scenes WITHOUT any character (the majority), omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
 
 If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
 })()}
