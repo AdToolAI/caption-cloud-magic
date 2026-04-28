@@ -232,12 +232,14 @@ export default function VideoComposerDashboard() {
 
     (async () => {
       try {
-        // Also pull project-level fields (output_url, status) so the rendered
-        // video remains visible after a reload.
+        // Also pull project-level fields (output_url, status, briefing, …) so
+        // the rendered video remains visible after a reload AND so a freshly
+        // redirected Auto-Director / Ad-Director project shows its briefing
+        // immediately instead of the empty default.
         const [{ data: projRow }, { data, error: dbError }] = await Promise.all([
           supabase
             .from('composer_projects')
-            .select('output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
+            .select('title, category, briefing, language, assembly_config, output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
             .eq('id', projectId)
             .maybeSingle(),
           supabase
@@ -250,6 +252,11 @@ export default function VideoComposerDashboard() {
         if (projRow) {
           setProject(prev => ({
             ...prev,
+            title: (projRow as any).title ?? prev.title,
+            category: ((projRow as any).category as ComposerCategory) ?? prev.category,
+            briefing: ((projRow as any).briefing as ComposerBriefing) ?? prev.briefing,
+            language: (projRow as any).language ?? prev.language,
+            assemblyConfig: ((projRow as any).assembly_config as AssemblyConfig) ?? prev.assemblyConfig,
             outputUrl: projRow.output_url ?? prev.outputUrl,
             status: (projRow.status as ComposerStatus) ?? prev.status,
             adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
