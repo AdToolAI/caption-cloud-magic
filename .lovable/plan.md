@@ -1,46 +1,68 @@
-## Problem
+## Ziel
 
-Die zwei erfolgreich gerenderten Luma-Ray-Szenen (`1318c027…` und `c16a9b72…`) sind im Storage vorhanden und in `composer_scenes` als `ready` markiert, erscheinen aber **nicht** im Tab „KI" der Mediathek.
+Der Voiceover-Skriptgenerator im Universal Creator (Schritt "Voiceover & Untertitel") soll sich automatisch an den vorher definierten **Storyboard-Szenen** orientieren. Egal ob der Nutzer den "KI-Generator" oder den "Aus Szenen"-Modus wählt – das Ergebnis ist ein zusammenhängendes Skript, das
 
-## Ursachenanalyse
+1. die **Gesamtgeschichte** der Szenen widerspiegelt (Hook → Mitte → Ende),
+2. **zeitlich pro Szene passt** (Wortanzahl-Budget je Szene basierend auf 2,5 Wörter/Sek),
+3. als ein **flüssiger Sprechtext** ausgegeben wird (mit unsichtbaren Szenen-Markern, damit Untertitel später passen).
 
-Edge-Function-Logs zeigen für beide Szenen nur:
+## Aktueller Stand (kurz)
+
+- Storyboard-Szenen (`Scene[]`) aus `useSceneManager` werden im `UniversalCreator` gehalten, aber **nicht** an `ContentVoiceStep` durchgereicht.
+- `VoiceoverScriptGenerator.tsx` ruft `generate-voiceover-script` nur mit `idea`, `targetDuration`, `tone`, `language` auf — kein Szenen-Kontext.
+- Die Edge Function generiert daher generische Texte, die zeitlich oft nicht zur Sequenz passen.
+
+## Änderungen
+
+### 1. Szenen an den Voiceover-Step durchreichen
+- `ContentVoiceStepProps` um `scenes?: Scene[]` erweitern.
+- In `UniversalCreator.tsx` (Step "content") `scenes={scenes}` übergeben.
+- Props nach unten an `<VoiceoverScriptGenerator scenes={scenes} ... />` durchreichen.
+
+### 2. `VoiceoverScriptGenerator` erweitert
+- Neue Prop: `scenes?: Scene[]`.
+- Wenn `scenes.length > 0`:
+  - Default-Dauer ergibt sich aus der **Summe der Szenen-Dauern** (statt `defaultDuration`).
+  - Neuer Hinweis-Block oben: „Skript wird auf deine X Szenen (Σ Y s) abgestimmt".
+  - Idea-Feld bleibt optional; wenn leer und Szenen vorhanden, wird "Erzähle eine zusammenhängende Geschichte basierend auf den Szenen" als Default benutzt.
+- Body-Payload um `scenes` (nur die für den Text relevanten Felder: `order`, `duration`, optionale Beschreibung aus `background`/`textOverlay`) erweitern.
+
+### 3. Kleiner "Aus Szenen"-Direktmodus
+- Neuer Button im Generator: **„Direkt aus Szenen generieren"** (überspringt Idea-Eingabe, nutzt Szenen + gewählten Ton).
+- Setzt intern `idea = ""` und ruft mit `mode: 'from_scenes'` auf.
+
+### 4. Edge Function `generate-voiceover-script` erweitern
+- Akzeptiert neu: `scenes?: { order: number; durationSeconds: number; description?: string }[]` und `mode?: 'from_idea' | 'from_scenes'`.
+- Wenn `scenes` vorhanden:
+  - **Pro Szene** wird ein Wort-Budget berechnet: `wordsPerScene = round(durationSeconds * 2.5)` (mit ±10 % Toleranz).
+  - System-Prompt wird ergänzt um eine **Szenen-Tabelle** (Szene 1: Xs / ~Y Wörter, …) und die Anweisung:
+    - „Schreibe einen einzigen, zusammenhängenden Sprechtext."
+    - „Halte dich pro Szene an das Wort-Budget (±10 %)."
+    - „Markiere Szenenwechsel mit `[[scene:N]]` im Text — diese Marker werden vor der Sprachausgabe entfernt."
+    - Hook in Szene 1, Resolution/CTA in der letzten Szene.
+- Tool-Schema erweitert um optionales `sceneScripts: { order:number; text:string; words:number }[]` (Hauptausgabe bleibt `script`, kompatibel zu bestehender UI).
+- Vor der Rückgabe werden `[[scene:N]]`-Marker für die Anzeige entfernt; `sceneScripts` wird zusätzlich zurückgegeben (für spätere Subtitle-Sync, optional in der UI als Vorschau pro Szene).
+
+### 5. UI-Vorschau pro Szene (optional, klein)
+- Wenn `sceneScripts` vorhanden, unter dem generierten Skript eine kompakte Liste „Pro Szene" anzeigen (Szene N · Xs · "…"), damit der Nutzer sieht, dass das Skript szenengetreu ist.
+
+## Technische Details
+
+- **Wort-Budget-Formel:** `targetWords(scene) = clamp(round(duration * 2.5), 4, 80)`; gesamt = Σ.
+- **Marker-Cleanup:** `script.replace(/\s*\[\[scene:\d+\]\]\s*/g, ' ').trim()`.
+- **Backward-Compatible:** Wenn keine `scenes` gesendet werden, verhält sich die Edge Function exakt wie vorher.
+- **Keine neuen Tabellen / Migrations** nötig.
+
+## Geänderte Dateien
+
+```text
+src/pages/UniversalCreator/UniversalCreator.tsx        (scenes an ContentVoiceStep durchreichen)
+src/components/universal-creator/steps/ContentVoiceStep.tsx   (scenes-Prop + an Generator weiterreichen)
+src/components/universal-creator/VoiceoverScriptGenerator.tsx (scenes-Prop, "Aus Szenen"-Button, Vorschau)
+supabase/functions/generate-voiceover-script/index.ts  (scenes-Kontext, Wort-Budget pro Szene, Marker)
 ```
-[compose-clip-webhook] Scene: <id>, Status: succeeded
-[compose-clip-webhook] Stored at: …
-```
 
-Der Archive-Block (der `📚 Archived scene … to Media Library (KI)` loggen sollte) **läuft nie** – weder erfolgreich noch mit Fehler. Das bedeutet: die **deployte Version** von `compose-clip-webhook` enthält den Archive-Code noch gar nicht. Das passt zum vorherigen `SUPABASE_CODEGEN_ERROR` (esm.sh-Timeout) – der Re-Deploy nach Hinzufügen des Archive-Blocks ist offenbar nicht endgültig durchgegangen.
+## Out of Scope
 
-DB-Check bestätigt: `video_creations` enthält **keinen** Eintrag mit `metadata.scene_id` für diese beiden IDs.
-
-Das Frontend (`src/pages/MediaLibrary.tsx`, Zeile 295) filtert korrekt nach `metadata.source === 'motion-studio-clip'` – kein Frontend-Bug.
-
-## Lösung
-
-### 1. `compose-clip-webhook` neu deployen
-Der Quellcode ist bereits korrekt. Wir triggern einen sauberen Re-Deploy (mit kleinem Kommentar-Touch, falls nötig, damit der Bundler die Funktion sicher neu baut).
-
-### 2. Backfill der zwei vorhandenen Luma-Szenen
-Migration: für die beiden bereits fertigen Szenen (und allgemein für **alle** `composer_scenes` mit `clip_status = 'ready'`, `clip_source LIKE 'ai-%'`, ohne entsprechenden `video_creations`-Eintrag) einmalig Einträge in `video_creations` anlegen mit:
-- `output_url` = `clip_url`
-- `metadata` = `{ source: 'motion-studio-clip', project_id, project_name, scene_id, scene_order: order_index, prompt: ai_prompt, model: clip_source, duration_seconds, reference_image_url, superseded: false }`
-- `credits_used` = 0
-- `status` = `'completed'`
-
-So tauchen die beiden Luma-Szenen sofort im KI-Tab auf, ohne dass neu gerendert werden muss.
-
-### 3. Verifikations-Schritt
-Nach Deploy + Backfill: `SELECT count(*) FROM video_creations WHERE metadata->>'source' = 'motion-studio-clip'` und Mediathek-KI-Tab im Browser prüfen.
-
-## Geänderte / Betroffene Artefakte
-
-1. **Edge Function**: `supabase/functions/compose-clip-webhook/index.ts` – nur Re-Deploy, evtl. minimaler Kommentar-Bump
-2. **DB-Migration**: einmaliges Backfill-INSERT in `video_creations` für alle nicht-archivierten ready Szenen mit `clip_source LIKE 'ai-%'`
-3. Keine Frontend-Änderungen nötig
-
-## Erwartetes Ergebnis
-
-- Beide Luma-Szenen erscheinen sofort im Tab „KI" der Mediathek (via Backfill)
-- Alle **zukünftigen** AI-Composer-Clips (Luma, Hailuo, Wan, Seedance, Kling, Veo, AI-Image) werden automatisch archiviert (durch den jetzt aktiven Webhook-Code)
-- Bei Re-Generation einer Szene wird die alte Version mit `superseded: true` markiert, bleibt aber sichtbar
+- Composer (`VoiceSubtitlesTab`) — der hat bereits `generateScriptFromScenes()` aus Overlays. Kann in einem späteren Schritt analog erweitert werden, wenn gewünscht.
+- Automatisches Re-Generieren bei nachträglicher Szenen-Änderung (bleibt manueller Klick).
