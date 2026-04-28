@@ -11,7 +11,6 @@ import { useTranslation } from '@/hooks/useTranslation';
 import ColorGradingSelector from './ColorGradingSelector';
 import WatermarkEditor from './WatermarkEditor';
 import ComposerSequencePreview from './ComposerSequencePreview';
-import CostEstimationPanel from './CostEstimationPanel';
 import ExportPresetPanel from './ExportPresetPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
