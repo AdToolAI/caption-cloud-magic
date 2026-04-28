@@ -480,6 +480,15 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                 <span>€{voCost.toFixed(2)}</span>
               </div>
             )}
+            {assemblyConfig.music?.enabled && assemblyConfig.music?.trackUrl && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Music className="h-3 w-3" />
+                  {t('videoComposer.backgroundMusic') || 'Hintergrundmusik'}
+                </span>
+                <span className="text-emerald-400">€0.00</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-muted-foreground">{t('videoComposer.rendering')}</span>
               <span>€{renderCost.toFixed(2)}</span>
