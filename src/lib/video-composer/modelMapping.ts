@@ -18,7 +18,7 @@ import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoMode
 import type { ClipSource, ClipQuality, ComposerCategory } from '@/types/video-composer';
 
 /** Toolkit families that compose-video-clips can actually render. */
-const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo']);
+const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo', 'sora']);
 
 /** Synthetic toolkit entry for the static "Gemini Image + Ken-Burns" source. */
 const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
