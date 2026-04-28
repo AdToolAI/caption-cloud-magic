@@ -171,6 +171,7 @@ export default function ContinuityGuardianStrip({
       sceneId: pair.next.id,
       anchorSceneId: pair.prev.id,
       projectId,
+      context: buildContext(pair),
     });
     if (!result) return null;
 
