@@ -1,74 +1,59 @@
-# Hintergrundmusik im Export sichtbar & hörbar machen
+## Problem
 
-## Diagnose
+Wenn du im **Storyboard** den KI-Prompt (oder Prompt-Slots / Shot-Director / Director-Modifiers) einer Szene manuell bearbeitest, landet die Änderung **nur im lokalen React-State**. Sie wird nicht in die Datenbank geschrieben. Folgen:
 
-Die Hintergrundmusik **wird** technisch in den Export übertragen — die Datenkette ist intakt:
+1. **Beim Wechsel zu „Clips" → „Generieren"**: Der erste Render benutzt noch den lokalen Wert (richtig), aber die DB bleibt veraltet.
+2. **Beim Zurückwechseln ins Storyboard** (oder Reload): Der `VideoComposerDashboard` synchronisiert Szenen aus der DB. Da `ai_prompt` dort noch den alten Wert hat, **überschreibt die DB-Hydration deine Änderung** und du siehst wieder den ursprünglichen Prompt.
 
-```text
-AudioTab (assemblyConfig.music)
-  → updateAssembly() debounced DB-Write (800ms)
-  → Render-Klick: persistAssemblyConfig() flush vor Edge-Call
-  → compose-video-assemble liest assembly_config aus DB
-  → inputProps.backgroundMusicUrl + backgroundMusicVolume
-  → Lambda rendert ComposedAdVideo mit <Audio src={backgroundMusicUrl} />
-```
+### Ursache (technisch)
 
-**Das wirkliche Problem**: Im Export-Step gibt es **keinerlei UI-Hinweis**, dass eine Musik ausgewählt ist. Die Vorschau im Export-Step spielt zudem nur das Voiceover ab, nicht die Musik. Dadurch entsteht der Eindruck, die Musik sei verloren — sie ist im finalen MP4 aber drin.
-
-Drei Lücken konkret:
-1. `AssemblyTab.tsx` zeigt keine Musik-Zusammenfassung (Track-Name, Volume).
-2. `ComposerSequencePreview.tsx` mischt nur das Voiceover, nicht die BGM.
-3. `CostEstimationPanel` listet Musik nicht als aktiven Bestandteil auf.
+- `setScenes` in `VideoComposerDashboard.tsx` aktualisiert nur `useState`, kein DB-Write.
+- `ensureProject()` in `ClipsTab.tsx` macht ein Short-Circuit, sobald `projectId` existiert — es ruft `ensureProjectPersisted` (das `ai_prompt` updaten würde) **nicht erneut** auf.
+- Die Hydration-Logik in `VideoComposerDashboard.tsx` (Zeilen 285–331) bevorzugt DB-Werte: `aiPrompt: row.ai_prompt ?? local?.aiPrompt` — der DB-Wert gewinnt also immer.
 
 ## Lösung
 
-### 1. Musik-Zusammenfassung im Export-Step (AssemblyTab)
+Storyboard-Edits müssen **debounced** in die DB geschrieben werden, sobald ein Projekt persistiert ist. Außerdem soll vor jedem „Generieren"-Klick sichergestellt werden, dass die DB den aktuellen Stand kennt.
 
-Neue kompakte Card direkt unter "Color Grading", die liest:
+### 1. Debounced Scene-Persistence im Dashboard
 
-- Aktiv / Inaktiv (mit Switch zum Schnell-Stummschalten ohne den Audio-Tab zu verlassen)
-- Track-Name (z.B. "Beach Sunset — Lofi Artist")
-- Volume in % (mit Slider 0–100, gespiegelt aus `assemblyConfig.music.volume`)
-- Mini-Play-Button für 10-Sekunden-Preview des Tracks
-- Link "Im Audio-Tab ändern" → wechselt zurück zum Audio-Tab
+In `src/components/video-composer/VideoComposerDashboard.tsx`:
 
-Wenn keine Musik gesetzt ist: dezenter Hinweis "Keine Hintergrundmusik gewählt — im Audio-Tab hinzufügen."
+- Neuen `setScenes`-Callback so erweitern, dass er — analog zur bestehenden `updateAssembly`-Logik (`assemblyPersistTimer`) — einen Timer (`scenesPersistTimer`, ~600ms) startet.
+- Nach Ablauf des Timers werden für alle Szenen mit echter UUID die editierbaren Felder per `supabase.from('composer_scenes').update(...)` geschrieben:
+  - `ai_prompt`, `prompt_slots`, `prompt_mode`, `prompt_slot_order`
+  - `director_modifiers`, `shot_director`, `applied_style_preset_id`, `cinematic_preset_slug`
+  - `reference_image_url`, `text_overlay`, `transition_type`, `transition_duration`
+  - `duration_seconds`, `clip_source`, `clip_quality`, `stock_keywords`, `character_shot`
+- **Wichtig**: `clip_url` und `clip_status` werden hier **nicht** überschrieben (die kommen aus dem Render-Webhook).
+- Persistenz nur auslösen, wenn `project.id` existiert (sonst still im LocalState halten — wird beim ersten „Generieren" via `ensureProjectPersisted` einmalig komplett geschrieben).
 
-### 2. Musik im Vorschau-Player abspielen
+### 2. Force-Persist vor Clip-Generierung
 
-`ComposerSequencePreview.tsx` erweitern:
+In `src/components/video-composer/ClipsTab.tsx` `ensureProject()`:
 
-- Zweites verstecktes `<audio>`-Element für `backgroundMusicUrl`
-- Sync-Logik analog zum Voiceover (play/pause/seek an `globalTime` gekoppelt)
-- Volume aus `assemblyConfig.music.volume / 100` (clamped 0..1)
-- Loop aktiv, falls Track kürzer als Gesamtvideo
-- Mute-Button im Player wirkt auf beide Spuren
+- Short-Circuit `if (projectId) return { projectId, scenes }` entfernen.
+- Stattdessen **immer** `onEnsurePersisted()` aufrufen, damit die aktuellen Storyboard-Edits garantiert in der DB liegen, bevor `compose-video-clips` läuft.
+- Falls keine UUID vorhanden ist, läuft der bestehende Insert-Pfad; falls vorhanden, läuft der Update-Pfad in `useComposerPersistence`.
 
-Neue Props an `ComposerSequencePreview`: `backgroundMusicUrl?: string | null`, `backgroundMusicVolume?: number`.
+### 3. Sofortiges Flush beim Tab-Wechsel
 
-### 3. Musik in CostEstimationPanel listen
+In `VideoComposerDashboard.handleTabChange`:
 
-Eine zusätzliche Zeile "Hintergrundmusik" — kostet 0 € (Stock-Library), aber sie taucht als aktiver Bestandteil auf, damit der User sieht, dass sie mitläuft.
+- Bevor der bestehende Re-Fetch beim Wechsel auf `'clips'` läuft, eventuell offene `scenesPersistTimer` **synchron flushen** (Timer canceln + Persist sofort ausführen). So überschreibt der nachfolgende `select('clip_status, clip_url, cost_euros')` den Prompt nicht versehentlich (er liest diese Felder ohnehin nicht — aber so ist garantiert, dass DB & Lokal übereinstimmen).
+- Optional gleicher Flush beim Wechsel **weg vom Storyboard** und beim Unmount, damit `saveDraft`/Hydration-Reihenfolge konsistent bleibt.
 
-### 4. Defensive Logging im Render-Pfad
+### 4. (Defensiv) Hydration-Konflikt entschärfen
 
-In `handleRender` (AssemblyTab) eine kurze Konsolen-Log-Ausgabe vor dem Edge-Call:
-
-```text
-[Composer] Render payload check: music=<trackName or "none"> vol=<%>
-```
-
-Hilft dem User & uns bei künftigem Debugging, sofort zu sehen, ob die Musik die Render-Stufe erreicht.
+In der DB-Hydration in `VideoComposerDashboard.tsx`: Da nach Schritt 1–3 DB & Local immer synchron sind, ist die bisherige `row.ai_prompt ?? local?.aiPrompt`-Regel unkritisch. Keine Änderung nötig.
 
 ## Geänderte Dateien
 
-- `src/components/video-composer/AssemblyTab.tsx` — neue MusicSummaryCard, Props an Preview, Pre-Render-Log
-- `src/components/video-composer/ComposerSequencePreview.tsx` — zweite Audio-Spur für BGM, Sync + Mute
-- `src/components/video-composer/CostEstimationPanel.tsx` — Zeile für Musik
-- (optional) neue kleine Komponente `src/components/video-composer/MusicSummaryCard.tsx`
+- `src/components/video-composer/VideoComposerDashboard.tsx` — Debounced Scene-Persist + Flush-on-tab-change
+- `src/components/video-composer/ClipsTab.tsx` — `ensureProject` ruft `onEnsurePersisted` immer auf
 
-Keine Änderungen an Edge-Funktion oder Remotion-Template nötig — die Render-Pipeline ist korrekt.
+## Verifikation
 
-## Ergebnis
-
-Im Export-Step sieht und hört der User klar, dass die Hintergrundmusik Teil des finalen Videos ist. Die tatsächliche Übergabe an Lambda war bereits korrekt; dieser Plan schließt die UX-Lücke, die das Vertrauen in das Feature untergräbt.
+1. Prompt im Storyboard bearbeiten → ~1s warten → kurz weg vom Tab und zurück → Prompt bleibt erhalten.
+2. Prompt bearbeiten → direkt zu „Clips" → „Neu generieren" → neuer Render benutzt die Änderung.
+3. Browser-Reload nach Edit → Storyboard zeigt den editierten Prompt.
