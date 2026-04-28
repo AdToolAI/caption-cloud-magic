@@ -172,7 +172,14 @@ serve(async (req) => {
     // the dedicated `negative_prompt` API parameter (see hailuoInput / klingInput).
     // The positive prompt only carries a short positive cue.
     const NEGATIVE_PROMPT_PARAM = "text, captions, subtitles, watermark, logo, typography, written words, letters, signs with readable text, UI overlay, lower thirds, isolated product, plain white background, floating product, rotating product, blurry, low quality";
+    // Extra negatives applied ONLY when a reference image is supplied (i2v).
+    // i2v models tend to hold the reference image static for the first 3-12 frames
+    // before motion kicks in. These tokens push the model to start motion at frame 1.
+    const NEGATIVE_PROMPT_I2V_EXTRA = ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
     const POSITIVE_CLEAN_CUE = ", clean cinematic composition, natural environment";
+    // Positive cue appended ONLY for i2v requests — biases the model toward
+    // immediate camera movement so the reference image doesn't appear as a still.
+    const POSITIVE_I2V_MOTION_CUE = ", motion already in progress from frame one, immediate camera movement, no static opening frame";
     const STYLE_HINT = getVisualStyleHint(visualStyle);
 
     // Build a quick character lookup for the safety-net injection
