@@ -46,6 +46,8 @@ import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
 import MultiEnginePromptPreview from '@/components/motion-studio/MultiEnginePromptPreview';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
+import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
   stitchSlots,
   naiveSplitToSlots,
