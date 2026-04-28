@@ -38,6 +38,12 @@ export function useContinuityDrift() {
       sceneId: string;
       anchorSceneId?: string;
       projectId?: string;
+      context?: {
+        sceneType?: string;
+        nextSceneType?: string;
+        expectsSameCharacter?: boolean;
+        nextPrompt?: string;
+      };
     }): Promise<DriftCheckResult | null> => {
       setCheckingPairId(params.sceneId);
       try {
