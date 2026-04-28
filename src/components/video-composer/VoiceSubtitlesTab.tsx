@@ -109,6 +109,9 @@ export default function VoiceSubtitlesTab({
   // ── Voiceover state ──────────────────────────────────────────────
   const [generatingVo, setGeneratingVo] = useState(false);
   const [scriptGenOpen, setScriptGenOpen] = useState(false);
+  const [autoGenerating, setAutoGenerating] = useState(false);
+  const [autoError, setAutoError] = useState(false);
+  const autoTriedRef = useRef(false);
 
   // Voice tuning (speed + ElevenLabs settings) — synced from/to assemblyConfig.voiceover
   const [speed, setSpeed] = useState<number>(voiceover?.speed ?? 1.0);
