@@ -106,9 +106,9 @@ function safeParseDrift(raw: string): DriftResult {
       parsed.recommendation === "hard-repair" ||
       parsed.recommendation === "soft-repair"
         ? parsed.recommendation
-        : driftScore >= 66
+        : driftScore >= 76
           ? "hard-repair"
-          : driftScore >= 36
+          : driftScore >= 56
             ? "soft-repair"
             : "ok";
     return { driftScore, label, recommendation: rec };
