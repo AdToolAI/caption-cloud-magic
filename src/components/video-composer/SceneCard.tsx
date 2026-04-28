@@ -783,30 +783,80 @@ export default function SceneCard({
                   language={lang}
                 />
 
+                {/* Phase 6 — Live Prompt Preview Panel (centralized composer) */}
                 {(() => {
-                  const hasMods = scene.directorModifiers && Object.values(scene.directorModifiers).some(Boolean);
-                  const hasShot = scene.shotDirector && Object.values(scene.shotDirector).some(Boolean);
-                  const resolved = resolveMentions(scene.aiPrompt || '', libCharacters, libLocations);
-                  const hasMentions = resolved.matches.length > 0;
-                  if (!hasMods && !hasMentions && !hasShot) return null;
-                  const withMods = applyDirectorModifiers(resolved.prompt, scene.directorModifiers || {});
-                  const shotSuffix = buildShotPromptSuffix(scene.shotDirector || {});
-                  const finalPrompt = [withMods, shotSuffix].filter(Boolean).join(' ');
+                  const composed = composePromptLayers({
+                    rawPrompt: scene.aiPrompt || '',
+                    directorModifiers: scene.directorModifiers,
+                    shotDirector: scene.shotDirector,
+                    cinematicStylePresetId: (scene as any).cinematicStylePresetId,
+                    brandCharacter: brandCharacterInput,
+                    libraryCharacters: libCharacters,
+                    libraryLocations: libLocations,
+                  });
+                  const hasAnyLayer = composed.layers.some(
+                    (l) => l.source !== 'rawPrompt' && l.applied,
+                  );
+                  if (!composed.finalPrompt && !hasAnyLayer) return null;
                   return (
                     <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <Label className="text-[10px] text-muted-foreground">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between mb-1"
+                        onClick={() => setPromptPreviewOpen((o) => !o)}
+                      >
+                        <Label className="text-[10px] text-muted-foreground cursor-pointer">
                           {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
+                          {composed.dropped.length > 0 && (
+                            <span className="ml-1 text-[9px] text-amber-400/80">
+                              · {composed.dropped.length} {lang === 'de' ? 'entfernt (Dedup)' : lang === 'es' ? 'eliminados (dedup)' : 'deduped'}
+                            </span>
+                          )}
                         </Label>
-                        {resolved.referenceImageUrl && (
-                          <Badge variant="outline" className="text-[8px] h-3 px-1 border-primary/40 text-primary">
-                            i2v ref
-                          </Badge>
-                        )}
-                      </div>
+                        <div className="flex items-center gap-1">
+                          {composed.referenceImageUrl && (
+                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-primary/40 text-primary">i2v ref</Badge>
+                          )}
+                          {composed.negativePrompt && (
+                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-amber-500/40 text-amber-400">neg</Badge>
+                          )}
+                          {brandCharacterInput && composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
+                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-emerald-500/40 text-emerald-400">brand</Badge>
+                          )}
+                          {promptPreviewOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </div>
+                      </button>
                       <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words whitespace-pre-line">
-                        {finalPrompt}
+                        {composed.finalPrompt}
                       </p>
+                      {promptPreviewOpen && (
+                        <div className="mt-2 space-y-1.5 border-t border-primary/20 pt-2">
+                          {composed.layers.map((l, i) => (
+                            <div key={i} className="text-[9px] flex gap-1.5">
+                              <span className={`font-semibold shrink-0 w-32 ${l.applied ? 'text-primary/80' : 'text-muted-foreground/40 line-through'}`}>
+                                {l.label}
+                              </span>
+                              <span className={`font-mono break-words ${l.applied ? 'text-foreground/70' : 'text-muted-foreground/40 line-through'}`}>
+                                {l.text || '—'}
+                              </span>
+                            </div>
+                          ))}
+                          {composed.negativePrompt && (
+                            <div className="text-[9px] flex gap-1.5">
+                              <span className="font-semibold shrink-0 w-32 text-amber-400/80">negative_prompt →</span>
+                              <span className="font-mono text-amber-300/70 break-words">{composed.negativePrompt}</span>
+                            </div>
+                          )}
+                          {composed.dropped.length > 0 && (
+                            <div className="text-[9px] flex gap-1.5">
+                              <span className="font-semibold shrink-0 w-32 text-amber-400/60">axis dedup ✂</span>
+                              <span className="font-mono text-amber-300/50 break-words line-through">
+                                {composed.dropped.map((d) => `${d.text} (${d.source})`).join(' · ')}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
