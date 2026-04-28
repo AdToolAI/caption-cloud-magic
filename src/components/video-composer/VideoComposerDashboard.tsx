@@ -522,9 +522,29 @@ export default function VideoComposerDashboard() {
     });
   }, [incrementTemplateUsage]);
 
-  // One-shot DB re-fetch when user switches BACK to the Clips tab
+  // One-shot DB re-fetch when user switches BACK to the Clips tab.
+  // Also flushes pending Storyboard edits to DB BEFORE the refetch so
+  // they don't get clobbered.
   const handleTabChange = useCallback(async (next: TabId) => {
     setActiveTab(next);
+
+    // Flush any pending debounced scene-edit writes synchronously
+    // (covers the Storyboard → Clips transition, which is exactly when
+    // users notice their prompt edits being lost).
+    if (scenesPersistTimerRef.current) {
+      window.clearTimeout(scenesPersistTimerRef.current);
+      scenesPersistTimerRef.current = null;
+    }
+    const pending = pendingScenesRef.current;
+    pendingScenesRef.current = null;
+    if (pending && project.id) {
+      try {
+        await persistScenesToDbRef.current?.(project.id, pending);
+      } catch (err) {
+        console.warn('[VideoComposerDashboard] flush before tab change failed:', err);
+      }
+    }
+
     if (next !== 'clips' || !project.id) return;
     try {
       const { data } = await supabase
@@ -549,6 +569,13 @@ export default function VideoComposerDashboard() {
       console.warn('[VideoComposerDashboard] tab refresh failed:', err);
     }
   }, [project.id]);
+
+  // Forward refs so handleTabChange (declared earlier) can reach the
+  // debounced scene-persist machinery defined later in this component.
+  const scenesPersistTimerRef = useRef<number | null>(null);
+  const pendingScenesRef = useRef<ComposerScene[] | null>(null);
+  const persistScenesToDbRef = useRef<((projectId: string, scenes: ComposerScene[]) => Promise<void>) | null>(null);
+
 
   const showCampaignTab = !!project.adMeta;
   const TABS = [
@@ -631,8 +658,90 @@ export default function VideoComposerDashboard() {
     setProject(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Debounced DB-write of edited scenes (prompt, slots, director settings, …)
+  // so Storyboard edits survive tab switches and reloads.
+  // Uses scenesPersistTimerRef / pendingScenesRef / persistScenesToDbRef
+  // declared above next to handleTabChange so the tab-change flush can
+  // reach them.
+
+  const persistScenesToDb = useCallback(async (projectId: string, scenes: ComposerScene[]) => {
+    const targets = scenes.filter(s => isUuid(s.id));
+    if (targets.length === 0) return;
+    await Promise.all(targets.map((s) =>
+      supabase
+        .from('composer_scenes')
+        .update({
+          // Editable storyboard fields — explicitly NOT clip_url / clip_status
+          // (those come from the render webhook).
+          order_index: scenes.indexOf(s),
+          duration_seconds: s.durationSeconds,
+          clip_source: s.clipSource,
+          clip_quality: s.clipQuality || 'standard',
+          ai_prompt: s.aiPrompt ?? null,
+          stock_keywords: s.stockKeywords ?? null,
+          upload_url: s.uploadUrl ?? null,
+          upload_type: s.uploadType ?? null,
+          reference_image_url: s.referenceImageUrl ?? null,
+          text_overlay: s.textOverlay as any,
+          transition_type: s.transitionType,
+          transition_duration: s.transitionDuration,
+          character_shot: (s.characterShot ?? null) as any,
+          director_modifiers: (s.directorModifiers ?? {}) as any,
+          shot_director: (s.shotDirector ?? {}) as any,
+          prompt_slots: (s.promptSlots ?? null) as any,
+          prompt_mode: s.promptMode ?? null,
+          prompt_slot_order: (s.promptSlotOrder ?? null) as any,
+          applied_style_preset_id: s.appliedStylePresetId ?? null,
+          cinematic_preset_slug: s.cinematicPresetSlug ?? null,
+        } as any)
+        .eq('id', s.id)
+        .eq('project_id', projectId)
+    )).catch(err => console.warn('[VideoComposerDashboard] scene persist failed:', err));
+  }, []);
+
+  // Expose to handleTabChange via ref (handleTabChange is declared earlier).
+  useEffect(() => {
+    persistScenesToDbRef.current = persistScenesToDb;
+  }, [persistScenesToDb]);
+
   const setScenes = useCallback((scenes: ComposerScene[]) => {
-    setProject(prev => ({ ...prev, scenes }));
+    setProject(prev => {
+      // Schedule debounced DB flush only for already-persisted projects.
+      if (prev.id) {
+        pendingScenesRef.current = scenes;
+        if (scenesPersistTimerRef.current) {
+          window.clearTimeout(scenesPersistTimerRef.current);
+        }
+        scenesPersistTimerRef.current = window.setTimeout(() => {
+          const pending = pendingScenesRef.current;
+          pendingScenesRef.current = null;
+          scenesPersistTimerRef.current = null;
+          if (pending && prev.id) {
+            persistScenesToDb(prev.id, pending);
+          }
+        }, 600);
+      }
+      return { ...prev, scenes };
+    });
+  }, [persistScenesToDb]);
+
+  // Flush pending scene-edit writes on unmount so they aren't lost when
+  // the user navigates away.
+  useEffect(() => {
+    return () => {
+      if (scenesPersistTimerRef.current) {
+        window.clearTimeout(scenesPersistTimerRef.current);
+        scenesPersistTimerRef.current = null;
+      }
+      const pending = pendingScenesRef.current;
+      pendingScenesRef.current = null;
+      const pid = project.id;
+      if (pending && pid) {
+        // fire-and-forget; component is unmounting
+        persistScenesToDb(pid, pending);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Debounced DB-write of assembly_config so voiceover / music / subtitle

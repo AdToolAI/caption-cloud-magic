@@ -250,15 +250,23 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   }, [generatingCount, pollScenes]);
 
   const ensureProject = async (): Promise<{ projectId: string; scenes: ComposerScene[] } | null> => {
-    if (projectId) return { projectId, scenes };
-    if (!onEnsurePersisted) return null;
-    try {
-      return await onEnsurePersisted();
-    } catch (err: any) {
-      toast({ title: 'Fehler', description: err.message || 'Projekt konnte nicht gespeichert werden', variant: 'destructive' });
-      return null;
+    // Always call onEnsurePersisted (when available) so the LATEST Storyboard
+    // edits (prompt, slots, director settings, …) are flushed to DB before
+    // compose-video-clips runs. This prevents the "edits not picked up /
+    // reverted on tab switch" bug where projectId already exists and the
+    // short-circuit skipped persistence.
+    if (onEnsurePersisted) {
+      try {
+        return await onEnsurePersisted();
+      } catch (err: any) {
+        toast({ title: 'Fehler', description: err.message || 'Projekt konnte nicht gespeichert werden', variant: 'destructive' });
+        return null;
+      }
     }
+    if (projectId) return { projectId, scenes };
+    return null;
   };
+
 
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
