@@ -18,6 +18,10 @@ interface Props {
   globalTextOverlays?: GlobalTextOverlay[];
   /** Voiceover audio URL — plays in sync with the video timeline. */
   voiceoverUrl?: string | null;
+  /** Background music URL — loops underneath the video at the configured volume. */
+  backgroundMusicUrl?: string | null;
+  /** Background music volume (0..1). Defaults to 0.3. */
+  backgroundMusicVolume?: number;
   /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
   onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
