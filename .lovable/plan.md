@@ -1,74 +1,85 @@
+
+# Audio-Toggle pro Szene im Motion Studio Composer
+
 ## Problem
 
-Alle 7 Sora-2-Szenen schlugen fehl. Die Edge-Function-Logs zeigen zwei klare Ursachen:
+Bei der Anbieter-Auswahl im Composer (SceneCard → KI-Modell) gibt es derzeit **keine Möglichkeit**, für audio-fähige Modelle (**Sora 2 Standard**, **Sora 2 Pro**, **Veo 3.1 Fast**, **Veo 3.1 Premium**, **Kling 3 Standard**, **Kling 3 Pro**) zu wählen, ob das generierte Video mit oder ohne nativen Sound erstellt werden soll. Im Standalone-Toolkit existiert dieser Switch bereits — im Composer pro Szene fehlt er komplett.
 
-**1. Replicate Rate Limit (429 Too Many Requests) — Hauptursache**
-Replicate drosselt `openai/sora-2` extrem aggressiv (~1 Request alle 5–10 Sekunden pro Account). Wir feuern alle Sora-Szenen praktisch gleichzeitig in einer engen `for`-Schleife ab. Nur die allererste geht durch, alle restlichen bekommen 429 mit `retry_after: 5–10s` und werden sofort als `failed` markiert.
+Außerdem ist Sora 2 in der Modell-Registry fälschlich als `audio: false` markiert, obwohl Sora 2 nativ Audio liefert.
 
-**2. Aspect-Ratio-Validierung (422 Unprocessable Entity)**
-Wir senden `aspect_ratio: "16:9"` an Sora 2, aber Replicate akzeptiert nur `"portrait"` oder `"landscape"`. Mindestens eine Szene scheitert deshalb dauerhaft (auch ohne Rate Limit).
+## Ziel
 
-## Lösung
+Pro Szene im Storyboard / Clips-Tab einen kompakten **„Mit Sound / Ohne Sound"-Toggle** anbieten — sichtbar nur, wenn das gewählte Modell Audio kann. Default = Mit Sound.
 
-### Fix 1 — Sora-2 Aspect-Ratio Mapping (`compose-video-clips/index.ts`, Zeile ~665)
+## Änderungen
 
-Mapping von Composer-Aspect-Ratios auf Sora-Enum:
+### 1. Modell-Registry korrigieren
+`src/config/aiVideoModelRegistry.ts`: Sora 2 Standard und Sora 2 Pro auf `capabilities.audio: true` setzen (Sora 2 liefert nativ Audio).
 
-```ts
-const soraAspect = (scene.aspectRatio === '9:16' || scene.aspectRatio === '3:4')
-  ? 'portrait' : 'landscape';
-soraInput.aspect_ratio = soraAspect;
+### 2. Datenmodell erweitern
+
+**Migration** auf `composer_scenes`:
+- Neue Spalte `with_audio boolean NOT NULL DEFAULT true`.
+
+**Type** in `src/types/video-composer.ts` (`ComposerScene`): Feld `withAudio?: boolean` ergänzen.
+
+**Mapping** in `VideoComposerDashboard.tsx` (3 Stellen, in denen `clip_quality` aus Rows gelesen / geschrieben wird) + `ClipsTab.tsx` / `StoryboardTab.tsx`: `withAudio` lesen/schreiben (Default `true`).
+
+### 3. UI: Audio-Toggle in SceneCard
+In `src/components/video-composer/SceneCard.tsx`, direkt unter dem `<ModelSelector>` (Zeilen 527–544):
+
+- Wenn das aktuell gewählte Toolkit-Modell `capabilities.audio === true`, einen kleinen Pill-Switch rendern:
+  - 🔊 „Mit Sound" / 🔇 „Ohne Sound" (lokalisiert DE/EN/ES).
+  - Schreibt `withAudio` über `onUpdate`.
+- Für Modelle ohne Audio-Fähigkeit (Hailuo, Wan, Luma, Seedance, Image) unsichtbar — keine optische Unruhe.
+
+### 4. Edge-Function `compose-video-clips` respektiert das Flag
+
+In `supabase/functions/compose-video-clips/index.ts`:
+
+| Anbieter | Umsetzung |
+|---|---|
+| **Veo 3.1** (Z. 635–640) | `veoInput.generate_audio = scene.withAudio !== false` (Replicate-Veo unterstützt das Flag direkt). |
+| **Kling 3 Omni** (Z. 409–414) | `klingInput.generate_audio = scene.withAudio !== false` (gleicher Mechanismus wie `generate-kling-video`). |
+| **Sora 2 / Sora 2 Pro** (Z. 680–685) | Sora 2 hat keinen API-Toggle für Audio — daher Flag in DB persistieren (`composer_scenes.strip_audio`) und beim **Stitch / Director's Cut**-Schritt per ffmpeg den Audio-Track entfernen, falls `withAudio = false`. Für die Erst-Generation bleibt der Replicate-Call unverändert. |
+
+Scene-Row beim Update um `with_audio: scene.withAudio` ergänzen.
+
+### 5. Stitch-Pipeline (Sora 2 Mute-Fall)
+
+Im Render-/Stitch-Service (`compose-video-storyboard` bzw. das Lambda-Stitch) bei `withAudio = false` für `ai-sora`-Clips den Audio-Track stummschalten / entfernen (`-an` ffmpeg-Flag oder Volume 0). Damit funktioniert „Ohne Sound" auch bei Sora konsistent.
+
+### 6. Lokalisierung
+
+Neue Keys in `src/lib/translations.ts`:
+- `composerSceneWithAudio` → „Mit Sound" / „With sound" / „Con sonido"
+- `composerSceneWithoutAudio` → „Ohne Sound" / „No sound" / „Sin sonido"
+- Tooltip „Natives KI-Audio aus dem Modell verwenden — sonst stumm."
+
+## Visuelles Design
+
+Kompakter Pill-Toggle direkt unter dem Modell-Dropdown — gleicher James-Bond-Stil (Glass / Goldakzent für aktiven Zustand), nicht aufdringlich.
+
+```text
+┌─ AI-Modell ──────────────────────────────┐
+│  [Sora 2 Pro · 1080p · €0.53/s     ▼]   │
+└──────────────────────────────────────────┘
+   🔊 Mit Sound   ◯ Ohne Sound        (nur sichtbar wenn audio-fähig)
 ```
 
-Genauso für `sora-2-pro` (gleicher Block).
+## Dateien (geschätzt)
 
-### Fix 2 — Throttling für Sora-2 mit Retry-after-Respektierung
+- `src/config/aiVideoModelRegistry.ts` — Sora-Audio-Flag
+- `src/types/video-composer.ts` — `withAudio` Feld
+- `src/components/video-composer/SceneCard.tsx` — UI-Toggle
+- `src/components/video-composer/VideoComposerDashboard.tsx` — DB-Mapping (3 Stellen)
+- `src/components/video-composer/ClipsTab.tsx`, `StoryboardTab.tsx` — Default-Initialisierung
+- `src/lib/translations.ts` — neue Keys
+- `supabase/functions/compose-video-clips/index.ts` — Veo/Kling Flag durchreichen, Sora Flag persistieren
+- `supabase/functions/compose-video-storyboard/index.ts` — Stitch-Mute für Sora bei `withAudio = false`
+- DB-Migration: `with_audio` Spalte auf `composer_scenes`
 
-In der Szenen-Schleife (Zeile 285) für `clipSource === 'ai-sora'`:
+## Out of Scope
 
-- **Pre-Delay:** Vor jedem Sora-Call mindestens **6 Sekunden** warten, wenn die vorherige Szene auch Sora war.
-- **Retry-Logik:** Bei 429-Antwort die `retry_after`-Sekunden aus der Response parsen und einmalig erneut versuchen, bevor die Szene als `failed` markiert wird (max. 1 Retry, +2s Buffer).
-- Andere Modelle (Veo, Luma, Hailuo, Kling) bleiben unangetastet — die haben keine so harten Limits.
-
-Implementierungsskizze:
-```ts
-// Helper am Modul-Anfang
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-let lastSoraCallAt = 0;
-
-// Im Sora-Block, vor replicate.predictions.create:
-const sinceLast = Date.now() - lastSoraCallAt;
-if (lastSoraCallAt && sinceLast < 6000) await sleep(6000 - sinceLast);
-
-// Try/Catch mit 429-Retry:
-try {
-  prediction = await replicate.predictions.create({ ... });
-} catch (e: any) {
-  const msg = String(e?.message ?? e);
-  const m = msg.match(/retry_after"?\s*:\s*(\d+)/);
-  if (msg.includes('429') && m) {
-    await sleep((parseInt(m[1]) + 2) * 1000);
-    prediction = await replicate.predictions.create({ ... }); // einmal retry
-  } else {
-    throw e;
-  }
-}
-lastSoraCallAt = Date.now();
-```
-
-### Fix 3 — UX: "Erneut versuchen"-Button bleibt funktional
-
-Der bestehende Retry-Button pro Szene funktioniert bereits — aber durch Fix 1+2 sollten Failures nun seltener erst gar nicht entstehen. Zusätzlich wird die Fehlermeldung in `composer_scenes` konkreter gespeichert (statt nur `failed`), damit der User im UI lesen kann *warum* (z.B. "Sora Rate Limit — bitte erneut versuchen in 10s").
-
-Optional in derselben Edit-Runde: kleines Banner über der Szenenliste, wenn ≥ 3 Szenen mit `429`/`rate limit` failed sind, mit "Alle fehlgeschlagenen erneut versuchen"-Button.
-
-## Geänderte Dateien
-
-- `supabase/functions/compose-video-clips/index.ts` — Aspect-Ratio-Mapping für Sora, Pre-Delay zwischen Sora-Calls, 429-Retry mit `retry_after`, präzisere Error-Messages.
-
-## Erwartetes Ergebnis
-
-- Sora-2-Szenen werden seriell mit ≥6s Abstand abgefeuert → keine 429 mehr beim ersten Versuch.
-- Falls Replicate trotzdem drosselt, wird automatisch einmal nach `retry_after + 2s` erneut versucht.
-- Sora akzeptiert das `landscape`/`portrait`-Format → keine 422 mehr.
-- Bei 7 Szenen dauert der "Alle generieren"-Start jetzt ~40s (statt sofortigem Fail aller Szenen) — die eigentliche Generierung läuft danach asynchron im Hintergrund wie bisher.
+- Eigener Audio-Mix pro Szene (kommt aus dem späteren Voiceover/Music-Tab, der ohnehin schon existiert)
+- Toggle für Modelle ohne Audio (Hailuo, Wan, Luma, Seedance) — bewusst unsichtbar.
