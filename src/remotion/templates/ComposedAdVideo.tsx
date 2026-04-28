@@ -339,6 +339,7 @@ export const ComposedAdVideo: React.FC<ComposedAdVideoProps> = ({
                   kineticText={kineticText}
                   effects={scene.effects}
                   positionTrack={scene.positionTrack}
+                  withAudio={scene.withAudio}
                 />
               </TransitionSeries.Sequence>
               {i < scenes.length - 1 && (
