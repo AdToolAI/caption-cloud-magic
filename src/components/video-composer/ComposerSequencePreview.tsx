@@ -18,6 +18,10 @@ interface Props {
   globalTextOverlays?: GlobalTextOverlay[];
   /** Voiceover audio URL — plays in sync with the video timeline. */
   voiceoverUrl?: string | null;
+  /** Background music URL — loops underneath the video at the configured volume. */
+  backgroundMusicUrl?: string | null;
+  /** Background music volume (0..1). Defaults to 0.3. */
+  backgroundMusicVolume?: number;
   /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
   onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
@@ -50,6 +54,8 @@ export default function ComposerSequencePreview({
   subtitles,
   globalTextOverlays,
   voiceoverUrl,
+  backgroundMusicUrl,
+  backgroundMusicVolume = 0.3,
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
@@ -122,6 +128,8 @@ export default function ComposerSequencePreview({
   const rafRef = useRef<number | null>(null);
   const imageStartRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  /** Background music audio element — independent linear track, looped under VO. */
+  const musicRef = useRef<HTMLAudioElement>(null);
 
   const playableRef = useRef(playable);
   const startOffsetsRef = useRef(startOffsets);
@@ -549,8 +557,8 @@ export default function ComposerSequencePreview({
   // Auto-unmute when a voiceover becomes available — VO is the primary
   // audio track and should be hearable by default (video stays muted via slot refs).
   useEffect(() => {
-    if (voiceoverUrl) setMuted(false);
-  }, [voiceoverUrl]);
+    if (voiceoverUrl || backgroundMusicUrl) setMuted(false);
+  }, [voiceoverUrl, backgroundMusicUrl]);
 
   // Unified audio sync — re-evaluates on globalTime so audio.play() fires
   // automatically once the lead-in threshold is crossed (no scrub needed).
@@ -578,6 +586,30 @@ export default function ComposerSequencePreview({
       audio.pause();
     }
   }, [playing, voiceoverUrl, muted, globalTime]);
+
+  // ── Background music sync ─────────────────────────────────────
+  // BGM is a linear track that loops underneath the video. It mirrors
+  // the play/pause state and is mute-controlled via the same toggle.
+  useEffect(() => {
+    const m = musicRef.current;
+    if (!m || !backgroundMusicUrl) return;
+    const safeVol = Math.max(0, Math.min(1, backgroundMusicVolume));
+    try { m.volume = safeVol; } catch {}
+    m.muted = muted;
+    m.loop = true;
+
+    const trackDur = m.duration || Math.max(1, totalDuration);
+    const targetTime = globalTime % trackDur;
+    if (Number.isFinite(targetTime) && Math.abs(m.currentTime - targetTime) > 0.5) {
+      try { m.currentTime = targetTime; } catch {}
+    }
+
+    if (playing) {
+      m.play().catch(() => {});
+    } else {
+      m.pause();
+    }
+  }, [playing, backgroundMusicUrl, backgroundMusicVolume, muted, globalTime, totalDuration]);
 
   const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
@@ -696,6 +728,16 @@ export default function ComposerSequencePreview({
           <audio
             ref={audioRef}
             src={voiceoverUrl}
+            preload="auto"
+            className="hidden"
+          />
+        )}
+
+        {/* Hidden background music audio — looped under the timeline */}
+        {backgroundMusicUrl && (
+          <audio
+            ref={musicRef}
+            src={backgroundMusicUrl}
             preload="auto"
             className="hidden"
           />
