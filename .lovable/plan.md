@@ -1,66 +1,38 @@
-## Problem
+Ich habe die Ursache gefunden: Die Szenengenerierung scheitert nicht an der Ansicht, sondern an der Engine-Ansteuerung im Backend.
 
-Der Auto-Director **funktioniert serverseitig korrekt**: Die Edge Function `auto-director-compose` erstellt das Projekt in `composer_projects`, fügt Szenen in `composer_scenes` ein und triggert `compose-video-clips` asynchron im Hintergrund. Der Wizard navigiert anschließend zu `/video-composer?projectId=NEW_ID&tab=clips`.
+Konkrete Fehler:
+- Kling-Szenen schlagen mit einem Validierungsfehler fehl: Das aktuell im Composer genutzte Kling-Modell erwartet ein `start_image` und nur 5s/10s Dauer. Der Auto-Director erzeugt aber normale Text-to-Video-Szenen mit 7s/8s.
+- Sora wird vom Auto-Director als Engine ausgewählt, ist in der Composer-Generierung aber nicht implementiert. Dadurch bleiben diese Szenen einfach auf „Ausstehend“ hängen.
+- Die UI zeigt aktuell nur allgemein „fehlgeschlagen“, aber nicht klar, dass es ein Engine-Konfigurationsproblem war.
 
-**Das UI ignoriert diese URL aber komplett.** Konkret:
+Plan zur Behebung:
 
-1. `VideoComposerDashboard.tsx` initialisiert seinen State ausschließlich aus localStorage (`loadDraft()`, Zeile 146) und liest `useSearchParams()` nirgendwo aus.
-2. Die DB-Hydration (Zeile 192–312) läuft nur, wenn `project.id` schon im State steht — aber genau diese ID kommt nie an, weil sie nur in der URL liegt.
-3. Der `AutoDirectorWizard` wird ohne `onProjectCreated`-Prop gemountet (Zeile 890–894), also gibt es auch keinen direkten Callback, der State + Tab setzen könnte.
+1. Kling im Composer auf das funktionierende Kling-3-Modell umstellen
+   - In der Backend-Funktion `compose-video-clips` wird `ai-kling` auf dasselbe Kling-3-Modell umgestellt, das im AI Video Toolkit bereits genutzt wird.
+   - Dadurch funktioniert Text-to-Video ohne `start_image`.
+   - Die Dauer 3-15 Sekunden wird korrekt an Kling 3 weitergegeben, statt auf ungültige 7s/8s für das alte Modell zu laufen.
 
-Resultat: Nach dem Klick auf „Movie generieren" landet der User auf einer URL mit `projectId=…`, sieht aber weiterhin den **alten Draft** (oder den leeren Default) — keine neuen Szenen im Storyboard, keine generierenden Clips im Clips-Tab. Die Bestätigungstoasts sind irreführend, weil im Hintergrund tatsächlich Credits abgezogen und Clips erzeugt werden, der User davon aber nichts mitbekommt.
+2. Auto-Director darf keine nicht unterstützten Composer-Engines mehr planen
+   - `ai-sora` wird aus den Auto-Director-Engine-Optionen für Composer-Projekte entfernt oder auf eine unterstützte Engine gemappt.
+   - Für „Premium“ wird stattdessen Kling/Luma/Veo oder Hailuo verwendet, je nachdem was in `compose-video-clips` tatsächlich verarbeitet wird.
+   - Zusätzlich kommt eine defensive Normalisierung: Falls doch `ai-sora` in einem Auto-Director-Plan auftaucht, wird es vor dem Speichern/Generieren auf eine unterstützte Engine umgeschrieben, damit keine Szene hängen bleibt.
 
-## Lösung
+3. Bestehende hängen gebliebene Szenen reparierbar machen
+   - Für Szenen mit `clip_source = ai-sora` oder ungültigem Kling-Setup wird die Re-Roll/Generieren-Logik so angepasst, dass sie mit einer unterstützten Engine neu gestartet werden können.
+   - Optional kann ich die aktuell betroffenen Szenen deines Projekts auf eine unterstützte Engine zurücksetzen, sodass du nicht neu anfangen musst.
 
-Drei kleine, gezielte Änderungen, die das Auto-Director-Ergebnis sichtbar machen — ohne Server- oder DB-Änderungen.
+4. Bessere Fehleranzeige im Clips-Tab
+   - Fehlgeschlagene Ergebnisse aus `compose-video-clips` sollen die echte Fehlermeldung in der Konsole/Toast nicht komplett verschlucken.
+   - Die Szene soll künftig klar anzeigen: „Engine-Konfiguration ungültig“ oder „Modell nicht unterstützt“, statt nur generisch „Fehlgeschlagen“.
 
-### 1. `VideoComposerDashboard.tsx` — URL-Parameter respektieren
+5. Absicherung der Credit-Logik
+   - Es werden nur Szenen berechnet, die wirklich erfolgreich gestartet oder fertiggestellt wurden.
+   - Für sofort fehlgeschlagene Szenen durch Engine-Validierung werden keine zusätzlichen Kosten abgezogen.
 
-- `useSearchParams()` aus `react-router-dom` einbinden.
-- Beim Mount prüfen, ob `?projectId=<uuid>` gesetzt ist. Wenn ja:
-  - localStorage-Draft **verwerfen** (nicht den fremden/anderen Draft mit der neuen Project-ID mischen).
-  - `project.id` im State auf den URL-Wert setzen, sodass die bestehende DB-Hydration (Zeile 192–312) das Projekt + Szenen vollständig aus der DB lädt (Briefing, Szenen, Status, etc.).
-- Wenn `?tab=clips` (oder `storyboard`/`text`/…) gesetzt ist, `setActiveTab(...)` initial darauf setzen.
-- Nach dem ersten Mount die Query-Parameter optional aus der URL entfernen (`setSearchParams({}, { replace: true })`), damit ein späterer Reload nicht erneut die alte Hydration triggert.
+Technische Dateien:
+- `supabase/functions/compose-video-clips/index.ts`
+- `supabase/functions/auto-director-compose/index.ts`
+- ggf. `src/components/video-composer/ClipsTab.tsx`
+- ggf. aktueller Projektzustand in der Datenbank für die bereits hängenden Szenen
 
-### 2. `AutoDirectorWizard.tsx` — Briefing aus dem DB-Projekt nachladen
-
-Heute kennt das Dashboard nur Szenen aus der DB-Hydration, aber das Briefing (idea, mood, duration) wird nicht aus dem DB-Feld `briefing` zurückgelesen. Damit das wiederhergestellte Projekt vollständig aussieht, in der DB-Hydration in Punkt 1 zusätzlich `title`, `category`, `briefing`, `language`, `assembly_config` lesen und in den lokalen State übernehmen — analog zu dem, was schon für `output_url`, `status`, `ad_meta` etc. passiert (Zeile 217–227).
-
-### 3. `VideoComposerDashboard.tsx` — `onProjectCreated`-Callback an Wizard durchreichen (Belt & Suspenders)
-
-Als zusätzliche Absicherung (falls die URL aus irgendeinem Grund verloren geht, z. B. Browser-History-Manipulation):
-
-```tsx
-<AutoDirectorWizard
-  open={showAutoDirector}
-  onOpenChange={setShowAutoDirector}
-  defaultLanguage={project.language}
-  onProjectCreated={(projectId) => {
-    // Verwerfe alten Draft, setze neue Project-ID,
-    // Hydration-Effect lädt dann Szenen aus DB.
-    clearDraft();
-    setProject({ ...defaultProject, id: projectId });
-    didInitialSyncRef.current = false; // erlaubt Re-Hydration
-    setActiveTab('clips');
-  }}
-/>
-```
-
-`didInitialSyncRef` muss zurückgesetzt werden, damit der Mount-Effect erneut läuft — alternativ kann man die Hydration in einen separaten Effect auslagern, der auf `project.id` reagiert.
-
-### 4. Optional: Live-Status für generierende Clips sichtbarer machen
-
-Der `compose-video-clips`-Aufruf läuft fire-and-forget. Damit der User sieht, dass tatsächlich etwas passiert, im Clips-Tab eine **Realtime-Subscription** auf `composer_scenes` (gefiltert nach `project_id`) ergänzen, sodass Statusübergänge `pending → generating → ready` ohne Reload sichtbar werden. Das passt zur bereits genutzten `useComposerScenesRealtime`-Infrastruktur (Zeile 50). Falls die nicht schon im Clips-Tab eingebunden ist, dort verdrahten.
-
-## Geänderte Dateien
-
-- `src/components/video-composer/VideoComposerDashboard.tsx` — URL-Parameter lesen, DB-Hydration auf Briefing erweitern, Wizard-Callback verdrahten, optional Realtime aktivieren.
-- (Kein Backend-Change nötig — Edge Function arbeitet bereits korrekt.)
-
-## Verifikation
-
-1. Auto-Director öffnen → Idee eingeben → Plan generieren → bestätigen.
-2. Erwartet: Wizard schließt, URL zeigt `?projectId=…&tab=clips`, Clips-Tab ist aktiv, alle Szenen aus dem AI-Plan sind sichtbar mit Status „Ausstehend" → kurz darauf „Generiert" → „Bereit".
-3. Reload auf der URL: Projekt + Szenen bleiben erhalten (DB-Hydration läuft).
-4. Storyboard-Tab: zeigt die generierten Szenen mit korrektem Briefing (idea/mood).
+Nach Umsetzung sollte der Auto-Director nicht mehr bei Kling/Sora hängen bleiben: Neue Projekte generieren nur unterstützte Szenen, und bestehende fehlgeschlagene Szenen können direkt neu erzeugt werden.

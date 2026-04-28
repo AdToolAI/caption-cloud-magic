@@ -52,17 +52,25 @@ interface BrandContext {
   brandValues: string[];
 }
 
+// Engines that the Composer pipeline (compose-video-clips) actually
+// implements. We never plan a scene with an engine outside this list.
+const SUPPORTED_COMPOSER_ENGINES = ['ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo'] as const;
+
 const ENGINE_BY_PREF: Record<EnginePref, string[]> = {
   auto:    ['ai-hailuo', 'ai-seedance', 'ai-wan', 'ai-kling', 'ai-luma'],
-  premium: ['ai-kling', 'ai-luma', 'ai-sora'],
+  premium: ['ai-kling', 'ai-luma', 'ai-veo'],
   budget:  ['ai-wan', 'ai-seedance', 'ai-hailuo'],
 };
 
 // Cost per second per engine (standard quality, mirrors compose-video-clips)
 const COST_PER_SEC: Record<string, number> = {
-  'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-sora': 0.25,
+  'ai-hailuo': 0.15, 'ai-kling': 0.15, 'ai-veo': 0.20,
   'ai-wan': 0.10, 'ai-seedance': 0.12, 'ai-luma': 0.20,
 };
+
+const FALLBACK_ENGINE = 'ai-hailuo';
+const normalizeEngine = (e: string): string =>
+  SUPPORTED_COMPOSER_ENGINES.includes(e as any) ? e : FALLBACK_ENGINE;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -151,21 +159,24 @@ serve(async (req) => {
       return jsonResponse({ error: "DB_ERROR", message: projErr?.message ?? "Failed to create project" }, 500);
     }
 
-    // Bulk insert scenes
-    const sceneRows = scenes.map((s) => ({
-      project_id: project.id,
-      order_index: s.orderIndex,
-      scene_type: s.sceneType,
-      duration_seconds: s.durationSeconds,
-      clip_source: s.recommendedEngine,
-      ai_prompt: s.aiPrompt,
-      clip_status: 'pending',
-      text_overlay: s.textOverlay ?? {},
-      transition_type: 'fade',
-      transition_duration: 0.5,
-      clip_quality: 'standard',
-      cost_euros: (COST_PER_SEC[s.recommendedEngine] ?? 0.15) * s.durationSeconds,
-    }));
+    // Bulk insert scenes — normalize unsupported engines defensively
+    const sceneRows = scenes.map((s) => {
+      const engine = normalizeEngine(s.recommendedEngine);
+      return {
+        project_id: project.id,
+        order_index: s.orderIndex,
+        scene_type: s.sceneType,
+        duration_seconds: s.durationSeconds,
+        clip_source: engine,
+        ai_prompt: s.aiPrompt,
+        clip_status: 'pending',
+        text_overlay: s.textOverlay ?? {},
+        transition_type: 'fade',
+        transition_duration: 0.5,
+        clip_quality: 'standard',
+        cost_euros: (COST_PER_SEC[engine] ?? 0.15) * s.durationSeconds,
+      };
+    });
 
     const { data: insertedScenes, error: scenesErr } = await supabaseAdmin
       .from('composer_scenes')
@@ -263,7 +274,7 @@ RULES:
 - Keep prompts concise (15-30 words each), suitable for AI video generation models.
 - Use the requested mood "${req.mood}" to drive style (e.g. cinematic = wide angles & dramatic lighting; hype = fast cuts & bold colors; calm = slow pans & soft tones; corporate = clean & professional; playful = bright & dynamic; dramatic = high contrast & tension).
 - Choose recommended_engine ONLY from this list: ${allowedEngines.join(', ')}.
-- Pick the best engine per scene: ai-kling/ai-luma for character close-ups & dialogue feel, ai-hailuo for fast action, ai-seedance for stylish motion, ai-wan for budget shots, ai-sora for hero moments.
+- Pick the best engine per scene: ai-kling/ai-luma for character close-ups & dialogue feel, ai-hailuo for fast action, ai-seedance for stylish motion, ai-wan for budget shots, ai-veo for hero moments with audio.
 - Scene types: hook, problem, solution, feature, proof, cta, intro, outro, transition.
 - Output language for any text_overlay: ${req.language ?? 'de'}.
 - Add a short text_overlay (3-6 words) ONLY on hook and cta scenes.`;
@@ -368,7 +379,7 @@ Create the storyboard now.`;
     sceneType: s.scene_type,
     durationSeconds: Number(s.duration_seconds),
     aiPrompt: String(s.ai_prompt),
-    recommendedEngine: allowedEngines.includes(s.recommended_engine) ? s.recommended_engine : allowedEngines[0],
+    recommendedEngine: normalizeEngine(allowedEngines.includes(s.recommended_engine) ? s.recommended_engine : allowedEngines[0]),
     textOverlay: s.text_overlay && s.text_overlay.text ? {
       text: String(s.text_overlay.text),
       position: (['top','center','bottom'].includes(s.text_overlay.position) ? s.text_overlay.position : 'bottom') as 'top'|'center'|'bottom',

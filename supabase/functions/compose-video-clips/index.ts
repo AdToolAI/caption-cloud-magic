@@ -236,8 +236,27 @@ serve(async (req) => {
       try { return JSON.stringify(err); } catch { return String(err); }
     };
 
+    // Engines that compose-video-clips actually implements. Anything outside
+    // this set (e.g. 'ai-sora') gets normalized to 'ai-hailuo' so an
+    // upstream planner (Auto-Director, manual choice) can never leave a
+    // scene stranded in 'pending' forever.
+    const SUPPORTED_AI_SOURCES = new Set([
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-image',
+    ]);
+
     // Process each scene
     for (const scene of scenes) {
+      // Defensive: rewrite unsupported AI engines to a working default.
+      if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
+        console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
+        scene.clipSource = 'ai-hailuo';
+        // Persist the rewrite so the UI reflects reality
+        await supabaseAdmin
+          .from('composer_scenes')
+          .update({ clip_source: 'ai-hailuo', updated_at: new Date().toISOString() })
+          .eq('id', scene.id);
+      }
+
       const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
 
       try {
@@ -314,20 +333,21 @@ serve(async (req) => {
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
         } else if (scene.clipSource === 'ai-kling') {
-          // Kling via Replicate — Kling 2.1
+          // Kling 3.0 Omni via Replicate — supports T2V, I2V, 3-15s
           await supabaseAdmin
             .from('composer_scenes')
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Kling 3 Omni accepts 3..15 seconds (integer)
+          const klingDuration = Math.min(15, Math.max(3, Math.round(scene.durationSeconds)));
           const klingInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            negative_prompt: NEGATIVE_PROMPT_PARAM,
-            duration: Math.min(scene.durationSeconds, 10),
+            duration: klingDuration,
             aspect_ratio: "16:9",
             mode: quality === 'pro' ? 'pro' : 'standard',
           };
-          // Image-to-Video: Kling 2.1 supports start_image AND end_image
+          // Image-to-Video: optional start/end image
           if (scene.referenceImageUrl) {
             klingInput.start_image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Kling scene ${scene.id} uses start_image`);
@@ -338,7 +358,7 @@ serve(async (req) => {
           }
 
           const prediction = await replicate.predictions.create({
-            model: "kwaivgi/kling-v2.1",
+            model: "kwaivgi/kling-v3-omni-video",
             input: klingInput,
             webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
