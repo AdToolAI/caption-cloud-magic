@@ -33,6 +33,7 @@ import type {
   SubtitlesConfig,
   SubtitleSegment,
   GlobalTextOverlay,
+  ComposerBriefing,
 } from '@/types/video-composer';
 import { DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -45,6 +46,7 @@ interface VoiceSubtitlesTabProps {
   assemblyConfig: AssemblyConfig;
   onUpdateAssembly: (config: Partial<AssemblyConfig>) => void;
   language: string;
+  briefing?: ComposerBriefing;
   onGoToAudio: () => void;
 }
 
