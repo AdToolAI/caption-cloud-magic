@@ -497,10 +497,6 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                 <span className="text-emerald-400">€0.00</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">{t('videoComposer.rendering')}</span>
-              <span>€{renderCost.toFixed(2)}</span>
-            </div>
             <div className="border-t border-border/40 pt-1.5 flex justify-between font-semibold text-sm">
               <span>{t('videoComposer.total')}</span>
               <span className="text-primary">€{totalCost.toFixed(2)}</span>
