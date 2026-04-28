@@ -727,12 +727,6 @@ export default function SceneCard({
                   );
                 })()}
 
-                <SceneReferenceImageUpload
-                  projectId={projectId}
-                  sceneId={scene.id}
-                  referenceImageUrl={scene.referenceImageUrl}
-                  onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
-                />
               </div>
             )}
 
