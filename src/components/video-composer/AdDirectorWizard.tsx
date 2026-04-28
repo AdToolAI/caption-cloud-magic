@@ -491,7 +491,7 @@ export default function AdDirectorWizard({
           ))}
         </div>
 
-        <ScrollArea className="flex-1 pr-2">
+        <ScrollArea className="flex-1 min-h-0 pr-2">
           <div className="space-y-6 pb-2">
             {step === 'format' && (
               <div className="space-y-4">
