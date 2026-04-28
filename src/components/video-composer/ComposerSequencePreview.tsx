@@ -557,8 +557,8 @@ export default function ComposerSequencePreview({
   // Auto-unmute when a voiceover becomes available — VO is the primary
   // audio track and should be hearable by default (video stays muted via slot refs).
   useEffect(() => {
-    if (voiceoverUrl) setMuted(false);
-  }, [voiceoverUrl]);
+    if (voiceoverUrl || backgroundMusicUrl) setMuted(false);
+  }, [voiceoverUrl, backgroundMusicUrl]);
 
   // Unified audio sync — re-evaluates on globalTime so audio.play() fires
   // automatically once the lead-in threshold is crossed (no scrub needed).
