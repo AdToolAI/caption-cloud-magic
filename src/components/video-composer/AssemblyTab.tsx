@@ -632,14 +632,6 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         </Card>
       )}
 
-      {/* Cost Estimation — radical price transparency before render */}
-      {!videoUrl && renderStatus !== 'completed' && (
-        <CostEstimationPanel
-          scenes={scenes}
-          assemblyConfig={assemblyConfig}
-          templateId={project?.template_id || project?.templateId}
-        />
-      )}
 
       {/* Render Button */}
       <div className="flex justify-end">
