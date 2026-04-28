@@ -19,7 +19,8 @@ import {
   getPresetById,
 } from './directorPresets';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
-import { resolveMentions, type ResolvedMention } from './mentionParser';
+import { resolveMentions, type MentionMatch } from './mentionParser';
+import type { MotionStudioCharacter, MotionStudioLocation } from '@/types/motion-studio';
 import { findStylePreset } from '@/config/cinematicStylePresets';
 import {
   classifyFragments,
@@ -44,8 +45,8 @@ export interface ComposerInputs {
     referenceImageUrl?: string;
   };
   /** Library lookups for @character / @location mentions (Phase 4 logic). */
-  libraryCharacters?: Array<{ id: string; name: string; description?: string; referenceImageUrl?: string }>;
-  libraryLocations?: Array<{ id: string; name: string; description?: string; referenceImageUrl?: string }>;
+  libraryCharacters?: MotionStudioCharacter[];
+  libraryLocations?: MotionStudioLocation[];
   /** UI language (currently informational — composition stays English). */
   language?: 'en' | 'de' | 'es';
 }
@@ -70,7 +71,7 @@ export interface ComposerResult {
   /** Fragments that were dropped by axis dedup (debug / preview). */
   dropped: AxisFragment[];
   /** Resolved @-mentions metadata (passed through from `resolveMentions`). */
-  mentions: ResolvedMention[];
+  mentions: MentionMatch[];
 }
 
 // ---------------------------------------------------------------------------
