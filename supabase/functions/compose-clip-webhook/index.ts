@@ -79,7 +79,7 @@ serve(async (req) => {
 
         const { data: projectMeta } = await supabase
           .from('composer_projects')
-          .select('user_id, name')
+          .select('user_id, title')
           .eq('id', projectId)
           .single();
 
