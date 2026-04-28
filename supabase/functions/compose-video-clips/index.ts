@@ -431,13 +431,16 @@ serve(async (req) => {
           const wanModel = scene.referenceImageUrl
             ? 'wan-video/wan-2.5-i2v'
             : 'wan-video/wan-2.5-t2v';
+          // Wan 2.5 only supports 5 or 10 seconds — snap to nearest allowed value
+          const wanDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const wanInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
             negative_prompt: NEGATIVE_PROMPT_PARAM,
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: wanDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
+          console.log(`[compose-video-clips] Wan scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${wanDuration}s`);
           if (scene.referenceImageUrl) {
             wanInput.image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Wan scene ${scene.id} uses i2v reference`);
