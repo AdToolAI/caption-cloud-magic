@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
 import StoryboardTab from './StoryboardTab';
@@ -140,21 +140,56 @@ const defaultProject: LocalProject = {
   language: 'de',
 };
 
+const isUuid = (val?: string | null) =>
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 export default function VideoComposerDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
-  const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
-  const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab());
+
+  // URL takes precedence over localStorage. If ?projectId=<uuid> is set
+  // (e.g. after Auto-Director or Ad-Director redirect), discard the local
+  // draft and seed state with that ID so the DB-hydration effect below
+  // pulls the freshly-created project + scenes from Supabase.
+  const urlProjectId = searchParams.get('projectId');
+  const urlTab = searchParams.get('tab') as TabId | null;
+  const hasUrlProject = isUuid(urlProjectId);
+
+  const [project, setProject] = useState<LocalProject>(() => {
+    if (hasUrlProject) {
+      // Fresh project from a director-wizard redirect — drop any stale draft
+      // so we don't merge unrelated scenes. Hydration effect will fill it in.
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      return { ...defaultProject, id: urlProjectId! };
+    }
+    return loadDraft() || defaultProject;
+  });
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (urlTab && TAB_ORDER.includes(urlTab)) return urlTab;
+    return restoreActiveTab();
+  });
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
-  // Auto-open template picker when starting fresh (no draft on mount)
-  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
+  // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
   const [showAdDirector, setShowAdDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
-  const didInitialSyncRef = useRef(false);
+  // Track which project.id we have already hydrated from DB so the effect
+  // can re-run when the AutoDirector / AdDirector swaps in a new project.
+  const lastSyncedProjectIdRef = useRef<string | null>(null);
+
+  // Strip the URL params after the first render so a later reload doesn't
+  // re-trigger the discard-draft path (the project.id is now in state).
+  useEffect(() => {
+    if (hasUrlProject || urlTab) {
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---------------- Realtime Collaboration ----------------
   const [selfMeta, setSelfMeta] = useState<{ userId: string; name: string; email?: string } | null>(null);
@@ -189,22 +224,24 @@ export default function VideoComposerDashboard() {
   // to mount LiveCursorLayer over their canvas (e.g. StoryboardTab). For now we
   // surface presence via avatars in the header — cursors are an opt-in overlay.
 
-  // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
+  // DB sync whenever project.id changes: hydrate scenes + briefing from DB.
+  // Idempotent per-project via lastSyncedProjectIdRef so it never double-fetches.
   useEffect(() => {
-    if (didInitialSyncRef.current) return;
-    didInitialSyncRef.current = true;
-
     const projectId = project.id;
     if (!projectId) return;
+    if (lastSyncedProjectIdRef.current === projectId) return;
+    lastSyncedProjectIdRef.current = projectId;
 
     (async () => {
       try {
-        // Also pull project-level fields (output_url, status) so the rendered
-        // video remains visible after a reload.
+        // Also pull project-level fields (output_url, status, briefing, …) so
+        // the rendered video remains visible after a reload AND so a freshly
+        // redirected Auto-Director / Ad-Director project shows its briefing
+        // immediately instead of the empty default.
         const [{ data: projRow }, { data, error: dbError }] = await Promise.all([
           supabase
             .from('composer_projects')
-            .select('output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
+            .select('title, category, briefing, language, assembly_config, output_url, status, ad_meta, ad_variant_strategy, parent_project_id, cutdown_type')
             .eq('id', projectId)
             .maybeSingle(),
           supabase
@@ -217,6 +254,11 @@ export default function VideoComposerDashboard() {
         if (projRow) {
           setProject(prev => ({
             ...prev,
+            title: (projRow as any).title ?? prev.title,
+            category: ((projRow as any).category as ComposerCategory) ?? prev.category,
+            briefing: ((projRow as any).briefing as ComposerBriefing) ?? prev.briefing,
+            language: (projRow as any).language ?? prev.language,
+            assemblyConfig: ((projRow as any).assembly_config as AssemblyConfig) ?? prev.assemblyConfig,
             outputUrl: projRow.output_url ?? prev.outputUrl,
             status: (projRow.status as ComposerStatus) ?? prev.status,
             adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
@@ -309,7 +351,7 @@ export default function VideoComposerDashboard() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [project.id]);
 
   /**
    * Block M — Refetch scenes from DB on demand (e.g. after a Hybrid Extend
@@ -891,6 +933,16 @@ export default function VideoComposerDashboard() {
         open={showAutoDirector}
         onOpenChange={setShowAutoDirector}
         defaultLanguage={project.language}
+        onProjectCreated={(newProjectId) => {
+          // Belt & Suspenders: even if the wizard's navigate() loses the
+          // query params, swap state directly so the user sees their new
+          // project + scenes immediately. The DB-hydration effect then
+          // backfills briefing/scenes from Supabase.
+          clearDraft();
+          setProject({ ...defaultProject, id: newProjectId });
+          lastSyncedProjectIdRef.current = null; // re-arm hydration for new id
+          setActiveTab('clips');
+        }}
       />
 
       <AdDirectorWizard
