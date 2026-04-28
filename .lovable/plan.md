@@ -1,52 +1,169 @@
-## Problem
+## Ziel
 
-Im Motion-Studio-Composer sehe ich unter dem KI-Modell-Dropdown keinen "Mit Sound / Ohne Sound"-Toggle — auch nicht bei Sora 2 (Screenshot) und auch nicht bei den anderen Modellen, die nativ Audio liefern.
+Die 4 UI-Schichten (Cinematic Presets, Director Modifiers, Shot Director, Visual Style) und 2 Server-Schichten (`enrichPrompt`, `injectCharacter`) im Motion Studio so vereinheitlichen, dass:
+- keine Achse (vor allem **Lighting**) doppelt belegt wird,
+- Brand Character Lock auch im Composer greift,
+- der Audio-Toggle für **alle** Provider tatsächlich wirkt,
+- der User vor dem Generieren sieht, was das Modell wirklich bekommt.
 
-Der Toggle-Code existiert bereits in `src/components/video-composer/SceneCard.tsx` (Zeilen 544–586) und prüft `selectedModel.capabilities.audio === true`. Er rendert nichts, weil:
+---
 
-1. **Sora 2 Standard und Sora 2 Pro** sind in `src/config/aiVideoModelRegistry.ts` (Zeilen 370 + 388) noch fälschlich als `audio: false` markiert — obwohl Sora 2 nativ Audio liefert.
-2. **Veo 3.1 Fast/Pro, Kling 3 Standard/Pro, Grok Imagine** sind bereits korrekt als `audio: true` markiert — der Toggle erscheint dort eigentlich. Falls er auch dort nicht sichtbar ist, liegt das am Browser-Cache (alter Build vor der letzten Änderung).
+## Phase 1 — Zentraler Prompt-Composer (Client)
 
-## Fix
+**Neue Datei:** `src/lib/motion-studio/composePromptLayers.ts`
 
-### 1. Sora als audio-fähig markieren
-
-**Datei:** `src/config/aiVideoModelRegistry.ts`
-
-- Zeile 370 (`sora-2-standard`): `audio: false` → `audio: true`
-- Zeile 388 (`sora-2-pro`): `audio: false` → `audio: true`
-
-Damit erscheint der Toggle für **alle** Audio-Modelle einheitlich:
-Veo 3.1 Fast, Veo 3.1 Pro, Kling 3 Standard, Kling 3 Pro, Grok Imagine, Sora 2 Standard, Sora 2 Pro.
-
-### 2. Mute-Pipeline für Sora vervollständigen
-
-Veo und Kling bekommen `generate_audio: false` direkt an die Replicate-API durchgereicht — fertig. Sora 2 hat keinen API-Toggle für Audio. Aktuell wird `with_audio` zwar in `composer_scenes` gespeichert, aber beim finalen Stitch nicht angewendet.
-
-**Datei:** `supabase/functions/compose-video-storyboard/index.ts`
-
-Beim Stitch-Schritt für jeden Sora-Clip prüfen, ob `with_audio = false` ist, und in dem Fall den Audio-Track per ffmpeg entfernen — entweder vor dem Concat (`-c:v copy -an` auf den Einzelclip) oder via Filter (`amix` mit Stummschaltung). Konkret: vor der Concat-Demuxer-Liste pro Sora-Clip mit `with_audio = false` einen lokalen Re-Encode (`ffmpeg -i input.mp4 -an -c:v copy muted.mp4`) einfügen und die gemutete Datei in die Liste schreiben.
-
-## Erwartetes Ergebnis
-
-Direkt unter dem Modell-Dropdown jeder Szene erscheint bei allen Audio-fähigen Modellen ein kompakter Pill-Toggle:
+Eine reine Funktion, die als **einzige Quelle** für den finalen Prompt dient. Ersetzt die verstreuten Aufrufe in `ClipsTab.tsx` (Z. 285–292) und `SceneCard.tsx` (Z. 775–780).
 
 ```text
-🔊 Mit Sound   🔇 Ohne Sound
+Input: { rawPrompt, slots, shotDirector, directorModifiers,
+         cinematicPreset, visualStyle, brandCharacter, characters, locations }
+
+Pipeline (deterministisch):
+  1. resolveMentions()         → Text + autoRefImage
+  2. dedupeAxes()              → NEU: erkennt Lighting/Camera/Mood-Konflikte
+  3. applyDirectorModifiers()  → nur Achsen, die nicht schon belegt sind
+  4. buildShotPromptSuffix()   → Cinematography-Suffix
+  5. injectBrandCharacter()    → NEU client-seitig, falls aktiv
+  6. return { finalPrompt, referenceImageUrl, conflictsResolved[] }
 ```
 
-Verhalten pro Modell:
-- **Veo 3.1 / Kling 3 / Grok Imagine** — `generate_audio` wird an Replicate durchgereicht (bereits implementiert).
-- **Sora 2 Standard / Pro** — Audio wird beim Stitch per ffmpeg entfernt, falls Toggle = "Ohne Sound".
+**`dedupeAxes()`-Regeln (Konflikt-Auflösung mit Priorität):**
 
-Der Toggle wird NICHT angezeigt für Hailuo, Wan, Luma, Seedance und das statische Bild-Modell — diese Modelle haben sowieso kein natives Audio.
+| Achse | Priorität (höchste gewinnt) |
+|---|---|
+| Lighting | Shot Director > Cinematic Preset > Director Modifier > Visual Style |
+| Camera/Movement | Shot Director > Cinematic Preset > Director Modifier |
+| Mood/Color Grade | Cinematic Preset > Director Modifier > Visual Style |
+| Lens/Film-Stock | Director Modifier (einzige Quelle) |
 
-## Dateien
+Konflikte werden im Return-Objekt gemeldet → UI zeigt sie an.
 
-- `src/config/aiVideoModelRegistry.ts` — 2 Booleans (`audio: false` → `true`)
-- `supabase/functions/compose-video-storyboard/index.ts` — ffmpeg-Mute für Sora-Clips mit `with_audio = false`
+---
 
-## Out of Scope
+## Phase 2 — Brand Character Lock im Composer
 
-- Toggle für Modelle ohne natives Audio (Hailuo, Wan, Luma, Seedance) — bewusst ausgeblendet, da kein Effekt.
-- Voiceover/Music-Mix — kommt aus den separaten Tabs "Voiceover & Untertitel" und "Musik & Sound-Mix", unabhängig vom Native-Audio-Toggle.
+**Geändert:** `src/components/video-composer/SceneCard.tsx`, `ClipsTab.tsx`, `supabase/functions/compose-video-clips/index.ts`
+
+- Hook `useActiveBrandCharacter()` lesen (existiert bereits via `useBrandCharacters`).
+- Wenn aktiv: `brandCharacter.identityCardPrompt` via neuen Composer **vor** `rawPrompt` injizieren, `brandCharacter.referenceImageUrl` als Fallback für `referenceImageUrl` setzen, **nur** wenn Scene keinen eigenen Reference hat.
+- Edge Function: neues optionales Feld `brand_character_prompt` im Scene-Payload — wird in `enrichPrompt` als erstes injiziert, mit Token-Hash-Dedupe gegen `injectCharacter` (siehe Phase 4).
+
+---
+
+## Phase 3 — Server-seitige Negative-Prompt-Sanitizer
+
+**Geändert:** `supabase/functions/compose-video-clips/index.ts` (Z. 231–252)
+
+Statt nur `/no on-screen text.../` zu entfernen, eine Regex-Liste aller bekannten Negativ-Phrasen:
+
+```text
+NEGATIVE_LEAK_PATTERNS = [
+  /,?\s*no on-screen text[^.,]*/gi,
+  /,?\s*without (text|logos|captions|subtitles)[^.,]*/gi,
+  /,?\s*avoid (text|logos|watermarks)[^.,]*/gi,
+  /,?\s*no (text|captions|logos|watermark)[^.,]*/gi,
+]
+```
+
+Diese Phrasen werden **stripped** — die Konzepte landen ausschließlich im separaten `negative_prompt`-API-Parameter (bereits korrekt implementiert).
+
+---
+
+## Phase 4 — Character-Dedupe via Token-Hash
+
+**Geändert:** `supabase/functions/compose-video-clips/index.ts` (`injectCharacter`, Z. 202–229)
+
+Aktuell: 30-Zeichen-Substring-Probe → fragil bei Umformulierung.
+
+Neu:
+```text
+1. Tokenisiere appearance + signatureItems in Wort-Set (lowercase, stoppwort-frei).
+2. Tokenisiere Prompt in gleiches Set.
+3. Wenn Jaccard-Overlap ≥ 0.6 → skip injection (schon vorhanden).
+4. Sonst injizieren.
+```
+
+Verhindert doppelte Charakter-Beschreibung wenn Mention-Resolution den Text leicht umformuliert hat.
+
+---
+
+## Phase 5 — Audio-Flag-Audit pro Provider
+
+**Geändert:** `supabase/functions/compose-video-clips/index.ts` (Provider-Branches Z. 357–693)
+
+Für **jeden** Provider explizit verifizieren und ergänzen:
+
+| Provider | Audio-API | Aktion |
+|---|---|---|
+| Veo 3.1 | `generateAudio: bool` | Bestätigen, dass `withAudio` durchgereicht wird |
+| Kling 3 Omni | `with_audio: bool` | Bestätigen |
+| Hailuo 2.3 | kein Audio | UI-Toggle ausgrauen (capabilities.audio: false) |
+| Sora 2 | kein API-Toggle | FFmpeg-Mute beim Stitching (existiert) |
+| Wan 2.5 | kein Audio | UI-Toggle ausgrauen |
+| Seedance 2 | kein Audio | UI-Toggle ausgrauen |
+| Luma Ray 2 | kein Audio | UI-Toggle ausgrauen |
+| Grok Imagine | `audio: bool` | Bestätigen |
+
+Registry `src/config/aiVideoModelRegistry.ts` als Single Source of Truth — `capabilities.audio` muss faktisch korrekt sein.
+
+---
+
+## Phase 6 — Live-Prompt-Preview-Panel
+
+**Geändert:** `src/components/video-composer/SceneCard.tsx` (Z. 770–800)
+
+Bestehende Vorschau (`finalPrompt`-Anzeige) ersetzen durch ein **aufklappbares 6-Layer-Panel**:
+
+```text
+┌─ FINAL PROMPT (was das Modell bekommt) ────────────────┐
+│ [Brand Character: "Sarah, 34, ..."]                     │ ← grün wenn aktiv
+│ [Raw: "woman walks to coffee shop"]                     │
+│ [+ Director Mods: ", Arri Alexa, 35mm..."] [3 conflicts]│ ← gelb bei Konflikt
+│ [+ Shot Director: "Cinematography: ..."]                │
+│ [- Stripped: "no on-screen text"] (moved to negative)   │ ← grau
+│ [+ Server: "+ clean cinematic, +i2v motion cue"]        │ ← blau
+│ ─────────────────────────────────────────────────────── │
+│ NEGATIVE: "text, captions, watermark, ..."              │
+│ REFERENCE IMAGE: [thumbnail] (from brand character)     │
+│ AUDIO: ✓ enabled (Veo: generateAudio=true)              │
+└─────────────────────────────────────────────────────────┘
+```
+
+Nutzt `composePromptLayers()`-Output (mit `conflictsResolved[]`). Konflikte als gelbe Badges anzeigen mit Tooltip "Lighting wurde von Shot Director übernommen, Cinematic Preset ignoriert."
+
+---
+
+## Technische Details
+
+**Geänderte Dateien:**
+- **NEU**: `src/lib/motion-studio/composePromptLayers.ts` (~120 Zeilen)
+- **NEU**: `src/lib/motion-studio/dedupeAxes.ts` (~80 Zeilen)
+- **GEÄNDERT**: `src/components/video-composer/ClipsTab.tsx` (Z. 285–305, 396–402)
+- **GEÄNDERT**: `src/components/video-composer/SceneCard.tsx` (Z. 770–800, neuer Preview-Block)
+- **GEÄNDERT**: `supabase/functions/compose-video-clips/index.ts` (`enrichPrompt`, `injectCharacter`, Negative-Sanitizer, Brand-Character-Field)
+- **GEÄNDERT**: `src/config/aiVideoModelRegistry.ts` (Audio-Capabilities-Audit für alle 9 Provider)
+- **GEÄNDERT**: `src/types/video-composer.ts` (`ComposerScene` bekommt optional `brandCharacterId`)
+
+**Keine DB-Migrationen** — alle Änderungen sind Code-Layer.
+
+**Keine neuen Edge Functions** — bestehende `compose-video-clips` wird erweitert.
+
+**Backward-compatible** — wenn `composePromptLayers` keine neuen Schichten findet, fällt das Verhalten auf den aktuellen Stand zurück.
+
+---
+
+## Akzeptanzkriterien
+
+1. Wählt User „Cinematic Noir" + Director Modifier „warm tungsten" + Shot Director „golden hour" → finaler Prompt enthält **nur eine** Lighting-Anweisung (golden hour gewinnt), Konflikt-Badge sichtbar.
+2. Aktiviert User einen Brand Character → Preview zeigt Identity Card als erste Layer, Reference-Image automatisch gesetzt.
+3. Schreibt User „avoid logos and text" in den Prompt → wird im Preview gestrichen, taucht im Negative-Prompt auf.
+4. `@character` mit großer Beschreibung wird nicht doppelt im finalen Prompt eingefügt (Jaccard-Test).
+5. Audio-Toggle für Hailuo/Wan/Seedance/Luma ist ausgegraut mit Tooltip „Modell unterstützt keinen Sound".
+6. Audio-Toggle für Veo/Kling/Grok schaltet im Provider-Input nachweislich `generateAudio`/`with_audio`/`audio` um.
+7. Preview-Panel zeigt alle 6 Layer einzeln, klar gefärbt.
+
+---
+
+## Memory-Update nach Implementierung
+
+Neue Memory: `mem://architecture/video-composer/unified-prompt-composer` — Single-Source-of-Truth-Pipeline, Achsen-Prioritäten, Brand-Character-Auto-Inject im Composer.
