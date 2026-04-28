@@ -178,7 +178,9 @@ export default function VideoComposerDashboard() {
   const [showAdDirector, setShowAdDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
-  const didInitialSyncRef = useRef(false);
+  // Track which project.id we have already hydrated from DB so the effect
+  // can re-run when the AutoDirector / AdDirector swaps in a new project.
+  const lastSyncedProjectIdRef = useRef<string | null>(null);
 
   // Strip the URL params after the first render so a later reload doesn't
   // re-trigger the discard-draft path (the project.id is now in state).
