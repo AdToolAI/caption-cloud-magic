@@ -1023,9 +1023,9 @@ export default function AdDirectorWizard({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+        <DialogFooter className="shrink-0 border-t border-border/40 p-4 flex items-center justify-between gap-2 sm:justify-between">
           <Button
             type="button"
             variant="ghost"
