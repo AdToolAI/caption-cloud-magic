@@ -587,6 +587,30 @@ export default function ComposerSequencePreview({
     }
   }, [playing, voiceoverUrl, muted, globalTime]);
 
+  // ── Background music sync ─────────────────────────────────────
+  // BGM is a linear track that loops underneath the video. It mirrors
+  // the play/pause state and is mute-controlled via the same toggle.
+  useEffect(() => {
+    const m = musicRef.current;
+    if (!m || !backgroundMusicUrl) return;
+    const safeVol = Math.max(0, Math.min(1, backgroundMusicVolume));
+    try { m.volume = safeVol; } catch {}
+    m.muted = muted;
+    m.loop = true;
+
+    const trackDur = m.duration || Math.max(1, totalDuration);
+    const targetTime = globalTime % trackDur;
+    if (Number.isFinite(targetTime) && Math.abs(m.currentTime - targetTime) > 0.5) {
+      try { m.currentTime = targetTime; } catch {}
+    }
+
+    if (playing) {
+      m.play().catch(() => {});
+    } else {
+      m.pause();
+    }
+  }, [playing, backgroundMusicUrl, backgroundMusicVolume, muted, globalTime, totalDuration]);
+
   const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
     return (
