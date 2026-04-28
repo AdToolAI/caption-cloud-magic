@@ -571,6 +571,42 @@ serve(async (req) => {
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
+        } else if (scene.clipSource === 'ai-sora') {
+          // OpenAI Sora 2 via Replicate — standard or pro tier.
+          // Sora 2 only supports 4 / 8 / 12 second clips.
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .eq('id', scene.id);
+
+          const soraModel = quality === 'pro' ? 'openai/sora-2-pro' : 'openai/sora-2';
+          const soraDuration = snapDuration(scene.durationSeconds, [4, 8, 12]);
+          const soraInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt, scene.characterShot),
+            duration: soraDuration,
+            aspect_ratio: '16:9',
+            resolution: quality === 'pro' ? '1080p' : '720p',
+          };
+          console.log(`[compose-video-clips] Sora scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${soraDuration}s (${soraModel})`);
+          if (scene.referenceImageUrl) {
+            soraInput.image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] Sora scene ${scene.id} uses i2v reference`);
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: soraModel,
+            input: soraInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
+          });
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
         } else {
           // Unknown source, skip
           results.push({ sceneId: scene.id, status: 'skipped', error: `Unknown clip source: ${scene.clipSource}` });
