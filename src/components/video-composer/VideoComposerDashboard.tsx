@@ -940,7 +940,7 @@ export default function VideoComposerDashboard() {
           // backfills briefing/scenes from Supabase.
           clearDraft();
           setProject({ ...defaultProject, id: newProjectId });
-          didInitialSyncRef.current = false; // re-arm the hydration effect
+          lastSyncedProjectIdRef.current = null; // re-arm hydration for new id
           setActiveTab('clips');
         }}
       />
