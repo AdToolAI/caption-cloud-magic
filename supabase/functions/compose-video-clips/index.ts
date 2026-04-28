@@ -672,6 +672,7 @@ serve(async (req) => {
               clip_status: 'generating',
               clip_quality: quality,
               clip_lead_in_trim_seconds: computeLeadInTrim('ai-sora', isI2V),
+              with_audio: scene.withAudio !== false,
               updated_at: new Date().toISOString(),
             })
             .eq('id', scene.id);
