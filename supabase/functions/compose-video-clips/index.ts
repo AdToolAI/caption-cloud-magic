@@ -337,23 +337,30 @@ serve(async (req) => {
           // Hailuo via Replicate (Standard 768p / Pro 1080p)
           const duration = scene.durationSeconds >= 8 ? 10 : 6;
           const resolution = quality === 'pro' ? '1080p' : '768p';
+          const isI2V = !!scene.referenceImageUrl;
 
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-hailuo', isI2V),
+              updated_at: new Date().toISOString(),
+            })
             .eq('id', scene.id);
 
           const hailuoInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt),
-            negative_prompt: NEGATIVE_PROMPT_PARAM,
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            negative_prompt: negativeFor(isI2V),
             duration: duration,
             resolution: resolution,
           };
           // Image-to-Video: use reference image as the first frame
-          if (scene.referenceImageUrl) {
+          if (isI2V) {
             hailuoInput.first_frame_image = scene.referenceImageUrl;
-            console.log(`[compose-video-clips] Hailuo scene ${scene.id} uses reference image`);
+            console.log(`[compose-video-clips] Hailuo scene ${scene.id} uses reference image (lead-in trim ${computeLeadInTrim('ai-hailuo', true)}s)`);
           }
+
 
           const prediction = await replicate.predictions.create({
             model: "minimax/hailuo-2.3",
