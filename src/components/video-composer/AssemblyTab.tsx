@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Download, Palette, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen, Scissors, Film } from 'lucide-react';
+import { Loader2, Download, Palette, Type, CheckCircle, AlertCircle, Sparkles, FolderOpen, Scissors, Film, Music } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
