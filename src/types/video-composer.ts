@@ -253,6 +253,15 @@ export interface ComposerScene {
    */
   continuityLocked?: boolean;
   lockReferenceUrl?: string;
+  /**
+   * Per-scene audio toggle for AI models that natively produce sound
+   * (Sora 2 / Sora 2 Pro, Veo 3.1, Kling 3 Omni). When `false`:
+   *   - Veo / Kling: `generate_audio` flag is set to false at generation.
+   *   - Sora 2: clip is generated normally, then muted by the stitch step
+   *     (`-an` ffmpeg flag) since Sora has no API-level audio toggle.
+   * Defaults to `true` for backwards-compat with existing scenes.
+   */
+  withAudio?: boolean;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';

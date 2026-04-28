@@ -301,6 +301,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             referenceImageUrl: s.referenceImageUrl || resolved.referenceImageUrl,
             durationSeconds: s.durationSeconds,
             characterShot: s.characterShot,
+            withAudio: s.withAudio !== false,
           };
         });
 
@@ -414,6 +415,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             referenceImageUrl: targetScene.referenceImageUrl || resolvedSingle.referenceImageUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
+            withAudio: targetScene.withAudio !== false,
           }],
         },
       });
