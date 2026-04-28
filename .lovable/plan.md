@@ -1,75 +1,34 @@
-# Continuity Guardian — Falsche „Bruch"-Meldungen beheben
+## Problem
 
-## Das Problem (sichtbar im Screenshot)
+Auf `/motion-studio/library` wird "0 Charaktere" angezeigt, obwohl in der DB ein Charakter ("Richard Löwenherz") für deinen User korrekt gespeichert ist. Der Speichern-Toast erscheint also zu Recht — die Anzeige ist defekt.
 
-Der Guardian meldet auf jedem Cut hohe Drift-Werte (85, 75, 90) mit Labels wie *„different character, framing, lighting, and scene"*.
+## Ursache
 
-Das ist **kein Bug im Vergleich**, sondern eine falsche Grundannahme:
+`useMotionStudioLibrary.loadAll()` läuft genau einmal beim Mount, abhängig von `user`. Es gibt **keinen Refresh** nach `createCharacter`. In den meisten Fällen funktioniert das, weil `createCharacter` den neuen Eintrag direkt per `setCharacters((prev) => [created, ...prev])` lokal in den State schiebt — aber:
 
-- Der Guardian vergleicht den **letzten Frame von Szene N** mit dem **ersten Frame von Szene N+1** und bewertet wie ein Film-Continuity-Supervisor: 0 = identisch, 100 = anderer Charakter/anderes Setting.
-- In einem typischen Marketing-/Storytelling-Video sind aufeinanderfolgende Szenen **absichtlich** verschieden (Hook → Problem → Lösung, andere Räume, andere Close-ups). Daraus folgt: jeder echte Cut wird als „Bruch" gewertet.
-- Ergebnis: Der Guardian ist zu 100 % Noise und der „Alle reparieren"-Button würde sinnlose Re-Renders auslösen.
+1. **Race condition beim ersten Mount**: Wird die Library-Page geladen, *bevor* `useAuth` den Session-Restore beendet hat (`user` ist noch `null`), läuft `loadAll` mit leerem State und setzt `loading=false`. Sobald der User wenige ms später kommt, läuft `loadAll` zwar erneut über `useCallback`-Deps — aber der Initial-Load mit `user=null` lässt eine kurze Race-Phase zu, in der bereits gespeicherte Daten nicht erscheinen.
+2. **Härter**: Nach dem Speichern aus dem `CharacterEditor` heraus wird der Dialog geschlossen und nichts erneut gefetcht. Die UI verlässt sich nur auf den `setCharacters((prev) => [created, ...prev])`-Trick. Wenn `createCharacter` aus irgendeinem Grund das Insert-Result-Objekt nicht in den lokalen State pusht (z. B. weil zwischendurch ein Tab-Wechsel den State zurücksetzt, oder der Dialog auf einer anderen Page-Instance lebt), bleibt die Library leer — und ein Reload zeigt "0".
+3. **Plus**: Beim Reload der Page sehen wir, dass dein User-Eintrag definitiv da ist (DB-Check bestätigt), aber `tags`-Spalte ist nullable und Default `'{}'`. Das ist nicht das Problem, RLS ist auch sauber (`auth.uid() = user_id`).
 
-## Was wir ändern
+Konkret heißt das: Das Insert klappt, der Toast stimmt, aber die Liste wird nach dem Schließen des Editors **nicht neu geladen**, und ein einfacher Browser-Reload zeigt das Ergebnis erst, wenn `useAuth` den User vor `loadAll` hat — was bei dir beim Routing offenbar nicht passiert.
 
-### 1. Guardian nur auf „continuity-relevante" Paare anwenden
+## Fix
 
-Aktuell prüft der Guardian **jedes** AI-Szenen-Paar. Wir prüfen nur noch Paare, bei denen Continuity tatsächlich gewollt ist:
+**1. `useMotionStudioLibrary` robust machen**
+- `loadAll` nicht früh mit `user=null` als "leer" abschließen — stattdessen `loading=true` lassen, bis ein User da ist, dann fetchen.
+- Beim Auth-State-Change (`onAuthStateChange` über Supabase) ein Re-Fetch triggern.
+- `createCharacter` / `createLocation`: nach Insert zusätzlich `loadAll()` (oder gezielter: nochmal aus der DB nachladen), damit unabhängig vom State-Trick die Liste konsistent ist.
 
-- **Geteilter Charakter**: Beide Szenen referenzieren dieselbe `characterId` aus dem Briefing (`ComposerCharacter`).
-- **Explizit gelockte Anker**: Die Folgeszene hat eine `referenceImageUrl` oder `continuityLocked = true` — d. h. der User/AI will hier sichtbar Konsistenz.
-- **Selber Szenentyp + grenzwertiger Cut**: z. B. zwei aufeinanderfolgende `talking-head`-Szenen.
+**2. `CharacterEditor` & `LocationEditor`**
+- Nach `onSaved` einen optionalen `refetch`-Hook aus der Library aufrufen lassen (oder einfach in `useMotionStudioLibrary` selbst nach create immer fetchen — siehe oben).
 
-Alle anderen Paare (intentionaler Cut zu neuem Subjekt) werden **ausgeblendet** — kein Chip, keine Warnung.
+**3. UX-Sicherung**
+- Wenn `loading` true ist, nicht gleichzeitig "Noch keine Charaktere" zeigen (aktuell wird der Skeleton korrekt gezeigt — das ist okay, aber der Übergang `user=null → user=set` darf den Empty-State nicht kurz aufflashen).
 
-### 2. Bewertungsrubrik im Edge-Function-Prompt entschärfen
+### Zu ändernde Dateien
+- `src/hooks/useMotionStudioLibrary.ts` — Auth-aware Loading + Re-Fetch nach Create
+- (kein UI-Change nötig in `Library.tsx` / `CharacterEditor.tsx`)
 
-`detect-scene-drift` bekommt einen neuen Prompt, der zwischen **„geplanter Cut"** und **„unbeabsichtigter Drift"** unterscheidet. Wir geben dem Modell zusätzlichen Kontext mit (Szenentyp, ob ein gemeinsamer Charakter erwartet wird, der Prompt-Text der Folgeszene), damit es nicht stumpf Pixel vergleicht, sondern fragt: „Wäre dieser Wechsel für einen Zuschauer ein Continuity-Fehler?"
-
-Neue Skala:
-- **0–25**: Cut wirkt natürlich (egal ob gleich oder anders) → grün
-- **26–55**: Auffälliger, aber vertretbarer Cut → gelb (nur Hinweis)
-- **56–100**: Echter Continuity-Bruch (Charakter wechselt mitten im Dialog, Lighting springt im selben Raum) → rot
-
-### 3. UI-Default: leise statt laut
-
-- Wenn keine Paare nach den neuen Filterkriterien übrigbleiben, rendert die Strip-Komponente `null` (heute schon vorhanden) — also **gar kein Guardian-Block** auf solchen Projekten.
-- Gibt es Paare, ist der Default-Status `unknown` (grau), nicht „Bruch". Erst nach „Alles prüfen" kommen Farben.
-- Der „Alle reparieren"-Button erscheint nur, wenn mindestens ein Paar wirklich rot (`broken`) ist — gelb („drift") triggert ihn nicht mehr.
-
-### 4. Klarere Sprache & Hinweis im Header
-
-Der kleine Untertitel im Header wird ergänzt um eine Erklärung:
-> „Prüft nur Cuts, in denen derselbe Charakter oder Anker erscheint."
-
-So versteht der User sofort, warum manche Szenen im Guardian fehlen.
-
-## Technische Details
-
-**Frontend — `ContinuityGuardianStrip.tsx`**
-- `pairs`-Memo erweitern: zusätzliche Filter `sharesCharacter(prev, next)`, `hasLockedAnchor(next)`, `sameSceneType(prev, next)`.
-- `repairAllBroken` filtert auf `score >= 56` (statt `>= 36`).
-- Header-Untertitel-Text aktualisieren.
-
-**Edge Function — `supabase/functions/detect-scene-drift/index.ts`**
-- `RequestBody` um `context?: { sceneType?: string; expectsSameCharacter?: boolean; nextPrompt?: string }` erweitern.
-- `SYSTEM_PROMPT` umschreiben: explizit zwischen „intentional cut" und „continuity break" unterscheiden, neue Skala.
-- `safeParseDrift`-Schwellen anpassen (`>=56` → `hard-repair`, `>=26` → `soft-repair`).
-
-**Hook — `useContinuityDrift.ts`**
-- `driftSeverity`-Schwellen synchron zur neuen Skala anpassen (15→25, 35→55, 65→… entsprechend).
-
-**Aufrufer — `checkPair` / `checkAll`**
-- Übergeben den neuen `context`-Block an die Edge Function.
-
-## Was sich für den User ändert
-
-- Auf dem aktuellen Projekt im Screenshot würde der Guardian-Block **komplett verschwinden**, weil keine zwei Szenen denselben Charakter teilen und nichts gelockt ist.
-- Sobald der User einen Brand-Charakter ins Briefing legt oder eine Szene per „🔒 Anker verriegeln" verbindet, taucht der Guardian wieder auf — diesmal mit aussagekräftigen Werten.
-- Keine falschen „Alle reparieren"-Aktionen mehr, die unnötig Credits verbrennen.
-
-## Aus Scope raus
-
-- Wir bauen **kein** zusätzliches Modell und keinen neuen Provider — nur Prompt- und Filter-Logik.
-- Bestehende `composer_drift_checks`-History bleibt unverändert.
-- Migrations sind nicht nötig.
+### Verifikation
+- Nach Fix: Page `/motion-studio/library` neu laden → "Richard Löwenherz" erscheint sofort.
+- Neuen Charakter anlegen → erscheint sofort + bleibt nach Reload.

@@ -26,10 +26,16 @@ export function useMotionStudioLibrary() {
   const [loading, setLoading] = useState(true);
 
   const loadAll = useCallback(async () => {
-    if (!user) {
-      setCharacters([]);
-      setLocations([]);
-      setLoading(false);
+    // Resolve current auth state directly from Supabase to avoid races where
+    // the AuthContext user is still null right after a hard reload.
+    const {
+      data: { user: liveUser },
+    } = await supabase.auth.getUser();
+    const effectiveUser = user ?? liveUser ?? null;
+
+    if (!effectiveUser) {
+      // Don't flip to "empty" while auth is still booting — keep loading=true
+      // so we don't flash the empty state and lose data on first paint.
       return;
     }
     setLoading(true);
@@ -58,6 +64,13 @@ export function useMotionStudioLibrary() {
 
   useEffect(() => {
     loadAll();
+    // Re-fetch whenever auth state changes (sign-in after hard reload, token refresh, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        loadAll();
+      }
+    });
+    return () => subscription.unsubscribe();
   }, [loadAll]);
 
   // ── Characters ──────────────────────────────────────────────────────────
