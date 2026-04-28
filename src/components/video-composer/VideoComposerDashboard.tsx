@@ -140,21 +140,54 @@ const defaultProject: LocalProject = {
   language: 'de',
 };
 
+const isUuid = (val?: string | null) =>
+  !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
 export default function VideoComposerDashboard() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
-  const [project, setProject] = useState<LocalProject>(() => loadDraft() || defaultProject);
-  const [activeTab, setActiveTab] = useState<TabId>(() => restoreActiveTab());
+
+  // URL takes precedence over localStorage. If ?projectId=<uuid> is set
+  // (e.g. after Auto-Director or Ad-Director redirect), discard the local
+  // draft and seed state with that ID so the DB-hydration effect below
+  // pulls the freshly-created project + scenes from Supabase.
+  const urlProjectId = searchParams.get('projectId');
+  const urlTab = searchParams.get('tab') as TabId | null;
+  const hasUrlProject = isUuid(urlProjectId);
+
+  const [project, setProject] = useState<LocalProject>(() => {
+    if (hasUrlProject) {
+      // Fresh project from a director-wizard redirect — drop any stale draft
+      // so we don't merge unrelated scenes. Hydration effect will fill it in.
+      try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      return { ...defaultProject, id: urlProjectId! };
+    }
+    return loadDraft() || defaultProject;
+  });
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (urlTab && TAB_ORDER.includes(urlTab)) return urlTab;
+    return restoreActiveTab();
+  });
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
-  // Auto-open template picker when starting fresh (no draft on mount)
-  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !loadDraft());
+  // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
   const [showAdDirector, setShowAdDirector] = useState(false);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   const didInitialSyncRef = useRef(false);
+
+  // Strip the URL params after the first render so a later reload doesn't
+  // re-trigger the discard-draft path (the project.id is now in state).
+  useEffect(() => {
+    if (hasUrlProject || urlTab) {
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ---------------- Realtime Collaboration ----------------
   const [selfMeta, setSelfMeta] = useState<{ userId: string; name: string; email?: string } | null>(null);
