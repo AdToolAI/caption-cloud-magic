@@ -467,12 +467,15 @@ serve(async (req) => {
             .update({ clip_status: 'generating', clip_quality: quality, updated_at: new Date().toISOString() })
             .eq('id', scene.id);
 
+          // Seedance Lite supports 5 or 10 seconds — snap to nearest allowed value
+          const seedDuration = snapDuration(scene.durationSeconds, [5, 10]);
           const seedInput: Record<string, unknown> = {
             prompt: enrichPrompt(scene.aiPrompt),
-            duration: Math.min(Math.max(scene.durationSeconds, 5), 10),
+            duration: seedDuration,
             aspect_ratio: '16:9',
             resolution: quality === 'pro' ? '1080p' : '720p',
           };
+          console.log(`[compose-video-clips] Seedance scene ${scene.id}: requested ${scene.durationSeconds}s → snapped to ${seedDuration}s`);
           if (scene.referenceImageUrl) {
             seedInput.image = scene.referenceImageUrl;
             console.log(`[compose-video-clips] Seedance scene ${scene.id} uses i2v reference`);
