@@ -1,34 +1,58 @@
+# Storyboard: Charakter-Removal & weniger Charakter-Fokus
+
+Zwei zusammenhängende Verbesserungen am Video Composer Storyboard.
+
 ## Problem
 
-Auf `/motion-studio/library` wird "0 Charaktere" angezeigt, obwohl in der DB ein Charakter ("Richard Löwenherz") für deinen User korrekt gespeichert ist. Der Speichern-Toast erscheint also zu Recht — die Anzeige ist defekt.
+1. **Charakter lässt sich schwer aus einer Szene entfernen.** Sobald ein Charakter im Briefing erstellt wurde, hängt der Picker („Charakter: Richard Löwenherz · Detail") an jeder Szene. Das Entfernen geht nur versteckt über das Dropdown → „— keiner —". Es gibt keinen offensichtlichen X-Button.
 
-## Ursache
+2. **AI fixiert sich zu stark auf Charaktere.** Die System-Prompt-Regeln in `compose-video-storyboard` verteilen den Charakter quasi auf **alle** Szenen (1–2 full + 2–3 profile/back + 1–2 detail + 1–2 pov + „Rest" absent). In der Praxis landet dadurch in fast jeder Szene irgendein Charakter-Bezug — auch wenn die Story das gar nicht braucht. Zusätzlich ist die User-Prompt-Anweisung formuliert als „CHARACTER REQUIREMENT (non-negotiable)", was der AI keinen Spielraum lässt, Szenen ohne Charakter zu produzieren.
 
-`useMotionStudioLibrary.loadAll()` läuft genau einmal beim Mount, abhängig von `user`. Es gibt **keinen Refresh** nach `createCharacter`. In den meisten Fällen funktioniert das, weil `createCharacter` den neuen Eintrag direkt per `setCharacters((prev) => [created, ...prev])` lokal in den State schiebt — aber:
+## Lösung
 
-1. **Race condition beim ersten Mount**: Wird die Library-Page geladen, *bevor* `useAuth` den Session-Restore beendet hat (`user` ist noch `null`), läuft `loadAll` mit leerem State und setzt `loading=false`. Sobald der User wenige ms später kommt, läuft `loadAll` zwar erneut über `useCallback`-Deps — aber der Initial-Load mit `user=null` lässt eine kurze Race-Phase zu, in der bereits gespeicherte Daten nicht erscheinen.
-2. **Härter**: Nach dem Speichern aus dem `CharacterEditor` heraus wird der Dialog geschlossen und nichts erneut gefetcht. Die UI verlässt sich nur auf den `setCharacters((prev) => [created, ...prev])`-Trick. Wenn `createCharacter` aus irgendeinem Grund das Insert-Result-Objekt nicht in den lokalen State pusht (z. B. weil zwischendurch ein Tab-Wechsel den State zurücksetzt, oder der Dialog auf einer anderen Page-Instance lebt), bleibt die Library leer — und ein Reload zeigt "0".
-3. **Plus**: Beim Reload der Page sehen wir, dass dein User-Eintrag definitiv da ist (DB-Check bestätigt), aber `tags`-Spalte ist nullable und Default `'{}'`. Das ist nicht das Problem, RLS ist auch sauber (`auth.uid() = user_id`).
+### 1. Sichtbarer Remove-Button pro Szene (UI)
 
-Konkret heißt das: Das Insert klappt, der Toast stimmt, aber die Liste wird nach dem Schließen des Editors **nicht neu geladen**, und ein einfacher Browser-Reload zeigt das Ergebnis erst, wenn `useAuth` den User vor `loadAll` hat — was bei dir beim Routing offenbar nicht passiert.
+In `CharacterShotBadge.tsx` → `CharacterShotPicker`:
+- Wenn ein Charakter ausgewählt ist, zeigen wir rechts neben dem Shot-Type-Dropdown einen kleinen **X-Button** (Icon + tooltip „Charakter aus Szene entfernen" / „Remove character from scene" / „Quitar personaje").
+- Klick ruft `onChange(undefined)` → entfernt `characterShot` komplett aus der Szene.
+- Lokalisierung: DE/EN/ES wie überall sonst (lang-prop oder useTranslation).
 
-## Fix
+Optional in `SceneCard.tsx`:
+- Header-Bereich der Szene (dort wo `CharacterShotBadge` als Chip angezeigt wird, Zeile ~311) bekommt ebenfalls einen kleinen ✕ direkt am Chip — damit auch in der kompakten Ansicht (Strip / kollabierte Karte) entfernt werden kann.
 
-**1. `useMotionStudioLibrary` robust machen**
-- `loadAll` nicht früh mit `user=null` als "leer" abschließen — stattdessen `loading=true` lassen, bis ein User da ist, dann fetchen.
-- Beim Auth-State-Change (`onAuthStateChange` über Supabase) ein Re-Fetch triggern.
-- `createCharacter` / `createLocation`: nach Insert zusätzlich `loadAll()` (oder gezielter: nochmal aus der DB nachladen), damit unabhängig vom State-Trick die Liste konsistent ist.
+### 2. AI-Storyboard rebalancieren (Edge Function)
 
-**2. `CharacterEditor` & `LocationEditor`**
-- Nach `onSaved` einen optionalen `refetch`-Hook aus der Library aufrufen lassen (oder einfach in `useMotionStudioLibrary` selbst nach create immer fetchen — siehe oben).
+In `supabase/functions/compose-video-storyboard/index.ts`:
 
-**3. UX-Sicherung**
-- Wenn `loading` true ist, nicht gleichzeitig "Noch keine Charaktere" zeigen (aktuell wird der Skeleton korrekt gezeigt — das ist okay, aber der Übergang `user=null → user=set` darf den Empty-State nicht kurz aufflashen).
+**a) System-Prompt-Verteilung lockern (Zeilen ~188–193):**
 
-### Zu ändernde Dateien
-- `src/hooks/useMotionStudioLibrary.ts` — Auth-aware Loading + Re-Fetch nach Create
-- (kein UI-Change nötig in `Library.tsx` / `CharacterEditor.tsx`)
+Neue Distribution-Regeln:
+- **Default = `absent`** (Charakter NICHT in der Szene). Nur dort einsetzen, wo es die Story wirklich verlangt.
+- Maximal **40–50 % der Szenen** sollen einen Charakter zeigen, der Rest ist Welt/Objekt/Atmosphäre.
+- Dabei weiterhin Variation der `shotType` über die Charakter-Szenen, aber ohne Mindest-Quoten pro Shot-Type.
+- Explizite Anweisung: „If a scene works narratively without the character, prefer `absent`. The character is a recurring anchor, not the subject of every shot."
 
-### Verifikation
-- Nach Fix: Page `/motion-studio/library` neu laden → "Richard Löwenherz" erscheint sofort.
-- Neuen Charakter anlegen → erscheint sofort + bleibt nach Reload.
+**b) User-Prompt entschärfen (Zeile ~234–235):**
+
+Aus dem „CHARACTER REQUIREMENT (non-negotiable)" wird ein **„CHARACTER GUIDANCE"**:
+- „The user defined recurring character(s) … Use them as a narrative anchor where it strengthens the story. **Not every scene needs to feature the character** — environmental, product, and atmospheric scenes are equally valuable. Aim for the character to appear in roughly half the scenes, with varied shotType."
+- Damit darf die AI legitim `characterShot.shotType = "absent"` (oder `characterShot` weglassen) wählen, ohne gegen eine „non-negotiable" Regel zu verstoßen.
+
+**c) Kein Eingriff in `pickClipSource`:** Die Stock-Footage-Logik (`hasCharacters && characterShot?.shotType !== 'absent'` blockiert Stock) bleibt unverändert — sie greift jetzt einfach öfter, was auch dem Kostenziel nutzt.
+
+## Erwartetes Verhalten nach der Änderung
+
+- Im Storyboard sieht der User pro Szene neben „Charakter: Richard Löwenherz · Detail" ein klares ✕, das den Charakter mit einem Klick aus genau dieser Szene entfernt.
+- Bei AI-Generierung neuer Storyboards mit definierten Charakteren entstehen Szenen mit gemischtem Fokus: Welt/Produkt/Atmosphäre dominieren, der Charakter taucht gezielt als wiederkehrender Anker auf, statt in jeder Szene präsent zu sein.
+
+## Geänderte Dateien
+
+- `src/components/video-composer/CharacterShotBadge.tsx` (Remove-Button im Picker)
+- `src/components/video-composer/SceneCard.tsx` (✕ am Header-Chip, optional)
+- `supabase/functions/compose-video-storyboard/index.ts` (System- & User-Prompt rebalancieren)
+- `src/lib/translations.ts` (3 neue Strings: removeCharacter / Charakter entfernen / Quitar personaje)
+
+## Out of Scope
+
+- Keine Änderung am Charakter-Library-Hook oder der Brand-Character-Konsistenz.
+- Keine Datenmigration nötig — `characterShot` ist bereits optional im Schema.
