@@ -258,6 +258,7 @@ export default function AdDirectorWizard({
     setChosenVariantId(null);
     setVariantsLoading(false);
     setGenerating(false);
+    try { sessionStorage.removeItem(storageKey); } catch { /* noop */ }
   };
 
   const handleClose = (next: boolean) => {
