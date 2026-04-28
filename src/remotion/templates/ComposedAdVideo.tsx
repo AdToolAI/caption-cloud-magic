@@ -188,7 +188,10 @@ const Scene: React.FC<{
           <Video
             src={videoUrl}
             style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition }}
-            muted
+            // Native scene audio (Sora/Veo/Kling) only when the per-scene
+            // "With sound" toggle is on. Default = muted to keep voiceover/
+            // music tracks unobstructed and preserve legacy behaviour.
+            muted={withAudio !== true}
             // Lock playback rate to 1.0 — prevents implicit speed warping when
             // Sequence/Video durations diverge.
             playbackRate={1}
