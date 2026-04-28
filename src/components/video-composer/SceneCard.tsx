@@ -571,6 +571,7 @@ export default function SceneCard({
                 characters={characters}
                 value={scene.characterShot}
                 onChange={(next) => onUpdate({ characterShot: next })}
+                language={lang as 'en' | 'de' | 'es'}
               />
             )}
             {scene.clipSource.startsWith('ai-') && (
