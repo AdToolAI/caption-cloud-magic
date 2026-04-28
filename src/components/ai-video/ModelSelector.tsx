@@ -18,26 +18,31 @@ interface ModelSelectorProps {
   onChange: (modelId: string) => void;
   currency: Currency;
   hasSora2Access: boolean;
+  /** Optional subset of toolkit models. Defaults to the full registry. */
+  models?: ToolkitModel[];
+  /** Optional className for the trigger (e.g. compact size). */
+  className?: string;
 }
 
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
 
-export function ModelSelector({ value, onChange, currency, hasSora2Access }: ModelSelectorProps) {
+export function ModelSelector({ value, onChange, currency, hasSora2Access, models, className }: ModelSelectorProps) {
   const { language } = useTranslation();
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
+  const list = models ?? AI_VIDEO_TOOLKIT_MODELS;
 
   const grouped = useMemo(() => {
     const map: Record<ToolkitModelGroup, ToolkitModel[]> = {
       recommended: [], audio: [], fast: [], premium: [],
     };
-    AI_VIDEO_TOOLKIT_MODELS.forEach((m) => {
+    list.forEach((m) => {
       map[m.group].push(m);
     });
     return map;
-  }, []);
+  }, [list]);
 
-  const selected = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === value);
+  const selected = list.find((m) => m.id === value);
 
   return (
     <Select value={value} onValueChange={onChange}>
