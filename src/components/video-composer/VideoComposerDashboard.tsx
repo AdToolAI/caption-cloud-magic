@@ -175,7 +175,15 @@ export default function VideoComposerDashboard() {
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
-  const [showAdDirector, setShowAdDirector] = useState(false);
+  const [showAdDirector, setShowAdDirector] = useState(() => {
+    try { return sessionStorage.getItem('ad-director-wizard:open') === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try {
+      if (showAdDirector) sessionStorage.setItem('ad-director-wizard:open', '1');
+      else sessionStorage.removeItem('ad-director-wizard:open');
+    } catch { /* noop */ }
+  }, [showAdDirector]);
   const { ensureProjectPersisted } = useComposerPersistence();
   const incrementTemplateUsage = useIncrementTemplateUsage();
   // Track which project.id we have already hydrated from DB so the effect
