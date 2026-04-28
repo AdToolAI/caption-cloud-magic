@@ -381,6 +381,12 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
             scenes={scenes}
             subtitles={assemblyConfig.subtitles}
             voiceoverUrl={assemblyConfig.voiceover?.audioUrl ?? null}
+            backgroundMusicUrl={
+              assemblyConfig.music?.enabled && assemblyConfig.music?.trackUrl
+                ? assemblyConfig.music.trackUrl
+                : null
+            }
+            backgroundMusicVolume={(assemblyConfig.music?.volume ?? 30) / 100}
             globalTextOverlays={
               assemblyConfig.textOverlaysEnabled === false
                 ? []
