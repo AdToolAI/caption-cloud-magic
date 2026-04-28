@@ -291,8 +291,12 @@ serve(async (req) => {
       'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-image',
     ]);
 
+    // Throttle for Sora 2: Replicate enforces ~1 request / 5–10s on openai/sora-2.
+    // We track the last Sora call and gate subsequent calls so we don't get 429-storms.
+    const SORA_MIN_INTERVAL_MS = 7000;
+    let lastSoraCallAt = 0;
+
     // Process each scene
-    for (const scene of scenes) {
       // Defensive: rewrite unsupported AI engines to a working default.
       if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
         console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
