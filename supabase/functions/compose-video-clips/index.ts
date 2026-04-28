@@ -236,8 +236,27 @@ serve(async (req) => {
       try { return JSON.stringify(err); } catch { return String(err); }
     };
 
+    // Engines that compose-video-clips actually implements. Anything outside
+    // this set (e.g. 'ai-sora') gets normalized to 'ai-hailuo' so an
+    // upstream planner (Auto-Director, manual choice) can never leave a
+    // scene stranded in 'pending' forever.
+    const SUPPORTED_AI_SOURCES = new Set([
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-image',
+    ]);
+
     // Process each scene
     for (const scene of scenes) {
+      // Defensive: rewrite unsupported AI engines to a working default.
+      if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
+        console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
+        scene.clipSource = 'ai-hailuo';
+        // Persist the rewrite so the UI reflects reality
+        await supabaseAdmin
+          .from('composer_scenes')
+          .update({ clip_source: 'ai-hailuo', updated_at: new Date().toISOString() })
+          .eq('id', scene.id);
+      }
+
       const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
 
       try {
