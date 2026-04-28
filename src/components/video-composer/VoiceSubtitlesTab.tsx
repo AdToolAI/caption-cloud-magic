@@ -628,7 +628,12 @@ export default function VoiceSubtitlesTab({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs">{t('videoComposer.voScript')}</Label>
+                <Label className="text-xs flex items-center gap-1.5">
+                  {t('videoComposer.voScript')}
+                  {autoGenerating && (
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                  )}
+                </Label>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="text-[10px] h-6" onClick={() => setScriptGenOpen(true)}>
                     <Sparkles className="h-3 w-3 mr-1" />
@@ -642,11 +647,17 @@ export default function VoiceSubtitlesTab({
               </div>
               <Textarea
                 value={voiceover.script}
-                onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value } })}
-                placeholder={t('videoComposer.voScriptPlaceholder')}
+                onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value, autoScriptGenerated: false } })}
+                placeholder={autoGenerating ? t('videoComposer.autoScriptLoading') : t('videoComposer.voScriptPlaceholder')}
                 rows={4}
+                disabled={autoGenerating}
                 className="bg-background/50 resize-none text-sm"
               />
+              {autoError && !voiceover.script.trim() && !autoGenerating && (
+                <p className="text-[10px] text-amber-500/90">
+                  {t('videoComposer.autoScriptError')}
+                </p>
+              )}
               <p className="text-[10px] text-muted-foreground">
                 {voiceover.script.split(/\s+/).filter(Boolean).length} {t('videoComposer.words')} · ~{Math.ceil(voiceover.script.split(/\s+/).filter(Boolean).length / 150 * 60)}s
               </p>
