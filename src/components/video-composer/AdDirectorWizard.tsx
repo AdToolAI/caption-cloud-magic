@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import {
   ArrowRight,
   ChevronLeft,
@@ -501,8 +501,8 @@ export default function AdDirectorWizard({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl h-[90vh] !flex flex-col overflow-hidden p-0 gap-0">
+        <DialogHeader className="shrink-0 p-6 pb-2">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Sparkles className="h-5 w-5 text-primary" />
             Ad Director Mode
@@ -516,7 +516,7 @@ export default function AdDirectorWizard({
         </DialogHeader>
 
         {/* Step indicator */}
-        <div className="flex items-center gap-2 px-1 pb-2">
+        <div className="shrink-0 flex items-center gap-2 px-6 pb-3">
           {STEPS.map((s, i) => (
             <div
               key={s}
@@ -528,8 +528,8 @@ export default function AdDirectorWizard({
           ))}
         </div>
 
-        <ScrollArea className="flex-1 min-h-0 pr-2">
-          <div className="space-y-6 pb-2">
+        <div className="flex-1 min-h-0 overflow-y-auto px-6">
+          <div className="space-y-6 pb-6">
             {step === 'format' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1023,9 +1023,9 @@ export default function AdDirectorWizard({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="flex items-center justify-between gap-2 sm:justify-between">
+        <DialogFooter className="shrink-0 border-t border-border/40 p-4 flex items-center justify-between gap-2 sm:justify-between">
           <Button
             type="button"
             variant="ghost"
