@@ -1899,6 +1899,8 @@ export const translations: Record<Language, any> = {
       voScriptPlaceholder: "The voiceover text for your video…",
       fromScenes: "From scenes",
       aiGenerator: "AI Generator",
+      autoScriptLoading: "AI is writing your script…",
+      autoScriptError: "Auto-script failed — use the ‘AI Generator’ button.",
       voiceTuning: "Voice Tuning",
       speed: "Speed",
       words: "words",
