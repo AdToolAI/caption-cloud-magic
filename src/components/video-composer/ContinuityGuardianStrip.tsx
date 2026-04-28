@@ -204,6 +204,7 @@ export default function ContinuityGuardianStrip({
         sceneId: string;
         anchorSceneId: string;
         projectId?: string;
+        context?: ReturnType<typeof buildContext>;
       }> = [];
       for (const p of pairs) {
         let anchorUrl =
@@ -235,6 +236,7 @@ export default function ContinuityGuardianStrip({
             sceneId: p.next.id,
             anchorSceneId: p.prev.id,
             projectId,
+            context: buildContext(p),
           });
         }
       }
@@ -248,8 +250,9 @@ export default function ContinuityGuardianStrip({
         const hit = results.find((r) => r.sceneId === s.id);
         if (!hit?.result) return s;
         const sc = hit.result.driftScore;
-        if (sc <= 35) okCount++;
-        else if (sc <= 65) warnCount++;
+        // Aligned with new driftSeverity buckets (25 / 55 / 75).
+        if (sc <= 55) okCount++;
+        else if (sc <= 75) warnCount++;
         else brokenCount++;
         return {
           ...s,
