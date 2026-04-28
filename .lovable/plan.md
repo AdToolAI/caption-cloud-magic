@@ -1,33 +1,42 @@
-## Ziel
+## Problem
 
-Aktuell ist der **Referenzbild-Upload** (`SceneReferenceImageUpload`) in der `SceneCard` nur sichtbar, wenn `scene.clipSource` mit `ai-` beginnt (Hailuo, Kling, Veo, Sora, AI-Image). In **Stock-Video**, **Stock-Image**, **Upload** und **anderen** Modi gibt es keine Möglichkeit, manuell ein Referenzbild zu setzen oder auszutauschen — obwohl das Bild u. a. für Continuity-Guardian, Brand-Character-Lock und spätere Engine-Wechsel relevant bleibt.
+Auf der Storyboard-Seite (Schritt 2) wächst der Inhalt seitlich über den Viewport hinaus, sodass die Seite horizontal scrollt. Ursache: die innere Content-Spalte einer Szene-Karte (`<div className="flex-1 space-y-3">` in `SceneCard.tsx`) hat **kein `min-w-0`**. Dadurch ignoriert der Browser das `overflow-x-auto` des „Cinematic Looks"-Rails (12 Preset-Karten à ~140 px ≈ 1680 px) und vergrößert stattdessen den Flex-Container — die ganze Szene-Karte und damit die ganze Seite werden breiter als der `max-w-7xl`-Container.
 
-## Änderung
+Zusätzlich sind einige Sub-Elemente unnötig breit/sperrig.
 
-### `src/components/video-composer/SceneCard.tsx`
+## Lösung
 
-1. **`SceneReferenceImageUpload` aus dem AI-Block herauslösen** (aktuell innerhalb des `scene.clipSource.startsWith('ai-')`-Blocks bei Zeile 730).
-2. Stattdessen **unterhalb** des modusspezifischen Blocks (AI / Stock / Upload) als **eigenständigen, immer sichtbaren Abschnitt** rendern.
-3. **Visuelle Anpassung**: Klar als optionaler universeller Reference-Slot beschriften, mit kurzem Hinweistext je nach Modus:
-   - AI-Modi: „Die KI orientiert sich am Bild (Image-to-Video)."
-   - Stock/Upload: „Wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet."
-4. Lokalisierung (DE/ES/EN) analog zu bestehenden Strings im File.
+Layout reparieren + Inhalte etwas dichter packen, ohne Funktionalität zu entfernen.
 
-### Verhalten
+### 1) Overflow-Fix (Hauptursache)
+- `src/components/video-composer/SceneCard.tsx` Zeile 288: `flex-1 space-y-3` → `flex-1 min-w-0 space-y-3`
+- Defensiv ebenfalls: dem äußeren Karten-Wrapper / `CardContent` ein `overflow-hidden` geben, damit eine versehentliche Breite nie wieder die Seite sprengen kann.
 
-- Upload-, Drag&Drop- und Remove-Logik bleiben unverändert (keine Änderung in `SceneReferenceImageUpload.tsx` nötig).
-- `scene.referenceImageUrl` wird weiter über `onUpdate({ referenceImageUrl })` persistiert.
-- Bestehende Continuity-Guardian- und Style-Reference-Flows funktionieren unverändert.
+### 2) „Cinematic Looks"-Rail kompakter
+`src/components/ai-video/CinematicStylePresets.tsx`:
+- Im `compact`-Modus Karten von `w-[120px]` auf `w-[104px]` verkleinern, Padding `p-2` → `p-1.5`, Emoji `text-xl` → `text-lg`.
+- Sicherstellen, dass das Rail einen scrollenden Container mit klarer Begrenzung hat (`max-w-full overflow-x-auto`).
 
-## Technische Details
+### 3) Shot Director vertikaler statt breiter
+`src/components/video-composer/SceneShotDirectorPanel.tsx`:
+- Grid bleibt `grid-cols-2`, aber Buttons strikt auf `min-w-0 truncate` setzen, damit lange Optionswerte (z. B. „Slow Push-In") die Spalte nicht aufblasen.
 
-- **Datei**: `src/components/video-composer/SceneCard.tsx`
-- **Entfernen**: `<SceneReferenceImageUpload … />` Block bei ~Zeile 730–735 innerhalb des AI-Conditional.
-- **Neu einfügen**: nach dem Schließen der drei modusspezifischen Blöcke (AI, Stock, Upload — endet ~Zeile 820), als gemeinsamer Footer-Bereich der Scene-Card.
-- Wrapper-Div mit dezentem Border (`border-dashed border-border/50`) und Mode-aware Hinweistext.
+### 4) Director-Mode-Button-Reihe sauberer umbrechen
+`SceneCard.tsx` (Director-Mode-Block ~Zeile 370):
+- `flex flex-wrap items-center gap-1.5` bleibt, aber Button-Text bei sehr engen Viewports nur als Icon (Label `hidden xl:inline`).
 
-## Nicht im Scope
+### 5) Storyboard-Container atmen lassen
+`src/components/video-composer/StoryboardTab.tsx`:
+- `max-w-4xl` bleibt; zusätzlich `min-w-0` auf den inneren Wrapper, damit verschachtelte Flex-Elemente nicht durchschlagen.
 
-- Keine Änderungen an Edge Functions, Composer-Engine oder Datenbank.
-- Keine Änderungen am Continuity-Guardian-Strip oder Brand-Character-Lock.
-- Keine UX-Änderung für AI-Wizard / Auto-Director — nur die Scene-Card-Ansicht im Storyboard/Clips-Tab.
+### Ergebnis
+- Keine horizontale Seiten-Scroll-Leiste mehr.
+- Cinematic Looks scrollen sauber **innerhalb** der Szene-Karte.
+- Shot Director / Light / Director Mode bleiben vollständig sichtbar, brechen bei Bedarf nach unten um.
+- Funktionalität unverändert — nur Layout & Dichte angepasst.
+
+### Geänderte Dateien
+- `src/components/video-composer/SceneCard.tsx`
+- `src/components/ai-video/CinematicStylePresets.tsx`
+- `src/components/video-composer/SceneShotDirectorPanel.tsx`
+- `src/components/video-composer/StoryboardTab.tsx`
