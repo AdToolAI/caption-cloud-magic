@@ -274,7 +274,7 @@ RULES:
 - Keep prompts concise (15-30 words each), suitable for AI video generation models.
 - Use the requested mood "${req.mood}" to drive style (e.g. cinematic = wide angles & dramatic lighting; hype = fast cuts & bold colors; calm = slow pans & soft tones; corporate = clean & professional; playful = bright & dynamic; dramatic = high contrast & tension).
 - Choose recommended_engine ONLY from this list: ${allowedEngines.join(', ')}.
-- Pick the best engine per scene: ai-kling/ai-luma for character close-ups & dialogue feel, ai-hailuo for fast action, ai-seedance for stylish motion, ai-wan for budget shots, ai-sora for hero moments.
+- Pick the best engine per scene: ai-kling/ai-luma for character close-ups & dialogue feel, ai-hailuo for fast action, ai-seedance for stylish motion, ai-wan for budget shots, ai-veo for hero moments with audio.
 - Scene types: hook, problem, solution, feature, proof, cta, intro, outro, transition.
 - Output language for any text_overlay: ${req.language ?? 'de'}.
 - Add a short text_overlay (3-6 words) ONLY on hook and cta scenes.`;
