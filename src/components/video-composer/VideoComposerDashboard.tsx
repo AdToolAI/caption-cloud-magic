@@ -224,13 +224,13 @@ export default function VideoComposerDashboard() {
   // to mount LiveCursorLayer over their canvas (e.g. StoryboardTab). For now we
   // surface presence via avatars in the header — cursors are an opt-in overlay.
 
-  // DB sync on mount: if the loaded draft has a project.id, hydrate scenes from DB
+  // DB sync whenever project.id changes: hydrate scenes + briefing from DB.
+  // Idempotent per-project via lastSyncedProjectIdRef so it never double-fetches.
   useEffect(() => {
-    if (didInitialSyncRef.current) return;
-    didInitialSyncRef.current = true;
-
     const projectId = project.id;
     if (!projectId) return;
+    if (lastSyncedProjectIdRef.current === projectId) return;
+    lastSyncedProjectIdRef.current = projectId;
 
     (async () => {
       try {
