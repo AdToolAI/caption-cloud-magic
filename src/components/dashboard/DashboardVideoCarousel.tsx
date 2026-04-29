@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 import { useTranslation } from '@/hooks/useTranslation';
+import { AutopilotHeroBanner } from '@/components/autopilot/AutopilotHeroBanner';
 
 interface QuickAction {
   label: string;
@@ -625,6 +626,9 @@ export const DashboardVideoCarousel = ({
           ))}
         </div>
       )}
+
+      {/* Autopilot Hero Banner — KI-Steuerung */}
+      <AutopilotHeroBanner />
 
       {/* News Section */}
       <div className="mt-6 pt-6 border-t border-border/50">
