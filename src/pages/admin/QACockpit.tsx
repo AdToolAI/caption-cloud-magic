@@ -820,11 +820,35 @@ export default function QACockpit() {
                 )}
               </div>
 
-              <DialogFooter className="gap-2 mt-4">
+              <DialogFooter className="gap-2 mt-4 flex-wrap">
+                {selectedBug.status !== "resolved" && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => resolveBug.mutate(selectedBug.id)}
+                      disabled={resolveBug.isPending}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Mark fixed
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const sample = (selectedBug.title || "").replace(/^Console:\s*/, "").replace(/^Network \d+:\s*/, "").replace(/\s*\(×\d+\)\s*$/, "").trim();
+                        const pattern = prompt("Regex-Pattern, das gemutet werden soll:", sample.slice(0, 80));
+                        if (!pattern) return;
+                        const reason = prompt("Grund (optional):", "Bekanntes Rauschen") ?? "";
+                        mutePattern.mutate({ pattern, reason });
+                        resolveBug.mutate(selectedBug.id);
+                      }}
+                    >
+                      <VolumeX className="h-4 w-4 mr-2" /> Mute pattern
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   onClick={() => {
-                    const md = `# Bug: ${selectedBug.title}\n\n**Mission:** ${selectedBug.mission_name}\n**Severity:** ${selectedBug.severity}\n**Category:** ${selectedBug.category}\n${selectedBug.route ? `**Route:** ${selectedBug.route}\n` : ""}\n## Beschreibung\n\`\`\`\n${selectedBug.description ?? ""}\n\`\`\`\n\n${selectedBug.network_trace ? `## Network Trace\n\`\`\`json\n${JSON.stringify(selectedBug.network_trace, null, 2)}\n\`\`\`\n` : ""}${Array.isArray(selectedBug.console_log) && selectedBug.console_log.length ? `\n## Console\n\`\`\`\n${selectedBug.console_log.map((c: any) => `[${c.type}] ${c.text}`).join("\n")}\n\`\`\`\n` : ""}`;
+                    const md = `# Bug: ${selectedBug.title}\n\n**Mission:** ${selectedBug.mission_name}\n**Severity:** ${selectedBug.severity}\n**Category:** ${selectedBug.category}\n${selectedBug.route ? `**Route:** ${selectedBug.route}\n` : ""}\n## Beschreibung\n\`\`\`\n${selectedBug.description ?? ""}\n\`\`\`\n\n${selectedBug.network_trace ? `## Network Trace\n\`\`\`json\n${JSON.stringify(selectedBug.network_trace, null, 2)}\n\`\`\`\n` : ""}${Array.isArray(selectedBug.console_log) && selectedBug.console_log.length ? `\n## Console\n\`\`\`\n${selectedBug.console_log.map((c: any) => `[${c.type}] ${c.text}${c.url ? ` @ ${c.url}:${c.line ?? "?"}` : ""}${c.stack ? `\n${c.stack}` : ""}`).join("\n")}\n\`\`\`\n` : ""}`;
                     navigator.clipboard.writeText(md);
                     toast.success("Bug-Context als Markdown kopiert — direkt im Chat einfügen");
                   }}
