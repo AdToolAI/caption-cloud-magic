@@ -37,6 +37,8 @@ const CLIP_COSTS: Record<string, Record<Quality, number>> = {
   'ai-seedance': { standard: 0.12, pro: 0.20 },
   'ai-luma':     { standard: 0.20, pro: 0.32 },
   'ai-veo':      { standard: 0.20, pro: 1.40 },
+  'ai-runway':   { standard: 0.15, pro: 0.15 },
+  'ai-pika':     { standard: 0.10, pro: 0.18 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
 };
 
@@ -303,7 +305,7 @@ serve(async (req) => {
     // upstream planner (Auto-Director, manual choice) can never leave a
     // scene stranded in 'pending' forever.
     const SUPPORTED_AI_SOURCES = new Set([
-      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-image',
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-runway', 'ai-pika', 'ai-image',
     ]);
 
     // Throttle for Sora 2: Replicate enforces ~1 request / 5–10s on openai/sora-2.
@@ -749,6 +751,137 @@ serve(async (req) => {
             .eq('id', scene.id);
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
+
+        } else if (scene.clipSource === 'ai-runway') {
+          // Runway Gen-4 Aleph — V2V only. Requires a reference VIDEO (not image).
+          // Composer convention: scene.uploadUrl OR a previously rendered scene clipUrl
+          // can serve as the reference. We accept uploadUrl here as the V2V source.
+          const referenceVideoUrl = scene.uploadUrl;
+          if (!referenceVideoUrl) {
+            console.warn(`[compose-video-clips] Runway scene ${scene.id} has no reference video — falling back to ai-hailuo.`);
+            scene.clipSource = 'ai-hailuo';
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_source: 'ai-hailuo', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            // Re-route this scene to Hailuo by inserting a synthetic Hailuo call
+            const fallbackDuration = scene.durationSeconds >= 8 ? 10 : 6;
+            const fallbackPred = await replicate.predictions.create({
+              model: "minimax/hailuo-2.3",
+              input: {
+                prompt: enrichPrompt(scene.aiPrompt, undefined, false),
+                negative_prompt: negativeFor(false, scene.negativePrompt),
+                duration: fallbackDuration,
+                resolution: '768p',
+              },
+              webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+              webhook_events_filter: ["completed"],
+            });
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'generating', clip_quality: 'standard', replicate_prediction_id: fallbackPred.id })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'generating', predictionId: fallbackPred.id });
+            continue;
+          }
+
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', scene.id);
+
+          const runwayDuration = scene.durationSeconds >= 8 ? 10 : 5;
+          const runwayResp = await fetch(`${supabaseUrl}/functions/v1/generate-runway-video`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+            body: JSON.stringify({
+              prompt: enrichPrompt(scene.aiPrompt, undefined, true),
+              model: 'runway-gen4-aleph',
+              duration: runwayDuration,
+              aspectRatio: '16:9',
+              referenceVideoUrl,
+            }),
+          });
+
+          if (!runwayResp.ok) {
+            const errBody = await runwayResp.text();
+            console.error(`[compose-video-clips] Runway scene ${scene.id} failed:`, runwayResp.status, errBody);
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'failed', error: `Runway ${runwayResp.status}` });
+          } else {
+            const runwayData = await runwayResp.json();
+            // Runway is async-polled in its own edge function; the composer
+            // webhook isn't called. Mark as generating; user polls scene later
+            // via the regular ai_video_generations status pipeline.
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({
+                replicate_prediction_id: runwayData.taskId ?? runwayData.generationId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'generating', predictionId: runwayData.taskId });
+          }
+
+        } else if (scene.clipSource === 'ai-pika') {
+          // Pika 2.2 via Replicate — supports T2V + I2V (Pikaframes via end_image)
+          const isI2V = !!scene.referenceImageUrl;
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-pika', isI2V),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', scene.id);
+
+          const pikaDuration = snapDuration(scene.durationSeconds, [5, 10]);
+          const pikaResp = await fetch(`${supabaseUrl}/functions/v1/generate-pika-video`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+            body: JSON.stringify({
+              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+              model: quality === 'pro' ? 'pika-2-2-pro' : 'pika-2-2-standard',
+              duration: pikaDuration,
+              aspectRatio: '16:9',
+              startImageUrl: scene.referenceImageUrl,
+              endImageUrl: scene.endReferenceImageUrl,
+            }),
+          });
+
+          if (!pikaResp.ok) {
+            const errBody = await pikaResp.text();
+            console.error(`[compose-video-clips] Pika scene ${scene.id} failed:`, pikaResp.status, errBody);
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'failed', error: `Pika ${pikaResp.status}` });
+          } else {
+            const pikaData = await pikaResp.json();
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({
+                replicate_prediction_id: pikaData.predictionId ?? pikaData.generationId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'generating', predictionId: pikaData.predictionId });
+          }
 
         } else {
           // Unknown source, skip
