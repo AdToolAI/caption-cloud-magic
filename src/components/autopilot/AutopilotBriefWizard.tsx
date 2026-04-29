@@ -83,6 +83,8 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
   const toggleLang = (l: string) =>
     setLanguages((prev) => (prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]));
 
+  const goalValid = goal.target_audience.trim().length > 0 && goal.usp.trim().length > 0 && goal.weekly_budget_eur >= 5;
+
   const handleSaveBrief = async () => {
     const input: UpsertBriefInput = {
       topic_pillars: pillarsText.split(',').map((s) => s.trim()).filter(Boolean),
@@ -94,9 +96,15 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
       avatar_ids: [],
       weekly_credit_budget: budget,
       auto_publish_enabled: autoPublish,
+      // Session H — Goal briefing
+      channel_goal: goal.channel_goal,
+      content_mix: goal.content_mix,
+      weekly_budget_eur: goal.weekly_budget_eur,
+      target_audience: goal.target_audience,
+      usp: goal.usp,
     };
     await upsert.mutateAsync(input);
-    setStep(2);
+    setStep(3);
   };
 
   const handleActivate = async () => {
