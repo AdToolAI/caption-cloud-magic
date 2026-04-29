@@ -128,6 +128,12 @@ export interface UpsertBriefInput {
   video_provider?: string;
   video_duration_sec?: number;
   video_aspect_ratio?: string;
+  // Session H
+  channel_goal?: 'awareness' | 'engagement' | 'traffic' | 'leads' | 'sales';
+  content_mix?: { ai_video: number; stock_reel: number; static: number };
+  weekly_budget_eur?: number;
+  target_audience?: string | null;
+  usp?: string | null;
 }
 
 export function useUpsertAutopilotBrief() {
