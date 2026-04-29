@@ -442,6 +442,82 @@ export default function QACockpit() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Credentials Modal — one-time password reveal */}
+      <Dialog open={!!credentials} onOpenChange={(open) => { if (!open) closeCredentials(); }}>
+        <DialogContent className="bg-[#0A0F1F] border-[#F5C76A]/30 text-foreground sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-[#F5C76A] flex items-center gap-2">
+              <KeyRound className="h-5 w-5" /> Test-User-Zugangsdaten
+            </DialogTitle>
+            <DialogDescription className="text-amber-300/90 flex items-start gap-2 mt-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                Dieses Passwort wird <strong>nur jetzt einmalig</strong> angezeigt. Speichere es sofort als
+                Secret <code className="px-1 py-0.5 bg-black/40 rounded text-[#F5C76A]">QA_TEST_USER_PASSWORD</code>.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          {credentials && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground">E-Mail</Label>
+                <Input
+                  readOnly
+                  value={credentials.email}
+                  className="font-mono bg-black/40 border-[#F5C76A]/20 mt-1"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+              </div>
+
+              <div>
+                <Label className="text-xs text-muted-foreground">Passwort (vollständig)</Label>
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    readOnly
+                    type={showPassword ? "text" : "password"}
+                    value={credentials.password}
+                    className="font-mono bg-black/40 border-[#F5C76A]/20 flex-1"
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowPassword((v) => !v)}
+                    title={showPassword ? "Verbergen" : "Anzeigen"}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleCopy}
+                    title="In Zwischenablage kopieren"
+                  >
+                    {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Länge: {credentials.password.length} Zeichen
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeCredentials}>
+              Schließen (Passwort verwerfen)
+            </Button>
+            <Button
+              className="bg-[#F5C76A] text-black hover:bg-[#F5C76A]/90"
+              onClick={handleCopy}
+            >
+              {copied ? <><Check className="h-4 w-4 mr-2" /> Kopiert</> : <><Copy className="h-4 w-4 mr-2" /> Passwort kopieren</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
