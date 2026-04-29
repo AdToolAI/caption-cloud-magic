@@ -295,6 +295,28 @@ export default function QACockpit() {
                       <span>Cost: {((r.cost_actual_cents ?? 0) / 100).toFixed(2)}€</span>
                       {r.duration_ms && <span>{(r.duration_ms / 1000).toFixed(1)}s</span>}
                     </div>
+                    {Array.isArray(r.metadata?.result?.heartbeats) && r.metadata.result.heartbeats.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-2">
+                        {r.metadata.result.heartbeats.map((h: any, i: number) => (
+                          <span
+                            key={i}
+                            title={h.error || h.url || ""}
+                            className={`text-[10px] px-1.5 py-0.5 rounded border font-mono ${
+                              h.label === "aborted"
+                                ? "bg-red-500/10 border-red-500/40 text-red-300"
+                                : "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
+                            }`}
+                          >
+                            {h.label}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {r.metadata?.result?.error && (
+                      <p className="text-[11px] text-red-400 mt-1 font-mono truncate" title={r.metadata.result.error}>
+                        ⚠ {r.metadata.result.error}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -592,6 +614,29 @@ export default function QACockpit() {
                     <p className="text-[10px] text-muted-foreground mt-1">
                       Was Browserless auf <code>/auth</code> tatsächlich gesehen hat, bevor der Login fehlschlug.
                     </p>
+                  </Section>
+                )}
+
+                {Array.isArray(selectedBug.network_trace?.heartbeats) && selectedBug.network_trace.heartbeats.length > 0 && (
+                  <Section title="Skript-Heartbeats (wo blieb das Skript stehen?)">
+                    <ol className="text-xs space-y-1 bg-black/40 p-3 rounded border border-[#F5C76A]/10 font-mono">
+                      {selectedBug.network_trace.heartbeats.map((h: any, i: number) => (
+                        <li key={i} className={h.label === "aborted" ? "text-red-300" : "text-cyan-300"}>
+                          {i + 1}. {h.label}
+                          {h.url && <span className="text-muted-foreground"> · {h.url}</span>}
+                          {h.via && <span className="text-muted-foreground"> · via {h.via}</span>}
+                          {h.error && <span className="text-red-400"> · {h.error}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  </Section>
+                )}
+
+                {selectedBug.network_trace?.raw_response && (
+                  <Section title="Roh-Antwort (Browserless)">
+                    <pre className="text-xs whitespace-pre-wrap font-mono bg-black/40 p-3 rounded border border-amber-500/20 max-h-48 overflow-auto">
+                      {selectedBug.network_trace.raw_response}
+                    </pre>
                   </Section>
                 )}
 
