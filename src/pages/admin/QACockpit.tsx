@@ -580,6 +580,21 @@ export default function QACockpit() {
                   </Section>
                 )}
 
+                {selectedBug.network_trace?.login_screenshot_url && (
+                  <Section title="Auth-Seite zum Zeitpunkt des Fehlers">
+                    <a href={selectedBug.network_trace.login_screenshot_url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={selectedBug.network_trace.login_screenshot_url}
+                        alt="Auth page at failure"
+                        className="w-full rounded border border-amber-500/30 hover:border-amber-500/60"
+                      />
+                    </a>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Was Browserless auf <code>/auth</code> tatsächlich gesehen hat, bevor der Login fehlschlug.
+                    </p>
+                  </Section>
+                )}
+
                 {selectedBug.network_trace && (
                   <Section title="Network / Raw Response">
                     <pre className="text-xs whitespace-pre-wrap font-mono bg-black/40 p-3 rounded border border-[#F5C76A]/10 max-h-60 overflow-auto">
