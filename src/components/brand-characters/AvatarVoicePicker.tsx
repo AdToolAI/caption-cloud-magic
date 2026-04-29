@@ -78,8 +78,8 @@ export const AvatarVoicePicker = ({ value, onChange, disabled }: AvatarVoicePick
               <SelectLabel className="text-[10px] uppercase tracking-widest text-primary/60 mt-2">
                 Your Custom Voices
               </SelectLabel>
-              {customList.map((v: any) => (
-                <SelectItem key={v.voice_id} value={v.voice_id} className="text-xs">
+              {customList.map((v) => (
+                <SelectItem key={v.id} value={v.elevenlabs_voice_id} className="text-xs">
                   {v.name || 'Custom voice'}
                 </SelectItem>
               ))}
