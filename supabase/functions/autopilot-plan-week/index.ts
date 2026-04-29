@@ -115,6 +115,30 @@ Deno.serve(async (req) => {
 NUTZE DIESE LERNDATEN AKTIV — sie sind echte historische Performance, kein Bauchgefühl.`
       : "";
 
+    // Session H — Goal & Budget Block
+    const contentMix = (brief.content_mix ?? { ai_video: 33, stock_reel: 33, static: 34 }) as Record<string, number>;
+    const budgetEur = brief.weekly_budget_eur ?? 25;
+    const goalMap: Record<string, string> = {
+      awareness: "REICHWEITE & neue Follower (große Hooks, virale Mechaniken, trending sounds/topics)",
+      engagement: "COMMUNITY-INTERAKTION (Fragen, Polls, Reactions, Saves, persönliche Stories)",
+      traffic: "KLICKS auf Website/Link in Bio (klare CTAs, Preview-Snippets, Cliffhanger)",
+      leads: "E-MAIL-SIGNUPS / DMs / Anfragen (Lead-Magnets, Free-Resources, Soft-Pitches)",
+      sales: "DIREKTER VERKAUF (Produkt-Demos, USPs, Social Proof, harte CTAs)",
+    };
+    const isLowBudget = budgetEur < 20;
+    const allowedFormats = isLowBudget
+      ? "single_image, image_carousel (KI-Video DEAKTIVIERT wegen Budget < 20€)"
+      : "short_video, image_carousel, single_image, talking_head";
+
+    const goalBudgetBlock = `
+CHANNEL-ZIEL DIESER WOCHE: ${goalMap[brief.channel_goal as string] ?? brief.channel_goal}
+WOCHEN-BUDGET: ${budgetEur}€ (≈ ${brief.weekly_credit_budget} Credits)
+CONTENT-MIX (Soll-Verteilung): ${contentMix.ai_video}% KI-Video / ${contentMix.stock_reel}% Stock+KI-Bild / ${contentMix.static}% Static
+ZIELGRUPPE: ${brief.target_audience || "(nicht definiert)"}
+USP: ${brief.usp || "(nicht definiert)"}
+ERLAUBTE FORMATE: ${allowedFormats}
+${isLowBudget ? "⚠️ Bei niedrigem Budget MAXIMAL Static-Posts und Image-Carousels einsetzen — keine ai-video!" : ""}`;
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
