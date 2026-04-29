@@ -1,11 +1,7 @@
 name: Load Tests
 
 on:
-  push:
-    branches: [main]
-  schedule:
-    # Run every Monday at 2 AM UTC
-    - cron: '0 2 * * 1'
+  # Disabled until load tests are repaired (Phase 1 cleanup).
   workflow_dispatch:
 
 jobs:
