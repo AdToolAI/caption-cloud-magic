@@ -23,7 +23,7 @@ export interface BrowserlessActionResult {
 export async function runBrowserlessFunction(
   code: string,
   context?: Record<string, unknown>,
-  timeoutMs = 90_000,
+  timeoutMs = 130_000,
 ): Promise<BrowserlessActionResult> {
   const apiKey = Deno.env.get("BROWSERLESS_API_KEY");
   if (!apiKey) {
@@ -34,9 +34,13 @@ export async function runBrowserlessFunction(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
+  // Browserless server-side timeout (default 60s) — explicitly raise to 120s
+  // so a slow route doesn't kill the whole tour. blockAds reduces networkidle wait.
+  const SERVER_TIMEOUT_MS = 120_000;
+
   try {
     const res = await fetch(
-      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}`,
+      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}&blockAds=true`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -280,7 +284,10 @@ export default async ({ page, context }) => {
     for (const p of (opts.paths || [])) {
       const t0 = Date.now();
       try {
-        await page.goto(opts.baseUrl + p, { waitUntil: 'networkidle2', timeout: 25000 });
+        // domcontentloaded + small settle is enough for a smoke route check.
+        // networkidle2 was making one slow route (e.g. analytics fetch) eat the whole budget.
+        await page.goto(opts.baseUrl + p, { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await new Promise(r => setTimeout(r, 800));
         const title = await page.title();
         result.pathResults.push({ path: p, ok: true, ms: Date.now() - t0, title });
       } catch (e) {
@@ -290,7 +297,7 @@ export default async ({ page, context }) => {
 
     // 3) Final screenshot + DOM summary
     if (opts.finalPath) {
-      await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'networkidle2', timeout: 25000 }).catch(() => {});
+      await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
     }
     beat('finalizing');
   } catch (e) {
