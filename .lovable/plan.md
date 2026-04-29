@@ -1,96 +1,147 @@
-## Native Music Library — Plan
+# Vidu Q2 Integration — Multi-Reference Specialist (10. Provider)
 
-Wir bauen eine eigenständige Music-Studio-Page (`/music-studio`) und erweitern den bestehenden `MusicLibraryBrowser` um drei neue Quellen: **Suno** (KI-Songs mit Vocals), **Mubert** (loopbare adaptive Background-Music) und eine kuratierte **Lizenzierte Stock-Library** (Jamendo Pro + Pixabay, in eigene DB-Tabelle gesynct mit Lizenznachweis).
+## Ziel
 
-Das ergänzt nahtlos die existierende Generation (ElevenLabs Music + MusicGen, drei Tiers) und die Stock-Suche (Jamendo, Pixabay live).
+Vidu Q2 als einzigartigen **Multi-Reference / Multi-Character Specialist** integrieren. Killer-Feature: **bis zu 7 Reference-Bilder** in einer Szene (Charakter + Produkt + Location + Style). Vollintegration in **AI Video Toolkit** (alle Modi), **Video Composer**, **Brand Character Lock** und **Avatar Library**.
 
-### Neue Provider — Capability Matrix
+## Provider-Specs
 
-| Provider | Stärke | Output | Preis-Tier | Use Case |
-|---|---|---|---|---|
-| **Suno v4** | Songs mit Lyrics + Vocals (Strophe/Refrain) | bis 4 min | €1.20/Track | Branded Anthems, Hooks, Werbe-Songs |
-| **Mubert** | Adaptive loopbare Tracks, exakte Länge | beliebig | €0.40/Track | Background-Music, Podcasts, Vlogs |
-| **Lizenzierte Library** | Pre-vetted Profi-Tracks mit Lizenz-PDF | fix | €0 (in Plan) | Production-safe ohne Generation |
+| Modell | Modus | Dauer | Auflösung | Replicate Slug | Preis |
+|---|---|---|---|---|---|
+| `vidu-q2-reference` | Reference2V (1-7 Refs) | 5s | 1080p | `vidu/vidu-q2-reference-to-video` | ~€0.45 |
+| `vidu-q2-i2v` | Image-to-Video | 5s | 1080p | `vidu/vidu-q2-image-to-video` | ~€0.40 |
+| `vidu-q2-t2v` | Text-to-Video | 5s | 1080p | `vidu/vidu-q2-text-to-video` | ~€0.40 |
 
-### Page `/music-studio` — Aufbau
+Verifiziert via Replicate-Modell-Naming. Final werden die Slugs in der Edge-Function geprüft und ggf. korrigiert (Replicate ändert gelegentlich Pfade).
 
-Ein Tab-System mit 4 Tabs, alle teilen denselben Player + "Use in Project"-Action:
+## Architektur-Übersicht
 
-1. **Generieren** — Bestehendes `MusicGeneratorPanel` + neue Provider-Auswahl (ElevenLabs / MusicGen / **Suno** / **Mubert**) als Segmented-Control. Für Suno: Lyrics-Editor + Style-Tags. Für Mubert: Mood-Palette + Loop-Toggle + exakte Sekunden.
-2. **Lizenziert** — Browse-Grid für die kuratierte Stock-Library mit Filter (Genre, Mood, BPM, Duration). Jeder Track zeigt Lizenz-Badge ("Royalty-free, commercial OK").
-3. **Stock-Suche** — Live Jamendo + Pixabay (existiert bereits, wird hier eingebettet).
-4. **Meine Tracks** — Alle generierten + favorisierten Tracks des Users mit Re-Use, Download, Tag-System.
-
-Top-Bar: Globaler Mood-Picker (Cinematic, Corporate, Upbeat, …), BPM-Filter, Search.
-
-### Integration im bestehenden `MusicLibraryBrowser`
-
-Neue Tabs werden hinzugefügt: `Generate (Suno/Mubert)`, `Licensed`. Bestehende Stock-Suche bleibt. So nutzbar in Director's Cut + Composer ohne Page-Wechsel.
-
-### Datenmodell
-
-Neue Tabelle `licensed_music_tracks` (admin-curated, public read):
-- `id, title, artist, duration_sec, bpm, genre, mood[], tags[]`
-- `audio_url` (Supabase Storage), `waveform_url` (optional)
-- `license_type` ('cc-by', 'royalty-free', 'commercial'), `license_url`, `attribution_required`
-- `category, is_featured, plays_count`
-
-Bestehende Tabelle `background_music_tracks` bleibt unverändert (für die Auto-Match-Engine).
-
-User-generierte Suno/Mubert-Tracks gehen in die existierende `generated_music_tracks`-Tabelle (nur neue Spalte `provider` extended um 'suno'/'mubert').
-
-### Edge Functions (neu)
-
-1. **`generate-suno-track`** — Suno API v4 (suno.ai oder via Replicate), erwartet `{ prompt, lyrics?, style, instrumental, durationSeconds }`. Background-Polling (3-5 min Generation-Zeit) via `EdgeRuntime.waitUntil`. Speichert in `generated_music_tracks` mit `provider:'suno'`. Credit-Refund bei Failure.
-2. **`generate-mubert-track`** — Mubert API, erwartet `{ mood, genre, bpm, durationSeconds, loop }`. Synchron (~5-15s). Speichert analog.
-3. **`seed-licensed-library`** — Admin-only Seeder, lädt kuratierte Tracks (initial ~50-100) aus Jamendo Pro + manuell uploads in den `licensed-music` Storage-Bucket und in die DB. Run-once, später iterativ erweiterbar.
-
-Bestehende `generate-music-track` bleibt unverändert (ElevenLabs/MusicGen).
-
-### API Keys benötigt
-
-- **`SUNO_API_KEY`** — über sunoapi.org oder direkt suno.ai (Beta-Access)
-- **`MUBERT_API_KEY`** — Pay-as-you-go via mubert.com/render-api
-- Beide via `add_secret`-Flow nach User-Bestätigung.
-
-### Storage
-
-Neuer öffentlicher Bucket `licensed-music` (read-public, write-admin-only). Generated Tracks bleiben im existierenden `generated-music`-Bucket (user-scoped RLS).
-
-### Pricing-Konfiguration (in `useMusicGeneration`)
-
-```typescript
-MUSIC_TIER_PRICING = {
-  quick:    { eur: 0.10, engine: 'MusicGen' },
-  standard: { eur: 0.35, engine: 'ElevenLabs Music' },
-  pro:      { eur: 1.40, engine: 'ElevenLabs Music Pro' },
-  mubert:   { eur: 0.40, engine: 'Mubert Adaptive' },     // NEW
-  suno:     { eur: 1.20, engine: 'Suno v4 (with vocals)' }, // NEW
-}
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  AI Video Toolkit  (/ai-video-studio?model=vidu-q2-…)        │
+│  ├─ Modus-Tabs: T2V | I2V | Multi-Reference (NEU)            │
+│  └─ Multi-Reference-UI: 7 Slots mit Rollen-Badges            │
+├─────────────────────────────────────────────────────────────┤
+│  Video Composer  (clipSource: 'ai-vidu')                     │
+│  ├─ Per-Scene Multi-Ref Picker (Char/Product/Location)       │
+│  └─ Auto-Pull aus aktivem Brand Character Lock               │
+├─────────────────────────────────────────────────────────────┤
+│  Edge: generate-vidu-video                                   │
+│  ├─ Polling + EdgeRuntime.waitUntil                          │
+│  ├─ Storage-Rehost → ai-videos bucket                        │
+│  └─ Refund-Hook bei Failure (idempotent)                     │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-### Sidebar / Navigation
+## Implementation Steps
 
-Neuer Eintrag "Music Studio" 🎵 unter Audio-Tools (oder als Top-Level neben "Audio Studio"). Genaue Position klären wir bei Implementierung am Live-Layout.
+### 1. Edge Function: `generate-vidu-video`
 
-### UX-Highlights
+Neue Function nach Vorbild von `generate-pika-video`:
+- **Input**: `prompt`, `model` (`vidu-q2-reference` | `vidu-q2-i2v` | `vidu-q2-t2v`), `aspectRatio`, `referenceImages[]` (1-7 URLs), `referenceRoles[]` (`character` | `product` | `location` | `style` | `prop`), optional `seed`, `negativePrompt`
+- **Validation**: Zod-Schema; Reference-Mode erfordert mind. 1 Bild, max. 7
+- **Pricing-Map** wie Pika; Credits-Reservation via bestehendem Wallet-System
+- **Polling**: 8min Timeout, 5s Intervall (Vidu rendert 60-120s)
+- **Rehost**: Replicate-URL → `ai-videos/{userId}/{generationId}.mp4`
+- **DB**: `ai_video_generations` Tabelle (existierend), kein Schema-Change nötig
+- **Refund**: Bei Fail → automatische Wallet-Refund (Idempotency-Key = generationId)
+- **Config**: `verify_jwt = true`, Timeout 300s in `supabase/config.toml`
 
-- **Lyrics-Editor (Suno)**: Mehrzeiliger Editor mit `[Verse]`, `[Chorus]`, `[Bridge]` Section-Tags + KI-Lyrics-Generation-Button (Lovable AI)
-- **Mubert Mood-Palette**: 12 Moods als visuelle Karten mit Mini-Wave-Preview
-- **Beat-Sync ready**: Generierte Tracks werden auto-analysiert (BPM via existierende `analyze-music-bpm`) und können direkt in den Beat-Sync übergeben werden
-- **Lizenz-Transparenz**: Jeder Track zeigt klar "AI-generated (Suno) — commercial use OK" oder "Licensed track — attribution required: …"
+### 2. Toolkit-Registry: `aiVideoModelRegistry.ts`
 
-### Lokalisierung
+Neue Family `'vidu'` zur Union hinzufügen. Drei Einträge in `AI_VIDEO_TOOLKIT_MODELS`:
+- `vidu-q2-reference` (group: `recommended`, badge: `Multi-Ref`, capability: neuer `multiRef: true` flag)
+- `vidu-q2-i2v` (group: `fast`)
+- `vidu-q2-t2v` (group: `fast`)
 
-Alle UI-Strings DE/EN/ES via `useTranslation`. Lyrics-Generation-Prompts respektieren `language`-State.
+`ToolkitModel.capabilities` um `multiRef?: boolean` und `maxReferences?: number` (=7) erweitern.
 
-### Phasen
+Neue Konfigdatei `src/config/viduVideoCredits.ts` analog zu `pikaVideoCredits.ts`.
 
-1. **Phase 1 (dieser Build):** Page-Skeleton `/music-studio` + Mubert-Integration + Sidebar + Erweiterung MusicLibraryBrowser um "Mubert"-Tab
-2. **Phase 2:** Suno-Integration + Lyrics-Editor (separater Build wegen Suno-Beta-Onboarding)
-3. **Phase 3:** Lizenzierte Library + Seeder + Admin-Upload-Tool (separater Build)
+### 3. Toolkit-UI: Multi-Reference-Card
 
-### Was geklärt werden muss vor Implementierung
+Neue Komponente `src/components/ai-video-toolkit/MultiReferenceUploader.tsx`:
+- 7 Slots in 2 Reihen (Bento-Grid, James-Bond-Glassmorphism)
+- Pro Slot: Drag-&-Drop Upload, Rollen-Selector (Character/Product/Location/Style/Prop), Vorschau
+- "Aus Brand Character Lock laden"-Button → autofills Slot 1 mit aktivem Avatar
+- "Aus Picture Studio laden"-Button → öffnet Media-Picker
+- Sichtbar nur wenn `selectedModel.capabilities.multiRef === true`
 
-- Bestätigung, ob wir Phase 1+2+3 in einem Big-Bang bauen oder schrittweise (empfehle schrittweise wegen Suno-Onboarding-Zeit)
-- Suno-API-Quelle: offizielle Beta vs. sunoapi.org-Wrapper (letzteres sofort nutzbar)
+Im `AIVideoToolkit.tsx`: bei `vidu-q2-reference` standardmäßig Multi-Ref-Card statt Standard-Image-Upload.
+
+### 4. Composer-Integration
+
+- `ClipSource` Type um `'ai-vidu'` erweitern (`src/types/video-composer.ts`)
+- `COMPOSER_FAMILIES` Set in `modelMapping.ts` um `'vidu'` ergänzen
+- Per-Scene "Multi-Ref"-Toggle in `SceneEditor`: bei aktivem Vidu erscheint kompakte 3-Slot-Variante (Character / Product / Location) — Vereinfachung gegenüber Toolkit
+- `compose-video-clips` Edge-Function: neuer Branch für `ai-vidu` der `generate-vidu-video` aufruft. Fallback bei fehlenden Refs → `ai-hailuo` (analog Runway-Fallback)
+- Brand Character Lock: wenn aktiv, Auto-Inject in Slot "Character"
+
+### 5. Brand Character Lock + Avatar Library
+
+In `useBrandCharacterLock` (oder vergleichbarem Hook): neuer `getViduReferenceCard()` Helper, der `{ url, role: 'character' }` zurückgibt. Wird in Toolkit + Composer konsumiert.
+
+Avatar Library (`/avatars`): Multi-Select-Modus erlauben (max 2) für Vidu-Dialog-Szenen.
+
+### 6. Routing & Navigation
+
+- Neue Legacy-Route `/vidu-studio` → Redirect auf `/ai-video-studio?model=vidu-q2-reference` (analog zu allen anderen)
+- Hub-Card im AI-Video-Hub: "Vidu Q2 — Multi-Reference Specialist"
+- `legacyRoute` Property in Registry-Einträgen setzen
+
+### 7. Localization
+
+EN/DE/ES Strings für:
+- Multi-Reference-Card Labels & Tooltips
+- Rollen-Namen (Character, Product, Location, Style, Prop)
+- Onboarding-Hint: "Lade bis zu 7 Bilder — dein Avatar, dein Produkt, dein Setting"
+
+Visual Prompts bleiben EN (gemäß Core-Memory).
+
+### 8. Memory-Update
+
+Neuer Memory-Eintrag `mem://features/ai-video-studio/vidu-q2-multi-reference-integration` mit:
+- Replicate-Slugs (verifiziert)
+- 7-Slot-Limit & Rollen-Mapping
+- Composer-Fallback-Verhalten
+- Brand Character Lock Auto-Inject-Pfad
+
+Index-Datei aktualisieren.
+
+## Technische Details
+
+**Reference-Roles → Vidu API**: Vidu nimmt Reference-Bilder in einem Array entgegen, ohne explizite Rollen-Felder. Die Rollen sind primär für **Prompt-Augmentation**: aus den UI-Rollen wird automatisch ein englischer Suffix gebaut, z.B. `"featuring the character from image 1, holding the product from image 3, in the location of image 4"`. Das verbessert nachweislich die Output-Konsistenz bei Vidu deutlich.
+
+**Reference-Image-Constraints**: Replicate erwartet öffentlich erreichbare URLs. Daher: alle Refs müssen vor dem Call in Storage liegen. UI-Uploader nutzt bestehenden `mediaUpload.ts` → `ai-references/{userId}/...` Bucket (RLS-konform: userId als erste Pfad-Komponente).
+
+**Cost-Estimation**: Vidu = Fixpreis pro Generation (nicht pro Sekunde). In `costPerSecond` Feld als `0.45 / 5 = 0.09` USD/EUR pro Sekunde abbilden, damit existierende UI-Cost-Anzeige funktioniert. Real abgerechnet wird der Fixbetrag in der Edge-Function.
+
+**Aspect-Ratios**: Vidu Q2 unterstützt `16:9`, `9:16`, `1:1`.
+
+**Capabilities-Flag**: V2V = false, Audio = false, T2V/I2V = true, neu: `multiRef = true` für `vidu-q2-reference` Variante.
+
+## Files Created
+- `supabase/functions/generate-vidu-video/index.ts`
+- `src/config/viduVideoCredits.ts`
+- `src/components/ai-video-toolkit/MultiReferenceUploader.tsx`
+- `mem://features/ai-video-studio/vidu-q2-multi-reference-integration`
+
+## Files Modified
+- `src/config/aiVideoModelRegistry.ts` — Family + 3 Modelle, `multiRef`/`maxReferences` Capabilities
+- `src/types/video-composer.ts` — `ClipSource` um `ai-vidu`
+- `src/lib/video-composer/modelMapping.ts` — Family-Set + Source-Mapping
+- `src/pages/AIVideoToolkit.tsx` — Multi-Ref-Card Conditional
+- `src/components/video-composer/SceneEditor.tsx` (oder äquivalent) — kompakter 3-Slot-Picker für Vidu
+- `supabase/functions/compose-video-clips/index.ts` — `ai-vidu` Branch + Fallback
+- `src/App.tsx` — `/vidu-studio` Redirect
+- `src/config/hubConfig.ts` — Hub-Card Eintrag
+- `supabase/config.toml` — neuer Function-Block mit Timeout 300s
+- `mem://index.md` — neuer Memory-Reference-Eintrag
+- DE/EN/ES Translation-Files
+
+## Out of Scope (später möglich)
+- Vidu Q2 mit längerer Dauer (Vidu 1.5 Reference erlaubt 8s, Q2 noch nicht stabil)
+- Vidu V2V (existiert noch nicht öffentlich auf Replicate)
+- Multi-Character-Konversations-Templates im Composer (separater Feature-Slot)
+
+Soll ich mit der Implementierung loslegen?
