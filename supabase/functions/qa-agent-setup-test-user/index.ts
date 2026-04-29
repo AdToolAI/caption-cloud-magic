@@ -32,7 +32,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const email: string = body?.email ?? "qa-bot@useadtool.ai";
-    const password: string = body?.password ?? crypto.randomUUID().replace(/-/g, "") + "Q!9";
+    const resetPassword: boolean = body?.reset_password === true;
+    const password: string =
+      body?.password ?? crypto.randomUUID().replace(/-/g, "") + "Q!9";
 
     // Check if user exists
     const { data: existingProfile } = await supabase
@@ -43,9 +45,17 @@ Deno.serve(async (req) => {
 
     let userId: string;
     let created = false;
+    let passwordChanged = false;
 
     if (existingProfile) {
       userId = existingProfile.id;
+      if (resetPassword) {
+        const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+          password,
+        });
+        if (updErr) throw updErr;
+        passwordChanged = true;
+      }
     } else {
       // Create auth user
       const { data: authUser, error: authErr } =
