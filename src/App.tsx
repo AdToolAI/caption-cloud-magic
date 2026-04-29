@@ -123,6 +123,7 @@ const Marketplace = lazy(() => import("./pages/Marketplace"));
 const CreatorStudio = lazy(() => import("./pages/CreatorStudio"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const MusicStudio = lazy(() => import("./pages/MusicStudio"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
@@ -258,6 +259,7 @@ function AppLayout() {
           <Route path="/grok-video-studio" element={<Navigate to="/ai-video-studio?model=grok-imagine" replace />} />
           <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
+          <Route path="/music-studio" element={<ProtectedRoute><MusicStudio /></ProtectedRoute>} />
            <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
            <Route path="/video-composer" element={<VideoComposer />} />
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />

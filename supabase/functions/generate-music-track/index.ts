@@ -7,31 +7,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Customer pricing per track in EUR (≥30% margin)
-// Quick: MusicGen ~$0.04 → €0.10
-// Standard: ElevenLabs Music ~$0.20 → €0.35
-// Pro: ElevenLabs Music ~$0.80 → €1.40
+// Customer pricing per track in EUR (≥30% margin over Replicate/ElevenLabs cost)
+// quick:    MusicGen ~$0.04 → €0.10 (instrumental loops, fast)
+// adaptive: Stable Audio 2.5 ~$0.04 → €0.15 (background, loopable, up to ~190s, inpainting/continuation)
+// standard: ElevenLabs Music ~$0.20 → €0.35 (full instrumental, polished)
+// vocal:    MiniMax Music 1.5 ~$0.05 → €0.30 (with vocals + lyrics, up to 60s)
+// pro:      ElevenLabs Music ~$0.80 → €1.40 (long-form pro)
 const MUSIC_PRICING: Record<string, { EUR: number; USD: number }> = {
-  quick: { EUR: 0.10, USD: 0.10 },
+  quick:    { EUR: 0.10, USD: 0.10 },
+  adaptive: { EUR: 0.15, USD: 0.15 },
   standard: { EUR: 0.35, USD: 0.35 },
-  pro: { EUR: 1.40, USD: 1.40 },
+  vocal:    { EUR: 0.30, USD: 0.30 },
+  pro:      { EUR: 1.40, USD: 1.40 },
 };
 
 const MAX_DURATION: Record<string, number> = {
-  quick: 30,
+  quick:    30,
+  adaptive: 190,   // Stable Audio 2.5 max ~190s
   standard: 60,
-  pro: 300,
+  vocal:    60,    // MiniMax Music 1.5 max 60s
+  pro:      300,
 };
 
 interface GenerateMusicRequest {
   prompt: string;
-  tier: 'quick' | 'standard' | 'pro';
+  tier: 'quick' | 'adaptive' | 'standard' | 'vocal' | 'pro';
   durationSeconds?: number;
   genre?: string;
   mood?: string;
   instrumental?: boolean;
   bpm?: number;          // Optional target BPM (e.g. match video tempo)
   key?: string;          // Optional musical key (e.g. "C minor")
+  lyrics?: string;       // Required for 'vocal' tier (MiniMax) — supports [Verse]/[Chorus]/[Bridge] tags
+  loop?: boolean;        // For 'adaptive' tier (Stable Audio loop hint)
 }
 
 function buildEnhancedPrompt(req: GenerateMusicRequest): string {
@@ -79,11 +87,16 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateMusicRequest;
-    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key } = body;
+    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key, lyrics, loop } = body;
 
     // Validation
     if (!prompt?.trim() || prompt.length > 500) {
       return new Response(JSON.stringify({ error: "Prompt is required (max 500 chars)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    if (tier === 'vocal' && (!lyrics || !lyrics.trim())) {
+      return new Response(JSON.stringify({ error: "Lyrics are required for the 'vocal' tier", code: "MISSING_LYRICS" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
@@ -177,6 +190,123 @@ serve(async (req) => {
         });
       }
 
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) {
+        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      audioBuffer = await audioRes.arrayBuffer();
+
+    } else if (tier === 'adaptive') {
+      // ----- Replicate Stable Audio 2.5 (background, loopable, ≤190s) -----
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      engineUsed = 'replicate/stable-audio-2.5';
+      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+      const stableAudioPrompt = loop
+        ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat`
+        : enhancedPrompt;
+
+      let output: any;
+      try {
+        output = await replicate.run(
+          'stability-ai/stable-audio-2.5',
+          {
+            input: {
+              prompt: stableAudioPrompt,
+              duration,
+              steps: 8,
+              cfg_scale: 7,
+              output_format: 'mp3',
+            },
+          }
+        );
+      } catch (err: any) {
+        console.error('[generate-music-track] Stable Audio error:', err);
+        return new Response(JSON.stringify({
+          error: `Stable Audio generation failed: ${err.message || 'Unknown error'}`,
+          code: "REPLICATE_ERROR",
+        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      let audioUrl: string | null = null;
+      if (typeof output === 'string') audioUrl = output;
+      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
+      else if (output && typeof output === 'object' && 'url' in output) {
+        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
+      }
+
+      if (!audioUrl) {
+        return new Response(JSON.stringify({ error: "No audio returned from Stable Audio", code: "NO_OUTPUT" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) {
+        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      audioBuffer = await audioRes.arrayBuffer();
+
+    } else if (tier === 'vocal') {
+      // ----- Replicate MiniMax Music 1.5 (vocals + lyrics, ≤60s) -----
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      engineUsed = 'replicate/minimax-music-1.5';
+      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+      // MiniMax expects lyrics with [Verse]/[Chorus]/[Bridge] tags + a style description
+      const styleDesc = [
+        genre && genre !== 'any' ? `Genre: ${genre}` : '',
+        mood ? `Mood: ${mood}` : '',
+        bpm ? `Tempo: ${bpm} BPM` : '',
+        key ? `Key: ${key}` : '',
+        prompt.trim(),
+        'Studio production quality',
+      ].filter(Boolean).join('. ');
+
+      let output: any;
+      try {
+        output = await replicate.run(
+          'minimax/music-1.5',
+          {
+            input: {
+              lyrics: lyrics!.trim(),
+              song_description: styleDesc,
+            },
+          }
+        );
+      } catch (err: any) {
+        console.error('[generate-music-track] MiniMax error:', err);
+        return new Response(JSON.stringify({
+          error: `Vocal music generation failed: ${err.message || 'Unknown error'}`,
+          code: "REPLICATE_ERROR",
+        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      let audioUrl: string | null = null;
+      if (typeof output === 'string') audioUrl = output;
+      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
+      else if (output && typeof output === 'object' && 'url' in output) {
+        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
+      }
+
+      if (!audioUrl) {
+        return new Response(JSON.stringify({ error: "No audio returned from MiniMax", code: "NO_OUTPUT" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
       const audioRes = await fetch(audioUrl);
       if (!audioRes.ok) {
         return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
@@ -282,6 +412,8 @@ serve(async (req) => {
           instrumental,
           bpm: bpm || null,
           key: key || null,
+          lyrics: lyrics || null,
+          loop: loop || false,
         },
       })
       .select()

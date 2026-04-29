@@ -3,7 +3,7 @@ import {
   Sparkles, Bot, ImagePlus,
   MessageSquare, MessageCircle, BookTemplate, Workflow,
   LineChart, BarChart3, Coins, Radar, Shield,
-  FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
+  FolderOpen, Mic2, Music2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
   Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon,
@@ -76,6 +76,7 @@ export const hubDefinitions: HubDefinition[] = [
     items: [
       { route: "/media-library", titleKey: "nav.mediaLibrary", descKey: "hubItemDesc.mediaLibrary", icon: FolderOpen },
       { route: "/audio-studio", titleKey: "VoicePro", descKey: "hubItemDesc.audioStudio", icon: Mic2 },
+      { route: "/music-studio", titleKey: "Music Studio", descKey: "Native Music Library — Stable Audio, MiniMax, ElevenLabs in einem Studio", icon: Music2 },
       { route: "/universal-creator", titleKey: "Universal Content Creator", descKey: "hubItemDesc.universalCreator", icon: Video },
       { route: "/universal-video-creator", titleKey: "Universal Video Creator", descKey: "hubItemDesc.universalVideo", icon: Film },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", descKey: "hubItemDesc.directorsCut", icon: Edit },

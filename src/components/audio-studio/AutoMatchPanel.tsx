@@ -23,7 +23,7 @@ interface AutoMatchPanelProps {
 }
 
 const TIER_ICONS: Record<MusicTier, typeof Zap> = {
-  quick: Zap, standard: Wand2, pro: Sparkles,
+  quick: Zap, adaptive: Activity, standard: Wand2, vocal: Music2, pro: Sparkles,
 };
 
 export function AutoMatchPanel({
