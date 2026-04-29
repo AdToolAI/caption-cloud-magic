@@ -45,6 +45,8 @@ export interface ToolkitModel {
   capabilities: {
     t2v: boolean;
     i2v: boolean;
+    /** Video-to-Video: accepts a reference clip as motion / style source. */
+    v2v?: boolean;
     audio: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
