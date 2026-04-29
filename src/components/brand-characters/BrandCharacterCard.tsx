@@ -77,6 +77,12 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
               {portraitBadge}
             </Badge>
           )}
+          {mpBadge && (
+            <Badge className={`absolute bottom-2 left-2 text-[10px] gap-1 ${mpBadge.className}`}>
+              <mpBadge.icon className="h-2.5 w-2.5" />
+              {mpBadge.label}
+            </Badge>
+          )}
         </div>
 
         <div className="p-3 space-y-3">
