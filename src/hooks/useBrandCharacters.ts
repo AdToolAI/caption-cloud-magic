@@ -15,7 +15,18 @@ export interface BrandCharacter {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  // Avatar Library extensions
+  default_voice_id: string | null;
+  default_voice_provider: 'elevenlabs' | 'custom' | null;
+  default_voice_name: string | null;
+  portrait_url: string | null;
+  portrait_mode: 'original' | 'auto_generated' | 'manual_upload' | null;
+  default_language: string | null;
+  default_aspect_ratio: string | null;
 }
+
+/** Friendly alias — the new public-facing name. */
+export type Avatar = BrandCharacter;
 
 export const useBrandCharacters = () => {
   const queryClient = useQueryClient();
