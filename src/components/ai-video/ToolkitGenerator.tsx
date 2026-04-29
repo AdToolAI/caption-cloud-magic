@@ -139,6 +139,34 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     }
   };
 
+  /* ── Video upload (V2V reference clip) ── */
+  const handleVideoUpload = async (file: File) => {
+    if (!user) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error(language === 'de'
+        ? 'Datei zu groß (max. 50 MB).'
+        : 'File too large (max 50 MB).');
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'mp4';
+      const path = `${user.id}/toolkit-v2v-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('ai-video-reference')
+        .upload(path, file, { upsert: true, contentType: file.type || 'video/mp4' });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('ai-video-reference')
+        .getPublicUrl(path);
+      setReferenceVideoUrl(publicUrl);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+    } finally {
+      setUploadingVideo(false);
+    }
+  };
+
   /* ── Generate dispatch ── */
   const handleGenerate = async () => {
     if (!prompt.trim()) {
