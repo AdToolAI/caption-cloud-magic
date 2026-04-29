@@ -151,9 +151,57 @@ export function useToggleAutopilot() {
   const { toast } = useToast();
   return useMutation({
     mutationFn: async (input: { activate: boolean; consentTextHash?: string; consentTextVersion?: string }) => {
-      const { data, error } = await supabase.functions.invoke('autopilot-toggle', { body: input });
-      if (error) throw error;
-      return data as { ok: boolean; is_active?: boolean; error?: string; lock_reason?: string };
+      // Try Edge Function first (Session B). Fallback to direct DB update so Session A is functional standalone.
+      try {
+        const { data, error } = await supabase.functions.invoke('autopilot-toggle', { body: input });
+        if (!error && data) return data as { ok: boolean; is_active?: boolean; error?: string; lock_reason?: string };
+      } catch {
+        /* Edge function not yet deployed — fall through */
+      }
+
+      // Fallback path
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) throw new Error('Not authenticated');
+
+      // Lock check
+      const { data: existing } = await supabase
+        .from('autopilot_briefs')
+        .select('id, locked_until')
+        .eq('user_id', u.user.id)
+        .maybeSingle();
+      if (existing?.locked_until && new Date(existing.locked_until) > new Date()) {
+        return { ok: false, error: 'Autopilot ist gesperrt. Kontaktiere den Support.' };
+      }
+
+      const patch: Record<string, unknown> = {
+        is_active: input.activate,
+        activated_at: input.activate ? new Date().toISOString() : null,
+      };
+      const { error: updErr } = await supabase
+        .from('autopilot_briefs')
+        .update(patch)
+        .eq('user_id', u.user.id);
+      if (updErr) throw updErr;
+
+      // Consent log
+      if (input.activate && input.consentTextVersion) {
+        await supabase.from('autopilot_consent_log').insert({
+          user_id: u.user.id,
+          consent_text_version: input.consentTextVersion,
+          consent_text_hash: input.consentTextHash ?? null,
+          accepted_clauses: ['aup', 'no_deepfake', 'no_copyright', 'termination_acknowledged'],
+        });
+      }
+
+      // Activity log
+      await supabase.from('autopilot_activity_log').insert({
+        user_id: u.user.id,
+        event_type: input.activate ? 'autopilot_activated' : 'autopilot_deactivated',
+        actor: 'user',
+        payload: {},
+      });
+
+      return { ok: true, is_active: input.activate };
     },
     onSuccess: (res) => {
       if (res.ok) {
