@@ -93,6 +93,10 @@ export async function runBrowserlessFunction(
 }
 
 // ESM-style Puppeteer function. Receives `context` from the JSON body.
+// Selectors target our Auth.tsx: <Input id="email" type="email"> + <Input id="password" type="password">.
+// In login mode (default) only one password field exists; in signup mode there is also #confirm-password.
+// We always wait for BOTH email and password fields to be present & visible before typing,
+// because React + framer-motion can render email first and hydrate password a tick later.
 export function buildSmokeNavigationScript(): string {
   return `
 export default async ({ page, context }) => {
@@ -112,18 +116,82 @@ export default async ({ page, context }) => {
     } catch (e) {}
   });
 
-  const result = { ok: true, screenshot: null, url: '', title: '', consoleLogs, networkErrors, domSummary: '', pathResults: [] };
+  const result = {
+    ok: true, screenshot: null, loginScreenshot: null,
+    url: '', title: '', consoleLogs, networkErrors, domSummary: '', pathResults: [],
+  };
+
+  const grabLoginShot = async () => {
+    try {
+      const s = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 55, fullPage: true });
+      result.loginScreenshot = 'data:image/jpeg;base64,' + s;
+    } catch (e) {}
+  };
 
   try {
-    // 1) Login
+    // 1) Open auth page
     await page.goto(opts.baseUrl + '/auth', { waitUntil: 'networkidle2', timeout: 30000 });
-    await page.waitForSelector('input[type="email"]', { timeout: 15000 });
-    await page.type('input[type="email"]', opts.email, { delay: 20 });
-    await page.type('input[type="password"]', opts.password, { delay: 20 });
-    await Promise.all([
-      page.click('button[type="submit"]'),
-      page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {}),
-    ]);
+
+    // Wait for BOTH fields. Prefer ids (Auth.tsx uses #email / #password), fall back to type selectors.
+    try {
+      await page.waitForSelector('input#email, input[type="email"]', { visible: true, timeout: 20000 });
+      await page.waitForSelector('input#password, input[type="password"]', { visible: true, timeout: 20000 });
+    } catch (waitErr) {
+      await grabLoginShot();
+      throw new Error('Auth form not ready: ' + String(waitErr && waitErr.message || waitErr).slice(0, 180));
+    }
+
+    // Small extra settle so React state listeners attach before we type.
+    await new Promise(r => setTimeout(r, 250));
+
+    // Fill credentials. Use the actual field handles so we don't depend on focus order.
+    const emailHandle = await page.$('input#email') || await page.$('input[type="email"]');
+    const pwHandle = await page.$('input#password') || await page.$('input[type="password"]');
+    if (!emailHandle || !pwHandle) {
+      await grabLoginShot();
+      throw new Error('Email or password input not present after wait');
+    }
+    await emailHandle.click({ clickCount: 3 });
+    await emailHandle.type(opts.email, { delay: 15 });
+    await pwHandle.click({ clickCount: 3 });
+    await pwHandle.type(opts.password, { delay: 15 });
+
+    // Submit. Try button[type=submit] first, then any button containing Login/Anmelden text.
+    const submitClicked = await page.evaluate(() => {
+      const byType = document.querySelector('button[type="submit"]');
+      if (byType) { byType.click(); return 'submit-button'; }
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const match = buttons.find(b => /login|anmelden|sign\\s*in/i.test((b.textContent || '').trim()));
+      if (match) { match.click(); return 'text-button'; }
+      return null;
+    });
+    if (!submitClicked) {
+      await grabLoginShot();
+      throw new Error('No submit button found on /auth');
+    }
+
+    // Wait until we leave /auth (= login redirect happened).
+    try {
+      await page.waitForFunction(
+        () => !location.pathname.startsWith('/auth'),
+        { timeout: 25000 }
+      );
+    } catch (redirErr) {
+      await grabLoginShot();
+      // Surface the visible error text from the page if any toast / inline error appeared.
+      let pageErr = '';
+      try {
+        pageErr = await page.evaluate(() => {
+          const t = document.body && document.body.innerText || '';
+          const m = t.match(/(Invalid|wrong|incorrect|fehlgeschlagen|fehler|error)[^\\n]{0,160}/i);
+          return m ? m[0] : '';
+        });
+      } catch (e) {}
+      throw new Error('Login did not redirect (still on /auth)' + (pageErr ? ' — page says: ' + pageErr : ''));
+    }
+
+    // Tiny grace period for SPA route transition.
+    await new Promise(r => setTimeout(r, 500));
 
     // 2) Visit each requested path
     for (const p of (opts.paths || [])) {
