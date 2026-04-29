@@ -20,6 +20,7 @@ const PLATFORM_EMOJI: Record<string, string> = {
 const STATUS_META: Record<AutopilotSlot['status'], { label: string; className: string; icon: typeof Clock }> = {
   draft:      { label: 'Entwurf',     className: 'bg-muted text-foreground border-border',                        icon: Clock },
   generating: { label: 'Generiere…',  className: 'bg-primary/15 text-primary border-primary/30 animate-pulse',    icon: Sparkles },
+  generating_video: { label: 'Video…',  className: 'bg-fuchsia-500/15 text-fuchsia-600 border-fuchsia-500/40 animate-pulse', icon: Sparkles },
   qa_review:  { label: 'QA-Review',   className: 'bg-amber-500/15 text-amber-600 border-amber-500/40',            icon: AlertTriangle },
   scheduled:  { label: 'Geplant',     className: 'bg-primary/20 text-primary border-primary/40',                  icon: CalendarIcon },
   posted:     { label: 'Live',        className: 'bg-emerald-500/15 text-emerald-600 border-emerald-500/40',      icon: CheckCircle2 },

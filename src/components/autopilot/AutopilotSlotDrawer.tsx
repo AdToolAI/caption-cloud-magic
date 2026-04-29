@@ -277,6 +277,7 @@ function StatusChip({ status }: { status: AutopilotSlot['status'] }) {
   const map: Record<AutopilotSlot['status'], { label: string; cls: string; icon: typeof Clock }> = {
     draft:      { label: 'Entwurf',      cls: 'bg-muted text-foreground',                          icon: Clock },
     generating: { label: 'Generiere…',   cls: 'bg-primary/15 text-primary animate-pulse',          icon: Sparkles },
+    generating_video: { label: 'Video rendert…', cls: 'bg-fuchsia-500/15 text-fuchsia-600 animate-pulse', icon: Sparkles },
     qa_review:  { label: 'QA-Review',    cls: 'bg-amber-500/15 text-amber-600',                    icon: AlertTriangle },
     scheduled:  { label: 'Geplant',      cls: 'bg-primary/20 text-primary',                        icon: Clock },
     posted:     { label: 'Live',         cls: 'bg-emerald-500/15 text-emerald-600',                icon: CheckCircle2 },
