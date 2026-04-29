@@ -126,14 +126,47 @@ export default async ({ page, context }) => {
   const networkErrors = [];
 
   page.on('console', m => {
-    try { consoleLogs.push({ type: m.type(), text: String(m.text()).slice(0, 500) }); } catch (e) {}
+    try {
+      const loc = (typeof m.location === 'function') ? m.location() : null;
+      consoleLogs.push({
+        type: m.type(),
+        text: String(m.text()).slice(0, 500),
+        url: loc && loc.url ? String(loc.url).slice(0, 300) : undefined,
+        line: loc && loc.lineNumber ? loc.lineNumber : undefined,
+      });
+    } catch (e) {}
   });
   page.on('pageerror', err => {
-    consoleLogs.push({ type: 'pageerror', text: String(err && err.message || err).slice(0, 500) });
+    consoleLogs.push({
+      type: 'pageerror',
+      text: String(err && err.message || err).slice(0, 500),
+      stack: err && err.stack ? String(err.stack).slice(0, 800) : undefined,
+    });
   });
   page.on('response', r => {
     try {
-      if (r.status() >= 400) networkErrors.push({ url: r.url(), status: r.status() });
+      const status = r.status();
+      if (status >= 400) {
+        const req = r.request();
+        networkErrors.push({
+          url: r.url(),
+          status,
+          method: req && typeof req.method === 'function' ? req.method() : undefined,
+          resourceType: req && typeof req.resourceType === 'function' ? req.resourceType() : undefined,
+        });
+      }
+    } catch (e) {}
+  });
+  page.on('requestfailed', req => {
+    try {
+      const failure = typeof req.failure === 'function' ? req.failure() : null;
+      networkErrors.push({
+        url: req.url(),
+        status: 0,
+        method: typeof req.method === 'function' ? req.method() : undefined,
+        resourceType: typeof req.resourceType === 'function' ? req.resourceType() : undefined,
+        error: failure && failure.errorText ? failure.errorText : 'request-failed',
+      });
     } catch (e) {}
   });
 

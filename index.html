@@ -44,8 +44,8 @@
     
     <!-- Security Headers (sollten auch vom Server gesetzt werden) -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
-    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <!-- X-Frame-Options must be set as an HTTP header (see public/_headers), not via <meta>. Browsers reject the meta variant. -->
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:title" content="AdTool AI - KI Social Media Manager" />

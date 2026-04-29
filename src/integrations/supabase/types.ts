@@ -9833,6 +9833,7 @@ export type Database = {
           network_trace: Json | null
           reproduce_steps: Json
           resolved_at: string | null
+          resolved_by: string | null
           route: string | null
           run_id: string | null
           screenshot_url: string | null
@@ -9852,6 +9853,7 @@ export type Database = {
           network_trace?: Json | null
           reproduce_steps?: Json
           resolved_at?: string | null
+          resolved_by?: string | null
           route?: string | null
           run_id?: string | null
           screenshot_url?: string | null
@@ -9871,6 +9873,7 @@ export type Database = {
           network_trace?: Json | null
           reproduce_steps?: Json
           resolved_at?: string | null
+          resolved_by?: string | null
           route?: string | null
           run_id?: string | null
           screenshot_url?: string | null
@@ -9937,6 +9940,36 @@ export type Database = {
           steps?: Json
           tier?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      qa_muted_patterns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          mission_pattern: string | null
+          pattern_regex: string
+          reason: string | null
+          severity_when_matched: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mission_pattern?: string | null
+          pattern_regex: string
+          reason?: string | null
+          severity_when_matched?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mission_pattern?: string | null
+          pattern_regex?: string
+          reason?: string | null
+          severity_when_matched?: string
         }
         Relationships: []
       }
