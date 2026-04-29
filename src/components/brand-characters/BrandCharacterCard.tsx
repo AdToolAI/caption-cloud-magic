@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles } from 'lucide-react';
+import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles, Store, Coins, Clock, ShieldAlert } from 'lucide-react';
 import { type BrandCharacter, useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { AvatarVoicePicker } from './AvatarVoicePicker';
 import { AvatarPortraitDialog } from './AvatarPortraitDialog';
 import TalkingHeadDialog from '@/components/video-composer/TalkingHeadDialog';
+import { SubmitCharacterToMarketplaceDialog } from '@/components/marketplace/SubmitCharacterToMarketplaceDialog';
 
 interface BrandCharacterCardProps {
   character: BrandCharacter;
