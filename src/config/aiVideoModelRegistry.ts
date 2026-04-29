@@ -35,7 +35,7 @@ export interface ToolkitModel {
   /** Short provider label, e.g. "Kuaishou", "Google". */
   provider: string;
   /** Family used to slot into the provider tab/icon. */
-  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway';
+  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika';
   /** Edge function name to invoke (without `supabase.functions.invoke()` prefix). */
   edgeFunction: string;
   /** Grouping in the dropdown. */
@@ -377,6 +377,42 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     badge: 'V2V Specialist',
     tagline: 'Restyle & transform existing clips',
     legacyRoute: '/runway-video-studio',
+  },
+
+  /* ─────────── Pika 2.2 ─────────── */
+  {
+    id: 'pika-2-2-standard',
+    name: 'Pika 2.2',
+    provider: 'Pika Labs',
+    family: 'pika',
+    edgeFunction: 'generate-pika-video',
+    group: 'recommended',
+    icon: Sparkles,
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: [5, 10],
+    resolution: '720p',
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    costPerSecond: { EUR: 0.10, USD: 0.10 },
+    badge: 'Pikaframes',
+    tagline: 'Smooth motion · Start+End frame morphing',
+    legacyRoute: '/pika-video-studio',
+  },
+  {
+    id: 'pika-2-2-pro',
+    name: 'Pika 2.2 Pro',
+    provider: 'Pika Labs',
+    family: 'pika',
+    edgeFunction: 'generate-pika-video',
+    group: 'premium',
+    icon: Sparkles,
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: [5, 10],
+    resolution: '1080p',
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    costPerSecond: { EUR: 0.18, USD: 0.18 },
+    badge: 'Premium',
+    tagline: 'High-fidelity Pika · 1080p',
+    legacyRoute: '/pika-video-studio',
   },
 
   /* ─────────── Premium / Sora ─────────── */
