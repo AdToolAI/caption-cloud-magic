@@ -265,6 +265,7 @@ Deno.serve(async (req) => {
           result: {
             url: result.url,
             title: result.title,
+            targetUrl: baseUrl,
             pathResults: allPathResults,
             heartbeats,
             navResults,
