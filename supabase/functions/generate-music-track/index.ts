@@ -198,6 +198,123 @@ serve(async (req) => {
       }
       audioBuffer = await audioRes.arrayBuffer();
 
+    } else if (tier === 'adaptive') {
+      // ----- Replicate Stable Audio 2.5 (background, loopable, ≤190s) -----
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      engineUsed = 'replicate/stable-audio-2.5';
+      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+      const stableAudioPrompt = loop
+        ? `${enhancedPrompt}. Seamless loop, no fade-in or fade-out, continuous beat`
+        : enhancedPrompt;
+
+      let output: any;
+      try {
+        output = await replicate.run(
+          'stability-ai/stable-audio-2.5',
+          {
+            input: {
+              prompt: stableAudioPrompt,
+              duration,
+              steps: 8,
+              cfg_scale: 7,
+              output_format: 'mp3',
+            },
+          }
+        );
+      } catch (err: any) {
+        console.error('[generate-music-track] Stable Audio error:', err);
+        return new Response(JSON.stringify({
+          error: `Stable Audio generation failed: ${err.message || 'Unknown error'}`,
+          code: "REPLICATE_ERROR",
+        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      let audioUrl: string | null = null;
+      if (typeof output === 'string') audioUrl = output;
+      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
+      else if (output && typeof output === 'object' && 'url' in output) {
+        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
+      }
+
+      if (!audioUrl) {
+        return new Response(JSON.stringify({ error: "No audio returned from Stable Audio", code: "NO_OUTPUT" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) {
+        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      audioBuffer = await audioRes.arrayBuffer();
+
+    } else if (tier === 'vocal') {
+      // ----- Replicate MiniMax Music 1.5 (vocals + lyrics, ≤60s) -----
+      const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY');
+      if (!REPLICATE_API_KEY) {
+        return new Response(JSON.stringify({ error: "REPLICATE_API_KEY not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      engineUsed = 'replicate/minimax-music-1.5';
+      const replicate = new Replicate({ auth: REPLICATE_API_KEY });
+
+      // MiniMax expects lyrics with [Verse]/[Chorus]/[Bridge] tags + a style description
+      const styleDesc = [
+        genre && genre !== 'any' ? `Genre: ${genre}` : '',
+        mood ? `Mood: ${mood}` : '',
+        bpm ? `Tempo: ${bpm} BPM` : '',
+        key ? `Key: ${key}` : '',
+        prompt.trim(),
+        'Studio production quality',
+      ].filter(Boolean).join('. ');
+
+      let output: any;
+      try {
+        output = await replicate.run(
+          'minimax/music-1.5',
+          {
+            input: {
+              lyrics: lyrics!.trim(),
+              song_description: styleDesc,
+            },
+          }
+        );
+      } catch (err: any) {
+        console.error('[generate-music-track] MiniMax error:', err);
+        return new Response(JSON.stringify({
+          error: `Vocal music generation failed: ${err.message || 'Unknown error'}`,
+          code: "REPLICATE_ERROR",
+        }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      let audioUrl: string | null = null;
+      if (typeof output === 'string') audioUrl = output;
+      else if (Array.isArray(output) && output.length > 0) audioUrl = typeof output[0] === 'string' ? output[0] : null;
+      else if (output && typeof output === 'object' && 'url' in output) {
+        audioUrl = typeof (output as any).url === 'function' ? (output as any).url().toString() : (output as any).url;
+      }
+
+      if (!audioUrl) {
+        return new Response(JSON.stringify({ error: "No audio returned from MiniMax", code: "NO_OUTPUT" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      const audioRes = await fetch(audioUrl);
+      if (!audioRes.ok) {
+        return new Response(JSON.stringify({ error: "Failed to fetch generated audio" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      }
+      audioBuffer = await audioRes.arrayBuffer();
+
     } else {
       // ----- ElevenLabs Music (standard / pro) -----
       const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
