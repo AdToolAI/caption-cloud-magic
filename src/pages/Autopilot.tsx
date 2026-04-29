@@ -164,6 +164,8 @@ export default function Autopilot() {
           </Tabs>
         </div>
       </div>
+
+      <AutopilotBriefWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </>
   );
 }
