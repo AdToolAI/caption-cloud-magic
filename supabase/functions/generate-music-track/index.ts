@@ -7,31 +7,39 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Customer pricing per track in EUR (≥30% margin)
-// Quick: MusicGen ~$0.04 → €0.10
-// Standard: ElevenLabs Music ~$0.20 → €0.35
-// Pro: ElevenLabs Music ~$0.80 → €1.40
+// Customer pricing per track in EUR (≥30% margin over Replicate/ElevenLabs cost)
+// quick:    MusicGen ~$0.04 → €0.10 (instrumental loops, fast)
+// adaptive: Stable Audio 2.5 ~$0.04 → €0.15 (background, loopable, up to ~190s, inpainting/continuation)
+// standard: ElevenLabs Music ~$0.20 → €0.35 (full instrumental, polished)
+// vocal:    MiniMax Music 1.5 ~$0.05 → €0.30 (with vocals + lyrics, up to 60s)
+// pro:      ElevenLabs Music ~$0.80 → €1.40 (long-form pro)
 const MUSIC_PRICING: Record<string, { EUR: number; USD: number }> = {
-  quick: { EUR: 0.10, USD: 0.10 },
+  quick:    { EUR: 0.10, USD: 0.10 },
+  adaptive: { EUR: 0.15, USD: 0.15 },
   standard: { EUR: 0.35, USD: 0.35 },
-  pro: { EUR: 1.40, USD: 1.40 },
+  vocal:    { EUR: 0.30, USD: 0.30 },
+  pro:      { EUR: 1.40, USD: 1.40 },
 };
 
 const MAX_DURATION: Record<string, number> = {
-  quick: 30,
+  quick:    30,
+  adaptive: 190,   // Stable Audio 2.5 max ~190s
   standard: 60,
-  pro: 300,
+  vocal:    60,    // MiniMax Music 1.5 max 60s
+  pro:      300,
 };
 
 interface GenerateMusicRequest {
   prompt: string;
-  tier: 'quick' | 'standard' | 'pro';
+  tier: 'quick' | 'adaptive' | 'standard' | 'vocal' | 'pro';
   durationSeconds?: number;
   genre?: string;
   mood?: string;
   instrumental?: boolean;
   bpm?: number;          // Optional target BPM (e.g. match video tempo)
   key?: string;          // Optional musical key (e.g. "C minor")
+  lyrics?: string;       // Required for 'vocal' tier (MiniMax) — supports [Verse]/[Chorus]/[Bridge] tags
+  loop?: boolean;        // For 'adaptive' tier (Stable Audio loop hint)
 }
 
 function buildEnhancedPrompt(req: GenerateMusicRequest): string {
