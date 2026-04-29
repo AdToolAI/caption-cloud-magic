@@ -104,7 +104,7 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
       usp: goal.usp,
     };
     await upsert.mutateAsync(input);
-    setStep(3);
+    setStep(2);
   };
 
   const handleActivate = async () => {
