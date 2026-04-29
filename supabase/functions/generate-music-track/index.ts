@@ -87,11 +87,16 @@ serve(async (req) => {
     );
 
     const body = await req.json() as GenerateMusicRequest;
-    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key } = body;
+    const { prompt, tier, durationSeconds = 30, genre, mood, instrumental = true, bpm, key, lyrics, loop } = body;
 
     // Validation
     if (!prompt?.trim() || prompt.length > 500) {
       return new Response(JSON.stringify({ error: "Prompt is required (max 500 chars)" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+    if (tier === 'vocal' && (!lyrics || !lyrics.trim())) {
+      return new Response(JSON.stringify({ error: "Lyrics are required for the 'vocal' tier", code: "MISSING_LYRICS" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
     }
