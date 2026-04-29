@@ -114,7 +114,6 @@ const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
-const Sora2LongFormCreator = lazy(() => import("./pages/Sora2LongFormCreator"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const EmailDirector = lazy(() => import("./pages/EmailDirector"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
@@ -252,13 +251,13 @@ function AppLayout() {
           <Route path="/wan-video-studio" element={<Navigate to="/ai-video-studio?model=wan-2-6-standard" replace />} />
           <Route path="/hailuo-video-studio" element={<Navigate to="/ai-video-studio?model=hailuo-standard" replace />} />
           <Route path="/luma-video-studio" element={<Navigate to="/ai-video-studio?model=luma-standard" replace />} />
-          <Route path="/sora-video-studio" element={<Navigate to="/ai-video-studio?model=sora-2-standard" replace />} />
+          <Route path="/sora-video-studio" element={<Navigate to="/ai-video-studio?model=veo-3.1-fast" replace />} />
           <Route path="/veo-video-studio" element={<Navigate to="/ai-video-studio?model=veo-3.1-fast" replace />} />
           <Route path="/ltx-video-studio" element={<Navigate to="/ai-video-studio?model=ltx-standard" replace />} />
           <Route path="/grok-video-studio" element={<Navigate to="/ai-video-studio?model=grok-imagine" replace />} />
           <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
-           <Route path="/sora-long-form" element={<Sora2LongFormCreator />} />
+           <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
            <Route path="/video-composer" element={<VideoComposer />} />
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
            <Route path="/motion-studio" element={<MotionStudioHub />} />

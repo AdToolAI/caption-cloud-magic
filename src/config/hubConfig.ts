@@ -79,7 +79,6 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/universal-creator", titleKey: "Universal Content Creator", descKey: "hubItemDesc.universalCreator", icon: Video },
       { route: "/universal-video-creator", titleKey: "Universal Video Creator", descKey: "hubItemDesc.universalVideo", icon: Film },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", descKey: "hubItemDesc.directorsCut", icon: Edit },
-      { route: "/sora-long-form", titleKey: "Sora 2 Long-Form", descKey: "hubItemDesc.soraLongForm", icon: Film },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", descKey: "hubItemDesc.aiVideoStudio", icon: Sparkles },
       { route: "/video-composer", titleKey: "videoComposer.title", descKey: "hubItemDesc.videoComposer", icon: Scissors },
       { route: "/motion-studio/library", titleKey: "Motion Studio Library", descKey: "Wiederverwendbare Charaktere & Locations für deine AI-Videos", icon: Users },
