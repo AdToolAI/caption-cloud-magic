@@ -47,6 +47,14 @@ export function AutopilotStrategyEditor({ brief }: Props) {
   const [videoProvider, setVideoProvider] = useState('hailuo-standard');
   const [videoDuration, setVideoDuration] = useState(6);
   const [videoRatio, setVideoRatio] = useState('9:16');
+  // Session H — Goal briefing
+  const [goal, setGoal] = useState<GoalBriefingValue>({
+    channel_goal: 'engagement',
+    weekly_budget_eur: 25,
+    content_mix: { ai_video: 33, stock_reel: 33, static: 34 },
+    target_audience: '',
+    usp: '',
+  });
 
   useEffect(() => {
     if (!brief) return;
