@@ -390,35 +390,132 @@ export default function QACockpit() {
 
           {/* BUG INBOX */}
           <TabsContent value="bugs" className="space-y-3 mt-4">
-            {(bugs.data ?? []).map((b: any) => (
-              <Card
-                key={b.id}
-                onClick={() => setSelectedBug(b)}
-                className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 cursor-pointer hover:border-[#F5C76A]/40 transition-colors"
-              >
-                <CardContent className="pt-4">
-                  <div className="flex items-start gap-3">
-                    <Badge className={SEVERITY_COLORS[b.severity] ?? ""}>{b.severity}</Badge>
-                    <Badge variant="outline">{b.category}</Badge>
-                    <span className="font-medium flex-1">{b.title}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}
-                    </span>
+            {(() => {
+              const all = bugs.data ?? [];
+              const open = all.filter((b: any) => b.status !== "resolved" && b.status !== "wont_fix");
+              const action = open.filter((b: any) => b.severity === "critical" || b.severity === "high");
+              const warnings = open.filter((b: any) => b.severity !== "critical" && b.severity !== "high");
+              const resolved = all.filter((b: any) => b.status === "resolved" || b.status === "wont_fix");
+              const list =
+                bugFilter === "action" ? action
+                : bugFilter === "warnings" ? warnings
+                : bugFilter === "resolved" ? resolved
+                : [];
+
+              return (
+                <>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <FilterPill active={bugFilter === "action"} onClick={() => setBugFilter("action")}>
+                      Action Required <span className="ml-1.5 text-red-300">({action.length})</span>
+                    </FilterPill>
+                    <FilterPill active={bugFilter === "warnings"} onClick={() => setBugFilter("warnings")}>
+                      Warnings <span className="ml-1.5 text-yellow-300">({warnings.length})</span>
+                    </FilterPill>
+                    <FilterPill active={bugFilter === "resolved"} onClick={() => setBugFilter("resolved")}>
+                      Resolved <span className="ml-1.5 text-emerald-300">({resolved.length})</span>
+                    </FilterPill>
+                    <FilterPill active={bugFilter === "muted"} onClick={() => setBugFilter("muted")}>
+                      Muted Patterns <span className="ml-1.5 text-slate-300">({(mutedPatterns.data ?? []).length})</span>
+                    </FilterPill>
                   </div>
-                  {b.description && (
-                    <pre className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded max-h-40 overflow-auto">
-                      {b.description}
-                    </pre>
+
+                  {bugFilter === "muted" ? (
+                    <div className="space-y-2">
+                      {(mutedPatterns.data ?? []).map((p: any) => (
+                        <Card key={p.id} className="bg-[#0A0F1F]/80 border-[#F5C76A]/10">
+                          <CardContent className="pt-4 flex items-start gap-3">
+                            <Badge variant="outline">{p.severity_when_matched}</Badge>
+                            <div className="flex-1 min-w-0">
+                              <code className="text-xs font-mono text-cyan-300 break-all">{p.pattern_regex}</code>
+                              {p.reason && <p className="text-xs text-muted-foreground mt-1">{p.reason}</p>}
+                            </div>
+                            <Button size="sm" variant="outline" onClick={() => unmutePattern.mutate(p.id)}>
+                              Unmute
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      {(mutedPatterns.data ?? []).length === 0 && (
+                        <EmptyState label="Keine Patterns stummgeschaltet" />
+                      )}
+                    </div>
+                  ) : list.length === 0 ? (
+                    <EmptyState
+                      label={
+                        bugFilter === "action"
+                          ? "Keine kritischen Bugs offen — alles grün ✓"
+                          : bugFilter === "warnings"
+                          ? "Keine Warnungen"
+                          : "Noch nichts gelöst"
+                      }
+                    />
+                  ) : (
+                    list.map((b: any) => (
+                      <Card
+                        key={b.id}
+                        onClick={() => setSelectedBug(b)}
+                        className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 cursor-pointer hover:border-[#F5C76A]/40 transition-colors"
+                      >
+                        <CardContent className="pt-4">
+                          <div className="flex items-start gap-3 flex-wrap">
+                            <Badge className={SEVERITY_COLORS[b.severity] ?? ""}>{b.severity}</Badge>
+                            <Badge variant="outline">{b.category}</Badge>
+                            {b.status === "resolved" && (
+                              <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40">
+                                <CheckCircle2 className="h-3 w-3 mr-1" /> resolved
+                              </Badge>
+                            )}
+                            <span className="font-medium flex-1 min-w-0">{b.title}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(b.created_at), { addSuffix: true })}
+                            </span>
+                          </div>
+                          {b.description && (
+                            <pre className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap font-mono bg-black/30 p-2 rounded max-h-32 overflow-auto">
+                              {b.description.slice(0, 400)}
+                            </pre>
+                          )}
+                          <div className="text-xs text-muted-foreground mt-2 flex items-center gap-3 flex-wrap">
+                            <span>Mission: {b.mission_name}{b.route ? ` · ${b.route}` : ""}</span>
+                            {b.status !== "resolved" && (
+                              <div className="ml-auto flex gap-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => resolveBug.mutate(b.id)}
+                                  disabled={resolveBug.isPending}
+                                >
+                                  <CheckCircle2 className="h-3 w-3 mr-1" /> Mark fixed
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 text-xs"
+                                  onClick={() => {
+                                    const sample = (b.title || "").replace(/^Console:\s*/, "").replace(/^Network \d+:\s*/, "").replace(/\s*\(×\d+\)\s*$/, "").trim();
+                                    const pattern = prompt("Regex-Pattern, das gemutet werden soll:", sample.slice(0, 80));
+                                    if (!pattern) return;
+                                    const reason = prompt("Grund (optional):", "Bekanntes Rauschen") ?? "";
+                                    mutePattern.mutate({ pattern, reason });
+                                    resolveBug.mutate(b.id);
+                                  }}
+                                >
+                                  <VolumeX className="h-3 w-3 mr-1" /> Mute
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))
                   )}
-                  <div className="text-xs text-muted-foreground mt-2 flex items-center gap-3">
-                    <span>Mission: {b.mission_name}{b.route ? ` · ${b.route}` : ""}</span>
-                    <span className="ml-auto text-[#F5C76A]/70">Klicken für Details →</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {(bugs.data ?? []).length === 0 && <EmptyState label="Keine Bugs gefunden — alles grün ✓" />}
+                </>
+              );
+            })()}
           </TabsContent>
+
 
           {/* MISSIONS */}
           <TabsContent value="missions" className="grid md:grid-cols-2 gap-3 mt-4">
