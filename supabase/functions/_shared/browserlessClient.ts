@@ -297,7 +297,7 @@ export default async ({ page, context }) => {
 
     // 3) Final screenshot + DOM summary
     if (opts.finalPath) {
-      await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'networkidle2', timeout: 25000 }).catch(() => {});
+      await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
     }
     beat('finalizing');
   } catch (e) {
