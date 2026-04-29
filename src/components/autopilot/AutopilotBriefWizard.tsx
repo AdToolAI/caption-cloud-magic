@@ -227,9 +227,15 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </div>
               <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
             </div>
+            </div>
+            {!goalValid && (
+              <p className="text-[11px] text-amber-500 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Bitte Channel-Ziel, Budget, Zielgruppe und USP ausfüllen.
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-              <Button disabled={!briefValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
+              <Button disabled={!briefValid || !goalValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
                 Weiter <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
