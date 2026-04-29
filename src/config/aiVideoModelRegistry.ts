@@ -24,6 +24,7 @@ import { LUMA_VIDEO_MODELS } from './lumaVideoCredits';
 import { SEEDANCE_VIDEO_MODELS } from './seedanceVideoCredits';
 import { GROK_VIDEO_MODELS } from './grokVideoCredits';
 import { AI_VIDEO_MODELS as SORA_VIDEO_MODELS } from './aiVideoCredits';
+import { VIDU_VIDEO_MODELS } from './viduVideoCredits';
 
 export type ToolkitModelGroup = 'recommended' | 'fast' | 'premium' | 'audio';
 
@@ -35,7 +36,7 @@ export interface ToolkitModel {
   /** Short provider label, e.g. "Kuaishou", "Google". */
   provider: string;
   /** Family used to slot into the provider tab/icon. */
-  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika';
+  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika' | 'vidu';
   /** Edge function name to invoke (without `supabase.functions.invoke()` prefix). */
   edgeFunction: string;
   /** Grouping in the dropdown. */
@@ -48,6 +49,10 @@ export interface ToolkitModel {
     /** Video-to-Video: accepts a reference clip as motion / style source. */
     v2v?: boolean;
     audio: boolean;
+    /** Multi-Reference: accepts 1–N reference images blended into one scene. */
+    multiRef?: boolean;
+    /** Max number of reference images supported when multiRef is true. */
+    maxReferences?: number;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
