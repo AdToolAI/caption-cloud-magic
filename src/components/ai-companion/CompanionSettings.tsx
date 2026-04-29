@@ -64,7 +64,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         .from('companion_user_preferences')
         .select('preferences')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (data?.preferences) {
         const prefs = data.preferences as Record<string, unknown>;
@@ -88,7 +88,7 @@ export function CompanionSettings({ userId, onClose, onSettingsChange }: Compani
         .from('companion_user_preferences')
         .select('id')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       if (existing) {
         const { error } = await supabase
