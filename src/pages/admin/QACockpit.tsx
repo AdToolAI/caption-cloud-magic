@@ -121,23 +121,46 @@ export default function QACockpit() {
   });
 
   const setupTestUser = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (resetPassword: boolean) => {
       const { data, error } = await supabase.functions.invoke("qa-agent-setup-test-user", {
-        body: {},
+        body: resetPassword ? { reset_password: true } : {},
       });
       if (error) throw error;
       return data;
     },
     onSuccess: (data) => {
-      toast.success(`Test-User bereit: ${data?.email}`, {
-        description: data?.password
-          ? `Passwort: ${data.password.slice(0, 8)}… (kopieren & als Secret QA_TEST_USER_PASSWORD speichern)`
-          : undefined,
-        duration: 30000,
-      });
+      if (data?.password) {
+        setCredentials({ email: data.email, password: data.password });
+        setShowPassword(false);
+        setCopied(false);
+        toast.success(`Test-User bereit: ${data.email}`, {
+          description: "Vollständige Zugangsdaten im Dialog — sofort als Secret speichern.",
+        });
+      } else {
+        toast.info(`Test-User existiert bereits: ${data?.email}`, {
+          description: "Klick auf 'Passwort zurücksetzen' um neue Zugangsdaten zu erzeugen.",
+        });
+      }
     },
     onError: (e: any) => toast.error(`Setup fehlgeschlagen: ${e?.message ?? String(e)}`),
   });
+
+  const handleCopy = async () => {
+    if (!credentials) return;
+    try {
+      await navigator.clipboard.writeText(credentials.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      toast.error("Kopieren fehlgeschlagen — bitte manuell markieren.");
+    }
+  };
+
+  const closeCredentials = () => {
+    setCredentials(null);
+    setShowPassword(false);
+    setCopied(false);
+  };
 
   const totalBudgetCents = (budget.data ?? []).reduce(
     (acc, row: any) => acc + (row.hard_cap_cents ?? 0),
