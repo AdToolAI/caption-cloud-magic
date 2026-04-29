@@ -113,6 +113,11 @@ export interface UpsertBriefInput {
   avatar_ids: string[];
   weekly_credit_budget: number;
   auto_publish_enabled: boolean;
+  // Session E: video defaults (optional for backward compat)
+  video_enabled?: boolean;
+  video_provider?: string;
+  video_duration_sec?: number;
+  video_aspect_ratio?: string;
 }
 
 export function useUpsertAutopilotBrief() {
