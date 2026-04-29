@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power } from 'lucide-react';
@@ -12,7 +13,9 @@ import {
   useAutopilotStrikes,
   useAutopilotActivity,
   usePauseAutopilot,
+  useToggleAutopilot,
 } from '@/hooks/useAutopilot';
+import { AutopilotBriefWizard } from '@/components/autopilot/AutopilotBriefWizard';
 import { cn } from '@/lib/utils';
 
 export default function Autopilot() {
@@ -21,6 +24,8 @@ export default function Autopilot() {
   const { data: strikes = [] } = useAutopilotStrikes();
   const { data: activity = [] } = useAutopilotActivity(30);
   const pause = usePauseAutopilot();
+  const toggle = useToggleAutopilot();
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const isActive = !!brief?.is_active;
   const isLocked = !!(brief?.locked_until && new Date(brief.locked_until) > new Date());
@@ -101,6 +106,9 @@ export default function Autopilot() {
                   isActive={isActive}
                   isLocked={isLocked}
                   hasBrief={!!brief}
+                  onOpenWizard={() => setWizardOpen(true)}
+                  onDeactivate={() => toggle.mutate({ activate: false })}
+                  isPending={toggle.isPending}
                 />
               </div>
             </div>
@@ -156,13 +164,29 @@ export default function Autopilot() {
           </Tabs>
         </div>
       </div>
+
+      <AutopilotBriefWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </>
   );
 }
 
 /* ====================== Subcomponents ====================== */
 
-function ActivationToggle({ isActive, isLocked, hasBrief }: { isActive: boolean; isLocked: boolean; hasBrief: boolean }) {
+function ActivationToggle({
+  isActive,
+  isLocked,
+  hasBrief,
+  onOpenWizard,
+  onDeactivate,
+  isPending,
+}: {
+  isActive: boolean;
+  isLocked: boolean;
+  hasBrief: boolean;
+  onOpenWizard: () => void;
+  onDeactivate: () => void;
+  isPending: boolean;
+}) {
   if (isLocked) {
     return (
       <Button variant="outline" size="sm" disabled className="gap-1.5 border-destructive/50 text-destructive">
@@ -175,13 +199,13 @@ function ActivationToggle({ isActive, isLocked, hasBrief }: { isActive: boolean;
       <span className="text-xs text-muted-foreground hidden md:inline">{isActive ? 'AKTIV' : 'INAKTIV'}</span>
       <Switch
         checked={isActive}
+        disabled={isPending}
         onCheckedChange={() => {
-          if (!hasBrief) {
-            // TODO Session B: open Brief Wizard + AUP confirmation flow
-            alert('Onboarding-Wizard kommt in Session B. Aktuell ist nur die Foundation live — der Toggle funktioniert nach Wizard-Build.');
+          if (!hasBrief || !isActive) {
+            onOpenWizard();
             return;
           }
-          alert('Toggle-Logik erfordert Edge Function (Session B). Cockpit-Anzeige ist bereits live.');
+          onDeactivate();
         }}
         aria-label="Autopilot aktivieren"
       />
