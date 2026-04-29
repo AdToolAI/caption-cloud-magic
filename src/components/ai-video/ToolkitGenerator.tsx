@@ -268,7 +268,6 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           value={model.id}
           onChange={setModelId}
           currency={currency}
-          hasSora2Access={hasSora2Access}
         />
       </div>
 
