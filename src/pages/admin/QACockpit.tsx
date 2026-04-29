@@ -552,7 +552,7 @@ function KpiCard({
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+const StatusBadge = forwardRef<HTMLDivElement, { status: string }>(({ status }, ref) => {
   const map: Record<string, string> = {
     pending: "bg-slate-500/20 text-slate-300",
     running: "bg-cyan-500/20 text-cyan-300 animate-pulse",
@@ -561,8 +561,9 @@ function StatusBadge({ status }: { status: string }) {
     aborted: "bg-orange-500/20 text-orange-300",
     skipped: "bg-slate-500/20 text-slate-300",
   };
-  return <Badge className={map[status] ?? ""}>{status}</Badge>;
-}
+  return <div ref={ref} className="inline-flex"><Badge className={map[status] ?? ""}>{status}</Badge></div>;
+});
+StatusBadge.displayName = "StatusBadge";
 
 function EmptyState({ label }: { label: string }) {
   return (
