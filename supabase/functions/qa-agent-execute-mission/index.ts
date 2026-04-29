@@ -73,24 +73,32 @@ Deno.serve(async (req) => {
       finalPath,
     });
 
-    // Persist screenshot to storage (data URL → just store inline for now in summary)
-    let screenshotUrl: string | undefined = undefined;
-    if (result.screenshot) {
+    // Persist screenshots to storage
+    const uploadShot = async (dataUrl: string, label: string): Promise<string | undefined> => {
       try {
-        const base64 = result.screenshot.split(",")[1];
+        const base64 = dataUrl.split(",")[1];
+        if (!base64) return undefined;
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-        const path = `qa-runs/${run_id}/final-${Date.now()}.jpg`;
+        const path = `qa-runs/${run_id}/${label}-${Date.now()}.jpg`;
         const { data: up } = await supabase.storage
           .from("qa-screenshots")
           .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
         if (up?.path) {
           const { data: pub } = supabase.storage.from("qa-screenshots").getPublicUrl(up.path);
-          screenshotUrl = pub?.publicUrl;
+          return pub?.publicUrl;
         }
       } catch (e) {
-        console.warn("[execute-mission] screenshot upload failed:", e);
+        console.warn(`[execute-mission] ${label} upload failed:`, e);
       }
-    }
+      return undefined;
+    };
+
+    let screenshotUrl: string | undefined = undefined;
+    if (result.screenshot) screenshotUrl = await uploadShot(result.screenshot, "final");
+
+    let loginScreenshotUrl: string | undefined = undefined;
+    const loginShotData = (result as any).data?.loginScreenshot;
+    if (loginShotData) loginScreenshotUrl = await uploadShot(loginShotData, "login");
 
     // Detect bugs
     const consoleErrors = (result.consoleLogs ?? []).filter(
@@ -102,18 +110,24 @@ Deno.serve(async (req) => {
 
     // Bug: Browserless overall failure
     if (!result.ok) {
+      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button/i.test(
+        result.error ?? ""
+      );
       await supabase.from("qa_bug_reports").insert({
         run_id,
         mission_name: mission.name,
         severity: "high",
-        category: "workflow",
-        title: `Mission execution failed: ${result.error?.slice(0, 100)}`,
+        category: isLoginFail ? "auth" : "workflow",
+        title: isLoginFail
+          ? `Login failed before any path could be visited`
+          : `Mission execution failed: ${result.error?.slice(0, 100)}`,
         description: result.error,
-        screenshot_url: screenshotUrl,
+        screenshot_url: loginScreenshotUrl ?? screenshotUrl,
         network_trace: {
           http_status: (result as any).httpStatus ?? null,
           raw_response: (result as any).rawResponse ?? null,
           duration_ms: result.durationMs,
+          login_screenshot_url: loginScreenshotUrl ?? null,
         },
       });
       bugsFound++;
