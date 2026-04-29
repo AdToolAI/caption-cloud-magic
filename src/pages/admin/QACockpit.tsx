@@ -305,7 +305,11 @@ export default function QACockpit() {
           {/* BUG INBOX */}
           <TabsContent value="bugs" className="space-y-3 mt-4">
             {(bugs.data ?? []).map((b: any) => (
-              <Card key={b.id} className="bg-[#0A0F1F]/80 border-[#F5C76A]/10">
+              <Card
+                key={b.id}
+                onClick={() => setSelectedBug(b)}
+                className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 cursor-pointer hover:border-[#F5C76A]/40 transition-colors"
+              >
                 <CardContent className="pt-4">
                   <div className="flex items-start gap-3">
                     <Badge className={SEVERITY_COLORS[b.severity] ?? ""}>{b.severity}</Badge>
@@ -320,8 +324,9 @@ export default function QACockpit() {
                       {b.description}
                     </pre>
                   )}
-                  <div className="text-xs text-muted-foreground mt-2">
-                    Mission: {b.mission_name} {b.route ? `· ${b.route}` : ""}
+                  <div className="text-xs text-muted-foreground mt-2 flex items-center gap-3">
+                    <span>Mission: {b.mission_name}{b.route ? ` · ${b.route}` : ""}</span>
+                    <span className="ml-auto text-[#F5C76A]/70">Klicken für Details →</span>
                   </div>
                 </CardContent>
               </Card>
