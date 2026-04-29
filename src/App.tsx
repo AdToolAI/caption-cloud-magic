@@ -123,6 +123,7 @@ const Marketplace = lazy(() => import("./pages/Marketplace"));
 const CreatorStudio = lazy(() => import("./pages/CreatorStudio"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
+const MusicStudio = lazy(() => import("./pages/MusicStudio"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
