@@ -1,147 +1,212 @@
-# Vidu Q2 Integration — Multi-Reference Specialist (10. Provider)
+# Character Marketplace — Plan
 
-## Ziel
+Erweitert das bestehende Marketplace-Konzept (`/marketplace`, 70/30 Revenue Share) um **Brand Characters / Avatars**. Höchste Priorität: **rechtliche Absicherung** gegen Persönlichkeitsrechts-, DSGVO- und Urheberrechtsverletzungen.
 
-Vidu Q2 als einzigartigen **Multi-Reference / Multi-Character Specialist** integrieren. Killer-Feature: **bis zu 7 Reference-Bilder** in einer Szene (Charakter + Produkt + Location + Style). Vollintegration in **AI Video Toolkit** (alle Modi), **Video Composer**, **Brand Character Lock** und **Avatar Library**.
+## Rechtliches Schutzkonzept (Kern)
 
-## Provider-Specs
+### 1. Strenge Origin-Wall beim Submit
+Jeder zum Marketplace eingereichte Charakter MUSS genau **eine** Origin-Kategorie deklarieren:
 
-| Modell | Modus | Dauer | Auflösung | Replicate Slug | Preis |
-|---|---|---|---|---|---|
-| `vidu-q2-reference` | Reference2V (1-7 Refs) | 5s | 1080p | `vidu/vidu-q2-reference-to-video` | ~€0.45 |
-| `vidu-q2-i2v` | Image-to-Video | 5s | 1080p | `vidu/vidu-q2-image-to-video` | ~€0.40 |
-| `vidu-q2-t2v` | Text-to-Video | 5s | 1080p | `vidu/vidu-q2-text-to-video` | ~€0.40 |
+- **`ai_generated`** (empfohlener Standardweg) — Charakter wurde mit einem AI-Bildgenerator erstellt. Creator wählt Tool aus Liste (Picture Studio, Midjourney, DALL·E, Flux, andere) und bestätigt per Checkbox: "Diese Person existiert nicht real."
+- **`licensed_real_person`** — echte Person. **Pflicht-Upload eines Model-Release-PDF** in privaten Bucket `character-licenses` (nur Admins + Creator lesbar). Plus: Vollständiger Name der Person, Land, Gültigkeits-Zeitraum, optional E-Mail der Person für Verification.
+- **`self_portrait`** — Creator ist die Person selbst. Selfie-Verification (Liveness-Check via Foto-Vergleich gegen Account-Profil), Identitäts-Bestätigung.
 
-Verifiziert via Replicate-Modell-Naming. Final werden die Slugs in der Edge-Function geprüft und ggf. korrigiert (Replicate ändert gelegentlich Pfade).
+Ohne gültige Origin-Deklaration → Submit blockiert (Edge Function rejected).
 
-## Architektur-Übersicht
+### 2. Verbindliche Creator-Verträge
+Mehrstufige Checkbox-Wall im Submit-Dialog (alle einzeln zu bestätigen, gespeichert mit Timestamp + IP-Hash + User-Agent in `character_marketplace_consents`):
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  AI Video Toolkit  (/ai-video-studio?model=vidu-q2-…)        │
-│  ├─ Modus-Tabs: T2V | I2V | Multi-Reference (NEU)            │
-│  └─ Multi-Reference-UI: 7 Slots mit Rollen-Badges            │
-├─────────────────────────────────────────────────────────────┤
-│  Video Composer  (clipSource: 'ai-vidu')                     │
-│  ├─ Per-Scene Multi-Ref Picker (Char/Product/Location)       │
-│  └─ Auto-Pull aus aktivem Brand Character Lock               │
-├─────────────────────────────────────────────────────────────┤
-│  Edge: generate-vidu-video                                   │
-│  ├─ Polling + EdgeRuntime.waitUntil                          │
-│  ├─ Storage-Rehost → ai-videos bucket                        │
-│  └─ Refund-Hook bei Failure (idempotent)                     │
-└─────────────────────────────────────────────────────────────┘
+1. Ich besitze alle Rechte am Bild- und Stimmenmaterial.
+2. Falls echte Person: Ich habe ein gültiges Model-Release inkl. Recht zur kommerziellen Sub-Lizenzierung.
+3. Charakter zeigt keine reale Person des öffentlichen Lebens (Politiker, Promis, Markenfiguren) ohne explizite schriftliche Genehmigung.
+4. Charakter ist nicht minderjährig dargestellt.
+5. Ich akzeptiere die **Creator Terms** (eigene Seite `/legal/marketplace-creator-terms`) inkl. Haftungsfreistellung der Plattform.
+6. Bei Falschangaben: vollständige Haftung + Account-Sperre + sofortiges Take-Down + Rückzahlung aller verdienten Credits.
+
+### 3. Käufer-Lizenz (separate Akzeptanz)
+Beim Kauf akzeptiert der Käufer eine **Buyer License** (`/legal/marketplace-buyer-terms`) mit:
+- Erlaubt: kommerzielle Nutzung in eigenen Videos, Anzeigen, Social Media.
+- Verboten: Weiterverkauf des nackten Charakters, Erstellung von Deepfakes realer Personen, illegale/diffamierende Inhalte, Adult-Content (außer Charakter explizit so getaggt + Käufer 18+ verifiziert — V2).
+- Käufer trägt eigenständige Verantwortung für Output-Compliance (EU AI Act Kennzeichnung, DSGVO).
+- Lizenz-Akzeptanz wird in `character_purchases.license_accepted_at` + Snapshot der Lizenz-Version gespeichert.
+
+### 4. Admin-Dual-Review (Premium + Real Persons)
+- **Free + AI-Generated** → Auto-Publish nach Submit (wie heute bei Free-Templates).
+- **Premium ODER `licensed_real_person`/`self_portrait`** → Pflicht-Review durch Admin. Admin sieht Origin-Deklaration, ggf. Model-Release-PDF (signed URL, 1h gültig), Charakter-Preview. Approve / Reject mit Reason.
+
+### 5. DMCA / Take-Down Workflow
+- Öffentlicher Report-Button auf jeder Character Detail Page → Modal mit Reason (`impersonation`, `copyright`, `minor`, `deepfake`, `other`) + Beschreibung + Reporter-E-Mail.
+- Speichert in `character_marketplace_reports`. Bei Eingang: Charakter automatisch in Status `under_investigation` (in Library + Marketplace ausgeblendet, bestehende Käufer behalten Zugriff vorerst).
+- Admin-Queue mit Entscheidung: `dismiss`, `unlist`, `permanent_remove` (letzteres sperrt auch alle Käufer-Verwendungen + automatischer Refund per Credit-RPC).
+
+### 6. Daten-Minimierung & Rechte der abgebildeten Person
+- Model-Release-PDFs werden **nicht** im AI-Pipeline-Kontext, nur in privatem Storage, mit Verschlüsselung at-rest (Supabase Standard).
+- Eigener Endpunkt: "Bin ich auf einem Marketplace-Charakter abgebildet?" (`/legal/character-takedown-request`) für Betroffene, ohne Account.
+
+## Datenbank-Schema
+
+Spiegelt die `motion_studio_templates`-Marketplace-Säule auf `brand_characters`:
+
+```sql
+-- 1) Marketplace-Spalten auf brand_characters
+ALTER TABLE brand_characters
+  ADD COLUMN marketplace_status text NOT NULL DEFAULT 'private'
+    CHECK (marketplace_status IN ('private','draft','pending_review','published','rejected','unlisted','under_investigation','permanent_removed')),
+  ADD COLUMN pricing_type text NOT NULL DEFAULT 'free'
+    CHECK (pricing_type IN ('free','premium')),
+  ADD COLUMN price_credits integer NOT NULL DEFAULT 0
+    CHECK (price_credits >= 0 AND price_credits <= 5000),
+  ADD COLUMN revenue_share_percent integer NOT NULL DEFAULT 70,
+  ADD COLUMN total_revenue_credits bigint NOT NULL DEFAULT 0,
+  ADD COLUMN total_purchases integer NOT NULL DEFAULT 0,
+  ADD COLUMN average_rating numeric(3,2) NOT NULL DEFAULT 0,
+  ADD COLUMN total_ratings integer NOT NULL DEFAULT 0,
+  ADD COLUMN published_at timestamptz,
+  ADD COLUMN reviewed_at timestamptz,
+  ADD COLUMN reviewed_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN rejection_reason text,
+  ADD COLUMN origin_type text
+    CHECK (origin_type IN ('ai_generated','licensed_real_person','self_portrait')),
+  ADD COLUMN origin_metadata jsonb NOT NULL DEFAULT '{}',  -- AI-Tool, Person-Name etc.
+  ADD COLUMN license_release_path text,                     -- Pfad in private bucket
+  ADD COLUMN nsfw_flag boolean NOT NULL DEFAULT false,
+  ADD COLUMN sample_video_urls text[] NOT NULL DEFAULT '{}',
+  ADD COLUMN voice_sample_url text,
+  ADD COLUMN tags text[] NOT NULL DEFAULT '{}';
+
+-- 2) Käufe
+CREATE TABLE character_purchases (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  character_id uuid NOT NULL REFERENCES brand_characters(id) ON DELETE CASCADE,
+  buyer_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  creator_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  price_credits int NOT NULL DEFAULT 0,
+  creator_earned_credits int NOT NULL DEFAULT 0,
+  platform_fee_credits int NOT NULL DEFAULT 0,
+  pricing_type text NOT NULL CHECK (pricing_type IN ('free','premium')),
+  license_version text NOT NULL,           -- z.B. 'v1-2026-04-29'
+  license_accepted_at timestamptz NOT NULL DEFAULT now(),
+  license_ip_hash text,                    -- sha256(ip+salt)
+  purchased_at timestamptz NOT NULL DEFAULT now(),
+  refunded_at timestamptz,
+  UNIQUE (character_id, buyer_user_id)
+);
+
+-- 3) Consent-Audit-Log (Creator)
+CREATE TABLE character_marketplace_consents (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  character_id uuid NOT NULL REFERENCES brand_characters(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  consents jsonb NOT NULL,                 -- {ownership:true, model_release:true, ...}
+  legal_version text NOT NULL,
+  ip_hash text,
+  user_agent text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 4) DMCA / Reports
+CREATE TABLE character_marketplace_reports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  character_id uuid NOT NULL REFERENCES brand_characters(id) ON DELETE CASCADE,
+  reporter_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  reporter_email text,
+  reason text NOT NULL CHECK (reason IN ('impersonation','copyright','minor','deepfake','nsfw','other')),
+  description text,
+  status text NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open','reviewing','dismissed','unlisted','permanent_removed')),
+  resolved_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  resolved_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- 5) Bewertungen
+CREATE TABLE character_marketplace_ratings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  character_id uuid NOT NULL REFERENCES brand_characters(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  rating int NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  review_text text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (character_id, user_id)
+);
 ```
 
-## Implementation Steps
+**Buyer-Earnings:** wiederverwendet vorhandene `creator_earnings_ledger` (template_id wird nullable belassen, neuer optionaler `character_id` per ALTER hinzufügen).
 
-### 1. Edge Function: `generate-vidu-video`
+**Storage-Bucket:** `character-licenses` (private, RLS: nur Owner + Admins read; Pfad: `{user_id}/{character_id}/release.pdf`).
 
-Neue Function nach Vorbild von `generate-pika-video`:
-- **Input**: `prompt`, `model` (`vidu-q2-reference` | `vidu-q2-i2v` | `vidu-q2-t2v`), `aspectRatio`, `referenceImages[]` (1-7 URLs), `referenceRoles[]` (`character` | `product` | `location` | `style` | `prop`), optional `seed`, `negativePrompt`
-- **Validation**: Zod-Schema; Reference-Mode erfordert mind. 1 Bild, max. 7
-- **Pricing-Map** wie Pika; Credits-Reservation via bestehendem Wallet-System
-- **Polling**: 8min Timeout, 5s Intervall (Vidu rendert 60-120s)
-- **Rehost**: Replicate-URL → `ai-videos/{userId}/{generationId}.mp4`
-- **DB**: `ai_video_generations` Tabelle (existierend), kein Schema-Change nötig
-- **Refund**: Bei Fail → automatische Wallet-Refund (Idempotency-Key = generationId)
-- **Config**: `verify_jwt = true`, Timeout 300s in `supabase/config.toml`
+**RLS-Policies (Auszug):**
+- `brand_characters` SELECT: bestehende Policy + neue Policy "marketplace_status = 'published' read by all authenticated".
+- `character_purchases` INSERT: nur via Edge Function (RPC).
+- Käufer kann gekauften Charakter wie eigenen verwenden (View `my_accessible_characters` UNION zwischen owned und purchased).
 
-### 2. Toolkit-Registry: `aiVideoModelRegistry.ts`
+## Edge Functions
 
-Neue Family `'vidu'` zur Union hinzufügen. Drei Einträge in `AI_VIDEO_TOOLKIT_MODELS`:
-- `vidu-q2-reference` (group: `recommended`, badge: `Multi-Ref`, capability: neuer `multiRef: true` flag)
-- `vidu-q2-i2v` (group: `fast`)
-- `vidu-q2-t2v` (group: `fast`)
+1. **`submit-character-to-marketplace`** — validiert Origin-Wall, prüft Consents, schreibt License-Release-Path bei Real-Person, setzt Status (`published` für Free+AI / `pending_review` sonst), schreibt Audit in `character_marketplace_consents`.
+2. **`purchase-marketplace-character`** — neue RPC `purchase_character` analog zu `purchase_template`: Wallet-Debit, Creator-Credit + Ledger, License-Akzeptanz mit Snapshot.
+3. **`review-marketplace-character`** — Admin-only; approve/reject mit Reason, signed URL für Release-PDF.
+4. **`report-marketplace-character`** — public (auch ohne Auth über E-Mail), schreibt Report + setzt Charakter auf `under_investigation` falls Severity high.
+5. **`takedown-marketplace-character`** — Admin: führt `permanent_removed` durch + automatischer Refund aller offenen Käufe via Credit-RPC.
 
-`ToolkitModel.capabilities` um `multiRef?: boolean` und `maxReferences?: number` (=7) erweitern.
+## Frontend
 
-Neue Konfigdatei `src/config/viduVideoCredits.ts` analog zu `pikaVideoCredits.ts`.
+### Marketplace-Tabs
+`/marketplace` bekommt **Tab-Bar** auf oberster Ebene: `Templates | Characters | (Snippets später)`. Aktueller Inhalt wandert in Tab "Templates".
 
-### 3. Toolkit-UI: Multi-Reference-Card
+### Neue Komponenten
+- `CharacterMarketplaceGallery.tsx` — Grid mit Portrait, Name, Origin-Badge ("AI-Generated" / "Real Person ✓ Licensed"), Sample-Video-Hover, Voice-Tag, Preis.
+- `CharacterMarketplaceCard.tsx` — Karte mit gleichen 70/30-Hinweisen wie Template-Card.
+- `CharacterDetailDialog.tsx` — Portrait, Voice-Sample-Player, 2–3 Sample-Videos, Tags, Creator-Profil, Report-Button, Buy-Button.
+- `SubmitCharacterToMarketplaceDialog.tsx` — **Multi-Step Wizard:**
+  1. Pricing (Free / Premium + Preis-Slider 25–1000).
+  2. Origin-Wall (Radio + dynamisches Formular).
+  3. Sample-Videos generieren oder hochladen (max 3).
+  4. Legal-Checkboxes (6 Stück, jede einzeln pflicht).
+  5. Review & Submit.
+- `CharacterReportDialog.tsx` — Report-Modal.
+- `BuyerLicenseAcceptDialog.tsx` — vor Kauf, scrollbarer Lizenztext + Pflicht-Checkbox.
 
-Neue Komponente `src/components/ai-video-toolkit/MultiReferenceUploader.tsx`:
-- 7 Slots in 2 Reihen (Bento-Grid, James-Bond-Glassmorphism)
-- Pro Slot: Drag-&-Drop Upload, Rollen-Selector (Character/Product/Location/Style/Prop), Vorschau
-- "Aus Brand Character Lock laden"-Button → autofills Slot 1 mit aktivem Avatar
-- "Aus Picture Studio laden"-Button → öffnet Media-Picker
-- Sichtbar nur wenn `selectedModel.capabilities.multiRef === true`
+### Brand Characters Page (`/brand-characters`)
+- Neue Spalte "Marketplace" pro Karte: "Im Marketplace anbieten" / "Status: Pending Review" / "Published — €X verdient".
+- Eigener Tab "Purchased Characters" listet zugekaufte Charaktere (read-only Origin, normale Verwendung).
 
-Im `AIVideoToolkit.tsx`: bei `vidu-q2-reference` standardmäßig Multi-Ref-Card statt Standard-Image-Upload.
+### Admin (`/admin`)
+Neuer Tab **Character Reviews** mit drei Sub-Listen:
+- Pending Reviews (Submit-Queue)
+- Open Reports (DMCA-Queue)
+- Permanent Removals Log
 
-### 4. Composer-Integration
+### Legal Pages
+- `/legal/marketplace-creator-terms` — vollständiger Vertrag, Versionierung im Footer.
+- `/legal/marketplace-buyer-terms`
+- `/legal/character-takedown-request` — public Form, kein Login nötig.
 
-- `ClipSource` Type um `'ai-vidu'` erweitern (`src/types/video-composer.ts`)
-- `COMPOSER_FAMILIES` Set in `modelMapping.ts` um `'vidu'` ergänzen
-- Per-Scene "Multi-Ref"-Toggle in `SceneEditor`: bei aktivem Vidu erscheint kompakte 3-Slot-Variante (Character / Product / Location) — Vereinfachung gegenüber Toolkit
-- `compose-video-clips` Edge-Function: neuer Branch für `ai-vidu` der `generate-vidu-video` aufruft. Fallback bei fehlenden Refs → `ai-hailuo` (analog Runway-Fallback)
-- Brand Character Lock: wenn aktiv, Auto-Inject in Slot "Character"
+## Integration in bestehende Module
 
-### 5. Brand Character Lock + Avatar Library
+Gekaufte Charaktere erscheinen in:
+- AI Video Toolkit (Brand-Character-Picker)
+- Composer (Brand Character Lock Auto-Inject)
+- Director's Cut TalkingHead-Dialog
+- Avatar Library `/avatars`
 
-In `useBrandCharacterLock` (oder vergleichbarem Hook): neuer `getViduReferenceCard()` Helper, der `{ url, role: 'character' }` zurückgibt. Wird in Toolkit + Composer konsumiert.
+Dafür Helper `useAccessibleCharacters()` (UNION owned + purchased) ersetzt punktuell `useBrandCharacters()`.
 
-Avatar Library (`/avatars`): Multi-Select-Modus erlauben (max 2) für Vidu-Dialog-Szenen.
+## Out of Scope (Phase 2)
+- Adult-Content-Tagging + 18+ Verification
+- Voice-only Marketplace (separate von Charakteren)
+- Affiliate-Boost: höhere Revenue-Shares für Top-Creator
+- Stripe-Auszahlung verdienter Credits in echtes Geld
 
-### 6. Routing & Navigation
+## Reihenfolge Implementierung
+1. DB-Migration (Tabellen + RLS + RPC `purchase_character`)
+2. Storage-Bucket `character-licenses` + Policies
+3. Edge Functions (5 Stück)
+4. Legal Pages + Versionierung
+5. Submit-Wizard + Origin-Wall
+6. Marketplace-Tab + Gallery + Detail-Dialog + Buyer-License-Dialog
+7. Brand-Characters-Page Marketplace-Aktionen
+8. Admin Review + Reports Queue
+9. Integration `useAccessibleCharacters` in Toolkit/Composer/TalkingHead
+10. Memory-Update + README-Eintrag
 
-- Neue Legacy-Route `/vidu-studio` → Redirect auf `/ai-video-studio?model=vidu-q2-reference` (analog zu allen anderen)
-- Hub-Card im AI-Video-Hub: "Vidu Q2 — Multi-Reference Specialist"
-- `legacyRoute` Property in Registry-Einträgen setzen
-
-### 7. Localization
-
-EN/DE/ES Strings für:
-- Multi-Reference-Card Labels & Tooltips
-- Rollen-Namen (Character, Product, Location, Style, Prop)
-- Onboarding-Hint: "Lade bis zu 7 Bilder — dein Avatar, dein Produkt, dein Setting"
-
-Visual Prompts bleiben EN (gemäß Core-Memory).
-
-### 8. Memory-Update
-
-Neuer Memory-Eintrag `mem://features/ai-video-studio/vidu-q2-multi-reference-integration` mit:
-- Replicate-Slugs (verifiziert)
-- 7-Slot-Limit & Rollen-Mapping
-- Composer-Fallback-Verhalten
-- Brand Character Lock Auto-Inject-Pfad
-
-Index-Datei aktualisieren.
-
-## Technische Details
-
-**Reference-Roles → Vidu API**: Vidu nimmt Reference-Bilder in einem Array entgegen, ohne explizite Rollen-Felder. Die Rollen sind primär für **Prompt-Augmentation**: aus den UI-Rollen wird automatisch ein englischer Suffix gebaut, z.B. `"featuring the character from image 1, holding the product from image 3, in the location of image 4"`. Das verbessert nachweislich die Output-Konsistenz bei Vidu deutlich.
-
-**Reference-Image-Constraints**: Replicate erwartet öffentlich erreichbare URLs. Daher: alle Refs müssen vor dem Call in Storage liegen. UI-Uploader nutzt bestehenden `mediaUpload.ts` → `ai-references/{userId}/...` Bucket (RLS-konform: userId als erste Pfad-Komponente).
-
-**Cost-Estimation**: Vidu = Fixpreis pro Generation (nicht pro Sekunde). In `costPerSecond` Feld als `0.45 / 5 = 0.09` USD/EUR pro Sekunde abbilden, damit existierende UI-Cost-Anzeige funktioniert. Real abgerechnet wird der Fixbetrag in der Edge-Function.
-
-**Aspect-Ratios**: Vidu Q2 unterstützt `16:9`, `9:16`, `1:1`.
-
-**Capabilities-Flag**: V2V = false, Audio = false, T2V/I2V = true, neu: `multiRef = true` für `vidu-q2-reference` Variante.
-
-## Files Created
-- `supabase/functions/generate-vidu-video/index.ts`
-- `src/config/viduVideoCredits.ts`
-- `src/components/ai-video-toolkit/MultiReferenceUploader.tsx`
-- `mem://features/ai-video-studio/vidu-q2-multi-reference-integration`
-
-## Files Modified
-- `src/config/aiVideoModelRegistry.ts` — Family + 3 Modelle, `multiRef`/`maxReferences` Capabilities
-- `src/types/video-composer.ts` — `ClipSource` um `ai-vidu`
-- `src/lib/video-composer/modelMapping.ts` — Family-Set + Source-Mapping
-- `src/pages/AIVideoToolkit.tsx` — Multi-Ref-Card Conditional
-- `src/components/video-composer/SceneEditor.tsx` (oder äquivalent) — kompakter 3-Slot-Picker für Vidu
-- `supabase/functions/compose-video-clips/index.ts` — `ai-vidu` Branch + Fallback
-- `src/App.tsx` — `/vidu-studio` Redirect
-- `src/config/hubConfig.ts` — Hub-Card Eintrag
-- `supabase/config.toml` — neuer Function-Block mit Timeout 300s
-- `mem://index.md` — neuer Memory-Reference-Eintrag
-- DE/EN/ES Translation-Files
-
-## Out of Scope (später möglich)
-- Vidu Q2 mit längerer Dauer (Vidu 1.5 Reference erlaubt 8s, Q2 noch nicht stabil)
-- Vidu V2V (existiert noch nicht öffentlich auf Replicate)
-- Multi-Character-Konversations-Templates im Composer (separater Feature-Slot)
-
-Soll ich mit der Implementierung loslegen?
+Soll ich starten?
