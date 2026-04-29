@@ -257,6 +257,9 @@ function AppLayout() {
           <Route path="/veo-video-studio" element={<Navigate to="/ai-video-studio?model=veo-3.1-fast" replace />} />
           <Route path="/ltx-video-studio" element={<Navigate to="/ai-video-studio?model=ltx-standard" replace />} />
           <Route path="/grok-video-studio" element={<Navigate to="/ai-video-studio?model=grok-imagine" replace />} />
+          <Route path="/vidu-studio" element={<Navigate to="/ai-video-studio?model=vidu-q2-reference" replace />} />
+          <Route path="/pika-video-studio" element={<Navigate to="/ai-video-studio?model=pika-2-2-standard" replace />} />
+          <Route path="/runway-video-studio" element={<Navigate to="/ai-video-studio?model=runway-gen-4-aleph" replace />} />
           <Route path="/compare-lab" element={<ProtectedRoute><CompareLab /></ProtectedRoute>} />
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/music-studio" element={<ProtectedRoute><MusicStudio /></ProtectedRoute>} />

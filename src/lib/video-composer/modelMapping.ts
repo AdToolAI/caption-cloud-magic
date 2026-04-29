@@ -18,7 +18,7 @@ import { AI_VIDEO_TOOLKIT_MODELS, type ToolkitModel } from '@/config/aiVideoMode
 import type { ClipSource, ClipQuality, ComposerCategory } from '@/types/video-composer';
 
 /** Toolkit families that compose-video-clips can actually render. */
-const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo', 'runway', 'pika']);
+const COMPOSER_FAMILIES = new Set(['hailuo', 'kling', 'wan', 'seedance', 'luma', 'veo', 'runway', 'pika', 'vidu']);
 
 /** Synthetic toolkit entry for the static "Gemini Image + Ken-Burns" source. */
 const IMAGE_TOOLKIT_MODEL: ToolkitModel = {
@@ -68,6 +68,7 @@ export function modelIdToSource(modelId: string): { clipSource: ClipSource; clip
       case 'sora':     return 'ai-veo'; // Sora 2 Sunset → Veo 3.1 fallback
       case 'runway':   return 'ai-runway';
       case 'pika':     return 'ai-pika';
+      case 'vidu':     return 'ai-vidu';
       default:         return 'ai-hailuo';
     }
   })();
@@ -89,6 +90,7 @@ export function sourceToModelId(clipSource: ClipSource, clipQuality: ClipQuality
     // 'ai-sora' entfernt — Sora 2 Sunset 2026
     'ai-runway':   'runway',
     'ai-pika':     'pika',
+    'ai-vidu':     'vidu',
   };
   const family = familyMap[clipSource];
   if (!family) return COMPOSER_AVAILABLE_MODELS[0].id;

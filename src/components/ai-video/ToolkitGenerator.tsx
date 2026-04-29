@@ -21,6 +21,7 @@ import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
+import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
@@ -68,6 +69,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
+  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -101,6 +103,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
+    if (!model.capabilities.multiRef) setViduReferences([]);
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -210,6 +213,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       if (model.capabilities.v2v && referenceVideoUrl) {
         body.referenceVideoUrl = referenceVideoUrl;
         body.videoReferenceType = videoReferenceType;
+      }
+      // multi-ref: Vidu Q2 Reference2V — 1–7 reference images with roles
+      if (model.capabilities.multiRef) {
+        if (viduReferences.length === 0) {
+          toast.error(
+            language === 'de'
+              ? 'Bitte mindestens 1 Referenzbild hinzufügen.'
+              : 'Please add at least 1 reference image.',
+          );
+          setGenerating(false);
+          return;
+        }
+        body.referenceImages = viduReferences.map((s) => s.url);
+        body.referenceRoles = viduReferences.map((s) => s.role);
       }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
@@ -326,6 +343,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         consistencyKey={consistencyKey}
         supportsImageInput={model.capabilities.i2v}
       />
+
+      {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
+      {model.capabilities.multiRef && (
+        <MultiReferenceUploader
+          slots={viduReferences}
+          onChange={setViduReferences}
+          maxReferences={model.capabilities.maxReferences ?? 7}
+          brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
+          brandCharacterName={brandCharacter?.name ?? null}
+        />
+      )}
 
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && (

@@ -24,6 +24,7 @@ import { LUMA_VIDEO_MODELS } from './lumaVideoCredits';
 import { SEEDANCE_VIDEO_MODELS } from './seedanceVideoCredits';
 import { GROK_VIDEO_MODELS } from './grokVideoCredits';
 import { AI_VIDEO_MODELS as SORA_VIDEO_MODELS } from './aiVideoCredits';
+import { VIDU_VIDEO_MODELS } from './viduVideoCredits';
 
 export type ToolkitModelGroup = 'recommended' | 'fast' | 'premium' | 'audio';
 
@@ -35,7 +36,7 @@ export interface ToolkitModel {
   /** Short provider label, e.g. "Kuaishou", "Google". */
   provider: string;
   /** Family used to slot into the provider tab/icon. */
-  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika';
+  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika' | 'vidu';
   /** Edge function name to invoke (without `supabase.functions.invoke()` prefix). */
   edgeFunction: string;
   /** Grouping in the dropdown. */
@@ -48,6 +49,10 @@ export interface ToolkitModel {
     /** Video-to-Video: accepts a reference clip as motion / style source. */
     v2v?: boolean;
     audio: boolean;
+    /** Multi-Reference: accepts 1–N reference images blended into one scene. */
+    multiRef?: boolean;
+    /** Max number of reference images supported when multiRef is true. */
+    maxReferences?: number;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
@@ -415,6 +420,60 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/pika-video-studio',
   },
 
+  /* ─────────── Vidu Q2 ─────────── */
+  {
+    id: 'vidu-q2-reference',
+    name: VIDU_VIDEO_MODELS['vidu-q2-reference'].name,
+    provider: 'Shengshu AI',
+    family: 'vidu',
+    edgeFunction: 'generate-vidu-video',
+    group: 'recommended',
+    icon: Eye,
+    capabilities: { t2v: false, i2v: false, audio: false, multiRef: true, maxReferences: 7 },
+    durations: [5],
+    resolution: '1080p',
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    // Flat €0.45 / 5s = €0.09/s for UI parity (real billing is flat per generation)
+    costPerSecond: { EUR: 0.09, USD: 0.09 },
+    badge: 'Multi-Ref',
+    tagline: 'Bis zu 7 Refs: Charakter + Produkt + Location in einer Szene',
+    legacyRoute: '/vidu-studio',
+  },
+  {
+    id: 'vidu-q2-i2v',
+    name: VIDU_VIDEO_MODELS['vidu-q2-i2v'].name,
+    provider: 'Shengshu AI',
+    family: 'vidu',
+    edgeFunction: 'generate-vidu-video',
+    group: 'fast',
+    icon: Eye,
+    capabilities: { t2v: false, i2v: true, audio: false },
+    durations: [5],
+    resolution: '1080p',
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    costPerSecond: { EUR: 0.08, USD: 0.08 },
+    badge: 'I2V',
+    tagline: 'Animiert ein Standbild zu einem 5s-Clip',
+    legacyRoute: '/vidu-studio',
+  },
+  {
+    id: 'vidu-q2-t2v',
+    name: VIDU_VIDEO_MODELS['vidu-q2-t2v'].name,
+    provider: 'Shengshu AI',
+    family: 'vidu',
+    edgeFunction: 'generate-vidu-video',
+    group: 'fast',
+    icon: Eye,
+    capabilities: { t2v: true, i2v: false, audio: false },
+    durations: [5],
+    resolution: '1080p',
+    aspectRatios: ['16:9', '9:16', '1:1'],
+    costPerSecond: { EUR: 0.08, USD: 0.08 },
+    badge: 'T2V',
+    tagline: '5s Clip aus reinem Prompt',
+    legacyRoute: '/vidu-studio',
+  },
+
   /* Sora 2 entfernt — OpenAI sunset 2026, Routen migrieren auf Veo 3.1 / Kling 3 Pro. */
 ];
 
@@ -445,4 +504,5 @@ export const LEGACY_ROUTE_TO_MODEL: Record<string, string> = {
   '/seedance-video-studio': 'seedance-standard',
   '/grok-video-studio':     'grok-imagine',
   '/sora-video-studio':     'sora-2-standard',
+  '/vidu-studio':           'vidu-q2-reference',
 };
