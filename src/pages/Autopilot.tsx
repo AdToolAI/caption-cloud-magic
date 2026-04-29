@@ -16,6 +16,10 @@ import {
   useToggleAutopilot,
 } from '@/hooks/useAutopilot';
 import { AutopilotBriefWizard } from '@/components/autopilot/AutopilotBriefWizard';
+import { AutopilotCalendarGrid } from '@/components/autopilot/AutopilotCalendarGrid';
+import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer';
+import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
+import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 
 export default function Autopilot() {
@@ -26,6 +30,8 @@ export default function Autopilot() {
   const pause = usePauseAutopilot();
   const toggle = useToggleAutopilot();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<AutopilotSlot | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isActive = !!brief?.is_active;
   const isLocked = !!(brief?.locked_until && new Date(brief.locked_until) > new Date());
@@ -143,11 +149,15 @@ export default function Autopilot() {
             </TabsList>
 
             <TabsContent value="calendar">
-              <CalendarPanel queue={queue} hasBrief={!!brief} />
+              <AutopilotCalendarGrid
+                queue={queue}
+                hasBrief={!!brief}
+                onSelectSlot={(s) => { setSelectedSlot(s); setDrawerOpen(true); }}
+              />
             </TabsContent>
 
             <TabsContent value="strategy">
-              <StrategyPanel brief={brief} />
+              <AutopilotStrategyEditor brief={brief} />
             </TabsContent>
 
             <TabsContent value="tools">
@@ -166,6 +176,7 @@ export default function Autopilot() {
       </div>
 
       <AutopilotBriefWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <AutopilotSlotDrawer slot={selectedSlot} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </>
   );
 }
