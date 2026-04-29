@@ -3,7 +3,7 @@ import {
   Sparkles, Bot, ImagePlus,
   MessageSquare, MessageCircle, BookTemplate, Workflow,
   LineChart, BarChart3, Coins, Radar, Shield,
-  FolderOpen, Mic2, Video, Film, Edit, Layers, Languages,
+  FolderOpen, Mic2, Music2, Video, Film, Edit, Layers, Languages,
   Users, Palette,
   ShieldCheck, Settings,
   Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon,
