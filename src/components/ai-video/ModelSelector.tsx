@@ -17,7 +17,8 @@ interface ModelSelectorProps {
   value: string;
   onChange: (modelId: string) => void;
   currency: Currency;
-  hasSora2Access: boolean;
+  /** @deprecated Sora 2 wurde nach OpenAI-Sunset entfernt — Prop wird ignoriert. */
+  hasSora2Access?: boolean;
   /** Optional subset of toolkit models. Defaults to the full registry. */
   models?: ToolkitModel[];
   /** Optional className for the trigger (e.g. compact size). */
@@ -26,7 +27,7 @@ interface ModelSelectorProps {
 
 const GROUP_ORDER: ToolkitModelGroup[] = ['recommended', 'audio', 'fast', 'premium'];
 
-export function ModelSelector({ value, onChange, currency, hasSora2Access, models, className }: ModelSelectorProps) {
+export function ModelSelector({ value, onChange, currency, models, className }: ModelSelectorProps) {
   const { language } = useTranslation();
   const lang = (['de', 'en', 'es'].includes(language) ? language : 'en') as 'de' | 'en' | 'es';
   const symbol = currency === 'USD' ? '$' : '€';
@@ -80,7 +81,7 @@ export function ModelSelector({ value, onChange, currency, hasSora2Access, model
                 {TOOLKIT_GROUP_LABELS[g][lang]}
               </SelectLabel>
               {models.map((m) => {
-                const locked = m.requiresAccess === 'sora2' && !hasSora2Access;
+                const locked = false;
                 return (
                   <SelectItem
                     key={m.id}

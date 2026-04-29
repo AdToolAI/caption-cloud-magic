@@ -30,7 +30,6 @@ import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix'
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIVideoWallet } from '@/hooks/useAIVideoWallet';
-import { useSora2Access } from '@/hooks/useSora2Access';
 import { useTranslation } from '@/hooks/useTranslation';
 import { getCurrencyForLanguage } from '@/lib/currency';
 import type { Currency } from '@/config/pricing';
@@ -49,7 +48,6 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const { user } = useAuth();
   const { language } = useTranslation();
   const { wallet, refetch: refetchWallet } = useAIVideoWallet();
-  const { hasAccess: hasSora2Access } = useSora2Access();
   const [searchParams, setSearchParams] = useSearchParams();
   const currency: Currency = getCurrencyForLanguage(language);
 
@@ -270,7 +268,6 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
           value={model.id}
           onChange={setModelId}
           currency={currency}
-          hasSora2Access={hasSora2Access}
         />
       </div>
 

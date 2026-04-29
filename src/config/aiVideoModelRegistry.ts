@@ -415,43 +415,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/pika-video-studio',
   },
 
-  /* ─────────── Premium / Sora ─────────── */
-  {
-    id: 'sora-2-standard',
-    name: SORA_VIDEO_MODELS['sora-2-standard'].name,
-    provider: 'OpenAI',
-    family: 'sora',
-    edgeFunction: 'generate-sora-chain',
-    group: 'premium',
-    icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [4, 8, 12],
-    resolution: '1080p',
-    aspectRatios: ['16:9', '9:16'],
-    costPerSecond: SORA_VIDEO_MODELS['sora-2-standard'].costPerSecond,
-    badge: 'Sora 2',
-    requiresAccess: 'sora2',
-    tagline: 'Cinematic Storytelling',
-    legacyRoute: '/sora-video-studio',
-  },
-  {
-    id: 'sora-2-pro',
-    name: SORA_VIDEO_MODELS['sora-2-pro'].name,
-    provider: 'OpenAI',
-    family: 'sora',
-    edgeFunction: 'generate-sora-chain',
-    group: 'premium',
-    icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: true },
-    durations: [4, 8, 12],
-    resolution: '1080p',
-    aspectRatios: ['16:9', '9:16'],
-    costPerSecond: SORA_VIDEO_MODELS['sora-2-pro'].costPerSecond,
-    badge: 'Sora 2 Pro',
-    requiresAccess: 'sora2',
-    tagline: 'Top-Tier · Premium Pro',
-    legacyRoute: '/sora-video-studio',
-  },
+  /* Sora 2 entfernt — OpenAI sunset 2026, Routen migrieren auf Veo 3.1 / Kling 3 Pro. */
 ];
 
 export const TOOLKIT_GROUP_LABELS: Record<ToolkitModelGroup, { de: string; en: string; es: string }> = {
