@@ -63,15 +63,15 @@ Deno.serve(async (req) => {
 
     const finalPath = steps[steps.length - 1]?.path;
 
-    const script = buildSmokeNavigationScript({
+    const script = buildSmokeNavigationScript();
+
+    const result = await runBrowserlessFunction(script, {
       baseUrl,
       email: qaEmail,
       password: qaPassword,
       paths: navPaths.length > 0 ? navPaths : ["/dashboard"],
       finalPath,
     });
-
-    const result = await runBrowserlessFunction(script);
 
     // Persist screenshot to storage (data URL → just store inline for now in summary)
     let screenshotUrl: string | undefined = undefined;
