@@ -69,6 +69,13 @@ export function AutopilotStrategyEditor({ brief }: Props) {
     setVideoProvider(brief.video_provider ?? 'hailuo-standard');
     setVideoDuration(brief.video_duration_sec ?? 6);
     setVideoRatio(brief.video_aspect_ratio ?? '9:16');
+    setGoal({
+      channel_goal: (brief.channel_goal ?? 'engagement') as GoalBriefingValue['channel_goal'],
+      weekly_budget_eur: brief.weekly_budget_eur ?? 25,
+      content_mix: brief.content_mix ?? { ai_video: 33, stock_reel: 33, static: 34 },
+      target_audience: brief.target_audience ?? '',
+      usp: brief.usp ?? '',
+    });
   }, [brief]);
 
   const dirty = useMemo(() => {
