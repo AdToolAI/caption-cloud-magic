@@ -18,6 +18,18 @@ const ALL_PLATFORMS = ['instagram', 'tiktok', 'facebook', 'linkedin', 'youtube',
 const ALL_LANGS = ['de', 'en', 'es'];
 const TONALITIES = ['professional', 'friendly', 'witty', 'inspirational', 'authoritative'];
 
+const VIDEO_PROVIDERS: { id: string; label: string; perSecCredits: number; bestFor: string }[] = [
+  { id: 'hailuo-standard', label: 'Hailuo Standard', perSecCredits: 5, bestFor: 'Schnell · günstig · 6/10s' },
+  { id: 'seedance-lite',   label: 'Seedance Lite',   perSecCredits: 6, bestFor: 'Stilisiert · 6–12s' },
+  { id: 'kling-std',       label: 'Kling 2.1',       perSecCredits: 8, bestFor: 'Premium-Realismus · 5/10s' },
+];
+const VIDEO_DURATIONS = [4, 6, 8, 10, 12];
+const VIDEO_RATIOS: { id: string; label: string }[] = [
+  { id: '9:16', label: '9:16 Reel/Story' },
+  { id: '1:1',  label: '1:1 Quadrat' },
+  { id: '16:9', label: '16:9 Landscape' },
+];
+
 export function AutopilotStrategyEditor({ brief }: Props) {
   const upsert = useUpsertAutopilotBrief();
   const [pillars, setPillars] = useState<string[]>([]);
@@ -29,6 +41,11 @@ export function AutopilotStrategyEditor({ brief }: Props) {
   const [autoPublish, setAutoPublish] = useState(false);
   const [pillarInput, setPillarInput] = useState('');
   const [forbiddenInput, setForbiddenInput] = useState('');
+  // Session E: video defaults
+  const [videoEnabled, setVideoEnabled] = useState(false);
+  const [videoProvider, setVideoProvider] = useState('hailuo-standard');
+  const [videoDuration, setVideoDuration] = useState(6);
+  const [videoRatio, setVideoRatio] = useState('9:16');
 
   useEffect(() => {
     if (!brief) return;
@@ -39,6 +56,10 @@ export function AutopilotStrategyEditor({ brief }: Props) {
     setLanguages(brief.languages ?? ['de']);
     setBudget(brief.weekly_credit_budget ?? 1000);
     setAutoPublish(!!brief.auto_publish_enabled);
+    setVideoEnabled(!!brief.video_enabled);
+    setVideoProvider(brief.video_provider ?? 'hailuo-standard');
+    setVideoDuration(brief.video_duration_sec ?? 6);
+    setVideoRatio(brief.video_aspect_ratio ?? '9:16');
   }, [brief]);
 
   const dirty = useMemo(() => {
@@ -50,9 +71,13 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       JSON.stringify(platforms) !== JSON.stringify(brief.platforms) ||
       JSON.stringify(languages) !== JSON.stringify(brief.languages) ||
       budget !== brief.weekly_credit_budget ||
-      autoPublish !== brief.auto_publish_enabled
+      autoPublish !== brief.auto_publish_enabled ||
+      videoEnabled !== !!brief.video_enabled ||
+      videoProvider !== (brief.video_provider ?? 'hailuo-standard') ||
+      videoDuration !== (brief.video_duration_sec ?? 6) ||
+      videoRatio !== (brief.video_aspect_ratio ?? '9:16')
     );
-  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish]);
+  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish, videoEnabled, videoProvider, videoDuration, videoRatio]);
 
   function togglePlatform(p: string) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
