@@ -103,8 +103,37 @@ Visual Prompt MUSS auf Englisch sein für beste Bildqualität.`,
     const args = aiData?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     const post = args ? JSON.parse(args) : { caption: slot.topic_hint, hashtags: [], visual_prompt_en: slot.topic_hint };
 
-    // 3) Generate image via Lovable AI image model
+    // 3) Asset generation — VIDEO if brief.video_enabled AND format hint suggests video, else IMAGE
     let assetUrl: string | null = null;
+    const formatHint = ((slot.content_payload as { format_hint?: string })?.format_hint ?? "single_image").toLowerCase();
+    const isVideoFormat = brief.video_enabled && /video|reel|short|tiktok|story/.test(formatHint);
+
+    if (isVideoFormat) {
+      // Caption + visual prompt are persisted up-front so the poller has everything it needs.
+      await admin.from("autopilot_queue").update({
+        caption: post.caption,
+        hashtags: post.hashtags,
+        content_payload: { ...slot.content_payload, visual_prompt_en: post.visual_prompt_en },
+      }).eq("id", slot.id);
+
+      const videoResp = await admin.functions.invoke("autopilot-generate-video", {
+        body: { slot_id: slot.id, visual_prompt_en: post.visual_prompt_en },
+      });
+
+      if (videoResp.error || videoResp.data?.ok === false) {
+        const errMsg = videoResp.error?.message ?? videoResp.data?.error ?? "video_init_failed";
+        await admin.from("autopilot_queue").update({
+          status: "failed",
+          block_reason: `video_init:${errMsg}`,
+        }).eq("id", slot.id);
+        return json({ ok: false, error: errMsg }, 500);
+      }
+
+      // Slot is now in 'generating_video'. Poller will run QA + finalize.
+      return json({ ok: true, status: "generating_video", prediction_id: videoResp.data?.prediction_id });
+    }
+
+    // IMAGE branch (default)
     try {
       const imgResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -119,7 +148,6 @@ Visual Prompt MUSS auf Englisch sein für beste Bildqualität.`,
         const imgJson = await imgResp.json();
         const b64 = imgJson?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
         if (b64) {
-          // Upload to storage
           const bytes = base64ToBytes(b64.split(",").pop() ?? "");
           const path = `${slot.user_id}/autopilot/${slot.id}.png`;
           const { error: upErr } = await admin.storage.from("autopilot-assets").upload(path, bytes, {
