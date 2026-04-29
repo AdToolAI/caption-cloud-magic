@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check } from "lucide-react";
+import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 const TIER_COLORS: Record<string, string> = {
