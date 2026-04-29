@@ -14,8 +14,8 @@ const BrandCharacters = () => {
   return (
     <>
       <Helmet>
-        <title>Brand Characters — Lock recurring characters | useadtool</title>
-        <meta name="description" content="Save and reuse consistent brand characters across all AI video and picture studios." />
+        <title>Avatar Library — Recurring talent with one-click voice | useadtool</title>
+        <meta name="description" content="Save your recurring on-screen talent once. Pick a voice, optionally generate a Hedra-optimized portrait, then make any avatar speak in one click." />
       </Helmet>
 
       <div className="min-h-screen bg-background">
@@ -25,11 +25,11 @@ const BrandCharacters = () => {
             <div>
               <div className="flex items-center gap-2 text-primary text-sm mb-2">
                 <Lock className="h-4 w-4" />
-                <span className="tracking-widest uppercase">Brand Character Lock</span>
+                <span className="tracking-widest uppercase">Avatar Library Lock</span>
               </div>
-              <h1 className="font-serif text-4xl md:text-5xl">Your Recurring Cast</h1>
+              <h1 className="font-serif text-4xl md:text-5xl">Your Avatar Library</h1>
               <p className="text-muted-foreground mt-2 max-w-2xl">
-                Upload a reference once. Reuse the exact same character across Sora, Kling, Veo, Picture Studio and more — no prompt engineering, no drift.
+                Recurring on-screen talent — one click to make them speak. Upload once, pick a voice, and reuse the same avatar across Kling, Veo, Hailuo, Picture Studio and Talking Head renders.
               </p>
             </div>
             <Button
@@ -37,7 +37,7 @@ const BrandCharacters = () => {
               className="bg-primary text-primary-foreground hover:bg-primary/90"
               size="lg"
             >
-              <Plus className="h-4 w-4 mr-2" /> New Character
+              <Plus className="h-4 w-4 mr-2" /> New Avatar
             </Button>
           </div>
 

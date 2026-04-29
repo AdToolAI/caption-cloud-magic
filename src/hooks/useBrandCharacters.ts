@@ -15,7 +15,18 @@ export interface BrandCharacter {
   archived_at: string | null;
   created_at: string;
   updated_at: string;
+  // Avatar Library extensions
+  default_voice_id: string | null;
+  default_voice_provider: 'elevenlabs' | 'custom' | null;
+  default_voice_name: string | null;
+  portrait_url: string | null;
+  portrait_mode: 'original' | 'auto_generated' | 'manual_upload' | null;
+  default_language: string | null;
+  default_aspect_ratio: string | null;
 }
+
+/** Friendly alias — the new public-facing name. */
+export type Avatar = BrandCharacter;
 
 export const useBrandCharacters = () => {
   const queryClient = useQueryClient();
@@ -115,8 +126,38 @@ export const useBrandCharacters = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
-      toast.success('Character archived');
+      toast.success('Avatar archived');
     },
+  });
+
+  /**
+   * Update avatar properties (voice, portrait, defaults).
+   * Used by Avatar Library voice picker and portrait dialog.
+   */
+  const updateAvatar = useMutation({
+    mutationFn: async (input: {
+      id: string;
+      default_voice_id?: string | null;
+      default_voice_provider?: 'elevenlabs' | 'custom' | null;
+      default_voice_name?: string | null;
+      portrait_url?: string | null;
+      portrait_mode?: 'original' | 'auto_generated' | 'manual_upload' | null;
+      default_language?: string | null;
+      default_aspect_ratio?: string | null;
+      name?: string;
+      description?: string | null;
+    }) => {
+      const { id, ...rest } = input;
+      const { error } = await supabase
+        .from('brand_characters')
+        .update(rest)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
+    },
+    onError: (e: any) => toast.error(e.message || 'Failed to update avatar'),
   });
 
   const trackUsage = async (input: {
@@ -150,13 +191,25 @@ export const useBrandCharacters = () => {
 
   return {
     characters: charactersQuery.data ?? [],
+    avatars: charactersQuery.data ?? [],
     isLoading: charactersQuery.isLoading,
     createCharacter,
     toggleFavorite,
     archiveCharacter,
+    updateAvatar,
     trackUsage,
   };
 };
+
+/** New public-facing alias — same hook, Avatar terminology. */
+export const useAvatars = useBrandCharacters;
+
+/**
+ * True when this avatar is ready for one-click Talking-Head playback
+ * (has a default voice AND a usable portrait or reference image).
+ */
+export const isPlayableAvatar = (a: BrandCharacter): boolean =>
+  Boolean(a.default_voice_id && (a.portrait_url || a.reference_image_url));
 
 /**
  * Helper to build a prompt-ready descriptor from a brand character.

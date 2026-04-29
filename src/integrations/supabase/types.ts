@@ -1495,10 +1495,17 @@ export type Database = {
         Row: {
           archived_at: string | null
           created_at: string
+          default_aspect_ratio: string | null
+          default_language: string | null
+          default_voice_id: string | null
+          default_voice_name: string | null
+          default_voice_provider: string | null
           description: string | null
           id: string
           is_favorite: boolean
           name: string
+          portrait_mode: string | null
+          portrait_url: string | null
           reference_image_url: string
           storage_path: string | null
           updated_at: string
@@ -1509,10 +1516,17 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           created_at?: string
+          default_aspect_ratio?: string | null
+          default_language?: string | null
+          default_voice_id?: string | null
+          default_voice_name?: string | null
+          default_voice_provider?: string | null
           description?: string | null
           id?: string
           is_favorite?: boolean
           name: string
+          portrait_mode?: string | null
+          portrait_url?: string | null
           reference_image_url: string
           storage_path?: string | null
           updated_at?: string
@@ -1523,10 +1537,17 @@ export type Database = {
         Update: {
           archived_at?: string | null
           created_at?: string
+          default_aspect_ratio?: string | null
+          default_language?: string | null
+          default_voice_id?: string | null
+          default_voice_name?: string | null
+          default_voice_provider?: string | null
           description?: string | null
           id?: string
           is_favorite?: boolean
           name?: string
+          portrait_mode?: string | null
+          portrait_url?: string | null
           reference_image_url?: string
           storage_path?: string | null
           updated_at?: string

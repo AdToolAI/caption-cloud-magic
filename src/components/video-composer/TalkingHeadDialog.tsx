@@ -19,6 +19,16 @@ interface TalkingHeadDialogProps {
   projectId?: string;
   sceneId?: string;
   onSuccess?: (result: { videoUrl: string | null; audioUrl: string; predictionId: string }) => void;
+  /**
+   * Optional preset from Avatar Library — pre-fills image, voice and aspect ratio
+   * so the user only has to write the script.
+   */
+  presetAvatar?: {
+    imageUrl?: string;
+    voiceId?: string;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    avatarName?: string;
+  };
 }
 
 const PRESET_VOICES = [
@@ -36,6 +46,7 @@ export default function TalkingHeadDialog({
   projectId,
   sceneId,
   onSuccess,
+  presetAvatar,
 }: TalkingHeadDialogProps) {
   const { generate, loading, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
@@ -46,6 +57,15 @@ export default function TalkingHeadDialog({
   const [voiceId, setVoiceId] = useState(PRESET_VOICES[0].id);
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('9:16');
   const [resolution, setResolution] = useState<'480p' | '720p'>('720p');
+
+  // Apply Avatar preset on open
+  useEffect(() => {
+    if (open && presetAvatar) {
+      if (presetAvatar.imageUrl) setImageUrl(presetAvatar.imageUrl);
+      if (presetAvatar.voiceId) setVoiceId(presetAvatar.voiceId);
+      if (presetAvatar.aspectRatio) setAspectRatio(presetAvatar.aspectRatio);
+    }
+  }, [open, presetAvatar]);
 
   // Reset on close
   useEffect(() => {
