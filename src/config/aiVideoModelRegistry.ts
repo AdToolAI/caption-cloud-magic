@@ -35,7 +35,7 @@ export interface ToolkitModel {
   /** Short provider label, e.g. "Kuaishou", "Google". */
   provider: string;
   /** Family used to slot into the provider tab/icon. */
-  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora';
+  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway';
   /** Edge function name to invoke (without `supabase.functions.invoke()` prefix). */
   edgeFunction: string;
   /** Grouping in the dropdown. */
@@ -358,6 +358,25 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     badge: 'Premium',
     tagline: 'Dynamic Motion · 1080p',
     legacyRoute: '/seedance-video-studio',
+  },
+
+  /* ─────────── V2V Specialist (Runway) ─────────── */
+  {
+    id: 'runway-gen4-aleph',
+    name: 'Runway Gen-4 Aleph',
+    provider: 'Runway',
+    family: 'runway',
+    edgeFunction: 'generate-runway-video',
+    group: 'premium',
+    icon: Film,
+    capabilities: { t2v: false, i2v: false, v2v: true, audio: false },
+    durations: [5, 10],
+    resolution: '720p',
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+    costPerSecond: { EUR: 0.15, USD: 0.15 },
+    badge: 'V2V Specialist',
+    tagline: 'Restyle & transform existing clips',
+    legacyRoute: '/runway-video-studio',
   },
 
   /* ─────────── Premium / Sora ─────────── */
