@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles } from 'lucide-react';
+import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles, Store, Coins, Clock, ShieldAlert } from 'lucide-react';
 import { type BrandCharacter, useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { AvatarVoicePicker } from './AvatarVoicePicker';
 import { AvatarPortraitDialog } from './AvatarPortraitDialog';
 import TalkingHeadDialog from '@/components/video-composer/TalkingHeadDialog';
+import { SubmitCharacterToMarketplaceDialog } from '@/components/marketplace/SubmitCharacterToMarketplaceDialog';
 
 interface BrandCharacterCardProps {
   character: BrandCharacter;
@@ -19,6 +20,7 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
 
   const [portraitOpen, setPortraitOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   const previewUrl =
     character.portrait_mode && character.portrait_mode !== 'original' && character.portrait_url
@@ -33,6 +35,19 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
       : null;
 
   const canSpeak = Boolean(character.default_voice_id);
+
+  const mpStatus = character.marketplace_status ?? 'private';
+  const mpBadge = (() => {
+    if (mpStatus === 'published')
+      return { label: character.pricing_type === 'premium' ? `Live · ${character.price_credits ?? 0} cr` : 'Live · Free', icon: Store, className: 'bg-emerald-600 text-white border-0' };
+    if (mpStatus === 'pending_review')
+      return { label: 'In review', icon: Clock, className: 'bg-amber-500/90 text-white border-0' };
+    if (mpStatus === 'under_investigation')
+      return { label: 'Investigating', icon: ShieldAlert, className: 'bg-destructive text-destructive-foreground border-0' };
+    if (mpStatus === 'rejected')
+      return { label: 'Rejected', icon: ShieldAlert, className: 'bg-destructive/80 text-destructive-foreground border-0' };
+    return null;
+  })();
 
   return (
     <>
@@ -60,6 +75,12 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
             <Badge className="absolute top-2 left-2 bg-primary/90 text-primary-foreground border-0 text-[10px]">
               <Sparkles className="h-2.5 w-2.5 mr-1" />
               {portraitBadge}
+            </Badge>
+          )}
+          {mpBadge && (
+            <Badge className={`absolute bottom-2 left-2 text-[10px] gap-1 ${mpBadge.className}`}>
+              <mpBadge.icon className="h-2.5 w-2.5" />
+              {mpBadge.label}
             </Badge>
           )}
         </div>
@@ -132,6 +153,25 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
             </Button>
           </div>
 
+          {/* Marketplace action */}
+          {(mpStatus === 'private' || mpStatus === 'rejected') && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 text-xs border-primary/30 hover:bg-primary/10"
+              onClick={() => setSubmitOpen(true)}
+            >
+              <Store className="h-3.5 w-3.5 mr-1.5" />
+              {mpStatus === 'rejected' ? 'Resubmit to Marketplace' : 'Sell on Marketplace'}
+            </Button>
+          )}
+          {mpStatus === 'published' && (
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1">
+              <span className="flex items-center gap-1"><Coins className="h-3 w-3" /> {character.total_purchases ?? 0} sold</span>
+              <span>★ {Number(character.average_rating ?? 0).toFixed(1)}</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-1 border-t border-primary/10">
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
@@ -166,6 +206,12 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
           aspectRatio: (character.default_aspect_ratio as '16:9' | '9:16' | '1:1' | undefined) ?? '9:16',
           avatarName: character.name,
         }}
+      />
+
+      <SubmitCharacterToMarketplaceDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        character={{ id: character.id, name: character.name }}
       />
     </>
   );

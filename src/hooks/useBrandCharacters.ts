@@ -23,6 +23,12 @@ export interface BrandCharacter {
   portrait_mode: 'original' | 'auto_generated' | 'manual_upload' | null;
   default_language: string | null;
   default_aspect_ratio: string | null;
+  // Marketplace
+  marketplace_status?: 'private' | 'pending_review' | 'published' | 'under_investigation' | 'rejected' | null;
+  pricing_type?: 'free' | 'premium' | null;
+  price_credits?: number | null;
+  total_purchases?: number | null;
+  average_rating?: number | null;
 }
 
 /** Friendly alias — the new public-facing name. */

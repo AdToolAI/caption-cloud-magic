@@ -12,6 +12,7 @@ import { AISuperuserAdmin } from '@/pages/admin/AISuperuserAdmin';
 import { MotionStudioSuperuserPanel } from '@/components/admin/MotionStudioSuperuserPanel';
 import LambdaHealth from '@/pages/admin/LambdaHealth';
 import { MarketplaceReviewPanel } from '@/components/admin/MarketplaceReviewPanel';
+import { CharacterMarketplaceReviewPanel } from '@/components/admin/CharacterMarketplaceReviewPanel';
 import { Activity, TrendingUp, Mail, Gauge, Database, DollarSign, Bell, Bug, ShieldAlert, Bot, Server, Film, Store } from 'lucide-react';
 
 export default function Admin() {
@@ -97,7 +98,14 @@ export default function Admin() {
         </TabsContent>
 
         <TabsContent value="marketplace-review">
-          <MarketplaceReviewPanel />
+          <Tabs defaultValue="templates" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="templates">Templates</TabsTrigger>
+              <TabsTrigger value="characters">Characters</TabsTrigger>
+            </TabsList>
+            <TabsContent value="templates"><MarketplaceReviewPanel /></TabsContent>
+            <TabsContent value="characters"><CharacterMarketplaceReviewPanel /></TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="lambda-health">
