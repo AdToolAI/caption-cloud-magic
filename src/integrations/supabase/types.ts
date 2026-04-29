@@ -9185,6 +9185,7 @@ export type Database = {
           email_verified_at: string | null
           id: string
           is_test_account: boolean
+          is_test_user: boolean
           language: string | null
           last_active_at: string | null
           level_auto_pause_until: string | null
@@ -9194,6 +9195,7 @@ export type Database = {
           personalized_recommendations: boolean | null
           phone_number: string | null
           plan: string | null
+          qa_budget_cents: number
           security_alerts_enabled: boolean | null
           sora2_grandfathered: boolean
           storage_limit_mb: number | null
@@ -9237,6 +9239,7 @@ export type Database = {
           email_verified_at?: string | null
           id: string
           is_test_account?: boolean
+          is_test_user?: boolean
           language?: string | null
           last_active_at?: string | null
           level_auto_pause_until?: string | null
@@ -9246,6 +9249,7 @@ export type Database = {
           personalized_recommendations?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          qa_budget_cents?: number
           security_alerts_enabled?: boolean | null
           sora2_grandfathered?: boolean
           storage_limit_mb?: number | null
@@ -9289,6 +9293,7 @@ export type Database = {
           email_verified_at?: string | null
           id?: string
           is_test_account?: boolean
+          is_test_user?: boolean
           language?: string | null
           last_active_at?: string | null
           level_auto_pause_until?: string | null
@@ -9298,6 +9303,7 @@ export type Database = {
           personalized_recommendations?: boolean | null
           phone_number?: string | null
           plan?: string | null
+          qa_budget_cents?: number
           security_alerts_enabled?: boolean | null
           sora2_grandfathered?: boolean
           storage_limit_mb?: number | null
@@ -9731,6 +9737,364 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      qa_baselines: {
+        Row: {
+          captured_at: string
+          dom_snapshot_hash: string | null
+          id: string
+          mission_id: string | null
+          performance_cls: number | null
+          performance_js_heap_mb: number | null
+          performance_lcp_ms: number | null
+          screenshot_hash: string | null
+          screenshot_url: string | null
+          step_index: number
+          step_name: string | null
+        }
+        Insert: {
+          captured_at?: string
+          dom_snapshot_hash?: string | null
+          id?: string
+          mission_id?: string | null
+          performance_cls?: number | null
+          performance_js_heap_mb?: number | null
+          performance_lcp_ms?: number | null
+          screenshot_hash?: string | null
+          screenshot_url?: string | null
+          step_index: number
+          step_name?: string | null
+        }
+        Update: {
+          captured_at?: string
+          dom_snapshot_hash?: string | null
+          id?: string
+          mission_id?: string | null
+          performance_cls?: number | null
+          performance_js_heap_mb?: number | null
+          performance_lcp_ms?: number | null
+          screenshot_hash?: string | null
+          screenshot_url?: string | null
+          step_index?: number
+          step_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_baselines_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "qa_missions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_budget_ledger: {
+        Row: {
+          budgeted_cents: number
+          category: string
+          hard_cap_cents: number
+          id: string
+          period: string
+          period_start: string
+          spent_cents: number
+          updated_at: string
+        }
+        Insert: {
+          budgeted_cents?: number
+          category: string
+          hard_cap_cents?: number
+          id?: string
+          period: string
+          period_start: string
+          spent_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          budgeted_cents?: number
+          category?: string
+          hard_cap_cents?: number
+          id?: string
+          period?: string
+          period_start?: string
+          spent_cents?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qa_bug_reports: {
+        Row: {
+          category: string
+          console_log: Json | null
+          created_at: string
+          description: string | null
+          diff_from_baseline: Json | null
+          id: string
+          mission_name: string
+          network_trace: Json | null
+          reproduce_steps: Json
+          resolved_at: string | null
+          route: string | null
+          run_id: string | null
+          screenshot_url: string | null
+          severity: string
+          status: string
+          step_index: number | null
+          title: string
+        }
+        Insert: {
+          category: string
+          console_log?: Json | null
+          created_at?: string
+          description?: string | null
+          diff_from_baseline?: Json | null
+          id?: string
+          mission_name: string
+          network_trace?: Json | null
+          reproduce_steps?: Json
+          resolved_at?: string | null
+          route?: string | null
+          run_id?: string | null
+          screenshot_url?: string | null
+          severity: string
+          status?: string
+          step_index?: number | null
+          title: string
+        }
+        Update: {
+          category?: string
+          console_log?: Json | null
+          created_at?: string
+          description?: string | null
+          diff_from_baseline?: Json | null
+          id?: string
+          mission_name?: string
+          network_trace?: Json | null
+          reproduce_steps?: Json
+          resolved_at?: string | null
+          route?: string | null
+          run_id?: string | null
+          screenshot_url?: string | null
+          severity?: string
+          status?: string
+          step_index?: number | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_bug_reports_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "qa_test_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_missions: {
+        Row: {
+          category: string
+          cost_cap_cents: number
+          cost_real_providers: string[]
+          created_at: string
+          description: string | null
+          enabled: boolean
+          expected_assertions: Json
+          id: string
+          last_run_at: string | null
+          name: string
+          rate_limit_minutes: number
+          steps: Json
+          tier: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          cost_cap_cents?: number
+          cost_real_providers?: string[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          expected_assertions?: Json
+          id?: string
+          last_run_at?: string | null
+          name: string
+          rate_limit_minutes?: number
+          steps?: Json
+          tier: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          cost_cap_cents?: number
+          cost_real_providers?: string[]
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          expected_assertions?: Json
+          id?: string
+          last_run_at?: string | null
+          name?: string
+          rate_limit_minutes?: number
+          steps?: Json
+          tier?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qa_provider_rotation: {
+        Row: {
+          avg_cost_cents: number
+          category: string
+          enabled: boolean
+          id: string
+          last_real_test_at: string | null
+          next_due_at: string | null
+          provider: string
+          total_failures: number
+          total_tests: number
+        }
+        Insert: {
+          avg_cost_cents?: number
+          category: string
+          enabled?: boolean
+          id?: string
+          last_real_test_at?: string | null
+          next_due_at?: string | null
+          provider: string
+          total_failures?: number
+          total_tests?: number
+        }
+        Update: {
+          avg_cost_cents?: number
+          category?: string
+          enabled?: boolean
+          id?: string
+          last_real_test_at?: string | null
+          next_due_at?: string | null
+          provider?: string
+          total_failures?: number
+          total_tests?: number
+        }
+        Relationships: []
+      }
+      qa_test_assets: {
+        Row: {
+          asset_type: string
+          created_at: string
+          duration_seconds: number | null
+          height: number | null
+          id: string
+          metadata: Json
+          storage_path: string | null
+          tags: string[]
+          url: string
+          width: number | null
+        }
+        Insert: {
+          asset_type: string
+          created_at?: string
+          duration_seconds?: number | null
+          height?: number | null
+          id?: string
+          metadata?: Json
+          storage_path?: string | null
+          tags?: string[]
+          url: string
+          width?: number | null
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          duration_seconds?: number | null
+          height?: number | null
+          id?: string
+          metadata?: Json
+          storage_path?: string | null
+          tags?: string[]
+          url?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
+      qa_test_runs: {
+        Row: {
+          baseline_run_id: string | null
+          bugs_found: number | null
+          cost_actual_cents: number
+          cost_budgeted_cents: number
+          created_at: string
+          duration_ms: number | null
+          finished_at: string | null
+          id: string
+          last_screenshot_url: string | null
+          log_summary: string | null
+          metadata: Json
+          mission_id: string | null
+          mission_name: string
+          started_at: string
+          status: string
+          steps_completed: number | null
+          steps_total: number | null
+          tier: string
+          triggered_by: string
+        }
+        Insert: {
+          baseline_run_id?: string | null
+          bugs_found?: number | null
+          cost_actual_cents?: number
+          cost_budgeted_cents?: number
+          created_at?: string
+          duration_ms?: number | null
+          finished_at?: string | null
+          id?: string
+          last_screenshot_url?: string | null
+          log_summary?: string | null
+          metadata?: Json
+          mission_id?: string | null
+          mission_name: string
+          started_at?: string
+          status?: string
+          steps_completed?: number | null
+          steps_total?: number | null
+          tier: string
+          triggered_by?: string
+        }
+        Update: {
+          baseline_run_id?: string | null
+          bugs_found?: number | null
+          cost_actual_cents?: number
+          cost_budgeted_cents?: number
+          created_at?: string
+          duration_ms?: number | null
+          finished_at?: string | null
+          id?: string
+          last_screenshot_url?: string | null
+          log_summary?: string | null
+          metadata?: Json
+          mission_id?: string | null
+          mission_name?: string
+          started_at?: string
+          status?: string
+          steps_completed?: number | null
+          steps_total?: number | null
+          tier?: string
+          triggered_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_test_runs_baseline_run_id_fkey"
+            columns: ["baseline_run_id"]
+            isOneToOne: false
+            referencedRelation: "qa_test_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qa_test_runs_mission_id_fkey"
+            columns: ["mission_id"]
+            isOneToOne: false
+            referencedRelation: "qa_missions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rate_limit_state: {
         Row: {
@@ -14889,6 +15253,14 @@ export type Database = {
         Returns: Json
       }
       purchase_template: { Args: { _template_id: string }; Returns: Json }
+      qa_check_budget: {
+        Args: { _amount_cents: number; _category: string }
+        Returns: boolean
+      }
+      qa_record_spend: {
+        Args: { _amount_cents: number; _category: string }
+        Returns: undefined
+      }
       record_streak_activity: {
         Args: { p_user_id: string }
         Returns: {
