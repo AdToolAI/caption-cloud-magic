@@ -21,6 +21,7 @@ import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer'
 import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
 import { AutopilotApprovalInbox } from '@/components/autopilot/AutopilotApprovalInbox';
 import { AutopilotInsightsPanel } from '@/components/autopilot/AutopilotInsightsPanel';
+import { AutopilotWeeklyReviewPanel } from '@/components/autopilot/AutopilotWeeklyReviewPanel';
 import { useAutopilotNotifications } from '@/hooks/useAutopilotNotifications';
 import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
