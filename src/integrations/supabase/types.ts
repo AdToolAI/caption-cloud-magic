@@ -1175,6 +1175,10 @@ export type Database = {
           topic_pillars: string[]
           updated_at: string
           user_id: string
+          video_aspect_ratio: string
+          video_duration_sec: number
+          video_enabled: boolean
+          video_provider: string
           weekly_credit_budget: number
           weekly_credits_spent: number
         }
@@ -1198,6 +1202,10 @@ export type Database = {
           topic_pillars?: string[]
           updated_at?: string
           user_id: string
+          video_aspect_ratio?: string
+          video_duration_sec?: number
+          video_enabled?: boolean
+          video_provider?: string
           weekly_credit_budget?: number
           weekly_credits_spent?: number
         }
@@ -1221,6 +1229,10 @@ export type Database = {
           topic_pillars?: string[]
           updated_at?: string
           user_id?: string
+          video_aspect_ratio?: string
+          video_duration_sec?: number
+          video_enabled?: boolean
+          video_provider?: string
           weekly_credit_budget?: number
           weekly_credits_spent?: number
         }
@@ -1286,6 +1298,12 @@ export type Database = {
           topic_hint: string | null
           updated_at: string
           user_id: string
+          video_completed_at: string | null
+          video_error: string | null
+          video_prediction_id: string | null
+          video_provider: string | null
+          video_started_at: string | null
+          video_status: string | null
         }
         Insert: {
           approved_at?: string | null
@@ -1310,6 +1328,12 @@ export type Database = {
           topic_hint?: string | null
           updated_at?: string
           user_id: string
+          video_completed_at?: string | null
+          video_error?: string | null
+          video_prediction_id?: string | null
+          video_provider?: string | null
+          video_started_at?: string | null
+          video_status?: string | null
         }
         Update: {
           approved_at?: string | null
@@ -1334,6 +1358,12 @@ export type Database = {
           topic_hint?: string | null
           updated_at?: string
           user_id?: string
+          video_completed_at?: string | null
+          video_error?: string | null
+          video_prediction_id?: string | null
+          video_provider?: string | null
+          video_started_at?: string | null
+          video_status?: string | null
         }
         Relationships: [
           {
@@ -1386,6 +1416,74 @@ export type Database = {
           {
             foreignKeyName: "autopilot_strikes_related_slot_id_fkey"
             columns: ["related_slot_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_video_jobs: {
+        Row: {
+          aspect_ratio: string
+          completed_at: string | null
+          cost_credits: number
+          created_at: string
+          duration_sec: number
+          error_message: string | null
+          id: string
+          model: string | null
+          output_url: string | null
+          prediction_id: string | null
+          prompt: string
+          provider: string
+          slot_id: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio: string
+          completed_at?: string | null
+          cost_credits?: number
+          created_at?: string
+          duration_sec: number
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          output_url?: string | null
+          prediction_id?: string | null
+          prompt: string
+          provider: string
+          slot_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string
+          completed_at?: string | null
+          cost_credits?: number
+          created_at?: string
+          duration_sec?: number
+          error_message?: string | null
+          id?: string
+          model?: string | null
+          output_url?: string | null
+          prediction_id?: string | null
+          prompt?: string
+          provider?: string
+          slot_id?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_video_jobs_slot_id_fkey"
+            columns: ["slot_id"]
             isOneToOne: false
             referencedRelation: "autopilot_queue"
             referencedColumns: ["id"]
