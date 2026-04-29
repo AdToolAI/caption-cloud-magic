@@ -154,9 +154,20 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
           ))}
         </div>
 
-        {/* ============ STEP 1: BRIEF ============ */}
+        {/* ============ STEP 1: GOAL + BRIEF ============ */}
         {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Session H — Channel Goal Briefing */}
+            <div className="rounded-lg border bg-primary/5 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold tracking-wide uppercase text-primary">Channel-Ziel & Budget</span>
+              </div>
+              <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">Inhaltliche Strategie</div>
             <div>
               <Label htmlFor="pillars">Themen-Pillars (kommagetrennt) *</Label>
               <Input id="pillars" value={pillarsText} onChange={(e) => setPillarsText(e.target.value)}
