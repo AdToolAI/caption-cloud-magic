@@ -750,13 +750,27 @@ export default function QACockpit() {
 
                 {Array.isArray(selectedBug.console_log) && selectedBug.console_log.length > 0 && (
                   <Section title={`Console-Logs (${selectedBug.console_log.length})`}>
-                    <div className="space-y-1 max-h-60 overflow-auto bg-black/40 p-3 rounded border border-[#F5C76A]/10">
+                    <div className="space-y-2 max-h-72 overflow-auto bg-black/40 p-3 rounded border border-[#F5C76A]/10">
                       {selectedBug.console_log.map((c: any, i: number) => (
-                        <div key={i} className="text-xs font-mono">
-                          <span className={c.type === "error" || c.type === "pageerror" ? "text-red-400" : "text-cyan-300"}>
-                            [{c.type}]
-                          </span>{" "}
-                          <span className="text-muted-foreground">{c.text}</span>
+                        <div key={i} className="text-xs font-mono border-b border-white/5 pb-2 last:border-0">
+                          <div>
+                            <span className={c.type === "error" || c.type === "pageerror" ? "text-red-400" : "text-cyan-300"}>
+                              [{c.type}]
+                            </span>{" "}
+                            <span className="text-muted-foreground">{c.text}</span>
+                            {c.occurrences > 1 && <span className="ml-2 text-yellow-300">×{c.occurrences}</span>}
+                          </div>
+                          {c.url && (
+                            <div className="text-[10px] text-cyan-400/70 mt-0.5 truncate" title={`${c.url}:${c.line ?? "?"}`}>
+                              @ {c.url}:{c.line ?? "?"}
+                            </div>
+                          )}
+                          {c.stack && (
+                            <pre className="text-[10px] text-red-300/70 mt-1 whitespace-pre-wrap max-h-24 overflow-auto">{c.stack}</pre>
+                          )}
+                          {c.muted_reason && (
+                            <div className="text-[10px] text-amber-300/80 mt-0.5">muted: {c.muted_reason}</div>
+                          )}
                         </div>
                       ))}
                     </div>
