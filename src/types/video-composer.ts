@@ -29,6 +29,7 @@ export type ClipSource =
   | 'ai-veo'
   | 'ai-runway'
   | 'ai-pika'
+  | 'ai-vidu'
   | 'ai-image'
   | 'stock'
   | 'stock-image'
@@ -462,6 +463,7 @@ export const CLIP_SOURCE_LABELS: Record<ClipSource, { de: string; en: string }> 
   'ai-veo':      { de: 'KI (Veo 3.1) 🎵', en: 'AI (Veo 3.1) 🎵' },
   'ai-runway':   { de: 'KI (Runway Gen-4 V2V)', en: 'AI (Runway Gen-4 V2V)' },
   'ai-pika':     { de: 'KI (Pika 2.2)', en: 'AI (Pika 2.2)' },
+  'ai-vidu':     { de: 'KI (Vidu Q2 Multi-Ref)', en: 'AI (Vidu Q2 Multi-Ref)' },
   'ai-image':    { de: 'KI Bild (Gemini)', en: 'AI Image (Gemini)' },
   stock:         { de: 'Stock Video', en: 'Stock Video' },
   'stock-image': { de: 'Stock Bild', en: 'Stock Image' },
@@ -480,6 +482,8 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
   'ai-veo':      { standard: 0.20, pro: 1.40 },
   'ai-runway':   { standard: 0.15, pro: 0.15 },
   'ai-pika':     { standard: 0.10, pro: 0.18 },
+  // Vidu Q2: flat €0.45 per 5s clip → 0.09 €/s for parity
+  'ai-vidu':     { standard: 0.09, pro: 0.09 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
   stock:         { standard: 0, pro: 0 },
   'stock-image': { standard: 0, pro: 0 },
@@ -497,6 +501,7 @@ export const QUALITY_LABELS: Record<ClipSource, Record<ClipQuality, string>> = {
   'ai-veo':      { standard: 'Lite 720p +Audio', pro: 'Pro 1080p +Audio' },
   'ai-runway':   { standard: 'Aleph 720p',        pro: 'Aleph 720p' },
   'ai-pika':     { standard: 'Pika 720p',         pro: 'Pika 1080p' },
+  'ai-vidu':     { standard: 'Vidu Q2 1080p',     pro: 'Vidu Q2 1080p' },
   'ai-image':    { standard: 'Nano Banana 2', pro: 'Gemini 3 Pro' },
   stock:         { standard: '-', pro: '-' },
   'stock-image': { standard: '-', pro: '-' },
