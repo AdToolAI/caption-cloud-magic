@@ -68,6 +68,7 @@ export function modelIdToSource(modelId: string): { clipSource: ClipSource; clip
       case 'sora':     return 'ai-veo'; // Sora 2 Sunset → Veo 3.1 fallback
       case 'runway':   return 'ai-runway';
       case 'pika':     return 'ai-pika';
+      case 'vidu':     return 'ai-vidu';
       default:         return 'ai-hailuo';
     }
   })();
@@ -89,6 +90,7 @@ export function sourceToModelId(clipSource: ClipSource, clipQuality: ClipQuality
     // 'ai-sora' entfernt — Sora 2 Sunset 2026
     'ai-runway':   'runway',
     'ai-pika':     'pika',
+    'ai-vidu':     'vidu',
   };
   const family = familyMap[clipSource];
   if (!family) return COMPOSER_AVAILABLE_MODELS[0].id;
