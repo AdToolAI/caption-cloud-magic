@@ -1159,8 +1159,11 @@ export type Database = {
           activated_at: string | null
           auto_publish_enabled: boolean
           avatar_ids: string[]
+          briefing_required_until: string | null
           budget_resets_at: string
+          channel_goal: string
           compliance_score: number
+          content_mix: Json
           created_at: string
           forbidden_topics: string[]
           id: string
@@ -1168,19 +1171,23 @@ export type Database = {
           languages: string[]
           last_performance_analysis_at: string | null
           last_plan_generated_at: string | null
+          last_review_completed_at: string | null
           locked_until: string | null
           paused_until: string | null
           performance_loop_enabled: boolean
           platforms: string[]
           posts_per_week: Json
+          target_audience: string | null
           tonality: string
           topic_pillars: string[]
           updated_at: string
           user_id: string
+          usp: string | null
           video_aspect_ratio: string
           video_duration_sec: number
           video_enabled: boolean
           video_provider: string
+          weekly_budget_eur: number
           weekly_credit_budget: number
           weekly_credits_spent: number
         }
@@ -1188,8 +1195,11 @@ export type Database = {
           activated_at?: string | null
           auto_publish_enabled?: boolean
           avatar_ids?: string[]
+          briefing_required_until?: string | null
           budget_resets_at?: string
+          channel_goal?: string
           compliance_score?: number
+          content_mix?: Json
           created_at?: string
           forbidden_topics?: string[]
           id?: string
@@ -1197,19 +1207,23 @@ export type Database = {
           languages?: string[]
           last_performance_analysis_at?: string | null
           last_plan_generated_at?: string | null
+          last_review_completed_at?: string | null
           locked_until?: string | null
           paused_until?: string | null
           performance_loop_enabled?: boolean
           platforms?: string[]
           posts_per_week?: Json
+          target_audience?: string | null
           tonality?: string
           topic_pillars?: string[]
           updated_at?: string
           user_id: string
+          usp?: string | null
           video_aspect_ratio?: string
           video_duration_sec?: number
           video_enabled?: boolean
           video_provider?: string
+          weekly_budget_eur?: number
           weekly_credit_budget?: number
           weekly_credits_spent?: number
         }
@@ -1217,8 +1231,11 @@ export type Database = {
           activated_at?: string | null
           auto_publish_enabled?: boolean
           avatar_ids?: string[]
+          briefing_required_until?: string | null
           budget_resets_at?: string
+          channel_goal?: string
           compliance_score?: number
+          content_mix?: Json
           created_at?: string
           forbidden_topics?: string[]
           id?: string
@@ -1226,19 +1243,23 @@ export type Database = {
           languages?: string[]
           last_performance_analysis_at?: string | null
           last_plan_generated_at?: string | null
+          last_review_completed_at?: string | null
           locked_until?: string | null
           paused_until?: string | null
           performance_loop_enabled?: boolean
           platforms?: string[]
           posts_per_week?: Json
+          target_audience?: string | null
           tonality?: string
           topic_pillars?: string[]
           updated_at?: string
           user_id?: string
+          usp?: string | null
           video_aspect_ratio?: string
           video_duration_sec?: number
           video_enabled?: boolean
           video_provider?: string
+          weekly_budget_eur?: number
           weekly_credit_budget?: number
           weekly_credits_spent?: number
         }
@@ -1551,6 +1572,77 @@ export type Database = {
             columns: ["slot_id"]
             isOneToOne: false
             referencedRelation: "autopilot_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_weekly_reviews: {
+        Row: {
+          ai_recommendation: Json
+          brief_id: string
+          created_at: string
+          credits_budgeted: number
+          credits_spent: number
+          decided_at: string | null
+          id: string
+          period_end: string
+          period_start: string
+          platform_breakdown: Json
+          posts_generated: number
+          posts_published: number
+          posts_rejected: number
+          top_pillar: string | null
+          total_engagement: number
+          user_decision: string
+          user_id: string
+          weakest_pillar: string | null
+        }
+        Insert: {
+          ai_recommendation?: Json
+          brief_id: string
+          created_at?: string
+          credits_budgeted?: number
+          credits_spent?: number
+          decided_at?: string | null
+          id?: string
+          period_end: string
+          period_start: string
+          platform_breakdown?: Json
+          posts_generated?: number
+          posts_published?: number
+          posts_rejected?: number
+          top_pillar?: string | null
+          total_engagement?: number
+          user_decision?: string
+          user_id: string
+          weakest_pillar?: string | null
+        }
+        Update: {
+          ai_recommendation?: Json
+          brief_id?: string
+          created_at?: string
+          credits_budgeted?: number
+          credits_spent?: number
+          decided_at?: string | null
+          id?: string
+          period_end?: string
+          period_start?: string
+          platform_breakdown?: Json
+          posts_generated?: number
+          posts_published?: number
+          posts_rejected?: number
+          top_pillar?: string | null
+          total_engagement?: number
+          user_decision?: string
+          user_id?: string
+          weakest_pillar?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_weekly_reviews_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_briefs"
             referencedColumns: ["id"]
           },
         ]

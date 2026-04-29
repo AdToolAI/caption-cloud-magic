@@ -8,8 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ShieldCheck, AlertTriangle, ChevronRight, Sparkles, Lock } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ChevronRight, Sparkles, Lock, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, useToggleAutopilot, type UpsertBriefInput } from '@/hooks/useAutopilot';
+import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 import { cn } from '@/lib/utils';
 
 interface Props {
@@ -48,6 +49,15 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
   const [budget, setBudget] = useState(2000);
   const [autoPublish, setAutoPublish] = useState(false);
 
+  // Session H — Goal briefing state
+  const [goal, setGoal] = useState<GoalBriefingValue>({
+    channel_goal: 'engagement',
+    weekly_budget_eur: 25,
+    content_mix: { ai_video: 33, stock_reel: 33, static: 34 },
+    target_audience: '',
+    usp: '',
+  });
+
   // AUP state
   const [scrolled, setScrolled] = useState(false);
   const [aupAccepted, setAupAccepted] = useState(false);
@@ -73,6 +83,8 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
   const toggleLang = (l: string) =>
     setLanguages((prev) => (prev.includes(l) ? prev.filter((x) => x !== l) : [...prev, l]));
 
+  const goalValid = goal.target_audience.trim().length > 0 && goal.usp.trim().length > 0 && goal.weekly_budget_eur >= 5;
+
   const handleSaveBrief = async () => {
     const input: UpsertBriefInput = {
       topic_pillars: pillarsText.split(',').map((s) => s.trim()).filter(Boolean),
@@ -84,6 +96,12 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
       avatar_ids: [],
       weekly_credit_budget: budget,
       auto_publish_enabled: autoPublish,
+      // Session H — Goal briefing
+      channel_goal: goal.channel_goal,
+      content_mix: goal.content_mix,
+      weekly_budget_eur: goal.weekly_budget_eur,
+      target_audience: goal.target_audience,
+      usp: goal.usp,
     };
     await upsert.mutateAsync(input);
     setStep(2);
@@ -136,9 +154,20 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
           ))}
         </div>
 
-        {/* ============ STEP 1: BRIEF ============ */}
+        {/* ============ STEP 1: GOAL + BRIEF ============ */}
         {step === 1 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Session H — Channel Goal Briefing */}
+            <div className="rounded-lg border bg-primary/5 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Target className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold tracking-wide uppercase text-primary">Channel-Ziel & Budget</span>
+              </div>
+              <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="text-sm font-semibold mb-3 uppercase tracking-wide text-muted-foreground">Inhaltliche Strategie</div>
             <div>
               <Label htmlFor="pillars">Themen-Pillars (kommagetrennt) *</Label>
               <Input id="pillars" value={pillarsText} onChange={(e) => setPillarsText(e.target.value)}
@@ -198,9 +227,15 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
               </div>
               <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
             </div>
+            </div>
+            {!goalValid && (
+              <p className="text-[11px] text-amber-500 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> Bitte Channel-Ziel, Budget, Zielgruppe und USP ausfüllen.
+              </p>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>Abbrechen</Button>
-              <Button disabled={!briefValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
+              <Button disabled={!briefValid || !goalValid || upsert.isPending} onClick={handleSaveBrief} className="gap-1.5">
                 Weiter <ChevronRight className="h-4 w-4" />
               </Button>
             </div>

@@ -7,8 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Save, X, Plus, Settings as SettingsIcon } from 'lucide-react';
+import { Save, X, Plus, Settings as SettingsIcon, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, type AutopilotBrief } from '@/hooks/useAutopilot';
+import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 
 interface Props {
   brief: AutopilotBrief | null | undefined;
@@ -46,6 +47,14 @@ export function AutopilotStrategyEditor({ brief }: Props) {
   const [videoProvider, setVideoProvider] = useState('hailuo-standard');
   const [videoDuration, setVideoDuration] = useState(6);
   const [videoRatio, setVideoRatio] = useState('9:16');
+  // Session H — Goal briefing
+  const [goal, setGoal] = useState<GoalBriefingValue>({
+    channel_goal: 'engagement',
+    weekly_budget_eur: 25,
+    content_mix: { ai_video: 33, stock_reel: 33, static: 34 },
+    target_audience: '',
+    usp: '',
+  });
 
   useEffect(() => {
     if (!brief) return;
@@ -60,6 +69,13 @@ export function AutopilotStrategyEditor({ brief }: Props) {
     setVideoProvider(brief.video_provider ?? 'hailuo-standard');
     setVideoDuration(brief.video_duration_sec ?? 6);
     setVideoRatio(brief.video_aspect_ratio ?? '9:16');
+    setGoal({
+      channel_goal: (brief.channel_goal ?? 'engagement') as GoalBriefingValue['channel_goal'],
+      weekly_budget_eur: brief.weekly_budget_eur ?? 25,
+      content_mix: brief.content_mix ?? { ai_video: 33, stock_reel: 33, static: 34 },
+      target_audience: brief.target_audience ?? '',
+      usp: brief.usp ?? '',
+    });
   }, [brief]);
 
   const dirty = useMemo(() => {
@@ -75,9 +91,16 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       videoEnabled !== !!brief.video_enabled ||
       videoProvider !== (brief.video_provider ?? 'hailuo-standard') ||
       videoDuration !== (brief.video_duration_sec ?? 6) ||
-      videoRatio !== (brief.video_aspect_ratio ?? '9:16')
+      videoRatio !== (brief.video_aspect_ratio ?? '9:16') ||
+      JSON.stringify(goal) !== JSON.stringify({
+        channel_goal: brief.channel_goal ?? 'engagement',
+        weekly_budget_eur: brief.weekly_budget_eur ?? 25,
+        content_mix: brief.content_mix ?? { ai_video: 33, stock_reel: 33, static: 34 },
+        target_audience: brief.target_audience ?? '',
+        usp: brief.usp ?? '',
+      })
     );
-  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish, videoEnabled, videoProvider, videoDuration, videoRatio]);
+  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish, videoEnabled, videoProvider, videoDuration, videoRatio, goal]);
 
   function togglePlatform(p: string) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
@@ -113,6 +136,11 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       video_provider: videoProvider,
       video_duration_sec: videoDuration,
       video_aspect_ratio: videoRatio,
+      channel_goal: goal.channel_goal,
+      content_mix: goal.content_mix,
+      weekly_budget_eur: goal.weekly_budget_eur,
+      target_audience: goal.target_audience,
+      usp: goal.usp,
     });
   }
 
@@ -129,6 +157,15 @@ export function AutopilotStrategyEditor({ brief }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Session H — Channel Goal & Budget */}
+      <Card className="p-5 space-y-3 border-primary/30 bg-primary/5">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <Label className="text-xs uppercase tracking-widest text-primary">Channel-Ziel & Budget</Label>
+        </div>
+        <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
+      </Card>
+
       {/* Pillars */}
       <Card className="p-5 space-y-3">
         <div>

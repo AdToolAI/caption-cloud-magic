@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox, BarChart3 } from 'lucide-react';
+import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox, BarChart3, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,7 @@ import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer'
 import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
 import { AutopilotApprovalInbox } from '@/components/autopilot/AutopilotApprovalInbox';
 import { AutopilotInsightsPanel } from '@/components/autopilot/AutopilotInsightsPanel';
+import { AutopilotWeeklyReviewPanel } from '@/components/autopilot/AutopilotWeeklyReviewPanel';
 import { useAutopilotNotifications } from '@/hooks/useAutopilotNotifications';
 import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
@@ -159,6 +160,12 @@ export default function Autopilot() {
               <TabsTrigger value="strategy" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> Strategie</TabsTrigger>
               <TabsTrigger value="tools" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Tools</TabsTrigger>
               <TabsTrigger value="insights" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Insights</TabsTrigger>
+              <TabsTrigger value="review" className="gap-1.5 relative">
+                <FileText className="h-3.5 w-3.5" /> Wochen-Review
+                {brief?.briefing_required_until && new Date(brief.briefing_required_until) > new Date() && (
+                  <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                )}
+              </TabsTrigger>
               <TabsTrigger value="compliance" className="gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Compliance</TabsTrigger>
               <TabsTrigger value="activity" className="gap-1.5"><Activity className="h-3.5 w-3.5" /> Activity</TabsTrigger>
             </TabsList>
@@ -187,6 +194,10 @@ export default function Autopilot() {
 
             <TabsContent value="insights">
               <AutopilotInsightsPanel />
+            </TabsContent>
+
+            <TabsContent value="review">
+              <AutopilotWeeklyReviewPanel />
             </TabsContent>
 
             <TabsContent value="compliance">
