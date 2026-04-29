@@ -32,6 +32,9 @@ const SEVERITY_COLORS: Record<string, string> = {
 export default function QACockpit() {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState("live");
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const runs = useQuery({
     queryKey: ["qa-runs"],
