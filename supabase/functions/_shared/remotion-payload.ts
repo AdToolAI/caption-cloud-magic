@@ -121,7 +121,7 @@ export function calculateScheduling(
     const needsFpsReduction = estRuntimeSec > LAMBDA_TIMEOUT_SECONDS;
     const timeoutBudgetOk = !needsFpsReduction;
     
-    console.log(`[remotion-payload] r56 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${Math.ceil(frameCount / fpl)}, needsFpsReduction=${needsFpsReduction}, estTime=${estRuntimeSec.toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s, timeoutBudgetOk=${timeoutBudgetOk}`);
+    console.log(`[remotion-payload] r57 STABILITY scheduling: frames=${frameCount}, fpl=${fpl}, lambdas=${Math.ceil(frameCount / fpl)}, maxStabilityLambdas=5, needsFpsReduction=${needsFpsReduction}, estTime=${estRuntimeSec.toFixed(1)}s, timeout=${LAMBDA_TIMEOUT_SECONDS}s, timeoutBudgetOk=${timeoutBudgetOk}`);
     return { framesPerLambda: fpl, estimatedLambdas: Math.ceil(frameCount / fpl), needsFpsReduction, schedulingMode, estRuntimeSec, timeoutBudgetOk };
   }
   
