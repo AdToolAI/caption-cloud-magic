@@ -58,8 +58,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Rate-limit check (skip for manual triggers)
-    if (!manualMissionId && mission.last_run_at) {
+    // Rate-limit check (skip for any manual trigger, with or without mission_id)
+    const isManual = triggerSource === "manual" || !!manualMissionId;
+    if (!isManual && mission.last_run_at) {
       const minutesSince =
         (Date.now() - new Date(mission.last_run_at).getTime()) / 60000;
       if (minutesSince < (mission.rate_limit_minutes ?? 240)) {
