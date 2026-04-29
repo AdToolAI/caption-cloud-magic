@@ -50,12 +50,22 @@ Deno.serve(async (req) => {
       // 2. Credit-Stand prüfen
       if (alreadyPaused) continue;
 
-      const { data: credits } = await admin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", userId)
+      // Find workspace for user (owner_user_id)
+      const { data: ws } = await admin
+        .from("workspaces")
+        .select("id")
+        .eq("owner_user_id", userId)
+        .limit(1)
         .maybeSingle();
-      const balance = (credits?.balance as number) ?? 0;
+
+      let balance = 0;
+      if (ws?.id) {
+        const { data: txs } = await admin
+          .from("credit_transactions")
+          .select("delta")
+          .eq("workspace_id", ws.id);
+        balance = (txs ?? []).reduce((sum, t: Record<string, unknown>) => sum + ((t.delta as number) ?? 0), 0);
+      }
 
       if (balance < MIN_CREDIT_THRESHOLD) {
         const pauseUntil = new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString();
