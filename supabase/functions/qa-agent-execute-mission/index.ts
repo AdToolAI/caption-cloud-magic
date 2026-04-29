@@ -69,7 +69,10 @@ Deno.serve(async (req) => {
 
     const qaEmail = Deno.env.get("QA_TEST_USER_EMAIL") ?? "qa-bot@useadtool.ai";
     const qaPassword = Deno.env.get("QA_TEST_USER_PASSWORD") ?? "";
-    const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://id-preview--8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovable.app";
+    // IMPORTANT: id-preview--*.lovable.app is gated by Lovable's auth-bridge
+    // (lovable.dev/login). Browserless cannot authenticate against that. Default to
+    // the public app domain instead so that /auth renders the real login form.
+    const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://useadtool.ai";
 
     if (!qaPassword) {
       throw new Error("QA_TEST_USER_PASSWORD secret not configured");
