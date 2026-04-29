@@ -21,6 +21,7 @@ import { VideoPromptOptimizer } from './VideoPromptOptimizer';
 import { ToolkitCastPicker, buildCastPromptSuffix } from './ToolkitCastPicker';
 import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
+import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
@@ -68,6 +69,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
   const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
   const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
+  const [viduReferences, setViduReferences] = useState<ViduReferenceSlot[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -101,6 +103,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
     if (!model.capabilities.v2v) setReferenceVideoUrl(null);
+    if (!model.capabilities.multiRef) setViduReferences([]);
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
