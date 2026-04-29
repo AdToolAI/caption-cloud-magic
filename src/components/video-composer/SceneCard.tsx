@@ -930,6 +930,53 @@ export default function SceneCard({
               />
             )}
 
+            {/* V2V Reference Video — only when the chosen AI model supports video-to-video */}
+            {(() => {
+              if (!scene.clipSource.startsWith('ai-')) return null;
+              const mid = sourceToModelId(scene.clipSource, scene.clipQuality);
+              const m = AI_VIDEO_TOOLKIT_MODELS.find((x) => x.id === mid);
+              if (!m?.capabilities?.v2v) return null;
+              const isRunway = scene.clipSource === 'ai-runway';
+              return (
+                <div className="space-y-1.5 pt-1 border-t border-primary/30">
+                  <div className="flex items-center gap-2">
+                    <Video className="h-3 w-3 text-primary" />
+                    <Label className="text-[11px] font-medium text-primary">
+                      {lang === 'de' ? 'Restyle mit Referenzvideo (V2V)' : lang === 'es' ? 'Restyle con video de referencia (V2V)' : 'Restyle with reference video (V2V)'}
+                    </Label>
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-primary/40 text-primary">
+                      {m.name}
+                    </Badge>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/80 leading-snug">
+                    {isRunway
+                      ? (lang === 'de'
+                          ? 'Runway Aleph benötigt zwingend ein Referenzvideo — ohne fällt die Szene auf Hailuo zurück.'
+                          : lang === 'es'
+                          ? 'Runway Aleph requiere un video de referencia — sin él, la escena recurre a Hailuo.'
+                          : 'Runway Aleph requires a reference video — without it the scene falls back to Hailuo.')
+                      : (lang === 'de'
+                          ? 'Optional: Lade ein Referenzvideo hoch, das die KI im Stil deines Prompts neu interpretiert.'
+                          : lang === 'es'
+                          ? 'Opcional: sube un video de referencia que la IA reinterpretará al estilo de tu prompt.'
+                          : 'Optional: upload a reference video that the AI will restyle according to your prompt.')}
+                  </p>
+                  <SceneMediaUpload
+                    projectId={projectId}
+                    sceneId={`${scene.id}-v2v`}
+                    uploadUrl={scene.uploadUrl}
+                    uploadType={scene.uploadType}
+                    onChange={(url, type) =>
+                      onUpdate({
+                        uploadUrl: url ?? undefined,
+                        uploadType: type ?? undefined,
+                      })
+                    }
+                  />
+                </div>
+              );
+            })()}
+
             {/* Universal Reference Image — available in every clip-source mode */}
             <div className="space-y-1.5 pt-1 border-t border-border/30">
               <div className="text-[10px] text-muted-foreground/80 leading-snug">
