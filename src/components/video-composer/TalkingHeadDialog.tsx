@@ -19,6 +19,16 @@ interface TalkingHeadDialogProps {
   projectId?: string;
   sceneId?: string;
   onSuccess?: (result: { videoUrl: string | null; audioUrl: string; predictionId: string }) => void;
+  /**
+   * Optional preset from Avatar Library — pre-fills image, voice and aspect ratio
+   * so the user only has to write the script.
+   */
+  presetAvatar?: {
+    imageUrl?: string;
+    voiceId?: string;
+    aspectRatio?: '16:9' | '9:16' | '1:1';
+    avatarName?: string;
+  };
 }
 
 const PRESET_VOICES = [
