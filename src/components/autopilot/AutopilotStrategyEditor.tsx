@@ -280,6 +280,89 @@ export function AutopilotStrategyEditor({ brief }: Props) {
         </Card>
       </div>
 
+      {/* Session E: Video Pipeline */}
+      <Card className="p-5 space-y-4 border-fuchsia-500/30 bg-gradient-to-br from-fuchsia-500/5 to-transparent">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label className="text-xs uppercase tracking-widest text-fuchsia-600">🎬 Video-Pipeline</Label>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Wenn aktiv und Slot-Format „video / reel / short / tiktok / story" enthält, rendert der Autopilot ein echtes Video statt eines Bildes.
+            </p>
+          </div>
+          <Switch checked={videoEnabled} onCheckedChange={setVideoEnabled} />
+        </div>
+
+        {videoEnabled && (
+          <>
+            <div>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">Provider</Label>
+              <div className="grid sm:grid-cols-3 gap-2 mt-2">
+                {VIDEO_PROVIDERS.map((p) => {
+                  const cost = p.perSecCredits * videoDuration;
+                  const active = videoProvider === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setVideoProvider(p.id)}
+                      className={`text-left p-3 rounded-md border transition ${
+                        active
+                          ? 'border-fuchsia-500/60 bg-fuchsia-500/10'
+                          : 'border-border hover:border-fuchsia-500/30'
+                      }`}
+                    >
+                      <div className="text-sm font-semibold">{p.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{p.bestFor}</div>
+                      <div className="text-[11px] mt-1 text-fuchsia-600">≈ {cost} cr / Video</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Dauer</Label>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {VIDEO_DURATIONS.map((d) => (
+                    <Button
+                      key={d}
+                      variant={videoDuration === d ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setVideoDuration(d)}
+                      className="text-xs"
+                    >
+                      {d}s
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs uppercase tracking-widest text-muted-foreground">Seitenverhältnis</Label>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {VIDEO_RATIOS.map((r) => (
+                    <Button
+                      key={r.id}
+                      variant={videoRatio === r.id ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setVideoRatio(r.id)}
+                      className="text-xs"
+                    >
+                      {r.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[11px] text-muted-foreground bg-muted/40 rounded p-2 leading-relaxed">
+              ⚠️ Video-Renders dauern typischerweise 1–5 Min. Status sichtbar im Slot-Drawer.
+              Bei Render-Fehler werden Credits automatisch zurückerstattet.
+            </div>
+          </>
+        )}
+      </Card>
+
       <Separator />
 
       {/* Sticky save bar */}
