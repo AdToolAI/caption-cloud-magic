@@ -1494,6 +1494,7 @@ export type Database = {
       brand_characters: {
         Row: {
           archived_at: string | null
+          average_rating: number
           created_at: string
           default_aspect_ratio: string | null
           default_language: string | null
@@ -1503,18 +1504,37 @@ export type Database = {
           description: string | null
           id: string
           is_favorite: boolean
+          license_release_path: string | null
+          marketplace_status: string
           name: string
+          nsfw_flag: boolean
+          origin_metadata: Json
+          origin_type: string | null
           portrait_mode: string | null
           portrait_url: string | null
+          price_credits: number
+          pricing_type: string
+          published_at: string | null
           reference_image_url: string
+          rejection_reason: string | null
+          revenue_share_percent: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          sample_video_urls: string[]
           storage_path: string | null
+          tags: string[]
+          total_purchases: number
+          total_ratings: number
+          total_revenue_credits: number
           updated_at: string
           usage_count: number
           user_id: string
           visual_identity_json: Json | null
+          voice_sample_url: string | null
         }
         Insert: {
           archived_at?: string | null
+          average_rating?: number
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
@@ -1524,18 +1544,37 @@ export type Database = {
           description?: string | null
           id?: string
           is_favorite?: boolean
+          license_release_path?: string | null
+          marketplace_status?: string
           name: string
+          nsfw_flag?: boolean
+          origin_metadata?: Json
+          origin_type?: string | null
           portrait_mode?: string | null
           portrait_url?: string | null
+          price_credits?: number
+          pricing_type?: string
+          published_at?: string | null
           reference_image_url: string
+          rejection_reason?: string | null
+          revenue_share_percent?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sample_video_urls?: string[]
           storage_path?: string | null
+          tags?: string[]
+          total_purchases?: number
+          total_ratings?: number
+          total_revenue_credits?: number
           updated_at?: string
           usage_count?: number
           user_id: string
           visual_identity_json?: Json | null
+          voice_sample_url?: string | null
         }
         Update: {
           archived_at?: string | null
+          average_rating?: number
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
@@ -1545,15 +1584,33 @@ export type Database = {
           description?: string | null
           id?: string
           is_favorite?: boolean
+          license_release_path?: string | null
+          marketplace_status?: string
           name?: string
+          nsfw_flag?: boolean
+          origin_metadata?: Json
+          origin_type?: string | null
           portrait_mode?: string | null
           portrait_url?: string | null
+          price_credits?: number
+          pricing_type?: string
+          published_at?: string | null
           reference_image_url?: string
+          rejection_reason?: string | null
+          revenue_share_percent?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          sample_video_urls?: string[]
           storage_path?: string | null
+          tags?: string[]
+          total_purchases?: number
+          total_ratings?: number
+          total_revenue_credits?: number
           updated_at?: string
           usage_count?: number
           user_id?: string
           visual_identity_json?: Json | null
+          voice_sample_url?: string | null
         }
         Relationships: []
       }
@@ -3089,6 +3146,185 @@ export type Database = {
             columns: ["brand_kit_id"]
             isOneToOne: false
             referencedRelation: "brand_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_marketplace_consents: {
+        Row: {
+          character_id: string
+          consents: Json
+          created_at: string
+          id: string
+          ip_hash: string | null
+          legal_version: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          character_id: string
+          consents: Json
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          legal_version: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          character_id?: string
+          consents?: Json
+          created_at?: string
+          id?: string
+          ip_hash?: string | null
+          legal_version?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_marketplace_consents_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_marketplace_ratings: {
+        Row: {
+          character_id: string
+          created_at: string
+          id: string
+          rating: number
+          review_text: string | null
+          user_id: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          id?: string
+          rating: number
+          review_text?: string | null
+          user_id: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          id?: string
+          rating?: number
+          review_text?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_marketplace_ratings_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_marketplace_reports: {
+        Row: {
+          character_id: string
+          created_at: string
+          description: string | null
+          id: string
+          reason: string
+          reporter_email: string | null
+          reporter_user_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          character_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason: string
+          reporter_email?: string | null
+          reporter_user_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          character_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason?: string
+          reporter_email?: string | null
+          reporter_user_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_marketplace_reports_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_purchases: {
+        Row: {
+          buyer_user_id: string
+          character_id: string
+          creator_earned_credits: number
+          creator_user_id: string | null
+          id: string
+          license_accepted_at: string
+          license_ip_hash: string | null
+          license_version: string
+          platform_fee_credits: number
+          price_credits: number
+          pricing_type: string
+          purchased_at: string
+          refunded_at: string | null
+        }
+        Insert: {
+          buyer_user_id: string
+          character_id: string
+          creator_earned_credits?: number
+          creator_user_id?: string | null
+          id?: string
+          license_accepted_at?: string
+          license_ip_hash?: string | null
+          license_version: string
+          platform_fee_credits?: number
+          price_credits?: number
+          pricing_type: string
+          purchased_at?: string
+          refunded_at?: string | null
+        }
+        Update: {
+          buyer_user_id?: string
+          character_id?: string
+          creator_earned_credits?: number
+          creator_user_id?: string | null
+          id?: string
+          license_accepted_at?: string
+          license_ip_hash?: string | null
+          license_version?: string
+          platform_fee_credits?: number
+          price_credits?: number
+          pricing_type?: string
+          purchased_at?: string
+          refunded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_purchases_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
             referencedColumns: ["id"]
           },
         ]
@@ -5097,30 +5333,53 @@ export type Database = {
       }
       creator_earnings_ledger: {
         Row: {
+          character_id: string | null
+          character_purchase_id: string | null
           created_at: string
           creator_user_id: string
           credits_earned: number
           id: string
           purchase_id: string | null
+          source_type: string
           template_id: string | null
         }
         Insert: {
+          character_id?: string | null
+          character_purchase_id?: string | null
           created_at?: string
           creator_user_id: string
           credits_earned: number
           id?: string
           purchase_id?: string | null
+          source_type?: string
           template_id?: string | null
         }
         Update: {
+          character_id?: string | null
+          character_purchase_id?: string | null
           created_at?: string
           creator_user_id?: string
           credits_earned?: number
           id?: string
           purchase_id?: string | null
+          source_type?: string
           template_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "creator_earnings_ledger_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "creator_earnings_ledger_character_purchase_id_fkey"
+            columns: ["character_purchase_id"]
+            isOneToOne: false
+            referencedRelation: "character_purchases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "creator_earnings_ledger_purchase_id_fkey"
             columns: ["purchase_id"]
@@ -14036,6 +14295,14 @@ export type Database = {
         }[]
       }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
+      purchase_character: {
+        Args: {
+          _character_id: string
+          _license_ip_hash?: string
+          _license_version: string
+        }
+        Returns: Json
+      }
       purchase_template: { Args: { _template_id: string }; Returns: Json }
       record_streak_activity: {
         Args: { p_user_id: string }

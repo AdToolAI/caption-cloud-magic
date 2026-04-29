@@ -121,6 +121,9 @@ const MotionStudioHub = lazy(() => import("./pages/MotionStudio/Hub"));
 const MotionStudioStudioMode = lazy(() => import("./pages/MotionStudio/StudioMode"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
 const CreatorStudio = lazy(() => import("./pages/CreatorStudio"));
+const MarketplaceCreatorTerms = lazy(() => import("./pages/legal/MarketplaceCreatorTerms"));
+const MarketplaceBuyerTerms = lazy(() => import("./pages/legal/MarketplaceBuyerTerms"));
+const CharacterTakedownRequest = lazy(() => import("./pages/legal/CharacterTakedownRequest"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
@@ -183,6 +186,10 @@ function AppLayout() {
                     <Route path="/upgrade-enterprise" element={<UpgradeEnterprise />} />
                     <Route path="/support" element={<Support />} />
                     <Route path="/onboarding" element={<Onboarding />} />
+                    {/* Marketplace legal — must come before /legal/:page catchall */}
+                    <Route path="/legal/marketplace-creator-terms" element={<MarketplaceCreatorTerms />} />
+                    <Route path="/legal/marketplace-buyer-terms" element={<MarketplaceBuyerTerms />} />
+                    <Route path="/legal/character-takedown-request" element={<CharacterTakedownRequest />} />
                     <Route path="/legal/:page" element={<Legal />} />
                     {/* Direct public routes for TikTok OAuth compliance */}
                     <Route path="/privacy" element={<Legal />} />
