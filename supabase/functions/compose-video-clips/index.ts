@@ -302,20 +302,26 @@ serve(async (req) => {
     };
 
     // Engines that compose-video-clips actually implements. Anything outside
-    // this set (e.g. 'ai-sora') gets normalized to 'ai-hailuo' so an
-    // upstream planner (Auto-Director, manual choice) can never leave a
-    // scene stranded in 'pending' forever.
+    // this set (e.g. legacy 'ai-sora' after the OpenAI Sunset 2026) gets
+    // normalized to a working default so an upstream planner (Auto-Director,
+    // manual choice) can never leave a scene stranded in 'pending' forever.
     const SUPPORTED_AI_SOURCES = new Set([
-      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-sora', 'ai-runway', 'ai-pika', 'ai-image',
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-runway', 'ai-pika', 'ai-image',
     ]);
-
-    // Throttle for Sora 2: Replicate enforces ~1 request / 5–10s on openai/sora-2.
-    // We track the last Sora call and gate subsequent calls so we don't get 429-storms.
-    const SORA_MIN_INTERVAL_MS = 7000;
-    let lastSoraCallAt = 0;
 
     // Process each scene
     for (const scene of scenes) {
+      // Sora 2 sunset: silently migrate any legacy 'ai-sora' scene to Veo 3.1
+      // (audio + cinematic) since OpenAI is sunsetting Sora 2 in 2026.
+      if ((scene.clipSource as string) === 'ai-sora') {
+        console.warn(`[compose-video-clips] Scene ${scene.id} clipSource 'ai-sora' is sunset — migrating to ai-veo.`);
+        scene.clipSource = 'ai-veo';
+        await supabaseAdmin
+          .from('composer_scenes')
+          .update({ clip_source: 'ai-veo', updated_at: new Date().toISOString() })
+          .eq('id', scene.id);
+      }
+
       // Defensive: rewrite unsupported AI engines to a working default.
       if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
         console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
