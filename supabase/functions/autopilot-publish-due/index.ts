@@ -88,6 +88,20 @@ Deno.serve(async (req) => {
           slot_id: slot.id,
           payload: { platform: slot.platform, social_post_id: result.post_id ?? null },
         });
+
+        EdgeRuntime.waitUntil(
+          admin.functions.invoke("autopilot-emit-notification", {
+            body: {
+              user_id: slot.user_id,
+              type: "autopilot_posted",
+              title: "Autopilot hat gepostet",
+              message: `${slot.platform.toUpperCase()} · live seit ${new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}`,
+              metadata: { slot_id: slot.id, platform: slot.platform, social_post_id: result.post_id ?? null },
+              push: false, // posted is good news, no need to push every time
+              push_url: "/autopilot",
+            },
+          }).then(() => {}).catch((e) => console.error("notif fail", e)),
+        );
         published++;
       } catch (e) {
         console.error("publish failed", slot.id, e);
@@ -95,6 +109,19 @@ Deno.serve(async (req) => {
           status: "failed",
           block_reason: `publish_error:${e instanceof Error ? e.message.slice(0, 200) : String(e)}`,
         }).eq("id", slot.id);
+
+        EdgeRuntime.waitUntil(
+          admin.functions.invoke("autopilot-emit-notification", {
+            body: {
+              user_id: slot.user_id,
+              type: "autopilot_failed",
+              title: "Veröffentlichung fehlgeschlagen",
+              message: `${slot.platform.toUpperCase()} · ${(e instanceof Error ? e.message : String(e)).slice(0, 140)}`,
+              metadata: { slot_id: slot.id, platform: slot.platform },
+              push_url: "/autopilot",
+            },
+          }).then(() => {}).catch((er) => console.error("notif fail", er)),
+        );
         failed++;
       }
     }
