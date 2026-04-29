@@ -20,6 +20,7 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
 
   const [portraitOpen, setPortraitOpen] = useState(false);
   const [speakOpen, setSpeakOpen] = useState(false);
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   const previewUrl =
     character.portrait_mode && character.portrait_mode !== 'original' && character.portrait_url
@@ -34,6 +35,19 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
       : null;
 
   const canSpeak = Boolean(character.default_voice_id);
+
+  const mpStatus = character.marketplace_status ?? 'private';
+  const mpBadge = (() => {
+    if (mpStatus === 'published')
+      return { label: character.pricing_type === 'premium' ? `Live · ${character.price_credits ?? 0} cr` : 'Live · Free', icon: Store, className: 'bg-emerald-600 text-white border-0' };
+    if (mpStatus === 'pending_review')
+      return { label: 'In review', icon: Clock, className: 'bg-amber-500/90 text-white border-0' };
+    if (mpStatus === 'under_investigation')
+      return { label: 'Investigating', icon: ShieldAlert, className: 'bg-destructive text-destructive-foreground border-0' };
+    if (mpStatus === 'rejected')
+      return { label: 'Rejected', icon: ShieldAlert, className: 'bg-destructive/80 text-destructive-foreground border-0' };
+    return null;
+  })();
 
   return (
     <>
