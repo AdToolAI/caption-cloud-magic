@@ -626,6 +626,9 @@ export const DashboardVideoCarousel = ({
         </div>
       )}
 
+      {/* Autopilot Hero Banner — KI-Steuerung */}
+      <AutopilotHeroBanner />
+
       {/* News Section */}
       <div className="mt-6 pt-6 border-t border-border/50">
         <div className="flex items-center gap-2 mb-3">
