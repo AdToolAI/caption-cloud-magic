@@ -32,7 +32,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const email: string = body?.email ?? "qa-bot@useadtool.ai";
-    const password: string = body?.password ?? crypto.randomUUID().replace(/-/g, "") + "Q!9";
+    const resetPassword: boolean = body?.reset_password === true;
+    const password: string =
+      body?.password ?? crypto.randomUUID().replace(/-/g, "") + "Q!9";
 
     // Check if user exists
     const { data: existingProfile } = await supabase
@@ -43,9 +45,17 @@ Deno.serve(async (req) => {
 
     let userId: string;
     let created = false;
+    let passwordChanged = false;
 
     if (existingProfile) {
       userId = existingProfile.id;
+      if (resetPassword) {
+        const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+          password,
+        });
+        if (updErr) throw updErr;
+        passwordChanged = true;
+      }
     } else {
       // Create auth user
       const { data: authUser, error: authErr } =
@@ -78,16 +88,18 @@ Deno.serve(async (req) => {
         { onConflict: "user_id" }
       );
 
+    const passwordReturned = created || passwordChanged;
     return new Response(
       JSON.stringify({
         ok: true,
         user_id: userId,
         email,
-        password: created ? password : "(unchanged - user already existed)",
+        password: passwordReturned ? password : null,
         created,
-        instructions: created
-          ? "Save QA_TEST_USER_EMAIL + QA_TEST_USER_PASSWORD as secrets so the orchestrator can log in."
-          : "User already existed; secrets unchanged.",
+        password_changed: passwordChanged,
+        instructions: passwordReturned
+          ? "Speichere das Passwort SOFORT als Secret QA_TEST_USER_PASSWORD — es wird nur dieses eine Mal angezeigt."
+          : "User existierte bereits; Passwort unverändert. Sende { reset_password: true } um es neu zu setzen.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
