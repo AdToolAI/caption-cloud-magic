@@ -412,6 +412,8 @@ serve(async (req) => {
           instrumental,
           bpm: bpm || null,
           key: key || null,
+          lyrics: lyrics || null,
+          loop: loop || false,
         },
       })
       .select()
