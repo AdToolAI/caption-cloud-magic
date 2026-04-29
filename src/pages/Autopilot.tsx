@@ -16,6 +16,10 @@ import {
   useToggleAutopilot,
 } from '@/hooks/useAutopilot';
 import { AutopilotBriefWizard } from '@/components/autopilot/AutopilotBriefWizard';
+import { AutopilotCalendarGrid } from '@/components/autopilot/AutopilotCalendarGrid';
+import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer';
+import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
+import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 
 export default function Autopilot() {
@@ -26,6 +30,8 @@ export default function Autopilot() {
   const pause = usePauseAutopilot();
   const toggle = useToggleAutopilot();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState<AutopilotSlot | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const isActive = !!brief?.is_active;
   const isLocked = !!(brief?.locked_until && new Date(brief.locked_until) > new Date());
@@ -143,11 +149,15 @@ export default function Autopilot() {
             </TabsList>
 
             <TabsContent value="calendar">
-              <CalendarPanel queue={queue} hasBrief={!!brief} />
+              <AutopilotCalendarGrid
+                queue={queue}
+                hasBrief={!!brief}
+                onSelectSlot={(s) => { setSelectedSlot(s); setDrawerOpen(true); }}
+              />
             </TabsContent>
 
             <TabsContent value="strategy">
-              <StrategyPanel brief={brief} />
+              <AutopilotStrategyEditor brief={brief} />
             </TabsContent>
 
             <TabsContent value="tools">
@@ -166,6 +176,7 @@ export default function Autopilot() {
       </div>
 
       <AutopilotBriefWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <AutopilotSlotDrawer slot={selectedSlot} open={drawerOpen} onOpenChange={setDrawerOpen} />
     </>
   );
 }
@@ -214,71 +225,6 @@ function ActivationToggle({
   );
 }
 
-function CalendarPanel({ queue, hasBrief }: { queue: ReturnType<typeof useAutopilotQueue>['data']; hasBrief: boolean }) {
-  if (!hasBrief) {
-    return (
-      <Card className="p-12 text-center border-dashed">
-        <Calendar className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-        <h3 className="font-serif text-xl mb-1">Noch kein Plan</h3>
-        <p className="text-sm text-muted-foreground max-w-md mx-auto">
-          Aktiviere den Autopilot oben — die KI erstellt automatisch einen 14-Tage-Plan basierend auf deinem Brief und den aktuellen Trends.
-        </p>
-      </Card>
-    );
-  }
-  if (!queue || queue.length === 0) {
-    return (
-      <Card className="p-12 text-center border-dashed">
-        <Sparkles className="h-10 w-10 text-primary/60 mx-auto mb-3 animate-pulse" />
-        <h3 className="font-serif text-xl mb-1">KI plant gerade…</h3>
-        <p className="text-sm text-muted-foreground">Erste Slots erscheinen innerhalb der nächsten Minuten.</p>
-      </Card>
-    );
-  }
-  return (
-    <div className="grid gap-2">
-      {queue.map((slot) => (
-        <Card key={slot.id} className="p-3 flex items-center gap-3">
-          <div className="text-xs text-muted-foreground w-32 shrink-0">
-            {new Date(slot.scheduled_at).toLocaleString()}
-          </div>
-          <Badge variant="outline" className="text-[10px]">{slot.platform}</Badge>
-          <Badge variant="outline" className="text-[10px] uppercase">{slot.language}</Badge>
-          <div className="flex-1 text-sm truncate">{slot.topic_hint || slot.caption || 'Ohne Titel'}</div>
-          <Badge className={cn(
-            'text-[10px]',
-            slot.status === 'posted' && 'bg-emerald-600',
-            slot.status === 'scheduled' && 'bg-primary text-primary-foreground',
-            slot.status === 'qa_review' && 'bg-amber-500 text-white',
-            slot.status === 'blocked' && 'bg-destructive',
-            slot.status === 'failed' && 'bg-destructive/70',
-          )}>{slot.status}</Badge>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function StrategyPanel({ brief }: { brief: ReturnType<typeof useAutopilotBrief>['data'] }) {
-  if (!brief) {
-    return (
-      <Card className="p-8 text-center border-dashed">
-        <Settings className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-        <p className="text-sm text-muted-foreground">Noch kein Brief erstellt — wird beim ersten Aktivieren konfiguriert.</p>
-      </Card>
-    );
-  }
-  return (
-    <div className="grid md:grid-cols-2 gap-4">
-      <StatCard label="Themen-Pillars" value={brief.topic_pillars.join(' · ') || '—'} />
-      <StatCard label="Verbots-Themen" value={brief.forbidden_topics.join(' · ') || 'keine'} />
-      <StatCard label="Tonalität" value={brief.tonality} />
-      <StatCard label="Plattformen" value={brief.platforms.join(' · ') || '—'} />
-      <StatCard label="Sprachen" value={brief.languages.join(' · ').toUpperCase()} />
-      <StatCard label="Auto-Publish" value={brief.auto_publish_enabled ? 'AN' : 'AUS (Co-Pilot)'} />
-    </div>
-  );
-}
 
 function ToolsPanel() {
   const tools = [
