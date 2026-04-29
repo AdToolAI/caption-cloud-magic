@@ -1,169 +1,112 @@
-## Ziel
 
-Die 4 UI-Schichten (Cinematic Presets, Director Modifiers, Shot Director, Visual Style) und 2 Server-Schichten (`enrichPrompt`, `injectCharacter`) im Motion Studio so vereinheitlichen, dass:
-- keine Achse (vor allem **Lighting**) doppelt belegt wird,
-- Brand Character Lock auch im Composer greift,
-- der Audio-Toggle für **alle** Provider tatsächlich wirkt,
-- der User vor dem Generieren sieht, was das Modell wirklich bekommt.
+# Avatar Library — Brand Character × Voice × Talking Head
+
+Konsolidierung von **Brand Characters** + **Voice Preset** + **Hedra-Portrait** in eine Entität namens **Avatar**. Jeder Avatar ist sofort „sprechfähig" via Talking Head, mit einem Klick.
 
 ---
 
-## Phase 1 — Zentraler Prompt-Composer (Client)
+## Strategie: Sanftes Rebranding statt destruktiver Migration
 
-**Neue Datei:** `src/lib/motion-studio/composePromptLayers.ts`
+Die existierende Tabelle `brand_characters` wird **nicht umbenannt** (zu riskant: 10+ Studios, RLS, Bucket-Name `brand-characters` haben harte Referenzen). Stattdessen:
 
-Eine reine Funktion, die als **einzige Quelle** für den finalen Prompt dient. Ersetzt die verstreuten Aufrufe in `ClipsTab.tsx` (Z. 285–292) und `SceneCard.tsx` (Z. 775–780).
+- Tabelle bleibt physisch `brand_characters` — bekommt nur **neue Avatar-Spalten**
+- UI und alle neuen Texte sprechen ausschließlich von **„Avatars"**
+- Route `/brand-characters` bleibt bestehen → neue Route `/avatars` zeigt dieselbe Page (Backward-Compat)
+- Alle Sidebar-/Hub-Einträge werden auf „Avatars" umbenannt
+- Hook bleibt `useBrandCharacters` intern, aber ein Alias-Export `useAvatars` wird hinzugefügt für neuen Code
 
-```text
-Input: { rawPrompt, slots, shotDirector, directorModifiers,
-         cinematicPreset, visualStyle, brandCharacter, characters, locations }
+→ Null Datenmigration, null Breaking Changes, klare User-Story.
 
-Pipeline (deterministisch):
-  1. resolveMentions()         → Text + autoRefImage
-  2. dedupeAxes()              → NEU: erkennt Lighting/Camera/Mood-Konflikte
-  3. applyDirectorModifiers()  → nur Achsen, die nicht schon belegt sind
-  4. buildShotPromptSuffix()   → Cinematography-Suffix
-  5. injectBrandCharacter()    → NEU client-seitig, falls aktiv
-  6. return { finalPrompt, referenceImageUrl, conflictsResolved[] }
+---
+
+## Datenbank — neue Spalten auf `brand_characters`
+
+```sql
+ALTER TABLE brand_characters
+  ADD COLUMN default_voice_id        text,        -- ElevenLabs voice ID oder custom_voice UUID
+  ADD COLUMN default_voice_provider  text DEFAULT 'elevenlabs'
+    CHECK (default_voice_provider IN ('elevenlabs','custom')),
+  ADD COLUMN default_voice_name      text,        -- Anzeige im UI ohne extra Lookup
+  ADD COLUMN portrait_url            text,        -- Hedra-optimiertes Frontal-Portrait
+  ADD COLUMN portrait_mode           text DEFAULT 'original'
+    CHECK (portrait_mode IN ('original','auto_generated','manual_upload')),
+  ADD COLUMN default_language        text DEFAULT 'en',
+  ADD COLUMN default_aspect_ratio    text DEFAULT '9:16';
 ```
 
-**`dedupeAxes()`-Regeln (Konflikt-Auflösung mit Priorität):**
-
-| Achse | Priorität (höchste gewinnt) |
-|---|---|
-| Lighting | Shot Director > Cinematic Preset > Director Modifier > Visual Style |
-| Camera/Movement | Shot Director > Cinematic Preset > Director Modifier |
-| Mood/Color Grade | Cinematic Preset > Director Modifier > Visual Style |
-| Lens/Film-Stock | Director Modifier (einzige Quelle) |
-
-Konflikte werden im Return-Objekt gemeldet → UI zeigt sie an.
+Kein neuer Bucket — `portrait_url` lebt im selben `brand-characters` Bucket unter `{user_id}/portraits/{uuid}.png` (RLS-Path-Constraint bleibt erfüllt).
 
 ---
 
-## Phase 2 — Brand Character Lock im Composer
+## Edge Function — `generate-avatar-portrait` (neu)
 
-**Geändert:** `src/components/video-composer/SceneCard.tsx`, `ClipsTab.tsx`, `supabase/functions/compose-video-clips/index.ts`
+Nimmt Original-Reference-Bild, ruft **`google/gemini-3.1-flash-image-preview`** über Lovable AI Gateway mit Edit-Prompt:
 
-- Hook `useActiveBrandCharacter()` lesen (existiert bereits via `useBrandCharacters`).
-- Wenn aktiv: `brandCharacter.identityCardPrompt` via neuen Composer **vor** `rawPrompt` injizieren, `brandCharacter.referenceImageUrl` als Fallback für `referenceImageUrl` setzen, **nur** wenn Scene keinen eigenen Reference hat.
-- Edge Function: neues optionales Feld `brand_character_prompt` im Scene-Payload — wird in `enrichPrompt` als erstes injiziert, mit Token-Hash-Dedupe gegen `injectCharacter` (siehe Phase 4).
+> *"Restyle this person as a centered frontal portrait, eye-level camera, neutral soft background, shoulders visible, looking directly into camera, photorealistic, soft studio lighting. Preserve exact facial identity, hair, and distinguishing features."*
+
+Speichert im Bucket, gibt URL zurück, schreibt `portrait_url` + `portrait_mode='auto_generated'` in DB.
+Kostet ~1 Credit (transparent für User per `featureCosts`).
 
 ---
 
-## Phase 3 — Server-seitige Negative-Prompt-Sanitizer
+## UI — Drei Touchpoints
 
-**Geändert:** `supabase/functions/compose-video-clips/index.ts` (Z. 231–252)
+### 1. `/brand-characters` → Rebrand zu „Avatars"
+- Page-Title: **„Your Avatar Library"**, Subline „Recurring on-screen talent — one click to make them speak"
+- Header-Chip: „Avatar Library Lock" (statt „Brand Character Lock")
+- `BrandCharacterCard` bekommt drei neue Inline-Sektionen:
+  - **Voice Picker** (Combobox: ElevenLabs Top 8 + Custom Voices) → speichert `default_voice_id` + `_provider` + `_name`
+  - **Portrait Section**: Toggle zwischen `original` / `auto_generated` / `manual_upload`
+    - Bei `auto_generated`: Button „Generate Hedra Portrait" → ruft Edge Function, zeigt Preview
+    - Bei `manual_upload`: Upload-Slot
+  - **„Speak" Quick-Action Button** (gold, prominent) → öffnet `TalkingHeadDialog` vorausgefüllt
 
-Statt nur `/no on-screen text.../` zu entfernen, eine Regex-Liste aller bekannten Negativ-Phrasen:
+### 2. `TalkingHeadDialog` — neuer „Avatar"-Tab
+Zusätzlich zu „Upload" und „Generated" Tabs: **„From Avatar"** (default wenn ≥1 Avatar mit `portrait_url` ODER `default_voice_id` existiert).
+- Avatar-Picker (Grid mit Bild + Name)
+- Auswahl füllt: `imageUrl` = `portrait_url || reference_image_url`, `voiceId` = `default_voice_id`, `aspectRatio` = `default_aspect_ratio`
+- User schreibt nur noch Skript
+
+### 3. Sidebar / Hub
+- Sidebar-Eintrag „Brand Characters" → **„Avatars"** (Icon bleibt Users-Lucide)
+- Hub-Tile gleiches Rebranding
+- Route `/avatars` → rendert dieselbe `BrandCharacters` Page (alias)
+
+---
+
+## Composer-Integration
+
+`SceneCard` Talking-Head-Action ruft `TalkingHeadDialog` schon heute. Mit neuem „From Avatar"-Tab funktioniert die Avatar-Auswahl dort automatisch, **ohne extra Code in SceneCard**.
+
+---
+
+## Memory & Rebranding-Konsistenz
+
+- Memory `brand-character-lock` bleibt, wird ergänzt um „Avatar Library = Brand Character + Voice + optional Hedra Portrait"
+- Neue Memory `mem://features/avatars/library-architecture` mit Schema, Edge Function, UI-Routen
+
+---
+
+## Geliefert wird
 
 ```text
-NEGATIVE_LEAK_PATTERNS = [
-  /,?\s*no on-screen text[^.,]*/gi,
-  /,?\s*without (text|logos|captions|subtitles)[^.,]*/gi,
-  /,?\s*avoid (text|logos|watermarks)[^.,]*/gi,
-  /,?\s*no (text|captions|logos|watermark)[^.,]*/gi,
-]
+Files (neu/geändert)
+├── supabase/migrations/<ts>_avatar_library.sql            (5 neue Spalten)
+├── supabase/functions/generate-avatar-portrait/index.ts   (Gemini Image Edit)
+├── src/hooks/useBrandCharacters.ts                        (+ default_voice/portrait Felder, alias useAvatars)
+├── src/hooks/useAvatarPortrait.ts                         (neuer Hook für Generate-Action)
+├── src/pages/BrandCharacters.tsx                          (Rebrand „Avatars", neue Tagline)
+├── src/components/brand-characters/BrandCharacterCard.tsx (Voice-Picker, Portrait-Toggle, „Speak"-Button)
+├── src/components/brand-characters/AvatarPortraitDialog.tsx (neu: Generate/Upload Hedra-Portrait)
+├── src/components/brand-characters/AvatarVoicePicker.tsx  (neu)
+├── src/components/video-composer/TalkingHeadDialog.tsx    (neuer „From Avatar"-Tab)
+├── src/App.tsx                                            (alias /avatars)
+├── src/config/hubConfig.ts                                (Rebrand-Label)
+├── src/components/layout/Sidebar.tsx (oder Equivalent)    (Rebrand-Label)
+└── mem://features/avatars/library-architecture            (neue Memory)
 ```
 
-Diese Phrasen werden **stripped** — die Konzepte landen ausschließlich im separaten `negative_prompt`-API-Parameter (bereits korrekt implementiert).
-
----
-
-## Phase 4 — Character-Dedupe via Token-Hash
-
-**Geändert:** `supabase/functions/compose-video-clips/index.ts` (`injectCharacter`, Z. 202–229)
-
-Aktuell: 30-Zeichen-Substring-Probe → fragil bei Umformulierung.
-
-Neu:
-```text
-1. Tokenisiere appearance + signatureItems in Wort-Set (lowercase, stoppwort-frei).
-2. Tokenisiere Prompt in gleiches Set.
-3. Wenn Jaccard-Overlap ≥ 0.6 → skip injection (schon vorhanden).
-4. Sonst injizieren.
-```
-
-Verhindert doppelte Charakter-Beschreibung wenn Mention-Resolution den Text leicht umformuliert hat.
-
----
-
-## Phase 5 — Audio-Flag-Audit pro Provider
-
-**Geändert:** `supabase/functions/compose-video-clips/index.ts` (Provider-Branches Z. 357–693)
-
-Für **jeden** Provider explizit verifizieren und ergänzen:
-
-| Provider | Audio-API | Aktion |
-|---|---|---|
-| Veo 3.1 | `generateAudio: bool` | Bestätigen, dass `withAudio` durchgereicht wird |
-| Kling 3 Omni | `with_audio: bool` | Bestätigen |
-| Hailuo 2.3 | kein Audio | UI-Toggle ausgrauen (capabilities.audio: false) |
-| Sora 2 | kein API-Toggle | FFmpeg-Mute beim Stitching (existiert) |
-| Wan 2.5 | kein Audio | UI-Toggle ausgrauen |
-| Seedance 2 | kein Audio | UI-Toggle ausgrauen |
-| Luma Ray 2 | kein Audio | UI-Toggle ausgrauen |
-| Grok Imagine | `audio: bool` | Bestätigen |
-
-Registry `src/config/aiVideoModelRegistry.ts` als Single Source of Truth — `capabilities.audio` muss faktisch korrekt sein.
-
----
-
-## Phase 6 — Live-Prompt-Preview-Panel
-
-**Geändert:** `src/components/video-composer/SceneCard.tsx` (Z. 770–800)
-
-Bestehende Vorschau (`finalPrompt`-Anzeige) ersetzen durch ein **aufklappbares 6-Layer-Panel**:
-
-```text
-┌─ FINAL PROMPT (was das Modell bekommt) ────────────────┐
-│ [Brand Character: "Sarah, 34, ..."]                     │ ← grün wenn aktiv
-│ [Raw: "woman walks to coffee shop"]                     │
-│ [+ Director Mods: ", Arri Alexa, 35mm..."] [3 conflicts]│ ← gelb bei Konflikt
-│ [+ Shot Director: "Cinematography: ..."]                │
-│ [- Stripped: "no on-screen text"] (moved to negative)   │ ← grau
-│ [+ Server: "+ clean cinematic, +i2v motion cue"]        │ ← blau
-│ ─────────────────────────────────────────────────────── │
-│ NEGATIVE: "text, captions, watermark, ..."              │
-│ REFERENCE IMAGE: [thumbnail] (from brand character)     │
-│ AUDIO: ✓ enabled (Veo: generateAudio=true)              │
-└─────────────────────────────────────────────────────────┘
-```
-
-Nutzt `composePromptLayers()`-Output (mit `conflictsResolved[]`). Konflikte als gelbe Badges anzeigen mit Tooltip "Lighting wurde von Shot Director übernommen, Cinematic Preset ignoriert."
-
----
-
-## Technische Details
-
-**Geänderte Dateien:**
-- **NEU**: `src/lib/motion-studio/composePromptLayers.ts` (~120 Zeilen)
-- **NEU**: `src/lib/motion-studio/dedupeAxes.ts` (~80 Zeilen)
-- **GEÄNDERT**: `src/components/video-composer/ClipsTab.tsx` (Z. 285–305, 396–402)
-- **GEÄNDERT**: `src/components/video-composer/SceneCard.tsx` (Z. 770–800, neuer Preview-Block)
-- **GEÄNDERT**: `supabase/functions/compose-video-clips/index.ts` (`enrichPrompt`, `injectCharacter`, Negative-Sanitizer, Brand-Character-Field)
-- **GEÄNDERT**: `src/config/aiVideoModelRegistry.ts` (Audio-Capabilities-Audit für alle 9 Provider)
-- **GEÄNDERT**: `src/types/video-composer.ts` (`ComposerScene` bekommt optional `brandCharacterId`)
-
-**Keine DB-Migrationen** — alle Änderungen sind Code-Layer.
-
-**Keine neuen Edge Functions** — bestehende `compose-video-clips` wird erweitert.
-
-**Backward-compatible** — wenn `composePromptLayers` keine neuen Schichten findet, fällt das Verhalten auf den aktuellen Stand zurück.
-
----
-
-## Akzeptanzkriterien
-
-1. Wählt User „Cinematic Noir" + Director Modifier „warm tungsten" + Shot Director „golden hour" → finaler Prompt enthält **nur eine** Lighting-Anweisung (golden hour gewinnt), Konflikt-Badge sichtbar.
-2. Aktiviert User einen Brand Character → Preview zeigt Identity Card als erste Layer, Reference-Image automatisch gesetzt.
-3. Schreibt User „avoid logos and text" in den Prompt → wird im Preview gestrichen, taucht im Negative-Prompt auf.
-4. `@character` mit großer Beschreibung wird nicht doppelt im finalen Prompt eingefügt (Jaccard-Test).
-5. Audio-Toggle für Hailuo/Wan/Seedance/Luma ist ausgegraut mit Tooltip „Modell unterstützt keinen Sound".
-6. Audio-Toggle für Veo/Kling/Grok schaltet im Provider-Input nachweislich `generateAudio`/`with_audio`/`audio` um.
-7. Preview-Panel zeigt alle 6 Layer einzeln, klar gefärbt.
-
----
-
-## Memory-Update nach Implementierung
-
-Neue Memory: `mem://architecture/video-composer/unified-prompt-composer` — Single-Source-of-Truth-Pipeline, Achsen-Prioritäten, Brand-Character-Auto-Inject im Composer.
+## Out of Scope (Phase 2 später)
+- Voice-Cloning direkt im Avatar-Erstellen-Flow (heute über separates Custom-Voices-Modul)
+- Mehrere Portraits pro Avatar (Profil/Halb/Ganzkörper)
+- Avatar-Sharing/Marketplace
