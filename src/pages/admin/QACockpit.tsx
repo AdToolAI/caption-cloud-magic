@@ -924,3 +924,19 @@ function EmptyState({ label }: { label: string }) {
     </div>
   );
 }
+
+function FilterPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+        active
+          ? "bg-[#F5C76A] text-black border-[#F5C76A]"
+          : "bg-[#0A0F1F]/80 text-muted-foreground border-[#F5C76A]/20 hover:border-[#F5C76A]/50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
