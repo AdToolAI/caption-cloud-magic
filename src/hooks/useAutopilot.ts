@@ -29,6 +29,16 @@ export interface AutopilotBrief {
   video_provider?: string;
   video_duration_sec?: number;
   video_aspect_ratio?: string;
+  // Session F
+  performance_loop_enabled?: boolean;
+  // Session H — Goal & Budget Briefing
+  channel_goal?: 'awareness' | 'engagement' | 'traffic' | 'leads' | 'sales';
+  content_mix?: { ai_video: number; stock_reel: number; static: number };
+  weekly_budget_eur?: number;
+  target_audience?: string | null;
+  usp?: string | null;
+  briefing_required_until?: string | null;
+  last_review_completed_at?: string | null;
 }
 
 export interface AutopilotSlot {
