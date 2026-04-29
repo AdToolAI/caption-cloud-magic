@@ -107,9 +107,15 @@ export function calculateScheduling(
   // r55-phase5: STABILITY MODE — graduated Lambda count for Loft-Film 30fps support
   // ≤500 frames → 1λ, ≤1000 → 2λ, >1000 → 3λ (allows 30fps/60s = 1800 frames safely)
   if (schedulingMode === 'stability') {
-    // r56: Max 3 Lambdas with higher framesPerLambda to avoid AWS concurrency limits
-    // ≤300 frames → 1λ, ≤600 → 2λ, >600 → 3λ (min 270 fpl to keep concurrency low)
-    const stabilityLambdas = frameCount <= 300 ? 1 : frameCount <= 600 ? 2 : 3;
+    // r57: Max 5 Lambdas (raised from 3) to accelerate 8s+ scenes / long composer renders.
+    // Tiered: ≤300 → 1λ, ≤600 → 2λ, ≤900 → 3λ, ≤1500 → 4λ, >1500 → 5λ.
+    // Min 270 fpl preserved to keep AWS concurrency safe (5λ × 25 parallel renders = 125 peak,
+    // still well under AWS account limit of 1000 in eu-central-1).
+    const stabilityLambdas =
+      frameCount <= 300 ? 1 :
+      frameCount <= 600 ? 2 :
+      frameCount <= 900 ? 3 :
+      frameCount <= 1500 ? 4 : 5;
     const fpl = Math.max(Math.ceil(frameCount / stabilityLambdas), 270);
     const estRuntimeSec = fpl * ESTIMATED_SECONDS_PER_FRAME;
     const needsFpsReduction = estRuntimeSec > LAMBDA_TIMEOUT_SECONDS;
