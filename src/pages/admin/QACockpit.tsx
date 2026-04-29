@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 const TIER_COLORS: Record<string, string> = {
