@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { DEMO_VIDEO, isDemoVideo } from '@/constants/demo-video';
 import { useTranslation } from '@/hooks/useTranslation';
+import { AutopilotHeroBanner } from '@/components/autopilot/AutopilotHeroBanner';
 
 interface QuickAction {
   label: string;
