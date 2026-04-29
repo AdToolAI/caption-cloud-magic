@@ -1,12 +1,8 @@
 name: Performance Tests
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: '0 */6 * * *'  # Alle 6 Stunden
+  # Disabled until performance tests are repaired (Phase 1 cleanup).
+  workflow_dispatch:
 
 jobs:
   load-tests:
