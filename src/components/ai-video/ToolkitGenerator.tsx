@@ -208,6 +208,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         castCharacter?.reference_image_url ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
+      // v2v: pass reference clip + reference type (Kling-3 omni)
+      if (model.capabilities.v2v && referenceVideoUrl) {
+        body.referenceVideoUrl = referenceVideoUrl;
+        body.videoReferenceType = videoReferenceType;
+      }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
