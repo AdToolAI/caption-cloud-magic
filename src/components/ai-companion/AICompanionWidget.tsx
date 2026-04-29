@@ -108,7 +108,7 @@ export function AICompanionWidget() {
         .from('companion_user_preferences')
         .select('preferences')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       if (data?.preferences) {
         setPreferences({ ...DEFAULT_PREFERENCES, ...(data.preferences as Record<string, unknown>) });
