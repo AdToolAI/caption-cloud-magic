@@ -49,6 +49,15 @@ export function AutopilotBriefWizard({ open, onOpenChange, onCompleted }: Props)
   const [budget, setBudget] = useState(2000);
   const [autoPublish, setAutoPublish] = useState(false);
 
+  // Session H — Goal briefing state
+  const [goal, setGoal] = useState<GoalBriefingValue>({
+    channel_goal: 'engagement',
+    weekly_budget_eur: 25,
+    content_mix: { ai_video: 33, stock_reel: 33, static: 34 },
+    target_audience: '',
+    usp: '',
+  });
+
   // AUP state
   const [scrolled, setScrolled] = useState(false);
   const [aupAccepted, setAupAccepted] = useState(false);
