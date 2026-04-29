@@ -129,6 +129,11 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       video_provider: videoProvider,
       video_duration_sec: videoDuration,
       video_aspect_ratio: videoRatio,
+      channel_goal: goal.channel_goal,
+      content_mix: goal.content_mix,
+      weekly_budget_eur: goal.weekly_budget_eur,
+      target_audience: goal.target_audience,
+      usp: goal.usp,
     });
   }
 
