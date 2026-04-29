@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Sparkles, ImagePlus, Loader2, Wand2, X, Volume2, VolumeX,
+  Sparkles, ImagePlus, Loader2, Wand2, X, Volume2, VolumeX, Film, Info,
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -68,7 +68,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+  const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
 
@@ -99,6 +102,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
+    if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
@@ -132,6 +136,34 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
       toast.error(err?.message ?? 'Upload fehlgeschlagen');
     } finally {
       setUploading(false);
+    }
+  };
+
+  /* ── Video upload (V2V reference clip) ── */
+  const handleVideoUpload = async (file: File) => {
+    if (!user) return;
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error(language === 'de'
+        ? 'Datei zu groß (max. 50 MB).'
+        : 'File too large (max 50 MB).');
+      return;
+    }
+    setUploadingVideo(true);
+    try {
+      const ext = file.name.split('.').pop() ?? 'mp4';
+      const path = `${user.id}/toolkit-v2v-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage
+        .from('ai-video-reference')
+        .upload(path, file, { upsert: true, contentType: file.type || 'video/mp4' });
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage
+        .from('ai-video-reference')
+        .getPublicUrl(path);
+      setReferenceVideoUrl(publicUrl);
+    } catch (err: any) {
+      toast.error(err?.message ?? 'Upload fehlgeschlagen');
+    } finally {
+      setUploadingVideo(false);
     }
   };
 
@@ -176,6 +208,11 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         castCharacter?.reference_image_url ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
+      // v2v: pass reference clip + reference type (Kling-3 omni)
+      if (model.capabilities.v2v && referenceVideoUrl) {
+        body.referenceVideoUrl = referenceVideoUrl;
+        body.videoReferenceType = videoReferenceType;
+      }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
@@ -332,6 +369,98 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
               />
             </label>
           )}
+        </Card>
+      )}
+
+      {/* ── Video upload (only for V2V) ── */}
+      {model.capabilities.v2v && (
+        <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Film className="h-4 w-4 text-primary" />
+              <Label className="text-sm font-medium">
+                {language === 'de' ? 'Referenz-Video (Video-to-Video)' : 'Reference video (Video-to-Video)'}
+              </Label>
+              <Badge variant="outline" className="border-primary/30 text-primary text-[10px]">V2V</Badge>
+            </div>
+            {referenceVideoUrl && (
+              <Button variant="ghost" size="sm" onClick={() => setReferenceVideoUrl(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
+          {referenceVideoUrl ? (
+            <div className="relative rounded-lg overflow-hidden border border-border/40">
+              <video
+                src={referenceVideoUrl}
+                controls
+                muted
+                playsInline
+                className="w-full max-h-56 object-cover bg-black"
+              />
+            </div>
+          ) : (
+            <label
+              htmlFor="toolkit-video-upload"
+              className="flex flex-col items-center justify-center gap-2 py-8 border-2 border-dashed border-border/40 rounded-lg cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors"
+            >
+              {uploadingVideo ? (
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              ) : (
+                <Film className="h-6 w-6 text-muted-foreground" />
+              )}
+              <span className="text-xs text-muted-foreground">
+                {language === 'de'
+                  ? 'Video hochladen (mp4/webm, max. 50 MB, ≤ 30s empfohlen)'
+                  : 'Upload a video (mp4/webm, max 50 MB, ≤ 30s recommended)'}
+              </span>
+              <input
+                id="toolkit-video-upload"
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleVideoUpload(e.target.files[0])}
+              />
+            </label>
+          )}
+
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                {language === 'de' ? 'Referenz-Typ' : 'Reference type'}
+              </Label>
+              <Select
+                value={videoReferenceType}
+                onValueChange={(v) => setVideoReferenceType(v as 'feature' | 'base')}
+                disabled={!referenceVideoUrl}
+              >
+                <SelectTrigger className="bg-background/40 border-border/40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="feature">
+                    {language === 'de'
+                      ? 'Feature — Stil & Bewegung übernehmen'
+                      : 'Feature — copy style & motion'}
+                  </SelectItem>
+                  <SelectItem value="base">
+                    {language === 'de'
+                      ? 'Base — Komposition als Grundlage'
+                      : 'Base — use composition as foundation'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-start gap-1.5 text-[11px] text-muted-foreground p-2 rounded-md bg-background/40 border border-border/40 max-w-xs">
+              <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+              <span>
+                {language === 'de'
+                  ? 'V2V derzeit nur für Kling 3 Standard / Pro.'
+                  : 'V2V is currently only available for Kling 3 Standard / Pro.'}
+              </span>
+            </div>
+          </div>
         </Card>
       )}
 
