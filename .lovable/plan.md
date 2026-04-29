@@ -1,50 +1,49 @@
-## Problem
+## Status
 
-Beide Smoke-Missionen (`smoke-01-dashboard-tour`, `smoke-02-picture-studio-mock`) failen sofort mit:
+Der vorige Browserless-Fix hat funktioniert: Der jüngste Run (`smoke-03-ai-video-toolkit`) hat **HTTP 200** geliefert und das Skript wurde tatsächlich auf der `/auth`-Seite ausgeführt. Das neue Problem ist auf Applikations-Ebene:
 
 ```
-Browserless 400: module is not defined
+No element found for selector: input[type="password"]
 ```
 
-Ursache: Wir senden den Code als **raw JavaScript** mit `Content-Type: application/javascript` und nutzen `module.exports = ...` (CommonJS). Der aktuelle Browserless `/function`-Endpoint (v2, `production-sfo.browserless.io`) erwartet jedoch:
+Das Login-Formular nutzt `<Input id="password" type="password" …>`, aber `waitForSelector('input[type="email"]')` resolved offenbar bevor das Passwort-Feld vollständig hydratisiert / gerendert ist (React + framer-motion Card + Tabs-Switch zwischen Login/Signup). Folge: Das Skript stirbt sofort beim ersten `page.type` und wir besuchen 0 Pfade.
 
-1. **`Content-Type: application/json`**
-2. Body: `{ "code": "<JS-string>", "context": { ... } }`
-3. Der Code selbst muss **ES-Module-Syntax** verwenden: `export default async ({ page, context }) => { ... }`
+## Was sich ändert
 
-Die Fehlermeldung `module is not defined` ist exakt das, was zurückkommt wenn der Runner ESM erwartet und wir `module.exports` schreiben.
+### 1. `supabase/functions/_shared/browserlessClient.ts` — `buildSmokeNavigationScript`
 
-## Änderungen
-
-### 1. `supabase/functions/_shared/browserlessClient.ts`
-
-**`runBrowserlessFunction(code, context?)`** neu schreiben:
-- Body als JSON senden: `{ code, context }`
-- Header: `Content-Type: application/json`
-- Antwort wie bisher parsen, `rawResponse`/`httpStatus` für Debugging behalten
-- Optionalen zweiten Parameter `context` ergänzen (wird vom Code als zweites Arg empfangen)
-
-**`buildSmokeNavigationScript(opts)`** umstellen:
-- `module.exports = async ({ page }) => { ... }` → `export default async ({ page, context }) => { ... }`
-- Statt `opts` per JSON-Inline-Stringify in den Code zu backen, übergeben wir die Optionen via `context`-Parameter (sauberer, keine Quote-Escapes nötig)
-- Funktion gibt das Tupel `{ data, type }` weiterhin so zurück wie Browserless es erwartet
+- **Beide Felder explizit abwarten**, nicht nur Email:
+  - `await page.waitForSelector('input#email, input[type="email"]', { visible: true, timeout: 20000 })`
+  - `await page.waitForSelector('input#password, input[type="password"]', { visible: true, timeout: 20000 })`
+- **Robustere Submit-Erkennung**: Statt `button[type="submit"]` zusätzlich `button:has-text("Login"), button:has-text("Anmelden")` Fallback per `page.evaluate` (querySelector + click).
+- **Login-Erfolg verifizieren**: Nach Submit warten bis URL nicht mehr `/auth` ist (`page.waitForFunction(() => !location.pathname.startsWith('/auth'), { timeout: 25000 })`). Falls Timeout → klaren Fehler `Login did not redirect (still on /auth)` werfen statt blind die Pfad-Schleife zu starten.
+- **Pre-Login Screenshot**: Falls Login fehlschlägt, einen Screenshot der Auth-Seite zurückgeben (hilft bei "warum sehe ich kein Password-Feld") — schreiben wir in `result.loginScreenshot`.
+- **Console-Log Pre-Init**: Listener vor dem ersten `page.goto` registrieren (ist schon der Fall — bestätigen).
+- **Selector-Doku im Skript** als Kommentar, damit künftige Tweaks (z. B. Magic-Link-Mode) klar bleiben.
 
 ### 2. `supabase/functions/qa-agent-execute-mission/index.ts`
 
-- `runBrowserlessFunction(script)` Aufruf erweitern: `runBrowserlessFunction(script, { baseUrl, email, password, paths, finalPath })`
-- `buildSmokeNavigationScript()` braucht keine Opts mehr im Code-Body, nur noch eine reine Code-Konstante → Signatur entsprechend anpassen (Funktion ohne Args, da Context separat übergeben wird)
+- Wenn `result.loginScreenshot` existiert und der Run failed, diesen Screenshot in `qa-screenshots` Bucket uploaden und als zusätzliches `screenshot_url` an den Bug-Report hängen (im `network_trace`-Objekt unter `login_screenshot_url`).
+- `pathResults`-Verarbeitung defensiv: Wenn leer, weiter wie bisher als Fail markieren, aber `error_message` klarer ("Login failed before any path could be visited").
 
-### 3. Verifikation
+### 3. `src/pages/admin/QACockpit.tsx` — Bug-Detail-Modal
 
-Nach dem Fix manuell `smoke-02-picture-studio-mock` im Cockpit auslösen. Erwartung:
-- HTTP 200 von Browserless
-- `pathResults: [{path: "/picture-studio", ok: true}]`
-- Screenshot wird in `qa-screenshots` Bucket abgelegt
-- Run-Status: `succeeded` (sofern keine Console-Errors)
+- Kleiner UI-Tweak: Wenn `network_trace.login_screenshot_url` vorhanden, eigene Sektion **"Auth-Seite zum Zeitpunkt des Fehlers"** mit Bild — sonst sehen wir nie was Browserless wirklich auf `/auth` vorgefunden hat.
 
-Falls Browserless trotz JSON-Format wieder mit `module is not defined` antwortet, fallen wir auf den Alternativ-Endpoint **`/function`** mit reinem ESM-Body und Content-Type `application/javascript` zurück — testen wir aber erst nach dem JSON-Versuch.
+## Nicht Teil dieser Runde
+
+- 2FA-Flow simulieren (Test-User hat keins).
+- Magic-Link / Google OAuth Login (Smoke-Tests nutzen Email+Passwort).
+- Mehr Missionen — erst Smoke-01..03 stabil, dann Rollout.
+
+## Verifikation
+
+Nach Deploy: "Nächste Mission starten" → erwartet wird entweder
+- **succeeded** mit `pathResults: [{path:"/picture-studio", ok:true}]`, **oder**
+- ein Bug mit Screenshot der Auth-Seite + klarer Message woran genau es liegt.
 
 ## Betroffene Dateien
 
-- `supabase/functions/_shared/browserlessClient.ts` — Body-Format JSON + ESM-Code
-- `supabase/functions/qa-agent-execute-mission/index.ts` — Aufruf mit Context-Objekt
+- `supabase/functions/_shared/browserlessClient.ts`
+- `supabase/functions/qa-agent-execute-mission/index.ts`
+- `src/pages/admin/QACockpit.tsx`
