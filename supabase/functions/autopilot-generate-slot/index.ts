@@ -171,6 +171,35 @@ Visual Prompt MUSS auf Englisch sein für beste Bildqualität.`,
       payload: { qa_score: qa.score, status: finalStatus },
     });
 
+    // Notification: only on states that need user attention
+    if (finalStatus === "qa_review") {
+      EdgeRuntime.waitUntil(
+        admin.functions.invoke("autopilot-emit-notification", {
+          body: {
+            user_id: slot.user_id,
+            type: "autopilot_qa_review",
+            title: "Neuer Slot wartet auf Freigabe",
+            message: `${slot.platform.toUpperCase()} · ${new Date(slot.scheduled_at).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" })} · QA ${qa.score}/100`,
+            metadata: { slot_id: slot.id, platform: slot.platform, qa_score: qa.score },
+            push_url: "/autopilot",
+          },
+        }).then(() => {}).catch((e) => console.error("notif fail", e)),
+      );
+    } else if (finalStatus === "blocked") {
+      EdgeRuntime.waitUntil(
+        admin.functions.invoke("autopilot-emit-notification", {
+          body: {
+            user_id: slot.user_id,
+            type: "autopilot_blocked",
+            title: "Slot durch QA blockiert",
+            message: `${slot.platform.toUpperCase()} · Grund: ${(qa.reason ?? "Compliance-Risiko").slice(0, 120)}`,
+            metadata: { slot_id: slot.id, qa_findings: qa.findings },
+            push_url: "/autopilot",
+          },
+        }).then(() => {}).catch((e) => console.error("notif fail", e)),
+      );
+    }
+
     return json({ ok: true, status: finalStatus, qa_score: qa.score });
   } catch (e) {
     console.error("generate-slot error", e);
