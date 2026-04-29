@@ -181,6 +181,34 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
             </Card>
           )}
 
+
+          {/* Plan context (Session D: trend anchor + scheduling source) */}
+          {(() => {
+            const payload = (slot.content_payload ?? {}) as Record<string, unknown>;
+            const trendAnchor = typeof payload.trend_anchor === 'string' ? payload.trend_anchor : null;
+            const source = typeof payload.scheduling_source === 'string' ? payload.scheduling_source : null;
+            if (!trendAnchor && !source) return null;
+            return (
+              <Card className="p-3 bg-primary/5 border-primary/20 space-y-1.5">
+                <div className="text-[10px] uppercase tracking-widest text-primary/80">Plan-Kontext</div>
+                {trendAnchor && (
+                  <div className="text-xs">
+                    <span className="text-muted-foreground">Trend-Anker: </span>
+                    <span>{trendAnchor}</span>
+                  </div>
+                )}
+                {source && (
+                  <div className="text-xs flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Slot-Wahl:</span>
+                    <Badge variant="outline" className="text-[10px]">
+                      {source === 'posting_slots' ? '📈 Optimaler Zeit-Slot' : '⏱️ Standard-Fallback'}
+                    </Badge>
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           {/* Meta */}
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div>Erstellt: {new Date(slot.created_at).toLocaleString()}</div>
