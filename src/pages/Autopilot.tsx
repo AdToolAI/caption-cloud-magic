@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox } from 'lucide-react';
+import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox, BarChart3 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { AutopilotCalendarGrid } from '@/components/autopilot/AutopilotCalendarG
 import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer';
 import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
 import { AutopilotApprovalInbox } from '@/components/autopilot/AutopilotApprovalInbox';
+import { AutopilotInsightsPanel } from '@/components/autopilot/AutopilotInsightsPanel';
 import { useAutopilotNotifications } from '@/hooks/useAutopilotNotifications';
 import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
@@ -157,6 +158,7 @@ export default function Autopilot() {
               </TabsTrigger>
               <TabsTrigger value="strategy" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> Strategie</TabsTrigger>
               <TabsTrigger value="tools" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Tools</TabsTrigger>
+              <TabsTrigger value="insights" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Insights</TabsTrigger>
               <TabsTrigger value="compliance" className="gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Compliance</TabsTrigger>
               <TabsTrigger value="activity" className="gap-1.5"><Activity className="h-3.5 w-3.5" /> Activity</TabsTrigger>
             </TabsList>
@@ -181,6 +183,10 @@ export default function Autopilot() {
 
             <TabsContent value="tools">
               <ToolsPanel />
+            </TabsContent>
+
+            <TabsContent value="insights">
+              <AutopilotInsightsPanel />
             </TabsContent>
 
             <TabsContent value="compliance">

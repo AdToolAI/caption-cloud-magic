@@ -371,3 +371,63 @@ export function useAutopilotActivity(limit = 50) {
     staleTime: 15_000,
   });
 }
+
+/* ============ Performance Insights (Session F) ============ */
+
+export interface AutopilotPerformanceInsights {
+  id: string;
+  brief_id: string;
+  total_posts_analyzed: number;
+  avg_engagement_rate: number | null;
+  top_pillars: string[];
+  weakest_pillars: string[];
+  top_platforms: Array<{ platform: string; avg_engagement: number; posts_count: number }>;
+  top_post_hours: Record<string, Array<{ hour: number; score: number }>>;
+  top_formats: Array<{ format: string; avg_engagement: number; posts_count: number }>;
+  recommendation_text: string | null;
+  analyzed_until: string;
+  updated_at: string;
+}
+
+export function useAutopilotInsights() {
+  return useQuery({
+    queryKey: ['autopilot-insights'],
+    queryFn: async (): Promise<AutopilotPerformanceInsights | null> => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) return null;
+      const { data, error } = await supabase
+        .from('autopilot_performance_insights')
+        .select('*')
+        .eq('user_id', u.user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as unknown as AutopilotPerformanceInsights) ?? null;
+    },
+    staleTime: 60_000,
+  });
+}
+
+export function useTriggerPerformanceAnalysis() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('autopilot-performance-analyze', { body: {} });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['autopilot-insights'] });
+      toast({
+        title: 'Analyse abgeschlossen',
+        description: `${data?.analyzed_briefs ?? 0} Brief(s) ausgewertet.`,
+      });
+    },
+    onError: (e: unknown) => toast({
+      title: 'Analyse fehlgeschlagen',
+      description: e instanceof Error ? e.message : String(e),
+      variant: 'destructive',
+    }),
+  });
+}
+

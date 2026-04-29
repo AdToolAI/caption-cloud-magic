@@ -94,9 +94,26 @@ Deno.serve(async (req) => {
     // ---------------- 2. Resolve high-score posting windows ----------------
     const postingWindows = await fetchPostingWindows(admin, userId, platforms);
 
+    // ---------------- 2b. Pull performance insights (Session F) ----------------
+    const { data: insights } = await admin
+      .from("autopilot_performance_insights")
+      .select("top_pillars, weakest_pillars, top_platforms, top_post_hours, top_formats, recommendation_text, total_posts_analyzed, avg_engagement_rate")
+      .eq("brief_id", brief.id)
+      .maybeSingle();
+    const hasInsights = insights && (insights.total_posts_analyzed ?? 0) >= 10;
+
     // ---------------- 3. Ask AI for plan with full context ----------------
     const apiKey = Deno.env.get("LOVABLE_API_KEY");
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
+
+    const performanceBlock = hasInsights
+      ? `\nPERFORMANCE-LERNDATEN (basierend auf ${insights!.total_posts_analyzed} echten Posts, ⌀ Engagement ${((insights!.avg_engagement_rate ?? 0) * 100).toFixed(1)}%):
+- Top-Themen die performt haben: ${(insights!.top_pillars as string[] ?? []).join(", ") || "(keine)"} → diese MÜSSEN 2× häufiger vorkommen
+- Schwächste Themen: ${(insights!.weakest_pillars as string[] ?? []).join(", ") || "(keine)"} → reduzieren oder neu framen
+- Beste Plattform: ${((insights!.top_platforms as Array<{platform: string}>)[0]?.platform ?? "—").toUpperCase()} → mehr Inhalte dorthin lenken
+- Empfehlung: ${insights!.recommendation_text ?? ""}
+NUTZE DIESE LERNDATEN AKTIV — sie sind echte historische Performance, kein Bauchgefühl.`
+      : "";
 
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -114,7 +131,7 @@ Strikte Regeln:
 - Tonalität strikt einhalten.
 - Verbots-Themen niemals: ${forbidden.join(", ") || "(keine)"}
 - Nutze die übergebenen Trends, um relevante Hooks zu erzeugen — aber kein direkter Newsjacking von Politik/Tragödien.
-- Sprache jeder Idee MUSS einer der erlaubten Sprachen entsprechen: ${languages.join(", ")}.`,
+- Sprache jeder Idee MUSS einer der erlaubten Sprachen entsprechen: ${languages.join(", ")}.${performanceBlock}`,
           },
           {
             role: "user",
@@ -128,6 +145,13 @@ Strikte Regeln:
               },
               live_trends: trends.slice(0, 30),
               live_news_headlines: news.slice(0, 20),
+              performance_insights: hasInsights ? {
+                top_pillars: insights!.top_pillars,
+                weakest_pillars: insights!.weakest_pillars,
+                top_platforms: insights!.top_platforms,
+                top_post_hours: insights!.top_post_hours,
+                top_formats: insights!.top_formats,
+              } : null,
             }),
           },
         ],

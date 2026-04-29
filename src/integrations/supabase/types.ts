@@ -1166,9 +1166,11 @@ export type Database = {
           id: string
           is_active: boolean
           languages: string[]
+          last_performance_analysis_at: string | null
           last_plan_generated_at: string | null
           locked_until: string | null
           paused_until: string | null
+          performance_loop_enabled: boolean
           platforms: string[]
           posts_per_week: Json
           tonality: string
@@ -1193,9 +1195,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           languages?: string[]
+          last_performance_analysis_at?: string | null
           last_plan_generated_at?: string | null
           locked_until?: string | null
           paused_until?: string | null
+          performance_loop_enabled?: boolean
           platforms?: string[]
           posts_per_week?: Json
           tonality?: string
@@ -1220,9 +1224,11 @@ export type Database = {
           id?: string
           is_active?: boolean
           languages?: string[]
+          last_performance_analysis_at?: string | null
           last_plan_generated_at?: string | null
           locked_until?: string | null
           paused_until?: string | null
+          performance_loop_enabled?: boolean
           platforms?: string[]
           posts_per_week?: Json
           tonality?: string
@@ -1273,6 +1279,65 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      autopilot_performance_insights: {
+        Row: {
+          analyzed_until: string
+          avg_engagement_rate: number | null
+          brief_id: string
+          created_at: string
+          id: string
+          recommendation_text: string | null
+          top_formats: Json
+          top_pillars: Json
+          top_platforms: Json
+          top_post_hours: Json
+          total_posts_analyzed: number
+          updated_at: string
+          user_id: string
+          weakest_pillars: Json
+        }
+        Insert: {
+          analyzed_until: string
+          avg_engagement_rate?: number | null
+          brief_id: string
+          created_at?: string
+          id?: string
+          recommendation_text?: string | null
+          top_formats?: Json
+          top_pillars?: Json
+          top_platforms?: Json
+          top_post_hours?: Json
+          total_posts_analyzed?: number
+          updated_at?: string
+          user_id: string
+          weakest_pillars?: Json
+        }
+        Update: {
+          analyzed_until?: string
+          avg_engagement_rate?: number | null
+          brief_id?: string
+          created_at?: string
+          id?: string
+          recommendation_text?: string | null
+          top_formats?: Json
+          top_pillars?: Json
+          top_platforms?: Json
+          top_post_hours?: Json
+          total_posts_analyzed?: number
+          updated_at?: string
+          user_id?: string
+          weakest_pillars?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_performance_insights_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: true
+            referencedRelation: "autopilot_briefs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       autopilot_queue: {
         Row: {
