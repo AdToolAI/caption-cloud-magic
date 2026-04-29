@@ -524,6 +524,107 @@ export default function QACockpit() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* BUG DETAIL MODAL */}
+      <Dialog open={!!selectedBug} onOpenChange={(open) => { if (!open) setSelectedBug(null); }}>
+        <DialogContent className="bg-[#0A0F1F] border-[#F5C76A]/30 text-foreground sm:max-w-3xl max-h-[85vh] overflow-y-auto">
+          {selectedBug && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start gap-2 flex-wrap">
+                  <Badge className={SEVERITY_COLORS[selectedBug.severity] ?? ""}>{selectedBug.severity}</Badge>
+                  <Badge variant="outline">{selectedBug.category}</Badge>
+                  <Badge variant="outline">{selectedBug.status}</Badge>
+                </div>
+                <DialogTitle className="text-[#F5C76A] mt-2">{selectedBug.title}</DialogTitle>
+                <DialogDescription className="text-xs">
+                  Mission: <span className="font-mono text-foreground">{selectedBug.mission_name}</span>
+                  {selectedBug.route && <> · Route: <span className="font-mono text-foreground">{selectedBug.route}</span></>}
+                  {" · "}{formatDistanceToNow(new Date(selectedBug.created_at), { addSuffix: true })}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                {selectedBug.description && (
+                  <Section title="Beschreibung">
+                    <pre className="text-xs whitespace-pre-wrap font-mono bg-black/40 p-3 rounded border border-[#F5C76A]/10">
+                      {selectedBug.description}
+                    </pre>
+                  </Section>
+                )}
+
+                {selectedBug.screenshot_url && (
+                  <Section title="Screenshot">
+                    <a href={selectedBug.screenshot_url} target="_blank" rel="noopener noreferrer">
+                      <img
+                        src={selectedBug.screenshot_url}
+                        alt="Bug screenshot"
+                        className="w-full rounded border border-[#F5C76A]/10 hover:border-[#F5C76A]/40"
+                      />
+                    </a>
+                  </Section>
+                )}
+
+                {Array.isArray(selectedBug.console_log) && selectedBug.console_log.length > 0 && (
+                  <Section title={`Console-Logs (${selectedBug.console_log.length})`}>
+                    <div className="space-y-1 max-h-60 overflow-auto bg-black/40 p-3 rounded border border-[#F5C76A]/10">
+                      {selectedBug.console_log.map((c: any, i: number) => (
+                        <div key={i} className="text-xs font-mono">
+                          <span className={c.type === "error" || c.type === "pageerror" ? "text-red-400" : "text-cyan-300"}>
+                            [{c.type}]
+                          </span>{" "}
+                          <span className="text-muted-foreground">{c.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {selectedBug.network_trace && (
+                  <Section title="Network / Raw Response">
+                    <pre className="text-xs whitespace-pre-wrap font-mono bg-black/40 p-3 rounded border border-[#F5C76A]/10 max-h-60 overflow-auto">
+                      {JSON.stringify(selectedBug.network_trace, null, 2)}
+                    </pre>
+                  </Section>
+                )}
+
+                {Array.isArray(selectedBug.reproduce_steps) && selectedBug.reproduce_steps.length > 0 && (
+                  <Section title="Reproduce-Steps">
+                    <ol className="text-xs list-decimal list-inside space-y-1 bg-black/40 p-3 rounded border border-[#F5C76A]/10">
+                      {selectedBug.reproduce_steps.map((s: any, i: number) => (
+                        <li key={i} className="font-mono text-muted-foreground">{typeof s === "string" ? s : JSON.stringify(s)}</li>
+                      ))}
+                    </ol>
+                  </Section>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const md = `# Bug: ${selectedBug.title}\n\n**Mission:** ${selectedBug.mission_name}\n**Severity:** ${selectedBug.severity}\n**Category:** ${selectedBug.category}\n${selectedBug.route ? `**Route:** ${selectedBug.route}\n` : ""}\n## Beschreibung\n\`\`\`\n${selectedBug.description ?? ""}\n\`\`\`\n\n${selectedBug.network_trace ? `## Network Trace\n\`\`\`json\n${JSON.stringify(selectedBug.network_trace, null, 2)}\n\`\`\`\n` : ""}${Array.isArray(selectedBug.console_log) && selectedBug.console_log.length ? `\n## Console\n\`\`\`\n${selectedBug.console_log.map((c: any) => `[${c.type}] ${c.text}`).join("\n")}\n\`\`\`\n` : ""}`;
+                    navigator.clipboard.writeText(md);
+                    toast.success("Bug-Context als Markdown kopiert — direkt im Chat einfügen");
+                  }}
+                >
+                  <Copy className="h-4 w-4 mr-2" /> Als Prompt kopieren
+                </Button>
+                <Button onClick={() => setSelectedBug(null)}>Schließen</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-xs font-semibold text-[#F5C76A]/80 uppercase tracking-wider mb-1.5">{title}</div>
+      {children}
     </div>
   );
 }
