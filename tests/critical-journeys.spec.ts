@@ -119,7 +119,8 @@ test.describe('Critical Journeys', () => {
 
   // === Journey 3: Geschützte Routen redirecten auf /auth (kein 500) ===
   test('Geschützte Routen redirecten unauth auf /auth', async ({ page }) => {
-    const protectedPaths = ['/dashboard', '/video-composer', '/picture-studio'];
+    // Nur echte ProtectedRoute-Pfade aus App.tsx — /dashboard existiert nicht
+    const protectedPaths = ['/video-composer', '/picture-studio', '/account'];
 
     for (const path of protectedPaths) {
       const resp = await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
