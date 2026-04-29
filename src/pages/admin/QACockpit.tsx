@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter } from "lucide-react";
+import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter, FlaskConical } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { E2EResultsTab } from "@/components/admin/qa-cockpit/E2EResultsTab";
 
 const TIER_COLORS: Record<string, string> = {
   smoke: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
@@ -309,11 +310,20 @@ export default function QACockpit() {
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="bg-[#0A0F1F]/80 border border-[#F5C76A]/20">
             <TabsTrigger value="live">Live Runs</TabsTrigger>
+            <TabsTrigger value="e2e">
+              <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
+              E2E Tests
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
             <TabsTrigger value="rotation">Provider-Rotation</TabsTrigger>
           </TabsList>
+
+          {/* E2E PLAYWRIGHT RESULTS */}
+          <TabsContent value="e2e" className="mt-4">
+            <E2EResultsTab />
+          </TabsContent>
 
           {/* LIVE RUNS */}
           <TabsContent value="live" className="space-y-3 mt-4">
