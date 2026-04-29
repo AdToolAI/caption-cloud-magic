@@ -35,6 +35,7 @@ export default function QACockpit() {
   const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [selectedBug, setSelectedBug] = useState<any | null>(null);
 
   const runs = useQuery({
     queryKey: ["qa-runs"],
