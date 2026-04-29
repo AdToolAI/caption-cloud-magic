@@ -148,11 +148,19 @@ export default async ({ page, context }) => {
       const status = r.status();
       if (status >= 400) {
         const req = r.request();
+        let postData;
+        try {
+          if (req && typeof req.postData === 'function') {
+            const pd = req.postData();
+            if (pd) postData = String(pd).slice(0, 400);
+          }
+        } catch (e) {}
         networkErrors.push({
           url: r.url(),
           status,
           method: req && typeof req.method === 'function' ? req.method() : undefined,
           resourceType: req && typeof req.resourceType === 'function' ? req.resourceType() : undefined,
+          postData,
         });
       }
     } catch (e) {}

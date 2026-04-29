@@ -278,18 +278,34 @@ Deno.serve(async (req) => {
       const baseSeverity =
         status >= 500 ? "critical"
         : status === 401 || status === 403 ? "high"
-        : status === 404 || status === 406 ? "medium"
+        : status === 404 ? "medium"
+        : status === 406 ? "low"
+        : status >= 400 ? "medium"
         : "low";
       const severity = mute ? mute.severity_when_matched : baseSeverity;
+      const method = group.sample.method ?? "GET";
+      const resourceType = group.sample.resourceType ?? "";
+      const postData = group.sample.postData ?? null;
+      const descLines = group.urls.map((u: string) => `${method} ${u}`);
+      if (postData) descLines.push(`\nRequest body (truncated):\n${postData}`);
       await insertBug({
         run_id,
         mission_name: missionName,
         severity,
         category: "network",
-        title: `Network ${status}: ${(() => { try { return new URL(group.sample.url).pathname.slice(0, 80); } catch { return group.sample.url.slice(0, 80); }})()}${group.count > 1 ? ` (×${group.count})` : ""}`,
-        description: group.urls.join("\n"),
+        title: `Network ${status} ${method}: ${(() => { try { return new URL(group.sample.url).pathname.slice(0, 70); } catch { return group.sample.url.slice(0, 70); }})()}${group.count > 1 ? ` (×${group.count})` : ""}`,
+        description: descLines.join("\n"),
         screenshot_url: screenshotUrl,
-        network_trace: { status, group_key: key, count: group.count, urls: group.urls, muted_reason: mute?.reason ?? null },
+        network_trace: {
+          status,
+          method,
+          resource_type: resourceType,
+          post_data: postData,
+          group_key: key,
+          count: group.count,
+          urls: group.urls,
+          muted_reason: mute?.reason ?? null,
+        },
       });
     }
 

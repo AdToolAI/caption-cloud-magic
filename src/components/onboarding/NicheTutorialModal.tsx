@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { NicheStep } from "./NicheStep";
 import { PlatformStep } from "./PlatformStep";
 import { GoalsStep } from "./GoalsStep";
@@ -149,6 +149,10 @@ export function NicheTutorialModal({ onComplete }: NicheTutorialModalProps) {
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        <DialogTitle className="sr-only">Personalisiere dein Dashboard</DialogTitle>
+        <DialogDescription className="sr-only">
+          Drei kurze Schritte, um deinen personalisierten Wochenplan zu erstellen.
+        </DialogDescription>
         <div className="space-y-4">
           <div className="flex items-center gap-2 text-center justify-center">
             <Sparkles className="h-5 w-5 text-primary" />
