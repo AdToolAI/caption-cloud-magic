@@ -109,6 +109,25 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                 ) : (
                   <img src={slot.asset_url} alt={slot.topic_hint ?? 'slot asset'} className="w-full h-full object-cover" />
                 )
+              ) : slot.status === 'generating_video' ? (
+                <div className="text-center p-6 w-full">
+                  <div className="relative h-12 w-12 mx-auto mb-3">
+                    <div className="absolute inset-0 rounded-full border-2 border-fuchsia-500/30 border-t-fuchsia-500 animate-spin" />
+                    <Sparkles className="absolute inset-0 m-auto h-5 w-5 text-fuchsia-500" />
+                  </div>
+                  <div className="text-sm font-medium">Video wird gerendert…</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Provider: <span className="capitalize">{slot.video_provider ?? '—'}</span>
+                  </div>
+                  {slot.video_started_at && (
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Gestartet: {new Date(slot.video_started_at).toLocaleTimeString()}
+                    </div>
+                  )}
+                  <div className="text-[11px] text-muted-foreground mt-2">
+                    Typisch 1–5 Min. Seite kann geschlossen werden — bei Fertigstellung kommt eine Benachrichtigung.
+                  </div>
+                </div>
               ) : (
                 <div className="text-center text-muted-foreground p-6">
                   <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-40" />
@@ -116,6 +135,11 @@ export function AutopilotSlotDrawer({ slot, open, onOpenChange }: Props) {
                 </div>
               )}
             </Card>
+            {slot.video_error && slot.status === 'failed' && (
+              <div className="mt-2 text-[11px] text-destructive bg-destructive/5 border border-destructive/30 rounded p-2">
+                Render-Fehler: {slot.video_error} (Credits zurückerstattet)
+              </div>
+            )}
           </div>
 
           {/* Caption */}
