@@ -1,6 +1,5 @@
 // QA Agent Execute Mission (Session QA-1 skeleton)
 // Loads mission, runs Browserless smoke navigation, captures bugs, finalizes run.
-// Session QA-2 will add full action engine, assertions, baseline-diff.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { runBrowserlessFunction, buildSmokeNavigationScript } from "../_shared/browserlessClient.ts";
@@ -28,9 +27,29 @@ Deno.serve(async (req) => {
 
   const t0 = Date.now();
   let bugsFound = 0;
+  let missionName = "unknown";
+
+  // Defensive bug-insert wrapper — never let an insert error kill the whole run.
+  const insertBug = async (payload: Record<string, unknown>) => {
+    try {
+      const safe = {
+        ...payload,
+        description: payload.description ?? "(no description — see metadata)",
+      };
+      const { error } = await supabase.from("qa_bug_reports").insert(safe);
+      if (error) {
+        console.error("[execute-mission] bug insert failed:", error.message, payload);
+      } else {
+        bugsFound++;
+      }
+    } catch (e: any) {
+      console.error("[execute-mission] bug insert threw:", e?.message ?? String(e));
+    }
+  };
 
   try {
-    // Mark running
+    console.log("[execute-mission] start", { run_id });
+
     await supabase
       .from("qa_test_runs")
       .update({ status: "running", started_at: new Date().toISOString() })
@@ -45,9 +64,9 @@ Deno.serve(async (req) => {
     if (!run) throw new Error("run not found");
 
     const mission: any = (run as any).qa_missions;
+    missionName = mission?.name ?? (run as any).mission_name ?? "unknown";
     const steps: any[] = Array.isArray(mission?.steps) ? mission.steps : [];
 
-    // Resolve QA test user credentials from env
     const qaEmail = Deno.env.get("QA_TEST_USER_EMAIL") ?? "qa-bot@useadtool.ai";
     const qaPassword = Deno.env.get("QA_TEST_USER_PASSWORD") ?? "";
     const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://id-preview--8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovable.app";
@@ -56,7 +75,6 @@ Deno.serve(async (req) => {
       throw new Error("QA_TEST_USER_PASSWORD secret not configured");
     }
 
-    // Build path list from steps where step.type === "navigate"
     const navPaths: string[] = steps
       .filter((s) => s?.type === "navigate" && typeof s.path === "string")
       .map((s) => s.path);
@@ -64,6 +82,8 @@ Deno.serve(async (req) => {
     const finalPath = steps[steps.length - 1]?.path;
 
     const script = buildSmokeNavigationScript();
+
+    console.log("[execute-mission] invoking browserless", { mission: missionName, navPaths: navPaths.length });
 
     const result = await runBrowserlessFunction(script, {
       baseUrl,
@@ -80,15 +100,19 @@ Deno.serve(async (req) => {
         if (!base64) return undefined;
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
         const path = `qa-runs/${run_id}/${label}-${Date.now()}.jpg`;
-        const { data: up } = await supabase.storage
+        const { data: up, error } = await supabase.storage
           .from("qa-screenshots")
           .upload(path, bytes, { contentType: "image/jpeg", upsert: true });
+        if (error) {
+          console.warn(`[execute-mission] ${label} upload error:`, error.message);
+          return undefined;
+        }
         if (up?.path) {
           const { data: pub } = supabase.storage.from("qa-screenshots").getPublicUrl(up.path);
           return pub?.publicUrl;
         }
-      } catch (e) {
-        console.warn(`[execute-mission] ${label} upload failed:`, e);
+      } catch (e: any) {
+        console.warn(`[execute-mission] ${label} upload threw:`, e?.message ?? String(e));
       }
       return undefined;
     };
@@ -105,39 +129,79 @@ Deno.serve(async (req) => {
       (l) => l.type === "error" || l.type === "pageerror"
     );
     const netErrors = result.networkErrors ?? [];
-    const pathResults: any[] = (result.data?.pathResults ?? []) as any[];
-    const failedNavs = pathResults.filter((p) => !p.ok);
+    const allPathResults: any[] = (result.data?.pathResults ?? []) as any[];
+    const navResults = allPathResults.filter((p) => typeof p?.path === "string");
+    const heartbeats = allPathResults.filter((p) => p?.phase === "login-step");
+    const failedNavs = navResults.filter((p) => !p.ok);
+    const successfulNavs = navResults.filter((p) => p.ok);
+
+    console.log("[execute-mission] result-summary", {
+      ok: result.ok,
+      error: result.error,
+      httpStatus: (result as any).httpStatus,
+      durationMs: result.durationMs,
+      navAttempted: navResults.length,
+      navOk: successfulNavs.length,
+      heartbeats: heartbeats.length,
+      lastBeat: heartbeats[heartbeats.length - 1]?.label,
+      urlReturned: result.url,
+      titleReturned: result.title,
+      hasFinalScreenshot: !!result.screenshot,
+      hasLoginScreenshot: !!loginShotData,
+      consoleErrorCount: consoleErrors.length,
+      networkErrorCount: netErrors.length,
+    });
 
     // Bug: Browserless overall failure
     if (!result.ok) {
-      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button/i.test(
-        result.error ?? ""
-      );
-      await supabase.from("qa_bug_reports").insert({
+      const errMsg = result.error ?? "(no error message)";
+      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button/i.test(errMsg);
+      await insertBug({
         run_id,
-        mission_name: mission.name,
+        mission_name: missionName,
         severity: "high",
         category: isLoginFail ? "auth" : "workflow",
         title: isLoginFail
           ? `Login failed before any path could be visited`
-          : `Mission execution failed: ${result.error?.slice(0, 100)}`,
-        description: result.error,
+          : `Mission execution failed: ${errMsg.slice(0, 100)}`,
+        description: errMsg,
         screenshot_url: loginScreenshotUrl ?? screenshotUrl,
         network_trace: {
           http_status: (result as any).httpStatus ?? null,
           raw_response: (result as any).rawResponse ?? null,
           duration_ms: result.durationMs,
           login_screenshot_url: loginScreenshotUrl ?? null,
+          last_heartbeat: heartbeats[heartbeats.length - 1] ?? null,
+          heartbeats,
         },
       });
-      bugsFound++;
+    }
+
+    // Bug: silent no-op (script returned ok but never executed any navigation)
+    if (result.ok && navResults.length === 0 && navPaths.length > 0) {
+      await insertBug({
+        run_id,
+        mission_name: missionName,
+        severity: "high",
+        category: "workflow",
+        title: "Navigation never executed (login likely failed silently)",
+        description: `Expected ${navPaths.length} path(s), got 0. Last heartbeat: ${heartbeats[heartbeats.length - 1]?.label ?? "(none)"}.`,
+        screenshot_url: loginScreenshotUrl ?? screenshotUrl,
+        network_trace: {
+          http_status: (result as any).httpStatus ?? null,
+          raw_response: (result as any).rawResponse ?? null,
+          duration_ms: result.durationMs,
+          heartbeats,
+          login_screenshot_url: loginScreenshotUrl ?? null,
+        },
+      });
     }
 
     // Bug: console errors
     if (consoleErrors.length > 0) {
-      await supabase.from("qa_bug_reports").insert({
+      await insertBug({
         run_id,
-        mission_name: mission.name,
+        mission_name: missionName,
         severity: consoleErrors.length > 3 ? "high" : "medium",
         category: "console",
         title: `${consoleErrors.length} console error(s) detected`,
@@ -145,15 +209,14 @@ Deno.serve(async (req) => {
         screenshot_url: screenshotUrl,
         console_log: consoleErrors.slice(0, 20),
       });
-      bugsFound++;
     }
 
     // Bug: 5xx network errors
     const fiveXX = netErrors.filter((n) => n.status >= 500);
     if (fiveXX.length > 0) {
-      await supabase.from("qa_bug_reports").insert({
+      await insertBug({
         run_id,
-        mission_name: mission.name,
+        mission_name: missionName,
         severity: "critical",
         category: "network",
         title: `${fiveXX.length} server error(s) (5xx)`,
@@ -161,36 +224,47 @@ Deno.serve(async (req) => {
         screenshot_url: screenshotUrl,
         network_trace: fiveXX.slice(0, 20),
       });
-      bugsFound++;
     }
 
     // Bug: failed navigations
     if (failedNavs.length > 0) {
-      await supabase.from("qa_bug_reports").insert({
+      await insertBug({
         run_id,
-        mission_name: mission.name,
+        mission_name: missionName,
         severity: "high",
         category: "workflow",
         title: `${failedNavs.length} route(s) failed to load`,
         description: failedNavs.map((f: any) => `${f.path}: ${f.error}`).join("\n"),
         screenshot_url: screenshotUrl,
       });
-      bugsFound++;
     }
 
-    // Finalize
-    const status = bugsFound === 0 && result.ok ? "succeeded" : "failed";
+    // Finalize — also fail if no nav succeeded.
+    const status =
+      bugsFound === 0 && result.ok && successfulNavs.length > 0 ? "succeeded" : "failed";
+
     await supabase
       .from("qa_test_runs")
       .update({
         status,
         finished_at: new Date().toISOString(),
         duration_ms: Date.now() - t0,
-        steps_completed: pathResults.filter((p) => p.ok).length,
+        steps_completed: successfulNavs.length,
         bugs_found: bugsFound,
         last_screenshot_url: screenshotUrl,
-        log_summary: `${pathResults.length} paths visited, ${consoleErrors.length} console errors, ${netErrors.length} network errors`,
-        metadata: { result: { url: result.url, title: result.title, pathResults } },
+        log_summary: `${navResults.length} paths visited, ${consoleErrors.length} console errors, ${netErrors.length} network errors, ${heartbeats.length} heartbeats`,
+        metadata: {
+          result: {
+            url: result.url,
+            title: result.title,
+            pathResults: allPathResults,
+            heartbeats,
+            navResults,
+            httpStatus: (result as any).httpStatus,
+            error: result.error,
+            rawResponse: (result as any).rawResponse,
+          },
+        },
       })
       .eq("id", run_id);
 
@@ -199,18 +273,34 @@ Deno.serve(async (req) => {
       status: 200,
     });
   } catch (e: any) {
-    console.error("[qa-agent-execute-mission] fatal:", e);
+    const msg = e?.message ?? String(e);
+    console.error("[qa-agent-execute-mission] fatal:", msg);
+
+    // Always leave a bug breadcrumb so the cockpit shows *why* the run died.
+    try {
+      await supabase.from("qa_bug_reports").insert({
+        run_id,
+        mission_name: missionName,
+        severity: "critical",
+        category: "infrastructure",
+        title: `Edge function crashed: ${msg.slice(0, 100)}`,
+        description: msg,
+      });
+    } catch (insertErr: any) {
+      console.error("[execute-mission] could not insert fatal bug:", insertErr?.message ?? insertErr);
+    }
+
     await supabase
       .from("qa_test_runs")
       .update({
         status: "failed",
         finished_at: new Date().toISOString(),
         duration_ms: Date.now() - t0,
-        log_summary: `fatal: ${e?.message ?? String(e)}`,
+        log_summary: `fatal: ${msg}`,
       })
       .eq("id", run_id);
 
-    return new Response(JSON.stringify({ ok: false, error: e?.message ?? String(e) }), {
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });

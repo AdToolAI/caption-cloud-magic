@@ -22,7 +22,8 @@ export interface BrowserlessActionResult {
 
 export async function runBrowserlessFunction(
   code: string,
-  context?: Record<string, unknown>
+  context?: Record<string, unknown>,
+  timeoutMs = 90_000,
 ): Promise<BrowserlessActionResult> {
   const apiKey = Deno.env.get("BROWSERLESS_API_KEY");
   if (!apiKey) {
@@ -30,6 +31,9 @@ export async function runBrowserlessFunction(
   }
 
   const start = Date.now();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
   try {
     const res = await fetch(
       `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}`,
@@ -37,17 +41,19 @@ export async function runBrowserlessFunction(
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ code, context: context ?? {} }),
+        signal: ctrl.signal,
       }
     );
 
     const durationMs = Date.now() - start;
     const rawText = await res.text();
+    const rawSnippet = rawText.slice(0, 1500);
 
     if (!res.ok) {
       return {
         ok: false,
         error: `Browserless ${res.status}: ${rawText.slice(0, 500)}`,
-        rawResponse: rawText.slice(0, 2000),
+        rawResponse: rawSnippet,
         httpStatus: res.status,
         durationMs,
       };
@@ -60,7 +66,7 @@ export async function runBrowserlessFunction(
       return {
         ok: false,
         error: "Browserless returned non-JSON response",
-        rawResponse: rawText.slice(0, 2000),
+        rawResponse: rawSnippet,
         httpStatus: res.status,
         durationMs,
       };
@@ -70,33 +76,48 @@ export async function runBrowserlessFunction(
     // when the function returns the canonical shape. Support both.
     const payload = data?.data && typeof data.data === "object" ? data.data : data;
 
+    if (!payload || typeof payload !== "object") {
+      return {
+        ok: false,
+        error: "Browserless returned unexpected payload shape",
+        rawResponse: rawSnippet,
+        httpStatus: res.status,
+        durationMs,
+        data: payload,
+      };
+    }
+
     return {
-      ok: payload?.ok !== false,
-      screenshot: payload?.screenshot,
-      url: payload?.url,
-      title: payload?.title,
-      consoleLogs: payload?.consoleLogs ?? [],
-      networkErrors: payload?.networkErrors ?? [],
-      domSummary: payload?.domSummary,
+      ok: payload.ok !== false,
+      screenshot: payload.screenshot,
+      url: payload.url,
+      title: payload.title,
+      consoleLogs: payload.consoleLogs ?? [],
+      networkErrors: payload.networkErrors ?? [],
+      domSummary: payload.domSummary,
       data: payload,
-      error: payload?.error,
+      error: payload.error,
+      rawResponse: rawSnippet,
       httpStatus: res.status,
       durationMs,
     };
   } catch (e: any) {
+    const aborted = e?.name === "AbortError";
     return {
       ok: false,
-      error: `Browserless fetch failed: ${e?.message ?? String(e)}`,
+      error: aborted
+        ? `Browserless fetch aborted after ${timeoutMs}ms`
+        : `Browserless fetch failed: ${e?.message ?? String(e)}`,
       durationMs: Date.now() - start,
     };
+  } finally {
+    clearTimeout(t);
   }
 }
 
 // ESM-style Puppeteer function. Receives `context` from the JSON body.
 // Selectors target our Auth.tsx: <Input id="email" type="email"> + <Input id="password" type="password">.
-// In login mode (default) only one password field exists; in signup mode there is also #confirm-password.
-// We always wait for BOTH email and password fields to be present & visible before typing,
-// because React + framer-motion can render email first and hydrate password a tick later.
+// We push step heartbeats into result.pathResults so the cockpit can show exactly where we stopped.
 export function buildSmokeNavigationScript(): string {
   return `
 export default async ({ page, context }) => {
@@ -121,6 +142,12 @@ export default async ({ page, context }) => {
     url: '', title: '', consoleLogs, networkErrors, domSummary: '', pathResults: [],
   };
 
+  const beat = (label, extra) => {
+    const entry = { phase: 'login-step', label: String(label), ts: Date.now() };
+    if (extra && typeof extra === 'object') Object.assign(entry, extra);
+    result.pathResults.push(entry);
+  };
+
   const grabLoginShot = async () => {
     try {
       const s = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 55, fullPage: true });
@@ -129,13 +156,17 @@ export default async ({ page, context }) => {
   };
 
   try {
+    beat('start', { baseUrl: opts.baseUrl, paths: (opts.paths || []).length });
+
     // 1) Open auth page
     await page.goto(opts.baseUrl + '/auth', { waitUntil: 'networkidle2', timeout: 30000 });
+    beat('auth-page-loaded', { url: page.url() });
 
     // Wait for BOTH fields. Prefer ids (Auth.tsx uses #email / #password), fall back to type selectors.
     try {
       await page.waitForSelector('input#email, input[type="email"]', { visible: true, timeout: 20000 });
       await page.waitForSelector('input#password, input[type="password"]', { visible: true, timeout: 20000 });
+      beat('auth-fields-visible');
     } catch (waitErr) {
       await grabLoginShot();
       throw new Error('Auth form not ready: ' + String(waitErr && waitErr.message || waitErr).slice(0, 180));
@@ -144,7 +175,6 @@ export default async ({ page, context }) => {
     // Small extra settle so React state listeners attach before we type.
     await new Promise(r => setTimeout(r, 250));
 
-    // Fill credentials. Use the actual field handles so we don't depend on focus order.
     const emailHandle = await page.$('input#email') || await page.$('input[type="email"]');
     const pwHandle = await page.$('input#password') || await page.$('input[type="password"]');
     if (!emailHandle || !pwHandle) {
@@ -155,6 +185,7 @@ export default async ({ page, context }) => {
     await emailHandle.type(opts.email, { delay: 15 });
     await pwHandle.click({ clickCount: 3 });
     await pwHandle.type(opts.password, { delay: 15 });
+    beat('credentials-typed');
 
     // Submit. Try button[type=submit] first, then any button containing Login/Anmelden text.
     const submitClicked = await page.evaluate(() => {
@@ -169,6 +200,7 @@ export default async ({ page, context }) => {
       await grabLoginShot();
       throw new Error('No submit button found on /auth');
     }
+    beat('submit-clicked', { via: submitClicked });
 
     // Wait until we leave /auth (= login redirect happened).
     try {
@@ -176,9 +208,9 @@ export default async ({ page, context }) => {
         () => !location.pathname.startsWith('/auth'),
         { timeout: 25000 }
       );
+      beat('redirect-from-auth', { url: page.url() });
     } catch (redirErr) {
       await grabLoginShot();
-      // Surface the visible error text from the page if any toast / inline error appeared.
       let pageErr = '';
       try {
         pageErr = await page.evaluate(() => {
@@ -209,17 +241,25 @@ export default async ({ page, context }) => {
     if (opts.finalPath) {
       await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'networkidle2', timeout: 25000 }).catch(() => {});
     }
-    const shot = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60, fullPage: false });
-    result.screenshot = 'data:image/jpeg;base64,' + shot;
-    result.url = page.url();
-    result.title = await page.title();
-    result.domSummary = await page.evaluate(() => {
-      const headings = Array.from(document.querySelectorAll('h1,h2')).slice(0, 10).map(h => (h.textContent || '').trim()).filter(Boolean);
-      return JSON.stringify({ headings, bodyLen: (document.body && document.body.innerText || '').length });
-    });
+    beat('finalizing');
   } catch (e) {
     result.ok = false;
     result.error = String(e && e.message || e).slice(0, 500);
+    beat('aborted', { error: result.error });
+  } finally {
+    // Always try to capture final state, even if the run aborted earlier.
+    try {
+      const shot = await page.screenshot({ encoding: 'base64', type: 'jpeg', quality: 60, fullPage: false });
+      result.screenshot = 'data:image/jpeg;base64,' + shot;
+    } catch (e) {}
+    try { result.url = page.url(); } catch (e) {}
+    try { result.title = await page.title(); } catch (e) {}
+    try {
+      result.domSummary = await page.evaluate(() => {
+        const headings = Array.from(document.querySelectorAll('h1,h2')).slice(0, 10).map(h => (h.textContent || '').trim()).filter(Boolean);
+        return JSON.stringify({ headings, bodyLen: (document.body && document.body.innerText || '').length });
+      });
+    } catch (e) {}
   }
 
   return {
