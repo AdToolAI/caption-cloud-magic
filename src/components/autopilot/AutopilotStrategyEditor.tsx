@@ -7,8 +7,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Save, X, Plus, Settings as SettingsIcon } from 'lucide-react';
+import { Save, X, Plus, Settings as SettingsIcon, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, type AutopilotBrief } from '@/hooks/useAutopilot';
+import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 
 interface Props {
   brief: AutopilotBrief | null | undefined;
