@@ -551,7 +551,6 @@ export default function SceneCard({
                           onUpdate({ clipSource: next.clipSource, clipQuality: next.clipQuality });
                         }}
                         currency="EUR"
-                        hasSora2Access={true}
                         models={COMPOSER_AVAILABLE_MODELS}
                         className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
                       />
