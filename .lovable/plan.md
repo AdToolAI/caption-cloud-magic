@@ -1,58 +1,63 @@
-## Ursache
+## Status
 
-Der Screenshot/Run zeigt nicht deine App-Loginseite. In den aktuellen Run-Metadaten steht nach `auth-page-loaded` diese URL:
+Der QA-Bot läuft jetzt korrekt durch (`smoke-07-calendar-crud`: Login OK, `/calendar` lädt in 5.9s, Screenshot vorhanden). Run wird trotzdem als "failed" markiert, weil:
 
-```text
-https://lovable.dev/login?redirect=.../auth-bridge?...return_url=.../auth
-```
+- **16 Console-Errors** (alle nur als 1 Sammel-Bug erfasst, ohne URL/Stack)
+- **13 Network-Errors** (komplett unsichtbar im Cockpit — werden nur gezählt, kein Bug erstellt für 4xx)
+- **1 generischer Bug** ohne actionable Details
 
-Browserless landet also auf der Lovable-Preview-Zugangsseite, nicht auf `/auth` deiner App. Deshalb findet er kein `input#password` aus `src/pages/Auth.tsx` und bricht ab.
+Beispiel-Errors aus dem letzten Run (sichtbar in der DB):
+- `X-Frame-Options may only be set via an HTTP header sent along with a document. It may not be set inside <meta>` → kosmetisch, fix in `index.html`
+- `Failed to load resource: 404` und `406` → echte Bugs, aber wir wissen nicht *welche* URL
 
-Zusätzlich gibt es einen zweiten Fehler: Die Edge Function versucht bei Login-Problemen `category: "auth"` in `qa_bug_reports` zu speichern, aber die DB-Check-Constraint erlaubt aktuell nur Kategorien wie `workflow`, `console`, `network`, `assertion` usw. Deshalb zeigt das Cockpit `Bugs: 0`, obwohl intern ein Bug-Insert versucht wurde.
+**Ohne saubere Aufschlüsselung können wir nichts gezielt fixen.** Daher zuerst: Detail-Telemetrie + Triage-UI, dann iterativ die echten Bugs.
 
 ## Plan
 
-### 1. QA-Ziel-URL auf eine öffentlich erreichbare App-URL umstellen
-- In `qa-agent-execute-mission/index.ts` den Default für `QA_TARGET_URL` von der `id-preview--...lovable.app` Preview auf die öffentliche App-Domain ändern, z. B. `https://useadtool.ai`.
-- Damit Browserless direkt deine echte App-Route `/auth` öffnet und nicht über `lovable.dev/auth-bridge` läuft.
-- Optional: Ziel-URL im Run-Metadata speichern, damit im Cockpit sichtbar ist, gegen welche Domain getestet wurde.
+### 1. Detail-Erfassung im Edge-Function (`qa-agent-execute-mission/index.ts`)
 
-### 2. Auth-Bridge-Falle explizit erkennen
-- In `_shared/browserlessClient.ts` nach dem `goto('/auth')` prüfen, ob `page.url()` auf `lovable.dev/login` oder `lovable.dev/auth-bridge` zeigt.
-- Wenn ja: sofort mit einer klaren Fehlermeldung abbrechen:
+- **4xx/Non-5xx Network-Errors** ebenfalls als Bug speichern (aktuell nur 5xx). Severity: `medium` für 404/406, `high` für 401/403.
+- **Console-Errors gruppieren**: pro einzigartigem Error-Pattern einen Bug, statt einen Sammel-Bug. Inkl. erster URL und (falls vorhanden) Stack-Trace.
+- **Allowlist** für bekannte Noise-Errors (z.B. `X-Frame-Options via meta`, `ResizeObserver`, `Loading chunk`) — diese als `severity: low` taggen, nicht als High.
+- **Run nicht als "failed" markieren**, wenn nur Low-Severity-Bugs vorhanden — neuer Status `succeeded_with_warnings`.
 
-```text
-QA target is protected by Lovable preview auth bridge; use public QA_TARGET_URL
-```
+### 2. Browserless-Script erweitert (`_shared/browserlessClient.ts`)
 
-- So wartet der Bot nicht 20 Sekunden auf ein Passwortfeld, das dort nie existiert.
+- Bei `console error`-Events zusätzlich `location.url`, `location.lineNumber`, `args[0]?.stack` capturen.
+- Bei `requestfailed`/`response.status>=400` Events: `request.resourceType`, `request.method`, `response.headers['content-type']` mitspeichern.
 
-### 3. Bug-Insert reparieren
-- In `qa-agent-execute-mission/index.ts` keine nicht erlaubte Kategorie `auth` mehr verwenden.
-- Login-/Auth-Fehler vorerst als `category: "workflow"` speichern und im `network_trace.failure_area = "auth"` markieren.
-- Dadurch erscheinen die Bug Reports wieder im Cockpit statt still an der DB-Constraint zu scheitern.
+### 3. Bug-Inbox-UI (`QACockpit.tsx`)
 
-### 4. QA-Testuser robuster machen
-- `qa-agent-setup-test-user/index.ts` erweitern, damit der QA-Testuser zusätzlich eine Admin-Rolle in `user_roles` bekommt.
-- Das ist wichtig, weil viele Smoke-Missionen Admin-/geschützte Bereiche testen und `ProtectedRoute requireRole="admin"` nutzt.
-- Rollen bleiben weiterhin in der separaten Rollen-Tabelle, nicht im Profil.
+- Neue **"Bug-Triage"-Sektion** unter den Run-Cards mit Tabs:
+  - **Action Required** (high/critical)
+  - **Warnings** (medium, low)
+  - **Ignored** (manuell stummgeschaltet)
+- Pro Bug: Erste-Hilfe-Buttons:
+  - **"Mark as fixed"** → `qa_bug_reports.resolved_at = now()`
+  - **"Mute pattern"** → speichert Regex in neuer Tabelle `qa_muted_patterns` (zukünftige Runs ignorieren)
+  - **"Show in code"** → Modal mit Stack/URL und (wenn möglich) File-Pfad
 
-### 5. Cockpit-Transparenz verbessern
-- In `QACockpit.tsx` bei Run-Karten die Ziel-URL und bei Login-Fehlern eine klare Hinweismeldung anzeigen, z. B.:
+### 4. Bekannte Quick-Wins parallel fixen
 
-```text
-Ziel-URL ist durch Preview-Auth geschützt. QA muss gegen Published/Custom Domain laufen.
-```
+Aus dem Run sehen wir bereits konkrete Issues — diese können wir sofort angehen:
 
-- Den existierenden Heartbeat-Block beibehalten.
+- **`index.html`**: `<meta http-equiv="X-Frame-Options">` entfernen (gehört in HTTP-Header oder `_headers`).
+- **404/406 auf `/calendar`**: nach Detail-Erfassung in Schritt 1 sehen wir die URL — vermutlich eine Supabase-Query mit `.single()` ohne Daten (406) oder ein fehlendes Asset (404). Fix dann gezielt.
+
+### 5. Migration
+
+Neue Tabelle `qa_muted_patterns` (id, pattern_regex, reason, created_by, created_at) + `qa_bug_reports.resolved_at` + `qa_bug_reports.resolved_by` Spalten.
 
 ## Erwartetes Ergebnis
 
-Nach der Änderung startet der Smoke-Run nicht mehr gegen die geschützte Preview-Bridge, sondern gegen die öffentlich erreichbare App. Falls die App-Loginseite selbst ein Problem hat, wird der Bug korrekt im Bug-Inbox sichtbar. Falls Login klappt, besucht der Bot danach die eigentlichen Mission-Pfade und `Steps` geht von `0/1` auf `1/1`.
+Nach Schritt 1-3: Du siehst im Cockpit eine sortierte Bug-Liste, jede mit URL/Stack, und kannst pro Bug entscheiden: Fix, Mute oder Ignore. Aktuell sind 16+13 Errors = 1 Sammel-Bug, danach werden es ~5-8 distinct, fixbare Bugs sein.
+
+Schritt 4 (kosmetisch + erste echte Fixes) folgt im selben Durchgang, sobald wir die URLs kennen.
 
 ## Betroffene Dateien
 
 - `supabase/functions/qa-agent-execute-mission/index.ts`
 - `supabase/functions/_shared/browserlessClient.ts`
-- `supabase/functions/qa-agent-setup-test-user/index.ts`
 - `src/pages/admin/QACockpit.tsx`
+- `index.html` (X-Frame-Options Meta entfernen)
+- Neue Migration: `qa_muted_patterns` Tabelle + `resolved_at`/`resolved_by` auf `qa_bug_reports`
