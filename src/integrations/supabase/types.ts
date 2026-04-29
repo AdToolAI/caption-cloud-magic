@@ -1116,6 +1116,282 @@ export type Database = {
           },
         ]
       }
+      autopilot_activity_log: {
+        Row: {
+          actor: string
+          created_at: string
+          event_type: string
+          id: string
+          payload: Json
+          slot_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          event_type: string
+          id?: string
+          payload?: Json
+          slot_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          payload?: Json
+          slot_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_activity_log_slot_id_fkey"
+            columns: ["slot_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_briefs: {
+        Row: {
+          activated_at: string | null
+          auto_publish_enabled: boolean
+          avatar_ids: string[]
+          budget_resets_at: string
+          compliance_score: number
+          created_at: string
+          forbidden_topics: string[]
+          id: string
+          is_active: boolean
+          languages: string[]
+          last_plan_generated_at: string | null
+          locked_until: string | null
+          paused_until: string | null
+          platforms: string[]
+          posts_per_week: Json
+          tonality: string
+          topic_pillars: string[]
+          updated_at: string
+          user_id: string
+          weekly_credit_budget: number
+          weekly_credits_spent: number
+        }
+        Insert: {
+          activated_at?: string | null
+          auto_publish_enabled?: boolean
+          avatar_ids?: string[]
+          budget_resets_at?: string
+          compliance_score?: number
+          created_at?: string
+          forbidden_topics?: string[]
+          id?: string
+          is_active?: boolean
+          languages?: string[]
+          last_plan_generated_at?: string | null
+          locked_until?: string | null
+          paused_until?: string | null
+          platforms?: string[]
+          posts_per_week?: Json
+          tonality?: string
+          topic_pillars?: string[]
+          updated_at?: string
+          user_id: string
+          weekly_credit_budget?: number
+          weekly_credits_spent?: number
+        }
+        Update: {
+          activated_at?: string | null
+          auto_publish_enabled?: boolean
+          avatar_ids?: string[]
+          budget_resets_at?: string
+          compliance_score?: number
+          created_at?: string
+          forbidden_topics?: string[]
+          id?: string
+          is_active?: boolean
+          languages?: string[]
+          last_plan_generated_at?: string | null
+          locked_until?: string | null
+          paused_until?: string | null
+          platforms?: string[]
+          posts_per_week?: Json
+          tonality?: string
+          topic_pillars?: string[]
+          updated_at?: string
+          user_id?: string
+          weekly_credit_budget?: number
+          weekly_credits_spent?: number
+        }
+        Relationships: []
+      }
+      autopilot_consent_log: {
+        Row: {
+          accepted_text_hash: string
+          accepted_text_version: string
+          created_at: string
+          event_type: string
+          id: string
+          ip_hash: string | null
+          metadata: Json
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          accepted_text_hash: string
+          accepted_text_version: string
+          created_at?: string
+          event_type: string
+          id?: string
+          ip_hash?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          accepted_text_hash?: string
+          accepted_text_version?: string
+          created_at?: string
+          event_type?: string
+          id?: string
+          ip_hash?: string | null
+          metadata?: Json
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      autopilot_queue: {
+        Row: {
+          approved_at: string | null
+          approved_by_user: boolean | null
+          asset_url: string | null
+          block_reason: string | null
+          brief_id: string
+          caption: string | null
+          content_payload: Json
+          created_at: string
+          generation_cost_credits: number | null
+          hashtags: string[] | null
+          id: string
+          language: string
+          platform: string
+          posted_at: string | null
+          qa_findings: Json | null
+          qa_score: number | null
+          scheduled_at: string
+          social_post_id: string | null
+          status: string
+          topic_hint: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by_user?: boolean | null
+          asset_url?: string | null
+          block_reason?: string | null
+          brief_id: string
+          caption?: string | null
+          content_payload?: Json
+          created_at?: string
+          generation_cost_credits?: number | null
+          hashtags?: string[] | null
+          id?: string
+          language?: string
+          platform: string
+          posted_at?: string | null
+          qa_findings?: Json | null
+          qa_score?: number | null
+          scheduled_at: string
+          social_post_id?: string | null
+          status?: string
+          topic_hint?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by_user?: boolean | null
+          asset_url?: string | null
+          block_reason?: string | null
+          brief_id?: string
+          caption?: string | null
+          content_payload?: Json
+          created_at?: string
+          generation_cost_credits?: number | null
+          hashtags?: string[] | null
+          id?: string
+          language?: string
+          platform?: string
+          posted_at?: string | null
+          qa_findings?: Json | null
+          qa_score?: number | null
+          scheduled_at?: string
+          social_post_id?: string | null
+          status?: string
+          topic_hint?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_queue_brief_id_fkey"
+            columns: ["brief_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_briefs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      autopilot_strikes: {
+        Row: {
+          created_at: string
+          evidence_json: Json
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          reason_code: string
+          reason_description: string
+          related_slot_id: string | null
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          evidence_json?: Json
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          reason_code: string
+          reason_description: string
+          related_slot_id?: string | null
+          severity: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          evidence_json?: Json
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          reason_code?: string
+          reason_description?: string
+          related_slot_id?: string | null
+          severity?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "autopilot_strikes_related_slot_id_fkey"
+            columns: ["related_slot_id"]
+            isOneToOne: false
+            referencedRelation: "autopilot_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       background_music_tracks: {
         Row: {
           created_at: string | null
@@ -8642,6 +8918,7 @@ export type Database = {
           activation_emails_sent: Json | null
           analytics_enabled: boolean | null
           api_key: string | null
+          autopilot_permanently_locked: boolean
           avatar_url: string | null
           brand_color: string | null
           brand_name: string | null
@@ -8672,6 +8949,8 @@ export type Database = {
           stripe_subscription_id: string | null
           subscription_current_period_end: string | null
           subscription_status: string | null
+          terminated_at: string | null
+          terminated_reason: string | null
           test_mode_plan: string | null
           timezone: string | null
           tour_completed_at: string | null
@@ -8691,6 +8970,7 @@ export type Database = {
           activation_emails_sent?: Json | null
           analytics_enabled?: boolean | null
           api_key?: string | null
+          autopilot_permanently_locked?: boolean
           avatar_url?: string | null
           brand_color?: string | null
           brand_name?: string | null
@@ -8721,6 +9001,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_status?: string | null
+          terminated_at?: string | null
+          terminated_reason?: string | null
           test_mode_plan?: string | null
           timezone?: string | null
           tour_completed_at?: string | null
@@ -8740,6 +9022,7 @@ export type Database = {
           activation_emails_sent?: Json | null
           analytics_enabled?: boolean | null
           api_key?: string | null
+          autopilot_permanently_locked?: boolean
           avatar_url?: string | null
           brand_color?: string | null
           brand_name?: string | null
@@ -8770,6 +9053,8 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_current_period_end?: string | null
           subscription_status?: string | null
+          terminated_at?: string | null
+          terminated_reason?: string | null
           test_mode_plan?: string | null
           timezone?: string | null
           tour_completed_at?: string | null
@@ -11844,6 +12129,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      terminated_accounts_archive: {
+        Row: {
+          appeal_outcome: string | null
+          appeal_received_at: string | null
+          consent_snapshot: Json | null
+          email: string | null
+          evidence_json: Json
+          hard_delete_at: string
+          id: string
+          original_user_id: string
+          strikes_snapshot: Json | null
+          terminated_at: string
+          terminated_by: string | null
+          termination_reason: string
+        }
+        Insert: {
+          appeal_outcome?: string | null
+          appeal_received_at?: string | null
+          consent_snapshot?: Json | null
+          email?: string | null
+          evidence_json: Json
+          hard_delete_at?: string
+          id?: string
+          original_user_id: string
+          strikes_snapshot?: Json | null
+          terminated_at?: string
+          terminated_by?: string | null
+          termination_reason: string
+        }
+        Update: {
+          appeal_outcome?: string | null
+          appeal_received_at?: string | null
+          consent_snapshot?: Json | null
+          email?: string | null
+          evidence_json?: Json
+          hard_delete_at?: string
+          id?: string
+          original_user_id?: string
+          strikes_snapshot?: Json | null
+          terminated_at?: string
+          terminated_by?: string | null
+          termination_reason?: string
+        }
+        Relationships: []
       }
       tiktok_sync_logs: {
         Row: {
