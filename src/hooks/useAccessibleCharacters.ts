@@ -61,12 +61,12 @@ export function useAccessibleCharacters() {
 
         const byId = new Map((chars ?? []).map((c: any) => [c.id, c]));
         purchasedList = (purch ?? [])
-          .map((p) => {
+          .map((p): AccessibleCharacter | null => {
             const c = byId.get(p.character_id);
             if (!c) return null;
             return {
               ...(c as unknown as BrandCharacter),
-              source: 'purchased' as const,
+              source: 'purchased',
               purchase_id: p.id,
               license_version: p.license_version ?? undefined,
             };
