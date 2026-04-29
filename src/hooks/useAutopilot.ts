@@ -24,6 +24,11 @@ export interface AutopilotBrief {
   budget_resets_at: string;
   created_at: string;
   updated_at: string;
+  // Session E: video defaults
+  video_enabled?: boolean;
+  video_provider?: string;
+  video_duration_sec?: number;
+  video_aspect_ratio?: string;
 }
 
 export interface AutopilotSlot {
@@ -34,7 +39,7 @@ export interface AutopilotSlot {
   platform: string;
   language: string;
   topic_hint: string | null;
-  status: 'draft' | 'generating' | 'qa_review' | 'scheduled' | 'posted' | 'blocked' | 'failed' | 'skipped';
+  status: 'draft' | 'generating' | 'generating_video' | 'qa_review' | 'scheduled' | 'posted' | 'blocked' | 'failed' | 'skipped';
   content_payload: Record<string, unknown>;
   asset_url: string | null;
   caption: string | null;
@@ -48,6 +53,13 @@ export interface AutopilotSlot {
   social_post_id: string | null;
   generation_cost_credits: number;
   created_at: string;
+  // Session E: video render tracking
+  video_provider?: string | null;
+  video_prediction_id?: string | null;
+  video_status?: string | null;
+  video_error?: string | null;
+  video_started_at?: string | null;
+  video_completed_at?: string | null;
 }
 
 export interface AutopilotStrike {
