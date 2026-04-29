@@ -196,6 +196,10 @@ export default function Autopilot() {
               <AutopilotInsightsPanel />
             </TabsContent>
 
+            <TabsContent value="review">
+              <AutopilotWeeklyReviewPanel />
+            </TabsContent>
+
             <TabsContent value="compliance">
               <CompliancePanel brief={brief} strikes={strikes} />
             </TabsContent>
