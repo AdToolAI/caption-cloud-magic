@@ -1,112 +1,96 @@
+## Native Music Library — Plan
 
-# Avatar Library — Brand Character × Voice × Talking Head
+Wir bauen eine eigenständige Music-Studio-Page (`/music-studio`) und erweitern den bestehenden `MusicLibraryBrowser` um drei neue Quellen: **Suno** (KI-Songs mit Vocals), **Mubert** (loopbare adaptive Background-Music) und eine kuratierte **Lizenzierte Stock-Library** (Jamendo Pro + Pixabay, in eigene DB-Tabelle gesynct mit Lizenznachweis).
 
-Konsolidierung von **Brand Characters** + **Voice Preset** + **Hedra-Portrait** in eine Entität namens **Avatar**. Jeder Avatar ist sofort „sprechfähig" via Talking Head, mit einem Klick.
+Das ergänzt nahtlos die existierende Generation (ElevenLabs Music + MusicGen, drei Tiers) und die Stock-Suche (Jamendo, Pixabay live).
 
----
+### Neue Provider — Capability Matrix
 
-## Strategie: Sanftes Rebranding statt destruktiver Migration
+| Provider | Stärke | Output | Preis-Tier | Use Case |
+|---|---|---|---|---|
+| **Suno v4** | Songs mit Lyrics + Vocals (Strophe/Refrain) | bis 4 min | €1.20/Track | Branded Anthems, Hooks, Werbe-Songs |
+| **Mubert** | Adaptive loopbare Tracks, exakte Länge | beliebig | €0.40/Track | Background-Music, Podcasts, Vlogs |
+| **Lizenzierte Library** | Pre-vetted Profi-Tracks mit Lizenz-PDF | fix | €0 (in Plan) | Production-safe ohne Generation |
 
-Die existierende Tabelle `brand_characters` wird **nicht umbenannt** (zu riskant: 10+ Studios, RLS, Bucket-Name `brand-characters` haben harte Referenzen). Stattdessen:
+### Page `/music-studio` — Aufbau
 
-- Tabelle bleibt physisch `brand_characters` — bekommt nur **neue Avatar-Spalten**
-- UI und alle neuen Texte sprechen ausschließlich von **„Avatars"**
-- Route `/brand-characters` bleibt bestehen → neue Route `/avatars` zeigt dieselbe Page (Backward-Compat)
-- Alle Sidebar-/Hub-Einträge werden auf „Avatars" umbenannt
-- Hook bleibt `useBrandCharacters` intern, aber ein Alias-Export `useAvatars` wird hinzugefügt für neuen Code
+Ein Tab-System mit 4 Tabs, alle teilen denselben Player + "Use in Project"-Action:
 
-→ Null Datenmigration, null Breaking Changes, klare User-Story.
+1. **Generieren** — Bestehendes `MusicGeneratorPanel` + neue Provider-Auswahl (ElevenLabs / MusicGen / **Suno** / **Mubert**) als Segmented-Control. Für Suno: Lyrics-Editor + Style-Tags. Für Mubert: Mood-Palette + Loop-Toggle + exakte Sekunden.
+2. **Lizenziert** — Browse-Grid für die kuratierte Stock-Library mit Filter (Genre, Mood, BPM, Duration). Jeder Track zeigt Lizenz-Badge ("Royalty-free, commercial OK").
+3. **Stock-Suche** — Live Jamendo + Pixabay (existiert bereits, wird hier eingebettet).
+4. **Meine Tracks** — Alle generierten + favorisierten Tracks des Users mit Re-Use, Download, Tag-System.
 
----
+Top-Bar: Globaler Mood-Picker (Cinematic, Corporate, Upbeat, …), BPM-Filter, Search.
 
-## Datenbank — neue Spalten auf `brand_characters`
+### Integration im bestehenden `MusicLibraryBrowser`
 
-```sql
-ALTER TABLE brand_characters
-  ADD COLUMN default_voice_id        text,        -- ElevenLabs voice ID oder custom_voice UUID
-  ADD COLUMN default_voice_provider  text DEFAULT 'elevenlabs'
-    CHECK (default_voice_provider IN ('elevenlabs','custom')),
-  ADD COLUMN default_voice_name      text,        -- Anzeige im UI ohne extra Lookup
-  ADD COLUMN portrait_url            text,        -- Hedra-optimiertes Frontal-Portrait
-  ADD COLUMN portrait_mode           text DEFAULT 'original'
-    CHECK (portrait_mode IN ('original','auto_generated','manual_upload')),
-  ADD COLUMN default_language        text DEFAULT 'en',
-  ADD COLUMN default_aspect_ratio    text DEFAULT '9:16';
+Neue Tabs werden hinzugefügt: `Generate (Suno/Mubert)`, `Licensed`. Bestehende Stock-Suche bleibt. So nutzbar in Director's Cut + Composer ohne Page-Wechsel.
+
+### Datenmodell
+
+Neue Tabelle `licensed_music_tracks` (admin-curated, public read):
+- `id, title, artist, duration_sec, bpm, genre, mood[], tags[]`
+- `audio_url` (Supabase Storage), `waveform_url` (optional)
+- `license_type` ('cc-by', 'royalty-free', 'commercial'), `license_url`, `attribution_required`
+- `category, is_featured, plays_count`
+
+Bestehende Tabelle `background_music_tracks` bleibt unverändert (für die Auto-Match-Engine).
+
+User-generierte Suno/Mubert-Tracks gehen in die existierende `generated_music_tracks`-Tabelle (nur neue Spalte `provider` extended um 'suno'/'mubert').
+
+### Edge Functions (neu)
+
+1. **`generate-suno-track`** — Suno API v4 (suno.ai oder via Replicate), erwartet `{ prompt, lyrics?, style, instrumental, durationSeconds }`. Background-Polling (3-5 min Generation-Zeit) via `EdgeRuntime.waitUntil`. Speichert in `generated_music_tracks` mit `provider:'suno'`. Credit-Refund bei Failure.
+2. **`generate-mubert-track`** — Mubert API, erwartet `{ mood, genre, bpm, durationSeconds, loop }`. Synchron (~5-15s). Speichert analog.
+3. **`seed-licensed-library`** — Admin-only Seeder, lädt kuratierte Tracks (initial ~50-100) aus Jamendo Pro + manuell uploads in den `licensed-music` Storage-Bucket und in die DB. Run-once, später iterativ erweiterbar.
+
+Bestehende `generate-music-track` bleibt unverändert (ElevenLabs/MusicGen).
+
+### API Keys benötigt
+
+- **`SUNO_API_KEY`** — über sunoapi.org oder direkt suno.ai (Beta-Access)
+- **`MUBERT_API_KEY`** — Pay-as-you-go via mubert.com/render-api
+- Beide via `add_secret`-Flow nach User-Bestätigung.
+
+### Storage
+
+Neuer öffentlicher Bucket `licensed-music` (read-public, write-admin-only). Generated Tracks bleiben im existierenden `generated-music`-Bucket (user-scoped RLS).
+
+### Pricing-Konfiguration (in `useMusicGeneration`)
+
+```typescript
+MUSIC_TIER_PRICING = {
+  quick:    { eur: 0.10, engine: 'MusicGen' },
+  standard: { eur: 0.35, engine: 'ElevenLabs Music' },
+  pro:      { eur: 1.40, engine: 'ElevenLabs Music Pro' },
+  mubert:   { eur: 0.40, engine: 'Mubert Adaptive' },     // NEW
+  suno:     { eur: 1.20, engine: 'Suno v4 (with vocals)' }, // NEW
+}
 ```
 
-Kein neuer Bucket — `portrait_url` lebt im selben `brand-characters` Bucket unter `{user_id}/portraits/{uuid}.png` (RLS-Path-Constraint bleibt erfüllt).
+### Sidebar / Navigation
 
----
+Neuer Eintrag "Music Studio" 🎵 unter Audio-Tools (oder als Top-Level neben "Audio Studio"). Genaue Position klären wir bei Implementierung am Live-Layout.
 
-## Edge Function — `generate-avatar-portrait` (neu)
+### UX-Highlights
 
-Nimmt Original-Reference-Bild, ruft **`google/gemini-3.1-flash-image-preview`** über Lovable AI Gateway mit Edit-Prompt:
+- **Lyrics-Editor (Suno)**: Mehrzeiliger Editor mit `[Verse]`, `[Chorus]`, `[Bridge]` Section-Tags + KI-Lyrics-Generation-Button (Lovable AI)
+- **Mubert Mood-Palette**: 12 Moods als visuelle Karten mit Mini-Wave-Preview
+- **Beat-Sync ready**: Generierte Tracks werden auto-analysiert (BPM via existierende `analyze-music-bpm`) und können direkt in den Beat-Sync übergeben werden
+- **Lizenz-Transparenz**: Jeder Track zeigt klar "AI-generated (Suno) — commercial use OK" oder "Licensed track — attribution required: …"
 
-> *"Restyle this person as a centered frontal portrait, eye-level camera, neutral soft background, shoulders visible, looking directly into camera, photorealistic, soft studio lighting. Preserve exact facial identity, hair, and distinguishing features."*
+### Lokalisierung
 
-Speichert im Bucket, gibt URL zurück, schreibt `portrait_url` + `portrait_mode='auto_generated'` in DB.
-Kostet ~1 Credit (transparent für User per `featureCosts`).
+Alle UI-Strings DE/EN/ES via `useTranslation`. Lyrics-Generation-Prompts respektieren `language`-State.
 
----
+### Phasen
 
-## UI — Drei Touchpoints
+1. **Phase 1 (dieser Build):** Page-Skeleton `/music-studio` + Mubert-Integration + Sidebar + Erweiterung MusicLibraryBrowser um "Mubert"-Tab
+2. **Phase 2:** Suno-Integration + Lyrics-Editor (separater Build wegen Suno-Beta-Onboarding)
+3. **Phase 3:** Lizenzierte Library + Seeder + Admin-Upload-Tool (separater Build)
 
-### 1. `/brand-characters` → Rebrand zu „Avatars"
-- Page-Title: **„Your Avatar Library"**, Subline „Recurring on-screen talent — one click to make them speak"
-- Header-Chip: „Avatar Library Lock" (statt „Brand Character Lock")
-- `BrandCharacterCard` bekommt drei neue Inline-Sektionen:
-  - **Voice Picker** (Combobox: ElevenLabs Top 8 + Custom Voices) → speichert `default_voice_id` + `_provider` + `_name`
-  - **Portrait Section**: Toggle zwischen `original` / `auto_generated` / `manual_upload`
-    - Bei `auto_generated`: Button „Generate Hedra Portrait" → ruft Edge Function, zeigt Preview
-    - Bei `manual_upload`: Upload-Slot
-  - **„Speak" Quick-Action Button** (gold, prominent) → öffnet `TalkingHeadDialog` vorausgefüllt
+### Was geklärt werden muss vor Implementierung
 
-### 2. `TalkingHeadDialog` — neuer „Avatar"-Tab
-Zusätzlich zu „Upload" und „Generated" Tabs: **„From Avatar"** (default wenn ≥1 Avatar mit `portrait_url` ODER `default_voice_id` existiert).
-- Avatar-Picker (Grid mit Bild + Name)
-- Auswahl füllt: `imageUrl` = `portrait_url || reference_image_url`, `voiceId` = `default_voice_id`, `aspectRatio` = `default_aspect_ratio`
-- User schreibt nur noch Skript
-
-### 3. Sidebar / Hub
-- Sidebar-Eintrag „Brand Characters" → **„Avatars"** (Icon bleibt Users-Lucide)
-- Hub-Tile gleiches Rebranding
-- Route `/avatars` → rendert dieselbe `BrandCharacters` Page (alias)
-
----
-
-## Composer-Integration
-
-`SceneCard` Talking-Head-Action ruft `TalkingHeadDialog` schon heute. Mit neuem „From Avatar"-Tab funktioniert die Avatar-Auswahl dort automatisch, **ohne extra Code in SceneCard**.
-
----
-
-## Memory & Rebranding-Konsistenz
-
-- Memory `brand-character-lock` bleibt, wird ergänzt um „Avatar Library = Brand Character + Voice + optional Hedra Portrait"
-- Neue Memory `mem://features/avatars/library-architecture` mit Schema, Edge Function, UI-Routen
-
----
-
-## Geliefert wird
-
-```text
-Files (neu/geändert)
-├── supabase/migrations/<ts>_avatar_library.sql            (5 neue Spalten)
-├── supabase/functions/generate-avatar-portrait/index.ts   (Gemini Image Edit)
-├── src/hooks/useBrandCharacters.ts                        (+ default_voice/portrait Felder, alias useAvatars)
-├── src/hooks/useAvatarPortrait.ts                         (neuer Hook für Generate-Action)
-├── src/pages/BrandCharacters.tsx                          (Rebrand „Avatars", neue Tagline)
-├── src/components/brand-characters/BrandCharacterCard.tsx (Voice-Picker, Portrait-Toggle, „Speak"-Button)
-├── src/components/brand-characters/AvatarPortraitDialog.tsx (neu: Generate/Upload Hedra-Portrait)
-├── src/components/brand-characters/AvatarVoicePicker.tsx  (neu)
-├── src/components/video-composer/TalkingHeadDialog.tsx    (neuer „From Avatar"-Tab)
-├── src/App.tsx                                            (alias /avatars)
-├── src/config/hubConfig.ts                                (Rebrand-Label)
-├── src/components/layout/Sidebar.tsx (oder Equivalent)    (Rebrand-Label)
-└── mem://features/avatars/library-architecture            (neue Memory)
-```
-
-## Out of Scope (Phase 2 später)
-- Voice-Cloning direkt im Avatar-Erstellen-Flow (heute über separates Custom-Voices-Modul)
-- Mehrere Portraits pro Avatar (Profil/Halb/Ganzkörper)
-- Avatar-Sharing/Marketplace
+- Bestätigung, ob wir Phase 1+2+3 in einem Big-Bang bauen oder schrittweise (empfehle schrittweise wegen Suno-Onboarding-Zeit)
+- Suno-API-Quelle: offizielle Beta vs. sunoapi.org-Wrapper (letzteres sofort nutzbar)
