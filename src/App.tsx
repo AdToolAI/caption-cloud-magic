@@ -124,6 +124,8 @@ const CreatorStudio = lazy(() => import("./pages/CreatorStudio"));
 const MarketplaceCreatorTerms = lazy(() => import("./pages/legal/MarketplaceCreatorTerms"));
 const MarketplaceBuyerTerms = lazy(() => import("./pages/legal/MarketplaceBuyerTerms"));
 const CharacterTakedownRequest = lazy(() => import("./pages/legal/CharacterTakedownRequest"));
+const Autopilot = lazy(() => import("./pages/Autopilot"));
+const AutopilotAUP = lazy(() => import("./pages/legal/AutopilotAUP"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
@@ -190,6 +192,7 @@ function AppLayout() {
                     <Route path="/legal/marketplace-creator-terms" element={<MarketplaceCreatorTerms />} />
                     <Route path="/legal/marketplace-buyer-terms" element={<MarketplaceBuyerTerms />} />
                     <Route path="/legal/character-takedown-request" element={<CharacterTakedownRequest />} />
+                    <Route path="/legal/autopilot-aup" element={<AutopilotAUP />} />
                     <Route path="/legal/:page" element={<Legal />} />
                     {/* Direct public routes for TikTok OAuth compliance */}
                     <Route path="/privacy" element={<Legal />} />
@@ -277,6 +280,7 @@ function AppLayout() {
            <Route path="/motion-studio/studio" element={<MotionStudioStudioMode />} />
            <Route path="/motion-studio/library" element={<MotionStudioLibrary />} />
            <Route path="/marketplace" element={<Marketplace />} />
+           <Route path="/autopilot" element={<ProtectedRoute><Autopilot /></ProtectedRoute>} />
            <Route path="/creator-studio" element={<ProtectedRoute><CreatorStudio /></ProtectedRoute>} />
            <Route path="/video-translator" element={<VideoTranslator />} />
            <Route path="/community" element={<Community />} />
