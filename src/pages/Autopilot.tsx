@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox, BarChart3 } from 'lucide-react';
+import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox, BarChart3, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
