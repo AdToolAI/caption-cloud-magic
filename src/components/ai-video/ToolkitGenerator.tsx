@@ -214,6 +214,20 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         body.referenceVideoUrl = referenceVideoUrl;
         body.videoReferenceType = videoReferenceType;
       }
+      // multi-ref: Vidu Q2 Reference2V — 1–7 reference images with roles
+      if (model.capabilities.multiRef) {
+        if (viduReferences.length === 0) {
+          toast.error(
+            language === 'de'
+              ? 'Bitte mindestens 1 Referenzbild hinzufügen.'
+              : 'Please add at least 1 reference image.',
+          );
+          setGenerating(false);
+          return;
+        }
+        body.referenceImages = viduReferences.map((s) => s.url);
+        body.referenceRoles = viduReferences.map((s) => s.role);
+      }
       if (model.capabilities.audio) body.generateAudio = generateAudio;
       // Grok-specific flag (alias)
       if (model.family === 'grok') body.enableAudio = generateAudio;
