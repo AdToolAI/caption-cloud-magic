@@ -158,18 +158,23 @@ Deno.serve(async (req) => {
     // Bug: Browserless overall failure
     if (!result.ok) {
       const errMsg = result.error ?? "(no error message)";
-      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button/i.test(errMsg);
+      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button|preview auth bridge/i.test(errMsg);
       await insertBug({
         run_id,
         mission_name: missionName,
+        // NOTE: qa_bug_reports.category check-constraint allows only:
+        // workflow|visual|data-integrity|performance|regression|cost-overrun|console|network|assertion
+        // Login failures don't have a dedicated category, so we tag failure_area instead.
         severity: "high",
-        category: isLoginFail ? "auth" : "workflow",
+        category: "workflow",
         title: isLoginFail
           ? `Login failed before any path could be visited`
           : `Mission execution failed: ${errMsg.slice(0, 100)}`,
         description: errMsg,
         screenshot_url: loginScreenshotUrl ?? screenshotUrl,
         network_trace: {
+          failure_area: isLoginFail ? "auth" : "workflow",
+          target_url: baseUrl,
           http_status: (result as any).httpStatus ?? null,
           raw_response: (result as any).rawResponse ?? null,
           duration_ms: result.durationMs,
