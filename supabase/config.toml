@@ -753,3 +753,6 @@ timeout_sec = 180
 [functions.detect-scene-drift]
 verify_jwt = true
 timeout_sec = 60
+
+[functions.ingest-e2e-results]
+verify_jwt = false
