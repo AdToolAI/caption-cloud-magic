@@ -111,6 +111,7 @@ const UsageReports = lazy(() => import("./pages/Analytics/UsageReports"));
 const PlatformAnalytics = lazy(() => import("./pages/Analytics/PlatformAnalytics"));
 const Admin = lazy(() => import("./pages/Admin"));
 const LambdaHealth = lazy(() => import("./pages/admin/LambdaHealth"));
+const QACockpit = lazy(() => import("./pages/admin/QACockpit"));
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
@@ -315,6 +316,11 @@ function AppLayout() {
           <Route path="/admin/lambda-health" element={
             <ProtectedRoute requireRole="admin">
               <LambdaHealth />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/qa-cockpit" element={
+            <ProtectedRoute requireRole="admin">
+              <QACockpit />
             </ProtectedRoute>
           } />
           
