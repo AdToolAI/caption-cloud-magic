@@ -57,10 +57,64 @@ export default function QACockpit() {
         .from("qa_bug_reports")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
       return data ?? [];
     },
     refetchInterval: 10000,
+  });
+
+  const mutedPatterns = useQuery({
+    queryKey: ["qa-muted-patterns"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("qa_muted_patterns")
+        .select("*")
+        .order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  const [bugFilter, setBugFilter] = useState<"action" | "warnings" | "resolved" | "muted">("action");
+
+  const resolveBug = useMutation({
+    mutationFn: async (bugId: string) => {
+      const { error } = await supabase
+        .from("qa_bug_reports")
+        .update({ status: "resolved", resolved_at: new Date().toISOString() })
+        .eq("id", bugId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Als behoben markiert");
+      queryClient.invalidateQueries({ queryKey: ["qa-bugs"] });
+      setSelectedBug(null);
+    },
+    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+  });
+
+  const mutePattern = useMutation({
+    mutationFn: async ({ pattern, reason }: { pattern: string; reason: string }) => {
+      const { error } = await supabase
+        .from("qa_muted_patterns")
+        .insert({ pattern_regex: pattern, reason, severity_when_matched: "ignore" });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pattern stummgeschaltet — zukünftige Runs ignorieren ihn");
+      queryClient.invalidateQueries({ queryKey: ["qa-muted-patterns"] });
+    },
+    onError: (e: any) => toast.error(`Fehler: ${e?.message ?? String(e)}`),
+  });
+
+  const unmutePattern = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("qa_muted_patterns").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Pattern wieder aktiv");
+      queryClient.invalidateQueries({ queryKey: ["qa-muted-patterns"] });
+    },
   });
 
   const missions = useQuery({
