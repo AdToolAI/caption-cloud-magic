@@ -344,6 +344,17 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         supportsImageInput={model.capabilities.i2v}
       />
 
+      {/* ── Multi-Reference (only for capabilities.multiRef → Vidu Q2 Reference2V) ── */}
+      {model.capabilities.multiRef && (
+        <MultiReferenceUploader
+          slots={viduReferences}
+          onChange={setViduReferences}
+          maxReferences={model.capabilities.maxReferences ?? 7}
+          brandCharacterUrl={brandCharacter?.reference_image_url ?? null}
+          brandCharacterName={brandCharacter?.name ?? null}
+        />
+      )}
+
       {/* ── Image upload (only for I2V) ── */}
       {model.capabilities.i2v && (
         <Card className="p-5 bg-card/60 backdrop-blur-xl border-border/60 space-y-3">
