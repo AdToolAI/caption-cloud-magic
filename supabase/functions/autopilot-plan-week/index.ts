@@ -155,7 +155,7 @@ Strikte Regeln:
 - Tonalität strikt einhalten.
 - Verbots-Themen niemals: ${forbidden.join(", ") || "(keine)"}
 - Nutze die übergebenen Trends, um relevante Hooks zu erzeugen — aber kein direkter Newsjacking von Politik/Tragödien.
-- Sprache jeder Idee MUSS einer der erlaubten Sprachen entsprechen: ${languages.join(", ")}.${performanceBlock}`,
+- Sprache jeder Idee MUSS einer der erlaubten Sprachen entsprechen: ${languages.join(", ")}.${performanceBlock}${goalBudgetBlock}`,
           },
           {
             role: "user",
