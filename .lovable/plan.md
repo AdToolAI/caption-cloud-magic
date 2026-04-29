@@ -1,119 +1,186 @@
-# Session H — Goal-Briefing, Budget-Modi & Wochen-Review
+## Bond QA Agent — 300€ Smart-Budget Tester
 
-Verwandelt den Autopiloten von "Setup einmal & läuft" zu einem **wöchentlichen Briefing-Zyklus** mit klarer Zielsetzung, Budget-bewusster Content-Mix-Entscheidung und automatischen Sicherheits-Pausen.
+KI-gesteuerter End-to-End-Tester der die **gesamte Plattform** abdeckt mit einem harten Budget-Cap von **300€ Credits**. Lambda-Renders & Browserless sind unlimitiert (kein Provider-Cost). Fokus: Maximale Bug-Abdeckung pro Cent.
 
-## 1. Goal-Briefing (Pflicht vor Aktivierung)
+**Setup:** Live-Preview + Test-Account `qa-bot@useadtool.ai` (Enterprise-Plan, separater Credit-Pool von 300€). Beides kombiniert: Nightly Smoke + Wöchentliche Deep Regression + Random Exploration.
 
-Erweiterung des Brief-Wizards um eine neue Pflicht-Stufe **"Channel-Ziel"**:
+---
 
-- **Channel-Goal** (Pflichtauswahl, 1 von 5):
-  - `awareness` — Reichweite & neue Follower
-  - `engagement` — Community-Interaktion (Likes, Kommentare, Saves)
-  - `traffic` — Klicks auf Website/Link in Bio
-  - `leads` — E-Mail-Signups, DMs, Anfragen
-  - `sales` — Direkter Produktverkauf
-- **Content-Mix-Slider** (3 Werte, Summe = 100 %):
-  - KI-Video (teuer)
-  - KI-Bilder + Stock-Video-Reels (mittel)
-  - Reine Bild-Posts / Karussells (günstig)
-- **Wochen-Budget in EUR** (10 € / 25 € / 50 € / 100 € / Custom) — wird intern zu Credits umgerechnet (1 € ≈ 100 Credits, basierend auf bestehender Pricing-Logik).
-- **Zielgruppe & USP** (2 Freitextfelder, je max. 280 Zeichen).
+### Budget-Allokation (300€ über 4 Wochen Testlauf, dann Quartals-Refill)
 
-→ Diese Felder werden in `autopilot-plan-week` direkt in den Gemini-Strategist-Prompt injiziert, damit die KI zwischen "10-€-Woche = nur Bilder + Stock" und "100-€-Woche = 5 KI-Videos" sauber unterscheidet.
+| Bereich | Budget | Strategie |
+|---|---|---|
+| **AI Video Provider** (10 Modelle) | 180€ | Rotations-Matrix: jede Woche 2-3 Provider mit minimalsten Settings (5s, niedrigste Auflösung). Alle 10 Provider in 4 Wochen 1× echt getestet. |
+| **AI Bilder** (Picture Studio, FLUX, Gemini Image) | 30€ | Smart-Sampling: 1 Generation pro Modus pro Woche (T2I, Inpaint, Outpaint, Upscale, Variations) |
+| **Voiceover/TTS** (ElevenLabs) | 20€ | Kurze 3-Sekunden-Texte, alle Stimmen rotieren |
+| **Music Studio** (Stable Audio, MiniMax) | 15€ | 1 Track pro Tier pro Woche, jeweils 10s |
+| **Talking Head** (Hedra) | 15€ | 1 kurzer Avatar-Render pro Woche |
+| **Autopilot End-to-End** | 25€ | Vollständiger Wochenlauf 1×/Monat mit echten Generierungen (4 Slots) |
+| **Translator + Sora Long-Form** | 10€ | 1 Lauf mit minimalem Input |
+| **Reserve / Random Exploration** | 5€ | Fail-Safe wenn Cost-Cap pro Run überschritten |
 
-## 2. Budget-Mode-Engine
+**Cost-Cap pro Run hart enforced:** Smoke 0€ (alles gemockt), Regression 5€, Deep 15€. Workspace-Credit-Hook stoppt automatisch wenn Test-User unter 10€ fällt → Telegram-Alert.
 
-`autopilot-plan-week` bekommt eine **Cost-Aware-Allocation**:
+---
 
-```text
-verfügbare_credits / 7 Tage
-  ↓
-für jeden geplanten Slot:
-  format = Mix-Slider × Channel-Goal × verbleibendes_Budget
-  Wenn KI-Video < verbleibendes_Budget → erlaubt
-  Sonst → fallback Stock-Video oder Bild-Post
-```
+### Kernprinzipien für maximale Bug-Abdeckung pro €
 
-Niedrig-Budget-Wochen erzeugen automatisch keine `ai-video`-Slots mehr — Slots werden als `stock-reel` oder `static-image` markiert. Bestehende `autopilot-generate-slot`-Branching wird erweitert.
+1. **Provider-Rotations-Matrix** — Statt jeden Provider jeden Tag, rotiert die KI durch alle 10 AI-Video-Provider über 4 Wochen. Jede Woche: 2-3 echte Renders + 7 gemockte. Workflow-Logik (Routing, Refund, Polling, DB-Writes) ist provider-agnostisch und wird täglich abgedeckt.
+2. **Cached Asset-Pool** — Test-User hat 50 vorgenerierte Assets (Videos/Bilder/Audios/Scripts). Workflows die nur **konsumieren** (Director's Cut, Composer, Translator) nutzen diese als Input → 0€ Cost.
+3. **Mock-by-Default** — `is_test_user`-Flag → alle teuren Edge-Functions mocken standardmäßig. Echte Calls nur wenn die Mission explizit `cost_real: true` setzt.
+4. **Differential Testing** — Screenshot/DOM/Performance-Diff gegen letzten grünen Baseline-Run. Nur Diffs werden mit Vision-AI tief analysiert → spart 80% Gemini-Vision-Calls.
+5. **Smart Mission Scheduler** — Statt fester Reihenfolge wählt der Orchestrator die Mission mit höchstem **Bug-Yield-pro-Cent**: Bereiche mit kürzlich vielen Bugs/Code-Änderungen werden öfter getestet.
+6. **Lambda & Browserless = unlimitiert** — Voller End-to-End-Render-Test täglich (Composer → Multi-Scene-Render → Director's Cut → Export) als Workflow-Backbone. Das ist der wichtigste Korrektheits-Check und kostet keine Credits.
 
-## 3. Samstag-Wochen-Review
+---
 
-Neue Edge Function `autopilot-weekly-review` (Cron: **Samstag 10:00 UTC**):
-
-- Aggregiert Daten der vergangenen 7 Tage:
-  - Posts erstellt / publiziert / abgelehnt
-  - Plattform-Verteilung
-  - Gesamt-Engagement (aus `post_metrics`)
-  - Top- & Flop-Pillar (aus Session-F-Insights)
-  - Verbrauchte vs. budgetierte Credits
-- Generiert **AI-Strategie-Vorschlag für die kommende Woche** (Gemini 2.5 Flash) inkl. neuem Budget-Vorschlag.
-- Speichert Ergebnis in neuer Tabelle `autopilot_weekly_reviews`.
-- Setzt `briefing_required_until = Sonntag 18:00 UTC` auf den Brief.
-- Sendet Notification `autopilot_weekly_review_ready` (in-app + optional E-Mail-Digest via bestehende `autopilot-daily-digest`-Infra).
-
-## 4. Wochen-Review-UI (neuer Tab "Wochen-Review")
-
-Im `/autopilot` Cockpit:
-
-- Bento-Cards: Posts/Engagement/Budget-Verbrauch/Top-Pillar
-- KI-Strategie-Vorschlag-Karte mit **"Bestätigen"** (= aktuelles Briefing übernehmen) oder **"Anpassen"** (= Brief-Wizard öffnen)
-- Visueller Countdown bis Sonntag 18:00 UTC mit Warn-Banner
-
-## 5. Auto-Pause-Mechaniken
-
-Neue Cron-Function `autopilot-safety-check` (stündlich):
-
-- **Briefing-Pause:** Wenn `briefing_required_until` < `now()` und kein neues Briefing bestätigt → setze `paused_until = now() + 30 Tage` + Notification `autopilot_paused_briefing_missing`.
-- **Credit-Pause:** Vor jedem Slot-Generate prüft `autopilot-generate-slot` bereits den Credit-Stand — neu: wenn `user_credits < min_required (50)` → setze `paused_until = now() + 7 Tage` + Notification `autopilot_paused_low_credits` mit CTA "Credits aufladen".
-- Beide Pausen werden im Sticky-Control-Bar prominent als roter Banner mit Fix-Button angezeigt.
-
-## 6. Schema-Änderungen
+### Wochenrhythmus
 
 ```text
-autopilot_briefs:
-  + channel_goal              text       not null default 'engagement'
-  + content_mix               jsonb      not null default '{"ai_video":33,"stock_reel":33,"static":34}'
-  + weekly_budget_eur         integer    not null default 25
-  + target_audience           text
-  + usp                       text
-  + briefing_required_until   timestamptz
-  + last_review_completed_at  timestamptz
+Mo-Fr 02:00 UTC → Smoke-Suite (0€/Nacht)
+                  • Login, Navigation, alle 24 Module laden
+                  • 1 echter Lambda-Render (Composer-Pipeline)
+                  • 8 Workflow-Missionen mit gemockten Providern
 
-autopilot_weekly_reviews (neu):
-  id, brief_id, user_id, period_start, period_end,
-  posts_published int, total_engagement int,
-  credits_spent int, credits_budgeted int,
-  top_pillar text, weakest_pillar text,
-  ai_recommendation jsonb,    -- {strategy_text, suggested_budget_eur, suggested_mix}
-  user_decision text,         -- 'pending' | 'accepted' | 'modified'
-  created_at, decided_at
+Sa 02:00 UTC    → Regression (~50€/Woche)
+                  • Smoke + 2-3 echte AI-Video-Provider (rotierend)
+                  • Echte Bild-Generation (1× pro Modus)
+                  • Echte VO/Music/Hedra-Calls (kurz)
+                  • 30 Min Random-Exploration
+
+So 02:00 UTC    → Performance-Audit (0€)
+                  • Lighthouse alle Hauptrouten
+                  • JS-Heap, LCP, FID, CLS
+                  • Diff gegen Vorwoche
+
+Monatlich 1×   → Deep Autopilot Run (~25€)
+                  • Vollständiger Wochenplan mit echten Generierungen
 ```
 
-Notification-Constraint erweitern: `autopilot_weekly_review_ready`, `autopilot_paused_briefing_missing`, `autopilot_paused_low_credits`.
+Über 4 Wochen sind alle 10 Video-Provider, alle Bild-Modi, alle TTS-Stimmen und alle Music-Tiers mindestens 1× echt durchgelaufen.
 
-## 7. Files
+---
 
-**Neu:**
-- `supabase/functions/autopilot-weekly-review/index.ts`
-- `supabase/functions/autopilot-safety-check/index.ts`
-- `src/components/autopilot/AutopilotWeeklyReviewPanel.tsx`
-- `src/components/autopilot/AutopilotGoalBriefingStep.tsx` (Pflicht-Step im Wizard)
-- 1 Migration (Schema + Cron-Schedules)
+### Datenmodell
 
-**Geändert:**
-- `src/components/autopilot/AutopilotBriefWizard.tsx` — neuer Step 1 "Channel-Ziel & Budget"
-- `src/components/autopilot/AutopilotStrategyEditor.tsx` — Goal/Mix/Budget editierbar
-- `src/pages/Autopilot.tsx` — neuer Tab "Wochen-Review" + Briefing-Countdown-Banner
-- `src/hooks/useAutopilot.ts` — neue Hooks (`useWeeklyReview`, `useAcceptReview`)
-- `supabase/functions/autopilot-plan-week/index.ts` — Goal + Mix + Budget-Modi in Prompt
-- `supabase/functions/autopilot-generate-slot/index.ts` — Cost-Aware-Branching
-- `src/integrations/supabase/types.ts` — auto-regen
+- **`qa_test_runs`** — `tier`, `mission`, `status`, `duration_ms`, `bugs_found`, `cost_actual_cents`, `cost_budgeted_cents`, `baseline_run_id`
+- **`qa_bug_reports`** — `severity`, `category` (workflow / visual / data-integrity / performance / regression / cost-overrun), `route`, `reproduce_steps[]`, `screenshot_url`, `console_log`, `network_trace`, `diff_from_baseline`
+- **`qa_missions`** — `name`, `tier`, `steps[]`, `expected_assertions[]`, `cost_real_providers[]` (welche Provider in diesem Run echt laufen dürfen), `cost_cap_cents`
+- **`qa_test_assets`** — vorgenerierte Inputs, getagged
+- **`qa_baselines`** — pro Mission+Step: Screenshot-Hash, DOM-Snapshot, Performance-Bandbreiten
+- **`qa_budget_ledger`** — Tages/Wochen/Monats-Spending pro Bereich, Hard-Cap-Enforcement
+- **`qa_provider_rotation`** — welcher Provider wann zuletzt echt getestet wurde, Next-In-Line Logik
 
-## 8. Cron-Schedules
+RLS: Nur Admins.
+
+---
+
+### Edge Functions
+
+- **`qa-agent-orchestrator`** (cron nightly) — Wählt Tier nach Wochentag, prüft `qa_budget_ledger`, picked Provider via Rotation-Matrix, startet Missions sequenziell.
+- **`qa-agent-execute-mission`** — Browserless-Loop mit Gemini Flash Lite für Action-Decisions, programmatischen Assertions (80% der Checks ohne AI), Screenshots nur bei Failure oder Mission-Ende.
+- **`qa-agent-mock-providers`** — Middleware-Pattern: alle teuren Provider-Edge-Functions checken `request.user.is_test_user` UND ob die laufende Mission diesen Provider in `cost_real_providers` hat. Sonst sofort Cached-Asset zurück.
+- **`qa-agent-budget-guard`** — Pre-Flight-Check vor jedem realen Provider-Call. Stoppt Run wenn Cost-Cap überschritten oder Monatsbudget erreicht.
+- **`qa-agent-diff-baseline`** — Screenshot-Hash + DOM-Diff. Nur echte Abweichungen → Gemini Flash Vision für Detail.
+- **`qa-agent-explore`** (Sa nur) — 30 Min Random-Click in unbesuchten Routen.
+- **`qa-agent-performance-audit`** (So) — Lighthouse via Browserless + JS-Heap-Snapshots.
+- **`qa-agent-digest`** (cron 07:00 UTC) — Telegram + In-App. Inkl. Budget-Status: "Diese Woche 12€/75€ verbraucht, alle Provider grün."
+- **`qa-cleanup-test-data`** — Tägliches Aufräumen aller Test-User-Inhalte > 24h.
+
+---
+
+### Frontend — `/admin/qa-cockpit` (5 Tabs, Bond-Design)
+
+1. **Live Run** — Step-Progress, Live-Console, letzter Screenshot, aktueller Cost-Counter
+2. **Bug Inbox** — Severity-Filter, Click → Drawer mit Reproduce-Steps + Diff-View (Baseline ↔ Aktuell)
+3. **Missions** — CRUD, "Jetzt ausführen", Tier-Badge, `cost_real_providers` Toggle
+4. **Budget Tracker** — Stacked Bar pro Bereich, Burn-Rate Forecast, Provider-Rotation-Matrix als Heatmap
+5. **Baselines & Performance** — Pro Mission letzter grüner Run + Lighthouse-Trends
+
+---
+
+### Mission-Library (Workflow-fokussiert)
+
+**Smoke (täglich, 0€):**
+1. Login + Dashboard + alle 24 Hauptmenüs öffnen
+2. Picture Studio: Generate (Mock) → Save → Media Library check
+3. AI Video Toolkit: Provider-Switch, Render-Job startet, Polling, Refund-Pfad
+4. Director's Cut: Cached Test-Video laden, Subtitles, Filter, Speed-Ramp
+5. Composer: 2 Cached Scenes → "Render All & Stitch" → **echter Lambda-Render** → Director's Cut Übergabe → Subtitle-Track sichtbar → Export → MP4-Header valide
+6. Autopilot Briefing-Form, Strategie-Generation triggert (Gemini = günstig, läuft echt)
+7. Social Calendar Slot CRUD
+8. Music Studio Tier-Buttons klickbar
+9. Marketplace Liste + Detail + Buy-Flow startet
+10. Brand Character Auswahl in allen Studios
+11. Avatar Library, Talking Head Dialog mit Preset-Avatar
+12. Credit-Refund Validation: Mock-Failure → DB-Refund-Check
+
+**Regression (Sa, ~50€):**
+13. **Provider-Rotation Realtest:** 2-3 AI-Video-Provider rotierend mit minimalsten Settings
+14. **Echte Bild-Generation:** 1× T2I, 1× Inpaint, 1× Upscale (~3€)
+15. **Echte VO+Music:** 3s ElevenLabs, 10s Stable Audio
+16. **Continuity Guardian:** Frame-Extraction → Reference → Next Scene generation
+17. Localization-Sweep DE/EN/ES auf allen Hauptseiten
+18. Stock-Library Live-Search (Pexels/Pixabay)
+19. Video Translator mit Cached Input
+20. Email Director Draft-Generation + Test-Send
+
+**Deep (monatlich, ~25€):**
+21. Autopilot Full-Week-Pipeline: Briefing → Plan → 4 Slots echt generieren → Approve → Publish (Sandbox)
+
+---
+
+### Safety & Cost Controls
+
+- **Hard Budget Cap 300€/Monat** im `qa_budget_ledger` — bei Erreichen automatischer Stop aller Real-Calls bis zum 1. des Folgemonats
+- **Cost-Cap pro Run** programmatisch enforced
+- **Lambda-Test-Composition** auf 5s/720p limitiert (kostet keine Credits, aber spart Render-Zeit)
+- **Auto-Cleanup** nach 24h
+- **Rate Limit:** max 1 Run pro Mission pro 4h
+- **Kill-Switch** im Cockpit
+- **Telegram-Alert** bei: jedem kritischen Bug, Budget > 80% verbraucht, Run-Failure ohne Refund
+
+---
+
+### Technische Details
+
+- **Browser:** Browserless.io — du brauchst `BROWSERLESS_API_KEY` als Secret später
+- **KI:** `gemini-2.5-flash-lite` für Action-Decisions, `gemini-2.5-flash` nur für Visual-Diff
+- **Assertions:** 80% programmatisch (Element-Existenz, HTTP-Status, DB-Row-Counts) → keine Token-Kosten
+- **Test-User:** Enterprise-Plan mit 999M Plattform-Credits aber **separater 300€/Monat Real-Money-Budget** im Ledger getrackt
+
+---
+
+### Diagramm
 
 ```text
-autopilot-weekly-review     SAT 10:00 UTC  (Wochen-Review erstellen)
-autopilot-safety-check      hourly          (Briefing-Deadline + Low-Credits)
+        ┌──────────────┐
+Cron ───┤ Orchestrator ├──checks──▶ qa_budget_ledger
+        └──────┬───────┘            qa_provider_rotation
+               ▼
+        ┌─────────────────────┐    ┌────────────────┐
+        │ execute-mission     │───▶│ Browserless    │
+        │ • Assertions (free) │    │ (Chromium)     │
+        │ • Gemini Flash Lite │    └────────┬───────┘
+        │ • Diff vs Baseline  │             │
+        └──────────┬──────────┘             ▼ provider call
+                   │                ┌────────────────┐
+                   │                │ budget-guard   │──over cap─▶ STOP+Alert
+                   │                │ + mock-check   │
+                   │                └────────┬───────┘
+                   │                         │ ok
+                   │                         ▼
+                   │                   real / mock
+                   ▼
+        bug_reports + budget_ledger ──▶ Telegram + Cockpit
 ```
 
-**Bereit zur Umsetzung?**
+---
+
+### Roadmap (3 Sessions)
+
+- **QA-1:** Schema (8 Tabellen) + Test-User mit 300€-Ledger + `is_test_user`-Mock-Hooks in alle teuren Provider-Functions + Browserless-Anbindung + Orchestrator-Skelett + Budget-Guard
+- **QA-2:** `execute-mission` mit Assertions-Engine + Differential-Testing + Provider-Rotations-Matrix + 12 Smoke-Missionen geseedet + Cached-Asset-Pool
+- **QA-3:** Admin-Cockpit (5 Tabs inkl. Budget-Tracker) + Telegram-Digest + Performance-Audit + 8 Regression-Missionen + Deep-Autopilot-Mission + Cleanup-Cron
+
+**Soll ich mit Session QA-1 starten?**
