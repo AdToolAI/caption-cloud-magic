@@ -29,7 +29,7 @@ export const AvatarVoicePicker = ({ value, onChange, disabled }: AvatarVoicePick
   const { voices: customVoices } = useCustomVoices();
 
   const customList = useMemo(
-    () => (customVoices ?? []).filter((v: any) => v?.voice_id),
+    () => (customVoices ?? []).filter((v) => v?.elevenlabs_voice_id && v?.is_active !== false),
     [customVoices]
   );
 
@@ -43,9 +43,13 @@ export const AvatarVoicePicker = ({ value, onChange, disabled }: AvatarVoicePick
       onChange({ voiceId: eleven.id, provider: 'elevenlabs', name: eleven.name });
       return;
     }
-    const custom = customList.find((v: any) => v.voice_id === selected);
+    const custom = customList.find((v) => v.elevenlabs_voice_id === selected);
     if (custom) {
-      onChange({ voiceId: custom.voice_id, provider: 'custom', name: custom.name || 'Custom voice' });
+      onChange({
+        voiceId: custom.elevenlabs_voice_id,
+        provider: 'custom',
+        name: custom.name || 'Custom voice',
+      });
     }
   };
 
