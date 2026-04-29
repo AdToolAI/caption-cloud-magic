@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power } from 'lucide-react';
+import { Bot, ShieldCheck, Calendar, Activity, Settings, Lock, AlertTriangle, Sparkles, Pause, Power, Inbox } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,8 @@ import { AutopilotBriefWizard } from '@/components/autopilot/AutopilotBriefWizar
 import { AutopilotCalendarGrid } from '@/components/autopilot/AutopilotCalendarGrid';
 import { AutopilotSlotDrawer } from '@/components/autopilot/AutopilotSlotDrawer';
 import { AutopilotStrategyEditor } from '@/components/autopilot/AutopilotStrategyEditor';
+import { AutopilotApprovalInbox } from '@/components/autopilot/AutopilotApprovalInbox';
+import { useAutopilotNotifications } from '@/hooks/useAutopilotNotifications';
 import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 
@@ -29,6 +31,9 @@ export default function Autopilot() {
   const { data: activity = [] } = useAutopilotActivity(30);
   const pause = usePauseAutopilot();
   const toggle = useToggleAutopilot();
+  const { unreadCount: inboxUnread } = useAutopilotNotifications(30);
+  const reviewCount = queue.filter((s) => s.status === 'qa_review').length;
+  const inboxBadge = inboxUnread + reviewCount;
   const [wizardOpen, setWizardOpen] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<AutopilotSlot | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -139,9 +144,17 @@ export default function Autopilot() {
           )}
 
           {/* Tabs */}
-          <Tabs defaultValue="calendar">
+          <Tabs defaultValue={inboxBadge > 0 ? 'inbox' : 'calendar'}>
             <TabsList className="mb-4">
               <TabsTrigger value="calendar" className="gap-1.5"><Calendar className="h-3.5 w-3.5" /> Wochenplan</TabsTrigger>
+              <TabsTrigger value="inbox" className="gap-1.5 relative">
+                <Inbox className="h-3.5 w-3.5" /> Inbox
+                {inboxBadge > 0 && (
+                  <Badge className="ml-1 bg-primary text-primary-foreground h-4 min-w-4 px-1 text-[10px] flex items-center justify-center rounded-full">
+                    {inboxBadge > 99 ? '99+' : inboxBadge}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="strategy" className="gap-1.5"><Settings className="h-3.5 w-3.5" /> Strategie</TabsTrigger>
               <TabsTrigger value="tools" className="gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Tools</TabsTrigger>
               <TabsTrigger value="compliance" className="gap-1.5"><ShieldCheck className="h-3.5 w-3.5" /> Compliance</TabsTrigger>
@@ -153,6 +166,12 @@ export default function Autopilot() {
                 queue={queue}
                 hasBrief={!!brief}
                 onSelectSlot={(s) => { setSelectedSlot(s); setDrawerOpen(true); }}
+              />
+            </TabsContent>
+
+            <TabsContent value="inbox">
+              <AutopilotApprovalInbox
+                onOpenSlot={(s) => { setSelectedSlot(s); setDrawerOpen(true); }}
               />
             </TabsContent>
 
