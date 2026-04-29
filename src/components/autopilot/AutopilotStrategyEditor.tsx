@@ -157,6 +157,15 @@ export function AutopilotStrategyEditor({ brief }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Session H — Channel Goal & Budget */}
+      <Card className="p-5 space-y-3 border-primary/30 bg-primary/5">
+        <div className="flex items-center gap-2">
+          <Target className="h-4 w-4 text-primary" />
+          <Label className="text-xs uppercase tracking-widest text-primary">Channel-Ziel & Budget</Label>
+        </div>
+        <AutopilotGoalBriefingStep value={goal} onChange={setGoal} />
+      </Card>
+
       {/* Pillars */}
       <Card className="p-5 space-y-3">
         <div>
