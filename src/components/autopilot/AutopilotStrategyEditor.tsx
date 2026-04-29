@@ -91,9 +91,16 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       videoEnabled !== !!brief.video_enabled ||
       videoProvider !== (brief.video_provider ?? 'hailuo-standard') ||
       videoDuration !== (brief.video_duration_sec ?? 6) ||
-      videoRatio !== (brief.video_aspect_ratio ?? '9:16')
+      videoRatio !== (brief.video_aspect_ratio ?? '9:16') ||
+      JSON.stringify(goal) !== JSON.stringify({
+        channel_goal: brief.channel_goal ?? 'engagement',
+        weekly_budget_eur: brief.weekly_budget_eur ?? 25,
+        content_mix: brief.content_mix ?? { ai_video: 33, stock_reel: 33, static: 34 },
+        target_audience: brief.target_audience ?? '',
+        usp: brief.usp ?? '',
+      })
     );
-  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish, videoEnabled, videoProvider, videoDuration, videoRatio]);
+  }, [brief, pillars, forbidden, tonality, platforms, languages, budget, autoPublish, videoEnabled, videoProvider, videoDuration, videoRatio, goal]);
 
   function togglePlatform(p: string) {
     setPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]);
