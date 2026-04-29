@@ -187,9 +187,10 @@ export function useToggleAutopilot() {
       if (input.activate && input.consentTextVersion) {
         await supabase.from('autopilot_consent_log').insert({
           user_id: u.user.id,
-          consent_text_version: input.consentTextVersion,
-          consent_text_hash: input.consentTextHash ?? null,
-          accepted_clauses: ['aup', 'no_deepfake', 'no_copyright', 'termination_acknowledged'],
+          event_type: 'autopilot_activated',
+          accepted_text_version: input.consentTextVersion,
+          accepted_text_hash: input.consentTextHash ?? 'unknown',
+          metadata: { clauses: ['aup', 'no_deepfake', 'no_copyright', 'termination_acknowledged'] },
         });
       }
 
