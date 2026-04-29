@@ -284,7 +284,10 @@ export default async ({ page, context }) => {
     for (const p of (opts.paths || [])) {
       const t0 = Date.now();
       try {
-        await page.goto(opts.baseUrl + p, { waitUntil: 'networkidle2', timeout: 25000 });
+        // domcontentloaded + small settle is enough for a smoke route check.
+        // networkidle2 was making one slow route (e.g. analytics fetch) eat the whole budget.
+        await page.goto(opts.baseUrl + p, { waitUntil: 'domcontentloaded', timeout: 12000 });
+        await new Promise(r => setTimeout(r, 800));
         const title = await page.title();
         result.pathResults.push({ path: p, ok: true, ms: Date.now() - t0, title });
       } catch (e) {
