@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
-  Sparkles, ImagePlus, Loader2, Wand2, X, Volume2, VolumeX,
+  Sparkles, ImagePlus, Loader2, Wand2, X, Volume2, VolumeX, Film, Info,
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -68,7 +68,10 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
   const [aspectRatio, setAspectRatio] = useState<string>(model.aspectRatios[0]);
   const [generateAudio, setGenerateAudio] = useState<boolean>(model.capabilities.audio);
   const [startImageUrl, setStartImageUrl] = useState<string | null>(null);
+  const [referenceVideoUrl, setReferenceVideoUrl] = useState<string | null>(null);
+  const [videoReferenceType, setVideoReferenceType] = useState<'feature' | 'base'>('feature');
   const [uploading, setUploading] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showOptimizer, setShowOptimizer] = useState(false);
 
@@ -99,6 +102,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
     if (!model.aspectRatios.includes(aspectRatio)) setAspectRatio(model.aspectRatios[0]);
     if (!model.capabilities.audio) setGenerateAudio(false);
     if (!model.capabilities.i2v) setStartImageUrl(null);
+    if (!model.capabilities.v2v) setReferenceVideoUrl(null);
     // Reflect selection in URL for shareable / bookmarkable state
     if (searchParams.get('model') !== model.id) {
       const next = new URLSearchParams(searchParams);
