@@ -1,38 +1,50 @@
 ## Problem
 
-Das QA-Cockpit hat das Passwort des `qa-bot@useadtool.ai` Test-Users nur **in den ersten 8 Zeichen** angezeigt (`password.slice(0, 8)`). Das vollständige Passwort ist damit verloren — es wurde nirgendwo persistiert und der Toast verschwindet ohnehin nach wenigen Sekunden.
+Beide Smoke-Missionen (`smoke-01-dashboard-tour`, `smoke-02-picture-studio-mock`) failen sofort mit:
 
-Lösung: (1) Passwort neu generieren via `qa-agent-setup-test-user` mit explizitem Reset-Flag, (2) UI so umbauen, dass das vollständige Passwort sicher angezeigt, kopiert und direkt als Secret gespeichert werden kann — ohne dass es jemals in Logs, Toasts oder LocalStorage abgeschnitten oder geleakt wird.
+```
+Browserless 400: module is not defined
+```
+
+Ursache: Wir senden den Code als **raw JavaScript** mit `Content-Type: application/javascript` und nutzen `module.exports = ...` (CommonJS). Der aktuelle Browserless `/function`-Endpoint (v2, `production-sfo.browserless.io`) erwartet jedoch:
+
+1. **`Content-Type: application/json`**
+2. Body: `{ "code": "<JS-string>", "context": { ... } }`
+3. Der Code selbst muss **ES-Module-Syntax** verwenden: `export default async ({ page, context }) => { ... }`
+
+Die Fehlermeldung `module is not defined` ist exakt das, was zurückkommt wenn der Runner ESM erwartet und wir `module.exports` schreiben.
 
 ## Änderungen
 
-### 1. Edge Function: `qa-agent-setup-test-user` erweitern
-- Neuer optionaler Parameter `reset_password: true` → setzt für existierende User ein **neues** Passwort via `supabase.auth.admin.updateUserById()` und gibt es zurück.
-- Ohne Flag bleibt das Verhalten idempotent (kein Passwort-Reset bei existierenden Usern).
+### 1. `supabase/functions/_shared/browserlessClient.ts`
 
-### 2. UI: `src/pages/admin/QACockpit.tsx` — sichere Passwort-Anzeige
-- Statt Toast mit Truncation → **dedizierter Modal-Dialog** ("Test-User-Zugangsdaten") mit:
-  - Vollständigem Passwort in einem `<input type="text" readOnly>` (monospace, voll selektierbar)
-  - **"Kopieren"-Button** mit Clipboard-API (zeigt nach Klick "Kopiert ✓")
-  - **"Show/Hide"-Toggle** (Default: maskiert mit `••••`, Klick enthüllt)
-  - Warnhinweis: *"Dieses Passwort wird nur jetzt einmalig angezeigt. Speichere es sofort als Secret `QA_TEST_USER_PASSWORD`."*
-  - **Direkt-Link / Button** der die Secret-Anlage triggert (öffnet den Secrets-Dialog mit vorausgefülltem Namen)
-- Zusätzlicher Button **"Passwort zurücksetzen"** im "Test-User"-Bereich → ruft Edge Function mit `reset_password: true` auf und öffnet denselben Modal mit dem neuen Passwort.
-- **Entfernen** des `slice(0, 8)`-Truncation-Codes komplett.
+**`runBrowserlessFunction(code, context?)`** neu schreiben:
+- Body als JSON senden: `{ code, context }`
+- Header: `Content-Type: application/json`
+- Antwort wie bisher parsen, `rawResponse`/`httpStatus` für Debugging behalten
+- Optionalen zweiten Parameter `context` ergänzen (wird vom Code als zweites Arg empfangen)
 
-### 3. Sicherheits-Hygiene
-- Passwort wird **nicht** in `console.log` ausgegeben.
-- Passwort wird **nicht** in React-State persistiert nach Modal-Close (Cleanup mit `setPassword(null)`).
-- Edge Function loggt das Passwort weiterhin **nicht** in Function-Logs (nur `created: true/false`).
+**`buildSmokeNavigationScript(opts)`** umstellen:
+- `module.exports = async ({ page }) => { ... }` → `export default async ({ page, context }) => { ... }`
+- Statt `opts` per JSON-Inline-Stringify in den Code zu backen, übergeben wir die Optionen via `context`-Parameter (sauberer, keine Quote-Escapes nötig)
+- Funktion gibt das Tupel `{ data, type }` weiterhin so zurück wie Browserless es erwartet
 
-## Workflow nach Implementierung
+### 2. `supabase/functions/qa-agent-execute-mission/index.ts`
 
-1. User klickt im QA-Cockpit auf **"Passwort zurücksetzen"**.
-2. Modal öffnet sich mit vollständigem neuem Passwort + Kopier-Button.
-3. User kopiert es, klickt **"Als Secret speichern"** → Secrets-Dialog öffnet sich.
-4. Modal schließen → Passwort wird aus dem Speicher entfernt.
+- `runBrowserlessFunction(script)` Aufruf erweitern: `runBrowserlessFunction(script, { baseUrl, email, password, paths, finalPath })`
+- `buildSmokeNavigationScript()` braucht keine Opts mehr im Code-Body, nur noch eine reine Code-Konstante → Signatur entsprechend anpassen (Funktion ohne Args, da Context separat übergeben wird)
+
+### 3. Verifikation
+
+Nach dem Fix manuell `smoke-02-picture-studio-mock` im Cockpit auslösen. Erwartung:
+- HTTP 200 von Browserless
+- `pathResults: [{path: "/picture-studio", ok: true}]`
+- Screenshot wird in `qa-screenshots` Bucket abgelegt
+- Run-Status: `succeeded` (sofern keine Console-Errors)
+
+Falls Browserless trotz JSON-Format wieder mit `module is not defined` antwortet, fallen wir auf den Alternativ-Endpoint **`/function`** mit reinem ESM-Body und Content-Type `application/javascript` zurück — testen wir aber erst nach dem JSON-Versuch.
 
 ## Betroffene Dateien
 
-- `supabase/functions/qa-agent-setup-test-user/index.ts` — Reset-Flag-Logik
-- `src/pages/admin/QACockpit.tsx` — Modal + Reset-Button, Truncation entfernen
+- `supabase/functions/_shared/browserlessClient.ts` — Body-Format JSON + ESM-Code
+- `supabase/functions/qa-agent-execute-mission/index.ts` — Aufruf mit Context-Objekt
