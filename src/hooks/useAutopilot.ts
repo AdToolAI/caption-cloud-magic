@@ -447,3 +447,118 @@ export function useTriggerPerformanceAnalysis() {
   });
 }
 
+/* ============ Session H — Weekly Review ============ */
+
+export interface AutopilotWeeklyReview {
+  id: string;
+  brief_id: string;
+  user_id: string;
+  period_start: string;
+  period_end: string;
+  posts_published: number;
+  posts_generated: number;
+  posts_rejected: number;
+  total_engagement: number;
+  credits_spent: number;
+  credits_budgeted: number;
+  top_pillar: string | null;
+  weakest_pillar: string | null;
+  platform_breakdown: Record<string, number>;
+  ai_recommendation: {
+    strategy_text?: string;
+    suggested_budget_eur?: number;
+    suggested_mix?: { ai_video: number; stock_reel: number; static: number };
+    key_actions?: string[];
+  };
+  user_decision: 'pending' | 'accepted' | 'modified';
+  decided_at: string | null;
+  created_at: string;
+}
+
+export function useLatestWeeklyReview() {
+  return useQuery({
+    queryKey: ['autopilot-weekly-review'],
+    queryFn: async (): Promise<AutopilotWeeklyReview | null> => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u?.user) return null;
+      const { data, error } = await supabase
+        .from('autopilot_weekly_reviews')
+        .select('*')
+        .eq('user_id', u.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as unknown as AutopilotWeeklyReview) ?? null;
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useAcceptWeeklyReview() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async (input: { reviewId: string; applySuggestion: boolean }) => {
+      const { data: review, error: revErr } = await supabase
+        .from('autopilot_weekly_reviews')
+        .select('*')
+        .eq('id', input.reviewId)
+        .single();
+      if (revErr) throw revErr;
+      const r = review as unknown as AutopilotWeeklyReview;
+
+      const patch: Record<string, unknown> = { briefing_required_until: null };
+      if (input.applySuggestion) {
+        const rec = r.ai_recommendation;
+        if (rec.suggested_budget_eur) patch.weekly_budget_eur = Math.round(rec.suggested_budget_eur);
+        if (rec.suggested_mix) patch.content_mix = rec.suggested_mix;
+      }
+      await supabase.from('autopilot_briefs').update(patch).eq('id', r.brief_id);
+
+      const { error } = await supabase
+        .from('autopilot_weekly_reviews')
+        .update({
+          user_decision: input.applySuggestion ? 'accepted' : 'modified',
+          decided_at: new Date().toISOString(),
+        })
+        .eq('id', input.reviewId);
+      if (error) throw error;
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['autopilot-weekly-review'] });
+      qc.invalidateQueries({ queryKey: ['autopilot-brief'] });
+      toast({
+        title: vars.applySuggestion ? 'Vorschlag übernommen' : 'Briefing bestätigt',
+        description: 'Autopilot läuft normal weiter.',
+      });
+    },
+    onError: (e: unknown) => toast({
+      title: 'Fehler',
+      description: e instanceof Error ? e.message : String(e),
+      variant: 'destructive',
+    }),
+  });
+}
+
+export function useTriggerWeeklyReview() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('autopilot-weekly-review', { body: {} });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['autopilot-weekly-review'] });
+      toast({ title: 'Review erstellt', description: 'Strategie-Vorschlag bereit.' });
+    },
+    onError: (e: unknown) => toast({
+      title: 'Review fehlgeschlagen',
+      description: e instanceof Error ? e.message : String(e),
+      variant: 'destructive',
+    }),
+  });
+}
+
