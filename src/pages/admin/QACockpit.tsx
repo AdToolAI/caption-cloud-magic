@@ -186,14 +186,26 @@ export default function QACockpit() {
               Autonomer KI-Tester · 300€ Smart-Budget · Live-Preview
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={() => setupTestUser.mutate()}
+              onClick={() => setupTestUser.mutate(false)}
               disabled={setupTestUser.isPending}
             >
               {setupTestUser.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Test-User einrichten
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (confirm("Wirklich neues Passwort erzeugen? Das alte wird sofort ungültig.")) {
+                  setupTestUser.mutate(true);
+                }
+              }}
+              disabled={setupTestUser.isPending}
+            >
+              <KeyRound className="h-4 w-4 mr-2" />
+              Passwort zurücksetzen
             </Button>
             <Button
               onClick={() => triggerMission.mutate(undefined)}
