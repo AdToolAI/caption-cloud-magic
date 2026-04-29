@@ -8,8 +8,9 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ShieldCheck, AlertTriangle, ChevronRight, Sparkles, Lock } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, ChevronRight, Sparkles, Lock, Target } from 'lucide-react';
 import { useUpsertAutopilotBrief, useToggleAutopilot, type UpsertBriefInput } from '@/hooks/useAutopilot';
+import { AutopilotGoalBriefingStep, type GoalBriefingValue } from './AutopilotGoalBriefingStep';
 import { cn } from '@/lib/utils';
 
 interface Props {
