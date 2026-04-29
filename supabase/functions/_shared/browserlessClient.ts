@@ -160,7 +160,17 @@ export default async ({ page, context }) => {
 
     // 1) Open auth page
     await page.goto(opts.baseUrl + '/auth', { waitUntil: 'networkidle2', timeout: 30000 });
-    beat('auth-page-loaded', { url: page.url() });
+    const landedUrl = page.url();
+    beat('auth-page-loaded', { url: landedUrl });
+
+    // Detect Lovable preview auth bridge — Browserless cannot pass that gate, so fail fast.
+    if (/lovable\\.dev\\/(login|auth-bridge)/i.test(landedUrl)) {
+      await grabLoginShot();
+      throw new Error(
+        'QA target is protected by Lovable preview auth bridge (' + landedUrl.slice(0, 120) +
+        '). Set QA_TARGET_URL secret to a public domain like https://useadtool.ai.'
+      );
+    }
 
     // Wait for BOTH fields. Prefer ids (Auth.tsx uses #email / #password), fall back to type selectors.
     try {

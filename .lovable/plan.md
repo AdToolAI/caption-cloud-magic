@@ -1,61 +1,58 @@
-## Was ist passiert
+## Ursache
 
-Der jüngste Run **`smoke-04-directors-cut-load`** lief 26.5 s, aber:
-- `metadata.result.pathResults = []`
-- `url = ""`, `title = ""`
-- **0 Bug-Reports** in `qa_bug_reports`
-- Trotzdem `status = "failed"`
+Der Screenshot/Run zeigt nicht deine App-Loginseite. In den aktuellen Run-Metadaten steht nach `auth-page-loaded` diese URL:
 
-Das ist ein Widerspruch in `qa-agent-execute-mission/index.ts`:
-```ts
-const status = bugsFound === 0 && result.ok ? "succeeded" : "failed";
+```text
+https://lovable.dev/login?redirect=.../auth-bridge?...return_url=.../auth
 ```
-Damit "failed" rauskommt, muss `result.ok === false` sein — aber dann hätte der Bug-Insert in Zeile 112-134 laufen müssen. Tut er aber nicht. Möglich ist:
-1. Browserless hat ein Skript-Resultat geliefert in einer Form, die unser Parser nicht versteht (`payload?.ok !== false` ist `true` weil `payload` `undefined` → `result.ok = true`), gleichzeitig `pathResults` aber leer ist → kein Bug, aber pathResults=0 wird nicht als Failure gewertet, **außer** der Bug-Insert für "failed Navigations" hängt sich an `result.ok` … falsch geprüft.
-2. Browserless-Funktion crashte mitten im Skript nach Login (`pathResults` noch leer), `result.ok` wurde auf `false` gesetzt, ABER der Bug-Insert warf eine Exception (z. B. wegen `description: undefined` + Schema-Konflikt) → Catch-Block markiert run als `failed`, aber Bug ist nicht eingetragen.
-3. Edge-Function-Logs zeigen nur "booted" — `console.log`s aus dem Hauptpfad fehlen, weil entweder die Logs verschluckt werden oder die Function tatsächlich nichts loggt. Wir loggen aktuell **nichts** außer im fatalen Catch.
 
-## Fix-Plan
+Browserless landet also auf der Lovable-Preview-Zugangsseite, nicht auf `/auth` deiner App. Deshalb findet er kein `input#password` aus `src/pages/Auth.tsx` und bricht ab.
 
-### 1. `qa-agent-execute-mission/index.ts` — viel mehr Telemetrie und harter Bug-Insert für jeden „leeren" Run
+Zusätzlich gibt es einen zweiten Fehler: Die Edge Function versucht bei Login-Problemen `category: "auth"` in `qa_bug_reports` zu speichern, aber die DB-Check-Constraint erlaubt aktuell nur Kategorien wie `workflow`, `console`, `network`, `assertion` usw. Deshalb zeigt das Cockpit `Bugs: 0`, obwohl intern ein Bug-Insert versucht wurde.
 
-- Zu Beginn `console.log("[execute-mission] start", { run_id, mission_name })`.
-- Nach `runBrowserlessFunction`: `console.log("[execute-mission] result-summary", { ok, error, httpStatus, durationMs, pathResults: pathResults.length, urlReturned: result.url, titleReturned: result.title, hasFinalScreenshot: !!result.screenshot, hasLoginScreenshot: !!loginShotData, consoleLogCount: consoleErrors.length, networkErrorCount: netErrors.length })`.
-- Bug-Insert defensiv machen: `description` immer mit Fallback `result.error ?? "unknown — see metadata"`, alle Inserts in `try/catch` mit `console.error` damit ein Insert-Fehler nicht den ganzen Run zerlegt.
-- **Neue Bug-Bedingung**: Wenn `result.ok === true`, aber `pathResults.length === 0` UND `navPaths.length > 0` → einen Bug `"Navigation never executed (login likely failed silently)"` mit der vollen `result.data` als `network_trace.raw_result` einlogegn. Das verhindert künftig den Geist-Failed-Status.
-- Status-Berechnung umstellen: `status = (bugsFound === 0 && result.ok && pathResults.length > 0) ? "succeeded" : "failed"` — sonst lügt das UI.
-- Im catch-Block ebenfalls einen Bug-Report inserten (heute geht der Fehler verloren), damit das Cockpit immer eine Erklärung anzeigt.
+## Plan
 
-### 2. `_shared/browserlessClient.ts` — robusterer Antwort-Parser + Timeout
+### 1. QA-Ziel-URL auf eine öffentlich erreichbare App-URL umstellen
+- In `qa-agent-execute-mission/index.ts` den Default für `QA_TARGET_URL` von der `id-preview--...lovable.app` Preview auf die öffentliche App-Domain ändern, z. B. `https://useadtool.ai`.
+- Damit Browserless direkt deine echte App-Route `/auth` öffnet und nicht über `lovable.dev/auth-bridge` läuft.
+- Optional: Ziel-URL im Run-Metadata speichern, damit im Cockpit sichtbar ist, gegen welche Domain getestet wurde.
 
-- AbortController mit 90 s Timeout (Browserless eigenes Timeout ist konservativ, wir wollen sauber abbrechen statt hängen).
-- Parser-Fix: aktuell `payload?.ok !== false` — wenn die Funktion einen non-Object payload liefert, ist `payload?.ok` `undefined` und `result.ok` wird `true`. Stattdessen: `ok = payload && typeof payload === 'object' && payload.ok !== false`. Falls payload kein Object ist → `ok=false, error="Browserless returned unexpected payload shape"`.
-- Roh-Antwort (erste 1500 Zeichen) immer in `rawResponse` mitliefern, auch bei `res.ok` — aktuell nur bei HTTP-Fail. So sehen wir endlich was Browserless wirklich zurückgibt.
+### 2. Auth-Bridge-Falle explizit erkennen
+- In `_shared/browserlessClient.ts` nach dem `goto('/auth')` prüfen, ob `page.url()` auf `lovable.dev/login` oder `lovable.dev/auth-bridge` zeigt.
+- Wenn ja: sofort mit einer klaren Fehlermeldung abbrechen:
 
-### 3. `_shared/browserlessClient.ts` — Skript: mehr Schritt-Telemetrie, abschließende Sammlung garantiert
+```text
+QA target is protected by Lovable preview auth bridge; use public QA_TARGET_URL
+```
 
-- Vor jedem Major-Step (`goto auth`, `wait selectors`, `submit`, `wait redirect`, `for path`) ein `pathResults.push({ phase: 'login-step', label: '...' })` als Heartbeat — so sehen wir im Cockpit genau wo das Skript stehengeblieben ist.
-- `try/finally` um den ganzen Block, sodass `result.consoleLogs / networkErrors / loginScreenshot` in jedem Fall an den Edge-Function-Caller zurückkommen, auch wenn ein Step wirft.
-- Den finalen `return { data: result, type: 'application/json' }` nach `finally` legen.
+- So wartet der Bot nicht 20 Sekunden auf ein Passwortfeld, das dort nie existiert.
 
-### 4. `QACockpit.tsx` — sichtbare Heartbeats
+### 3. Bug-Insert reparieren
+- In `qa-agent-execute-mission/index.ts` keine nicht erlaubte Kategorie `auth` mehr verwenden.
+- Login-/Auth-Fehler vorerst als `category: "workflow"` speichern und im `network_trace.failure_area = "auth"` markieren.
+- Dadurch erscheinen die Bug Reports wieder im Cockpit statt still an der DB-Constraint zu scheitern.
 
-- Run-Karte: Wenn `metadata.result.pathResults` Einträge mit `phase === 'login-step'` enthält, diese als kleine Schritt-Liste rendern („Auth geöffnet → Felder gefunden → Submit geklickt → Redirect …") — so erkennen wir auf einen Blick, wo's gestolpert ist, ohne in die DB zu schauen.
-- Neue Sektion „Roh-Antwort (Browserless)" im Bug-Modal, wenn `network_trace.raw_response` vorhanden — sonst raten wir weiter im Dunkeln.
+### 4. QA-Testuser robuster machen
+- `qa-agent-setup-test-user/index.ts` erweitern, damit der QA-Testuser zusätzlich eine Admin-Rolle in `user_roles` bekommt.
+- Das ist wichtig, weil viele Smoke-Missionen Admin-/geschützte Bereiche testen und `ProtectedRoute requireRole="admin"` nutzt.
+- Rollen bleiben weiterhin in der separaten Rollen-Tabelle, nicht im Profil.
 
-## Nicht Teil dieser Runde
+### 5. Cockpit-Transparenz verbessern
+- In `QACockpit.tsx` bei Run-Karten die Ziel-URL und bei Login-Fehlern eine klare Hinweismeldung anzeigen, z. B.:
 
-- Tatsächliche Inhalts-Tests pro Page (kommt in QA-2).
-- Provider-Mocking — die Smoke-Missionen klicken keine teuren Buttons.
+```text
+Ziel-URL ist durch Preview-Auth geschützt. QA muss gegen Published/Custom Domain laufen.
+```
 
-## Verifikation
+- Den existierenden Heartbeat-Block beibehalten.
 
-Nach Deploy: „Nächste Mission starten" auf smoke-02 → entweder
-- **succeeded** mit `pathResults: [{path:"/picture-studio", ok:true}]` und sichtbaren Heartbeats, oder
-- ein Bug mit klarer Aussage **welcher Schritt** stehenblieb + Roh-Antwort von Browserless im Modal.
+## Erwartetes Ergebnis
+
+Nach der Änderung startet der Smoke-Run nicht mehr gegen die geschützte Preview-Bridge, sondern gegen die öffentlich erreichbare App. Falls die App-Loginseite selbst ein Problem hat, wird der Bug korrekt im Bug-Inbox sichtbar. Falls Login klappt, besucht der Bot danach die eigentlichen Mission-Pfade und `Steps` geht von `0/1` auf `1/1`.
 
 ## Betroffene Dateien
 
 - `supabase/functions/qa-agent-execute-mission/index.ts`
 - `supabase/functions/_shared/browserlessClient.ts`
+- `supabase/functions/qa-agent-setup-test-user/index.ts`
 - `src/pages/admin/QACockpit.tsx`

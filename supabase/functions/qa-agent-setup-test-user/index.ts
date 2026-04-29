@@ -88,6 +88,18 @@ Deno.serve(async (req) => {
         { onConflict: "user_id" }
       );
 
+    // Grant admin role so smoke missions can reach admin-only routes (/admin/*).
+    // Roles live in the dedicated user_roles table — never on profiles.
+    const { error: roleErr } = await supabase
+      .from("user_roles")
+      .upsert(
+        { user_id: userId, role: "admin" },
+        { onConflict: "user_id,role" }
+      );
+    if (roleErr) {
+      console.warn("[qa-agent-setup-test-user] could not upsert admin role:", roleErr.message);
+    }
+
     const passwordReturned = created || passwordChanged;
     return new Response(
       JSON.stringify({

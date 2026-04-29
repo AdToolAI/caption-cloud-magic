@@ -312,9 +312,19 @@ export default function QACockpit() {
                         ))}
                       </div>
                     )}
+                    {r.metadata?.result?.targetUrl && (
+                      <p className="text-[11px] text-muted-foreground/70 mt-1 font-mono truncate" title={r.metadata.result.targetUrl}>
+                        Ziel: {r.metadata.result.targetUrl}
+                      </p>
+                    )}
                     {r.metadata?.result?.error && (
                       <p className="text-[11px] text-red-400 mt-1 font-mono truncate" title={r.metadata.result.error}>
                         ⚠ {r.metadata.result.error}
+                      </p>
+                    )}
+                    {r.metadata?.result?.error && /preview auth bridge/i.test(r.metadata.result.error) && (
+                      <p className="text-[11px] text-amber-300 mt-1">
+                        Hinweis: Ziel-URL ist durch Lovable-Preview-Auth geschützt. Setze das Secret <code className="font-mono">QA_TARGET_URL</code> auf eine öffentliche Domain (z. B. <code className="font-mono">https://useadtool.ai</code>).
                       </p>
                     )}
                   </div>

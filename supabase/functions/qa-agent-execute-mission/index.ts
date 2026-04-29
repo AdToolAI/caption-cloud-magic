@@ -69,7 +69,10 @@ Deno.serve(async (req) => {
 
     const qaEmail = Deno.env.get("QA_TEST_USER_EMAIL") ?? "qa-bot@useadtool.ai";
     const qaPassword = Deno.env.get("QA_TEST_USER_PASSWORD") ?? "";
-    const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://id-preview--8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovable.app";
+    // IMPORTANT: id-preview--*.lovable.app is gated by Lovable's auth-bridge
+    // (lovable.dev/login). Browserless cannot authenticate against that. Default to
+    // the public app domain instead so that /auth renders the real login form.
+    const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://useadtool.ai";
 
     if (!qaPassword) {
       throw new Error("QA_TEST_USER_PASSWORD secret not configured");
@@ -155,18 +158,23 @@ Deno.serve(async (req) => {
     // Bug: Browserless overall failure
     if (!result.ok) {
       const errMsg = result.error ?? "(no error message)";
-      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button/i.test(errMsg);
+      const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button|preview auth bridge/i.test(errMsg);
       await insertBug({
         run_id,
         mission_name: missionName,
+        // NOTE: qa_bug_reports.category check-constraint allows only:
+        // workflow|visual|data-integrity|performance|regression|cost-overrun|console|network|assertion
+        // Login failures don't have a dedicated category, so we tag failure_area instead.
         severity: "high",
-        category: isLoginFail ? "auth" : "workflow",
+        category: "workflow",
         title: isLoginFail
           ? `Login failed before any path could be visited`
           : `Mission execution failed: ${errMsg.slice(0, 100)}`,
         description: errMsg,
         screenshot_url: loginScreenshotUrl ?? screenshotUrl,
         network_trace: {
+          failure_area: isLoginFail ? "auth" : "workflow",
+          target_url: baseUrl,
           http_status: (result as any).httpStatus ?? null,
           raw_response: (result as any).rawResponse ?? null,
           duration_ms: result.durationMs,
@@ -257,6 +265,7 @@ Deno.serve(async (req) => {
           result: {
             url: result.url,
             title: result.title,
+            targetUrl: baseUrl,
             pathResults: allPathResults,
             heartbeats,
             navResults,
