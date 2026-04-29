@@ -153,6 +153,25 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
             </Button>
           </div>
 
+          {/* Marketplace action */}
+          {(mpStatus === 'private' || mpStatus === 'rejected') && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full h-8 text-xs border-primary/30 hover:bg-primary/10"
+              onClick={() => setSubmitOpen(true)}
+            >
+              <Store className="h-3.5 w-3.5 mr-1.5" />
+              {mpStatus === 'rejected' ? 'Resubmit to Marketplace' : 'Sell on Marketplace'}
+            </Button>
+          )}
+          {mpStatus === 'published' && (
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground bg-emerald-500/10 border border-emerald-500/20 rounded px-2 py-1">
+              <span className="flex items-center gap-1"><Coins className="h-3 w-3" /> {character.total_purchases ?? 0} sold</span>
+              <span>★ {Number(character.average_rating ?? 0).toFixed(1)}</span>
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-1 border-t border-primary/10">
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3" />
@@ -187,6 +206,12 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
           aspectRatio: (character.default_aspect_ratio as '16:9' | '9:16' | '1:1' | undefined) ?? '9:16',
           avatarName: character.name,
         }}
+      />
+
+      <SubmitCharacterToMarketplaceDialog
+        open={submitOpen}
+        onOpenChange={setSubmitOpen}
+        character={{ id: character.id, name: character.name }}
       />
     </>
   );
