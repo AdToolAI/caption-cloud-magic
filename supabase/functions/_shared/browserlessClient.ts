@@ -1,6 +1,7 @@
 // Lightweight Browserless.io client for the Bond QA Agent.
-// Uses the /function REST endpoint with raw JS body (CommonJS export).
-// See: https://docs.browserless.io/baas/start/sending-code
+// Uses the /function REST endpoint with JSON body { code, context }.
+// The code itself is ESM: `export default async ({ page, context }) => {...}`.
+// See: https://docs.browserless.io/rest-apis/function-api
 
 const BROWSERLESS_BASE = "https://production-sfo.browserless.io";
 
@@ -14,13 +15,14 @@ export interface BrowserlessActionResult {
   domSummary?: string;
   data?: any;
   error?: string;
-  rawResponse?: string; // first 2KB of raw body for debugging
+  rawResponse?: string;
   httpStatus?: number;
   durationMs: number;
 }
 
 export async function runBrowserlessFunction(
-  code: string
+  code: string,
+  context?: Record<string, unknown>
 ): Promise<BrowserlessActionResult> {
   const apiKey = Deno.env.get("BROWSERLESS_API_KEY");
   if (!apiKey) {
@@ -29,14 +31,12 @@ export async function runBrowserlessFunction(
 
   const start = Date.now();
   try {
-    // Browserless /function expects raw JavaScript (CommonJS) as the body
-    // with Content-Type: application/javascript. NOT JSON.
     const res = await fetch(
       `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/javascript" },
-        body: code,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code, context: context ?? {} }),
       }
     );
 
@@ -53,7 +53,6 @@ export async function runBrowserlessFunction(
       };
     }
 
-    // Successful response: try JSON first, fall back to raw
     let data: any;
     try {
       data = JSON.parse(rawText);
@@ -67,16 +66,20 @@ export async function runBrowserlessFunction(
       };
     }
 
+    // Browserless wraps the returned `{ data, type }` — payload sits in data.data
+    // when the function returns the canonical shape. Support both.
+    const payload = data?.data && typeof data.data === "object" ? data.data : data;
+
     return {
-      ok: data?.ok !== false,
-      screenshot: data?.screenshot,
-      url: data?.url,
-      title: data?.title,
-      consoleLogs: data?.consoleLogs ?? [],
-      networkErrors: data?.networkErrors ?? [],
-      domSummary: data?.domSummary,
-      data,
-      error: data?.error,
+      ok: payload?.ok !== false,
+      screenshot: payload?.screenshot,
+      url: payload?.url,
+      title: payload?.title,
+      consoleLogs: payload?.consoleLogs ?? [],
+      networkErrors: payload?.networkErrors ?? [],
+      domSummary: payload?.domSummary,
+      data: payload,
+      error: payload?.error,
       httpStatus: res.status,
       durationMs,
     };
@@ -89,19 +92,11 @@ export async function runBrowserlessFunction(
   }
 }
 
-// Build a Puppeteer "function" body (CommonJS, as required by Browserless /function).
-// Returns a JSON object with screenshot + console + network + nav-results.
-export function buildSmokeNavigationScript(opts: {
-  baseUrl: string;
-  email: string;
-  password: string;
-  paths: string[];
-  finalPath?: string;
-}): string {
-  const json = JSON.stringify(opts);
+// ESM-style Puppeteer function. Receives `context` from the JSON body.
+export function buildSmokeNavigationScript(): string {
   return `
-module.exports = async ({ page }) => {
-  const opts = ${json};
+export default async ({ page, context }) => {
+  const opts = context || {};
   const consoleLogs = [];
   const networkErrors = [];
 
@@ -131,7 +126,7 @@ module.exports = async ({ page }) => {
     ]);
 
     // 2) Visit each requested path
-    for (const p of opts.paths) {
+    for (const p of (opts.paths || [])) {
       const t0 = Date.now();
       try {
         await page.goto(opts.baseUrl + p, { waitUntil: 'networkidle2', timeout: 25000 });
