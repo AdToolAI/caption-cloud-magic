@@ -110,6 +110,11 @@ Deno.serve(async (req) => {
         title: `Mission execution failed: ${result.error?.slice(0, 100)}`,
         description: result.error,
         screenshot_url: screenshotUrl,
+        network_trace: {
+          http_status: (result as any).httpStatus ?? null,
+          raw_response: (result as any).rawResponse ?? null,
+          duration_ms: result.durationMs,
+        },
       });
       bugsFound++;
     }
