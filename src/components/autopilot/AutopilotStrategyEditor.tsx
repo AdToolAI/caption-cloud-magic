@@ -109,6 +109,10 @@ export function AutopilotStrategyEditor({ brief }: Props) {
       avatar_ids: brief?.avatar_ids ?? [],
       weekly_credit_budget: budget,
       auto_publish_enabled: autoPublish,
+      video_enabled: videoEnabled,
+      video_provider: videoProvider,
+      video_duration_sec: videoDuration,
+      video_aspect_ratio: videoRatio,
     });
   }
 
