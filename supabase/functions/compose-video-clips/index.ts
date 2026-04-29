@@ -280,6 +280,7 @@ serve(async (req) => {
       'ai-luma': 0.10,
       'ai-veo': 0.10,
       'ai-sora': 0.15,
+      'ai-pika': 0.20,
     };
     const computeLeadInTrim = (clipSource: string, hasReference: boolean): number =>
       hasReference ? (I2V_TRIM_DEFAULTS[clipSource] ?? 0) : 0;
