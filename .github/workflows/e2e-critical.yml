@@ -40,7 +40,10 @@ jobs:
         env:
           BASE_URL: https://caption-cloud-magic.lovable.app
           CI: 'true'
-        run: npx playwright test tests/critical-journeys.spec.ts --reporter=list
+          # Cockpit-Reporter pusht Resultate in smoke_test_runs (no-op ohne diese Vars).
+          E2E_INGEST_URL: https://lbunafpxuskwmsrraqxl.functions.supabase.co/ingest-e2e-results
+          E2E_INGEST_TOKEN: ${{ secrets.E2E_INGEST_TOKEN }}
+        run: npx playwright test tests/critical-journeys.spec.ts
 
       - name: Upload Playwright report
         if: failure()
