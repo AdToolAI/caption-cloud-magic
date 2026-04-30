@@ -16,10 +16,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+// Reliable public MP4/MP3 samples — Google's GTV bucket is widely cached and
+// returns a real video/mp4 with a parseable moov atom (the previous
+// lovable-public sample returned an XML S3 error, breaking Lambda playback).
 const SAMPLE_VIDEO_URL =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4";
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
 const SAMPLE_AUDIO_URL =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp3";
+  "https://download.samplelib.com/mp3/sample-3s.mp3";
 
 async function uploadIfMissing(
   supabase: any,
