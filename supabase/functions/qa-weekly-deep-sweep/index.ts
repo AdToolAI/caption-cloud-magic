@@ -821,10 +821,15 @@ Deno.serve(async (req) => {
         peek.status = "budget_skipped";
         peek.actual_cost_eur = 0;
         skipped++;
-      } else if (peek.status === "budget_skipped") {
+      } else if (peek.status === "budget_skipped" || peek.status === "skipped") {
+        // Normalize soft-skips (e.g. HeyGen "no face detected") so they show up
+        // as a skipped Flow in the UI instead of vanishing from the run.
+        peek.status = "budget_skipped";
         skipped++;
       } else {
+        // "timeout" = transient infrastructure (yellow), not a hard failure.
         if (peek.status === "success") succeeded++;
+        else if (peek.status === "timeout") failed++; // counted but UI shows yellow
         else failed++;
         ctx.remainingEur -= peek.actual_cost_eur;
         totalSpent += peek.actual_cost_eur;
