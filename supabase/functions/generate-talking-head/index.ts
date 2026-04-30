@@ -369,17 +369,16 @@ Deno.serve(async (req) => {
     }
     if (!audioUrl) throw new Error('Audio URL missing after synthesis');
 
-    // Step 2: Upload assets to HeyGen (parallel)
-    console.log(`[talking-head] Uploading assets to HeyGen…`);
-    const [talkingPhotoId, audioAssetId] = await Promise.all([
-      uploadHeyGenAsset(imageUrl, 'image'),
-      uploadHeyGenAsset(audioUrl, 'audio'),
-    ]);
-    console.log(`[talking-head] Asset IDs: photo=${talkingPhotoId}, audio=${audioAssetId}`);
+    // Step 2: Upload only the image to HeyGen as talking_photo asset.
+    // The audio is passed directly as URL in the V2 video.generate call,
+    // which avoids a second upload round-trip + the upload subdomain quirks.
+    console.log(`[talking-head] Uploading talking-photo image to HeyGen…`);
+    const talkingPhotoId = await uploadHeyGenAsset(imageUrl, 'image');
+    console.log(`[talking-head] talking_photo_id=${talkingPhotoId}`);
 
-    // Step 3: Create video generation job
+    // Step 3: Create video generation job (audio passed as URL, not asset)
     const dimension = mapDimension(aspectRatio, resolution);
-    const videoId = await createHeyGenVideo({ talkingPhotoId, audioAssetId, dimension });
+    const videoId = await createHeyGenVideo({ talkingPhotoId, audioUrl, dimension });
     console.log(`[talking-head] HeyGen video_id=${videoId}`);
 
     // Step 4: Update scene with processing status
