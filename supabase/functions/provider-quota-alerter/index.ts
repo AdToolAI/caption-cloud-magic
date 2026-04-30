@@ -10,7 +10,7 @@ import { ADMIN_ALERT_EMAIL } from '../_shared/admin-config.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
 const ALERT_THRESHOLD = 0.8;

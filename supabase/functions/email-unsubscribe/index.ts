@@ -10,7 +10,7 @@ import { generateUnsubscribeToken, suppressEmail } from "../_shared/email-send.t
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
 function page(title: string, message: string, status = 200): Response {

@@ -9,7 +9,7 @@ const APP_URL = Deno.env.get("APP_URL") || Deno.env.get("APP_BASE_URL") || "http
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
 const DAY_14_REWARD_USD = 5;
