@@ -8,7 +8,7 @@ import { renderDripEmail, isSupportedLang } from "../_shared/drip-templates/inde
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

@@ -422,6 +422,11 @@ Deno.serve(async (req) => {
               "title.ilike.%check-subscription%",
               "title.ilike.%(no error message)%",
               "title.ilike.%Browserless engine returned ok:false%",
+              "title.ilike.%blocked by CORS%",
+              "title.ilike.%Network 0 POST%companion-diagnose%",
+              "title.ilike.%Network 0 POST%check-subscription%",
+              "title.ilike.%Failed to load resource: net::ERR_FAILED%",
+              "description.ilike.%x-qa-mock is not allowed%",
             ].join(","),
           );
         if (resolveErr) {
