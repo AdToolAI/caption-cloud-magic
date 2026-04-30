@@ -273,6 +273,16 @@ serve(async (req) => {
             }
           }
 
+          // Long-Form (sora_long_form) project completion sync
+          if (isLongForm && longFormProjectId) {
+            await supabaseAdmin.from('sora_long_form_projects').update({
+              status: 'completed',
+              final_video_url: finalOutputUrl,
+              updated_at: new Date().toISOString(),
+            }).eq('id', longFormProjectId);
+            console.log('✅ sora_long_form_projects marked completed:', longFormProjectId);
+          }
+
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
           try {
             let progressUpdated = false;
