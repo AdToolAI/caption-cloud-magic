@@ -1001,6 +1001,9 @@ Deno.serve(async (req) => {
       if (f1.status === "success" && f1.output_url) stitchedVideoUrl = f1.output_url;
       await persistAndCount(f1);
 
+      // Cooldown: composer-stitch (Flow 1) leaves Lambda workers warm for ~10s.
+      // Wait before triggering DC Lambda to avoid AWS Concurrency throttling.
+      if (!skipBudget(2, 1.5, "Director's Cut Lambda Render")) await sleep(15_000);
       const skip2 = skipBudget(2, 1.5, "Director's Cut Lambda Render");
       const f2 = skip2 || await flowDirectorsCutRender(ctx, stitchedVideoUrl || ctx.assets.video);
       await persistAndCount(f2);
