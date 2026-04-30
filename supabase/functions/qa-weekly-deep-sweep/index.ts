@@ -788,7 +788,7 @@ Deno.serve(async (req) => {
       cap_eur: capEur,
       status: "running",
       triggered_by: userData.user.id,
-      flows_total: 7 - skipFlows.length,
+      flows_total: 6 - skipFlows.length,
     })
     .select()
     .single();
