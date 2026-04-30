@@ -32,11 +32,21 @@ export async function runBrowserlessFunction(
 
   const start = Date.now();
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  // Browserless server-side timeout cap is 60s on standard plan. Use full 60s.
-  // Slow routes are mitigated via blockAds + per-step timeouts inside the script.
-  const SERVER_TIMEOUT_MS = 60_000;
+  // Browserless query-param `timeout` is in MILLISECONDS but capped per plan.
+  // Hobby/Starter plans cap at 30_000 ms; Standard at 60_000 ms.
+  // Override via BROWSERLESS_SERVER_TIMEOUT_MS env if your plan supports more.
+  // We clamp into [1_000, 60_000] to satisfy the API's hard upper bound.
+  const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
+  const SERVER_TIMEOUT_MS = Math.min(
+    60_000,
+    Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000),
+  );
+
+  // Client-side abort: give the server-cap a small buffer so we get a clean
+  // Browserless error instead of an AbortError when the server is right at its limit.
+  const effectiveClientTimeout = Math.max(timeoutMs, SERVER_TIMEOUT_MS + 5_000);
+  const t = setTimeout(() => ctrl.abort(), effectiveClientTimeout);
 
   try {
     const res = await fetch(
