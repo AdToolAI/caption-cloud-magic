@@ -118,17 +118,35 @@ Deno.serve(async (req) => {
       .map((s) => s.path);
 
     const finalPath = steps[steps.length - 1]?.path;
+    const interactiveCount = steps.filter((s) => s?.type && s.type !== "navigate").length;
+
+    // Mock-mode: enabled by default unless mission explicitly opts out OR caller forces real providers.
+    // Header x-qa-mock=true is read by AI edge functions (replicate-generate-video, picture-studio-*,
+    // music-studio-*, render-directors-cut, etc.) — they MUST short-circuit to a fake response when set
+    // AND the caller is the QA test user.
+    const forceReal = (run as any).triggered_by === "manual" && (run as any).metadata?.force_real_providers === true;
+    const mockEnabled = (mission as any)?.mock_mode !== false && !forceReal;
+    const extraHeaders = mockEnabled ? { "x-qa-mock": "true" } : undefined;
 
     const script = buildSmokeNavigationScript();
 
-    console.log("[execute-mission] invoking browserless", { mission: missionName, navPaths: navPaths.length });
+    console.log("[execute-mission] invoking browserless", {
+      mission: missionName,
+      navPaths: navPaths.length,
+      interactiveSteps: interactiveCount,
+      mockEnabled,
+    });
 
     const result = await runBrowserlessFunction(script, {
       baseUrl,
       email: qaEmail,
       password: qaPassword,
+      // Pass full steps array — script supports navigate/click/click_text/fill/wait_for/expect_visible/expect_no_console_error/sleep
+      steps,
+      // Backwards compat: paths is still respected when steps is empty
       paths: navPaths.length > 0 ? navPaths : ["/dashboard"],
       finalPath,
+      extraHeaders,
     });
 
     const uploadShot = async (dataUrl: string, label: string): Promise<string | undefined> => {
