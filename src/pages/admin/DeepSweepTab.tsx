@@ -178,8 +178,13 @@ export function DeepSweepTab() {
     }
   };
 
-  const passRate = latestRun && latestRun.flows_total > 0
-    ? Math.round((latestRun.flows_succeeded / latestRun.flows_total) * 100)
+  // Pass rate excludes timeouts (transient AWS infrastructure limits — not bugs).
+  const timeoutCount = flows.filter((f) => f.status === "timeout").length;
+  const effectiveTotal = latestRun
+    ? Math.max(latestRun.flows_total - timeoutCount, 1)
+    : 0;
+  const passRate = latestRun && effectiveTotal > 0
+    ? Math.round((latestRun.flows_succeeded / effectiveTotal) * 100)
     : 0;
   const budgetUsedPct = latestRun
     ? Math.round((Number(latestRun.total_cost_eur) / Number(latestRun.cap_eur)) * 100)
