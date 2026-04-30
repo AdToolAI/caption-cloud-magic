@@ -1021,6 +1021,9 @@ Deno.serve(async (req) => {
       await persistAndCount(f5);
 
       const skip6 = skipBudget(6, 3.5, "Long-Form Render (Lambda)");
+      // Cooldown before next Lambda trigger to avoid AWS Concurrency throttle
+      // (DC Lambda from Flow 2 may still hold worker slots).
+      if (!skip6) await sleep(15_000);
       const f6 = skip6 || await flowLongFormRender(ctx);
       await persistAndCount(f6);
 
