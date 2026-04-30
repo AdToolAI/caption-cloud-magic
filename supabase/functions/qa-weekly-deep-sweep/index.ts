@@ -701,16 +701,27 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
 
     // Trigger render
     const t0 = Date.now();
-    const render = await callEdge(
+    const render = await triggerRenderWithBackoff(
       "render-long-form-video",
       { projectId: proj.id },
       ctx.userId,
       120_000,
     );
-    stages.push({ stage: "trigger-render", ok: render.ok, ms: Date.now() - t0, note: render.error });
+    stages.push({
+      stage: "trigger-render",
+      ok: render.ok,
+      ms: Date.now() - t0,
+      note: render.throttled
+        ? `AWS Lambda throttled after ${render.attempts} attempt(s): ${render.error}`
+        : render.error,
+    });
 
     if (!render.ok) {
-      result.error_message = render.error;
+      result.error_message = render.throttled
+        ? `AWS Lambda concurrency throttled (${render.attempts} retries exhausted) — infrastructure quota, not a code bug`
+        : render.error;
+      result.status = render.throttled ? "timeout" : "failed";
+      result.actual_cost_eur = 0;
       result.duration_ms = Date.now() - start;
       return result;
     }
