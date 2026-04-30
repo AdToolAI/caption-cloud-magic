@@ -1,4 +1,4 @@
-// QA Agent Execute Mission
+// QA Agent Execute Mission — v2026-04-30b (re-deploy: wait_selector aliases)
 // Loads mission, runs Browserless smoke navigation, captures bugs (deduplicated),
 // applies muted-pattern allowlist, finalizes run.
 
