@@ -567,7 +567,7 @@ export default function Calendar() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
+    <div data-testid="calendar-page" className="min-h-screen flex flex-col bg-background">
       <main className="flex-1 container mx-auto px-4 py-6">
         <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />
 
