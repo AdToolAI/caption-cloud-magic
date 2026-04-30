@@ -156,7 +156,7 @@ async function headOk(url: string, timeoutMs = 10_000): Promise<boolean> {
 
 async function getTestAssets(
   admin: any,
-): Promise<{ image: string; video: string; audio: string; mask: string }> {
+): Promise<{ image: string; video: string; audio: string; mask: string; portrait: string }> {
   const tryUrl = (path: string) => {
     const { data } = admin.storage.from("qa-test-assets").getPublicUrl(path);
     return data?.publicUrl;
@@ -185,11 +185,13 @@ async function getTestAssets(
   const candidateImage = tryUrl("test-image.png") || tryUrl("sample-1024.jpg") || FALLBACK_IMAGE;
   const candidateVideo = tryUrl("test-video-2s.mp4") || tryUrl("sample-5s.mp4") || FALLBACK_VIDEO;
   const candidateAudio = tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO;
+  const candidatePortrait = tryUrl("test-portrait.png") || "";
 
-  const [imgOk, vidOk, audOk] = await Promise.all([
+  const [imgOk, vidOk, audOk, portOk] = await Promise.all([
     validate(candidateImage, "image/", 1024),
     validate(candidateVideo, "video/", 50_000),
     validate(candidateAudio, "audio/", 5_000),
+    validate(candidatePortrait, "image/", 5_000),
   ]);
 
   return {
@@ -197,6 +199,7 @@ async function getTestAssets(
     video: vidOk ? candidateVideo : FALLBACK_VIDEO,
     audio: audOk ? candidateAudio : FALLBACK_AUDIO,
     mask: tryUrl("sample-mask-512.png") || "",
+    portrait: portOk ? candidatePortrait : "",
   };
 }
 
