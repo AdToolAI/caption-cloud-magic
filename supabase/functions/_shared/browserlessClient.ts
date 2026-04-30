@@ -131,7 +131,7 @@ export async function runBrowserlessFunction(
     return {
       ok: false,
       error: aborted
-        ? `Browserless fetch aborted after ${timeoutMs}ms`
+        ? `Browserless fetch aborted after ${effectiveClientTimeout}ms (server cap ${SERVER_TIMEOUT_MS}ms)`
         : `Browserless fetch failed: ${e?.message ?? String(e)}`,
       durationMs: Date.now() - start,
     };
