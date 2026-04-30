@@ -672,10 +672,10 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
     } else {
-      // Poll project status (max 360s)
+      // Poll project status (max 90s — Edge Function wall-clock budget; Lambda continues async)
       const tPoll = Date.now();
       let polled: any = null;
-      for (let i = 0; i < 36; i++) {
+      for (let i = 0; i < 9; i++) {
         await new Promise((r) => setTimeout(r, 10_000));
         const { data } = await ctx.admin
           .from("sora_long_form_projects")
@@ -697,7 +697,7 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
         result.status = polled?.status === "failed" ? "failed" : "timeout";
         result.error_message = polled?.status === "failed"
           ? "Long-form render reported failed status"
-          : "Long-form render did not complete in 360s";
+          : "Long-form render did not complete in 90s polling window (Lambda may still finish async)";
         result.actual_cost_eur = 1.0;
       }
     }
