@@ -99,6 +99,7 @@ async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Pr
     headers: {
       'X-Api-Key': HEYGEN_API_KEY,
       'Content-Type': contentType,
+      'accept': 'application/json',
     },
     body: buffer,
   });
