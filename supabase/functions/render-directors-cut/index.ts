@@ -145,7 +145,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Verify user
+    // Verify user (with QA service-auth shortcut)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Missing authorization' }), {
@@ -154,13 +154,21 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    const qaSvc = detectQaServiceAuth(req);
+    let user: { id: string } | null = null;
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[render-directors-cut] QA service-auth user=${user.id}`);
+    } else {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: jwtUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !jwtUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      user = jwtUser;
     }
 
     const { 
