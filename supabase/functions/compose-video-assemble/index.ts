@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id',
 };
 
 // ── MP4 duration probe ─────────────────────────────────────────────
@@ -92,12 +93,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Auth
+    // Auth (with QA service-auth shortcut for Bond QA Deep Sweep)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('No authorization header');
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) throw new Error('Unauthorized');
+    const qaSvc = detectQaServiceAuth(req);
+    let user: { id: string };
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[compose-video-assemble] QA service-auth user=${user.id}`);
+    } else {
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user: jwtUser }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !jwtUser) throw new Error('Unauthorized');
+      user = jwtUser;
+    }
 
     const { projectId, aspectOverride, exportId } = await req.json();
     if (!projectId) throw new Error('projectId is required');
