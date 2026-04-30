@@ -33,15 +33,19 @@ export async function runBrowserlessFunction(
   const start = Date.now();
   const ctrl = new AbortController();
 
-  // Browserless `/function` query-param `timeout` is in MILLISECONDS but
-  // hard-capped per plan: Hobby/Starter = 30_000 ms, Standard = 60_000 ms.
-  // We default to 30_000 ms (Hobby-safe). Override via BROWSERLESS_SERVER_TIMEOUT_MS
-  // env when a higher-tier plan is in use. Clamp into [1_000, 60_000].
+  // Browserless `/function` query-param `timeout` is in **SECONDS**, not ms
+  // (server error message: "Timeout must be an integer between 1 and 60,000
+  // seconds based on the limit for your plan"). Per-plan caps:
+  //   Hobby/Starter = 30 s, Standard = 60 s.
+  // We default to 30 s (Hobby-safe). Override via BROWSERLESS_SERVER_TIMEOUT_MS
+  // (still expressed in ms for backwards compat) when a higher-tier plan is in use.
   const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
   const SERVER_TIMEOUT_MS = Math.min(
     60_000,
     Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000),
   );
+  // Convert to whole seconds for the query param (1..60).
+  const SERVER_TIMEOUT_SEC = Math.min(60, Math.max(1, Math.ceil(SERVER_TIMEOUT_MS / 1000)));
 
   // Client-side abort MUST follow the server cap, NOT exceed it. Otherwise
   // the server returns 408 long before the client gives up — leading to
@@ -59,7 +63,7 @@ export async function runBrowserlessFunction(
     // errors and triggering false-positive bug reports. Real third-party pixels
     // are filtered via `qa_muted_patterns` instead.
     const res = await fetch(
-      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}`,
+      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_SEC}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +82,7 @@ export async function runBrowserlessFunction(
       const isTimeout = res.status === 408;
       const baseMsg = `Browserless ${res.status}: ${rawText.slice(0, 500)}`;
       const hint = isTimeout
-        ? ` — Mission exceeded ${SERVER_TIMEOUT_MS}ms server cap. Reduce step count, lower per-step timeouts, or upgrade Browserless plan and set BROWSERLESS_SERVER_TIMEOUT_MS=60000.`
+        ? ` — Mission exceeded ${SERVER_TIMEOUT_SEC}s server cap (${SERVER_TIMEOUT_MS}ms). Reduce step count, lower per-step timeouts, or upgrade Browserless plan and set BROWSERLESS_SERVER_TIMEOUT_MS=60000.`
         : "";
       return {
         ok: false,

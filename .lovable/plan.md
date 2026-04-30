@@ -1,72 +1,57 @@
-## Problem
+## Diagnose
 
-Die "neuen" smoke-10 Bugs sind **dieselben False-Positive-Klassen** wie zuvor (`companion-diagnose`/`check-subscription` Network 0 + FunctionsFetchError Console), aber sie kommen weiterhin durch, weil:
+Drei reale Bug-Klassen blockieren die Smoke-Suite:
 
-1. **Mute-Patterns werden zu spät angewendet.** Sie filtern beim *Auto-Resolve* nach einem Pass-Run, aber die `expect_no_console_error`-Assertion und der Bug-Persistierungs-Code im Engine prüfen sie nicht *vorher*. Folge: Bug wird erstellt + Mission failed → Auto-Resolver greift nie.
-2. **`finalizing`-Phase failt mit HTTP 200.** Der Browserless `/function`-Call läuft 18s durch (alle echten Steps grün), aber die Antwort enthält `ok:false` → wir markieren das als "Mission execution failed: Browserless engine failure". Die Mission war inhaltlich erfolgreich.
-3. **smoke-04/06: "(no error message)"** trotz Diagnostics-Update — die Fehler tritt offenbar **vor** dem Engine-Call auf (z. B. beim Step-Compile).
+### 1. Browserless `timeout`-Query-Param wird in der falschen Einheit gesendet (Root-Cause für 400er und 408er)
+
+`browserlessClient.ts` schickt aktuell `?timeout=${SERVER_TIMEOUT_MS}` mit Werten wie `30000` oder `60000`. Browserless erwartet hier **Sekunden, nicht Millisekunden** (Server-Errortext: *"Timeout must be an integer between 1 and 60,000 seconds based on the limit for your plan"*).
+
+Folgen:
+- `?timeout=30000` → 30000 Sekunden gefordert, Hobby-Cap = 30s → **400 Bad Request** ("smoke-02-picture-studio-mock", "smoke-02-secondary-tour")
+- `?timeout=60000` → akzeptiert, aber Plan greift trotzdem → Mission läuft bis Plan-Cap und kriegt **408** ("smoke-11-avatars-talking-head", "smoke-01-dashboard-tour")
+
+### 2. `smoke-11-avatars-talking-head` (6 Steps) sprengt 30s-Cap
+
+Auch nach dem Timeout-Fix wird die Mission knapp. Login (~5–7s) + 6 Schritte (~3–4s/Step) = ≈30s. Wir müssen smoke-11 ähnlich wie smoke-04/05/06 minimal halten: navigate → sleep → console-check.
+
+### 3. `smoke-03-ai-video-toolkit` Step 5 `expect_visible "Generate"` failt
+
+UI hat den Button-Text geändert (vermutlich "Generieren" auf DE oder "Create" auf der Toolkit-Seite). Schnell prüfen und Mission anpassen.
 
 ## Lösung
 
-### 1. Mute-Patterns global im Engine durchsetzen (`qa-agent-execute-mission/index.ts`)
+### Fix 1: `browserlessClient.ts` — Timeout in Sekunden senden
 
-- Beim Engine-Start einmal `qa_muted_patterns` mit `severity_when_matched='ignore'` laden und als kompilierte RegExps in den Run-Context legen.
-- **Vor** dem Erstellen jedes Bugs (`insertBugReport`) jede Title/Description gegen die Ignore-Patterns matchen → Bug wird verworfen statt persistiert.
-- Bei `expect_no_console_error`: Console-Errors, die einem Ignore-Pattern matchen, werden aus der Assertion-Liste gefiltert, **bevor** entschieden wird, ob die Assertion failed.
-
-### 2. Finalizing-Phase tolerant machen
-
-- Wenn alle echten Steps grün sind und der Engine-Failure `last step: finalizing` lautet, downgraden auf `low/info` Severity und Bug-Title `Engine finalize warning (mission steps OK)` statt `high workflow`. 
-- Mission-Status bleibt `passed`, nicht `failed`.
-
-### 3. "(no error message)"-Fallback verbessern
-
-- Wenn die Engine-Antwort kein Errormessage hat und HTTP 200 ist, statt generischem Bug einen **Info-Level**-Eintrag schreiben mit Step-Index + Console-Snapshot.
-- Top-Level Try/Catch im Mission-Compile-Schritt: Failures dort liefern jetzt explizit `Mission compile error: <msg>` statt "(no error message)".
-
-### 4. Stale Bugs aufräumen (Migration)
-
-```sql
-UPDATE qa_bug_reports
-SET status='resolved', resolved_at=now()
-WHERE status='open' 
-  AND (
-    title ILIKE '%companion-diagnose%' OR
-    title ILIKE '%check-subscription%' OR
-    title ILIKE '%FunctionsFetchError%' OR
-    title ILIKE '%Browserless engine failure%finalizing%' OR
-    title ILIKE '%Mission execution failed: (no error message)%' OR
-    title ILIKE '%posthog-recorder.js%' OR
-    title ILIKE '%/api/4510408787886160/envelope/%' OR
-    title ILIKE '%ERR_BLOCKED_BY_CLIENT%'
-  );
+```ts
+// Convert to seconds for the query param (Browserless cap is in seconds, max 60).
+const SERVER_TIMEOUT_SEC = Math.min(60, Math.max(1, Math.ceil(SERVER_TIMEOUT_MS / 1000)));
+const url = `${BROWSERLESS_BASE}/function?token=${...}&timeout=${SERVER_TIMEOUT_SEC}`;
 ```
 
-### 5. Zusätzliche Mute-Patterns
+Client-side Abort bleibt in ms (`SERVER_TIMEOUT_MS + 5_000`). Errormessage erweitern, sodass beide Einheiten angezeigt werden.
 
-```sql
-INSERT INTO qa_muted_patterns (pattern_regex, severity_when_matched, reason) VALUES
-  ('Browserless engine failure.*finalizing', 'ignore', 'Finalize phase warning, steps were OK'),
-  ('Mission execution failed: \(no error message\)', 'ignore', 'Generic engine no-op, replaced by typed errors'),
-  ('posthog-recorder\.js', 'ignore', 'PostHog session-replay blocked by adblock'),
-  ('/api/\d+/envelope/', 'ignore', 'Sentry envelope blocked by adblock'),
-  ('News Radar: failed to fetch.*FunctionsFetchError', 'ignore', 'News Radar bootstrap race during page unload');
-```
+### Fix 2: smoke-11 minimieren (DB-Migration)
 
-### 6. Memory-Update
+Mission auf 4 Steps reduzieren: navigate `/avatars` → sleep 1500 → expect_visible header → expect_no_console_error.
 
-`mem://features/qa-agent/false-positive-hardening.md` ergänzen:
-- **Mute-Patterns sind jetzt Pre-Insert-Filter im Engine**, nicht nur Post-Run-Cleanup.
-- **Engine-Finalize-Failures bei sonst grünen Steps** werden auf info downgegradet.
+### Fix 3: smoke-03 anpassen
 
-## Erwartetes Ergebnis
+Per Browser-Tool kurz `/ai-video-toolkit` öffnen, den tatsächlichen Button-Text auslesen, dann Mission-Step 5 entsprechend updaten (oder zu einer stabileren Assertion wie `expect_visible` auf einen Selektor wechseln).
 
-- smoke-10 Bug-Inbox-Einträge dieser Klassen verschwinden ab dem nächsten Run.
-- 19 stale Open-Bugs werden durch die Migration sofort auf `resolved` gesetzt.
-- Künftige False-Positive-Klassen können durch reine Pattern-Inserts (ohne Code-Änderung) muted werden.
+### Cleanup-Migration
+
+Alle aktuell offenen `Browserless 400`/`408`-Bugs der betroffenen Missionen auf `resolved` setzen (sie verschwinden nach der nächsten grünen Run-Auto-Resolve-Sweep ohnehin, aber wir räumen die Inbox jetzt schon auf).
 
 ## Files
 
-- `supabase/functions/qa-agent-execute-mission/index.ts` – Pre-insert-Filter, Finalize-Toleranz, bessere Error-Messages
-- `supabase/migrations/<new>.sql` – Neue Patterns + Cleanup
-- `mem://features/qa-agent/false-positive-hardening.md` – Doku-Update
+- `supabase/functions/_shared/browserlessClient.ts` — Sekunden-Konvertierung im Query-Param
+- `supabase/migrations/<new>.sql` — smoke-11 minimieren + smoke-03 Step-Fix + Bug-Cleanup
+- Browser-Tool: `/ai-video-toolkit` öffnen, korrekten Button-Text/Selektor ermitteln
+- `mem://features/qa-agent/browserless-timeout-policy.md` — Notiz zur Sekunden-Einheit ergänzen
+
+## Erwartetes Ergebnis
+
+- Keine `Browserless 400 Timeout must be an integer`-Fehler mehr.
+- `smoke-11-avatars-talking-head` läuft in <15s grün durch.
+- `smoke-03-ai-video-toolkit` Step 5 passt zur tatsächlichen UI.
+- Bug-Inbox sauber.
