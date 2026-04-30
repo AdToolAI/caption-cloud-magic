@@ -348,6 +348,20 @@ export default async ({ page, context }) => {
       return el;
     };
 
+    // Per-step timeouts: hard-clamp to [200, 12000] ms so a single slow step
+    // can never exhaust the Browserless server cap (30s on hobby, 60s standard).
+    // A mission with 8 steps × 12s + 5s login still fits comfortably under 60s.
+    const clampStep = (ms) => {
+      const n = Number(ms);
+      if (!Number.isFinite(n) || n <= 0) return 8000;
+      return Math.min(12000, Math.max(200, n));
+    };
+    const clampWait = (ms) => {
+      const n = Number(ms);
+      if (!Number.isFinite(n) || n < 0) return 800;
+      return Math.min(3000, n);
+    };
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i] || {};
       const tStep = Date.now();
