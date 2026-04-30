@@ -434,7 +434,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    const portraitUrl = ctx.assets.image;
+    const portraitUrl = ctx.signedAssets.image || ctx.assets.image;
     result.validation_checks.portrait = !!portraitUrl;
 
     const t0 = Date.now();
@@ -456,6 +456,15 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     const predictionId = (hedra.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
+    // Hedra Replicate model was removed (April 2026). Detect 404 / "Model not found"
+    // / "resource could not be found" and degrade gracefully to budget_skipped instead
+    // of polluting the bug report with a known-broken provider.
+    const errStr = (hedra.error || "").toLowerCase();
+    const isHedraGone =
+      errStr.includes("model not found") ||
+      errStr.includes("resource could not be found") ||
+      (hedra.status === 500 && errStr.includes("404"));
+
     if (hedra.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
@@ -465,6 +474,11 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
       result.error_message = "Async — prediction triggered, output via webhook";
+    } else if (isHedraGone) {
+      result.status = "budget_skipped";
+      result.actual_cost_eur = 0;
+      result.error_message =
+        "Hedra Replicate model removed (April 2026). Flow auto-skipped until provider migration (Hedra native API or Replicate alternative).";
     } else {
       result.error_message = hedra.error || "Hedra returned no video URL or predictionId";
     }
