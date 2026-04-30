@@ -47,7 +47,7 @@ interface RunCtx {
   runId: string;
   userId: string;
   admin: ReturnType<typeof createClient>;
-  assets: { image: string; video: string; audio: string; mask: string };
+  assets: { image: string; video: string; audio: string; mask: string; portrait: string };
   signedAssets: { image: string; mask: string };
   remainingEur: number;
 }
