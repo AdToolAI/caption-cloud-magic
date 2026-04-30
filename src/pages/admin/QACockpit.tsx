@@ -14,6 +14,7 @@ import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, 
 import { formatDistanceToNow } from "date-fns";
 import { E2EResultsTab } from "@/components/admin/qa-cockpit/E2EResultsTab";
 import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
+import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 
 const TIER_COLORS: Record<string, string> = {
   smoke: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
@@ -319,6 +320,10 @@ export default function QACockpit() {
               <Sparkles className="h-3.5 w-3.5 mr-1.5" />
               Live Sweep
             </TabsTrigger>
+            <TabsTrigger value="deep-sweep" className="text-[#F5C76A]">
+              <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
+              Deep Sweep
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -333,6 +338,11 @@ export default function QACockpit() {
           {/* LIVE PROVIDER SWEEP */}
           <TabsContent value="live-sweep">
             <LiveSweepTab />
+          </TabsContent>
+
+          {/* WEEKLY DEEP SWEEP */}
+          <TabsContent value="deep-sweep">
+            <DeepSweepTab />
           </TabsContent>
 
           {/* LIVE RUNS */}
