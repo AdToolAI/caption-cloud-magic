@@ -9903,6 +9903,7 @@ export type Database = {
           expected_assertions: Json
           id: string
           last_run_at: string | null
+          mock_mode: boolean
           name: string
           rate_limit_minutes: number
           steps: Json
@@ -9919,6 +9920,7 @@ export type Database = {
           expected_assertions?: Json
           id?: string
           last_run_at?: string | null
+          mock_mode?: boolean
           name: string
           rate_limit_minutes?: number
           steps?: Json
@@ -9935,6 +9937,7 @@ export type Database = {
           expected_assertions?: Json
           id?: string
           last_run_at?: string | null
+          mock_mode?: boolean
           name?: string
           rate_limit_minutes?: number
           steps?: Json
