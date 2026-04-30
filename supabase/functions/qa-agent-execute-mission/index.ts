@@ -505,7 +505,7 @@ Deno.serve(async (req) => {
         status,
         finished_at: new Date().toISOString(),
         duration_ms: Date.now() - t0,
-        steps_completed: successfulNavs.length,
+        steps_completed: Math.max(successfulNavs.length, steps.length - (((result.data as any)?.stepErrors ?? []) as any[]).length),
         bugs_found: bugsFound,
         last_screenshot_url: screenshotUrl,
         log_summary: `${navResults.length} paths, ${consoleErrors.length} console errs (${consoleGroups.size} unique), ${netErrors.length} net errs (${netGroups.size} unique), ${bugsFound} bugs (${highSeverityBugs} high/critical), ${mutedDrops} muted-drops`,
