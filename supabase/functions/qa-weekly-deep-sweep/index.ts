@@ -23,10 +23,12 @@ const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 const FALLBACK_IMAGE =
   "https://storage.googleapis.com/lovable-public/qa-mock/sample-1024.jpg";
+// Use a reliable, decodable MP4 — the previous lovable-public sample returned an
+// XML S3 error (~133 bytes) which crashed Lambda video playback.
 const FALLBACK_VIDEO =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4";
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
 const FALLBACK_AUDIO =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp3";
+  "https://download.samplelib.com/mp3/sample-3s.mp3";
 
 interface FlowResult {
   flow_index: number;
