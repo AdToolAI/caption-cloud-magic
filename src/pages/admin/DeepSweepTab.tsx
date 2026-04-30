@@ -165,6 +165,20 @@ export function DeepSweepTab() {
     }
   };
 
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const runBootstrap = async () => {
+    setBootstrapping(true);
+    try {
+      const { error } = await supabase.functions.invoke("qa-live-sweep-bootstrap", {});
+      if (error) throw error;
+      toast.success("QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.");
+    } catch (e: any) {
+      toast.error(`Bootstrap failed: ${e?.message ?? String(e)}`);
+    } finally {
+      setBootstrapping(false);
+    }
+  };
+
   const passRate = latestRun && latestRun.flows_total > 0
     ? Math.round((latestRun.flows_succeeded / latestRun.flows_total) * 100)
     : 0;
