@@ -43,9 +43,9 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     edge_function: "generate-image-replicate",
     buildPayload: () => ({
       prompt: "neutral product on white background, studio light",
-      model: "flux-schnell",
-      width: 1024,
-      height: 1024,
+      tier: "fast",
+      aspectRatio: "1:1",
+      style: "realistic",
     }),
   },
   {
@@ -86,14 +86,16 @@ const PROVIDER_MATRIX: ProviderTest[] = [
   },
   {
     provider: "Vidu Q2",
-    model: "vidu/q2-multi-reference",
+    model: "vidu-q2-reference",
     mode: "Ref2V",
     estimated_cost_eur: 0.40,
     edge_function: "generate-vidu-video",
     buildPayload: ({ image }) => ({
       prompt: "the subject walks forward in a soft golden light",
-      reference_images: [image],
-      duration: 5,
+      model: "vidu-q2-reference",
+      aspectRatio: "16:9",
+      referenceImages: [image],
+      referenceRoles: ["character"],
     }),
   },
   {
@@ -121,14 +123,16 @@ const PROVIDER_MATRIX: ProviderTest[] = [
   },
   {
     provider: "Pika 2.2 Std",
-    model: "pika/pika-2.2",
+    model: "pika-2-2-standard",
     mode: "I2V",
     estimated_cost_eur: 0.60,
     edge_function: "generate-pika-video",
     buildPayload: ({ image }) => ({
       prompt: "gentle parallax motion, soft cinematic vibe",
-      image_url: image,
+      model: "pika-2-2-standard",
       duration: 5,
+      aspectRatio: "16:9",
+      startImageUrl: image,
     }),
   },
   {
@@ -145,25 +149,29 @@ const PROVIDER_MATRIX: ProviderTest[] = [
   },
   {
     provider: "Veo 3 (Google)",
-    model: "google/veo-3",
+    model: "veo-3.1-fast",
     mode: "T2V",
     estimated_cost_eur: 1.50,
     edge_function: "generate-veo-video",
     buildPayload: () => ({
       prompt: "a cute animated robot waving hello in a sunny garden",
+      model: "veo-3.1-fast",
       duration: 4,
+      aspectRatio: "16:9",
     }),
   },
   {
     provider: "Runway Aleph",
-    model: "runway/gen4-aleph",
+    model: "runway-gen4-aleph",
     mode: "V2V",
     estimated_cost_eur: 1.50,
     edge_function: "generate-runway-video",
     buildPayload: ({ video }) => ({
       prompt: "transform into oil painting style",
-      video_url: video,
+      model: "runway-gen4-aleph",
       duration: 5,
+      aspectRatio: "16:9",
+      referenceVideoUrl: video,
     }),
   },
   {
@@ -173,9 +181,10 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     estimated_cost_eur: 0.60,
     edge_function: "generate-talking-head",
     buildPayload: ({ image, audio }) => ({
-      image_url: image,
-      audio_url: audio,
-      duration: 5,
+      imageUrl: image,
+      audioUrl: audio,
+      aspectRatio: "16:9",
+      resolution: "720p",
     }),
   },
 ];
