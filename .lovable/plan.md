@@ -1,92 +1,96 @@
+## Diagnose: 7 Fehler, 0 € verbrannt — alles Payload-Bugs
 
-## Ziel
+Der erste Run hat **bewiesen, dass die Safety funktioniert** (kein Cent ausgegeben), aber alle 7 Flows scheiterten an falschen Request-Schemas. Hier die echten Root Causes:
 
-Ein **separater "Weekly Deep Sweep"** (`qa-weekly-deep-sweep`), der nicht nur Provider-Pings macht wie der tägliche Live Sweep, sondern **vollständige Bezahl-Pipelines** durchläuft: Asset-Generierung → Stitching → Lambda-Render → Webhook-Roundtrip. Hard cap **50 € pro Run**, manueller Trigger im Cockpit, Ergebnis-Reports inkl. Render-URLs zum visuellen QA.
+| # | Flow | Fehler | Root Cause |
+|---|------|--------|------------|
+| 1 | Composer Stitch | `Missing clip URLs: false,false,false` | Hailuo/Seedance/Kling sind **async via Webhook** — Response enthält `generationId`, nicht `video_url`. Wir warten nicht aufs Webhook. |
+| 2 | DC Lambda Render | `Missing source_video_url` | Wir senden `clips: [...]`, die Function erwartet aber `source_video_url` (snake_case, single URL). |
+| 3 | Auto-Director | `idea must be at least 5 characters` | Wir senden `brief`/`category`/`target_duration`, Schema will `idea`, `mood`, `targetDurationSec`, `stage`. |
+| 4 | Talking Head | `Invalid version or not permitted` | Hedra braucht ein Replicate-**Model-Version-Hash**, nicht den Slug `hedra/character-3`. Bug im Provider-Code. |
+| 5 | Universal Video | `userId is required` | Wir senden `category`/`topic`, Schema will `briefing` + explizit `userId` im Body. |
+| 6 | Long-Form Render | `Project not found` | Function erwartet `projectId` einer existierenden DB-Row, nicht `script` direkt. Braucht Vorab-Setup. |
+| 7 | Magic Edit | `400 Bad Request` von Replicate FLUX Fill | Wir senden ein JPG als Mask — FLUX Fill Pro will eine echte Schwarz/Weiß-Maske als PNG. |
 
-## Was abgedeckt wird (7 E2E-Flows)
+## Fix-Plan
 
-| # | Flow | Was passiert | Geschätzt |
-|---|------|--------------|-----------|
-| 1 | **Composer Multi-Scene Stitch** | 3 Szenen (Hailuo, Seedance, Kling) parallel → `compose-stitch-and-handoff` → fertiges MP4 | ~2,50 € |
-| 2 | **Director's Cut Lambda Render** | Fertiges Composer-MP4 → `render-directors-cut` mit 1 Filter + Subtitles → Lambda → Webhook | ~1,50 € |
-| 3 | **Auto-Director (Brief → Video)** | Brief-Text → `auto-director-compose` → 3-Szenen-Storyboard → Stitch → Render | ~3,00 € |
-| 4 | **Talking Head (Hedra)** | FLUX-Portrait → ElevenLabs TTS → `generate-talking-head` → 8s-Video | ~1,80 € |
-| 5 | **Universal Video Creator** | Kategorie "Marketing" → `auto-generate-universal-video` → Wizard-Skript → Render | ~2,20 € |
-| 6 | **Long-Form Render** | 3-Min-Skript → `render-long-form-video` (Lambda) | ~3,50 € |
-| 7 | **Magic Edit (Inpaint)** | FLUX-Bild → Maske → `magic-edit-image` (FLUX Fill Pro) | ~0,15 € |
+### A. Orchestrator-Payloads korrigieren (`qa-weekly-deep-sweep/index.ts`)
 
-**Gesamt-Estimate: ~14,65 €** pro Voll-Run. Budget 50 € erlaubt **3× Wiederholung** (Stabilität) oder **Erweiterung** um Varianten (z.B. zweite Composer-Stitch mit Vidu+Pika+Wan).
+**Flow 1 — Composer Stitch:**
+- Nach `generate-hailuo/seedance/kling` die `generationId` aus Response lesen
+- Polling-Helper `pollAiVideoGeneration(generationId, 180s)` → wartet auf `ai_video_generations.status='completed'` und liest `result_url`/`output_url`
+- Erst danach `compose-stitch-and-handoff` aufrufen mit den 3 fertigen URLs
 
-## Architektur
-
-### Neue Edge Function: `qa-weekly-deep-sweep`
-- Sequentielle Ausführung der 7 Flows
-- Pro Flow: Cost-Cap-Check vor Start, Asset-URLs aus `qa-test-assets` Bucket, vollständiger Roundtrip mit Polling auf Webhook-Status (max 300s pro Flow)
-- Bei Render-Flows: wartet auf `status: "completed"` in DB-Tabelle, validiert dass Output-URL existiert und HEAD-Request 200 liefert
-- Bei Failure: Auto-Refund prüfen (sind die Credits zurück?), Bug-Report mit Flow-Stage-Info
-
-### Neue DB-Tabelle: `qa_deep_sweep_runs`
+**Flow 2 — DC Lambda Render:**
+Payload umbauen auf das echte Schema:
 ```text
-id, started_at, finished_at, total_cost_eur, status (running/completed/failed)
-flows_total, flows_succeeded, flows_failed
+{
+  source_video_url: stitchedVideoUrl,
+  duration_seconds: 16,
+  effects: { filter: 'cinematic' },
+  subtitle_track: { visible: true, clips: [{ start_time:0, end_time:5, text:'QA test' }] },
+  export_settings: { quality:'hd', format:'mp4' }
+}
 ```
 
-### Neue DB-Tabelle: `qa_deep_sweep_flow_results`
+**Flow 3 — Auto-Director:**
 ```text
-id, run_id, flow_name, started_at, finished_at, duration_ms,
-status (pending/running/success/failed/timeout/budget_skipped),
-cost_eur, output_url, error_message, validation_checks (jsonb)
+{
+  stage: 'plan',
+  idea: 'A 15-second cinematic spot for a coffee subscription with morning vibes',
+  mood: 'warm',
+  targetDurationSec: 15,
+  language: 'en'
+}
+```
+(Nur `stage:'plan'` testen — `execute` würde 3 weitere Renders triggern, sprengt Budget. Plan-Stage validiert die ganze AI-Tool-Calling-Pipeline.)
+
+**Flow 4 — Talking Head:**
+- Bug-Fix in `generate-talking-head/index.ts`: `version: HEDRA_MODEL` → korrekt gemäß Replicate-API entweder `model: 'hedra/character-3'` (für `models.predictions.create`) oder ein echter Version-Hash. Wir nutzen `replicate.models.predictions.create({ model: 'hedra/character-3', ... })` statt `predictions.create({ version: ... })`.
+
+**Flow 5 — Universal Video:**
+```text
+{
+  briefing: { category:'product-ad', topic:'Bond QA validation', visualStyle:'cinematic', durationSeconds:15 },
+  userId: <triggered_by user.id>,
+  language: 'en'
+}
 ```
 
-### Cockpit-UI: Neuer Tab "Deep Sweep"
-- Button "Run Deep Sweep (Cap: 50 €)" mit Disable während Lauf
-- Live-Status-Tabelle: 7 Zeilen mit Spinner → Grün/Rot, Render-Preview-Link, Dauer, Kosten
-- History der letzten 10 Runs mit Pass-Rate-Trend
-- Kostenanzeige vs. monatliches QA-Budget (300 € hard cap aus Bond QA Memory)
+**Flow 6 — Long-Form Render:**
+Vor dem Render-Call eine **Test-Project-Row** in `sora_long_form_projects` + 1 fertige Scene in `sora_long_form_scenes` anlegen (mit `status='completed'` und `generated_video_url = ctx.assets.video`). Dann `projectId` an Render-Function senden. Cleanup nach dem Run.
 
-## Technische Details
+**Flow 7 — Magic Edit:**
+- Eine echte 1024x1024 PNG-Maske ins `qa-test-assets`-Bucket bootstrappen (zentrales weißes Quadrat auf schwarz)
+- `qa-live-sweep-bootstrap` erweitern: zusätzlich `sample-mask-1024.png` hochladen (clientseitig via Canvas → Base64 generieren, kein externer Download nötig)
+- Im Sweep: `maskUrl` zeigt auf diese echte Maske
 
-### Polling-Pattern für asynchrone Renders
+### B. Hedra Provider Bug (`generate-talking-head/index.ts`)
+Echter Bug der **alle Talking-Head-Calls in Production** betrifft, nicht nur QA. Replicate-API:
 ```text
-1. Trigger Render → erhält job_id
-2. Poll qa_deep_sweep_flow_results / video_creations alle 10s
-3. Timeout nach 300s → markiere als "timeout", nicht "failed" (Lambda kann lange brauchen)
-4. Bei "completed": HEAD-Request auf output_url → 200 = success
+- predictions.create({ version: '<hash>' })  ← braucht explizite Version
+- models.predictions.create({ model: 'hedra/character-3' })  ← lockt auf "latest"
 ```
+Aktueller Code nutzt `version: HEDRA_MODEL` mit Slug → Replicate lehnt ab. Fix: auf `models.predictions.create` umstellen.
 
-### Asset-Reuse aus täglichem Sweep
-- Nutzt dieselben `qa-test-assets/sample-1024.jpg`, `sample-5s.mp4`, `sample-5s.mp3`
-- Composer-Szenen referenzieren reale FLUX-Outputs aus Flow #1 als Frames für Continuity Guardian (kein Replicate-Call)
+### C. Bootstrap-Function erweitern (`qa-live-sweep-bootstrap/index.ts`)
+- Neuer Asset: `sample-mask-1024.png` — programmatisch via Canvas API in Deno generieren (zentrales weißes 512x512-Quadrat auf 1024x1024 schwarz)
+- Idempotent wie die anderen Assets
 
-### Frequenz & Trigger
-- **Manuell** im Cockpit (jetzt)
-- **Optional später**: Cron `0 3 * * 0` (Sonntag 03:00 UTC) — wird nur als TODO im UI vermerkt, nicht jetzt eingebaut
-- Hard-Lock: max 1 Deep Sweep pro 6h (verhindert Burn bei Fehlbedienung)
+### D. Test ohne Re-Deploy-Risiko
+Nach den Fixes:
+1. Bootstrap erneut aufrufen (lädt nur den neuen Mask-Asset hoch, Rest no-op)
+2. Deep Sweep manuell triggern
+3. Erwartung: 6/7 grün, ~12 € Verbrauch. Flow 6 (Long-Form) eventuell flaky wegen Lambda-Cold-Start — Timeout dann auf 360s erhöhen falls nötig.
 
-### QA-Mock-Header bewusst NICHT setzen
-- Diese Function ist explizit dafür da, **echte** Calls zu machen
-- Provider-Edge-Functions erkennen den `qa-deep-sweep@bond.local` Test-User aber **bypassen den Mock**, weil der Sweep den `x-qa-real-spend: true` Header sendet
-- Erfordert Mini-Update in `_shared/qaMock.ts`: bei `x-qa-real-spend: true` → kein Short-Circuit
-
-## Was nicht im Scope ist
-
-- **Keine UI-E2E** (Browserless-Klicks) — das macht der Bond QA Agent bereits
-- **Keine Social-Publishing-Tests** (Meta/TikTok/X) — separates Risk-Profil, eigener Sweep später
-- **Keine Stripe/Payment-Tests** — Test-Mode-Abos existieren bereits separat
-- **Kein automatisches Posting** der gerenderten Videos — bleiben in `qa-test-assets`, nach 7 Tagen Auto-Cleanup
-
-## Erwartung
-
-- Erster Run: ~15 € echte Kosten, ~12-15 Min Dauer, 7/7 grün ist das Ziel
-- Findet Bugs die der Provider-Ping-Sweep nicht sieht: Webhook-Drift, Lambda-Bundle-Mismatch, Stitch-FFmpeg-Probleme, Continuity-Guardian-Frame-Bugs, Subtitle-Sync-Drift im Lambda-Output
-- Bei einem grünen Deep Sweep + grünem Live Sweep am gleichen Tag: **hohe Konfidenz, dass alle Bezahl-Pfade funktionieren**
+## Was sich NICHT ändert
+- Cap (50 €), Lock (6h), Mock-Bypass-Header, UI, DB-Schema bleiben wie sie sind.
+- Live Sweep (täglich, mocked) wird nicht angefasst.
 
 ## Lieferung
+1. `supabase/functions/qa-weekly-deep-sweep/index.ts` — alle 7 Payloads + Polling-Helper
+2. `supabase/functions/generate-talking-head/index.ts` — Hedra-Aufruf-Fix
+3. `supabase/functions/qa-live-sweep-bootstrap/index.ts` — Mask-Asset
+4. Memory-Update in `mem://features/qa-agent/deep-sweep`
 
-1. Migration: 2 neue Tabellen + RLS (admin-only)
-2. Edge Function `qa-weekly-deep-sweep/index.ts`
-3. Mini-Patch in `_shared/qaMock.ts` für `x-qa-real-spend` Header
-4. Neuer Tab `DeepSweepTab.tsx` im `/admin/qa-cockpit`
-5. Memory-Update unter `mem://features/qa-agent/deep-sweep`
-
-Bestätige mit "mach" und ich baue es. Bei "nein, nur 5 Flows" oder "lass Long-Form weg" passe ich vorher an.
+Bestätige mit "mach", dann baue ich's. Bei "Hedra-Fix erstmal weg" lasse ich Flow 4 als known-failure und liefere die anderen 6.
