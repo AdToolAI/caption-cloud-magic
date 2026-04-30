@@ -32,10 +32,12 @@ serve(async (req) => {
     const progressIdFromWebhook = customData?.progressId; // ← NEW: direct progressId
     const isDirectorsCut = source === 'directors-cut';
     const isComposer = source === 'composer';
+    const isLongForm = source === 'sora-long-form';
     const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
+    const longFormProjectId = customData?.sora_long_form_project_id;
 
-    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, progressIdFromWebhook });
+    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
