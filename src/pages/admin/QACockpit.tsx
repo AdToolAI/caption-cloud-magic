@@ -1,4 +1,4 @@
-import { useState, forwardRef } from "react";
+import { useState, forwardRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -951,7 +951,7 @@ function EmptyState({ label }: { label: string }) {
 
 const FilterPill = forwardRef<
   HTMLButtonElement,
-  { active: boolean; onClick: () => void; children: React.ReactNode }
+  { active: boolean; onClick: () => void; children: ReactNode }
 >(({ active, onClick, children }, ref) => {
   return (
     <button
