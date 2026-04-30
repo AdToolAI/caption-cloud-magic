@@ -1,8 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
 const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY')!;
@@ -107,6 +108,11 @@ async function callHedra(imageUrl: string, audioUrl: string, aspectRatio: string
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Bond QA Agent: short-circuit on x-qa-mock header (no provider call, no credits)
+  if (isQaMockRequest(req)) {
+    return qaMockResponse({ corsHeaders, kind: "talking-head" });
   }
 
   try {
