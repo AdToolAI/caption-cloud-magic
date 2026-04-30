@@ -1,9 +1,8 @@
-name: E2E Critical Journeys
+name: E2E Smoke Suite
 
-# Schlanker, stabiler E2E-Workflow.
-# Läuft nur die 5 kritischen User-Journeys gegen die Published URL.
-# Kein Login, keine Secrets — soll bei jedem Push grün bleiben und
-# echte Regressionen sofort melden.
+# Breite Smoke-Suite gegen die Published URL.
+# 8 Spec-Files, ~25 Tests, ~3-4 Min Laufzeit.
+# Kein Login, keine Secrets nötig — fängt 80% aller "ist die App online?"-Regressionen.
 
 on:
   push:
@@ -12,14 +11,14 @@ on:
     branches: [main]
   workflow_dispatch:
   schedule:
-    # Einmal täglich um 06:00 UTC gegen Production
-    - cron: '0 6 * * *'
+    # Alle 6 Stunden gegen Production
+    - cron: '0 */6 * * *'
 
 jobs:
-  critical-journeys:
-    name: Critical User Journeys
+  smoke-suite:
+    name: E2E Smoke Suite
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - uses: actions/checkout@v4
@@ -36,14 +35,23 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
-      - name: Run critical journeys
+      - name: Run smoke suite
         env:
           BASE_URL: https://caption-cloud-magic.lovable.app
           CI: 'true'
-          # Cockpit-Reporter pusht Resultate in smoke_test_runs (no-op ohne diese Vars).
           E2E_INGEST_URL: https://lbunafpxuskwmsrraqxl.functions.supabase.co/ingest-e2e-results
           E2E_INGEST_TOKEN: ${{ secrets.E2E_INGEST_TOKEN }}
-        run: npx playwright test tests/critical-journeys.spec.ts
+        run: |
+          npx playwright test \
+            tests/critical-journeys.spec.ts \
+            tests/public-pages.spec.ts \
+            tests/seo-meta.spec.ts \
+            tests/auth-flows.spec.ts \
+            tests/api-health.spec.ts \
+            tests/performance-budgets.spec.ts \
+            tests/mobile-responsive.spec.ts \
+            tests/not-found.spec.ts \
+            --workers=2
 
       - name: Upload Playwright report
         if: failure()
