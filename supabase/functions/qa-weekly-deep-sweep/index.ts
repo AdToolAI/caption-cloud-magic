@@ -626,7 +626,7 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
   const result: FlowResult = {
-    flow_index: 7,
+    flow_index: 6,
     flow_name: "Magic Edit (FLUX Fill Inpaint)",
     status: "failed",
     duration_ms: 0,
