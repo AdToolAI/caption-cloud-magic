@@ -365,10 +365,11 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       return result;
     }
 
-    // Poll director_cut_renders for completion (max 360s)
+    // Poll director_cut_renders for completion (max 90s — Edge Function wall-clock budget)
+    // Lambda continues async; remotion-webhook updates the row even after we stop polling.
     const tPoll = Date.now();
     let polled: any = null;
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 9; i++) {
       await new Promise((r) => setTimeout(r, 10_000));
       const { data } = await ctx.admin
         .from("director_cut_renders")
