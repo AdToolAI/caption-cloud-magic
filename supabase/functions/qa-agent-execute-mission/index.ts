@@ -110,7 +110,21 @@ Deno.serve(async (req) => {
     const baseUrl = Deno.env.get("QA_TARGET_URL") ?? "https://useadtool.ai";
 
     if (!qaPassword) {
-      throw new Error("QA_TEST_USER_PASSWORD secret not configured");
+      throw new Error(
+        "QA_TEST_USER_PASSWORD secret not configured. Click 'Test-User einrichten' in the QA Cockpit header to provision the QA bot account, then re-run.",
+      );
+    }
+
+    // Pre-flight: warn (don't block) when mission has too many steps for the
+    // Browserless server cap. Hobby = 30s, Standard = 60s. Average step ≈ 3-4s
+    // including navigation; login adds ~5-7s. So ~6 steps fit safely on Hobby.
+    const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
+    const serverCapMs = Math.min(60_000, Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000));
+    const stepBudget = Math.floor((serverCapMs - 7_000) / 4_000); // -7s for login, 4s/step
+    if (steps.length > stepBudget) {
+      console.warn(
+        `[execute-mission] mission '${missionName}' has ${steps.length} steps but server cap of ${serverCapMs}ms only fits ~${stepBudget}. Expect 408 timeout.`,
+      );
     }
 
     const navPaths: string[] = steps
