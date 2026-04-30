@@ -447,3 +447,6 @@ export default async ({ page, context }) => {
 };
 `.trim();
 }
+
+// Backwards-compatible alias — older code imports buildSmokeNavigationScript.
+export const buildSmokeNavigationScript = buildInteractiveScript;
