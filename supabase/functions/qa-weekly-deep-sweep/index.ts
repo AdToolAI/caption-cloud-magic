@@ -26,7 +26,7 @@ const FALLBACK_IMAGE =
 // Use a reliable, decodable MP4 — the previous lovable-public sample returned an
 // XML S3 error (~133 bytes) which crashed Lambda video playback.
 const FALLBACK_VIDEO =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+  "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4";
 const FALLBACK_AUDIO =
   "https://download.samplelib.com/mp3/sample-3s.mp3";
 
@@ -365,10 +365,11 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       return result;
     }
 
-    // Poll director_cut_renders for completion (max 360s)
+    // Poll director_cut_renders for completion (max 90s — Edge Function wall-clock budget)
+    // Lambda continues async; remotion-webhook updates the row even after we stop polling.
     const tPoll = Date.now();
     let polled: any = null;
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 9; i++) {
       await new Promise((r) => setTimeout(r, 10_000));
       const { data } = await ctx.admin
         .from("director_cut_renders")
@@ -388,7 +389,7 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       result.actual_cost_eur = result.estimated_cost_eur;
     } else {
       result.status = polled?.status === "failed" ? "failed" : "timeout";
-      result.error_message = polled?.error_message || "Lambda render did not complete in 360s";
+      result.error_message = polled?.error_message || "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
       result.actual_cost_eur = 0.5;
     }
   } catch (e: any) {
@@ -671,10 +672,10 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
     } else {
-      // Poll project status (max 360s)
+      // Poll project status (max 90s — Edge Function wall-clock budget; Lambda continues async)
       const tPoll = Date.now();
       let polled: any = null;
-      for (let i = 0; i < 36; i++) {
+      for (let i = 0; i < 9; i++) {
         await new Promise((r) => setTimeout(r, 10_000));
         const { data } = await ctx.admin
           .from("sora_long_form_projects")
@@ -696,7 +697,7 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
         result.status = polled?.status === "failed" ? "failed" : "timeout";
         result.error_message = polled?.status === "failed"
           ? "Long-form render reported failed status"
-          : "Long-form render did not complete in 360s";
+          : "Long-form render did not complete in 90s polling window (Lambda may still finish async)";
         result.actual_cost_eur = 1.0;
       }
     }

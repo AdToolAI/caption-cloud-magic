@@ -142,6 +142,29 @@ export function DeepSweepTab() {
   };
 
   const isRunning = latestRun?.status === "running";
+  const runAgeMinutes = latestRun?.started_at
+    ? (Date.now() - new Date(latestRun.started_at).getTime()) / 60000
+    : 0;
+  const isStale = isRunning && runAgeMinutes > 8;
+  const [finalizing, setFinalizing] = useState(false);
+
+  const finalizeStaleRun = async () => {
+    if (!latestRun) return;
+    setFinalizing(true);
+    try {
+      const { error } = await supabase.functions.invoke("qa-deep-sweep-finalize-stale", {
+        body: { run_id: latestRun.id },
+      });
+      if (error) throw error;
+      toast.success("Run als gescheitert markiert.");
+      await load();
+    } catch (e: any) {
+      toast.error(`Finalize failed: ${e?.message ?? String(e)}`);
+    } finally {
+      setFinalizing(false);
+    }
+  };
+
   const passRate = latestRun && latestRun.flows_total > 0
     ? Math.round((latestRun.flows_succeeded / latestRun.flows_total) * 100)
     : 0;
@@ -176,6 +199,22 @@ export function DeepSweepTab() {
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Reload
             </Button>
+            {isStale && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={finalizeStaleRun}
+                disabled={finalizing}
+                title={`Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`}
+              >
+                {finalizing ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-1" />
+                )}
+                Run abbrechen ({Math.round(runAgeMinutes)} min)
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
