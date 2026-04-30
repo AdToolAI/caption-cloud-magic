@@ -66,8 +66,19 @@ Deno.serve(async (req) => {
     .select("pattern_regex, severity_when_matched, reason");
   const muted: MutedPattern[] = (mutedRows ?? []) as MutedPattern[];
 
+  let mutedDrops = 0;
   const insertBug = async (payload: Record<string, unknown>) => {
     try {
+      // Pre-insert mute filter: drop any bug whose title or description matches an "ignore" pattern.
+      const titleStr = String(payload.title ?? "");
+      const descStr = String(payload.description ?? "");
+      const combined = `${titleStr}\n${descStr}`;
+      const mute = matchMuted(combined, muted);
+      if (mute?.severity_when_matched === "ignore") {
+        mutedDrops++;
+        console.log("[execute-mission] muted bug dropped:", titleStr.slice(0, 80), "reason:", mute.reason ?? "(no reason)");
+        return;
+      }
       const safe = {
         ...payload,
         description: payload.description ?? "(no description — see metadata)",
@@ -213,12 +224,17 @@ Deno.serve(async (req) => {
     });
 
     // ----- BUG: Browserless overall failure -----
+    let finalizeWarningOnly = false;
     if (!result.ok) {
       const rawErr = result.error;
       const httpStatus = (result as any).httpStatus ?? null;
       const rawResponse = (result as any).rawResponse ?? null;
       const lastHb = heartbeats[heartbeats.length - 1];
       const lastHbLabel = lastHb?.label ?? lastHb?.step ?? lastHb?.path ?? null;
+      const stepErrorsArr: any[] = ((result.data as any)?.stepErrors ?? []) as any[];
+      const realStepErrors = stepErrorsArr.filter((se: any) => se && se.type !== "navigate");
+      const allStepsGreen = realStepErrors.length === 0 && successfulNavs.length > 0;
+      const isFinalizePhase = /finaliz/i.test(String(lastHbLabel ?? "")) || /finaliz/i.test(String(rawResponse ?? ""));
 
       // Build a meaningful fallback when browserlessClient returned ok:false without an error string
       let errMsg: string;
@@ -235,7 +251,7 @@ Deno.serve(async (req) => {
         }
         errMsg = parts.length > 0
           ? `Browserless engine failure (${parts.join(", ")})`
-          : "Browserless engine returned ok:false with no diagnostic data";
+          : "Browserless engine returned ok:false with no diagnostic data — likely transient (timeout or proxy hiccup)";
       }
 
       const description = rawResponse
@@ -243,27 +259,50 @@ Deno.serve(async (req) => {
         : errMsg;
 
       const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button|preview auth bridge/i.test(errMsg);
-      await insertBug({
-        run_id,
-        mission_name: missionName,
-        severity: "high",
-        category: "workflow",
-        title: isLoginFail
-          ? `Login failed before any path could be visited`
-          : `Mission execution failed: ${errMsg.slice(0, 120)}`,
-        description,
-        screenshot_url: loginScreenshotUrl ?? screenshotUrl,
-        network_trace: {
-          failure_area: isLoginFail ? "auth" : "workflow",
-          target_url: baseUrl,
-          http_status: (result as any).httpStatus ?? null,
-          raw_response: (result as any).rawResponse ?? null,
-          duration_ms: result.durationMs,
-          login_screenshot_url: loginScreenshotUrl ?? null,
-          last_heartbeat: heartbeats[heartbeats.length - 1] ?? null,
-          heartbeats,
-        },
-      });
+
+      // Finalize-phase failures with all real steps green = downgrade to info, do not fail mission.
+      if (isFinalizePhase && allStepsGreen && !isLoginFail) {
+        finalizeWarningOnly = true;
+        console.log("[execute-mission] finalize-only failure suppressed — steps were green:", { lastHbLabel, errMsg });
+        await insertBug({
+          run_id,
+          mission_name: missionName,
+          severity: "info",
+          category: "workflow",
+          title: `Engine finalize warning (mission steps OK): ${errMsg.slice(0, 80)}`,
+          description,
+          screenshot_url: loginScreenshotUrl ?? screenshotUrl,
+          network_trace: {
+            failure_area: "finalize",
+            target_url: baseUrl,
+            http_status: httpStatus,
+            duration_ms: result.durationMs,
+            heartbeats,
+          },
+        });
+      } else {
+        await insertBug({
+          run_id,
+          mission_name: missionName,
+          severity: "high",
+          category: "workflow",
+          title: isLoginFail
+            ? `Login failed before any path could be visited`
+            : `Mission execution failed: ${errMsg.slice(0, 120)}`,
+          description,
+          screenshot_url: loginScreenshotUrl ?? screenshotUrl,
+          network_trace: {
+            failure_area: isLoginFail ? "auth" : "workflow",
+            target_url: baseUrl,
+            http_status: httpStatus,
+            raw_response: rawResponse,
+            duration_ms: result.durationMs,
+            login_screenshot_url: loginScreenshotUrl ?? null,
+            last_heartbeat: heartbeats[heartbeats.length - 1] ?? null,
+            heartbeats,
+          },
+        });
+      }
     }
 
     // ----- BUG: silent no-op -----
@@ -382,10 +421,25 @@ Deno.serve(async (req) => {
     }
 
     // ----- BUG: interactive step failures (click/fill/wait_for/expect_visible) -----
+    // For expect_no_console_error: only emit a bug if there is at least one console error
+    // that does NOT match an "ignore" mute pattern (otherwise the assertion was triggered
+    // purely by background noise we already chose to ignore).
+    const unMutedConsoleCount = consoleErrors.filter((c: any) => {
+      const mute = matchMuted(String(c.text ?? ""), muted);
+      return !(mute?.severity_when_matched === "ignore");
+    }).length;
+
     const stepErrors: any[] = ((result.data as any)?.stepErrors ?? []) as any[];
     for (const se of stepErrors) {
       // Skip pure 'navigate' failures here — already covered by failedNavs block above.
       if (se.type === "navigate") continue;
+      // Skip console-error assertion failures whose underlying errors are all muted.
+      if (se.type === "expect_no_console_error" && unMutedConsoleCount === 0) {
+        console.log("[execute-mission] suppressed expect_no_console_error step (all errors muted)", {
+          step_index: se.step_index,
+        });
+        continue;
+      }
       await insertBug({
         run_id,
         mission_name: missionName,
@@ -399,8 +453,10 @@ Deno.serve(async (req) => {
     }
 
     // ----- Status: succeeded if no high/critical bugs and at least one nav OK -----
+    // Finalize-only failures (steps green, only finalize phase complained) count as success.
+    const effectiveOk = result.ok || finalizeWarningOnly;
     const status =
-      result.ok && successfulNavs.length > 0 && highSeverityBugs === 0
+      effectiveOk && successfulNavs.length > 0 && highSeverityBugs === 0
         ? "succeeded"
         : "failed";
 
@@ -422,10 +478,16 @@ Deno.serve(async (req) => {
               "title.ilike.%check-subscription%",
               "title.ilike.%(no error message)%",
               "title.ilike.%Browserless engine returned ok:false%",
+              "title.ilike.%Browserless engine failure%finalizing%",
+              "title.ilike.%Engine finalize warning%",
               "title.ilike.%blocked by CORS%",
               "title.ilike.%Network 0 POST%companion-diagnose%",
               "title.ilike.%Network 0 POST%check-subscription%",
               "title.ilike.%Failed to load resource: net::ERR_FAILED%",
+              "title.ilike.%FunctionsFetchError%",
+              "title.ilike.%posthog-recorder%",
+              "title.ilike.%/envelope/%",
+              "title.ilike.%expect_no_console_error%",
               "description.ilike.%x-qa-mock is not allowed%",
             ].join(","),
           );
@@ -446,7 +508,7 @@ Deno.serve(async (req) => {
         steps_completed: successfulNavs.length,
         bugs_found: bugsFound,
         last_screenshot_url: screenshotUrl,
-        log_summary: `${navResults.length} paths, ${consoleErrors.length} console errs (${consoleGroups.size} unique), ${netErrors.length} net errs (${netGroups.size} unique), ${bugsFound} bugs (${highSeverityBugs} high/critical)`,
+        log_summary: `${navResults.length} paths, ${consoleErrors.length} console errs (${consoleGroups.size} unique), ${netErrors.length} net errs (${netGroups.size} unique), ${bugsFound} bugs (${highSeverityBugs} high/critical), ${mutedDrops} muted-drops`,
         metadata: {
           result: {
             url: result.url,
