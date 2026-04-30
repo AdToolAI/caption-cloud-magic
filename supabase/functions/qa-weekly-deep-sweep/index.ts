@@ -459,9 +459,18 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       result.validation_checks.url_reachable = await headOk(polled.output_url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
+    } else if (polled?.status === "failed") {
+      // Webhook reported failure — distinguish AWS Lambda throttle (transient
+      // infrastructure limit, not a code bug) from real render bugs.
+      const throttled = isLambdaThrottleMessage(polled?.error_message);
+      result.status = throttled ? "timeout" : "failed";
+      result.error_message = throttled
+        ? `AWS Lambda concurrency throttled async (post-trigger) — infrastructure quota, not a code bug. Original: ${(polled.error_message || "").slice(0, 200)}`
+        : polled?.error_message || "Render failed without error message";
+      result.actual_cost_eur = throttled ? 0 : 0.5;
     } else {
-      result.status = polled?.status === "failed" ? "failed" : "timeout";
-      result.error_message = polled?.error_message || "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
+      result.status = "timeout";
+      result.error_message = "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
       result.actual_cost_eur = 0.5;
     }
   } catch (e: any) {
