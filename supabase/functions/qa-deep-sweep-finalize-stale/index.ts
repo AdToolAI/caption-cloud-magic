@@ -78,7 +78,8 @@ Deno.serve(async (req) => {
     const { error: updErr } = await admin
       .from("qa_deep_sweep_runs")
       .update({
-        status: "timeout",
+        // qa_deep_sweep_runs.status check-constraint allows: running|completed|failed|cancelled
+        status: "failed",
         finished_at: new Date().toISOString(),
         flows_succeeded: succeeded,
         flows_failed: failed,
