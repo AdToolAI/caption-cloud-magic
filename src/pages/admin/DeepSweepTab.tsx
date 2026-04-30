@@ -293,7 +293,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          Aktueller Run — 7 Flows
+          Aktueller Run — 6 Flows
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {
