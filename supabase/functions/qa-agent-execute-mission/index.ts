@@ -421,10 +421,25 @@ Deno.serve(async (req) => {
     }
 
     // ----- BUG: interactive step failures (click/fill/wait_for/expect_visible) -----
+    // For expect_no_console_error: only emit a bug if there is at least one console error
+    // that does NOT match an "ignore" mute pattern (otherwise the assertion was triggered
+    // purely by background noise we already chose to ignore).
+    const unMutedConsoleCount = consoleErrors.filter((c: any) => {
+      const mute = matchMuted(String(c.text ?? ""), muted);
+      return !(mute?.severity_when_matched === "ignore");
+    }).length;
+
     const stepErrors: any[] = ((result.data as any)?.stepErrors ?? []) as any[];
     for (const se of stepErrors) {
       // Skip pure 'navigate' failures here — already covered by failedNavs block above.
       if (se.type === "navigate") continue;
+      // Skip console-error assertion failures whose underlying errors are all muted.
+      if (se.type === "expect_no_console_error" && unMutedConsoleCount === 0) {
+        console.log("[execute-mission] suppressed expect_no_console_error step (all errors muted)", {
+          step_index: se.step_index,
+        });
+        continue;
+      }
       await insertBug({
         run_id,
         mission_name: missionName,
@@ -438,8 +453,10 @@ Deno.serve(async (req) => {
     }
 
     // ----- Status: succeeded if no high/critical bugs and at least one nav OK -----
+    // Finalize-only failures (steps green, only finalize phase complained) count as success.
+    const effectiveOk = result.ok || finalizeWarningOnly;
     const status =
-      result.ok && successfulNavs.length > 0 && highSeverityBugs === 0
+      effectiveOk && successfulNavs.length > 0 && highSeverityBugs === 0
         ? "succeeded"
         : "failed";
 
