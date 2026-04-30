@@ -78,9 +78,10 @@ function mapDimension(aspectRatio: string, resolution: string): { width: number;
 async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Promise<string> {
   // 1. Fetch the source binary
   const srcRes = await fetch(sourceUrl);
-  if (!srcRes.ok) throw new Error(`Failed to fetch source ${kind}: ${srcRes.status}`);
+  if (!srcRes.ok) throw new Error(`Failed to fetch source ${kind} from ${sourceUrl}: ${srcRes.status}`);
   const blob = await srcRes.blob();
   const buffer = await blob.arrayBuffer();
+  console.log(`[talking-head] Source ${kind} fetched: ${buffer.byteLength} bytes, type=${blob.type}`);
 
   // HeyGen upload.heygen.com/v1/asset accepts raw binary upload.
   // Allowed MIME types: image/png, image/jpeg, audio/mpeg, video/mp4, video/webm.
@@ -102,12 +103,15 @@ async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Pr
     body: buffer,
   });
 
+  const respText = await uploadRes.text();
+  console.log(`[talking-head] HeyGen ${kind} upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
+
   if (!uploadRes.ok) {
-    const errText = await uploadRes.text();
-    throw new Error(`HeyGen asset upload (${kind}) failed [${uploadRes.status}]: ${errText.slice(0, 300)}`);
+    throw new Error(`HeyGen asset upload (${kind}) failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
   }
 
-  const json = await uploadRes.json();
+  let json: any;
+  try { json = JSON.parse(respText); } catch { throw new Error(`HeyGen ${kind} upload returned non-JSON: ${respText.slice(0, 200)}`); }
   // HeyGen returns: { code: 100, data: { id, url, file_type, image_key, ... } }
   const assetId = json?.data?.id || json?.data?.image_key || json?.data?.audio_id;
   if (!assetId) throw new Error(`HeyGen asset upload (${kind}) missing id in response: ${JSON.stringify(json).slice(0, 200)}`);
