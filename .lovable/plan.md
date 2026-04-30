@@ -1,61 +1,41 @@
-## Die 3 Bugs
+## Problem
 
-### 1. `Unknown step type: wait_selector` (smoke-07-calendar-crud)
-Im letzten Loop wurde die Mission auf `[data-testid="calendar-page"]` umgestellt, **aber** der Step-Typ `wait_selector` ist im `browserlessClient.ts`-Switch gar nicht implementiert — nur `wait_for` existiert. Jede `wait_selector`-Mission wirft sofort.
-
-**Fix:** In `supabase/functions/_shared/browserlessClient.ts` (Zeile ~453) `wait_selector` als Alias zu `wait_for` ergänzen:
-
-```js
-else if (step.type === 'wait_for' || step.type === 'wait_selector') {
-  await page.waitForSelector(step.selector, { 
-    visible: true, 
-    timeout: clampStep(step.timeout_ms || 10000) 
-  });
-}
+Edge function deploys keep failing intermittently with:
+```
+Failed to bundle the function (reason: Fetch 'https://esm.sh/...' timed out after 10s)
 ```
 
-Danach verschwindet der "Unknown step type"-Bug für smoke-07 — die Mission selbst funktioniert ja, nur der Handler fehlt.
+So far we've fixed `credit-reserve` and `grant-welcome-bonus` one at a time, but **321 edge function files still import `@supabase/supabase-js` from `esm.sh`**, plus a handful of other packages (`stripe`, `resend`, `replicate`, `jszip`, `fast-xml-parser`, `aws4fetch`). Any future deploy can hit the same timeout on a different function — that's why "the error keeps coming back."
 
-### 2. `Console: Failed to load resource: status of 400` (smoke-10-brand-characters)
-Der Bug-Report ist generisch (keine URL im Text), aber der Pattern matcht nicht den existierenden Mute-Filter `Failed to load resource.*sentry`. Brand-Characters-Page macht keinen 400er-eigenen Call — sehr wahrscheinlich ein PostHog/Sentry/Recorder-Endpoint, der in Browserless-Sessions ohne CORS-Whitelist 400 zurückgibt (analog zu den Sentry-CORS-Blocks).
+## Fix
 
-**Fix in zwei Schritten:**
+Do a one-shot bulk rewrite of all `https://esm.sh/<pkg>@<ver>` imports to `npm:<pkg>@<ver>` in `supabase/functions/`. The `npm:` specifier is the supported, stable resolver in Supabase Edge Runtime and avoids the flaky esm.sh CDN fetch during bundling.
 
-**a) Console-Logger im Browser-Script anreichern** (`browserlessClient.ts`, console-collector-Block oben): Statt nur den Error-Text zu pushen, auch die URL aus dem ersten arg/Stack extrahieren — damit der nächste Bug "Console: Failed to load resource: status of 400" zur Quell-URL nachvollziehbar ist:
+### Scope of replacements (distinct URLs found)
 
-```js
-const urlMatch = String(args[0]).match(/https?:\/\/[^\s"')]+/);
-const sourceUrl = urlMatch ? urlMatch[0] : (e.location?.url ?? '');
-consoleLogs.push({ type, text, url: sourceUrl, ts: Date.now() });
-```
+| esm.sh URL | Replacement |
+|---|---|
+| `https://esm.sh/@supabase/supabase-js@<ver>` (10 versions: 2, 2.7.1, 2.39.0, 2.39.3, 2.45.0, 2.49.1, 2.49.4, 2.57.0, 2.57.2, 2.75.0, 2.95.0) | `npm:@supabase/supabase-js@<ver>` |
+| `https://esm.sh/stripe@14.21.0` / `@18.5.0` | `npm:stripe@...` |
+| `https://esm.sh/resend@2.0.0` | `npm:resend@2.0.0` |
+| `https://esm.sh/replicate@0.25.2` | `npm:replicate@0.25.2` |
+| `https://esm.sh/jszip@3.10.1` | `npm:jszip@3.10.1` |
+| `https://esm.sh/fast-xml-parser@4.5.0` | `npm:fast-xml-parser@4.5.0` |
+| `https://esm.sh/aws4fetch@1.0.18` | `npm:aws4fetch@1.0.18` |
 
-**b) Mute-Pattern erweitern** in der DB (`qa_console_mute_patterns` Tabelle): generische `Failed to load resource: the server responded with a status of 4\d\d \(\)$` mit leerer URL als analytics/posthog/sentry-Noise mute (die App-eigenen 400er liefern immer eine URL mit). Plus: bestehenden offenen Bug-Report resolven.
+### Steps
 
-### 3. React-Warning "Function components cannot be given refs" (Badge in QACockpit)
-Der Console-Log zeigt: `Badge` wird als Forward-Ref-Ziel benutzt (vermutlich in einem Tooltip-Trigger oder Tabs-Trigger im Cockpit), aber `src/components/ui/badge.tsx` ist eine plain Function-Component ohne `forwardRef`.
+1. Run a single `sed`-based rewrite over all `*.ts` files in `supabase/functions/` replacing the prefix `https://esm.sh/` with `npm:` (only inside import statement string literals).
+2. Verify with `rg` that no `esm.sh/...` import remains.
+3. Do NOT mass-redeploy all functions (~300+). The next deploy of any changed/touched function will pick up the new imports automatically. We'll redeploy the currently failing one (`grant-welcome-bonus` if it re-fails, or whichever is reported next) explicitly to confirm.
+4. If `supabase/functions/deno.lock` exists and references esm.sh URLs, delete it so the runtime regenerates a clean lockfile (per the deploy-error troubleshooting guide).
 
-**Fix:** `src/components/ui/badge.tsx` auf `React.forwardRef` umstellen — Standard-shadcn-Pattern, keine API-Änderung:
+### Out of scope
 
-```tsx
-const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
-  ({ className, variant, ...props }, ref) => (
-    <div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
-  )
-);
-Badge.displayName = "Badge";
-```
+- Frontend `src/` imports (not affected by edge bundler).
+- Switching versions or upgrading SDKs — keep all version pins identical, only the resolver changes.
+- The `_shared/*` helper files are included in the rewrite (same `supabase/functions/` tree).
 
-Das eliminiert die Warnung global (Badge wird an vielen Stellen in Tooltips/Triggern benutzt).
+### Risk
 
-## Files
-
-- `supabase/functions/_shared/browserlessClient.ts` — `wait_selector` Alias + URL-Extraktion in Console-Logger
-- `src/components/ui/badge.tsx` — `forwardRef`
-- Migration: Mute-Pattern für "status of 4xx ()"-ohne-URL + Bulk-resolve der `smoke-07` "Unknown step type"-Bugs und des `smoke-10` 400-Bugs
-
-## Erwartetes Ergebnis
-
-- smoke-07-calendar-crud: 4/4 grün
-- smoke-10-brand-characters: 400-Console-Noise gemutet, Bug raus
-- QA-Cockpit-Tab: Keine Badge-ref-Warning mehr
-- Künftige "status of 400"-Bugs liefern die Source-URL → echte App-400er bleiben sichtbar, Browserless-Noise wird stumm
+Very low. `npm:` specifiers are the documented Supabase Edge Runtime pattern and we've already verified the swap works for `credit-reserve` and `grant-welcome-bonus`. Versions remain pinned so behavior is unchanged.
