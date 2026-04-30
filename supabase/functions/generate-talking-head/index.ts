@@ -1,9 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id',
 };
 
 const REPLICATE_API_KEY = Deno.env.get('REPLICATE_API_KEY')!;
@@ -126,16 +127,24 @@ Deno.serve(async (req) => {
       });
     }
 
-    const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    // QA service-role shortcut (only honored when caller IS the service role)
+    const qaSvc = detectQaServiceAuth(req);
+    let user: { id: string } | null = null;
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[talking-head] QA service-auth user=${user.id}`);
+    } else {
+      const userClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        global: { headers: { Authorization: authHeader } },
       });
+      const { data: { user: jwtUser }, error: userError } = await userClient.auth.getUser();
+      if (userError || !jwtUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      user = jwtUser;
     }
 
     const body: TalkingHeadRequest = await req.json();

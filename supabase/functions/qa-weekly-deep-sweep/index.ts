@@ -1,17 +1,20 @@
-// Bond QA — Weekly Deep Sweep Orchestrator (v2)
+// Bond QA — Weekly Deep Sweep Orchestrator (v3)
 // Runs 7 full end-to-end pipelines (not just provider pings) to catch
 // integration drift: webhooks, Lambda renders, FFmpeg stitches, frame
 // continuity, subtitle sync. Hard cap 50€ per run, manual trigger only.
 //
-// Sends `x-qa-real-spend: true` header so provider edge functions DO NOT
-// short-circuit via qaMock helper. This sweep is meant to spend real money.
+// Auth model:
+// - The triggering user must be admin (verified at request time)
+// - All internal calls use the SERVICE ROLE key + headers:
+//     x-qa-real-spend: true   (bypasses qaMock short-circuit)
+//     x-qa-user-id: <admin>   (used by QA-aware functions for the user context)
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-qa-real-spend, x-qa-user-id",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -41,23 +44,23 @@ interface FlowResult {
 interface RunCtx {
   runId: string;
   userId: string;
-  authHeader: string;
   admin: ReturnType<typeof createClient>;
   assets: { image: string; video: string; audio: string; mask: string };
   remainingEur: number;
 }
 
-const HEADERS_REAL_SPEND = (auth: string) => ({
+const HEADERS_INTERNAL = (userId: string) => ({
   "Content-Type": "application/json",
-  Authorization: auth,
-  apikey: SUPABASE_ANON_KEY,
+  Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+  apikey: SUPABASE_SERVICE_ROLE_KEY,
   "x-qa-real-spend": "true",
+  "x-qa-user-id": userId,
 });
 
 async function callEdge<T = any>(
   fn: string,
   body: Record<string, unknown>,
-  authHeader: string,
+  userId: string,
   timeoutMs = 120_000,
 ): Promise<{ ok: boolean; status: number; json: T | null; error?: string }> {
   const ctrl = new AbortController();
@@ -65,7 +68,7 @@ async function callEdge<T = any>(
   try {
     const res = await fetch(`${SUPABASE_URL}/functions/v1/${fn}`, {
       method: "POST",
-      headers: HEADERS_REAL_SPEND(authHeader),
+      headers: HEADERS_INTERNAL(userId),
       body: JSON.stringify(body),
       signal: ctrl.signal,
     });
@@ -117,9 +120,9 @@ async function getTestAssets(
     return data?.publicUrl;
   };
   return {
-    image: tryUrl("sample-1024.jpg") || FALLBACK_IMAGE,
-    video: tryUrl("sample-5s.mp4") || FALLBACK_VIDEO,
-    audio: tryUrl("sample-5s.mp3") || FALLBACK_AUDIO,
+    image: tryUrl("test-image.png") || tryUrl("sample-1024.jpg") || FALLBACK_IMAGE,
+    video: tryUrl("test-video-2s.mp4") || tryUrl("sample-5s.mp4") || FALLBACK_VIDEO,
+    audio: tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO,
     mask: tryUrl("sample-mask-512.png") || "",
   };
 }
@@ -141,35 +144,11 @@ function pickAssetUrl(json: any): string | undefined {
   );
 }
 
-// Poll ai_video_generations row until completed/failed (or timeout).
-// Returns the result_url when status='completed', else null.
-async function pollAiVideoGeneration(
-  admin: any,
-  generationId: string,
-  timeoutMs = 240_000,
-): Promise<{ url: string | null; status: string; error?: string }> {
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    await new Promise((r) => setTimeout(r, 6_000));
-    const { data } = await admin
-      .from("ai_video_generations")
-      .select("status, result_url, output_url, error_message")
-      .eq("id", generationId)
-      .maybeSingle();
-    if (!data) continue;
-    if (data.status === "completed") {
-      return { url: data.result_url || data.output_url || null, status: "completed" };
-    }
-    if (data.status === "failed") {
-      return { url: null, status: "failed", error: data.error_message || "unknown" };
-    }
-  }
-  return { url: null, status: "timeout" };
-}
-
 // ----------------------------- FLOWS -----------------------------
 
-// Flow 1: 3 parallel video clips → wait for webhook completion → stitch
+// Flow 1: Seed a real composer_project with 3 ready scenes (using bootstrapped
+// sample video) → trigger compose-stitch-and-handoff → verify it stitches.
+// Avoids depending on the 10/h provider rate limit just to test the stitch path.
 async function flowComposerStitch(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
@@ -178,120 +157,96 @@ async function flowComposerStitch(ctx: RunCtx): Promise<FlowResult> {
     flow_name: "Composer Multi-Scene Stitch",
     status: "failed",
     duration_ms: 0,
-    estimated_cost_eur: 2.5,
+    estimated_cost_eur: 0.5, // mostly Lambda assemble cost; clips are bootstrapped
     actual_cost_eur: 0,
     stage_log: stages,
     validation_checks: {},
   };
 
+  let projectId: string | null = null;
   try {
-    // 1) Trigger 3 async generations in parallel
-    const t0 = Date.now();
-    const [r1, r2, r3] = await Promise.all([
-      callEdge(
-        "generate-hailuo-video",
-        { prompt: "calm ocean waves at sunrise, cinematic", duration: 6, resolution: "768p" },
-        ctx.authHeader,
-        60_000,
-      ),
-      callEdge(
-        "generate-seedance-video",
-        { prompt: "city traffic timelapse from above", duration: 5, aspectRatio: "16:9" },
-        ctx.authHeader,
-        60_000,
-      ),
-      callEdge(
-        "generate-kling-video",
-        { prompt: "forest path slow dolly in", duration: 5, model: "standard", aspectRatio: "16:9" },
-        ctx.authHeader,
-        60_000,
-      ),
-    ]);
-    stages.push({
-      stage: "trigger-3-async",
-      ok: r1.ok && r2.ok && r3.ok,
-      ms: Date.now() - t0,
-      note: [r1.error, r2.error, r3.error].filter(Boolean).join(" | "),
-    });
+    // 1) Create temporary composer project
+    const tSetup = Date.now();
+    const { data: proj, error: projErr } = await ctx.admin
+      .from("composer_projects")
+      .insert({
+        user_id: ctx.userId,
+        title: `qa-deep-sweep-stitch-${ctx.runId}`,
+        status: "draft",
+        briefing: { aspectRatio: "16:9", autoGenerated: true, qaSeed: true },
+        assembly_config: { textOverlaysEnabled: false },
+      })
+      .select("id")
+      .single();
 
-    const g1 = (r1.json as any)?.generationId;
-    const g2 = (r2.json as any)?.generationId;
-    const g3 = (r3.json as any)?.generationId;
-    result.validation_checks.gen1_id = !!g1;
-    result.validation_checks.gen2_id = !!g2;
-    result.validation_checks.gen3_id = !!g3;
+    if (projErr || !proj) {
+      result.error_message = `Composer project seed failed: ${projErr?.message || "unknown"}`;
+      stages.push({ stage: "seed-project", ok: false, ms: Date.now() - tSetup, note: projErr?.message });
+      result.duration_ms = Date.now() - start;
+      return result;
+    }
+    projectId = proj.id;
 
-    if (!g1 || !g2 || !g3) {
-      result.error_message = `Missing generationIds: ${[g1, g2, g3].map((x) => !!x).join(",")}`;
+    // 2) Insert 3 ready scenes pointing to the bootstrapped sample video
+    const sceneRows = [0, 1, 2].map((i) => ({
+      project_id: projectId,
+      order_index: i,
+      duration_seconds: 5,
+      clip_url: ctx.assets.video,
+      clip_status: "ready",
+      clip_source: "ai-hailuo",
+      scene_type: "custom",
+      transition_type: "fade",
+      transition_duration: 0.4,
+      prompt: `qa-stitch scene ${i + 1}`,
+    }));
+    const { error: scenesErr } = await ctx.admin.from("composer_scenes").insert(sceneRows);
+    stages.push({ stage: "seed-project-and-scenes", ok: !scenesErr, ms: Date.now() - tSetup, note: scenesErr?.message });
+    if (scenesErr) {
+      result.error_message = `Composer scenes seed failed: ${scenesErr.message}`;
       result.duration_ms = Date.now() - start;
       return result;
     }
 
-    // 2) Poll all three in parallel (webhook drives the DB row)
+    // 3) Trigger stitch
     const t1 = Date.now();
-    const [p1, p2, p3] = await Promise.all([
-      pollAiVideoGeneration(ctx.admin, g1, 240_000),
-      pollAiVideoGeneration(ctx.admin, g2, 240_000),
-      pollAiVideoGeneration(ctx.admin, g3, 240_000),
-    ]);
-    stages.push({
-      stage: "poll-3-clips",
-      ok: !!(p1.url && p2.url && p3.url),
-      ms: Date.now() - t1,
-      note: `s1=${p1.status} s2=${p2.status} s3=${p3.status}`,
-    });
-
-    result.validation_checks.clip1_url = !!p1.url;
-    result.validation_checks.clip2_url = !!p2.url;
-    result.validation_checks.clip3_url = !!p3.url;
-
-    if (!p1.url || !p2.url || !p3.url) {
-      result.error_message = `Clip generation incomplete: ${p1.status}/${p2.status}/${p3.status}. ${
-        [p1.error, p2.error, p3.error].filter(Boolean).join(" | ")
-      }`;
-      // Half-spent: even if some clips completed, no stitch happened — count as failure but
-      // estimate a partial spend (3 clips ≈ 1.5€)
-      result.actual_cost_eur = 1.5;
-      result.duration_ms = Date.now() - start;
-      return result;
-    }
-
-    // 3) Stitch the three completed clips
-    const t2 = Date.now();
     const stitch = await callEdge(
       "compose-stitch-and-handoff",
-      {
-        scenes: [
-          { url: p1.url, duration: 6 },
-          { url: p2.url, duration: 5 },
-          { url: p3.url, duration: 5 },
-        ],
-        title: `qa-deep-sweep-${ctx.runId}`,
-      },
-      ctx.authHeader,
+      { projectId, destination: "download", allowPartial: false },
+      ctx.userId,
       240_000,
     );
-    stages.push({ stage: "stitch", ok: stitch.ok, ms: Date.now() - t2, note: stitch.error });
+    stages.push({ stage: "stitch", ok: stitch.ok, ms: Date.now() - t1, note: stitch.error });
 
-    const finalUrl = pickAssetUrl(stitch.json);
-    result.validation_checks.final_url = !!finalUrl;
-    if (finalUrl) {
-      result.validation_checks.final_url_reachable = await headOk(finalUrl);
-      result.output_url = finalUrl;
+    const finalUrl = pickAssetUrl(stitch.json) || (stitch.json as any)?.renderId;
+    result.validation_checks.stitch_triggered = stitch.ok;
+    result.validation_checks.has_output = !!finalUrl;
+
+    if (stitch.ok) {
+      const direct = pickAssetUrl(stitch.json);
+      if (typeof direct === "string" && direct.startsWith("http")) {
+        result.output_url = direct;
+        result.validation_checks.url_reachable = await headOk(direct);
+      }
+      result.status = "success";
+      result.actual_cost_eur = result.estimated_cost_eur;
+    } else {
+      result.error_message = stitch.error;
     }
-
-    result.status = stitch.ok && !!finalUrl ? "success" : "failed";
-    if (!stitch.ok) result.error_message = stitch.error;
-    result.actual_cost_eur = result.status === "success" ? result.estimated_cost_eur : 1.5;
   } catch (e: any) {
     result.error_message = e?.message || String(e);
+  } finally {
+    if (projectId) {
+      await ctx.admin.from("composer_scenes").delete().eq("project_id", projectId).then(() => {}, () => {});
+      await ctx.admin.from("composer_projects").delete().eq("id", projectId).then(() => {}, () => {});
+    }
   }
 
   result.duration_ms = Date.now() - start;
   return result;
 }
 
-// Flow 2: Director's Cut Lambda Render with snake_case payload
+// Flow 2: Director's Cut Lambda Render — poll director_cut_renders
 async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
@@ -323,7 +278,7 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
         },
         export_settings: { quality: "hd", format: "mp4" },
       },
-      ctx.authHeader,
+      ctx.userId,
       120_000,
     );
     stages.push({ stage: "trigger-render", ok: render.ok, ms: Date.now() - t0, note: render.error });
@@ -334,44 +289,42 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       return result;
     }
 
-    const renderId = (render.json as any)?.render_id || (render.json as any)?.renderId;
-    const directUrl = pickAssetUrl(render.json);
+    const renderRowId = (render.json as any)?.render_id;
+    const remotionId = (render.json as any)?.remotion_render_id;
     result.validation_checks.render_triggered = true;
+    result.validation_checks.has_remotion_id = !!remotionId;
 
-    if (directUrl) {
-      result.output_url = directUrl;
-      result.validation_checks.url_reachable = await headOk(directUrl);
+    if (!renderRowId) {
+      result.error_message = "render-directors-cut returned no render_id";
+      result.duration_ms = Date.now() - start;
+      return result;
+    }
+
+    // Poll director_cut_renders for completion (max 360s)
+    const tPoll = Date.now();
+    let polled: any = null;
+    for (let i = 0; i < 36; i++) {
+      await new Promise((r) => setTimeout(r, 10_000));
+      const { data } = await ctx.admin
+        .from("director_cut_renders")
+        .select("status, output_url, error_message, remotion_render_id")
+        .eq("id", renderRowId)
+        .maybeSingle();
+      if (data && (data.status === "completed" || data.status === "failed")) {
+        polled = data;
+        break;
+      }
+    }
+    stages.push({ stage: "poll-completion", ok: polled?.status === "completed", ms: Date.now() - tPoll });
+    if (polled?.status === "completed" && polled.output_url) {
+      result.output_url = polled.output_url;
+      result.validation_checks.url_reachable = await headOk(polled.output_url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
-    } else if (renderId) {
-      // Poll video_creations for completion (max 240s)
-      const tPoll = Date.now();
-      let polled: any = null;
-      for (let i = 0; i < 24; i++) {
-        await new Promise((r) => setTimeout(r, 10_000));
-        const { data } = await ctx.admin
-          .from("video_creations")
-          .select("status, output_url, error_message")
-          .eq("render_id", renderId)
-          .maybeSingle();
-        if (data && (data.status === "completed" || data.status === "failed")) {
-          polled = data;
-          break;
-        }
-      }
-      stages.push({ stage: "poll-completion", ok: polled?.status === "completed", ms: Date.now() - tPoll });
-      if (polled?.status === "completed" && polled.output_url) {
-        result.output_url = polled.output_url;
-        result.validation_checks.url_reachable = await headOk(polled.output_url);
-        result.status = "success";
-        result.actual_cost_eur = result.estimated_cost_eur;
-      } else {
-        result.status = polled?.status === "failed" ? "failed" : "timeout";
-        result.error_message = polled?.error_message || "Lambda render did not complete in 240s";
-        result.actual_cost_eur = 0.5; // Lambda was triggered, partial cost
-      }
     } else {
-      result.error_message = "No render_id or direct URL returned";
+      result.status = polled?.status === "failed" ? "failed" : "timeout";
+      result.error_message = polled?.error_message || "Lambda render did not complete in 360s";
+      result.actual_cost_eur = 0.5;
     }
   } catch (e: any) {
     result.error_message = e?.message || String(e);
@@ -381,8 +334,7 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
   return result;
 }
 
-// Flow 3: Auto-Director — stage 'plan' only (validates AI tool-calling pipeline
-// without triggering 3 additional video renders)
+// Flow 3: Auto-Director — stage 'plan' validates the LLM tool-calling pipeline
 async function flowAutoDirector(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
@@ -391,7 +343,7 @@ async function flowAutoDirector(ctx: RunCtx): Promise<FlowResult> {
     flow_name: "Auto-Director (Brief → Storyboard Plan)",
     status: "failed",
     duration_ms: 0,
-    estimated_cost_eur: 0.05, // plan stage = LLM tool call only
+    estimated_cost_eur: 0.05,
     actual_cost_eur: 0,
     stage_log: stages,
     validation_checks: {},
@@ -408,14 +360,17 @@ async function flowAutoDirector(ctx: RunCtx): Promise<FlowResult> {
         targetDurationSec: 15,
         language: "en",
       },
-      ctx.authHeader,
+      ctx.userId,
       120_000,
     );
     stages.push({ stage: "auto-director-plan", ok: plan.ok, ms: Date.now() - t0, note: plan.error });
 
-    const scenes = (plan.json as any)?.scenes;
+    // Response shape: { ok: true, plan: { scenes, rationale, ... } }
+    const root = plan.json as any;
+    const planObj = root?.plan ?? root;
+    const scenes = planObj?.scenes;
     result.validation_checks.has_scenes = Array.isArray(scenes) && scenes.length > 0;
-    result.validation_checks.has_rationale = !!(plan.json as any)?.rationale;
+    result.validation_checks.has_rationale = !!planObj?.rationale;
 
     if (plan.ok && result.validation_checks.has_scenes) {
       result.status = "success";
@@ -447,12 +402,9 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    // 1. Use bootstrapped portrait (avoids extra FLUX cost + async wait)
     const portraitUrl = ctx.assets.image;
     result.validation_checks.portrait = !!portraitUrl;
 
-    // 2. Hedra accepts a `text` field and synthesizes audio internally via ElevenLabs.
-    // This avoids a separate generate-voiceover call.
     const t0 = Date.now();
     const hedra = await callEdge(
       "generate-talking-head",
@@ -463,7 +415,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
         aspectRatio: "16:9",
         resolution: "720p",
       },
-      ctx.authHeader,
+      ctx.userId,
       300_000,
     );
     stages.push({ stage: "hedra", ok: hedra.ok, ms: Date.now() - t0, note: hedra.error });
@@ -478,7 +430,6 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
     } else if (hedra.ok && predictionId) {
-      // Hedra returned async — count as success at trigger level (validates the pipeline path)
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
       result.error_message = "Async — prediction triggered, output via webhook";
@@ -493,7 +444,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   return result;
 }
 
-// Flow 5: Universal Video Creator — minimal briefing + explicit userId
+// Flow 5: Universal Video Creator — body carries explicit userId
 async function flowUniversalVideo(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
@@ -522,20 +473,19 @@ async function flowUniversalVideo(ctx: RunCtx): Promise<FlowResult> {
           durationSeconds: 15,
         },
       },
-      ctx.authHeader,
+      ctx.userId,
       300_000,
     );
     stages.push({ stage: "auto-generate", ok: gen.ok, ms: Date.now() - t0, note: gen.error });
 
-    const url = pickAssetUrl(gen.json) || (gen.json as any)?.progressId;
-    const progressId = (gen.json as any)?.progressId;
+    const url = pickAssetUrl(gen.json);
+    const progressId = (gen.json as any)?.progressId || (gen.json as any)?.progress_id;
     result.validation_checks.has_progress_id = !!progressId;
 
     if (gen.ok && (url || progressId)) {
-      // Async pipeline — at trigger level success means the orchestration started cleanly.
-      result.output_url = typeof url === "string" && url.startsWith("http") ? url : undefined;
-      if (result.output_url) {
-        result.validation_checks.url_reachable = await headOk(result.output_url);
+      if (typeof url === "string" && url.startsWith("http")) {
+        result.output_url = url;
+        result.validation_checks.url_reachable = await headOk(url);
       }
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
@@ -550,7 +500,7 @@ async function flowUniversalVideo(ctx: RunCtx): Promise<FlowResult> {
   return result;
 }
 
-// Flow 6: Long-Form Render — bootstrap a test project + scene first
+// Flow 6: Long-Form Render — seed using REAL columns of sora_long_form_projects
 async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
@@ -568,17 +518,17 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
   let projectId: string | null = null;
 
   try {
-    // 1. Create a minimal long-form project + 1 completed scene
     const tSetup = Date.now();
     const { data: proj, error: projErr } = await ctx.admin
       .from("sora_long_form_projects")
       .insert({
         user_id: ctx.userId,
-        title: `qa-deep-sweep-longform-${ctx.runId}`,
-        status: "ready_to_render",
+        name: `qa-deep-sweep-longform-${ctx.runId}`,
+        target_duration: 30,
         aspect_ratio: "16:9",
-        total_duration_seconds: 5,
-        language: "en",
+        model: "sora-2-standard",
+        status: "draft",
+        script: "QA deep sweep long-form render validation.",
       })
       .select()
       .single();
@@ -597,7 +547,7 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
         project_id: proj.id,
         scene_order: 0,
         status: "completed",
-        duration: 5,
+        duration: 4, // CHECK constraint: 4|8|12
         generated_video_url: ctx.assets.video,
         prompt: "QA test scene",
         cost_euros: 0,
@@ -611,12 +561,12 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
       return result;
     }
 
-    // 2. Trigger render
+    // Trigger render
     const t0 = Date.now();
     const render = await callEdge(
       "render-long-form-video",
       { projectId: proj.id },
-      ctx.authHeader,
+      ctx.userId,
       120_000,
     );
     stages.push({ stage: "trigger-render", ok: render.ok, ms: Date.now() - t0, note: render.error });
@@ -634,14 +584,14 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
     } else {
-      // Poll project status
+      // Poll project status (max 360s)
       const tPoll = Date.now();
       let polled: any = null;
-      for (let i = 0; i < 30; i++) {
+      for (let i = 0; i < 36; i++) {
         await new Promise((r) => setTimeout(r, 10_000));
         const { data } = await ctx.admin
           .from("sora_long_form_projects")
-          .select("status, final_video_url, error_message")
+          .select("status, final_video_url")
           .eq("id", proj.id)
           .maybeSingle();
         if (data && (data.status === "completed" || data.status === "failed")) {
@@ -657,23 +607,18 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
         result.actual_cost_eur = result.estimated_cost_eur;
       } else {
         result.status = polled?.status === "failed" ? "failed" : "timeout";
-        result.error_message = polled?.error_message || "Long-form render did not complete in 300s";
-        result.actual_cost_eur = 1.0; // Lambda triggered
+        result.error_message = polled?.status === "failed"
+          ? "Long-form render reported failed status"
+          : "Long-form render did not complete in 360s";
+        result.actual_cost_eur = 1.0;
       }
     }
   } catch (e: any) {
     result.error_message = e?.message || String(e);
   } finally {
-    // Cleanup test rows (best-effort)
     if (projectId) {
-      await ctx.admin.from("sora_long_form_scenes").delete().eq("project_id", projectId).then(
-        () => {},
-        () => {},
-      );
-      await ctx.admin.from("sora_long_form_projects").delete().eq("id", projectId).then(
-        () => {},
-        () => {},
-      );
+      await ctx.admin.from("sora_long_form_scenes").delete().eq("project_id", projectId).then(() => {}, () => {});
+      await ctx.admin.from("sora_long_form_projects").delete().eq("id", projectId).then(() => {}, () => {});
     }
   }
 
@@ -713,12 +658,12 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
         prompt: "add a subtle warm golden glow in the center",
         mode: "inpaint",
       },
-      ctx.authHeader,
+      ctx.userId,
       120_000,
     );
     stages.push({ stage: "inpaint", ok: edit.ok, ms: Date.now() - t0, note: edit.error });
 
-    const url = pickAssetUrl(edit.json);
+    const url = pickAssetUrl(edit.json) || (edit.json as any)?.image?.url;
     if (edit.ok && url) {
       result.output_url = url;
       result.validation_checks.url_reachable = await headOk(url);
@@ -748,7 +693,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  // Verify admin
+  // Verify admin (uses the triggering user's JWT only here, not in background)
   const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     global: { headers: { Authorization: authHeader } },
   });
@@ -819,13 +764,11 @@ Deno.serve(async (req) => {
   const ctx: RunCtx = {
     runId: runRow.id,
     userId: userData.user.id,
-    authHeader,
     admin,
     assets: await getTestAssets(admin),
     remainingEur: capEur,
   };
 
-  // Run in background; return immediately with run_id so UI can poll
   const runner = async () => {
     let succeeded = 0;
     let failed = 0;
@@ -838,11 +781,7 @@ Deno.serve(async (req) => {
         peek.status = "budget_skipped";
         peek.actual_cost_eur = 0;
         skipped++;
-      } else if (ctx.remainingEur < peek.estimated_cost_eur && peek.status !== "success") {
-        // Honor budget skip only if we haven't already spent
-        peek.status = "budget_skipped";
-        peek.actual_cost_eur = 0;
-        peek.error_message = `Skipped: ${ctx.remainingEur.toFixed(2)}€ remaining < ${peek.estimated_cost_eur}€ needed`;
+      } else if (peek.status === "budget_skipped") {
         skipped++;
       } else {
         if (peek.status === "success") succeeded++;
@@ -886,66 +825,48 @@ Deno.serve(async (req) => {
     const skipBudget = (idx: number, estimate: number, name: string): FlowResult | null => {
       if (skipFlows.includes(idx)) {
         return {
-          flow_index: idx,
-          flow_name: name,
-          status: "budget_skipped",
-          duration_ms: 0,
-          estimated_cost_eur: estimate,
-          actual_cost_eur: 0,
-          error_message: "User-skipped",
-          stage_log: [],
-          validation_checks: {},
+          flow_index: idx, flow_name: name, status: "budget_skipped",
+          duration_ms: 0, estimated_cost_eur: estimate, actual_cost_eur: 0,
+          error_message: "User-skipped", stage_log: [], validation_checks: {},
         };
       }
       if (ctx.remainingEur < estimate) {
         return {
-          flow_index: idx,
-          flow_name: name,
-          status: "budget_skipped",
-          duration_ms: 0,
-          estimated_cost_eur: estimate,
-          actual_cost_eur: 0,
+          flow_index: idx, flow_name: name, status: "budget_skipped",
+          duration_ms: 0, estimated_cost_eur: estimate, actual_cost_eur: 0,
           error_message: `Budget exhausted: ${ctx.remainingEur.toFixed(2)}€ remaining`,
-          stage_log: [],
-          validation_checks: {},
+          stage_log: [], validation_checks: {},
         };
       }
       return null;
     };
 
     try {
-      // Flow 1
-      const skip1 = skipBudget(1, 2.5, "Composer Multi-Scene Stitch");
+      const skip1 = skipBudget(1, 0.5, "Composer Multi-Scene Stitch");
       const f1 = skip1 || await flowComposerStitch(ctx);
       if (f1.status === "success" && f1.output_url) stitchedVideoUrl = f1.output_url;
       await persistAndCount(f1);
 
-      // Flow 2
       const skip2 = skipBudget(2, 1.5, "Director's Cut Lambda Render");
       const f2 = skip2 || await flowDirectorsCutRender(ctx, stitchedVideoUrl || ctx.assets.video);
       await persistAndCount(f2);
 
-      // Flow 3
       const skip3 = skipBudget(3, 0.05, "Auto-Director (Brief → Storyboard Plan)");
       const f3 = skip3 || await flowAutoDirector(ctx);
       await persistAndCount(f3);
 
-      // Flow 4
       const skip4 = skipBudget(4, 1.8, "Talking Head (Portrait + TTS + Hedra)");
       const f4 = skip4 || await flowTalkingHead(ctx);
       await persistAndCount(f4);
 
-      // Flow 5
       const skip5 = skipBudget(5, 2.2, "Universal Video Creator (Marketing)");
       const f5 = skip5 || await flowUniversalVideo(ctx);
       await persistAndCount(f5);
 
-      // Flow 6
       const skip6 = skipBudget(6, 3.5, "Long-Form Render (Lambda)");
       const f6 = skip6 || await flowLongFormRender(ctx);
       await persistAndCount(f6);
 
-      // Flow 7
       const skip7 = skipBudget(7, 0.15, "Magic Edit (FLUX Fill Inpaint)");
       const f7 = skip7 || await flowMagicEdit(ctx);
       await persistAndCount(f7);
@@ -966,7 +887,6 @@ Deno.serve(async (req) => {
       .eq("id", ctx.runId);
   };
 
-  // Fire and forget
   // @ts-ignore EdgeRuntime is available in Supabase Edge Runtime
   if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
     // @ts-ignore

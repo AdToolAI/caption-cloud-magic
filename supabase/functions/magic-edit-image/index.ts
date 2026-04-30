@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id",
 };
 
 // Pricing per Magic Edit (≥30% margin over Replicate cost)
@@ -31,11 +32,6 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
-
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -44,13 +40,25 @@ serve(async (req) => {
       );
     }
 
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    let user: { id: string } | null = null;
+    const qaSvc = detectQaServiceAuth(req);
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[magic-edit] QA service-auth user=${user.id}`);
+    } else {
+      const supabaseClient = createClient(
+        Deno.env.get("SUPABASE_URL") ?? "",
+        Deno.env.get("SUPABASE_ANON_KEY") ?? ""
       );
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user: jwtUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !jwtUser) {
+        return new Response(
+          JSON.stringify({ error: "Unauthorized" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      user = jwtUser;
     }
 
     const supabaseAdmin = createClient(
