@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter, FlaskConical } from "lucide-react";
+import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter, FlaskConical, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { E2EResultsTab } from "@/components/admin/qa-cockpit/E2EResultsTab";
 import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
