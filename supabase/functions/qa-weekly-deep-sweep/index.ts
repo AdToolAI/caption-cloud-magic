@@ -140,25 +140,7 @@ async function triggerRenderWithBackoff<T = any>(
   userId: string,
   timeoutMs = 120_000,
 ): Promise<{ ok: boolean; json: T | null; error?: string; throttled: boolean; attempts: number }> {
-  const isThrottle = (msg?: string) => {
-    if (!msg) return false;
-    const m = msg.toLowerCase();
-    return (
-      m.includes("rate exceeded") ||
-      m.includes("concurrency limit") ||
-      m.includes("toomanyrequests") ||
-      m.includes("throttlingexception") ||
-      m.includes(" 429") ||
-      m.startsWith("429") ||
-      m.includes("http 429") ||
-      m.includes("rate_limit_exceeded") ||
-      m.includes("render-kapazität") ||
-      m.includes("render-kapazitat") ||
-      m.includes("vorübergehend erschöpft") ||
-      m.includes("vorubergehend erschopft") ||
-      m.includes("momentan werden viele videos")
-    );
-  };
+  const isThrottle = isLambdaThrottleMessage;
   const delays = [10_000, 20_000, 40_000];
   let lastErr: string | undefined;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
