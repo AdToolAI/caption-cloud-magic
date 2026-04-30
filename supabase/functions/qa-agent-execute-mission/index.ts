@@ -66,8 +66,19 @@ Deno.serve(async (req) => {
     .select("pattern_regex, severity_when_matched, reason");
   const muted: MutedPattern[] = (mutedRows ?? []) as MutedPattern[];
 
+  let mutedDrops = 0;
   const insertBug = async (payload: Record<string, unknown>) => {
     try {
+      // Pre-insert mute filter: drop any bug whose title or description matches an "ignore" pattern.
+      const titleStr = String(payload.title ?? "");
+      const descStr = String(payload.description ?? "");
+      const combined = `${titleStr}\n${descStr}`;
+      const mute = matchMuted(combined, muted);
+      if (mute?.severity_when_matched === "ignore") {
+        mutedDrops++;
+        console.log("[execute-mission] muted bug dropped:", titleStr.slice(0, 80), "reason:", mute.reason ?? "(no reason)");
+        return;
+      }
       const safe = {
         ...payload,
         description: payload.description ?? "(no description — see metadata)",
