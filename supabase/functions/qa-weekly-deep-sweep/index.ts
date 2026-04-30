@@ -389,7 +389,7 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       result.actual_cost_eur = result.estimated_cost_eur;
     } else {
       result.status = polled?.status === "failed" ? "failed" : "timeout";
-      result.error_message = polled?.error_message || "Lambda render did not complete in 360s";
+      result.error_message = polled?.error_message || "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
       result.actual_cost_eur = 0.5;
     }
   } catch (e: any) {
