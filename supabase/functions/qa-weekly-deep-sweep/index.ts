@@ -103,6 +103,45 @@ async function callEdge<T = any>(
   }
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Lambda-throttle-aware retry: wraps callEdge and retries on AWS rate-limit /
+// concurrency errors with exponential backoff (10s → 20s → 40s).
+// Returns { ok, json, error, throttled } so the flow can label the run as
+// "timeout" (infrastructure issue) instead of "failed" (bug) when applicable.
+async function triggerRenderWithBackoff<T = any>(
+  fn: string,
+  body: Record<string, unknown>,
+  userId: string,
+  timeoutMs = 120_000,
+): Promise<{ ok: boolean; json: T | null; error?: string; throttled: boolean; attempts: number }> {
+  const isThrottle = (msg?: string) => {
+    if (!msg) return false;
+    const m = msg.toLowerCase();
+    return (
+      m.includes("rate exceeded") ||
+      m.includes("concurrency limit") ||
+      m.includes("toomanyrequests") ||
+      m.includes("throttlingexception") ||
+      m.includes(" 429")
+    );
+  };
+  const delays = [10_000, 20_000, 40_000];
+  let lastErr: string | undefined;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    const res = await callEdge<T>(fn, body, userId, timeoutMs);
+    if (res.ok) return { ok: true, json: res.json, throttled: false, attempts: attempt + 1 };
+    lastErr = res.error;
+    if (!isThrottle(res.error)) {
+      return { ok: false, json: res.json, error: res.error, throttled: false, attempts: attempt + 1 };
+    }
+    if (attempt === delays.length) break;
+    console.log(`[deep-sweep] ${fn} throttled (attempt ${attempt + 1}); waiting ${delays[attempt]}ms`);
+    await sleep(delays[attempt]);
+  }
+  return { ok: false, json: null, error: lastErr, throttled: true, attempts: delays.length + 1 };
+}
+
 async function headOk(url: string, timeoutMs = 10_000): Promise<boolean> {
   try {
     const ctrl = new AbortController();
