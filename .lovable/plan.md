@@ -1,62 +1,32 @@
-## Diagnose
+Ich habe die aktuellen Fehlruns geprüft. Die neuen Timeouts passieren nicht mehr wegen zu vieler Missions-Schritte. Alle betroffenen Missionen haben bereits nur 3 Schritte. Der entscheidende Hinweis ist: `duration_ms` liegt nur bei ca. 650–850 ms, `heartbeats: []`, `0 paths`. Das bedeutet: Browserless bricht ab, bevor unser Skript überhaupt startet.
 
-**Status der QA-Inbox**: 73 Bugs total, 64 resolved (88%), **9 offen**:
+Ursache: In `browserlessClient.ts` wurde der Browserless-`timeout` Query-Parameter zuletzt fälschlich von Millisekunden in Sekunden umgerechnet. Die aktuelle Browserless-Dokumentation sagt jedoch: REST-API-Timeouts sind in Millisekunden. Dadurch schicken wir aktuell `timeout=30` statt `timeout=30000`, was praktisch ein 30-ms-Limit ist. Deshalb kommen sofort 408-Timeouts, obwohl die Mission kurz ist.
 
-| # | Mission | Severity | Ursache |
-|---|---|---|---|
-| 3 | smoke-01, smoke-02-mock, smoke-02-secondary | high | Browserless 408 — Missionen zu lang (6 navigates × ~5s + Login = >30s) |
-| 1 | smoke-02-picture-studio-mock | (Teil oben) | Step 4 `expect_visible "Generate"` — i18n-Drift (DE-UI zeigt "Generieren") |
-| 2 | smoke-09, smoke-10 | medium | 404 auf `/icon-192.png` (PWA-Manifest verweist auf nicht existierende Datei) |
-| 2 | smoke-09, smoke-10 | low | 406 auf `companion_user_preferences` (RLS/Header-Issue) |
-| 1 | smoke-10-brand-characters | low | 406 als zusätzlicher Console-Spam |
+Plan zur Behebung:
 
-`avg_pass_ms = null` über 28 Runs in 7 Tagen heißt: **0 grüne Runs** seit Deploy. Der Sekunden-Fix in `browserlessClient.ts` greift, aber die langen Missionen sind weiterhin strukturell zu groß.
+1. Browserless Timeout-Parameter korrigieren
+   - In `supabase/functions/_shared/browserlessClient.ts` den `timeout` Query-Parameter wieder in Millisekunden übergeben.
+   - `SERVER_TIMEOUT_SEC` entfernen/ersetzen durch `SERVER_TIMEOUT_MS` im Request.
+   - Kommentar und Fehlermeldung korrigieren, damit dort nicht mehr fälschlich steht, Browserless erwarte Sekunden.
+   - User-facing Hinweis weiterhin klar halten: Hobby-safe 30s, optional 60s über `BROWSERLESS_SERVER_TIMEOUT_MS`.
 
-## Lösung
+2. Diagnose verbessern
+   - Wenn Browserless 408 innerhalb von <2s zurückkommt und keine Heartbeats vorhanden sind, soll die Fehlermeldung künftig explizit auf einen externen Browserless-Konfigurations-/Timeout-Startfehler hinweisen statt auf „zu viele Schritte“.
+   - Das verhindert, dass wir künftig wieder Missionsinhalt optimieren, obwohl der Request gar nicht gestartet wurde.
 
-### Fix 1 — Lange Tour-Missionen splitten (DB-Migration)
+3. Edge Function neu deployen und testen
+   - `qa-agent-execute-mission` deployen, weil sie den Shared-Client nutzt.
+   - Optional zusätzlich prüfen, ob ein Deploy der Shared-Änderung automatisch greift; falls nicht, die abhängige Funktion explizit deployen.
+   - Danach eine der fehlgeschlagenen 3-Step-Missionen manuell gegen Browserless testen.
 
-`smoke-01-dashboard-tour` und `smoke-02-secondary-tour` von 6 auf **3 navigates** reduzieren. Die jeweils gestrichenen 3 Routen wandern in zwei neue Missionen:
+4. Daten bereinigen
+   - Die zwei aktuell offenen 408-Bugs (`smoke-01b-creator-tour`, `smoke-02b-tertiary-tour`) als resolved markieren, wenn der Test grün läuft.
+   - Den alten `smoke-02-picture-studio-mock` Run hatte noch `steps_total: 5`, also war er vor der Missionsoptimierung gestartet; bei Bedarf ebenfalls neu starten und alte 408-Meldung bereinigen.
 
-- `smoke-01-dashboard-tour`: `/dashboard`, `/picture-studio`, `/ai-video-toolkit` (3 Steps)
-- `smoke-01b-creator-tour` (neu): `/video-composer`, `/universal-directors-cut`, `/autopilot` (3 Steps)
-- `smoke-02-secondary-tour`: `/calendar`, `/music-studio`, `/marketplace` (3 Steps)
-- `smoke-02b-tertiary-tour` (neu): `/avatars`, `/brand-characters`, `/news-hub` (3 Steps)
+5. Memory/Regel aktualisieren
+   - Die QA-Agent-Memory ergänzen: Browserless REST `timeout` ist Millisekunden; frühe 408s mit `duration_ms < 2000` und `heartbeats: []` bedeuten Request-Start/Timeout-Konfiguration, nicht Missions-Komplexität.
 
-Drei navigates × ~5s + Login ~7s = ~22s, sicher unter 30s-Cap.
-
-### Fix 2 — `smoke-02-picture-studio-mock` i18n-Drift (DB-Migration)
-
-Step 4 `expect_visible "Generate"` durch language-neutrale Assertion ersetzen, z.B. `expect_visible "Picture"` (Header bleibt EN) oder einen Selector. Wir wählen den stabileren Header-Check und entfernen den redundanten zweiten `expect_no_console_error` — bringt die Mission auf 4 Steps.
-
-### Fix 3 — `/icon-192.png` 404 beheben (zwei Optionen)
-
-Prüfen: `public/manifest.json` referenziert vermutlich `/icon-192.png` und `/icon-512.png`, die fehlen. Zwei Wege:
-- **A (sauber)**: Pattern zur `qa_muted_patterns`-Tabelle hinzufügen, da PWA-Icons für die App-Funktion irrelevant sind. Schnell, kein Asset-Aufwand.
-- **B (richtig)**: Manifest-Einträge für fehlende Icons rauswerfen oder Platzhalter-Icons einchecken.
-
-Empfehlung: **B** — Manifest aufräumen (Quelle des Bugs entfernen, nicht muten). Wenn nur 1-2 Größen wirklich fehlen, einfache PNG-Platzhalter in `public/` legen oder die Einträge im Manifest entfernen.
-
-### Fix 4 — `companion_user_preferences` 406 fixen
-
-406 von PostgREST = Accept-Header- oder RLS-Mismatch. Wahrscheinlich `.single()` Query, die 0 Rows zurückbekommt (ohne `.maybeSingle()`). Code-Suche nach `companion_user_preferences` → `.single()` durch `.maybeSingle()` ersetzen. Falls kein App-Code ihn wirklich braucht und nur ein Hook ihn lädt, dort defensiv handhaben.
-
-### Fix 5 — Bug-Inbox bereinigen (DB-Update)
-
-Alle 9 offenen Bugs nach den Fixes auf `resolved` setzen (sie würden beim nächsten grünen Run via auto-resolve-Sweep ohnehin verschwinden, aber wir räumen jetzt auf).
-
-## Files
-
-- `supabase/migrations/<new>.sql` — smoke-01/02 splitten + smoke-02-mock Step-Fix + zwei neue Missionen
-- (Daten-Updates via insert tool, nicht Migration: `qa_bug_reports.status='resolved'`)
-- `public/manifest.json` — fehlende Icons rauswerfen ODER `public/icon-192.png` + `icon-512.png` als Platzhalter ergänzen
-- Code-Suche `companion_user_preferences` → `.single()` → `.maybeSingle()` in betroffenem Hook
-- Memory-Update: `mem://features/qa-agent/false-positive-hardening` um "Tour-Missionen max 3 navigates"-Regel ergänzen
-
-## Erwartetes Ergebnis
-
-- 4 grüne Tour-Missionen (smoke-01, smoke-01b, smoke-02-secondary, smoke-02b) statt 2 dauerhaft roten
-- smoke-02-picture-studio-mock grün (i18n-stabil)
-- smoke-09/10 ohne 404/406-Console-Spam → keine neuen Bugs auf folgenden Runs
-- Bug-Inbox: **0 offene** Bugs nach den Fixes
-- Pass-Rate: von aktuell ~14% (4/28) auf >85% in den nächsten 7 Tagen
+Erwartetes Ergebnis:
+- Die Missionen starten wieder wirklich im Browser.
+- `pathResults`/Heartbeats erscheinen wieder.
+- Falls danach noch Fehler kommen, sind es echte UI-/Auth-/Netzwerk-Bugs statt der aktuellen künstlichen 30-ms-Timeouts.
