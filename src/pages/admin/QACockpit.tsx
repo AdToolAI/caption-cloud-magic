@@ -1,4 +1,4 @@
-import { useState, forwardRef } from "react";
+import { useState, forwardRef, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -949,9 +949,13 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function FilterPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+const FilterPill = forwardRef<
+  HTMLButtonElement,
+  { active: boolean; onClick: () => void; children: ReactNode }
+>(({ active, onClick, children }, ref) => {
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
@@ -963,4 +967,5 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
       {children}
     </button>
   );
-}
+});
+FilterPill.displayName = "FilterPill";

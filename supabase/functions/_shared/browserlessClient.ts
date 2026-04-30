@@ -450,7 +450,7 @@ export default async ({ page, context }) => {
           await h.click({ clickCount: 3 });
           await h.type(String(step.value), { delay: 10 });
         }
-        else if (step.type === 'wait_for' || step.type === 'wait_selector') {
+        else if (step.type === 'wait_for' || step.type === 'wait_selector' || step.type === 'wait_for_selector' || step.type === 'waitForSelector' || step.type === 'wait') {
           await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms || 10000) });
         }
         else if (step.type === 'expect_visible') {
