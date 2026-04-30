@@ -165,6 +165,20 @@ export function DeepSweepTab() {
     }
   };
 
+  const [bootstrapping, setBootstrapping] = useState(false);
+  const runBootstrap = async () => {
+    setBootstrapping(true);
+    try {
+      const { error } = await supabase.functions.invoke("qa-live-sweep-bootstrap", {});
+      if (error) throw error;
+      toast.success("QA-Test-Assets aktualisiert. Beim nächsten Run sollte Magic Edit grün werden.");
+    } catch (e: any) {
+      toast.error(`Bootstrap failed: ${e?.message ?? String(e)}`);
+    } finally {
+      setBootstrapping(false);
+    }
+  };
+
   const passRate = latestRun && latestRun.flows_total > 0
     ? Math.round((latestRun.flows_succeeded / latestRun.flows_total) * 100)
     : 0;
@@ -317,6 +331,24 @@ export function DeepSweepTab() {
                       {(flow.duration_ms / 1000).toFixed(1)}s · {Number(flow.actual_cost_eur).toFixed(2)} €
                     </p>
                   )}
+                  {flow?.flow_index === 7 &&
+                    flow?.status === "budget_skipped" &&
+                    flow?.error_message?.includes("Bootstrap Assets") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-1.5 h-7 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                        disabled={bootstrapping}
+                        onClick={runBootstrap}
+                      >
+                        {bootstrapping ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                        )}
+                        Bootstrap jetzt ausführen
+                      </Button>
+                    )}
                 </div>
                 {flow?.output_url && (
                   <a
