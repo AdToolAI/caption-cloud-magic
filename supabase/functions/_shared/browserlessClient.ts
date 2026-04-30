@@ -63,7 +63,7 @@ export async function runBrowserlessFunction(
     // errors and triggering false-positive bug reports. Real third-party pixels
     // are filtered via `qa_muted_patterns` instead.
     const res = await fetch(
-      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}`,
+      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_SEC}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
