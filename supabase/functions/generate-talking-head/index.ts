@@ -119,9 +119,10 @@ async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Pr
 }
 
 // Create a video generation request → returns video_id
+// Uses talking_photo character + audio voice with direct URL (no audio asset upload needed)
 async function createHeyGenVideo(opts: {
   talkingPhotoId: string;
-  audioAssetId: string;
+  audioUrl: string;
   dimension: { width: number; height: number };
 }): Promise<string> {
   const body = {
@@ -133,7 +134,7 @@ async function createHeyGenVideo(opts: {
         },
         voice: {
           type: 'audio',
-          audio_asset_id: opts.audioAssetId,
+          audio_url: opts.audioUrl,
         },
       },
     ],
