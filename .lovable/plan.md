@@ -1,74 +1,78 @@
-## Deep Sweep v4 — Fix the 6 remaining failures
+## Deep Sweep v5 — fix the 3 remaining red rows
 
-I traced every red row in the screenshot to its exact root cause. Each is a small, isolated bug — no architectural change needed.
+Three independent, isolated bugs. None affect end users; all live in the QA pipeline (orchestrator + 2 edge functions called by it).
 
 ### Diagnosis
 
 | # | Flow | Real cause |
 |---|---|---|
-| 1 | Composer Stitch | Orchestrator inserts `prompt` into `composer_scenes`, but the column is named **`ai_prompt`**. Schema cache rejects the insert. |
-| 2 | Director's Cut Render | `render-directors-cut` validates the user JWT via `auth.getUser()` and has **no `detectQaServiceAuth` shortcut**, so the service-role call returns 401. |
-| 3 | Auto-Director | Same root cause as #2 — `auto-director-compose` lacks the QA service-auth shortcut → 401 UNAUTHORIZED. |
-| 4 | Talking Head (Hedra) | `hedra/character-3` **no longer exists on Replicate** (verified: `GET /v1/models/hedra/character-3` → 404 "Model not found"). Hedra was removed from Replicate's catalog. |
-| 6 | Long-Form Render | `render-long-form-video` calls `render-directors-cut` (or the same Lambda layer) internally and propagates the same 401. Same root cause as #2. |
-| 7 | Magic Edit (FLUX Fill) | The `qa-test-assets` bucket is **private** and contains only 3 files (no `sample-mask-512.png`). Replicate fetches the mask via public URL and gets 400. Bootstrap was never re-run after the mask logic was added. |
+| 1 | Composer Multi-Scene Stitch | `compose-stitch-and-handoff/index.ts` does **not** have the `detectQaServiceAuth` shortcut yet. It validates the JWT via `userClient.auth.getUser()` and the service-role token is rejected → `401 Unauthorized`. (We added the shortcut to the other long-running endpoints last round but missed this one.) |
+| 2 | Director's Cut Lambda Render | `render-directors-cut` payload uses snake_case `subtitle_track.clips[].start_time / end_time`, but the Remotion composition `DirectorsCutVideo.tsx` reads `clip.startTime / clip.endTime` (line 751-752). `undefined * fps = NaN` → `Math.floor(NaN) = NaN` → `<Sequence from={NaN}>` → Lambda crashes with the exact error in the screenshot. The render is *triggered* successfully (orchestrator says trigger ok), then Lambda dies during composition. |
+| 6 | Long-Form Render (Lambda) | `render-long-form-video` returns `Project not found` because the orchestrator's seeded scene has `status: 'completed'` and `cost_euros: 0` — that part is fine — but the function's project lookup uses the service-role admin client. The actual cause is that **the orchestrator's `finally` block in `flowLongFormRender` deletes the project too aggressively**: when the synchronous `render-long-form-video` call returns 200 (it returns `status: 'rendering'` immediately), the orchestrator polls for completion in a separate downstream call (`render-with-remotion`), which *re-fetches* the project from `sora_long_form_projects`. By then the orchestrator has already moved on, but the `finally` is on the outer flow. Looking again: the immediate 500 ("Project not found") comes from `render-long-form-video` itself on its first `select('*').eq('id', projectId).single()`. **Root cause**: the orchestrator's INSERT uses the service-role admin client and returns `proj.id`, but `render-long-form-video` is invoked with the body `{ projectId: proj.id }`. The function's first DB call is `from('sora_long_form_projects').select('*').eq('id', projectId).single()`. Service role bypasses RLS. The only way `single()` returns "not found" here is if the projectId is *not actually persisted yet* — the previous flow's `await ctx.admin.from('sora_long_form_projects').insert(...).select().single()` does persist immediately, BUT the previous deep-sweep `qa-deep-sweep-longform-*` rows from earlier failed runs were left behind and the unique-name index (or RLS write-guard) is causing the new insert to silently swallow. Reading the code carefully one more time: the insert uses `.select().single()` and explicitly checks `projErr || !proj` — that branch returned ok, so projectId is real. **The actual problem**: `render-long-form-video` reads `project.user_id` and forwards it as `userId` to `render-with-remotion`, but in QA service-auth mode the orchestrator already overrides this with `qaSvc.userId`. The "Project not found" message is the literal text thrown when the *downstream* `render-with-remotion` fails to find the project in *its* table (likely a different table or the same table with stricter RLS). The fix is to add the same QA service-auth shortcut to `compose-stitch-and-handoff`, fix the snake/camel mismatch in render-directors-cut's subtitle payload normalization, and have `render-long-form-video` log the actual failing query so we can confirm — but the safest concrete fix is to **normalize the subtitle clip keys to camelCase before passing to Lambda** and **add the auth shortcut to compose-stitch-and-handoff**, then re-run; if Flow 6 still fails, the error message will tell us exactly which downstream call returned "Project not found".
 
 ### Fix list
 
-**Code (orchestrator)**
-- `supabase/functions/qa-weekly-deep-sweep/index.ts`
-  - Flow 1: rename `prompt:` → `ai_prompt:` in the seed scene rows.
-  - Flow 4: degrade gracefully — if the talking-head call returns 404 / "Model not found" / "resource could not be found", mark the flow as `budget_skipped` with a clear note ("Hedra Replicate model removed — flow disabled until provider migration") instead of `failed`. This stops the noise while we sort out the provider.
-  - Flow 7: before calling `magic-edit-image`, generate a **signed URL** for the mask (and for the source image) via `admin.storage.from('qa-test-assets').createSignedUrl(path, 600)` instead of the public URL. Same for the source image since the bucket is private.
+**Code changes**
 
-**Service-role auth shortcut on the 3 missing functions**
-Add the same minimal block we already use in `generate-talking-head` and `magic-edit-image`:
-```ts
-import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
-// inside the handler, BEFORE the regular getUser flow:
-const qaSvc = detectQaServiceAuth(req);
-let user = qaSvc.isQaService && qaSvc.userId ? { id: qaSvc.userId } : null;
-if (!user) { /* existing JWT validation path */ }
-```
-- `supabase/functions/render-directors-cut/index.ts`
-- `supabase/functions/auto-director-compose/index.ts`
-- `supabase/functions/render-long-form-video/index.ts`
+1. `supabase/functions/compose-stitch-and-handoff/index.ts`
+   - Add `import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";`
+   - Add `x-qa-real-spend, x-qa-user-id` to `Access-Control-Allow-Headers`.
+   - Insert the QA service-auth shortcut before the existing `userClient.auth.getUser()` call.
 
-Also add `x-qa-real-spend, x-qa-user-id` to each function's `Access-Control-Allow-Headers`.
+2. `supabase/functions/render-directors-cut/index.ts`
+   - Right after destructuring `subtitle_track` from the body, normalize each clip:
+     ```ts
+     if (subtitle_track?.clips?.length) {
+       subtitle_track.clips = subtitle_track.clips.map((c: any, i: number) => ({
+         id: c.id ?? `clip-${i}`,
+         text: c.text ?? '',
+         startTime: Number(c.startTime ?? c.start_time ?? 0),
+         endTime: Number(c.endTime ?? c.end_time ?? 0),
+         ...c,
+       }));
+     }
+     ```
+     Same normalization for `text_overlays` (also reads `.startTime`/`.endTime` in the composition). This eliminates the `NaN` and is backward-compatible with the existing camelCase callers.
 
-**Bootstrap**
-- Re-deploy `qa-live-sweep-bootstrap` (no code change needed — already creates `sample-mask-512.png`) and **the user must click "Bootstrap Assets"** once before the next Deep Sweep run. I'll add a clear hint in the Cockpit Deep Sweep tab: *"Run Bootstrap Assets once before the first Deep Sweep."*
+3. `supabase/functions/render-long-form-video/index.ts`
+   - Improve the "Project not found" error to include both `projectError?.message` and the projectId, so the next run reveals the true cause:
+     ```ts
+     if (projectError || !project) {
+       throw new Error(`Project not found (id=${projectId}, err=${projectError?.message ?? 'no row'})`);
+     }
+     ```
+   - Also wrap the downstream `render-with-remotion` failure text the same way (it currently throws `Remotion render failed: {"error":"Project not found"}` without saying which projectId). This is observability-only and makes the next deep-sweep self-diagnose Flow 6 definitively.
+
+4. `supabase/functions/qa-weekly-deep-sweep/index.ts`
+   - In `flowLongFormRender`, after seeding `proj`, do an explicit `select('id').eq('id', proj.id).maybeSingle()` and log the result before calling `render-long-form-video`. If that returns null, the seed silently failed (RLS / trigger). One log line, no behavior change otherwise.
+   - In Flow 2 (`flowDirectorsCutRender`), keep the snake_case payload — the fix is on the receiving end (#2 above).
+
+**Deploy**
+
+- `compose-stitch-and-handoff`
+- `render-directors-cut`
+- `render-long-form-video`
+- `qa-weekly-deep-sweep`
 
 **Memory**
-- Update `mem://features/qa-agent/deep-sweep` to record:
-  - Hedra Replicate model removed (April 2026) — Flow 4 currently auto-skips.
-  - QA service-auth must be wired into every long-running pipeline endpoint the orchestrator calls.
-  - `qa-test-assets` bucket is private → always use signed URLs when handing assets to external providers.
+
+- Update `mem://features/qa-agent/deep-sweep`: every Lambda composition expects camelCase keys (`startTime`/`endTime`); render-directors-cut now normalizes both casings server-side. Service-auth must be wired into every endpoint the orchestrator calls — `compose-stitch-and-handoff` was the last gap.
 
 ### Expected outcome after deploy
 
 | Flow | Expected status |
 |---|---|
-| 1 Composer Stitch | success (stitches 3 sample clips into one MP4) |
-| 2 Director's Cut Lambda | success (full Lambda render, ~60–120 s) |
+| 1 Composer Stitch | success |
+| 2 Director's Cut Lambda | success (no more NaN) |
 | 3 Auto-Director | success |
-| 4 Talking Head | `budget_skipped` with note "Hedra Replicate model removed" |
-| 5 Universal Video | success (already green) |
-| 6 Long-Form Lambda | success |
-| 7 Magic Edit | success (mask now reachable via signed URL) |
+| 4 Talking Head | `budget_skipped` (Hedra removed — known) |
+| 5 Universal Video | success |
+| 6 Long-Form Lambda | success **OR** a self-explanatory error message that tells us exactly which row is missing |
+| 7 Magic Edit | success (after Bootstrap Assets) |
 
-Estimated spend: **~7–10 €** (Flow 4 spends 0 €).
+Estimated spend: 7-10 €.
 
-### Files touched
+### Out of scope
 
-- `supabase/functions/qa-weekly-deep-sweep/index.ts` — column fix, Flow 4 graceful skip, Flow 7 signed URLs
-- `supabase/functions/render-directors-cut/index.ts` — add QA service-auth shortcut
-- `supabase/functions/auto-director-compose/index.ts` — add QA service-auth shortcut
-- `supabase/functions/render-long-form-video/index.ts` — add QA service-auth shortcut
-- `src/pages/admin/DeepSweepTab.tsx` — small hint about bootstrap prerequisite
-- `mem://features/qa-agent/deep-sweep` — record current limits
-- (Re-)deploy all four edge functions
-
-### Out of scope (separate follow-up)
-
-Migrating the Talking Head pipeline off Hedra-on-Replicate (either to Hedra's native API with a new `HEDRA_API_KEY` secret or to a Replicate alternative). I'll surface this as a clear next step after this fix lands so you can decide.
+- Migrating Talking Head off Hedra (separate decision).
+- Refactoring the snake/camel split across the whole Remotion stack — we only normalize at the API boundary for now.

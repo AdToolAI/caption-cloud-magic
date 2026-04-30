@@ -587,6 +587,14 @@ async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
     }
     projectId = proj.id;
 
+    // Verify the seed actually persisted (catches silent RLS/trigger drops)
+    const { data: verify } = await ctx.admin
+      .from("sora_long_form_projects")
+      .select("id, user_id, status")
+      .eq("id", proj.id)
+      .maybeSingle();
+    console.log(`[deep-sweep][flow6] seed verify: ${JSON.stringify(verify)}`);
+
     const { error: sceneErr } = await ctx.admin
       .from("sora_long_form_scenes")
       .insert({

@@ -31,7 +31,7 @@ serve(async (req) => {
       .single();
 
     if (projectError || !project) {
-      throw new Error("Project not found");
+      throw new Error(`Project not found (id=${projectId}, err=${projectError?.message ?? 'no row'})`);
     }
 
     const { data: scenes, error: scenesError } = await supabase
@@ -41,7 +41,7 @@ serve(async (req) => {
       .order('scene_order');
 
     if (scenesError || !scenes || scenes.length === 0) {
-      throw new Error("No scenes found");
+      throw new Error(`No scenes found (project_id=${projectId}, err=${scenesError?.message ?? 'empty'})`);
     }
 
     // Verify all scenes are completed
@@ -123,15 +123,15 @@ serve(async (req) => {
 
     if (!renderResponse.ok) {
       const errorText = await renderResponse.text();
-      console.error('[Long-Form Render] Remotion render failed:', errorText);
-      
+      console.error('[Long-Form Render] Remotion render failed:', { projectId, status: renderResponse.status, errorText });
+
       // Update project status to failed
       await supabase
         .from('sora_long_form_projects')
         .update({ status: 'failed' })
         .eq('id', projectId);
-      
-      throw new Error(`Remotion render failed: ${errorText}`);
+
+      throw new Error(`Remotion render failed (project_id=${projectId}, status=${renderResponse.status}): ${errorText.slice(0, 400)}`);
     }
 
     const renderResult = await renderResponse.json();
