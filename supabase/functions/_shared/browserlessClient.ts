@@ -32,11 +32,21 @@ export async function runBrowserlessFunction(
 
   const start = Date.now();
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  // Browserless server-side timeout cap is 60s on standard plan. Use full 60s.
-  // Slow routes are mitigated via blockAds + per-step timeouts inside the script.
-  const SERVER_TIMEOUT_MS = 60_000;
+  // Browserless query-param `timeout` is in MILLISECONDS but capped per plan.
+  // Hobby/Starter plans cap at 30_000 ms; Standard at 60_000 ms.
+  // Override via BROWSERLESS_SERVER_TIMEOUT_MS env if your plan supports more.
+  // We clamp into [1_000, 60_000] to satisfy the API's hard upper bound.
+  const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
+  const SERVER_TIMEOUT_MS = Math.min(
+    60_000,
+    Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000),
+  );
+
+  // Client-side abort: give the server-cap a small buffer so we get a clean
+  // Browserless error instead of an AbortError when the server is right at its limit.
+  const effectiveClientTimeout = Math.max(timeoutMs, SERVER_TIMEOUT_MS + 5_000);
+  const t = setTimeout(() => ctrl.abort(), effectiveClientTimeout);
 
   try {
     const res = await fetch(
@@ -338,24 +348,38 @@ export default async ({ page, context }) => {
       return el;
     };
 
+    // Per-step timeouts: hard-clamp to [200, 12000] ms so a single slow step
+    // can never exhaust the Browserless server cap (30s on hobby, 60s standard).
+    // A mission with 8 steps × 12s + 5s login still fits comfortably under 60s.
+    const clampStep = (ms) => {
+      const n = Number(ms);
+      if (!Number.isFinite(n) || n <= 0) return 8000;
+      return Math.min(12000, Math.max(200, n));
+    };
+    const clampWait = (ms) => {
+      const n = Number(ms);
+      if (!Number.isFinite(n) || n < 0) return 800;
+      return Math.min(3000, n);
+    };
+
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i] || {};
       const tStep = Date.now();
       const label = step.type + (step.path ? ' ' + step.path : step.selector ? ' ' + step.selector : step.text ? ' "' + step.text + '"' : '');
       try {
         if (step.type === 'navigate') {
-          await page.goto(opts.baseUrl + step.path, { waitUntil: 'domcontentloaded', timeout: step.timeout_ms || 15000 });
-          await new Promise(r => setTimeout(r, step.wait_ms != null ? step.wait_ms : 800));
+          await page.goto(opts.baseUrl + step.path, { waitUntil: 'domcontentloaded', timeout: clampStep(step.timeout_ms || 12000) });
+          await new Promise(r => setTimeout(r, clampWait(step.wait_ms != null ? step.wait_ms : 800)));
           const title = await page.title();
           result.pathResults.push({ path: step.path, ok: true, ms: Date.now() - tStep, title, step_index: i });
         }
         else if (step.type === 'click') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           await page.click(step.selector);
           await new Promise(r => setTimeout(r, 250));
         }
         else if (step.type === 'click_text') {
-          const deadline = Date.now() + (step.timeout_ms || 8000);
+          const deadline = Date.now() + clampStep(step.timeout_ms);
           let el = null;
           while (Date.now() < deadline && !el) {
             el = await findByText(step.text, step.role);
@@ -366,19 +390,19 @@ export default async ({ page, context }) => {
           await new Promise(r => setTimeout(r, 250));
         }
         else if (step.type === 'fill') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           const h = await page.$(step.selector);
           await h.click({ clickCount: 3 });
           await h.type(String(step.value), { delay: 10 });
         }
         else if (step.type === 'wait_for') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 10000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms || 10000) });
         }
         else if (step.type === 'expect_visible') {
           if (step.selector) {
-            await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+            await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           } else if (step.text) {
-            const deadline = Date.now() + (step.timeout_ms || 8000);
+            const deadline = Date.now() + clampStep(step.timeout_ms);
             let found = false;
             while (Date.now() < deadline && !found) {
               found = await page.evaluate((t) => {
@@ -400,7 +424,7 @@ export default async ({ page, context }) => {
           consoleErrorBaseline = currentErrs;
         }
         else if (step.type === 'sleep') {
-          await new Promise(r => setTimeout(r, step.ms || 500));
+          await new Promise(r => setTimeout(r, clampWait(step.ms != null ? step.ms : 500)));
         }
         else {
           throw new Error('Unknown step type: ' + step.type);
