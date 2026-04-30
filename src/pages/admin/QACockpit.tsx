@@ -315,6 +315,10 @@ export default function QACockpit() {
               <FlaskConical className="h-3.5 w-3.5 mr-1.5" />
               E2E Tests
             </TabsTrigger>
+            <TabsTrigger value="live-sweep" className="text-[#F5C76A]">
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+              Live Sweep
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -324,6 +328,11 @@ export default function QACockpit() {
           {/* E2E PLAYWRIGHT RESULTS */}
           <TabsContent value="e2e" className="mt-4">
             <E2EResultsTab />
+          </TabsContent>
+
+          {/* LIVE PROVIDER SWEEP */}
+          <TabsContent value="live-sweep">
+            <LiveSweepTab />
           </TabsContent>
 
           {/* LIVE RUNS */}
