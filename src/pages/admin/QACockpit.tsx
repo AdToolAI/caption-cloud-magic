@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Activity, Bug, Target, Wallet, TrendingUp, Play, Loader2, ShieldCheck, AlertTriangle, Eye, EyeOff, Copy, KeyRound, Check, CheckCircle2, VolumeX, Filter, FlaskConical } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { E2EResultsTab } from "@/components/admin/qa-cockpit/E2EResultsTab";
+import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 
 const TIER_COLORS: Record<string, string> = {
   smoke: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
