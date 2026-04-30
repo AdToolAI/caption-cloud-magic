@@ -14,6 +14,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const HEYGEN_BASE_V1 = 'https://api.heygen.com/v1';
 const HEYGEN_BASE_V2 = 'https://api.heygen.com/v2';
+const HEYGEN_UPLOAD_BASE = 'https://upload.heygen.com/v1'; // separate subdomain for asset uploads
 
 interface TalkingHeadRequest {
   sceneId?: string;
@@ -81,12 +82,18 @@ async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Pr
   const blob = await srcRes.blob();
   const buffer = await blob.arrayBuffer();
 
-  // HeyGen /v1/asset accepts raw binary upload with Content-Type header
-  const contentType = kind === 'image'
-    ? (blob.type || 'image/jpeg')
-    : (blob.type || 'audio/mpeg');
+  // HeyGen upload.heygen.com/v1/asset accepts raw binary upload.
+  // Allowed MIME types: image/png, image/jpeg, audio/mpeg, video/mp4, video/webm.
+  // Normalize anything else to a supported value.
+  let contentType: string;
+  if (kind === 'image') {
+    const t = (blob.type || 'image/jpeg').toLowerCase();
+    contentType = t === 'image/png' ? 'image/png' : 'image/jpeg';
+  } else {
+    contentType = 'audio/mpeg';
+  }
 
-  const uploadRes = await fetch(`${HEYGEN_BASE_V1}/asset`, {
+  const uploadRes = await fetch(`${HEYGEN_UPLOAD_BASE}/asset`, {
     method: 'POST',
     headers: {
       'X-Api-Key': HEYGEN_API_KEY,
