@@ -244,7 +244,9 @@ async function processHeyGenJob(opts: {
   await refundCredits(admin2, opts.userId, opts.videoId, opts.estimatedCostEur, opts.sceneId, 'HeyGen render timed out after 5min');
 }
 
-// Idempotent credit refund (per-job, indexed by video_id)
+// Idempotent credit refund (per-job). Uses existing refund_ai_video_credits RPC
+// which expects a UUID generation_id. We deterministically derive a UUID from
+// the HeyGen video_id so retries are idempotent (same video_id → same UUID).
 async function refundCredits(
   admin: ReturnType<typeof createClient>,
   userId: string,
@@ -254,7 +256,6 @@ async function refundCredits(
   reason: string,
 ) {
   try {
-    // Mark scene as failed
     if (sceneId) {
       await admin.from('composer_scenes').update({
         clip_status: 'failed',
@@ -263,21 +264,25 @@ async function refundCredits(
       }).eq('id', sceneId);
     }
 
-    // Idempotent refund via unique transaction reference
-    const refundRef = `talking-head-refund-${videoId}`;
-    const credits = Math.ceil(amountEur * 100); // 1 credit ≈ 0.01 EUR
+    // Derive deterministic UUIDv5-style id from video_id for idempotency
+    const enc = new TextEncoder().encode(`heygen-${videoId}`);
+    const hash = await crypto.subtle.digest('SHA-256', enc);
+    const bytes = new Uint8Array(hash).slice(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant
+    const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const generationId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 
-    const { error } = await admin.rpc('refund_credits', {
+    const { error } = await admin.rpc('refund_ai_video_credits', {
       p_user_id: userId,
-      p_amount: credits,
-      p_reference: refundRef,
-      p_reason: `Talking head failed: ${reason.slice(0, 200)}`,
+      p_amount_euros: amountEur,
+      p_generation_id: generationId,
     });
 
-    if (error && !error.message.includes('duplicate') && !error.message.includes('already refunded')) {
-      console.error(`[talking-head] Refund failed: ${error.message}`);
+    if (error && !String(error.message || '').toLowerCase().includes('already')) {
+      console.error(`[talking-head] Refund RPC failed: ${error.message}`);
     } else {
-      console.log(`[talking-head] ✅ Refunded ${credits} credits to ${userId} (ref=${refundRef})`);
+      console.log(`[talking-head] ✅ Refunded ${amountEur}€ to ${userId} (gen=${generationId}, reason=${reason.slice(0, 80)})`);
     }
   } catch (e: any) {
     console.error(`[talking-head] Refund error: ${e?.message}`);
