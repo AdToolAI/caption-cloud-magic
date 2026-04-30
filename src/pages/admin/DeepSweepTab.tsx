@@ -178,8 +178,13 @@ export function DeepSweepTab() {
     }
   };
 
-  const passRate = latestRun && latestRun.flows_total > 0
-    ? Math.round((latestRun.flows_succeeded / latestRun.flows_total) * 100)
+  // Pass rate excludes timeouts (transient AWS infrastructure limits — not bugs).
+  const timeoutCount = flows.filter((f) => f.status === "timeout").length;
+  const effectiveTotal = latestRun
+    ? Math.max(latestRun.flows_total - timeoutCount, 1)
+    : 0;
+  const passRate = latestRun && effectiveTotal > 0
+    ? Math.round((latestRun.flows_succeeded / effectiveTotal) * 100)
     : 0;
   const budgetUsedPct = latestRun
     ? Math.round((Number(latestRun.total_cost_eur) / Number(latestRun.cap_eur)) * 100)
@@ -273,7 +278,7 @@ export function DeepSweepTab() {
             <StatCard label="Status" value={latestRun.status} variant={latestRun.status} />
             <StatCard
               label="Pass Rate"
-              value={`${latestRun.flows_succeeded}/${latestRun.flows_total} (${passRate}%)`}
+              value={`${latestRun.flows_succeeded}/${effectiveTotal} (${passRate}%)${timeoutCount > 0 ? ` · ${timeoutCount} timeout` : ""}`}
             />
             <StatCard
               label="Verbraucht"
@@ -293,7 +298,7 @@ export function DeepSweepTab() {
       {/* Live Flow Status */}
       <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10 p-4">
         <h4 className="text-sm font-semibold text-slate-300 mb-3">
-          Aktueller Run — 7 Flows
+          Aktueller Run — 6 Flows
         </h4>
         <div className="space-y-2">
           {FLOW_NAMES.map((name, idx) => {

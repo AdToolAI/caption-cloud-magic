@@ -1,84 +1,73 @@
-## Problem
+## Befund
 
-Flow 2 (Director's Cut Lambda) ist im letzten Deep Sweep als **`failed`** (rot) markiert worden mit:
+Der aktuelle Run läuft weiterhin rot, weil Flow 2 nicht beim Triggern scheitert, sondern erst danach beim Polling:
 
-> `Error: AWS Concurrency limit reached (Original Error: Rate Exceeded). See https://www.remotion.dev/docs/lambda/troubleshooting/rate-limit ...`
+- `render-directors-cut` startet zunächst erfolgreich und gibt `render_id` + `remotion_render_id` zurück.
+- Kurz danach schreibt der Remotion-Webhook den Render-Job als `failed` in `director_cut_renders`, mit `Error: AWS Concurrency limit reached (Original Error: Rate Exceeded.)`.
+- `qa-weekly-deep-sweep` klassifiziert aktuell jeden `director_cut_renders.status = failed` im Polling automatisch als `failed`, auch wenn die Fehlermeldung eindeutig ein temporäres AWS-Lambda-Concurrency-Limit ist.
 
-Obwohl **drei separate Retry-Schichten** existieren, wurde der Fehler als harter Bug klassifiziert statt als transientes Infrastruktur-Problem (`timeout`).
+Zusätzlich sehe ich zwei Nebenprobleme:
 
-## Root Cause Analysis
+1. Der Run zählt intern `flows_total = 7`, obwohl aktuell nur 6 Flow-Slots im UI und in der Ausführung existieren. Deshalb wird `4/7 (57%)` angezeigt statt sinnvoll `4/6` bzw. `4/5`, wenn ein Timeout separat gezählt wird.
+2. Flow 4 (Talking Head) wird gar nicht als Ergebnis gespeichert, obwohl `generate-talking-head` laut Logs mit `No face detected` scheitert. Die Funktion setzt dafür `status = skipped`, aber der Status-Typ/Counter kennt `skipped` nicht sauber. Dadurch verschwindet Flow 4 aus dem aktuellen Run.
 
-**Drei Layer existieren bereits, alle mit Lücken:**
+## Plan
 
-1. **`render-directors-cut/index.ts` (Z. 538-614)**: 3 Retries × exponential backoff (5s/10s/20s). Wenn alle scheitern → return **HTTP 429** mit Body `{ error: 'RATE_LIMIT_EXCEEDED', message: '...' }`.
+### 1. Throttle-Erkennung zentralisieren
 
-2. **`qa-weekly-deep-sweep` `triggerRenderWithBackoff` (Z. 112-143)**: Detektiert `"rate exceeded"`, `"concurrency limit"`, `" 429"` im **Error-String**. Bei Match → 3 weitere Retries (10s/20s/40s) und am Ende `throttled: true` → Status `timeout` (orange) statt `failed` (rot).
+In `qa-weekly-deep-sweep/index.ts` baue ich eine gemeinsame Helper-Funktion ein, z.B. `isLambdaThrottleMessage(message)`, die alle bekannten Varianten erkennt:
 
-3. **`callEdge` (Z. 63-104)**: Generischer Fetch-Wrapper.
+- `Rate Exceeded`
+- `AWS Concurrency limit reached`
+- `TooManyRequestsException`
+- `ThrottlingException`
+- `HTTP 429`
+- `RATE_LIMIT_EXCEEDED`
+- deutsche Texte wie `Render-Kapazität` / `vorübergehend erschöpft`
 
-**Die Lücke**: Wenn alle 3 Retries in render-directors-cut scheitern, kommt **HTTP 429** zurück mit JSON-Body — aber `callEdge` hängt den Body nicht in den Error-String. Das Detection-Pattern in `triggerRenderWithBackoff` greift dann auf `"http 429"` zurück (existiert nur als ` 429` mit Leerzeichen). Die deutsche User-Message `"AWS Render-Kapazität vorübergehend erschöpft"` matched **keines** der englischen Throttle-Keywords. → Fehler wird als `failed` (Bug) klassifiziert statt als `timeout` (Infrastruktur).
+Diese Helper-Funktion wird sowohl beim direkten Trigger-Fehler als auch beim Polling-Fehler verwendet.
 
-Zusätzlich: Mit nur 90s Polling-Budget und parallelen Composer-Renders im selben Sweep ist die Wahrscheinlichkeit hoch, dass Remotions interne Concurrency-Counter genau zum Trigger-Zeitpunkt am Limit sind.
+### 2. Flow 2 Polling-Fehler korrekt als `timeout` klassifizieren
 
-## Solution: 3-stufige Härtung
+In `flowDirectorsCutRender` ändere ich die Polling-Auswertung:
 
-### Schritt 1 — `callEdge` propagiert HTTP-Status in Error
+- Wenn `director_cut_renders.status = completed`: bleibt `success`.
+- Wenn `status = failed` und `error_message` ein Lambda-Throttle ist: `timeout`, nicht `failed`.
+- Wenn `status = failed` mit echtem Render-/Codefehler: weiterhin `failed`.
+- Wenn der Render nach 90s noch nicht fertig ist: weiterhin `timeout`.
 
-In `qa-weekly-deep-sweep/index.ts` Z. 63-104: Wenn HTTP-Status nicht ok, **Status-Code mit in den Error-String** packen:
+Damit wird der aktuelle Fehler nicht mehr rot als Code-Bug angezeigt, sondern gelb als temporäres Infrastruktur-Limit.
 
-```ts
-error: `HTTP ${res.status}: ${bodyText.slice(0, 500)}`
-```
+### 3. Optionalen Quick-Fix für QA-Render: Single-Lambda erzwingen
 
-So matched `triggerRenderWithBackoff` zuverlässig auf `"429"` und auf den Body-Inhalt (`"RATE_LIMIT_EXCEEDED"`, `"Render-Kapazität"`, `"vorübergehend erschöpft"`).
+Für den Deep-Sweep-Director's-Cut-Test ist Geschwindigkeit weniger wichtig als Stabilität. Deshalb sende ich beim QA-Call an `render-directors-cut` ein internes Flag, z.B. `qa_stability_mode: true` oder `max_lambda_workers: 1`.
 
-### Schritt 2 — Detection-Pattern erweitern
+In `render-directors-cut/index.ts` bzw. der Payload-Normalisierung wird dieses Flag genutzt, um für diesen 10s-Test `framesPerLambda = durationInFrames` zu setzen. Ergebnis: Der QA-Render nutzt nur 1 Lambda-Worker statt 3 und kollidiert deutlich seltener mit laufenden Composer-/Remotion-Jobs.
 
-In `triggerRenderWithBackoff` Z. 118-128 weitere Keywords aufnehmen:
+Falls wir das minimaler halten wollen, kann ich Schritt 3 weglassen; meine Empfehlung ist aber, ihn einzubauen, weil reine Klassifizierung den roten Status verhindert, aber den Render nicht stabiler macht.
 
-```ts
-m.includes("http 429") ||
-m.includes("rate_limit_exceeded") ||
-m.includes("render-kapazität") ||
-m.includes("vorübergehend erschöpft")
-```
+### 4. Flow-Gesamtzahl und Status-Counter reparieren
 
-So fängt der Wrapper sowohl die englische AWS-Original-Message als auch die deutsche User-Message aus `render-directors-cut`.
+Ich passe `flows_total` von `7 - skipFlows.length` auf die echte Anzahl `6 - skipFlows.length` an.
 
-### Schritt 3 — Pre-Flight-Spacing vor Flow 2
+Außerdem wird `skipped` als gültiger Flow-Status sauber behandelt oder in `budget_skipped` normalisiert. Dadurch verschwindet Flow 4 nicht mehr aus dem Run, sondern erscheint sichtbar als skipped/soft-skip, falls HeyGen kein Gesicht erkennt.
 
-In `qa-weekly-deep-sweep/index.ts` Z. 864 existiert bereits ein Kommentar `// Wait before triggering DC Lambda to avoid AWS Concurrency throttling.` — aber der eigentliche `await sleep(...)` fehlt oder ist zu kurz. Direkt vor `flowDirectorsCutRender`:
+### 5. UI-Anzeige in `DeepSweepTab.tsx` korrigieren
 
-```ts
-// Cooldown nach Composer-Stitch (Flow 1) — gibt AWS Lambda 30s Zeit,
-// die parallelen Composer-Render-Slots freizugeben.
-await sleep(30_000);
-```
+Ich passe die Anzeige an:
 
-30 Sekunden sind weniger als ein einziger Retry-Backoff (5s+10s+20s=35s) und drastisch reduzieren die Kollisionswahrscheinlichkeit, da Composer-Clips typischerweise ~30-60s brauchen.
+- Überschrift: `Aktueller Run — 6 Flows`
+- Pass-Rate: Timeouts separat behandeln oder klar anzeigen, damit ein Infrastruktur-Timeout nicht wie ein roter Failure wirkt.
+- Flow 2 bei Lambda-Throttle: gelber `timeout` Badge mit erklärendem Tooltip.
+- Flow 4 bei No-Face: sichtbarer Skip-/Warn-Badge statt leerer Zeile.
 
-### Schritt 4 — Klarere `timeout`-Klassifizierung im UI
+## Erwartetes Ergebnis nach dem Fix
 
-`DeepSweepTab.tsx`: Der Status `timeout` sollte visuell als **gelbe Warnung** (nicht rot) erscheinen mit Tooltip "Transientes Infrastruktur-Limit, kein Code-Bug — automatischer Retry beim nächsten Sweep löst das in der Regel". Aktuell wird `timeout` vermutlich als generisches `failed` gerendert.
+Beim nächsten Deep Sweep sollte Flow 2 entweder:
 
-## Geänderte Dateien
+- grün durchlaufen, weil der QA-Render weniger Lambda-Worker nutzt, oder
+- gelb als `timeout` erscheinen, falls AWS gerade trotzdem throttelt.
 
-- `supabase/functions/qa-weekly-deep-sweep/index.ts` — `callEdge` Error-String mit HTTP-Status, erweiterte Throttle-Keywords, 30s Cooldown vor Flow 2
-- `src/pages/admin/DeepSweepTab.tsx` — `timeout`-Status als gelber Badge mit Erklärungs-Tooltip
+Er sollte nicht mehr rot als harter Code-Fehler erscheinen, solange die Ursache `Rate Exceeded` / Lambda-Concurrency ist.
 
-**Keine DB-Migration. Kein neues Secret. Keine Edge-Function-Konfig-Änderung.**
-
-## Validierung
-
-Nach Deploy: Deep Sweep erneut starten. Erwartung:
-
-- **Best Case (90%)**: Flow 2 grün — die 30s Cooldown haben gereicht, AWS hat Kapazität freigegeben
-- **Worst Case (10%)**: Flow 2 wird als **gelber `timeout`-Badge** angezeigt mit Message "AWS Lambda concurrency throttled (4 retries exhausted)" — kein roter Failure mehr, Pass-Rate-Berechnung exkludiert `timeout` von "failed"
-
-## Was wir bewusst NICHT machen
-
-- **Sequenzielle Flow-Ausführung** (Flow 2 erst nach 60s Vollstillstand): zu langsam, würde Sweep auf 5+ Min verlängern
-- **Lambda-Concurrency-Quota erhöhen** (AWS Account Setting): kostet ~$0/Monat aber erfordert AWS-Console-Zugriff & Approval-Wartezeit
-- **Reservierte Concurrency** für `render-directors-cut`: würde Composer-Renders verlangsamen, falsche Optimierung
-
-Soll ich loslegen?
+Außerdem sollte die Run-Anzeige nicht mehr `4/7` zeigen, sondern die echte Flow-Anzahl korrekt widerspiegeln.

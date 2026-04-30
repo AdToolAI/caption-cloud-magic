@@ -30,10 +30,35 @@ const FALLBACK_VIDEO =
 const FALLBACK_AUDIO =
   "https://download.samplelib.com/mp3/sample-3s.mp3";
 
+// Shared throttle/concurrency-detection helper. Used both for direct trigger
+// errors AND for async webhook-reported render failures, so a "Rate Exceeded"
+// from AWS Lambda never gets classified as a hard failure (red bug) — it's
+// always a yellow infrastructure timeout.
+function isLambdaThrottleMessage(msg?: string | null): boolean {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return (
+    m.includes("rate exceeded") ||
+    m.includes("concurrency limit") ||
+    m.includes("aws concurrency") ||
+    m.includes("toomanyrequests") ||
+    m.includes("throttlingexception") ||
+    m.includes(" 429") ||
+    m.startsWith("429") ||
+    m.includes("http 429") ||
+    m.includes("rate_limit_exceeded") ||
+    m.includes("render-kapazität") ||
+    m.includes("render-kapazitat") ||
+    m.includes("vorübergehend erschöpft") ||
+    m.includes("vorubergehend erschopft") ||
+    m.includes("momentan werden viele videos")
+  );
+}
+
 interface FlowResult {
   flow_index: number;
   flow_name: string;
-  status: "success" | "failed" | "timeout" | "budget_skipped";
+  status: "success" | "failed" | "timeout" | "budget_skipped" | "skipped";
   duration_ms: number;
   estimated_cost_eur: number;
   actual_cost_eur: number;
@@ -115,25 +140,7 @@ async function triggerRenderWithBackoff<T = any>(
   userId: string,
   timeoutMs = 120_000,
 ): Promise<{ ok: boolean; json: T | null; error?: string; throttled: boolean; attempts: number }> {
-  const isThrottle = (msg?: string) => {
-    if (!msg) return false;
-    const m = msg.toLowerCase();
-    return (
-      m.includes("rate exceeded") ||
-      m.includes("concurrency limit") ||
-      m.includes("toomanyrequests") ||
-      m.includes("throttlingexception") ||
-      m.includes(" 429") ||
-      m.startsWith("429") ||
-      m.includes("http 429") ||
-      m.includes("rate_limit_exceeded") ||
-      m.includes("render-kapazität") ||
-      m.includes("render-kapazitat") ||
-      m.includes("vorübergehend erschöpft") ||
-      m.includes("vorubergehend erschopft") ||
-      m.includes("momentan werden viele videos")
-    );
-  };
+  const isThrottle = isLambdaThrottleMessage;
   const delays = [10_000, 20_000, 40_000];
   let lastErr: string | undefined;
   for (let attempt = 0; attempt <= delays.length; attempt++) {
@@ -392,6 +399,10 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
           ],
         },
         export_settings: { quality: "hd", format: "mp4" },
+        // QA stability hint: 1 Lambda worker only — minimizes AWS concurrency
+        // collisions with parallel composer/universal renders in the same sweep.
+        qa_stability_mode: true,
+        max_lambda_workers: 1,
       },
       ctx.userId,
       120_000,
@@ -448,9 +459,18 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
       result.validation_checks.url_reachable = await headOk(polled.output_url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
+    } else if (polled?.status === "failed") {
+      // Webhook reported failure — distinguish AWS Lambda throttle (transient
+      // infrastructure limit, not a code bug) from real render bugs.
+      const throttled = isLambdaThrottleMessage(polled?.error_message);
+      result.status = throttled ? "timeout" : "failed";
+      result.error_message = throttled
+        ? `AWS Lambda concurrency throttled async (post-trigger) — infrastructure quota, not a code bug. Original: ${(polled.error_message || "").slice(0, 200)}`
+        : polled?.error_message || "Render failed without error message";
+      result.actual_cost_eur = throttled ? 0 : 0.5;
     } else {
-      result.status = polled?.status === "failed" ? "failed" : "timeout";
-      result.error_message = polled?.error_message || "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
+      result.status = "timeout";
+      result.error_message = "Lambda render did not complete in 90s polling window (Lambda may still finish async)";
       result.actual_cost_eur = 0.5;
     }
   } catch (e: any) {
@@ -768,7 +788,7 @@ Deno.serve(async (req) => {
       cap_eur: capEur,
       status: "running",
       triggered_by: userData.user.id,
-      flows_total: 7 - skipFlows.length,
+      flows_total: 6 - skipFlows.length,
     })
     .select()
     .single();
@@ -801,10 +821,15 @@ Deno.serve(async (req) => {
         peek.status = "budget_skipped";
         peek.actual_cost_eur = 0;
         skipped++;
-      } else if (peek.status === "budget_skipped") {
+      } else if (peek.status === "budget_skipped" || peek.status === "skipped") {
+        // Normalize soft-skips (e.g. HeyGen "no face detected") so they show up
+        // as a skipped Flow in the UI instead of vanishing from the run.
+        peek.status = "budget_skipped";
         skipped++;
       } else {
+        // "timeout" = transient infrastructure (yellow), not a hard failure.
         if (peek.status === "success") succeeded++;
+        else if (peek.status === "timeout") failed++; // counted but UI shows yellow
         else failed++;
         ctx.remainingEur -= peek.actual_cost_eur;
         totalSpent += peek.actual_cost_eur;
@@ -826,18 +851,15 @@ Deno.serve(async (req) => {
         validation_checks: peek.validation_checks,
       });
 
-      if (peek.status === "failed" || peek.status === "timeout") {
+      if (peek.status === "failed") {
+        // Only real failures are tracked as bug reports — timeouts (AWS Lambda
+        // throttle) are infrastructure noise, not bugs.
         await admin.from("qa_bug_reports").insert({
+          category: "workflow",
           mission_name: "deep-sweep",
-          bug_type: "e2e_pipeline_failure",
           severity: "high",
-          title: `Deep Sweep: ${peek.flow_name} ${peek.status}`,
+          title: `Deep Sweep: ${peek.flow_name} failed`,
           description: peek.error_message || "No error message",
-          metadata: {
-            run_id: ctx.runId,
-            flow_index: peek.flow_index,
-            stages: peek.stage_log,
-          },
         }).then(() => {}, () => {});
       }
     };
