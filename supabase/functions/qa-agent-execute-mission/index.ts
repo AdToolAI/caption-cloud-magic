@@ -340,6 +340,23 @@ Deno.serve(async (req) => {
       });
     }
 
+    // ----- BUG: interactive step failures (click/fill/wait_for/expect_visible) -----
+    const stepErrors: any[] = ((result.data as any)?.stepErrors ?? []) as any[];
+    for (const se of stepErrors) {
+      // Skip pure 'navigate' failures here — already covered by failedNavs block above.
+      if (se.type === "navigate") continue;
+      await insertBug({
+        run_id,
+        mission_name: missionName,
+        severity: "high",
+        category: "workflow",
+        title: `Step ${se.step_index} (${se.type}) failed: ${se.label?.slice(0, 60) ?? ""}`,
+        description: se.error ?? "(no error message)",
+        screenshot_url: screenshotUrl,
+        network_trace: { step_index: se.step_index, step_type: se.type, duration_ms: se.ms },
+      });
+    }
+
     // ----- Status: succeeded if no high/critical bugs and at least one nav OK -----
     const status =
       result.ok && successfulNavs.length > 0 && highSeverityBugs === 0
