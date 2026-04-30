@@ -4,10 +4,11 @@
 // die finale Video-URL zur Übergabe an Director's Cut / Library / Download zurück.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id",
 };
 
 serve(async (req) => {
@@ -26,13 +27,22 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const userClient = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: userRes } = await userClient.auth.getUser();
-    const userId = userRes?.user?.id;
+
+    // QA service-auth shortcut for Bond QA Deep Sweep
+    const qaSvc = detectQaServiceAuth(req);
+    let userId: string | undefined;
+    if (qaSvc.isQaService && qaSvc.userId) {
+      userId = qaSvc.userId;
+      console.log(`[compose-stitch-and-handoff] QA service-auth user=${userId}`);
+    } else {
+      const userClient = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: userRes } = await userClient.auth.getUser();
+      userId = userRes?.user?.id;
+    }
     if (!userId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,

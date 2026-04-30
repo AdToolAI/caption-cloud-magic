@@ -215,6 +215,31 @@ serve(async (req) => {
       });
     }
 
+    // Normalize subtitle clips and text overlays to camelCase before passing to
+    // the Remotion composition (DirectorsCutVideo.tsx reads .startTime/.endTime).
+    // Snake_case (start_time/end_time) callers would otherwise cause NaN sequence
+    // bounds → Lambda crash "The 'from' prop of a sequence must be finite".
+    if (subtitle_track?.clips?.length) {
+      subtitle_track.clips = subtitle_track.clips.map((c: any, i: number) => ({
+        ...c,
+        id: c.id ?? `clip-${i}`,
+        text: c.text ?? '',
+        startTime: Number(c.startTime ?? c.start_time ?? 0),
+        endTime: Number(c.endTime ?? c.end_time ?? 0),
+      }));
+    }
+    if (Array.isArray(text_overlays) && text_overlays.length) {
+      for (let i = 0; i < text_overlays.length; i++) {
+        const o: any = text_overlays[i];
+        text_overlays[i] = {
+          ...o,
+          id: o.id ?? `overlay-${i}`,
+          startTime: Number(o.startTime ?? o.start_time ?? 0),
+          endTime: o.endTime ?? o.end_time != null ? Number(o.endTime ?? o.end_time) : undefined,
+        };
+      }
+    }
+
     console.log(`[RenderDirectorsCut] Starting render for user ${user.id}, project ${project_id}`);
     console.log(`[RenderDirectorsCut] Received effects:`, JSON.stringify(effects));
     console.log(`[RenderDirectorsCut] Filter value:`, effects?.filter);
