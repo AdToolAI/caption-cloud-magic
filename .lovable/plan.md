@@ -1,36 +1,57 @@
-# Live Sweep Fix — Deploy der fehlenden Edge Functions
+# Fix der 6 Payload-Fehler im Live Sweep
 
 ## Diagnose
 
-Der Sweep-Button zeigt **"Failed to send a request to the Edge Function"**, weil:
+Der Sweep selbst läuft korrekt, aber **6 von 12 Provider-Payloads im Orchestrator** verwenden falsche Parameternamen für die echten Edge Functions. Es sind **keine echten Provider-Bugs** — die echten Studios funktionieren mit ihren eigenen UIs einwandfrei.
 
-1. `qa-live-sweep` und `qa-live-sweep-bootstrap` existieren als Dateien im Repo (im letzten Loop erstellt)
-2. Aber: `POST /functions/v1/qa-live-sweep-bootstrap` → **404 NOT_FOUND**
-3. Edge-Function-Logs sind leer → wurden nie aufgerufen, weil nie deployed
+| Provider | Fehler | Ursache |
+|---|---|---|
+| FLUX Schnell | `Invalid tier. Use fast, pro, or ultra.` | Sweep sendet `model: "flux-schnell"` statt `tier: "fast"` |
+| Hedra Talking Head | `imageUrl is required` | Sweep sendet `image_url` statt `imageUrl` (camelCase) |
+| Runway Aleph | `Unknown model: undefined` | Sweep sendet `video_url` statt `model: "runway-gen4-aleph"` + `referenceVideoUrl` |
+| Veo 3 (Google) | `Invalid model` | Sweep sendet kein `model` — braucht `model: "veo-3.1-fast"` |
+| Pika 2.2 Std | `Unknown Pika model: undefined` | Sweep sendet kein `model` — braucht `model: "pika-2-2-standard"` + `startImageUrl` |
+| Vidu Q2 | `Unknown Vidu model: undefined` | Sweep sendet kein `model` — braucht `model: "vidu-q2-reference"` + `referenceImages` |
 
-Das passiert manchmal, wenn neue Functions im selben Loop erstellt werden, in dem auch DB-Migrations laufen — der automatische Deploy-Schritt wird übersprungen.
+Die 6 erfolgreichen Provider (Kling, Luma, Wan, Seedance, Hailuo, Stable Audio) haben zufällig "lockere" Schemas und akzeptieren die generischen Felder.
 
-## Fix (1 Schritt)
+## Fix (1 Datei)
 
-**Manuelles Deploy** der beiden Functions erzwingen via `supabase--deploy_edge_functions`:
+In `supabase/functions/qa-live-sweep/index.ts` die `buildPayload`-Funktionen für die 6 fehlgeschlagenen Provider auf die korrekten Schemas umstellen:
 
-- `qa-live-sweep`
-- `qa-live-sweep-bootstrap`
+```ts
+// FLUX Schnell
+buildPayload: () => ({ prompt: "...", tier: "fast", aspectRatio: "1:1", style: "realistic" })
 
-Das ist die einzige notwendige Aktion. Code, DB, Bucket, RLS und UI sind bereits korrekt.
+// Hedra (camelCase!)
+buildPayload: ({ image, audio }) => ({ imageUrl: image, audioUrl: audio, aspectRatio: "16:9", resolution: "720p" })
 
-## Verifikation
+// Runway Aleph
+buildPayload: ({ video }) => ({ prompt: "...", model: "runway-gen4-aleph", duration: 5, aspectRatio: "16:9", referenceVideoUrl: video })
 
-Nach dem Deploy:
-1. `OPTIONS /qa-live-sweep-bootstrap` → 200 (statt 404)
-2. Im Cockpit "Bootstrap Assets" klicken → erzeugt 3 Assets im `qa-test-assets` Bucket
-3. "Run Live Sweep" klicken → läuft sequentiell durch die Provider, Hard-Cap 20 € greift
+// Veo 3
+buildPayload: () => ({ prompt: "...", model: "veo-3.1-fast", duration: 4, aspectRatio: "16:9" })
+
+// Pika 2.2 Std
+buildPayload: ({ image }) => ({ prompt: "...", model: "pika-2-2-standard", duration: 5, aspectRatio: "16:9", startImageUrl: image })
+
+// Vidu Q2 (Reference2V braucht referenceImages-Array)
+buildPayload: ({ image }) => ({ prompt: "...", model: "vidu-q2-reference", aspectRatio: "16:9", referenceImages: [image], referenceRoles: ["character"] })
+```
+
+## Bonus: Auto-Resolve alter Bug-Reports
+
+Die 6 Failures haben automatisch `qa_bug_reports` erzeugt — das sind aber Sweep-interne Payload-Bugs, keine echten Produktbugs. Nach dem Fix werden sie beim nächsten grünen Sweep liegen bleiben. Optional als kleinen Cleanup: ein einmaliger SQL-Update setzt diese 6 Reports auf `resolved` mit Note "fixed in sweep payload v2".
+
+## Erwartung nach dem Fix
+
+- Nächster Sweep-Run sollte **12/12 grün** liefern
+- Restliches Budget reicht locker (~17 € verbleibend, geschätzte Kosten für 2. Run ~8 €)
+- Falls einzelne Provider trotzdem fehlschlagen, sind das dann **echte** Produktbugs und landen korrekt im Bug Inbox
 
 ## Was nicht angefasst wird
 
-- Keine Code-Änderungen an den Functions
+- Keine Änderung an den Provider-Edge-Functions selbst (die sind korrekt)
 - Keine DB-Migration
-- Keine UI-Änderungen
-- Keine neuen Secrets
-
-Falls nach dem Deploy ein zweiter Fehler auftritt (z.B. fehlendes Secret in einer Provider-Function), wird der separat im Bug-Inbox sichtbar — der Sweep selbst läuft dann aber zumindest an.
+- Keine UI-Änderung
+- Kein neuer Deploy nötig außer `qa-live-sweep`
