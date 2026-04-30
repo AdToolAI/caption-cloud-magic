@@ -9892,6 +9892,116 @@ export type Database = {
           },
         ]
       }
+      qa_deep_sweep_flow_results: {
+        Row: {
+          actual_cost_eur: number
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          estimated_cost_eur: number
+          finished_at: string | null
+          flow_index: number
+          flow_name: string
+          id: string
+          output_url: string | null
+          run_id: string
+          stage_log: Json
+          started_at: string | null
+          status: string
+          validation_checks: Json
+        }
+        Insert: {
+          actual_cost_eur?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_eur?: number
+          finished_at?: string | null
+          flow_index: number
+          flow_name: string
+          id?: string
+          output_url?: string | null
+          run_id: string
+          stage_log?: Json
+          started_at?: string | null
+          status?: string
+          validation_checks?: Json
+        }
+        Update: {
+          actual_cost_eur?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_eur?: number
+          finished_at?: string | null
+          flow_index?: number
+          flow_name?: string
+          id?: string
+          output_url?: string | null
+          run_id?: string
+          stage_log?: Json
+          started_at?: string | null
+          status?: string
+          validation_checks?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_deep_sweep_flow_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "qa_deep_sweep_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qa_deep_sweep_runs: {
+        Row: {
+          cap_eur: number
+          created_at: string
+          finished_at: string | null
+          flows_failed: number
+          flows_skipped: number
+          flows_succeeded: number
+          flows_total: number
+          id: string
+          notes: string | null
+          started_at: string
+          status: string
+          total_cost_eur: number
+          triggered_by: string | null
+        }
+        Insert: {
+          cap_eur?: number
+          created_at?: string
+          finished_at?: string | null
+          flows_failed?: number
+          flows_skipped?: number
+          flows_succeeded?: number
+          flows_total?: number
+          id?: string
+          notes?: string | null
+          started_at?: string
+          status?: string
+          total_cost_eur?: number
+          triggered_by?: string | null
+        }
+        Update: {
+          cap_eur?: number
+          created_at?: string
+          finished_at?: string | null
+          flows_failed?: number
+          flows_skipped?: number
+          flows_succeeded?: number
+          flows_total?: number
+          id?: string
+          notes?: string | null
+          started_at?: string
+          status?: string
+          total_cost_eur?: number
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       qa_live_budget: {
         Row: {
           cap_eur: number
