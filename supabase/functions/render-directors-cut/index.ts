@@ -557,6 +557,15 @@ serve(async (req) => {
           payload: JSON.stringify(finalInputProps),
         };
 
+        // QA stability mode: pin to 1 Lambda worker by setting framesPerLambda
+        // = total durationInFrames. Avoids AWS concurrency collisions in Deep Sweep.
+        const stabilityFpl = (qa_stability_mode || max_lambda_workers === 1)
+          ? Math.max(durationInFrames, 1)
+          : undefined;
+        if (stabilityFpl) {
+          console.log(`[RenderDirectorsCut] 🛡️ QA stability mode active — single-Lambda render (framesPerLambda=${stabilityFpl})`);
+        }
+
         const lambdaPayload = normalizeStartPayload({
           type: 'start',
           serveUrl: REMOTION_SERVE_URL,
@@ -565,7 +574,7 @@ serve(async (req) => {
           codec: format === 'webm' ? 'vp8' : 'h264',
           imageFormat: 'jpeg',
           maxRetries: 1,
-          // framesPerLambda removed — let Remotion auto-schedule via concurrencyPerLambda
+          ...(stabilityFpl ? { framesPerLambda: stabilityFpl } : {}),
           privacy: 'public',
           bucketName: 'remotionlambda-eucentral1-13gm4o6s90',
           durationInFrames,
