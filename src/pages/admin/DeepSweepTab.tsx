@@ -80,9 +80,8 @@ const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
   "Auto-Director (Brief → Video)",
-  "Talking Head (Hedra)",
+  "Talking Head (HeyGen)",
   "Universal Video Creator",
-  "Long-Form Render (Lambda)",
   "Magic Edit (FLUX Fill)",
 ];
 
@@ -200,8 +199,8 @@ export function DeepSweepTab() {
               </Badge>
             </div>
             <p className="text-sm text-slate-400">
-              7 echte End-to-End-Pipelines: Composer-Stitch, Director's Cut Lambda, Auto-Director,
-              Talking Head, Universal Video, Long-Form, Magic Edit. ~10–15 € pro Voll-Run.
+              6 echte End-to-End-Pipelines: Composer-Stitch, Director's Cut Lambda, Auto-Director,
+              Talking Head (HeyGen), Universal Video, Magic Edit. ~8–12 € pro Voll-Run.
             </p>
             <p className="text-xs text-amber-400/80 mt-1">
               ⚠️ Vor dem ersten Run einmal in <strong>Live Sweep</strong> auf <em>"Bootstrap Assets"</em> klicken,
@@ -248,8 +247,8 @@ export function DeepSweepTab() {
                   <AlertDialogTitle>Deep Sweep mit echten Renders starten?</AlertDialogTitle>
                   <AlertDialogDescription>
                     Diese Aktion löst <strong>echte bezahlte API-Calls</strong> aus
-                    (Replicate, Hedra, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
-                    ~15 €. Hard-Cap: 50 €. Dauer: 12-15 Minuten.
+                    (Replicate, HeyGen, ElevenLabs, AWS Lambda). Erwarteter Verbrauch:
+                    ~12 €. Hard-Cap: 50 €. Dauer: 10-12 Minuten.
                     <br /><br />
                     Hard-Lock: Max 1 Sweep alle 6h.
                   </AlertDialogDescription>

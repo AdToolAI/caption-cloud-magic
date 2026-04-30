@@ -502,16 +502,17 @@ async function flowAutoDirector(ctx: RunCtx): Promise<FlowResult> {
   return result;
 }
 
-// Flow 4: Talking Head (Hedra)
+// Flow 4: Talking Head (HeyGen) — Hedra was removed from Replicate (Apr 2026),
+// migrated to HeyGen native API which provides premium photo-avatar quality.
 async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
   const result: FlowResult = {
     flow_index: 4,
-    flow_name: "Talking Head (Portrait + TTS + Hedra)",
+    flow_name: "Talking Head (Portrait + TTS + HeyGen)",
     status: "failed",
     duration_ms: 0,
-    estimated_cost_eur: 1.8,
+    estimated_cost_eur: 0.4,
     actual_cost_eur: 0,
     stage_log: stages,
     validation_checks: {},
@@ -522,7 +523,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     result.validation_checks.portrait = !!portraitUrl;
 
     const t0 = Date.now();
-    const hedra = await callEdge(
+    const heygen = await callEdge(
       "generate-talking-head",
       {
         imageUrl: portraitUrl,
@@ -534,37 +535,24 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
       ctx.userId,
       300_000,
     );
-    stages.push({ stage: "hedra", ok: hedra.ok, ms: Date.now() - t0, note: hedra.error });
+    stages.push({ stage: "heygen-create", ok: heygen.ok, ms: Date.now() - t0, note: heygen.error });
 
-    const url = pickAssetUrl(hedra.json) || (hedra.json as any)?.videoUrl;
-    const predictionId = (hedra.json as any)?.predictionId;
+    const url = pickAssetUrl(heygen.json) || (heygen.json as any)?.videoUrl;
+    const predictionId = (heygen.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
-    // Hedra Replicate model was removed (April 2026). Detect 404 / "Model not found"
-    // / "resource could not be found" and degrade gracefully to budget_skipped instead
-    // of polluting the bug report with a known-broken provider.
-    const errStr = (hedra.error || "").toLowerCase();
-    const isHedraGone =
-      errStr.includes("model not found") ||
-      errStr.includes("resource could not be found") ||
-      (hedra.status === 500 && errStr.includes("404"));
-
-    if (hedra.ok && url) {
+    if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
-    } else if (hedra.ok && predictionId) {
+    } else if (heygen.ok && predictionId) {
+      // Async — HeyGen polling runs in background via waitUntil
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
-      result.error_message = "Async — prediction triggered, output via webhook";
-    } else if (isHedraGone) {
-      result.status = "budget_skipped";
-      result.actual_cost_eur = 0;
-      result.error_message =
-        "Hedra Replicate model removed (April 2026). Flow auto-skipped until provider migration (Hedra native API or Replicate alternative).";
+      result.error_message = "Async — HeyGen video_id received, completion via background poll";
     } else {
-      result.error_message = hedra.error || "Hedra returned no video URL or predictionId";
+      result.error_message = heygen.error || "HeyGen returned no video URL or predictionId";
     }
   } catch (e: any) {
     result.error_message = e?.message || String(e);
@@ -630,157 +618,15 @@ async function flowUniversalVideo(ctx: RunCtx): Promise<FlowResult> {
   return result;
 }
 
-// Flow 6: Long-Form Render — seed using REAL columns of sora_long_form_projects
-async function flowLongFormRender(ctx: RunCtx): Promise<FlowResult> {
-  const start = Date.now();
-  const stages: FlowResult["stage_log"] = [];
-  const result: FlowResult = {
-    flow_index: 6,
-    flow_name: "Long-Form Render (Lambda)",
-    status: "failed",
-    duration_ms: 0,
-    estimated_cost_eur: 3.5,
-    actual_cost_eur: 0,
-    stage_log: stages,
-    validation_checks: {},
-  };
-
-  let projectId: string | null = null;
-
-  try {
-    const tSetup = Date.now();
-    const { data: proj, error: projErr } = await ctx.admin
-      .from("sora_long_form_projects")
-      .insert({
-        user_id: ctx.userId,
-        name: `qa-deep-sweep-longform-${ctx.runId}`,
-        target_duration: 30,
-        aspect_ratio: "16:9",
-        model: "sora-2-standard",
-        status: "draft",
-        script: "QA deep sweep long-form render validation.",
-      })
-      .select()
-      .single();
-
-    if (projErr || !proj) {
-      stages.push({ stage: "setup-project", ok: false, ms: Date.now() - tSetup, note: projErr?.message });
-      result.error_message = `Could not seed test project: ${projErr?.message || "unknown"}`;
-      result.duration_ms = Date.now() - start;
-      return result;
-    }
-    projectId = proj.id;
-
-    // Verify the seed actually persisted (catches silent RLS/trigger drops)
-    const { data: verify } = await ctx.admin
-      .from("sora_long_form_projects")
-      .select("id, user_id, status")
-      .eq("id", proj.id)
-      .maybeSingle();
-    console.log(`[deep-sweep][flow6] seed verify: ${JSON.stringify(verify)}`);
-
-    const { error: sceneErr } = await ctx.admin
-      .from("sora_long_form_scenes")
-      .insert({
-        project_id: proj.id,
-        scene_order: 0,
-        status: "completed",
-        duration: 4, // CHECK constraint: 4|8|12
-        generated_video_url: ctx.assets.video,
-        prompt: "QA test scene",
-        cost_euros: 0,
-        transition_type: "none",
-      });
-    stages.push({ stage: "setup-project-and-scene", ok: !sceneErr, ms: Date.now() - tSetup, note: sceneErr?.message });
-
-    if (sceneErr) {
-      result.error_message = `Scene seed failed: ${sceneErr.message}`;
-      result.duration_ms = Date.now() - start;
-      return result;
-    }
-
-    // Trigger render
-    const t0 = Date.now();
-    const render = await triggerRenderWithBackoff(
-      "render-long-form-video",
-      { projectId: proj.id },
-      ctx.userId,
-      120_000,
-    );
-    stages.push({
-      stage: "trigger-render",
-      ok: render.ok,
-      ms: Date.now() - t0,
-      note: render.throttled
-        ? `AWS Lambda throttled after ${render.attempts} attempt(s): ${render.error}`
-        : render.error,
-    });
-
-    if (!render.ok) {
-      result.error_message = render.throttled
-        ? `AWS Lambda concurrency throttled (${render.attempts} retries exhausted) — infrastructure quota, not a code bug`
-        : render.error;
-      result.status = render.throttled ? "timeout" : "failed";
-      result.actual_cost_eur = 0;
-      result.duration_ms = Date.now() - start;
-      return result;
-    }
-
-    const directUrl = pickAssetUrl(render.json);
-    if (directUrl) {
-      result.output_url = directUrl;
-      result.validation_checks.url_reachable = await headOk(directUrl);
-      result.status = "success";
-      result.actual_cost_eur = result.estimated_cost_eur;
-    } else {
-      // Poll project status (max 90s — Edge Function wall-clock budget; Lambda continues async)
-      const tPoll = Date.now();
-      let polled: any = null;
-      for (let i = 0; i < 9; i++) {
-        await new Promise((r) => setTimeout(r, 10_000));
-        const { data } = await ctx.admin
-          .from("sora_long_form_projects")
-          .select("status, final_video_url")
-          .eq("id", proj.id)
-          .maybeSingle();
-        if (data && (data.status === "completed" || data.status === "failed")) {
-          polled = data;
-          break;
-        }
-      }
-      stages.push({ stage: "poll-completion", ok: polled?.status === "completed", ms: Date.now() - tPoll });
-      if (polled?.status === "completed" && polled.final_video_url) {
-        result.output_url = polled.final_video_url;
-        result.validation_checks.url_reachable = await headOk(polled.final_video_url);
-        result.status = "success";
-        result.actual_cost_eur = result.estimated_cost_eur;
-      } else {
-        result.status = polled?.status === "failed" ? "failed" : "timeout";
-        result.error_message = polled?.status === "failed"
-          ? "Long-form render reported failed status"
-          : "Long-form render did not complete in 90s polling window (Lambda may still finish async)";
-        result.actual_cost_eur = 1.0;
-      }
-    }
-  } catch (e: any) {
-    result.error_message = e?.message || String(e);
-  } finally {
-    if (projectId) {
-      await ctx.admin.from("sora_long_form_scenes").delete().eq("project_id", projectId).then(() => {}, () => {});
-      await ctx.admin.from("sora_long_form_projects").delete().eq("id", projectId).then(() => {}, () => {});
-    }
-  }
-
-  result.duration_ms = Date.now() - start;
-  return result;
-}
+// Flow 6 (Long-Form Render) was removed in April 2026 after Sora 2 was decommissioned.
+// Long-form video creation is now covered by Motion Studio + Director's Cut.
 
 // Flow 7: Magic Edit (Inpaint with proper PNG mask)
 async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
   const result: FlowResult = {
-    flow_index: 7,
+    flow_index: 6,
     flow_name: "Magic Edit (FLUX Fill Inpaint)",
     status: "failed",
     duration_ms: 0,
@@ -1020,14 +866,8 @@ Deno.serve(async (req) => {
       const f5 = skip5 || await flowUniversalVideo(ctx);
       await persistAndCount(f5);
 
-      const skip6 = skipBudget(6, 3.5, "Long-Form Render (Lambda)");
-      // Cooldown before next Lambda trigger to avoid AWS Concurrency throttle
-      // (DC Lambda from Flow 2 may still hold worker slots).
-      if (!skip6) await sleep(15_000);
-      const f6 = skip6 || await flowLongFormRender(ctx);
-      await persistAndCount(f6);
-
-      const skip7 = skipBudget(7, 0.15, "Magic Edit (FLUX Fill Inpaint)");
+      // Flow 6 (Long-Form) removed April 2026 — Sora 2 decommissioned.
+      const skip7 = skipBudget(6, 0.15, "Magic Edit (FLUX Fill Inpaint)");
       const f7 = skip7 || await flowMagicEdit(ctx);
       await persistAndCount(f7);
     } catch (e: any) {

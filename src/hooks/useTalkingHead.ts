@@ -55,11 +55,11 @@ export function useTalkingHead() {
     }
   };
 
-  // Cost estimate: ~0.15 EUR/sec for Hedra at 720p + ~0.05 EUR for TTS
+  // Cost estimate: HeyGen Photo Avatar ~0.30 EUR/video (flat) + ~0.05 EUR for TTS
   const estimateCost = (durationSec: number, includesTTS: boolean): number => {
-    const hedraCost = durationSec * 0.15;
+    const heygenCost = 0.30;
     const ttsCost = includesTTS ? 0.05 : 0;
-    return Number((hedraCost + ttsCost).toFixed(2));
+    return Number((heygenCost + ttsCost).toFixed(2));
   };
 
   return { loading, result, generate, estimateCost };
