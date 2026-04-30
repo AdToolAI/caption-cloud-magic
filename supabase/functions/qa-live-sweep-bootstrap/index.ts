@@ -25,22 +25,45 @@ async function uploadIfMissing(
   supabase: any,
   path: string,
   fetchBody: () => Promise<{ blob: Blob; contentType: string }>,
-): Promise<{ uploaded: boolean; path: string; error?: string }> {
-  // Probe via signed URL — exists() needs list permissions; createSignedUrl returns 400 on missing
-  const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
-  if (probe.data?.signedUrl) {
-    return { uploaded: false, path };
+  opts: { minBytes?: number; expectedMimePrefix?: string } = {},
+): Promise<{ uploaded: boolean; repaired?: boolean; path: string; error?: string; reason?: string }> {
+  // Check existing object — if it's clearly corrupt (too small, wrong mime,
+  // looks like an XML S3 error response), overwrite it.
+  let needsUpload = true;
+  let repairing = false;
+  try {
+    const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
+    if (probe.data?.signedUrl) {
+      const head = await fetch(probe.data.signedUrl, { method: "HEAD" });
+      const len = Number(head.headers.get("content-length") || 0);
+      const ct = head.headers.get("content-type") || "";
+      const minBytes = opts.minBytes ?? 1024;
+      const expectedMime = opts.expectedMimePrefix;
+      const corrupt =
+        len < minBytes ||
+        ct.includes("xml") ||
+        (expectedMime && !ct.startsWith(expectedMime));
+      if (!corrupt) {
+        needsUpload = false;
+      } else {
+        repairing = true;
+        console.warn(`[bootstrap] repairing ${path} (size=${len}, ct=${ct})`);
+      }
+    }
+  } catch {
+    // Assume missing
   }
+  if (!needsUpload) return { uploaded: false, path };
 
   try {
     const { blob, contentType } = await fetchBody();
     const { error } = await supabase.storage
       .from("qa-test-assets")
       .upload(path, blob, { contentType, upsert: true });
-    if (error) return { uploaded: false, path, error: error.message };
-    return { uploaded: true, path };
+    if (error) return { uploaded: false, repaired: repairing, path, error: error.message };
+    return { uploaded: true, repaired: repairing, path };
   } catch (e: any) {
-    return { uploaded: false, path, error: e?.message || String(e) };
+    return { uploaded: false, repaired: repairing, path, error: e?.message || String(e) };
   }
 }
 
