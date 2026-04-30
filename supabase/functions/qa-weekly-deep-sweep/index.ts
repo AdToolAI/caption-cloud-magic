@@ -198,7 +198,7 @@ async function flowComposerStitch(ctx: RunCtx): Promise<FlowResult> {
       scene_type: "custom",
       transition_type: "fade",
       transition_duration: 0.4,
-      prompt: `qa-stitch scene ${i + 1}`,
+      ai_prompt: `qa-stitch scene ${i + 1}`,
     }));
     const { error: scenesErr } = await ctx.admin.from("composer_scenes").insert(sceneRows);
     stages.push({ stage: "seed-project-and-scenes", ok: !scenesErr, ms: Date.now() - tSetup, note: scenesErr?.message });
