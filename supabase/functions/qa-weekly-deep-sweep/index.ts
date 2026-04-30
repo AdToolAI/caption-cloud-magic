@@ -522,8 +522,11 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    const portraitUrl = ctx.signedAssets.image || ctx.assets.image;
+    // HeyGen Photo-Avatar requires an image with a detectable human face.
+    // Prefer the dedicated bootstrapped portrait; fall back to generic image (likely fails face-detection).
+    const portraitUrl = ctx.assets.portrait || ctx.signedAssets.image || ctx.assets.image;
     result.validation_checks.portrait = !!portraitUrl;
+    result.validation_checks.dedicated_portrait = !!ctx.assets.portrait;
 
     const t0 = Date.now();
     const heygen = await callEdge(
@@ -544,7 +547,13 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     const predictionId = (heygen.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
-    if (heygen.ok && url) {
+    // Detect HeyGen "no face detected" (code 400127) → soft-skip, don't count as failure.
+    const errBlob = `${heygen.error || ""} ${JSON.stringify(heygen.json || {})}`;
+    if (!heygen.ok && errBlob.includes("400127")) {
+      result.status = "skipped";
+      result.error_message =
+        "Bootstrap-Asset enthält kein Gesicht. Klicke 'Bootstrap Assets' im Live Sweep Tab, um test-portrait.png zu provisionieren, dann erneut starten.";
+    } else if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
       result.status = "success";
