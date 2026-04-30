@@ -5,8 +5,8 @@
 //   import { sendEmail } from "../_shared/email-send.ts";
 //   await sendEmail({ to, subject, html, template: "verify", category: "transactional" });
 
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import { Resend } from "https://esm.sh/resend@2.0.0";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.39.3";
+import { Resend } from "npm:resend@2.0.0";
 
 export type EmailCategory = "transactional" | "marketing" | "system";
 

@@ -12,7 +12,7 @@
 //   - 'pro'      → google/gemini-3-pro-image-preview
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {

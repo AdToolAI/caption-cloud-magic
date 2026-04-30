@@ -2,8 +2,8 @@
 // The Reference2V flavour is the differentiator: 1–7 reference images
 // (character + product + location + style + props) blended into one 5s clip.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Replicate from "https://esm.sh/replicate@0.25.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
 
 const corsHeaders = {

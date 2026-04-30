@@ -3,7 +3,7 @@
 //
 // Session D upgrade: pulls real trends from `trend_entries` + `news_hub_articles`
 // and aligns slot scheduling with `posting_slots` (high-score windows per platform).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

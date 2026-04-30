@@ -1,7 +1,7 @@
 // auto-director-compose v1.0.0 — 1-Click AI Movie Generator
 // Orchestrates: AI plan → scene insert → parallel clip generation → optional voiceover/music
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

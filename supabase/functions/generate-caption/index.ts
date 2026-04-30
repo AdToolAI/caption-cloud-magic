@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { getSupabaseClient } from '../_shared/db-client.ts';
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { ErrorResponses, createErrorResponse } from '../_shared/errorHandler.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';

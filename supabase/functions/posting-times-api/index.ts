@@ -1,5 +1,5 @@
 // Posting Times API - Returns optimal posting times based on historical data or industry benchmarks
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { getRedisCache } from '../_shared/redis-cache.ts';
 
 const corsHeaders = {

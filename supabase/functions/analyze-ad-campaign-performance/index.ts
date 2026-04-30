@@ -3,7 +3,7 @@
 // finds linked posts in `ad_campaign_posts`, joins to `post_metrics` and returns
 // per-variant aggregated engagement + a "winner" pick.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

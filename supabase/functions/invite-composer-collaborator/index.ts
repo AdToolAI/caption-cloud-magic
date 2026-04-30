@@ -2,7 +2,7 @@
 // If the email belongs to an existing user, we directly create the collaborator row.
 // Otherwise we create a placeholder row with invited_email so the owner can reshare later.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

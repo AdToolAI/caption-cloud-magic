@@ -2,7 +2,7 @@
 // Pausiert Autopilot wenn:
 //  1. Briefing-Deadline überschritten
 //  2. User-Credits unter Mindest-Schwelle
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

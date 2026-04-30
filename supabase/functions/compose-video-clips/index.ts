@@ -17,8 +17,8 @@ function parseRetryAfter(msg: string): number {
   const m2 = msg.match(/retry_after"?\s*:\s*(\d+)/);
   return m2 ? Math.max(parseInt(m2[1], 10), 1) : 8;
 }
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import Replicate from "https://esm.sh/replicate@0.25.2";
+import { createClient } from "npm:@supabase/supabase-js@2";
+import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 
 const corsHeaders = {

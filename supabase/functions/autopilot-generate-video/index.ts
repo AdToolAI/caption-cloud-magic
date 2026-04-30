@@ -1,7 +1,7 @@
 // Starts an asynchronous Replicate prediction for an autopilot slot.
 // Persists the prediction id and a video_job audit row.
 // The poller (autopilot-video-poll) handles completion and credit refund.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

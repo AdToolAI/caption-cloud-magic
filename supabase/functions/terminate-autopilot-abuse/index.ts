@@ -1,6 +1,6 @@
 // Terminates an account on Critical-Strike: archives data, locks autopilot, signs out, marks profile.
 // Hard-deletion runs separately after retention period; this function is the immediate termination trigger.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

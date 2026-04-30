@@ -2,7 +2,7 @@
 // Cron-triggered: chooses tier by weekday, picks next mission, dispatches execute-mission.
 // Manual trigger via { mission_id, force_real_providers? } also supported.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

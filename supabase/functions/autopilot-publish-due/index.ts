@@ -1,5 +1,5 @@
 // Cron-driven publisher — picks scheduled slots whose time has come and publishes via the unified `publish` function.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
