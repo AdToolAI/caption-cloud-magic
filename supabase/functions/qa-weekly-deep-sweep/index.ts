@@ -816,6 +816,7 @@ Deno.serve(async (req) => {
     userId: userData.user.id,
     admin,
     assets: await getTestAssets(admin),
+    signedAssets: await getSignedAssets(admin),
     remainingEur: capEur,
   };
 
