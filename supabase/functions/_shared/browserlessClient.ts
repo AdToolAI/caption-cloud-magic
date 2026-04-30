@@ -53,8 +53,13 @@ export async function runBrowserlessFunction(
   const _requestedTimeout = timeoutMs ?? effectiveClientTimeout;
 
   try {
+    // NOTE: `blockAds=true` was removed because Browserless' built-in ad/tracker
+    // blocklist also blocks legit Supabase edge-function calls like
+    // `companion-diagnose`, surfacing as fake `ERR_BLOCKED_BY_CLIENT` console
+    // errors and triggering false-positive bug reports. Real third-party pixels
+    // are filtered via `qa_muted_patterns` instead.
     const res = await fetch(
-      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}&blockAds=true`,
+      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
