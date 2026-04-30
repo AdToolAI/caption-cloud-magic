@@ -30,10 +30,35 @@ const FALLBACK_VIDEO =
 const FALLBACK_AUDIO =
   "https://download.samplelib.com/mp3/sample-3s.mp3";
 
+// Shared throttle/concurrency-detection helper. Used both for direct trigger
+// errors AND for async webhook-reported render failures, so a "Rate Exceeded"
+// from AWS Lambda never gets classified as a hard failure (red bug) — it's
+// always a yellow infrastructure timeout.
+function isLambdaThrottleMessage(msg?: string | null): boolean {
+  if (!msg) return false;
+  const m = msg.toLowerCase();
+  return (
+    m.includes("rate exceeded") ||
+    m.includes("concurrency limit") ||
+    m.includes("aws concurrency") ||
+    m.includes("toomanyrequests") ||
+    m.includes("throttlingexception") ||
+    m.includes(" 429") ||
+    m.startsWith("429") ||
+    m.includes("http 429") ||
+    m.includes("rate_limit_exceeded") ||
+    m.includes("render-kapazität") ||
+    m.includes("render-kapazitat") ||
+    m.includes("vorübergehend erschöpft") ||
+    m.includes("vorubergehend erschopft") ||
+    m.includes("momentan werden viele videos")
+  );
+}
+
 interface FlowResult {
   flow_index: number;
   flow_name: string;
-  status: "success" | "failed" | "timeout" | "budget_skipped";
+  status: "success" | "failed" | "timeout" | "budget_skipped" | "skipped";
   duration_ms: number;
   estimated_cost_eur: number;
   actual_cost_eur: number;
