@@ -178,6 +178,13 @@
     @apply border-border;
   }
 
+  html, body {
+    /* Prevent horizontal overflow from decorative blur orbs, sub-pixel rounding,
+       and transform-scaled hero elements (caught by mobile-responsive E2E test). */
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
