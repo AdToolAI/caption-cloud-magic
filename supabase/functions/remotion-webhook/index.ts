@@ -457,6 +457,15 @@ serve(async (req) => {
           }
         }
 
+        // Long-Form failure sync
+        if (isLongForm && longFormProjectId) {
+          await supabaseAdmin.from('sora_long_form_projects').update({
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          }).eq('id', longFormProjectId);
+          console.log('✅ sora_long_form_projects marked failed:', longFormProjectId);
+        }
+
         // r28: Update universal_video_progress — MERGE errorCategory into result_data
         try {
           let progressUpdated = false;
