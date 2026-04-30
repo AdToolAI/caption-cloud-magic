@@ -368,18 +368,18 @@ export default async ({ page, context }) => {
       const label = step.type + (step.path ? ' ' + step.path : step.selector ? ' ' + step.selector : step.text ? ' "' + step.text + '"' : '');
       try {
         if (step.type === 'navigate') {
-          await page.goto(opts.baseUrl + step.path, { waitUntil: 'domcontentloaded', timeout: step.timeout_ms || 15000 });
-          await new Promise(r => setTimeout(r, step.wait_ms != null ? step.wait_ms : 800));
+          await page.goto(opts.baseUrl + step.path, { waitUntil: 'domcontentloaded', timeout: clampStep(step.timeout_ms || 12000) });
+          await new Promise(r => setTimeout(r, clampWait(step.wait_ms != null ? step.wait_ms : 800)));
           const title = await page.title();
           result.pathResults.push({ path: step.path, ok: true, ms: Date.now() - tStep, title, step_index: i });
         }
         else if (step.type === 'click') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           await page.click(step.selector);
           await new Promise(r => setTimeout(r, 250));
         }
         else if (step.type === 'click_text') {
-          const deadline = Date.now() + (step.timeout_ms || 8000);
+          const deadline = Date.now() + clampStep(step.timeout_ms);
           let el = null;
           while (Date.now() < deadline && !el) {
             el = await findByText(step.text, step.role);
@@ -390,19 +390,19 @@ export default async ({ page, context }) => {
           await new Promise(r => setTimeout(r, 250));
         }
         else if (step.type === 'fill') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           const h = await page.$(step.selector);
           await h.click({ clickCount: 3 });
           await h.type(String(step.value), { delay: 10 });
         }
         else if (step.type === 'wait_for') {
-          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 10000 });
+          await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms || 10000) });
         }
         else if (step.type === 'expect_visible') {
           if (step.selector) {
-            await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+            await page.waitForSelector(step.selector, { visible: true, timeout: clampStep(step.timeout_ms) });
           } else if (step.text) {
-            const deadline = Date.now() + (step.timeout_ms || 8000);
+            const deadline = Date.now() + clampStep(step.timeout_ms);
             let found = false;
             while (Date.now() < deadline && !found) {
               found = await page.evaluate((t) => {
@@ -424,7 +424,7 @@ export default async ({ page, context }) => {
           consoleErrorBaseline = currentErrs;
         }
         else if (step.type === 'sleep') {
-          await new Promise(r => setTimeout(r, step.ms || 500));
+          await new Promise(r => setTimeout(r, clampWait(step.ms != null ? step.ms : 500)));
         }
         else {
           throw new Error('Unknown step type: ' + step.type);
