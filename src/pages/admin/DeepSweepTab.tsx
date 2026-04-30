@@ -278,7 +278,7 @@ export function DeepSweepTab() {
             <StatCard label="Status" value={latestRun.status} variant={latestRun.status} />
             <StatCard
               label="Pass Rate"
-              value={`${latestRun.flows_succeeded}/${latestRun.flows_total} (${passRate}%)`}
+              value={`${latestRun.flows_succeeded}/${effectiveTotal} (${passRate}%)${timeoutCount > 0 ? ` · ${timeoutCount} timeout` : ""}`}
             />
             <StatCard
               label="Verbraucht"
