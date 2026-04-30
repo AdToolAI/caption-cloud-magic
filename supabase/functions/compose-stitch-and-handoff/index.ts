@@ -149,15 +149,22 @@ serve(async (req) => {
         .eq("user_id", userId);
     }
 
-    // Trigger stitch via existing assemble function
+    // Trigger stitch via existing assemble function.
+    // When running as QA service-auth, forward the service-role token + QA
+    // headers so compose-video-assemble's QA shortcut can authorize the call.
+    const stitchHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: authHeader,
+    };
+    if (qaSvc.isQaService && qaSvc.userId) {
+      stitchHeaders["x-qa-real-spend"] = "true";
+      stitchHeaders["x-qa-user-id"] = qaSvc.userId;
+    }
     const assembleResp = await fetch(
       `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-video-assemble`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeader,
-        },
+        headers: stitchHeaders,
         body: JSON.stringify({ projectId }),
       }
     );

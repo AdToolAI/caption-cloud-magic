@@ -32,10 +32,12 @@ serve(async (req) => {
     const progressIdFromWebhook = customData?.progressId; // ← NEW: direct progressId
     const isDirectorsCut = source === 'directors-cut';
     const isComposer = source === 'composer';
+    const isLongForm = source === 'sora-long-form';
     const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
+    const longFormProjectId = customData?.sora_long_form_project_id;
 
-    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, progressIdFromWebhook });
+    console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
     if (type === 'success') {
       console.log(`✅ Render ${renderId} completed`);
@@ -271,6 +273,16 @@ serve(async (req) => {
             }
           }
 
+          // Long-Form (sora_long_form) project completion sync
+          if (isLongForm && longFormProjectId) {
+            await supabaseAdmin.from('sora_long_form_projects').update({
+              status: 'completed',
+              final_video_url: finalOutputUrl,
+              updated_at: new Date().toISOString(),
+            }).eq('id', longFormProjectId);
+            console.log('✅ sora_long_form_projects marked completed:', longFormProjectId);
+          }
+
           // Update universal_video_progress — PRIMARY via progressId, fallback via renderId scan
           try {
             let progressUpdated = false;
@@ -443,6 +455,15 @@ serve(async (req) => {
               error_message: errorMessage.substring(0, 500),
             }).eq('id', exportId);
           }
+        }
+
+        // Long-Form failure sync
+        if (isLongForm && longFormProjectId) {
+          await supabaseAdmin.from('sora_long_form_projects').update({
+            status: 'failed',
+            updated_at: new Date().toISOString(),
+          }).eq('id', longFormProjectId);
+          console.log('✅ sora_long_form_projects marked failed:', longFormProjectId);
         }
 
         // r28: Update universal_video_progress — MERGE errorCategory into result_data

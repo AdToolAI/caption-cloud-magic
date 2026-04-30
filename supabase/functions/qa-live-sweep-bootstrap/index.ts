@@ -16,31 +16,57 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+// Reliable public MP4/MP3 samples — Google's GTV bucket is widely cached and
+// returns a real video/mp4 with a parseable moov atom (the previous
+// lovable-public sample returned an XML S3 error, breaking Lambda playback).
 const SAMPLE_VIDEO_URL =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp4";
+  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
 const SAMPLE_AUDIO_URL =
-  "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp3";
+  "https://download.samplelib.com/mp3/sample-3s.mp3";
 
 async function uploadIfMissing(
   supabase: any,
   path: string,
   fetchBody: () => Promise<{ blob: Blob; contentType: string }>,
-): Promise<{ uploaded: boolean; path: string; error?: string }> {
-  // Probe via signed URL — exists() needs list permissions; createSignedUrl returns 400 on missing
-  const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
-  if (probe.data?.signedUrl) {
-    return { uploaded: false, path };
+  opts: { minBytes?: number; expectedMimePrefix?: string } = {},
+): Promise<{ uploaded: boolean; repaired?: boolean; path: string; error?: string; reason?: string }> {
+  // Check existing object — if it's clearly corrupt (too small, wrong mime,
+  // looks like an XML S3 error response), overwrite it.
+  let needsUpload = true;
+  let repairing = false;
+  try {
+    const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
+    if (probe.data?.signedUrl) {
+      const head = await fetch(probe.data.signedUrl, { method: "HEAD" });
+      const len = Number(head.headers.get("content-length") || 0);
+      const ct = head.headers.get("content-type") || "";
+      const minBytes = opts.minBytes ?? 1024;
+      const expectedMime = opts.expectedMimePrefix;
+      const corrupt =
+        len < minBytes ||
+        ct.includes("xml") ||
+        (expectedMime && !ct.startsWith(expectedMime));
+      if (!corrupt) {
+        needsUpload = false;
+      } else {
+        repairing = true;
+        console.warn(`[bootstrap] repairing ${path} (size=${len}, ct=${ct})`);
+      }
+    }
+  } catch {
+    // Assume missing
   }
+  if (!needsUpload) return { uploaded: false, path };
 
   try {
     const { blob, contentType } = await fetchBody();
     const { error } = await supabase.storage
       .from("qa-test-assets")
       .upload(path, blob, { contentType, upsert: true });
-    if (error) return { uploaded: false, path, error: error.message };
-    return { uploaded: true, path };
+    if (error) return { uploaded: false, repaired: repairing, path, error: error.message };
+    return { uploaded: true, repaired: repairing, path };
   } catch (e: any) {
-    return { uploaded: false, path, error: e?.message || String(e) };
+    return { uploaded: false, repaired: repairing, path, error: e?.message || String(e) };
   }
 }
 
@@ -131,20 +157,22 @@ Deno.serve(async (req) => {
     }),
   );
 
-  // 2. Test video — copy public sample (small 5s clip)
+  // 2. Test video — copy a real, decodable MP4 (validates: size + mime)
   results.push(
     await uploadIfMissing(adminClient, "test-video-2s.mp4", async () => {
       const r = await fetch(SAMPLE_VIDEO_URL);
+      if (!r.ok) throw new Error(`Sample video fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "video/mp4" };
-    }),
+    }, { minBytes: 50_000, expectedMimePrefix: "video/" }),
   );
 
-  // 3. Test audio — copy public sample
+  // 3. Test audio — copy public sample (validates: size + mime)
   results.push(
     await uploadIfMissing(adminClient, "test-audio.mp3", async () => {
       const r = await fetch(SAMPLE_AUDIO_URL);
+      if (!r.ok) throw new Error(`Sample audio fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "audio/mpeg" };
-    }),
+    }, { minBytes: 5_000, expectedMimePrefix: "audio/" }),
   );
 
   // 4. FLUX Fill mask — embedded 512x512 PNG (black bg, white centered 256x256 square).

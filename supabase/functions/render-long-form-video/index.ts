@@ -105,12 +105,18 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         component_name: 'LongFormVideo',
-        project_id: projectId,
+        // IMPORTANT: do NOT pass the sora_long_form_projects.id as project_id —
+        // render-with-remotion validates project_id against content_projects and
+        // would 404 with "Project not found". Keep the long-form id in the
+        // metadata only so the webhook can route the result back.
+        project_id: null,
         userId: downstreamUserId,
         customizations: {
           scenes: remotionScenes,
           fps: 30,
           aspectRatio: project.aspect_ratio,
+          source: 'sora-long-form',
+          sora_long_form_project_id: projectId,
         },
         format: 'mp4',
         aspect_ratio: project.aspect_ratio,
