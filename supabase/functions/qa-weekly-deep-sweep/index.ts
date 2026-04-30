@@ -122,10 +122,41 @@ async function getTestAssets(
     const { data } = admin.storage.from("qa-test-assets").getPublicUrl(path);
     return data?.publicUrl;
   };
+  // Validate that an asset URL points at a real file of the expected mime
+  // (catches the 133-byte XML error from the previous broken sample).
+  const validate = async (url: string, mimePrefix: string, minBytes = 1024): Promise<boolean> => {
+    if (!url) return false;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(url, { method: "HEAD", signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return false;
+      const ct = res.headers.get("content-type") || "";
+      const len = Number(res.headers.get("content-length") || 0);
+      if (ct.includes("xml")) return false;
+      if (mimePrefix && !ct.startsWith(mimePrefix)) return false;
+      if (len > 0 && len < minBytes) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const candidateImage = tryUrl("test-image.png") || tryUrl("sample-1024.jpg") || FALLBACK_IMAGE;
+  const candidateVideo = tryUrl("test-video-2s.mp4") || tryUrl("sample-5s.mp4") || FALLBACK_VIDEO;
+  const candidateAudio = tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO;
+
+  const [imgOk, vidOk, audOk] = await Promise.all([
+    validate(candidateImage, "image/", 1024),
+    validate(candidateVideo, "video/", 50_000),
+    validate(candidateAudio, "audio/", 5_000),
+  ]);
+
   return {
-    image: tryUrl("test-image.png") || tryUrl("sample-1024.jpg") || FALLBACK_IMAGE,
-    video: tryUrl("test-video-2s.mp4") || tryUrl("sample-5s.mp4") || FALLBACK_VIDEO,
-    audio: tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO,
+    image: imgOk ? candidateImage : FALLBACK_IMAGE,
+    video: vidOk ? candidateVideo : FALLBACK_VIDEO,
+    audio: audOk ? candidateAudio : FALLBACK_AUDIO,
     mask: tryUrl("sample-mask-512.png") || "",
   };
 }
