@@ -122,7 +122,20 @@ export async function runBrowserlessFunction(
 // ESM-style Puppeteer function. Receives `context` from the JSON body.
 // Selectors target our Auth.tsx: <Input id="email" type="email"> + <Input id="password" type="password">.
 // We push step heartbeats into result.pathResults so the cockpit can show exactly where we stopped.
-export function buildSmokeNavigationScript(): string {
+// Step types supported by the interactive script:
+//   { type: "navigate", path: string, wait_ms?: number }
+//   { type: "click", selector: string, timeout_ms?: number }
+//   { type: "click_text", text: string, role?: "button"|"link"|"any", timeout_ms?: number }
+//   { type: "fill", selector: string, value: string, timeout_ms?: number }
+//   { type: "wait_for", selector: string, timeout_ms?: number }
+//   { type: "expect_visible", selector?: string, text?: string, timeout_ms?: number }
+//   { type: "expect_no_console_error", since_ms?: number }
+//   { type: "sleep", ms: number }
+//   { type: "set_header", name: "x-qa-mock", value: "true" }   (set once at run start)
+//
+// Each step records a heartbeat. Failures push a step-level error to result.stepErrors
+// AND set result.ok = false so the executor reports a "workflow" bug.
+export function buildInteractiveScript(): string {
   return `
 export default async ({ page, context }) => {
   const opts = context || {};
