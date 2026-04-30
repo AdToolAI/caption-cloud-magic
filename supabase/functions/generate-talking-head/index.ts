@@ -75,26 +75,22 @@ function mapDimension(aspectRatio: string, resolution: string): { width: number;
 }
 
 // Upload an image or audio URL to HeyGen as an asset → returns talking_photo_id or audio_asset_id
-async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Promise<string> {
-  // 1. Fetch the source binary
+// Upload an image URL to HeyGen as a Talking Photo → returns talking_photo_id
+// Endpoint: https://upload.heygen.com/v1/talking_photo  (NOT /v1/asset — that
+// returns a generic asset id which is NOT a valid talking_photo_id and would
+// fail later with "avatar look not found" in /v2/video/generate.)
+async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   const srcRes = await fetch(sourceUrl);
-  if (!srcRes.ok) throw new Error(`Failed to fetch source ${kind} from ${sourceUrl}: ${srcRes.status}`);
+  if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
   const blob = await srcRes.blob();
   const buffer = await blob.arrayBuffer();
-  console.log(`[talking-head] Source ${kind} fetched: ${buffer.byteLength} bytes, type=${blob.type}`);
+  console.log(`[talking-head] Source image fetched: ${buffer.byteLength} bytes, type=${blob.type}`);
 
-  // HeyGen upload.heygen.com/v1/asset accepts raw binary upload.
-  // Allowed MIME types: image/png, image/jpeg, audio/mpeg, video/mp4, video/webm.
-  // Normalize anything else to a supported value.
-  let contentType: string;
-  if (kind === 'image') {
-    const t = (blob.type || 'image/jpeg').toLowerCase();
-    contentType = t === 'image/png' ? 'image/png' : 'image/jpeg';
-  } else {
-    contentType = 'audio/mpeg';
-  }
+  // Allowed MIME types: image/png, image/jpeg
+  const t = (blob.type || 'image/jpeg').toLowerCase();
+  const contentType = t === 'image/png' ? 'image/png' : 'image/jpeg';
 
-  const uploadRes = await fetch(`${HEYGEN_UPLOAD_BASE}/asset`, {
+  const uploadRes = await fetch(`${HEYGEN_UPLOAD_BASE}/talking_photo`, {
     method: 'POST',
     headers: {
       'X-Api-Key': HEYGEN_API_KEY,
@@ -105,18 +101,17 @@ async function uploadHeyGenAsset(sourceUrl: string, kind: 'image' | 'audio'): Pr
   });
 
   const respText = await uploadRes.text();
-  console.log(`[talking-head] HeyGen ${kind} upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
+  console.log(`[talking-head] HeyGen talking_photo upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
 
   if (!uploadRes.ok) {
-    throw new Error(`HeyGen asset upload (${kind}) failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
+    throw new Error(`HeyGen talking_photo upload failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
   }
 
   let json: any;
-  try { json = JSON.parse(respText); } catch { throw new Error(`HeyGen ${kind} upload returned non-JSON: ${respText.slice(0, 200)}`); }
-  // HeyGen returns: { code: 100, data: { id, url, file_type, image_key, ... } }
-  const assetId = json?.data?.id || json?.data?.image_key || json?.data?.audio_id;
-  if (!assetId) throw new Error(`HeyGen asset upload (${kind}) missing id in response: ${JSON.stringify(json).slice(0, 200)}`);
-  return assetId;
+  try { json = JSON.parse(respText); } catch { throw new Error(`HeyGen talking_photo upload returned non-JSON: ${respText.slice(0, 200)}`); }
+  const talkingPhotoId = json?.data?.talking_photo_id;
+  if (!talkingPhotoId) throw new Error(`HeyGen talking_photo upload missing talking_photo_id in response: ${JSON.stringify(json).slice(0, 200)}`);
+  return talkingPhotoId;
 }
 
 // Create a video generation request → returns video_id
@@ -370,11 +365,11 @@ Deno.serve(async (req) => {
     }
     if (!audioUrl) throw new Error('Audio URL missing after synthesis');
 
-    // Step 2: Upload only the image to HeyGen as talking_photo asset.
+    // Step 2: Upload the image as a Talking Photo to HeyGen.
     // The audio is passed directly as URL in the V2 video.generate call,
     // which avoids a second upload round-trip + the upload subdomain quirks.
     console.log(`[talking-head] Uploading talking-photo image to HeyGen…`);
-    const talkingPhotoId = await uploadHeyGenAsset(imageUrl, 'image');
+    const talkingPhotoId = await uploadHeyGenTalkingPhoto(imageUrl);
     console.log(`[talking-head] talking_photo_id=${talkingPhotoId}`);
 
     // Step 3: Create video generation job (audio passed as URL, not asset)
