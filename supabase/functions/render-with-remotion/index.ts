@@ -399,7 +399,10 @@ serve(async (req) => {
           user_id: userId,
           project_id: project_id,
           credits_used: credits_required,
-          source: 'universal-creator',
+          // Allow callers (e.g. render-long-form-video) to override the source
+          // so the webhook can route the result back to the right table.
+          source: (customizations as any)?.source || 'universal-creator',
+          sora_long_form_project_id: (customizations as any)?.sora_long_form_project_id || null,
         },
       },
     });
