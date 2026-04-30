@@ -312,7 +312,14 @@ export function DeepSweepTab() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-200 truncate">{name}</span>
                     {flow && (
-                      <Badge className={STATUS_STYLES[status] ?? STATUS_STYLES.pending}>
+                      <Badge
+                        className={STATUS_STYLES[status] ?? STATUS_STYLES.pending}
+                        title={
+                          status === "timeout"
+                            ? "Transientes Infrastruktur-Limit (z.B. AWS Lambda Concurrency) — kein Code-Bug. Wird beim nächsten Sweep i.d.R. automatisch grün."
+                            : undefined
+                        }
+                      >
                         <Icon
                           className={`h-3 w-3 mr-1 ${status === "running" || status === "pending" && isRunning ? "animate-spin" : ""}`}
                         />
@@ -321,7 +328,12 @@ export function DeepSweepTab() {
                     )}
                   </div>
                   {flow?.error_message && (
-                    <p className="text-xs text-red-400/80 mt-0.5 truncate" title={flow.error_message}>
+                    <p
+                      className={`text-xs mt-0.5 truncate ${
+                        status === "timeout" ? "text-amber-400/80" : "text-red-400/80"
+                      }`}
+                      title={flow.error_message}
+                    >
                       {flow.error_message}
                     </p>
                   )}
