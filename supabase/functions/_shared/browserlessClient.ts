@@ -293,25 +293,132 @@ export default async ({ page, context }) => {
     // Tiny grace period for SPA route transition.
     await new Promise(r => setTimeout(r, 500));
 
-    // 2) Visit each requested path
-    for (const p of (opts.paths || [])) {
-      const t0 = Date.now();
+    // ---- Optional QA-mock header injection (set once before any nav) ----
+    if (opts.extraHeaders && typeof opts.extraHeaders === 'object') {
       try {
-        // domcontentloaded + small settle is enough for a smoke route check.
-        // networkidle2 was making one slow route (e.g. analytics fetch) eat the whole budget.
-        await page.goto(opts.baseUrl + p, { waitUntil: 'domcontentloaded', timeout: 12000 });
-        await new Promise(r => setTimeout(r, 800));
-        const title = await page.title();
-        result.pathResults.push({ path: p, ok: true, ms: Date.now() - t0, title });
+        await page.setExtraHTTPHeaders(opts.extraHeaders);
+        beat('headers-set', { keys: Object.keys(opts.extraHeaders) });
       } catch (e) {
-        result.pathResults.push({ path: p, ok: false, ms: Date.now() - t0, error: String(e).slice(0, 200) });
+        beat('headers-set-failed', { error: String(e).slice(0, 120) });
       }
     }
 
-    // 3) Final screenshot + DOM summary
-    if (opts.finalPath) {
-      await page.goto(opts.baseUrl + opts.finalPath, { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+    // ---- INTERACTIVE STEP ENGINE ----
+    // Backwards compatible: if opts.steps is empty, fall back to opts.paths.
+    const steps = Array.isArray(opts.steps) && opts.steps.length > 0
+      ? opts.steps
+      : (opts.paths || []).map(p => ({ type: 'navigate', path: p }));
+
+    const stepErrors = [];
+    let consoleErrorBaseline = consoleLogs.filter(l => l.type === 'error' || l.type === 'pageerror').length;
+
+    const findByText = async (text, role) => {
+      // role: 'button' | 'link' | 'any'
+      const handle = await page.evaluateHandle((searchText, searchRole) => {
+        const re = new RegExp(searchText.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&'), 'i');
+        let candidates;
+        if (searchRole === 'button') {
+          candidates = Array.from(document.querySelectorAll('button, [role="button"]'));
+        } else if (searchRole === 'link') {
+          candidates = Array.from(document.querySelectorAll('a, [role="link"]'));
+        } else {
+          candidates = Array.from(document.querySelectorAll('button, a, [role="button"], [role="link"], [role="tab"], [role="menuitem"]'));
+        }
+        for (const el of candidates) {
+          const t = (el.textContent || '').trim();
+          if (t && re.test(t)) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) return el;
+          }
+        }
+        return null;
+      }, text, role || 'any');
+      const el = handle.asElement();
+      if (!el) { handle.dispose && handle.dispose(); return null; }
+      return el;
+    };
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i] || {};
+      const tStep = Date.now();
+      const label = step.type + (step.path ? ' ' + step.path : step.selector ? ' ' + step.selector : step.text ? ' "' + step.text + '"' : '');
+      try {
+        if (step.type === 'navigate') {
+          await page.goto(opts.baseUrl + step.path, { waitUntil: 'domcontentloaded', timeout: step.timeout_ms || 15000 });
+          await new Promise(r => setTimeout(r, step.wait_ms != null ? step.wait_ms : 800));
+          const title = await page.title();
+          result.pathResults.push({ path: step.path, ok: true, ms: Date.now() - tStep, title, step_index: i });
+        }
+        else if (step.type === 'click') {
+          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          await page.click(step.selector);
+          await new Promise(r => setTimeout(r, 250));
+        }
+        else if (step.type === 'click_text') {
+          const deadline = Date.now() + (step.timeout_ms || 8000);
+          let el = null;
+          while (Date.now() < deadline && !el) {
+            el = await findByText(step.text, step.role);
+            if (!el) await new Promise(r => setTimeout(r, 200));
+          }
+          if (!el) throw new Error('Element with text "' + step.text + '" not found (role=' + (step.role || 'any') + ')');
+          await el.click();
+          await new Promise(r => setTimeout(r, 250));
+        }
+        else if (step.type === 'fill') {
+          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          const h = await page.$(step.selector);
+          await h.click({ clickCount: 3 });
+          await h.type(String(step.value), { delay: 10 });
+        }
+        else if (step.type === 'wait_for') {
+          await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 10000 });
+        }
+        else if (step.type === 'expect_visible') {
+          if (step.selector) {
+            await page.waitForSelector(step.selector, { visible: true, timeout: step.timeout_ms || 8000 });
+          } else if (step.text) {
+            const deadline = Date.now() + (step.timeout_ms || 8000);
+            let found = false;
+            while (Date.now() < deadline && !found) {
+              found = await page.evaluate((t) => {
+                const re = new RegExp(t.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&'), 'i');
+                return re.test(document.body && document.body.innerText || '');
+              }, step.text);
+              if (!found) await new Promise(r => setTimeout(r, 200));
+            }
+            if (!found) throw new Error('Expected text "' + step.text + '" not visible');
+          }
+        }
+        else if (step.type === 'expect_no_console_error') {
+          const currentErrs = consoleLogs.filter(l => l.type === 'error' || l.type === 'pageerror').length;
+          const newErrs = currentErrs - consoleErrorBaseline;
+          if (newErrs > 0) {
+            const recent = consoleLogs.filter(l => l.type === 'error' || l.type === 'pageerror').slice(-newErrs);
+            throw new Error('Console errors after step ' + (i - 1) + ': ' + recent.map(r => r.text.slice(0, 100)).join(' | '));
+          }
+          consoleErrorBaseline = currentErrs;
+        }
+        else if (step.type === 'sleep') {
+          await new Promise(r => setTimeout(r, step.ms || 500));
+        }
+        else {
+          throw new Error('Unknown step type: ' + step.type);
+        }
+        beat('step-' + i + '-ok', { label, ms: Date.now() - tStep });
+      } catch (e) {
+        const errMsg = String(e && e.message || e).slice(0, 300);
+        stepErrors.push({ step_index: i, type: step.type, label, error: errMsg, ms: Date.now() - tStep });
+        beat('step-' + i + '-FAIL', { label, error: errMsg });
+        result.ok = false;
+        if (step.type === 'navigate') {
+          result.pathResults.push({ path: step.path, ok: false, ms: Date.now() - tStep, error: errMsg, step_index: i });
+        }
+        // Continue to next step so we collect all failures (not just the first).
+      }
     }
+    result.stepErrors = stepErrors;
+
     beat('finalizing');
   } catch (e) {
     result.ok = false;
