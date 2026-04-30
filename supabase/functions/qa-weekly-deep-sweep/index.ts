@@ -46,6 +46,7 @@ interface RunCtx {
   userId: string;
   admin: ReturnType<typeof createClient>;
   assets: { image: string; video: string; audio: string; mask: string };
+  signedAssets: { image: string; mask: string };
   remainingEur: number;
 }
 
@@ -125,6 +126,37 @@ async function getTestAssets(
     audio: tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO,
     mask: tryUrl("sample-mask-512.png") || "",
   };
+}
+
+// qa-test-assets bucket is PRIVATE — external providers (Replicate FLUX Fill,
+// Hedra, etc.) need signed URLs, not public URLs.
+async function getSignedAssets(
+  admin: any,
+): Promise<{ image: string; mask: string }> {
+  const sign = async (path: string): Promise<string> => {
+    try {
+      const { data } = await admin.storage
+        .from("qa-test-assets")
+        .createSignedUrl(path, 3600);
+      return data?.signedUrl || "";
+    } catch {
+      return "";
+    }
+  };
+  // try alternatives in order
+  const imageCandidates = ["test-image.png", "sample-1024.jpg"];
+  const maskCandidates = ["sample-mask-512.png"];
+  let image = "";
+  for (const p of imageCandidates) {
+    image = await sign(p);
+    if (image) break;
+  }
+  let mask = "";
+  for (const p of maskCandidates) {
+    mask = await sign(p);
+    if (mask) break;
+  }
+  return { image, mask };
 }
 
 function pickAssetUrl(json: any): string | undefined {
