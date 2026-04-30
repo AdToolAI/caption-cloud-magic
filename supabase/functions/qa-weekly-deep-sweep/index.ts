@@ -46,6 +46,7 @@ interface RunCtx {
   userId: string;
   admin: ReturnType<typeof createClient>;
   assets: { image: string; video: string; audio: string; mask: string };
+  signedAssets: { image: string; mask: string };
   remainingEur: number;
 }
 
@@ -127,6 +128,37 @@ async function getTestAssets(
   };
 }
 
+// qa-test-assets bucket is PRIVATE — external providers (Replicate FLUX Fill,
+// Hedra, etc.) need signed URLs, not public URLs.
+async function getSignedAssets(
+  admin: any,
+): Promise<{ image: string; mask: string }> {
+  const sign = async (path: string): Promise<string> => {
+    try {
+      const { data } = await admin.storage
+        .from("qa-test-assets")
+        .createSignedUrl(path, 3600);
+      return data?.signedUrl || "";
+    } catch {
+      return "";
+    }
+  };
+  // try alternatives in order
+  const imageCandidates = ["test-image.png", "sample-1024.jpg"];
+  const maskCandidates = ["sample-mask-512.png"];
+  let image = "";
+  for (const p of imageCandidates) {
+    image = await sign(p);
+    if (image) break;
+  }
+  let mask = "";
+  for (const p of maskCandidates) {
+    mask = await sign(p);
+    if (mask) break;
+  }
+  return { image, mask };
+}
+
 function pickAssetUrl(json: any): string | undefined {
   if (!json) return undefined;
   return (
@@ -198,7 +230,7 @@ async function flowComposerStitch(ctx: RunCtx): Promise<FlowResult> {
       scene_type: "custom",
       transition_type: "fade",
       transition_duration: 0.4,
-      prompt: `qa-stitch scene ${i + 1}`,
+      ai_prompt: `qa-stitch scene ${i + 1}`,
     }));
     const { error: scenesErr } = await ctx.admin.from("composer_scenes").insert(sceneRows);
     stages.push({ stage: "seed-project-and-scenes", ok: !scenesErr, ms: Date.now() - tSetup, note: scenesErr?.message });
@@ -402,7 +434,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    const portraitUrl = ctx.assets.image;
+    const portraitUrl = ctx.signedAssets.image || ctx.assets.image;
     result.validation_checks.portrait = !!portraitUrl;
 
     const t0 = Date.now();
@@ -424,6 +456,15 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     const predictionId = (hedra.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
+    // Hedra Replicate model was removed (April 2026). Detect 404 / "Model not found"
+    // / "resource could not be found" and degrade gracefully to budget_skipped instead
+    // of polluting the bug report with a known-broken provider.
+    const errStr = (hedra.error || "").toLowerCase();
+    const isHedraGone =
+      errStr.includes("model not found") ||
+      errStr.includes("resource could not be found") ||
+      (hedra.status === 500 && errStr.includes("404"));
+
     if (hedra.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
@@ -433,6 +474,11 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
       result.error_message = "Async — prediction triggered, output via webhook";
+    } else if (isHedraGone) {
+      result.status = "budget_skipped";
+      result.actual_cost_eur = 0;
+      result.error_message =
+        "Hedra Replicate model removed (April 2026). Flow auto-skipped until provider migration (Hedra native API or Replicate alternative).";
     } else {
       result.error_message = hedra.error || "Hedra returned no video URL or predictionId";
     }
@@ -642,9 +688,13 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    if (!ctx.assets.mask) {
+    const maskUrl = ctx.signedAssets.mask;
+    const imageUrl = ctx.signedAssets.image || ctx.assets.image;
+
+    if (!maskUrl) {
+      result.status = "budget_skipped";
       result.error_message =
-        "No mask asset available. Run qa-live-sweep-bootstrap to provision sample-mask-512.png.";
+        "No mask asset available. Click 'Bootstrap Assets' in the Live Sweep tab once to provision sample-mask-512.png, then re-run.";
       result.duration_ms = Date.now() - start;
       return result;
     }
@@ -653,8 +703,8 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
     const edit = await callEdge(
       "magic-edit-image",
       {
-        imageUrl: ctx.assets.image,
-        maskUrl: ctx.assets.mask,
+        imageUrl,
+        maskUrl,
         prompt: "add a subtle warm golden glow in the center",
         mode: "inpaint",
       },
@@ -766,6 +816,7 @@ Deno.serve(async (req) => {
     userId: userData.user.id,
     admin,
     assets: await getTestAssets(admin),
+    signedAssets: await getSignedAssets(admin),
     remainingEur: capEur,
   };
 

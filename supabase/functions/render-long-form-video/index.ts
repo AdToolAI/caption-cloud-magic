@@ -1,9 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id",
 };
 
 interface RenderRequest {
@@ -85,17 +86,27 @@ serve(async (req) => {
 
     // Get authorization header for internal function call
     const authHeader = req.headers.get('Authorization');
+    const qaSvc = detectQaServiceAuth(req);
+
+    // For QA service-auth requests we MUST hand the downstream
+    // render-with-remotion the userId in the body, because that function
+    // only honors body userId when called with the service-role key.
+    const downstreamAuth = qaSvc.isQaService
+      ? `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+      : (authHeader || `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`);
+    const downstreamUserId = qaSvc.isQaService ? qaSvc.userId : project.user_id;
 
     // Call render-with-remotion to concatenate all scenes
     const renderResponse = await fetch(`${SUPABASE_URL}/functions/v1/render-with-remotion`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader || `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Authorization': downstreamAuth,
       },
       body: JSON.stringify({
         component_name: 'LongFormVideo',
         project_id: projectId,
+        userId: downstreamUserId,
         customizations: {
           scenes: remotionScenes,
           fps: 30,

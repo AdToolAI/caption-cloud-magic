@@ -1,141 +1,74 @@
-## Diagnose: neue Deep-Sweep-Bugs
+## Deep Sweep v4 — Fix the 6 remaining failures
 
-Der aktuelle Run ist deutlich weiter gekommen: Es wurden diesmal echte Renders angestoßen, aber die nächsten Fehler liegen in vier Bereichen:
+I traced every red row in the screenshot to its exact root cause. Each is a small, isolated bug — no architectural change needed.
 
-1. **Auth-Weitergabe im Background-Runner**
-   - Flow 4, 5 und 7 scheitern mit `401 Unauthorized` / `UNAUTHORIZED_LEGACY_JWT`.
-   - Ursache: Der Deep-Sweep startet per `EdgeRuntime.waitUntil`. Der User-JWT aus dem ursprünglichen Browser-Request ist im langen Background-Kontext offenbar nicht mehr zuverlässig für interne Function-Aufrufe nutzbar. Einige Functions validieren ihn strikt, andere erwarten moderne Header-Konfiguration.
+### Diagnosis
 
-2. **Composer Flow nutzt falsche Stitch-Abstraktion**
-   - Flow 1 scheitert mit `Missing generationIds: false,true,true`.
-   - Ursache A: Hailuo wurde durch das globale 10/h Rate-Limit blockiert.
-   - Ursache B: Selbst wenn alle drei URLs vorliegen, ruft der Orchestrator `compose-stitch-and-handoff` mit direkten `scenes` auf. Diese Function erwartet aber ein echtes `composer_project` mit `composer_scenes` und nur `projectId`.
+| # | Flow | Real cause |
+|---|---|---|
+| 1 | Composer Stitch | Orchestrator inserts `prompt` into `composer_scenes`, but the column is named **`ai_prompt`**. Schema cache rejects the insert. |
+| 2 | Director's Cut Render | `render-directors-cut` validates the user JWT via `auth.getUser()` and has **no `detectQaServiceAuth` shortcut**, so the service-role call returns 401. |
+| 3 | Auto-Director | Same root cause as #2 — `auto-director-compose` lacks the QA service-auth shortcut → 401 UNAUTHORIZED. |
+| 4 | Talking Head (Hedra) | `hedra/character-3` **no longer exists on Replicate** (verified: `GET /v1/models/hedra/character-3` → 404 "Model not found"). Hedra was removed from Replicate's catalog. |
+| 6 | Long-Form Render | `render-long-form-video` calls `render-directors-cut` (or the same Lambda layer) internally and propagates the same 401. Same root cause as #2. |
+| 7 | Magic Edit (FLUX Fill) | The `qa-test-assets` bucket is **private** and contains only 3 files (no `sample-mask-512.png`). Replicate fetches the mask via public URL and gets 400. Bootstrap was never re-run after the mask logic was added. |
 
-3. **Auto-Director Response wird falsch gelesen**
-   - Flow 3: Function ist `ok`, aber Deep Sweep sagt `returned no scenes`.
-   - Ursache: `auto-director-compose` gibt `{ ok: true, plan: { scenes, rationale } }` zurück. Der Orchestrator sucht aktuell fälschlich `json.scenes` und `json.rationale` auf Root-Ebene.
+### Fix list
 
-4. **Long-Form Seed-Schema ist falsch**
-   - Flow 6: `Could not find the 'language' column...`
-   - Ursache: Die echte Tabelle `sora_long_form_projects` hat `name`, `target_duration`, `script`, aber keine `title`, `total_duration_seconds`, `language`.
-   - Zusätzlich sind Szenen-Dauern per Constraint nur `4, 8, 12`; der Seed nutzt aktuell `5`.
-
-5. **Director's Cut Polling schaut in die falsche Tabelle**
-   - Flow 2 triggert Render korrekt, läuft aber in Timeout.
-   - Ursache: `render-directors-cut` schreibt in `director_cut_renders`, der Orchestrator pollt aber `video_creations`.
-
-## Fix-Plan
-
-### 1. Deep-Sweep Auth robust machen
-
-In `supabase/functions/qa-weekly-deep-sweep/index.ts`:
-
-- Den eingehenden User-JWT nur noch für den initialen Admin-Check nutzen.
-- Für interne Deep-Sweep-Aufrufe einen sicheren internen Service-Auth-Modus verwenden:
-  - `Authorization: Bearer <service_role_key>`
-  - zusätzlich `x-qa-user-id: <triggered_by_user_id>`
-  - zusätzlich `x-qa-real-spend: true`
-- Für QA-only Pfade in den Ziel-Functions eine explizite, serverseitig geschützte Service-Auth-Erkennung einbauen, damit kein Client diese Pfade fälschen kann.
-
-Betroffene Ziel-Functions:
-- `generate-talking-head`
-- `magic-edit-image`
-- `auto-generate-universal-video` nur falls sie User-Kontext benötigt; ansonsten genügt Service-Header plus Body-`userId`.
-
-### 2. Flow 1 stabilisieren: Composer-Seed statt direkte Scenes
-
-In `qa-weekly-deep-sweep`:
-
-- Nicht mehr drei teure Provider parallel für jeden Run erzwingen.
-- Stattdessen für den Stitch-E2E-Test ein temporäres `composer_project` mit drei fertigen `composer_scenes` anlegen:
-  - `clip_status = 'ready'`
-  - `clip_url = ctx.assets.video` oder optional eine Kombination aus bootstrapped sample + erfolgreich generierter Provider-URL
-  - `duration_seconds` passend zur Sample-Länge
-- Dann `compose-stitch-and-handoff` korrekt mit `{ projectId, destination: 'download' }` aufrufen.
-- Cleanup der temporären Composer-Rows im `finally`-Block.
-- Optional: Einen separaten Provider-Generation-Flow behalten, aber nicht als Voraussetzung für Stitching; so bricht Hailuo Rate-Limit nicht den gesamten Composer-Stitch-Test.
-
-### 3. Flow 2 Polling auf `director_cut_renders` umstellen
-
-In `qa-weekly-deep-sweep`:
-
-- Nach `render-directors-cut` den zurückgegebenen `render_id` als ID der Tabelle `director_cut_renders` behandeln.
-- Polling ersetzen:
-  - Tabelle: `director_cut_renders`
-  - Felder: `status`, `output_url`, `error_message`, `remotion_render_id`
-- Timeout auf 360s erhöhen, damit Lambda-Cold-Starts realistischer abgedeckt sind.
-- Bei `status='rendering'` und vorhandenem `remotion_render_id` nicht sofort als Payload-Bug werten, sondern sauber als Render-Timeout klassifizieren.
-
-### 4. Flow 3 Auto-Director Response korrigieren
-
-In `qa-weekly-deep-sweep`:
-
-- `const planObj = json.plan ?? json`
-- `scenes = planObj.scenes`
-- `rationale = planObj.rationale`
-- Flow als success werten, wenn `plan.ok === true` und `planObj.scenes.length > 0`.
-
-### 5. Flow 6 Long-Form Seed korrigieren
-
-In `qa-weekly-deep-sweep`:
-
-- Project-Insert auf echte Spalten umstellen:
-  - `name`
-  - `target_duration: 30`
-  - `aspect_ratio: '16:9'`
-  - `model: 'sora-2-standard'`
-  - `status: 'draft'` oder `ready_to_render`, je nachdem was die Render-Function toleriert
-  - `script`
-- Scene-Insert korrigieren:
-  - `duration: 4` statt `5`
-  - `scene_order: 0`
-  - `generated_video_url: ctx.assets.video`
-  - `status: 'completed'`
-- Polling bleibt auf `sora_long_form_projects`, aber Timeout auf 360s erhöhen.
-
-### 6. Flow 4/7 Ziel-Functions QA-Service-Auth-fähig machen
-
-In `generate-talking-head` und `magic-edit-image`:
-
-- Kleine Helper-Funktion hinzufügen:
-  - Wenn `Authorization` Service-Key ist und `x-qa-user-id` gesetzt ist, wird dieser User für den QA-Run verwendet.
-  - Sonst bleibt der normale User-JWT-Flow unverändert.
-- Keine öffentliche Umgehung der Auth: Der `x-qa-user-id` Header wird nur akzeptiert, wenn gleichzeitig der Service-Key im Authorization-Header ist.
-
-### 7. CORS Header aktualisieren
-
-Alle betroffenen QA-/Provider-Functions, die interne QA-Header erhalten, bekommen in `Access-Control-Allow-Headers` zusätzlich:
-
-```text
-x-qa-real-spend, x-qa-user-id
-```
-
-Das verhindert Preflight-/Header-Drift, falls diese Functions künftig auch direkt aus dem Admin-UI oder Test-Harness mit QA-Headern angesprochen werden.
-
-### 8. Optionaler Rate-Limit-Schutz im Deep Sweep
-
-Damit wir das 50€ Budget möglichst sinnvoll nutzen:
-
-- Vor teuren Provider-Flows prüfen, ob der User in der letzten Stunde bereits nahe am 10/h-Limit ist.
-- Wenn ja: Flow sauber als `budget_skipped` oder `rate_limited` markieren statt `failed`.
-- Für den eigentlichen Stitch-Test weiterhin bootstrapped Sample-Clips verwenden, damit er unabhängig vom Provider-Rate-Limit bleibt.
-
-## Erwartetes Ergebnis nach Fix
-
-Beim nächsten Run sollten die Fehler nicht mehr als Payload-/Auth-Bugs auftreten:
-
-- Flow 1: Stitch testet wirklich Composer → Assemble → Render-Pipeline.
-- Flow 2: Pollt den richtigen Director's-Cut-Render-Status.
-- Flow 3: Erkennt den gültigen Plan als Erfolg.
-- Flow 4: Talking Head startet mit gültigem QA-User-Kontext.
-- Flow 5: Universal Video erhält einen gültigen internen Aufrufkontext.
-- Flow 6: Long-Form Seed passt zum echten DB-Schema.
-- Flow 7: Magic Edit startet mit gültigem QA-User-Kontext und PNG-Maske.
-
-## Dateien, die ich ändern werde
-
+**Code (orchestrator)**
 - `supabase/functions/qa-weekly-deep-sweep/index.ts`
-- `supabase/functions/generate-talking-head/index.ts`
-- `supabase/functions/magic-edit-image/index.ts`
-- eventuell `supabase/config.toml` nur für function-spezifische Timeout-/Header-Kompatibilität, keine Projekt-Settings
-- Memory-Update für `mem://features/qa-agent/deep-sweep` mit den neuen Deep-Sweep-Stabilitätsregeln
+  - Flow 1: rename `prompt:` → `ai_prompt:` in the seed scene rows.
+  - Flow 4: degrade gracefully — if the talking-head call returns 404 / "Model not found" / "resource could not be found", mark the flow as `budget_skipped` with a clear note ("Hedra Replicate model removed — flow disabled until provider migration") instead of `failed`. This stops the noise while we sort out the provider.
+  - Flow 7: before calling `magic-edit-image`, generate a **signed URL** for the mask (and for the source image) via `admin.storage.from('qa-test-assets').createSignedUrl(path, 600)` instead of the public URL. Same for the source image since the bucket is private.
+
+**Service-role auth shortcut on the 3 missing functions**
+Add the same minimal block we already use in `generate-talking-head` and `magic-edit-image`:
+```ts
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
+// inside the handler, BEFORE the regular getUser flow:
+const qaSvc = detectQaServiceAuth(req);
+let user = qaSvc.isQaService && qaSvc.userId ? { id: qaSvc.userId } : null;
+if (!user) { /* existing JWT validation path */ }
+```
+- `supabase/functions/render-directors-cut/index.ts`
+- `supabase/functions/auto-director-compose/index.ts`
+- `supabase/functions/render-long-form-video/index.ts`
+
+Also add `x-qa-real-spend, x-qa-user-id` to each function's `Access-Control-Allow-Headers`.
+
+**Bootstrap**
+- Re-deploy `qa-live-sweep-bootstrap` (no code change needed — already creates `sample-mask-512.png`) and **the user must click "Bootstrap Assets"** once before the next Deep Sweep run. I'll add a clear hint in the Cockpit Deep Sweep tab: *"Run Bootstrap Assets once before the first Deep Sweep."*
+
+**Memory**
+- Update `mem://features/qa-agent/deep-sweep` to record:
+  - Hedra Replicate model removed (April 2026) — Flow 4 currently auto-skips.
+  - QA service-auth must be wired into every long-running pipeline endpoint the orchestrator calls.
+  - `qa-test-assets` bucket is private → always use signed URLs when handing assets to external providers.
+
+### Expected outcome after deploy
+
+| Flow | Expected status |
+|---|---|
+| 1 Composer Stitch | success (stitches 3 sample clips into one MP4) |
+| 2 Director's Cut Lambda | success (full Lambda render, ~60–120 s) |
+| 3 Auto-Director | success |
+| 4 Talking Head | `budget_skipped` with note "Hedra Replicate model removed" |
+| 5 Universal Video | success (already green) |
+| 6 Long-Form Lambda | success |
+| 7 Magic Edit | success (mask now reachable via signed URL) |
+
+Estimated spend: **~7–10 €** (Flow 4 spends 0 €).
+
+### Files touched
+
+- `supabase/functions/qa-weekly-deep-sweep/index.ts` — column fix, Flow 4 graceful skip, Flow 7 signed URLs
+- `supabase/functions/render-directors-cut/index.ts` — add QA service-auth shortcut
+- `supabase/functions/auto-director-compose/index.ts` — add QA service-auth shortcut
+- `supabase/functions/render-long-form-video/index.ts` — add QA service-auth shortcut
+- `src/pages/admin/DeepSweepTab.tsx` — small hint about bootstrap prerequisite
+- `mem://features/qa-agent/deep-sweep` — record current limits
+- (Re-)deploy all four edge functions
+
+### Out of scope (separate follow-up)
+
+Migrating the Talking Head pipeline off Hedra-on-Replicate (either to Hedra's native API with a new `HEDRA_API_KEY` secret or to a Replicate alternative). I'll surface this as a clear next step after this fix lands so you can decide.

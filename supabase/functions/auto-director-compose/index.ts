@@ -2,10 +2,11 @@
 // Orchestrates: AI plan → scene insert → parallel clip generation → optional voiceover/music
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id",
 };
 
 type Mood = 'cinematic' | 'hype' | 'calm' | 'corporate' | 'playful' | 'dramatic';
@@ -85,10 +86,19 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !user) {
-      return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+
+    const qaSvc = detectQaServiceAuth(req);
+    let user: { id: string } | null = null;
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[auto-director-compose] QA service-auth user=${user.id}`);
+    } else {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user: jwtUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !jwtUser) {
+        return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+      }
+      user = jwtUser;
     }
 
     const supabaseAdmin = createClient(
