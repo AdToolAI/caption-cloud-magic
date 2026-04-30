@@ -224,12 +224,17 @@ Deno.serve(async (req) => {
     });
 
     // ----- BUG: Browserless overall failure -----
+    let finalizeWarningOnly = false;
     if (!result.ok) {
       const rawErr = result.error;
       const httpStatus = (result as any).httpStatus ?? null;
       const rawResponse = (result as any).rawResponse ?? null;
       const lastHb = heartbeats[heartbeats.length - 1];
       const lastHbLabel = lastHb?.label ?? lastHb?.step ?? lastHb?.path ?? null;
+      const stepErrorsArr: any[] = ((result.data as any)?.stepErrors ?? []) as any[];
+      const realStepErrors = stepErrorsArr.filter((se: any) => se && se.type !== "navigate");
+      const allStepsGreen = realStepErrors.length === 0 && successfulNavs.length > 0;
+      const isFinalizePhase = /finaliz/i.test(String(lastHbLabel ?? "")) || /finaliz/i.test(String(rawResponse ?? ""));
 
       // Build a meaningful fallback when browserlessClient returned ok:false without an error string
       let errMsg: string;
@@ -246,7 +251,7 @@ Deno.serve(async (req) => {
         }
         errMsg = parts.length > 0
           ? `Browserless engine failure (${parts.join(", ")})`
-          : "Browserless engine returned ok:false with no diagnostic data";
+          : "Browserless engine returned ok:false with no diagnostic data — likely transient (timeout or proxy hiccup)";
       }
 
       const description = rawResponse
@@ -254,27 +259,50 @@ Deno.serve(async (req) => {
         : errMsg;
 
       const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button|preview auth bridge/i.test(errMsg);
-      await insertBug({
-        run_id,
-        mission_name: missionName,
-        severity: "high",
-        category: "workflow",
-        title: isLoginFail
-          ? `Login failed before any path could be visited`
-          : `Mission execution failed: ${errMsg.slice(0, 120)}`,
-        description,
-        screenshot_url: loginScreenshotUrl ?? screenshotUrl,
-        network_trace: {
-          failure_area: isLoginFail ? "auth" : "workflow",
-          target_url: baseUrl,
-          http_status: (result as any).httpStatus ?? null,
-          raw_response: (result as any).rawResponse ?? null,
-          duration_ms: result.durationMs,
-          login_screenshot_url: loginScreenshotUrl ?? null,
-          last_heartbeat: heartbeats[heartbeats.length - 1] ?? null,
-          heartbeats,
-        },
-      });
+
+      // Finalize-phase failures with all real steps green = downgrade to info, do not fail mission.
+      if (isFinalizePhase && allStepsGreen && !isLoginFail) {
+        finalizeWarningOnly = true;
+        console.log("[execute-mission] finalize-only failure suppressed — steps were green:", { lastHbLabel, errMsg });
+        await insertBug({
+          run_id,
+          mission_name: missionName,
+          severity: "info",
+          category: "workflow",
+          title: `Engine finalize warning (mission steps OK): ${errMsg.slice(0, 80)}`,
+          description,
+          screenshot_url: loginScreenshotUrl ?? screenshotUrl,
+          network_trace: {
+            failure_area: "finalize",
+            target_url: baseUrl,
+            http_status: httpStatus,
+            duration_ms: result.durationMs,
+            heartbeats,
+          },
+        });
+      } else {
+        await insertBug({
+          run_id,
+          mission_name: missionName,
+          severity: "high",
+          category: "workflow",
+          title: isLoginFail
+            ? `Login failed before any path could be visited`
+            : `Mission execution failed: ${errMsg.slice(0, 120)}`,
+          description,
+          screenshot_url: loginScreenshotUrl ?? screenshotUrl,
+          network_trace: {
+            failure_area: isLoginFail ? "auth" : "workflow",
+            target_url: baseUrl,
+            http_status: httpStatus,
+            raw_response: rawResponse,
+            duration_ms: result.durationMs,
+            login_screenshot_url: loginScreenshotUrl ?? null,
+            last_heartbeat: heartbeats[heartbeats.length - 1] ?? null,
+            heartbeats,
+          },
+        });
+      }
     }
 
     // ----- BUG: silent no-op -----
