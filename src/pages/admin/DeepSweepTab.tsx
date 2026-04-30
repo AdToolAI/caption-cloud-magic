@@ -80,9 +80,8 @@ const FLOW_NAMES = [
   "Composer Multi-Scene Stitch",
   "Director's Cut Lambda Render",
   "Auto-Director (Brief → Video)",
-  "Talking Head (Hedra)",
+  "Talking Head (HeyGen)",
   "Universal Video Creator",
-  "Long-Form Render (Lambda)",
   "Magic Edit (FLUX Fill)",
 ];
 
