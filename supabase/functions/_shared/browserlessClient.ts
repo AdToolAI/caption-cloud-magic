@@ -174,21 +174,54 @@ export default async ({ page, context }) => {
   const consoleLogs = [];
   const networkErrors = [];
 
+  // Browserless-session-only noise that has nothing to do with the app under test.
+  // MUST stay in sync with qa_muted_patterns rows in the database.
+  const IGNORED_CONSOLE_PATTERNS = [
+    /favicon/i,
+    /ResizeObserver/i,
+    /sentry\\.io/i,
+    /ingest\\.(de|us)\\.sentry\\.io/i,
+    /Failed to load resource.*sentry/i,
+    /net::ERR_BLOCKED_BY_CLIENT/i,
+    /net::ERR_FAILED.*(companion-diagnose|check-subscription|sentry)/i,
+    /companion-diagnose/i,
+    /check-subscription.*(FunctionsFetchError|ERR_FAILED|Failed to send a request)/i,
+    /FunctionsFetchError.*check-subscription/i,
+    /manifest\\.json/i,
+    /\\/sw\\.js/i,
+    /AbortError/i,
+    /X-Frame-Options/i,
+    /DialogContent.*requires.*DialogTitle/i,
+    /status of 406/i,
+    /Loading chunk \\d+ failed/i,
+    /ChunkLoadError/i,
+    /blocked by CORS policy.*x-qa-mock/i,
+  ];
+  const isIgnoredConsole = (text) => {
+    if (!text) return false;
+    for (const re of IGNORED_CONSOLE_PATTERNS) { if (re.test(text)) return true; }
+    return false;
+  };
+
   page.on('console', m => {
     try {
+      const text = String(m.text()).slice(0, 500);
+      if ((m.type() === 'error') && isIgnoredConsole(text)) return; // drop noise at source
       const loc = (typeof m.location === 'function') ? m.location() : null;
       consoleLogs.push({
         type: m.type(),
-        text: String(m.text()).slice(0, 500),
+        text,
         url: loc && loc.url ? String(loc.url).slice(0, 300) : undefined,
         line: loc && loc.lineNumber ? loc.lineNumber : undefined,
       });
     } catch (e) {}
   });
   page.on('pageerror', err => {
+    const text = String(err && err.message || err).slice(0, 500);
+    if (isIgnoredConsole(text)) return;
     consoleLogs.push({
       type: 'pageerror',
-      text: String(err && err.message || err).slice(0, 500),
+      text,
       stack: err && err.stack ? String(err.stack).slice(0, 800) : undefined,
     });
   });
