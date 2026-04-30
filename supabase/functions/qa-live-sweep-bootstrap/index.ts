@@ -71,6 +71,87 @@ async function uploadIfMissing(
   }
 }
 
+// ---- PNG builder for FLUX Fill mask ---------------------------------------
+// Builds a deterministic 8-bit grayscale PNG of `size` x `size` with a
+// centered white square (`whiteSize` x `whiteSize`) on a black background.
+// Uses uncompressed DEFLATE blocks → no deps, valid CRC32 + adler32.
+function buildMaskPng(size: number, whiteSize: number): Uint8Array {
+  const offset = Math.floor((size - whiteSize) / 2);
+  const rowLen = size + 1;
+  const raw = new Uint8Array(rowLen * size);
+  for (let y = 0; y < size; y++) {
+    const rowStart = y * rowLen;
+    raw[rowStart] = 0;
+    if (y >= offset && y < offset + whiteSize) {
+      for (let x = offset; x < offset + whiteSize; x++) raw[rowStart + 1 + x] = 0xff;
+    }
+  }
+  const idat = zlibStore(raw);
+  const sig = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const ihdr = new Uint8Array(13);
+  const dv = new DataView(ihdr.buffer);
+  dv.setUint32(0, size);
+  dv.setUint32(4, size);
+  ihdr[8] = 8; ihdr[9] = 0; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  const chunks = [sig, pngChunk("IHDR", ihdr), pngChunk("IDAT", idat), pngChunk("IEND", new Uint8Array(0))];
+  let total = 0; for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let pos = 0; for (const c of chunks) { out.set(c, pos); pos += c.length; }
+  return out;
+}
+function pngChunk(type: string, data: Uint8Array): Uint8Array {
+  const typeBytes = new TextEncoder().encode(type);
+  const buf = new Uint8Array(8 + data.length + 4);
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(0, data.length);
+  buf.set(typeBytes, 4);
+  buf.set(data, 8);
+  const crcInput = new Uint8Array(typeBytes.length + data.length);
+  crcInput.set(typeBytes, 0);
+  crcInput.set(data, typeBytes.length);
+  dv.setUint32(8 + data.length, crc32(crcInput));
+  return buf;
+}
+function zlibStore(data: Uint8Array): Uint8Array {
+  const MAX = 65535;
+  const blockCount = Math.max(1, Math.ceil(data.length / MAX));
+  const out = new Uint8Array(2 + data.length + blockCount * 5 + 4);
+  out[0] = 0x78; out[1] = 0x01;
+  let pos = 2;
+  for (let i = 0; i < data.length; i += MAX) {
+    const len = Math.min(MAX, data.length - i);
+    const last = (i + len >= data.length) ? 1 : 0;
+    out[pos++] = last;
+    out[pos++] = len & 0xff; out[pos++] = (len >> 8) & 0xff;
+    const nlen = (~len) & 0xffff;
+    out[pos++] = nlen & 0xff; out[pos++] = (nlen >> 8) & 0xff;
+    out.set(data.subarray(i, i + len), pos);
+    pos += len;
+  }
+  const dv = new DataView(out.buffer);
+  dv.setUint32(pos, adler32(data));
+  return out.subarray(0, pos + 4);
+}
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+function adler32(buf: Uint8Array): number {
+  let a = 1, b = 0;
+  for (let i = 0; i < buf.length; i++) { a = (a + buf[i]) % 65521; b = (b + a) % 65521; }
+  return ((b << 16) | a) >>> 0;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -226,15 +307,14 @@ Deno.serve(async (req) => {
     }, { minBytes: 5_000, expectedMimePrefix: "image/" }),
   );
 
-  // 5. FLUX Fill mask — embedded 512x512 PNG (black bg, white centered 256x256 square).
+  // 5. FLUX Fill mask — programmatically built 512x512 PNG (black bg, white centered 256x256 square).
   // Used by the deep-sweep Magic Edit flow. Idempotent + no external fetch.
+  // Built from raw bytes with valid CRC32 chunks (avoids base64-decode fragility that caused 400 errors).
   results.push(
     await uploadIfMissing(adminClient, "sample-mask-512.png", async () => {
-      const MASK_B64 =
-        "iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAIAAAB7GkOtAAAFlklEQVR42u3VMQEAAAjDsPk3Dc8E8JOIaBMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgBp4TAEwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwAJAADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAPAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAPAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAwADAAMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM4Wm2Ys1B2w4QMAAAAASUVORK5CYII=";
-      const bytes = Uint8Array.from(atob(MASK_B64), (c) => c.charCodeAt(0));
-      return { blob: new Blob([bytes], { type: "image/png" }), contentType: "image/png" };
-    }),
+      const png = buildMaskPng(512, 256);
+      return { blob: new Blob([png], { type: "image/png" }), contentType: "image/png" };
+    }, { minBytes: 200, expectedMimePrefix: "image/" }),
   );
 
   return new Response(
