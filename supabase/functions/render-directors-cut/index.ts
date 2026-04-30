@@ -206,6 +206,10 @@ serve(async (req) => {
       scene_effects,
       // Subtitle Safe Zone (hard crop)
       subtitle_safe_zone,
+      // QA stability hint: forces single-Lambda render to avoid AWS concurrency
+      // collisions when triggered from the Deep Sweep alongside other Lambda jobs.
+      qa_stability_mode,
+      max_lambda_workers,
     } = await req.json();
 
     if (!source_video_url) {
