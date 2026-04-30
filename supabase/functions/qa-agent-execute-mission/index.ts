@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
         steps_completed: successfulNavs.length,
         bugs_found: bugsFound,
         last_screenshot_url: screenshotUrl,
-        log_summary: `${navResults.length} paths, ${consoleErrors.length} console errs (${consoleGroups.size} unique), ${netErrors.length} net errs (${netGroups.size} unique), ${bugsFound} bugs (${highSeverityBugs} high/critical)`,
+        log_summary: `${navResults.length} paths, ${consoleErrors.length} console errs (${consoleGroups.size} unique), ${netErrors.length} net errs (${netGroups.size} unique), ${bugsFound} bugs (${highSeverityBugs} high/critical), ${mutedDrops} muted-drops`,
         metadata: {
           result: {
             url: result.url,
