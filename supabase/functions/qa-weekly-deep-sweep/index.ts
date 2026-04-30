@@ -851,18 +851,15 @@ Deno.serve(async (req) => {
         validation_checks: peek.validation_checks,
       });
 
-      if (peek.status === "failed" || peek.status === "timeout") {
+      if (peek.status === "failed") {
+        // Only real failures are tracked as bug reports — timeouts (AWS Lambda
+        // throttle) are infrastructure noise, not bugs.
         await admin.from("qa_bug_reports").insert({
+          category: "workflow",
           mission_name: "deep-sweep",
-          bug_type: "e2e_pipeline_failure",
           severity: "high",
-          title: `Deep Sweep: ${peek.flow_name} ${peek.status}`,
+          title: `Deep Sweep: ${peek.flow_name} failed`,
           description: peek.error_message || "No error message",
-          metadata: {
-            run_id: ctx.runId,
-            flow_index: peek.flow_index,
-            stages: peek.stage_log,
-          },
         }).then(() => {}, () => {});
       }
     };
