@@ -199,6 +199,22 @@ export function DeepSweepTab() {
               <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
               Reload
             </Button>
+            {isStale && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={finalizeStaleRun}
+                disabled={finalizing}
+                title={`Run läuft seit ${Math.round(runAgeMinutes)} min — vermutlich hat das Edge-Function-Wall-Clock-Limit zugeschlagen.`}
+              >
+                {finalizing ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4 mr-1" />
+                )}
+                Run abbrechen ({Math.round(runAgeMinutes)} min)
+              </Button>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
