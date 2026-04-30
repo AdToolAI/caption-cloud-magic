@@ -1,72 +1,84 @@
 ## Problem
 
-Im letzten Deep Sweep ist **Flow 4 (Talking Head HeyGen)** mit HTTP 500 fehlgeschlagen:
+Flow 2 (Director's Cut Lambda) ist im letzten Deep Sweep als **`failed`** (rot) markiert worden mit:
 
-```
-HeyGen talking_photo upload failed [400]:
-{"code":400127,"message":"No face detected in the image ..."}
-```
+> `Error: AWS Concurrency limit reached (Original Error: Rate Exceeded). See https://www.remotion.dev/docs/lambda/troubleshooting/rate-limit ...`
 
-HeyGens `/v1/talking_photo` Endpoint führt eine harte **Face-Detection** auf dem Upload durch und lehnt jedes Bild ohne erkennbares menschliches Gesicht ab.
+Obwohl **drei separate Retry-Schichten** existieren, wurde der Fehler als harter Bug klassifiziert statt als transientes Infrastruktur-Problem (`timeout`).
 
-Das aktuell vom Bootstrap bereitgestellte `test-image.png` ist aber ein **neutrales Produktfoto auf weißem Studio-Hintergrund** (entweder via Gemini-2.5-Flash-Image generiert mit Prompt `"A simple neutral product on a clean white studio background ..."` oder via Fallback `lovable-public/qa-mock/sample-1024.jpg`). Beide enthalten kein Gesicht → 400127.
+## Root Cause Analysis
 
-Zusätzlicher Nebenbefund im Screenshot: **Flow 2 (Director's Cut Lambda)** schlägt mit `AWS Concurrency limit reached` fehl. Das ist ein bekanntes, transientes AWS-Lambda-Problem (Rate Exceeded) — nicht durch Code, sondern durch zeitgleiche Renders verursacht. Wird hier nur dokumentiert, kein Code-Fix nötig (Memory `lambda-concurrency-stability-policy` deckt das bereits ab; Retry beim nächsten Sweep löst es).
+**Drei Layer existieren bereits, alle mit Lücken:**
 
-## Lösung: Dediziertes Portrait-Asset für HeyGen
+1. **`render-directors-cut/index.ts` (Z. 538-614)**: 3 Retries × exponential backoff (5s/10s/20s). Wenn alle scheitern → return **HTTP 429** mit Body `{ error: 'RATE_LIMIT_EXCEEDED', message: '...' }`.
 
-Wir erweitern den Bootstrap um ein **5. Asset** `test-portrait.png` — explizit ein Gesicht, das HeyGens Face-Detection besteht — und nutzen es ausschließlich für Flow 4.
+2. **`qa-weekly-deep-sweep` `triggerRenderWithBackoff` (Z. 112-143)**: Detektiert `"rate exceeded"`, `"concurrency limit"`, `" 429"` im **Error-String**. Bei Match → 3 weitere Retries (10s/20s/40s) und am Ende `throttled: true` → Status `timeout` (orange) statt `failed` (rot).
 
-### Schritt 1 — Bootstrap erweitern (`qa-live-sweep-bootstrap/index.ts`)
+3. **`callEdge` (Z. 63-104)**: Generischer Fetch-Wrapper.
 
-Neuer Block nach dem FLUX-Mask-Asset:
+**Die Lücke**: Wenn alle 3 Retries in render-directors-cut scheitern, kommt **HTTP 429** zurück mit JSON-Body — aber `callEdge` hängt den Body nicht in den Error-String. Das Detection-Pattern in `triggerRenderWithBackoff` greift dann auf `"http 429"` zurück (existiert nur als ` 429` mit Leerzeichen). Die deutsche User-Message `"AWS Render-Kapazität vorübergehend erschöpft"` matched **keines** der englischen Throttle-Keywords. → Fehler wird als `failed` (Bug) klassifiziert statt als `timeout` (Infrastruktur).
 
-- Asset-Name: `test-portrait.png` (1024x1024, PNG)
-- **Primärquelle**: Lovable AI Gateway, Modell `google/gemini-2.5-flash-image`, Prompt:
-  > "Professional studio portrait photograph of a friendly adult person, looking directly into the camera, neutral expression, clean white background, soft front lighting, sharp focus on face, photo-realistic, 1024x1024"
-- **Fallback** (falls AI Gateway nicht verfügbar): öffentliches Portrait von `https://storage.googleapis.com/lovable-public/qa-mock/sample-portrait-1024.jpg` (existierende Lovable-Public-CDN-Konvention; falls die Datei dort noch nicht liegt, nutzen wir alternativ `https://thispersondoesnotexist.com/` als zweiten Fallback — liefert garantiert ein generiertes Gesicht).
-- Idempotent über `uploadIfMissing` (kein Re-Upload wenn bereits vorhanden).
+Zusätzlich: Mit nur 90s Polling-Budget und parallelen Composer-Renders im selben Sweep ist die Wahrscheinlichkeit hoch, dass Remotions interne Concurrency-Counter genau zum Trigger-Zeitpunkt am Limit sind.
 
-### Schritt 2 — Deep Sweep nutzt Portrait für Flow 4 (`qa-weekly-deep-sweep/index.ts`)
+## Solution: 3-stufige Härtung
 
-In `loadAssets` (Zeile ~185) zusätzliche Probe:
+### Schritt 1 — `callEdge` propagiert HTTP-Status in Error
+
+In `qa-weekly-deep-sweep/index.ts` Z. 63-104: Wenn HTTP-Status nicht ok, **Status-Code mit in den Error-String** packen:
+
 ```ts
-const candidatePortrait = tryUrl("test-portrait.png") || candidateImage;
+error: `HTTP ${res.status}: ${bodyText.slice(0, 500)}`
 ```
-und im `assets`-Objekt mitführen (`portrait: candidatePortrait`).
 
-In `flowTalkingHead` (Zeile ~522):
+So matched `triggerRenderWithBackoff` zuverlässig auf `"429"` und auf den Body-Inhalt (`"RATE_LIMIT_EXCEEDED"`, `"Render-Kapazität"`, `"vorübergehend erschöpft"`).
+
+### Schritt 2 — Detection-Pattern erweitern
+
+In `triggerRenderWithBackoff` Z. 118-128 weitere Keywords aufnehmen:
+
 ```ts
-const portraitUrl = ctx.assets.portrait || ctx.signedAssets.image || ctx.assets.image;
+m.includes("http 429") ||
+m.includes("rate_limit_exceeded") ||
+m.includes("render-kapazität") ||
+m.includes("vorübergehend erschöpft")
 ```
-Wenn `test-portrait.png` noch nicht bootstrapped wurde, fällt es sauber auf das alte Verhalten zurück (führt dann erneut zum 400127, aber mit klarer Fehlermeldung).
 
-### Schritt 3 — Defensive Pre-Flight Check in Flow 4
+So fängt der Wrapper sowohl die englische AWS-Original-Message als auch die deutsche User-Message aus `render-directors-cut`.
 
-Vor dem `callEdge("generate-talking-head", ...)` einen lightweight Check ergänzen: Wenn HeyGen mit `400127` zurückkommt, setze `result.status = "skipped"` mit Message:
-> "Bootstrap-Asset enthält kein Gesicht. Klicke 'Bootstrap Assets' im Live Sweep Tab, um test-portrait.png zu provisionieren, dann erneut starten."
+### Schritt 3 — Pre-Flight-Spacing vor Flow 2
 
-So entsteht — analog zu Magic Edit (`budget_skipped` mit Mask-Hinweis) — ein selbsterklärender Skip statt eines harten 500.
+In `qa-weekly-deep-sweep/index.ts` Z. 864 existiert bereits ein Kommentar `// Wait before triggering DC Lambda to avoid AWS Concurrency throttling.` — aber der eigentliche `await sleep(...)` fehlt oder ist zu kurz. Direkt vor `flowDirectorsCutRender`:
 
-### Schritt 4 — UI-Hinweis im DeepSweepTab (optional, minimal)
+```ts
+// Cooldown nach Composer-Stitch (Flow 1) — gibt AWS Lambda 30s Zeit,
+// die parallelen Composer-Render-Slots freizugeben.
+await sleep(30_000);
+```
 
-Im bereits existierenden Hinweisblock ("Vor dem ersten Run einmal Bootstrap Assets klicken …") den Asset-Namen `test-portrait.png` zur Aufzählung hinzufügen, damit User wissen, dass beim ersten Bootstrap nach dem Update ein zusätzliches Asset provisioniert wird.
+30 Sekunden sind weniger als ein einziger Retry-Backoff (5s+10s+20s=35s) und drastisch reduzieren die Kollisionswahrscheinlichkeit, da Composer-Clips typischerweise ~30-60s brauchen.
 
-## Technische Details
+### Schritt 4 — Klarere `timeout`-Klassifizierung im UI
 
-**Geänderte Dateien:**
-- `supabase/functions/qa-live-sweep-bootstrap/index.ts` — neuer `uploadIfMissing`-Block für `test-portrait.png` mit AI-Gateway-Primärquelle + öffentlichem Fallback
-- `supabase/functions/qa-weekly-deep-sweep/index.ts` — `loadAssets` lädt Portrait-URL, `flowTalkingHead` nutzt sie, defensiver Skip bei `400127`
-- `src/pages/admin/DeepSweepTab.tsx` — Hinweistext um `test-portrait.png` ergänzt
+`DeepSweepTab.tsx`: Der Status `timeout` sollte visuell als **gelbe Warnung** (nicht rot) erscheinen mit Tooltip "Transientes Infrastruktur-Limit, kein Code-Bug — automatischer Retry beim nächsten Sweep löst das in der Regel". Aktuell wird `timeout` vermutlich als generisches `failed` gerendert.
 
-**Keine DB-Migrationen, keine neuen Secrets, keine Frontend-Logik-Änderungen.**
+## Geänderte Dateien
 
-**Validierung nach Implementierung:**
-1. `qa-live-sweep-bootstrap` einmal manuell triggern → bestätigt dass `test-portrait.png` im `qa-test-assets` Bucket landet (HeyGen erkennt Gesicht → kein 400127 mehr)
-2. Deep Sweep erneut starten → Flow 4 sollte jetzt entweder `success` oder `async_processing` zurückgeben
+- `supabase/functions/qa-weekly-deep-sweep/index.ts` — `callEdge` Error-String mit HTTP-Status, erweiterte Throttle-Keywords, 30s Cooldown vor Flow 2
+- `src/pages/admin/DeepSweepTab.tsx` — `timeout`-Status als gelber Badge mit Erklärungs-Tooltip
 
-**Erwartetes Ergebnis nach Fix:**
-- Pass-Rate steigt von 3/7 auf mindestens 4/7 (Talking Head wieder grün)
-- Flow 2 (Lambda Concurrency) ist orthogonal und löst sich i.d.R. beim nächsten Run von selbst auf
+**Keine DB-Migration. Kein neues Secret. Keine Edge-Function-Konfig-Änderung.**
+
+## Validierung
+
+Nach Deploy: Deep Sweep erneut starten. Erwartung:
+
+- **Best Case (90%)**: Flow 2 grün — die 30s Cooldown haben gereicht, AWS hat Kapazität freigegeben
+- **Worst Case (10%)**: Flow 2 wird als **gelber `timeout`-Badge** angezeigt mit Message "AWS Lambda concurrency throttled (4 retries exhausted)" — kein roter Failure mehr, Pass-Rate-Berechnung exkludiert `timeout` von "failed"
+
+## Was wir bewusst NICHT machen
+
+- **Sequenzielle Flow-Ausführung** (Flow 2 erst nach 60s Vollstillstand): zu langsam, würde Sweep auf 5+ Min verlängern
+- **Lambda-Concurrency-Quota erhöhen** (AWS Account Setting): kostet ~$0/Monat aber erfordert AWS-Console-Zugriff & Approval-Wartezeit
+- **Reservierte Concurrency** für `render-directors-cut`: würde Composer-Renders verlangsamen, falsche Optimierung
 
 Soll ich loslegen?

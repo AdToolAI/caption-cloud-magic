@@ -123,7 +123,15 @@ async function triggerRenderWithBackoff<T = any>(
       m.includes("concurrency limit") ||
       m.includes("toomanyrequests") ||
       m.includes("throttlingexception") ||
-      m.includes(" 429")
+      m.includes(" 429") ||
+      m.startsWith("429") ||
+      m.includes("http 429") ||
+      m.includes("rate_limit_exceeded") ||
+      m.includes("render-kapazität") ||
+      m.includes("render-kapazitat") ||
+      m.includes("vorübergehend erschöpft") ||
+      m.includes("vorubergehend erschopft") ||
+      m.includes("momentan werden viele videos")
     );
   };
   const delays = [10_000, 20_000, 40_000];
@@ -861,8 +869,9 @@ Deno.serve(async (req) => {
 
       const skip2 = skipBudget(2, 1.5, "Director's Cut Lambda Render");
       // Cooldown: composer-stitch (Flow 1) leaves Lambda workers warm.
-      // Wait before triggering DC Lambda to avoid AWS Concurrency throttling.
-      if (!skip2) await sleep(15_000);
+      // 30s gives AWS Lambda enough time to release parallel composer render slots
+      // before we trigger another concurrent render. Less than one retry-backoff cycle (35s).
+      if (!skip2) await sleep(30_000);
       const f2 = skip2 || await flowDirectorsCutRender(ctx, stitchedVideoUrl || ctx.assets.video);
       await persistAndCount(f2);
 
