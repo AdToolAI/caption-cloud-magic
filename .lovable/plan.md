@@ -1,53 +1,50 @@
-I found the new failures from the latest Deep Sweep run and the root causes are now clear:
+## Was ist passiert
 
-1. Flow 1 still fails with `Unauthorized`, but now the 401/500 comes from the downstream `compose-video-assemble` call, not from `compose-stitch-and-handoff`.
-2. Flow 2 fails because the bootstrapped `test-video-2s.mp4` is not actually a playable MP4. The storage object is only 133 bytes and has `application/xml`, so Lambda/Remotion throws `MEDIA_ELEMENT_ERROR: Format error`.
-3. Flow 6 fails because `render-long-form-video` calls `render-with-remotion` with a `sora_long_form_projects.id` as `project_id`; `render-with-remotion` validates `project_id` against `content_projects`, so it returns `404 Project not found`.
-4. Flow 7 is skipped because `sample-mask-512.png` is missing. The bootstrap function only skips existing files and does not repair corrupt/missing required assets reliably.
+Run `a86223af…` läuft seit ~12 min und ist aus Sicht der DB noch "running", obwohl die Edge Function laut Logs schon **bei 21:19:41 und 21:23:02 mit `shutdown` beendet wurde**.
 
-Plan:
+Konkret:
 
-1. Fix Flow 1 auth propagation
-   - Add the existing QA service-auth shortcut (`detectQaServiceAuth`) to `compose-video-assemble`.
-   - Extend its CORS headers to allow `x-qa-real-spend` and `x-qa-user-id`.
-   - In `compose-stitch-and-handoff`, when running as QA service-auth, forward the service-role auth and QA headers to `compose-video-assemble` instead of forwarding a token that downstream standard auth rejects.
+- Flows 1–5 sind fertig (Composer ✓, DC ✗, Auto-Director ✓, Hedra skip, Universal ✓)
+- Flow 6 (Long-Form Render) hat um 21:17:13 begonnen und pollt **bis zu 36 × 10 s = 360 s** auf `sora_long_form_projects.status`
+- Supabase Edge Functions haben ein Wall-Clock-Limit (~150–400 s). Der Background-Task (`EdgeRuntime.waitUntil`) wird mittendrin gekillt
+- Weil der Killing zwischen zwei Flows passiert, wird **weder `qa_deep_sweep_runs.status` noch `finished_at` gesetzt** → UI zeigt ewig "Läuft…"
 
-2. Repair QA test asset bootstrapping
-   - Update `qa-live-sweep-bootstrap` so it validates existing asset type/size before skipping.
-   - If `test-video-2s.mp4` or `test-audio.mp3` is the current 133-byte XML error object, overwrite it with a valid known playable sample.
-   - Ensure `sample-mask-512.png` is always created if missing.
-   - Add clearer bootstrap response details so the UI/user can see which assets were repaired.
+Zusatzbefund Flow 2 (Director's Cut): Lambda crasht mit `MEDIA_ELEMENT_ERROR Code 4` auf der von uns als "known good" gewählten Datei `commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4`. Chromium auf Lambda mag dieses spezifische MP4 nicht (vermutlich CORS/Range-Issue über die Google-Storage-URL).
 
-3. Make Deep Sweep use valid signed assets for render flows
-   - Change `qa-weekly-deep-sweep` asset loading to prefer signed URLs and/or fallback public known-good video if the bucket asset is not valid.
-   - Use the signed/validated video URL for Flow 1, Flow 2, and Flow 6 to avoid private/public bucket and malformed-object issues.
-   - Keep Magic Edit using signed image/mask URLs.
+## Fix-Plan (4 Punkte)
 
-4. Fix Flow 6 Long-Form render tracking
-   - Change `render-long-form-video` so it does not pass the Sora long-form project id as `project_id` into `render-with-remotion` when that function expects `content_projects`.
-   - Include a Long-Form-specific marker in the render metadata/customizations so the render can be tracked without failing the `content_projects` lookup.
-   - Update Flow 6 polling to track the `video_renders` row returned by `render-with-remotion`, and optionally update the `sora_long_form_projects.final_video_url` when completed.
-   - Keep the seeded project alive until polling finishes, then clean it up.
+### 1. Polling-Budget hart begrenzen (Flow 2 + Flow 6)
+In `supabase/functions/qa-weekly-deep-sweep/index.ts` die Long-Poll-Loops von 360 s auf **max. 90 s** kürzen (9 × 10 s). Renders, die länger brauchen, werden als `timeout` markiert (kein Geld verbrannt, weil Lambda asynchron weiterläuft und der Webhook das Projekt eh aktualisiert). Damit bleibt die Gesamt-Funktionsdauer sicher unter dem Edge-Function-Limit.
 
-5. Add webhook support for Long-Form completion
-   - Extend `remotion-webhook` to recognize a Long-Form source marker.
-   - On success, update both `video_renders` and `sora_long_form_projects` (`status = completed`, `final_video_url`).
-   - On failure, update `sora_long_form_projects` to `failed` and preserve the detailed error in `video_renders`.
+### 2. Stale-Run-Watchdog im Frontend
+`DeepSweepTab.tsx` soll einen Run, der älter als **8 min** ist und noch auf `running` steht, automatisch mit einem "Run als gescheitert markieren"-Button anzeigen. Der Klick ruft eine kleine neue Edge Function `qa-deep-sweep-finalize-stale` auf, die:
+- den Run auf `status='timeout'` setzt
+- `finished_at = now()` schreibt
+- `notes = 'Edge function wall-clock exceeded — finalized by watchdog'`
 
-6. Deploy and verify
-   - Deploy the affected backend functions:
-     - `compose-stitch-and-handoff`
-     - `compose-video-assemble`
-     - `qa-live-sweep-bootstrap`
-     - `qa-weekly-deep-sweep`
-     - `render-long-form-video`
-     - `render-with-remotion` if needed for metadata passthrough
-     - `remotion-webhook`
-   - After deployment, rerun/trigger bootstrap so corrupt QA assets are repaired before the next Deep Sweep.
+So bleibt die UI nie hängen.
 
-Expected result:
-- Flow 1 should pass the auth handoff and proceed to render invocation.
-- Flow 2 should no longer crash on an invalid 133-byte MP4.
-- Flow 6 should no longer hit `Project not found` in the generic render function.
-- Flow 7 should run once the mask is provisioned instead of being skipped.
-- Hedra/Talking Head may remain `budget_skipped` until provider migration, which is expected.
+### 3. Asset für Flow 2 austauschen
+`qa-live-sweep-bootstrap` und der Flow-2-Code verwenden statt der Google-Storage-URL eine **bereits in unserem Supabase Storage bootstrappte 2-s-MP4** (`qa-test-assets/test-video-2s.mp4`) und übergeben sie als **signed URL** (Public Read funktioniert nicht zuverlässig auf Remotion Lambda Chromium). Falls die Datei dort noch korrupt ist, einmalig mit einem getesteten H.264/AAC-Encode überschreiben (z. B. `https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4`, der ist bekannt Lambda-stabil).
+
+### 4. Aktuellen hängenden Run aufräumen
+Sofortmigration: `update qa_deep_sweep_runs set status='timeout', finished_at=now(), notes='manual cleanup — edge function killed at flow 6' where id='a86223af-003c-4087-98dc-7e8e6d0519e0';` damit die UI sofort wieder frei wird.
+
+## Technische Details
+
+**Geänderte Dateien:**
+- `supabase/functions/qa-weekly-deep-sweep/index.ts` — Poll-Loop von 36 auf 9 Iterationen kürzen (Flow 2 + Flow 6); Lambda läuft async weiter, Webhook macht den Rest
+- `supabase/functions/qa-live-sweep-bootstrap/index.ts` — Asset-URL auf bekannten H.264/AAC-MP4 umstellen
+- `supabase/functions/qa-deep-sweep-finalize-stale/index.ts` (NEU, ~30 LOC) — Admin-only RPC zum manuellen Finalisieren
+- `src/pages/admin/DeepSweepTab.tsx` — Watchdog-UI: wenn `status='running' && now()-started_at > 8min`, "Run abbrechen"-Button anzeigen
+- Migration: einmaliges UPDATE für den aktuell hängenden Run
+
+**Warum das sicher ist:**
+- Der Lambda-Render läuft unabhängig von der Edge Function weiter — verkürztes Polling kostet kein Geld, markiert lediglich "wir haben nicht lange genug gewartet"
+- Webhook (`remotion-webhook`) aktualisiert die Projekt-Tabellen weiterhin korrekt
+- Watchdog ist read-after-write idempotent
+
+**Erwartetes Verhalten nach Fix:**
+- Deep Sweep beendet immer in < 4 min (statt potenziell ewig)
+- Flow 2 wird grün (echtes Lambda-kompatibles MP4)
+- Flow 6 wird entweder grün oder als `timeout` markiert — Run wird in jedem Fall finalisiert
