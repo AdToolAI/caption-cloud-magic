@@ -688,9 +688,13 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    if (!ctx.assets.mask) {
+    const maskUrl = ctx.signedAssets.mask;
+    const imageUrl = ctx.signedAssets.image || ctx.assets.image;
+
+    if (!maskUrl) {
+      result.status = "budget_skipped";
       result.error_message =
-        "No mask asset available. Run qa-live-sweep-bootstrap to provision sample-mask-512.png.";
+        "No mask asset available. Click 'Bootstrap Assets' in the Live Sweep tab once to provision sample-mask-512.png, then re-run.";
       result.duration_ms = Date.now() - start;
       return result;
     }
@@ -699,8 +703,8 @@ async function flowMagicEdit(ctx: RunCtx): Promise<FlowResult> {
     const edit = await callEdge(
       "magic-edit-image",
       {
-        imageUrl: ctx.assets.image,
-        maskUrl: ctx.assets.mask,
+        imageUrl,
+        maskUrl,
         prompt: "add a subtle warm golden glow in the center",
         mode: "inpaint",
       },
