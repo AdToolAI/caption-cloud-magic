@@ -68,9 +68,16 @@ export async function runBrowserlessFunction(
     const rawSnippet = rawText.slice(0, 1500);
 
     if (!res.ok) {
+      // 408 = Browserless server-side timeout (plan cap reached).
+      // Make the error actionable so cockpit users see what to do.
+      const isTimeout = res.status === 408;
+      const baseMsg = `Browserless ${res.status}: ${rawText.slice(0, 500)}`;
+      const hint = isTimeout
+        ? ` — Mission exceeded ${SERVER_TIMEOUT_MS}ms server cap. Reduce step count, lower per-step timeouts, or upgrade Browserless plan and set BROWSERLESS_SERVER_TIMEOUT_MS=60000.`
+        : "";
       return {
         ok: false,
-        error: `Browserless ${res.status}: ${rawText.slice(0, 500)}`,
+        error: baseMsg + hint,
         rawResponse: rawSnippet,
         httpStatus: res.status,
         durationMs,
