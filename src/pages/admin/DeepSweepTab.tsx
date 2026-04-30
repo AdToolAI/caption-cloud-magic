@@ -164,7 +164,11 @@ export function DeepSweepTab() {
             </div>
             <p className="text-sm text-slate-400">
               7 echte End-to-End-Pipelines: Composer-Stitch, Director's Cut Lambda, Auto-Director,
-              Talking Head, Universal Video, Long-Form, Magic Edit. ~15 € pro Voll-Run.
+              Talking Head, Universal Video, Long-Form, Magic Edit. ~10–15 € pro Voll-Run.
+            </p>
+            <p className="text-xs text-amber-400/80 mt-1">
+              ⚠️ Vor dem ersten Run einmal in <strong>Live Sweep</strong> auf <em>"Bootstrap Assets"</em> klicken,
+              damit Sample-Video, -Bild, -Audio und PNG-Mask im qa-test-assets Bucket liegen.
             </p>
           </div>
           <div className="flex items-center gap-2">
