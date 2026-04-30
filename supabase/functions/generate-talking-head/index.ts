@@ -79,7 +79,10 @@ async function callHedra(imageUrl: string, audioUrl: string, aspectRatio: string
     '1:1': '1:1',
   };
 
-  const response = await fetch('https://api.replicate.com/v1/predictions', {
+  // Use the model-scoped predictions endpoint so we don't need a pinned version hash.
+  // Replicate accepts POST /v1/models/{owner}/{name}/predictions and locks to the
+  // model owner's currently published version.
+  const response = await fetch(`https://api.replicate.com/v1/models/${HEDRA_MODEL}/predictions`, {
     method: 'POST',
     headers: {
       'Authorization': `Token ${REPLICATE_API_KEY}`,
@@ -87,7 +90,6 @@ async function callHedra(imageUrl: string, audioUrl: string, aspectRatio: string
       'Prefer': 'wait',
     },
     body: JSON.stringify({
-      version: HEDRA_MODEL,
       input: {
         image: imageUrl,
         audio: audioUrl,
