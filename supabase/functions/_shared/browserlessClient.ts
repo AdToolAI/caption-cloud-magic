@@ -33,19 +33,18 @@ export async function runBrowserlessFunction(
   const start = Date.now();
   const ctrl = new AbortController();
 
-  // Browserless `/function` query-param `timeout` is in **SECONDS**, not ms
-  // (server error message: "Timeout must be an integer between 1 and 60,000
-  // seconds based on the limit for your plan"). Per-plan caps:
-  //   Hobby/Starter = 30 s, Standard = 60 s.
-  // We default to 30 s (Hobby-safe). Override via BROWSERLESS_SERVER_TIMEOUT_MS
-  // (still expressed in ms for backwards compat) when a higher-tier plan is in use.
+  // Browserless REST `/function` query-param `timeout` is in **MILLISECONDS**
+  // (per https://docs.browserless.io/rest-apis/timeouts — "All timeout values
+  // are specified in milliseconds"). A previous revision incorrectly converted
+  // to seconds, which made every request appear to time out in ~30ms and
+  // produced instant 408s with empty heartbeats. Per-plan caps still apply:
+  // Hobby/Starter ≈ 30s, Standard ≈ 60s, configurable up to plan limit via
+  // BROWSERLESS_SERVER_TIMEOUT_MS.
   const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
   const SERVER_TIMEOUT_MS = Math.min(
     60_000,
     Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000),
   );
-  // Convert to whole seconds for the query param (1..60).
-  const SERVER_TIMEOUT_SEC = Math.min(60, Math.max(1, Math.ceil(SERVER_TIMEOUT_MS / 1000)));
 
   // Client-side abort MUST follow the server cap, NOT exceed it. Otherwise
   // the server returns 408 long before the client gives up — leading to
@@ -63,7 +62,7 @@ export async function runBrowserlessFunction(
     // errors and triggering false-positive bug reports. Real third-party pixels
     // are filtered via `qa_muted_patterns` instead.
     const res = await fetch(
-      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_SEC}`,
+      `${BROWSERLESS_BASE}/function?token=${encodeURIComponent(apiKey)}&timeout=${SERVER_TIMEOUT_MS}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,9 +79,12 @@ export async function runBrowserlessFunction(
       // 408 = Browserless server-side timeout (plan cap reached).
       // Make the error actionable so cockpit users see what to do.
       const isTimeout = res.status === 408;
+      const earlyAbort = isTimeout && durationMs < 2_000;
       const baseMsg = `Browserless ${res.status}: ${rawText.slice(0, 500)}`;
-      const hint = isTimeout
-        ? ` — Mission exceeded ${SERVER_TIMEOUT_SEC}s server cap (${SERVER_TIMEOUT_MS}ms). Reduce step count, lower per-step timeouts, or upgrade Browserless plan and set BROWSERLESS_SERVER_TIMEOUT_MS=60000.`
+      const hint = earlyAbort
+        ? ` — 408 within ${durationMs}ms (no heartbeats). This is NOT a mission-length issue: Browserless rejected the request before our script started. Most likely cause: misconfigured timeout query param or invalid API token. Current SERVER_TIMEOUT_MS=${SERVER_TIMEOUT_MS}.`
+        : isTimeout
+        ? ` — Mission exceeded ${SERVER_TIMEOUT_MS}ms server cap. Reduce step count, lower per-step timeouts, or upgrade Browserless plan and set BROWSERLESS_SERVER_TIMEOUT_MS up to your plan max.`
         : "";
       return {
         ok: false,
