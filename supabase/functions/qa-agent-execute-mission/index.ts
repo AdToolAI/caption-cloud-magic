@@ -377,6 +377,27 @@ Deno.serve(async (req) => {
         ? "succeeded"
         : "failed";
 
+    // ----- Auto-resolve stale "Mission execution failed: Browserless 408" bugs -----
+    // When this mission now runs green, retroactively close earlier 408 reports
+    // for the same mission so the Bug Inbox doesn't accumulate stale entries.
+    if (status === "succeeded") {
+      try {
+        const { error: resolveErr } = await supabase
+          .from("qa_bug_reports")
+          .update({ status: "resolved", resolved_at: new Date().toISOString() })
+          .eq("mission_name", missionName)
+          .neq("status", "resolved")
+          .or(
+            "title.ilike.Mission execution failed: Browserless 408%,title.ilike.%ERR_BLOCKED_BY_CLIENT%,title.ilike.%companion-diagnose%",
+          );
+        if (resolveErr) {
+          console.warn("[execute-mission] auto-resolve failed:", resolveErr.message);
+        }
+      } catch (e: any) {
+        console.warn("[execute-mission] auto-resolve threw:", e?.message ?? String(e));
+      }
+    }
+
     await supabase
       .from("qa_test_runs")
       .update({
