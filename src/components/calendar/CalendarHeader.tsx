@@ -60,7 +60,7 @@ export function CalendarHeader({
       .from("calendar_integrations")
       .select("*")
       .eq("workspace_id", workspaceId)
-      .single();
+      .maybeSingle();
 
     if (data) {
       setGoogleConnected(data.google_calendar_connected || false);

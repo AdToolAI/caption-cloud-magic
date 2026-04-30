@@ -84,6 +84,8 @@ interface BrandKit {
 }
 
 export default function Calendar() {
+  // QA test-id (language-neutral selector for smoke missions)
+  // Used as data-testid="calendar-page" on the root container below.
   const { t } = useTranslation();
   const { user } = useAuth();
   const { emit } = useEventEmitter();

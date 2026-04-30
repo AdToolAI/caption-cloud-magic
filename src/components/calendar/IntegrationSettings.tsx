@@ -34,7 +34,7 @@ export function IntegrationSettings({ workspaceId }: IntegrationSettingsProps) {
       .from("calendar_integrations")
       .select("*")
       .eq("workspace_id", workspaceId)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== "PGRST116") {
       console.error("Failed to fetch integration:", error);
