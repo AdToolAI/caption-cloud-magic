@@ -1,62 +1,118 @@
 ## Ausgangslage
 
-Der Workflow läuft jetzt sauber durch (3/5 grün, Cockpit empfängt alle 9 Resultate). Die 2 Fails sind **falsche Test-Annahmen**, keine App-Bugs:
+- ✅ Workflow läuft jetzt **grün** (5/5 passed, 1 Retry beim Account-Test)
+- ⚠ Der Flake bei `/account`: Im Code ist `/account` **nicht** mit `ProtectedRoute` umschlossen (siehe `App.tsx` Zeile 183). Account.tsx macht den Auth-Check intern und redirectet langsam — daher reichen 1500ms Wait nicht immer
+- 🎯 Du willst breitere Abdeckung, um *wirklich* die meisten Bugs zu fangen
 
-**Fail 1 – Pricing-Selektor zu spezifisch:**
-Test sucht nach Texten `14,99` / `34,95` / `69,95` auf der Landing Page (`/`). Diese exakten Preise existieren nicht im Code — die Landing Page hat nur strukturierte Daten mit `"price": "0"`. Pricing wird vermutlich auf einer eigenen `/pricing`-Route angezeigt, nicht auf `/`.
+## Ziel
 
-**Fail 2 – Auth-Redirect-Logik missverstanden:**
-`/dashboard` redirectet auf `/home` (nicht `/auth`), weil:
-- App.tsx Zeile 171: `<Route path="/" element={user ? <Navigate to="/home" replace /> : <Index />} />`
-- `/dashboard` existiert in dieser App **gar nicht** als geschützte Route
-- Echte geschützte Routen sind z.B. `/video-composer`, `/picture-studio`, die korrekt auf `/auth` redirecten (via `ProtectedRoute`)
+Von **5 Tests → ~25 stabile Smoke-Tests**, die alle 5 Min/täglich gegen Production laufen und folgende Schichten abdecken:
 
-## Lösung — Tests an Realität anpassen
+1. **Public Pages** (rendern, kein 500, keine JS-Errors)
+2. **Auth-Flows** (Login-Form, Forgot-Password, Reset-Password)
+3. **Geschützte Routen** (echte ProtectedRoute-Pfade)
+4. **SEO & Meta** (Title, Meta-Description, OG-Tags, Sitemap, Robots)
+5. **Legal & Compliance** (alle 4 Pflichtseiten DACH/TikTok)
+6. **API-Health** (Supabase-Reachability, Edge-Function-Pings)
+7. **Performance-Budgets** (LCP, Bundle-Size pro Page)
+8. **Mobile-Responsiveness** (kein horizontaler Scroll auf 375px)
+9. **404-Handling** (NotFound-Page rendert sauber)
 
-### Änderung 1: Pricing-Test entschärfen
+## Konkrete Test-Suites
 
-Statt nach festen Preisen zu suchen, prüfen wir flexibler auf das **Vorhandensein irgendeiner Preis-Indikation** (€-Zeichen, "monatlich", "Plan", "kostenlos") oder erkennen, dass die Landing keine Preise zeigt und navigieren zur Pricing-Seite.
+### Suite 1: `critical-journeys.spec.ts` (bestehend, FIX)
 
-Neuer Selector (robust gegen Preisänderungen):
-```ts
-// Prüfe entweder Preis-Pattern auf Landing ODER Pricing-Link existiert
-const hasPriceOnLanding = await page.getByText(/\d+[,.]\d{2}\s*€|€\s*\d+|kostenlos|free/i).first().isVisible().catch(() => false);
-const hasPricingLink = await page.getByRole('link', { name: /pricing|preise|plan/i }).first().isVisible().catch(() => false);
-expect(hasPriceOnLanding || hasPricingLink, 'Weder Preis noch Pricing-Link auf Landing').toBeTruthy();
+**Fix für Flake:** `/account` aus `protectedPaths` entfernen (ist gar nicht protected im Routing). Stattdessen nur **echte** `ProtectedRoute`-Pfade aus App.tsx:
+- `/streak`, `/autopilot`, `/email-director`, `/brand-characters`, `/account/delete`
+
+Plus: `waitForURL('**/auth**', { timeout: 8000 })` statt fixem `waitForTimeout` — das eliminiert Race-Conditions.
+
+### Suite 2: `public-pages.spec.ts` (NEU — ~10 Tests)
+
+Loop über alle Public-Routen, prüft pro Route:
+- HTTP-Status < 400
+- `<h1>` sichtbar binnen 5s
+- Keine JS-Errors (page.on('pageerror'))
+- Title-Tag nicht leer
+
+Routen:
+- `/`, `/pricing`, `/faq`, `/auth`, `/forgot-password`
+- `/legal/privacy`, `/legal/terms`, `/legal/imprint`
+- `/coming-soon`, `/delete-data`
+- `/hub/content` (Hub-Page mit dynamischem Param)
+
+### Suite 3: `seo-meta.spec.ts` (NEU — ~5 Tests)
+
+- `/sitemap.xml` ist erreichbar und valides XML
+- `/robots.txt` ist erreichbar
+- Landing hat `<meta property="og:title">` + `og:image`
+- Landing hat `<link rel="canonical">`
+- `/manifest.json` ist gültiges JSON
+
+### Suite 4: `auth-flows.spec.ts` (NEU — ~3 Tests, KEIN Login)
+
+- `/auth` zeigt sowohl Email/Password-Form als auch (falls vorhanden) Google-Button
+- `/forgot-password` zeigt Email-Eingabe + Submit
+- `/reset-password` ohne Token → zeigt sinnvolle Error-Message (kein White-Screen)
+
+### Suite 5: `api-health.spec.ts` (NEU — ~3 Tests)
+
+Direkte Network-Calls (kein Browser nötig, schnell):
+- `GET https://lbunafpxuskwmsrraqxl.supabase.co/rest/v1/` → 200/401 (nicht 5xx)
+- `OPTIONS` auf eine bekannte Edge-Function → CORS-Header da
+- Anon-Key kann eine public Tabelle lesen (z.B. `pricing_plans` falls existent)
+
+### Suite 6: `performance-budgets.spec.ts` (NEU — ~3 Tests)
+
+- Landing < 4s LCP (du hast schon einen — ausweiten)
+- `/pricing` < 4s LCP
+- `/auth` < 3s (sollte schlanker sein als Landing)
+
+### Suite 7: `mobile-responsive.spec.ts` (NEU — ~2 Tests)
+
+Viewport 375x667 (iPhone SE):
+- Landing: kein horizontaler Scroll (`document.documentElement.scrollWidth <= 375`)
+- `/pricing`: kein horizontaler Scroll
+
+### Suite 8: `not-found.spec.ts` (NEU — ~1 Test)
+
+- `/this-route-does-not-exist-xyz` zeigt NotFound-Page mit Link zurück zur Landing
+
+## Workflow-Update
+
+`.github/workflows/e2e-critical.yml` umbenennen zu **E2E Smoke Suite** und alle 8 Specs laufen lassen statt nur einer:
+
+```yaml
+- name: Run smoke suite
+  run: npx playwright test tests/critical-journeys.spec.ts tests/public-pages.spec.ts tests/seo-meta.spec.ts tests/auth-flows.spec.ts tests/api-health.spec.ts tests/performance-budgets.spec.ts tests/mobile-responsive.spec.ts tests/not-found.spec.ts
 ```
 
-### Änderung 2: Geschützte-Routen-Test korrigieren
+Plus: `--workers=2` (statt 1) für Parallelisierung — sollte auf ~3-4 Min Gesamtlaufzeit kommen statt 8+ Min sequenziell.
 
-`/dashboard` aus der Liste entfernen (existiert nicht), nur **echte** `ProtectedRoute`-Pfade testen. Aus `App.tsx` ableiten:
-- `/video-composer` ✓
-- `/picture-studio` ✓
-- `/account` ✓ (statt nicht-existentem /dashboard)
+Schedule auf alle **6h** (statt nur täglich), damit Regressionen früher auffallen — bei Public Repo kostenlos.
 
-### Änderung 3: Legal-Selektor in Test 1 prüfen
+## Was bewusst NICHT getestet wird
 
-Test 1 prüft auch `getByRole('link', { name: /impressum/i })` im Footer. Falls das auch fehlschlägt (Cascade-Effekt), nehmen wir denselben "OR"-Ansatz: entweder Footer-Link auf `/` ODER `/impressum` direkt erreichbar (wird sowieso in Test 4 geprüft).
+- **Authentifizierte Flows** (Video-Generation, Composer, Studios) — bräuchten Test-User + Credits, würden bei jedem Run echtes Geld verbrennen. Dafür gibt es bereits `tests/e2e/*.spec.ts` mit Test-Users für gezielte manuelle Runs.
+- **Visual Regression** — bereits in separatem Workflow (`visual-regression.yml`)
+- **Load Tests** — bereits in `load-tests.yml`
 
-## Technische Details
-
-**Datei:** `tests/critical-journeys.spec.ts`
-
-**Konkrete Edits:**
-
-1. **Zeile 59** (Pricing-Check) — ersetzen durch flexible OR-Logik
-2. **Zeile 89** (`protectedPaths`) — `/dashboard` ersetzen durch `/account` (da Account.tsx ProtectedRoute nutzt)
-3. **Zeile 62-63** (Legal-Footer) — als `.or()`-Locator schreiben, der auch akzeptiert wenn Links nur in einem Hamburger-Menu sind
-
-**Was nicht angefasst wird:**
-- `playwright.config.ts` (BASE_URL läuft schon korrekt gegen `caption-cloud-magic.lovable.app`)
-- Workflow-YAML (`.github/workflows/e2e-critical.yml` läuft sauber)
-- Cockpit-Reporter (funktioniert — 9/9 Resultate empfangen)
-- App-Code (keine echten Bugs gefunden)
+Diese Smoke-Suite ist die **erste Verteidigungslinie**: schnell, kostenlos, deckt 80% der "ist die Website überhaupt online und nutzbar?"-Fragen ab.
 
 ## Erwartetes Ergebnis
 
-Nächster Workflow-Run sollte **5/5 grün** sein. Du siehst dann im QA Cockpit unter `/admin/qa-cockpit` alle Tests als ✅ und der GitHub Actions Badge wird grün.
+- ~25 grüne Tests in ~3-4 Min
+- Cockpit zeigt 25 Resultate alle 6h
+- Wenn morgen jemand versehentlich `/pricing` killt, die OG-Tags entfernt, oder `/auth` zerschießt → roter Badge in <6h
 
-## Was du danach tun kannst
+## Technische Details (für später beim Implementieren)
 
-- **Optional:** Spezifischere Tests dazuschreiben sobald die Pricing-Seite stabil ist (mit echten Selektoren wie `data-testid="price-pro"`)
-- **Optional:** Den Workflow auf `schedule` (z.B. alle 6h) statt nur manuell laufen lassen, um Regressionen früh zu erkennen — kostet bei Public Repo nichts
+- Helper-File `tests/helpers/page-checks.ts` mit `assertPageHealthy(page, path)` — prüft Status, h1, Errors, Title in einer Funktion
+- Cockpit-Reporter funktioniert bereits — keine Änderung nötig
+- BASE_URL bleibt `https://caption-cloud-magic.lovable.app`
+- Custom-Domain (`useadtool.ai`) NICHT testen — die Auth-Redirect-Logik dort ist anders, würde Flakes produzieren
+
+## Was du danach optional tun kannst
+
+- Test-User mit Trial-Credits einrichten → dann können wir auch authentifizierte Smoke-Tests dazunehmen (Video-Composer öffnet, Composer-Brief speichert, Brand-Character laden)
+- Slack/Discord-Webhook im Workflow → automatische Notification bei Fail
