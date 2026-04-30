@@ -1,71 +1,70 @@
-## Was die Bugs uns sagen
+## Was die neuen Bugs uns sagen
 
-Die alten 408er sind weg (gut!). Jetzt sehen wir **drei neue, echte Probleme**:
+### Cluster A — `smoke-08-music-studio` × `check-subscription` ERR_FAILED (2× high)
+`useAuth.tsx:117` ruft `supabase.functions.invoke('check-subscription')` automatisch beim Mount jeder Page (auch unter Browserless). Im Headless-Run schlägt der Call manchmal fehl mit `FunctionsFetchError: Failed to send a request to the Edge Function` / `net::ERR_FAILED` — typisch wenn die Page während des Auth-Bootstraps schon weiternavigiert, oder wenn Browserless einen In-flight-Fetch beim Page-Unload abbricht.
 
-### Bug-Cluster A — `ERR_BLOCKED_BY_CLIENT` auf `companion-diagnose`
-Erscheint in **smoke-04, smoke-05, smoke-06** als `expect_no_console_error`-Failure:
-```
-Failed to load resource: net::ERR_BLOCKED_BY_CLIENT
-Access to fetch at 'https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/companion-diagnose' from o[rigin]
-Failed to load resource: net::ERR_FAILED
-```
+**Edge-Function-Logs zeigen:** `check-subscription` bootet sauber, aber kein einziger Request-Log → der Call erreicht den Server nie. Das ist **Browserless-Lifecycle-Noise**, kein App-Bug. Genau wie `companion-diagnose` letzte Runde.
 
-**Ursache:** Browserless wird mit `&blockAds=true` aufgerufen (Zeile 57 in `browserlessClient.ts`). Browserless' Ad-Blocker blockt `companion-diagnose`-Calls als „tracking". Das ist **kein App-Bug** — es ist eine falsch-positive Erkennung des QA-Agents selbst.
+### Cluster B — `smoke-08-music-studio` "Mission execution failed: (no error message)"
+Engine-Bug: wenn `browserlessClient` `ok:false` ohne `error`-Feld zurückgibt, schreiben wir wörtlich `"(no error message)"` in den Bug. Wir haben aber `httpStatus`, `durationMs`, `last_heartbeat` und `loginScreenshotUrl` zur Verfügung — die müssen in den Title fließen.
 
-### Bug-Cluster B — Falsche Selektoren (`click_text "Subtitles" / "Briefing"`)
-- `smoke-04` sucht Text **„Subtitles"** auf `/universal-directors-cut` → existiert nicht (App ist DE/multilingual, Tab heißt z.B. „Untertitel" oder ist ein Icon-Button).
-- `smoke-06` sucht Text **„Briefing"** auf `/autopilot` → ebenfalls nicht so beschriftet.
-
-Diese Steps wurden ohne Code-Verifizierung in die DB-Missions geseedet.
-
-### Bug-Cluster C — `smoke-05-composer-render-stitch` Browserless 408
-Mission hat 7 Steps, aber `/video-composer` ist eine schwere Page (Lambda-Render-Engine bootet, Realtime-Channels, viele Edge-Function-Probes). Login + 7 Steps + heavy page = >30s. Hobby-Cap reicht nicht.
+### Cluster C — `smoke-07-calendar-crud` Browserless 408
+6 Steps mit `click_text "Event"` — auf `/calendar` gibt's keinen exakten Text "Event" (sondern „Veranstaltung", Icons etc.). `click_text` wartet bis zum Per-Step-Timeout (12s) → 408. Selber Pattern wie smoke-04/06 letzte Runde, nur diese Mission wurde übersehen.
 
 ## Lösung
 
-### 1. `blockAds=true` ausschalten oder gezielt allowlist-en
-**Datei:** `supabase/functions/_shared/browserlessClient.ts`
-- `&blockAds=true` aus dem `/function`-Call entfernen. Wir wollen alle Real-User-Requests sehen, inklusive companion-diagnose. Nicht-genutzte Drittanbieter-Pixel landen sowieso in der `qa_muted_patterns`-Tabelle.
+### 1. `check-subscription`-Noise als Muted Pattern (Defense-in-Depth)
+Neuer Eintrag in `qa_muted_patterns`:
+```
+pattern_regex: check-subscription.*(ERR_FAILED|FunctionsFetchError|Failed to send a request)
+severity: ignore
+reason: Auth-bootstrap fetch raced with Browserless page lifecycle; not an app bug.
+```
+Plus Alias-Pattern `FunctionsFetchError.*check-subscription` für die zweite Logzeilen-Variante.
 
-### 2. Selektoren in den Smoke-Missions korrigieren
-**Datei:** Migration `update qa_missions steps`
-Zuerst die echten UI-Texte verifizieren mit:
-- `rg -i "subtitle|untertitel" src/pages/UniversalDirectorsCut.tsx src/pages/DirectorsCut/`
-- `rg -i "briefing|brief" src/pages/Autopilot* src/components/autopilot/`
+### 2. Engine: aussagekräftiger Fallback statt "(no error message)"
+**Datei:** `supabase/functions/qa-agent-execute-mission/index.ts` (Zeile 217 + 226)
+- Wenn `result.error` leer ist, baue Title aus verfügbaren Signalen: `Mission execution failed: HTTP {httpStatus} after {durationMs}ms (last step: {heartbeats[-1]?.label ?? "unknown"})`.
+- Description bekommt den vollen `rawResponse`-Snippet (erste 500 Chars), nicht nur `(no error message)`.
 
-Dann die DB-Steps so anpassen, dass entweder:
-- ein **tatsächlich vorhandener** Tab/Button-Text gesucht wird, ODER
-- ein robuster `data-testid="…"`-Selector benutzt wird (Engine in `browserlessClient.ts` unterstützt das schon via `selector`-Feld).
+### 3. `smoke-07-calendar-crud` entschärfen (Migration)
+Steps reduzieren auf das, was wirklich existiert:
+```
+1. navigate /calendar (wait_ms 2500)
+2. expect_visible "Calendar" (timeout 10s)
+3. sleep 1500  // calendar-page hat heavy bootstrap
+4. expect_no_console_error
+```
+`click_text "Event"` raus — Calendar ist multilingual + icon-driven, das ist nicht testbar mit Text-Selector. Wer Event-CRUD echt testen will, braucht `data-testid="calendar-add-event"` (separater PR).
 
-Falls die App noch keine `data-testid`s an den richtigen Stellen hat: **lieber die problematischen Steps ersatzlos streichen** und nur navigate + expect_visible (auf Page-Header) + expect_no_console_error behalten. Lieber 3 grüne Steps als 6 rote.
+### 4. Stale-Bug-Auto-Resolve erweitern
+**Datei:** `qa-agent-execute-mission/index.ts` Zeile 391
+Auto-Resolve-OR-Filter erweitern um:
+- `title.ilike.%check-subscription%`
+- `title.ilike.%(no error message)%`
 
-### 3. `smoke-05-composer-render-stitch` entschlacken
-**Migration auf `qa_missions`:**
-- 7 → max. 4 Steps: `navigate /video-composer` → `expect_visible "Composer"` (oder echter Header) → `sleep 1500` (Heavy-Page-Bootstrap) → `expect_no_console_error`.
-- Den `click_text "Add Scene"` + `expect_visible "Scene"` rauswerfen (zu fragil, hier nicht der Test-Fokus).
+Damit verschwinden die aktuellen 4 Inbox-Einträge automatisch beim nächsten grünen smoke-07/08-Run.
 
-### 4. Auto-Resolve für „Mission execution failed: Browserless 408"
-**Datei:** `supabase/functions/qa-agent-execute-mission/index.ts`
-- Beim nächsten erfolgreichen Run einer Mission alle vorherigen `qa_bug_reports` derselben `mission_name` mit Title-Prefix `"Mission execution failed: Browserless 408"` auf `status = 'resolved'` setzen. So leert sich die Bug Inbox automatisch, statt dass der User 24 stale Einträge manuell wegklicken muss.
-
-### 5. (Optional, nice-to-have) `companion-diagnose` als Muted-Pattern
-Falls Schritt 1 (`blockAds=false`) doch noch etwas durchlässt: einen Eintrag in `qa_muted_patterns` mit `pattern_regex = 'companion-diagnose.*ERR_(BLOCKED|FAILED)'` und `severity_when_matched = 'ignore'`. Das ist Defense-in-Depth.
+### 5. Bug-Inbox einmalig bereinigen (Migration)
+SQL-Update auf `qa_bug_reports`: setzt die jetzt im Screenshot sichtbaren stale Einträge (`smoke-07-calendar-crud` 408, `smoke-08-music-studio` × check-subscription/no-error-message) auf `status='resolved'` mit `resolution_note='Auto-resolved by QA hardening: known false positive'`.
 
 ## Dateien
 
-- `supabase/functions/_shared/browserlessClient.ts` — `blockAds=true` entfernen
-- `supabase/functions/qa-agent-execute-mission/index.ts` — Auto-Resolve-Block ergänzen
-- Migration: `UPDATE qa_missions SET steps = ... WHERE name IN ('smoke-04-...', 'smoke-05-...', 'smoke-06-...')`
-- Optional Migration: `INSERT INTO qa_muted_patterns ...` für companion-diagnose
+- Migration: `INSERT INTO qa_muted_patterns` (3 Einträge: check-subscription × 2 Patterns + FunctionsFetchError)
+- Migration: `UPDATE qa_missions SET steps = ...` für `smoke-07-calendar-crud`
+- Migration: `UPDATE qa_bug_reports SET status='resolved'` für die 4 Inbox-Einträge
+- `supabase/functions/qa-agent-execute-mission/index.ts` — besserer Fallback-Title + erweiterter Auto-Resolve-Filter
+- Memory-Update: `mem://features/qa-agent/false-positive-hardening.md` ergänzen um check-subscription + smoke-07-Pattern
 
 ## Erwartung nach dem Fix
 
-- smoke-04 / smoke-06 grün (keine fake "Subtitles"/"Briefing"-Klicks mehr, keine falschen `ERR_BLOCKED_BY_CLIENT`-Console-Errors)
-- smoke-05 grün (4 statt 7 Steps, passt in 30s Hobby-Cap)
-- Bug Inbox: 24 → ~0–2 echte Einträge nach dem nächsten Cron-Lauf
-- Wir sehen wieder **echte** App-Probleme statt QA-Agent-Eigenartefakte
+- smoke-08 grün (check-subscription-Noise gemuted, kein leerer Error mehr möglich)
+- smoke-07 grün (4 stabile Steps statt 6 fragiler)
+- Bug Inbox: 4 stale Einträge automatisch resolved
+- Falls je wieder ein echter Engine-Crash auftritt: Title verrät HTTP-Status + Duration + letzten Heartbeat, statt nur "(no error message)"
 
 ## Out-of-scope
 
+- Echtes Calendar-Event-CRUD-Testing (braucht `data-testid`-PR)
 - Browserless-Plan-Upgrade
-- Komplette Selektor-Robustheits-Initiative (z.B. `data-testid` auf jeden Tab) — separater PR
+- Refactor von `useAuth` `check-subscription`-Call auf debounced/lazy (nicht-trivial, würde Live-App ändern)

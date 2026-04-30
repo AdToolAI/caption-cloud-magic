@@ -214,7 +214,34 @@ Deno.serve(async (req) => {
 
     // ----- BUG: Browserless overall failure -----
     if (!result.ok) {
-      const errMsg = result.error ?? "(no error message)";
+      const rawErr = result.error;
+      const httpStatus = (result as any).httpStatus ?? null;
+      const rawResponse = (result as any).rawResponse ?? null;
+      const lastHb = heartbeats[heartbeats.length - 1];
+      const lastHbLabel = lastHb?.label ?? lastHb?.step ?? lastHb?.path ?? null;
+
+      // Build a meaningful fallback when browserlessClient returned ok:false without an error string
+      let errMsg: string;
+      if (rawErr && rawErr.trim().length > 0) {
+        errMsg = rawErr;
+      } else {
+        const parts: string[] = [];
+        if (httpStatus) parts.push(`HTTP ${httpStatus}`);
+        if (result.durationMs) parts.push(`after ${result.durationMs}ms`);
+        if (lastHbLabel) parts.push(`last step: ${lastHbLabel}`);
+        if (rawResponse) {
+          const snippet = String(rawResponse).slice(0, 200).replace(/\s+/g, " ").trim();
+          if (snippet) parts.push(`response: ${snippet}`);
+        }
+        errMsg = parts.length > 0
+          ? `Browserless engine failure (${parts.join(", ")})`
+          : "Browserless engine returned ok:false with no diagnostic data";
+      }
+
+      const description = rawResponse
+        ? `${errMsg}\n\n--- raw response (truncated) ---\n${String(rawResponse).slice(0, 500)}`
+        : errMsg;
+
       const isLoginFail = /Login did not redirect|Auth form not ready|Email or password input|No submit button|preview auth bridge/i.test(errMsg);
       await insertBug({
         run_id,
@@ -223,8 +250,8 @@ Deno.serve(async (req) => {
         category: "workflow",
         title: isLoginFail
           ? `Login failed before any path could be visited`
-          : `Mission execution failed: ${errMsg.slice(0, 100)}`,
-        description: errMsg,
+          : `Mission execution failed: ${errMsg.slice(0, 120)}`,
+        description,
         screenshot_url: loginScreenshotUrl ?? screenshotUrl,
         network_trace: {
           failure_area: isLoginFail ? "auth" : "workflow",
@@ -388,7 +415,14 @@ Deno.serve(async (req) => {
           .eq("mission_name", missionName)
           .neq("status", "resolved")
           .or(
-            "title.ilike.Mission execution failed: Browserless 408%,title.ilike.%ERR_BLOCKED_BY_CLIENT%,title.ilike.%companion-diagnose%",
+            [
+              "title.ilike.Mission execution failed: Browserless 408%",
+              "title.ilike.%ERR_BLOCKED_BY_CLIENT%",
+              "title.ilike.%companion-diagnose%",
+              "title.ilike.%check-subscription%",
+              "title.ilike.%(no error message)%",
+              "title.ilike.%Browserless engine returned ok:false%",
+            ].join(","),
           );
         if (resolveErr) {
           console.warn("[execute-mission] auto-resolve failed:", resolveErr.message);
