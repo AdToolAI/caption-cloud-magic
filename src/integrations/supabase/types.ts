@@ -9892,6 +9892,90 @@ export type Database = {
           },
         ]
       }
+      qa_live_budget: {
+        Row: {
+          cap_eur: number
+          created_at: string
+          id: string
+          last_run_at: string | null
+          period_start: string
+          spent_eur: number
+          updated_at: string
+        }
+        Insert: {
+          cap_eur?: number
+          created_at?: string
+          id?: string
+          last_run_at?: string | null
+          period_start?: string
+          spent_eur?: number
+          updated_at?: string
+        }
+        Update: {
+          cap_eur?: number
+          created_at?: string
+          id?: string
+          last_run_at?: string | null
+          period_start?: string
+          spent_eur?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      qa_live_runs: {
+        Row: {
+          asset_url: string | null
+          completed_at: string | null
+          cost_eur: number
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          estimated_cost_eur: number
+          id: string
+          mode: string
+          model: string | null
+          provider: string
+          raw_response: Json | null
+          refund_verified: boolean | null
+          status: string
+          sweep_id: string
+        }
+        Insert: {
+          asset_url?: string | null
+          completed_at?: string | null
+          cost_eur?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_eur?: number
+          id?: string
+          mode: string
+          model?: string | null
+          provider: string
+          raw_response?: Json | null
+          refund_verified?: boolean | null
+          status: string
+          sweep_id: string
+        }
+        Update: {
+          asset_url?: string | null
+          completed_at?: string | null
+          cost_eur?: number
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          estimated_cost_eur?: number
+          id?: string
+          mode?: string
+          model?: string | null
+          provider?: string
+          raw_response?: Json | null
+          refund_verified?: boolean | null
+          status?: string
+          sweep_id?: string
+        }
+        Relationships: []
+      }
       qa_missions: {
         Row: {
           category: string
