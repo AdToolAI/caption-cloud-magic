@@ -16,11 +16,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
-// Reliable public MP4/MP3 samples — Google's GTV bucket is widely cached and
-// returns a real video/mp4 with a parseable moov atom (the previous
-// lovable-public sample returned an XML S3 error, breaking Lambda playback).
+// Reliable public MP4/MP3 samples — Big Buck Bunny H.264/AAC is the de-facto
+// industry test sample and plays cleanly in Chromium on Lambda. The previous
+// Google GTV "ForBiggerBlazes" URL triggered MEDIA_ELEMENT_ERROR Code 4 in
+// Remotion Lambda Chromium (likely Range/CORS handling on storage.googleapis.com).
 const SAMPLE_VIDEO_URL =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+  "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4";
 const SAMPLE_AUDIO_URL =
   "https://download.samplelib.com/mp3/sample-3s.mp3";
 
