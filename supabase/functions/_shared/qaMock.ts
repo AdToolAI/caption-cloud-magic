@@ -21,6 +21,11 @@ const SAMPLE_AUDIO_URL =
   "https://storage.googleapis.com/lovable-public/qa-mock/sample-5s.mp3";
 
 export function isQaMockRequest(req: Request): boolean {
+  // Explicit override: Deep Sweep / Live Sweep want REAL spend even if a
+  // wrapping caller set x-qa-mock. This header trumps everything.
+  const realSpend = req.headers.get("x-qa-real-spend");
+  if (realSpend === "true" || realSpend === "1") return false;
+
   const h = req.headers.get("x-qa-mock");
   return h === "true" || h === "1";
 }
