@@ -502,16 +502,17 @@ async function flowAutoDirector(ctx: RunCtx): Promise<FlowResult> {
   return result;
 }
 
-// Flow 4: Talking Head (Hedra)
+// Flow 4: Talking Head (HeyGen) — Hedra was removed from Replicate (Apr 2026),
+// migrated to HeyGen native API which provides premium photo-avatar quality.
 async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   const start = Date.now();
   const stages: FlowResult["stage_log"] = [];
   const result: FlowResult = {
     flow_index: 4,
-    flow_name: "Talking Head (Portrait + TTS + Hedra)",
+    flow_name: "Talking Head (Portrait + TTS + HeyGen)",
     status: "failed",
     duration_ms: 0,
-    estimated_cost_eur: 1.8,
+    estimated_cost_eur: 0.4,
     actual_cost_eur: 0,
     stage_log: stages,
     validation_checks: {},
@@ -522,7 +523,7 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     result.validation_checks.portrait = !!portraitUrl;
 
     const t0 = Date.now();
-    const hedra = await callEdge(
+    const heygen = await callEdge(
       "generate-talking-head",
       {
         imageUrl: portraitUrl,
@@ -534,37 +535,24 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
       ctx.userId,
       300_000,
     );
-    stages.push({ stage: "hedra", ok: hedra.ok, ms: Date.now() - t0, note: hedra.error });
+    stages.push({ stage: "heygen-create", ok: heygen.ok, ms: Date.now() - t0, note: heygen.error });
 
-    const url = pickAssetUrl(hedra.json) || (hedra.json as any)?.videoUrl;
-    const predictionId = (hedra.json as any)?.predictionId;
+    const url = pickAssetUrl(heygen.json) || (heygen.json as any)?.videoUrl;
+    const predictionId = (heygen.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
-    // Hedra Replicate model was removed (April 2026). Detect 404 / "Model not found"
-    // / "resource could not be found" and degrade gracefully to budget_skipped instead
-    // of polluting the bug report with a known-broken provider.
-    const errStr = (hedra.error || "").toLowerCase();
-    const isHedraGone =
-      errStr.includes("model not found") ||
-      errStr.includes("resource could not be found") ||
-      (hedra.status === 500 && errStr.includes("404"));
-
-    if (hedra.ok && url) {
+    if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
-    } else if (hedra.ok && predictionId) {
+    } else if (heygen.ok && predictionId) {
+      // Async — HeyGen polling runs in background via waitUntil
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
-      result.error_message = "Async — prediction triggered, output via webhook";
-    } else if (isHedraGone) {
-      result.status = "budget_skipped";
-      result.actual_cost_eur = 0;
-      result.error_message =
-        "Hedra Replicate model removed (April 2026). Flow auto-skipped until provider migration (Hedra native API or Replicate alternative).";
+      result.error_message = "Async — HeyGen video_id received, completion via background poll";
     } else {
-      result.error_message = hedra.error || "Hedra returned no video URL or predictionId";
+      result.error_message = heygen.error || "HeyGen returned no video URL or predictionId";
     }
   } catch (e: any) {
     result.error_message = e?.message || String(e);
