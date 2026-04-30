@@ -1,32 +1,36 @@
-Ich habe die aktuellen Fehlruns geprüft. Die neuen Timeouts passieren nicht mehr wegen zu vieler Missions-Schritte. Alle betroffenen Missionen haben bereits nur 3 Schritte. Der entscheidende Hinweis ist: `duration_ms` liegt nur bei ca. 650–850 ms, `heartbeats: []`, `0 paths`. Das bedeutet: Browserless bricht ab, bevor unser Skript überhaupt startet.
+## Neue Bugs aus smoke-07-calendar-crud
 
-Ursache: In `browserlessClient.ts` wurde der Browserless-`timeout` Query-Parameter zuletzt fälschlich von Millisekunden in Sekunden umgerechnet. Die aktuelle Browserless-Dokumentation sagt jedoch: REST-API-Timeouts sind in Millisekunden. Dadurch schicken wir aktuell `timeout=30` statt `timeout=30000`, was praktisch ein 30-ms-Limit ist. Deshalb kommen sofort 408-Timeouts, obwohl die Mission kurz ist.
+Zwei Cluster, beide mit eindeutiger Root-Cause:
 
-Plan zur Behebung:
+### Bug 1 — Echter Code-Bug: 406 auf `calendar_integrations`
+`src/components/calendar/CalendarHeader.tsx` Zeile 63 nutzt `.single()` statt `.maybeSingle()`. Wenn ein Workspace noch keinen Calendar-Integration-Eintrag hat (Default-Zustand für neue User wie unseren QA-Bot), antwortet PostgREST mit **HTTP 406** ("0 rows when 1 expected"). Das ist genau das Pattern aus unserer eigenen `single-query-errors`-Regel.
 
-1. Browserless Timeout-Parameter korrigieren
-   - In `supabase/functions/_shared/browserlessClient.ts` den `timeout` Query-Parameter wieder in Millisekunden übergeben.
-   - `SERVER_TIMEOUT_SEC` entfernen/ersetzen durch `SERVER_TIMEOUT_MS` im Request.
-   - Kommentar und Fehlermeldung korrigieren, damit dort nicht mehr fälschlich steht, Browserless erwarte Sekunden.
-   - User-facing Hinweis weiterhin klar halten: Hobby-safe 30s, optional 60s über `BROWSERLESS_SERVER_TIMEOUT_MS`.
+Das ist **kein** false positive — wir haben es nur bei `companion_user_preferences` gemutet. Hier muss der Code richtig gefixt werden.
 
-2. Diagnose verbessern
-   - Wenn Browserless 408 innerhalb von <2s zurückkommt und keine Heartbeats vorhanden sind, soll die Fehlermeldung künftig explizit auf einen externen Browserless-Konfigurations-/Timeout-Startfehler hinweisen statt auf „zu viele Schritte“.
-   - Das verhindert, dass wir künftig wieder Missionsinhalt optimieren, obwohl der Request gar nicht gestartet wurde.
+### Bug 2 — Mission-Sprach-Drift: `expect_visible "Calendar"`
+Step 1 erwartet den englischen Text "Calendar", aber das UI rendert je nach `i18n`-Sprache "Kalender" (DE) oder "Calendario" (ES). Selbes Problem wie damals bei smoke-02 Picture Studio ("Generate" → "Picture").
 
-3. Edge Function neu deployen und testen
-   - `qa-agent-execute-mission` deployen, weil sie den Shared-Client nutzt.
-   - Optional zusätzlich prüfen, ob ein Deploy der Shared-Änderung automatisch greift; falls nicht, die abhängige Funktion explizit deployen.
-   - Danach eine der fehlgeschlagenen 3-Step-Missionen manuell gegen Browserless testen.
+## Änderungen
 
-4. Daten bereinigen
-   - Die zwei aktuell offenen 408-Bugs (`smoke-01b-creator-tour`, `smoke-02b-tertiary-tour`) als resolved markieren, wenn der Test grün läuft.
-   - Den alten `smoke-02-picture-studio-mock` Run hatte noch `steps_total: 5`, also war er vor der Missionsoptimierung gestartet; bei Bedarf ebenfalls neu starten und alte 408-Meldung bereinigen.
+### 1. Code-Fix: `src/components/calendar/CalendarHeader.tsx`
+- Zeile 63: `.single()` → `.maybeSingle()`
+- Damit wird der 406 weg (sowohl Network als auch Console-Error), und Step 3 (`expect_no_console_error`) wird grün.
 
-5. Memory/Regel aktualisieren
-   - Die QA-Agent-Memory ergänzen: Browserless REST `timeout` ist Millisekunden; frühe 408s mit `duration_ms < 2000` und `heartbeats: []` bedeuten Request-Start/Timeout-Konfiguration, nicht Missions-Komplexität.
+### 2. Mission-Update: `smoke-07-calendar-crud`
+SQL-Migration, die den ersten Step robuster macht:
+- `expect_visible "Calendar"` → sprachneutrales Selektor-Pattern, z.B. `wait_selector` auf `[data-testid="calendar-page"]` oder `expect_url_contains "/calendar"`.
+- Falls kein Test-ID existiert, fügen wir in `src/pages/Calendar.tsx` ein `data-testid="calendar-page"` auf den Root-Container hinzu (1-Zeilen-Edit) und verwenden den Selektor in der Mission.
 
-Erwartetes Ergebnis:
-- Die Missionen starten wieder wirklich im Browser.
-- `pathResults`/Heartbeats erscheinen wieder.
-- Falls danach noch Fehler kommen, sind es echte UI-/Auth-/Netzwerk-Bugs statt der aktuellen künstlichen 30-ms-Timeouts.
+### 3. Inbox-Cleanup
+- Bulk-resolve der 4 offenen Einträge (2 Action Required + 2 Warnings) für `smoke-07-calendar-crud` in `qa_bug_reports` via Migration.
+
+### 4. Mini-Audit (nice-to-have, kurz)
+`rg "\\.single\\(\\)" src/components/calendar` zeigt, ob noch andere Calendar-Stellen `.single()` ohne Treffer-Garantie nutzen — falls ja, gleich mitfixen, sonst kommen die in der nächsten Mission-Runde wieder.
+
+## Erwartetes Ergebnis
+- smoke-07-calendar-crud: 3/3 grün, ~15-20s Laufzeit
+- Bug-Inbox: 0 offen
+- Keine neuen Mute-Patterns nötig (echter Fix, keine Suppression)
+
+## Was wir **nicht** tun
+- Kein Mute auf `calendar_integrations` 406 — das wäre ein Feigling-Fix und würde echte zukünftige Bugs verstecken.
