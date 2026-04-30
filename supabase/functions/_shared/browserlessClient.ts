@@ -23,7 +23,7 @@ export interface BrowserlessActionResult {
 export async function runBrowserlessFunction(
   code: string,
   context?: Record<string, unknown>,
-  timeoutMs = 130_000,
+  timeoutMs?: number,
 ): Promise<BrowserlessActionResult> {
   const apiKey = Deno.env.get("BROWSERLESS_API_KEY");
   if (!apiKey) {
@@ -33,20 +33,24 @@ export async function runBrowserlessFunction(
   const start = Date.now();
   const ctrl = new AbortController();
 
-  // Browserless query-param `timeout` is in MILLISECONDS but capped per plan.
-  // Hobby/Starter plans cap at 30_000 ms; Standard at 60_000 ms.
-  // Override via BROWSERLESS_SERVER_TIMEOUT_MS env if your plan supports more.
-  // We clamp into [1_000, 60_000] to satisfy the API's hard upper bound.
+  // Browserless `/function` query-param `timeout` is in MILLISECONDS but
+  // hard-capped per plan: Hobby/Starter = 30_000 ms, Standard = 60_000 ms.
+  // We default to 30_000 ms (Hobby-safe). Override via BROWSERLESS_SERVER_TIMEOUT_MS
+  // env when a higher-tier plan is in use. Clamp into [1_000, 60_000].
   const envCap = Number(Deno.env.get("BROWSERLESS_SERVER_TIMEOUT_MS"));
   const SERVER_TIMEOUT_MS = Math.min(
     60_000,
     Math.max(1_000, Number.isFinite(envCap) && envCap > 0 ? envCap : 30_000),
   );
 
-  // Client-side abort: give the server-cap a small buffer so we get a clean
-  // Browserless error instead of an AbortError when the server is right at its limit.
-  const effectiveClientTimeout = Math.max(timeoutMs, SERVER_TIMEOUT_MS + 5_000);
+  // Client-side abort MUST follow the server cap, NOT exceed it. Otherwise
+  // the server returns 408 long before the client gives up — leading to
+  // confusing "Request has timed out" errors with no per-step diagnostics.
+  // We add a small (+5s) buffer so the server's own 408 reaches us first.
+  const effectiveClientTimeout = SERVER_TIMEOUT_MS + 5_000;
   const t = setTimeout(() => ctrl.abort(), effectiveClientTimeout);
+  // `timeoutMs` is now informational only (used in error messages).
+  const _requestedTimeout = timeoutMs ?? effectiveClientTimeout;
 
   try {
     const res = await fetch(
