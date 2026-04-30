@@ -34,9 +34,9 @@ export async function runBrowserlessFunction(
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  // Browserless server-side timeout (default 60s) — explicitly raise to 120s
-  // so a slow route doesn't kill the whole tour. blockAds reduces networkidle wait.
-  const SERVER_TIMEOUT_MS = 120_000;
+  // Browserless server-side timeout cap is 60s on standard plan. Use full 60s.
+  // Slow routes are mitigated via blockAds + per-step timeouts inside the script.
+  const SERVER_TIMEOUT_MS = 60_000;
 
   try {
     const res = await fetch(
