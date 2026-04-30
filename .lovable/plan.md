@@ -1,86 +1,61 @@
-## Was du beobachtet hast — und warum
+## Die 3 Bugs
 
-Du siehst drei verbundene Symptome, die alle dieselbe Wurzel haben:
+### 1. `Unknown step type: wait_selector` (smoke-07-calendar-crud)
+Im letzten Loop wurde die Mission auf `[data-testid="calendar-page"]` umgestellt, **aber** der Step-Typ `wait_selector` ist im `browserlessClient.ts`-Switch gar nicht implementiert — nur `wait_for` existiert. Jede `wait_selector`-Mission wirft sofort.
 
-1. **"Bugs fast alle raus"** — Stimmt. Die Mute-Patterns + echten Code-Fixes der letzten Loops greifen. Bug-Inbox ist sauber.
-2. **"Immer wieder 2 Console-Errors"** — Das sind in **jeder** Mission die gleichen zwei Sentry-Envelope-Calls (`o4510408780480512.ingest.de.sentry.io/.../envelope/?...` → `Failed to load resource: net::ERR_FAILED`). Die Browserless-Session hat keine echte CORS-Allowance für Sentry's EU-Ingest-Endpoint, also blockt der Browser sie. Sentry retried zweimal → 2 Console-Errors, in jeder Mission identisch.
-3. **"Bei manchen nur Step 1/4"** — Genau diese Sentry-Errors triggern den ersten `expect_no_console_error`-Step direkt nach Login → Step 1 fail → `result.ok=false`. Die nachfolgenden Steps laufen zwar weiter (siehe Code in `browserlessClient.ts:463`), aber die Mission wird als "failed" markiert und die UI zeigt nur den ersten erfolgreichen Step prominent an.
+**Fix:** In `supabase/functions/_shared/browserlessClient.ts` (Zeile ~453) `wait_selector` als Alias zu `wait_for` ergänzen:
 
-### Warum die existierenden Mute-Patterns nicht reichen
-
-Die DB-Patterns (`Failed to load resource: net::ERR_FAILED`, `ERR_BLOCKED_BY_CLIENT` etc.) werden **erst nach** dem Mission-Run beim Bug-Insertion angewendet (`qa-agent-execute-mission/index.ts:337` → `matchMuted`). Der **In-Browser**-Check in `browserlessClient.ts:439-447` (`expect_no_console_error`) hat dagegen **null Filter** — er zählt einfach roh alle `console.error` und `pageerror`. Deshalb knallt's immer an Step 1.
-
-## Änderungen
-
-### 1. In-Browser Console-Filter in `browserlessClient.ts` (Hauptfix)
-
-Im Browser-Page-Script (das per `page.evaluate` injiziert wird, gerendert als String in `browserlessClient.ts`) eine Ignore-Liste einbauen, die identisch zur Logik aus `tests/helpers/page-checks.ts` arbeitet — aber spezifisch für QA-Agent erweitert:
-
-```
-const IGNORED_CONSOLE_PATTERNS = [
-  /favicon/i,
-  /ResizeObserver/i,
-  /sentry\.io/i,                          // NEU: Sentry-Ingest CORS-Block
-  /ingest\.(de|us)\.sentry\.io/i,         // NEU: Region-spezifisch
-  /Failed to load resource.*sentry/i,     // NEU: Resource-Variante
-  /net::ERR_BLOCKED_BY_CLIENT/i,
-  /net::ERR_FAILED.*(?:companion-diagnose|check-subscription|sentry)/i,
-  /companion-diagnose/i,
-  /check-subscription.*FunctionsFetchError/i,
-  /manifest\.json/i,
-  /sw\.js/i,
-  /AbortError/i,
-  /X-Frame-Options/i,
-  /DialogContent.*requires.*DialogTitle/i,
-  /status of 406/i,
-];
+```js
+else if (step.type === 'wait_for' || step.type === 'wait_selector') {
+  await page.waitForSelector(step.selector, { 
+    visible: true, 
+    timeout: clampStep(step.timeout_ms || 10000) 
+  });
+}
 ```
 
-`expect_no_console_error`-Step zählt nur Errors, die **keinem** Pattern matchen. Identische Filter auch beim console-collector ganz oben — damit erscheinen die Sentry-Noise-Logs gar nicht erst im `consoleLogs`-Array, das später ans Cockpit gesendet wird.
+Danach verschwindet der "Unknown step type"-Bug für smoke-07 — die Mission selbst funktioniert ja, nur der Handler fehlt.
 
-**Effekt:** "2 console errs (2 unique)" verschwinden überall, `expect_no_console_error` wird grün, alle Folge-Steps werden korrekt durchgeführt und gezählt.
+### 2. `Console: Failed to load resource: status of 400` (smoke-10-brand-characters)
+Der Bug-Report ist generisch (keine URL im Text), aber der Pattern matcht nicht den existierenden Mute-Filter `Failed to load resource.*sentry`. Brand-Characters-Page macht keinen 400er-eigenen Call — sehr wahrscheinlich ein PostHog/Sentry/Recorder-Endpoint, der in Browserless-Sessions ohne CORS-Whitelist 400 zurückgibt (analog zu den Sentry-CORS-Blocks).
 
-### 2. Optional: Sentry komplett im QA-Modus deaktivieren
+**Fix in zwei Schritten:**
 
-Schöner als filtern: Sentry per `x-qa-mock`-Header gar nicht erst initialisieren. Check in `src/main.tsx` oder wo `Sentry.init` aufgerufen wird:
+**a) Console-Logger im Browser-Script anreichern** (`browserlessClient.ts`, console-collector-Block oben): Statt nur den Error-Text zu pushen, auch die URL aus dem ersten arg/Stack extrahieren — damit der nächste Bug "Console: Failed to load resource: status of 400" zur Quell-URL nachvollziehbar ist:
 
-```ts
-// Sentry skip in QA-Mode (header set by browserlessClient)
-const isQA = typeof window !== 'undefined' && 
-  document.cookie.includes('qa-mock') || 
-  navigator.userAgent.includes('Browserless');
-if (!isQA) Sentry.init({ ... });
+```js
+const urlMatch = String(args[0]).match(/https?:\/\/[^\s"')]+/);
+const sourceUrl = urlMatch ? urlMatch[0] : (e.location?.url ?? '');
+consoleLogs.push({ type, text, url: sourceUrl, ts: Date.now() });
 ```
 
-Da `x-qa-mock` ein Request-Header ist und nicht im Browser sichtbar, gehen wir den **User-Agent-Weg**: Browserless-Sessions haben einen distinct UA. Falls das zu fragil ist, bleibt Variante 1 (Filter) der primäre Fix und wir lassen Sentry-Init so wie es ist.
+**b) Mute-Pattern erweitern** in der DB (`qa_console_mute_patterns` Tabelle): generische `Failed to load resource: the server responded with a status of 4\d\d \(\)$` mit leerer URL als analytics/posthog/sentry-Noise mute (die App-eigenen 400er liefern immer eine URL mit). Plus: bestehenden offenen Bug-Report resolven.
 
-→ **Entscheidung:** Variante 1 zuerst (sicherer Hotfix, keine App-Code-Änderung). Variante 2 später als Polish.
+### 3. React-Warning "Function components cannot be given refs" (Badge in QACockpit)
+Der Console-Log zeigt: `Badge` wird als Forward-Ref-Ziel benutzt (vermutlich in einem Tooltip-Trigger oder Tabs-Trigger im Cockpit), aber `src/components/ui/badge.tsx` ist eine plain Function-Component ohne `forwardRef`.
 
-### 3. Cockpit-Anzeige `Steps: X/Y` korrigieren
+**Fix:** `src/components/ui/badge.tsx` auf `React.forwardRef` umstellen — Standard-shadcn-Pattern, keine API-Änderung:
 
-Der `steps_completed`-Counter in `qa_test_runs` zählt aktuell vermutlich nur bis zum ersten Fail. Nach Fix #1 sollte das automatisch passen, weil `expect_no_console_error` nicht mehr fehlschlägt. Falls die Anzeige nach dem Fix immer noch "1/X" zeigt obwohl alle Steps grün sind: in `qa-agent-execute-mission/index.ts` den Wert aus `successfulNavs.length + grünen non-nav-steps` berechnen statt aus dem ersten Fail-Index.
+```tsx
+const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
+  ({ className, variant, ...props }, ref) => (
+    <div ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
+  )
+);
+Badge.displayName = "Badge";
+```
 
-Erst nach Deploy beobachten — wahrscheinlich nicht nötig.
+Das eliminiert die Warnung global (Badge wird an vielen Stellen in Tooltips/Triggern benutzt).
 
-### 4. Inbox-Cleanup
+## Files
 
-Bulk-resolve aller offenen Einträge mit `expect_no_console_error.*sentry` oder `Failed to load resource.*sentry` in `qa_bug_reports`, falls vorhanden.
-
-### 5. Memory-Update
-
-`mem://features/qa-agent/false-positive-hardening`: Ergänzen um:
-- "In-Browser console filters in browserlessClient.ts MUST mirror DB mute patterns — DB patterns are post-run only"
-- Sentry EU/US ingest endpoints in der Ignored-Liste
-- Browserless-Sessions blocken Sentry Ingest grundsätzlich (kein App-Bug)
+- `supabase/functions/_shared/browserlessClient.ts` — `wait_selector` Alias + URL-Extraktion in Console-Logger
+- `src/components/ui/badge.tsx` — `forwardRef`
+- Migration: Mute-Pattern für "status of 4xx ()"-ohne-URL + Bulk-resolve der `smoke-07` "Unknown step type"-Bugs und des `smoke-10` 400-Bugs
 
 ## Erwartetes Ergebnis
 
-- smoke-03/05/12 (und alle anderen): vollständige Step-Anzahl grün, "0 console errs (0 unique)"
-- Cockpit zeigt korrektes `Steps: X/X`
-- Bug-Inbox bleibt sauber
-- Kein neuer App-Code nötig (reiner QA-Infra-Fix)
-
-## Was wir **nicht** tun
-
-- Sentry nicht abschalten in Production (das Sentry-Tracking ist real wertvoll — wir filtern nur die Browserless-Session-Noise raus)
-- Keine zusätzlichen DB-Mute-Patterns (die existieren schon, greifen aber zu spät — der echte Fix ist im In-Browser-Script)
+- smoke-07-calendar-crud: 4/4 grün
+- smoke-10-brand-characters: 400-Console-Noise gemutet, Bug raus
+- QA-Cockpit-Tab: Keine Badge-ref-Warning mehr
+- Künftige "status of 400"-Bugs liefern die Source-URL → echte App-400er bleiben sichtbar, Browserless-Noise wird stumm
