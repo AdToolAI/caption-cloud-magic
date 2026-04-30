@@ -86,10 +86,19 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    if (authError || !user) {
-      return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+
+    const qaSvc = detectQaServiceAuth(req);
+    let user: { id: string } | null = null;
+    if (qaSvc.isQaService && qaSvc.userId) {
+      user = { id: qaSvc.userId };
+      console.log(`[auto-director-compose] QA service-auth user=${user.id}`);
+    } else {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user: jwtUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (authError || !jwtUser) {
+        return jsonResponse({ error: "UNAUTHORIZED" }, 401);
+      }
+      user = jwtUser;
     }
 
     const supabaseAdmin = createClient(
