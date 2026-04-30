@@ -47,7 +47,7 @@ interface RunCtx {
   runId: string;
   userId: string;
   admin: ReturnType<typeof createClient>;
-  assets: { image: string; video: string; audio: string; mask: string };
+  assets: { image: string; video: string; audio: string; mask: string; portrait: string };
   signedAssets: { image: string; mask: string };
   remainingEur: number;
 }
@@ -156,7 +156,7 @@ async function headOk(url: string, timeoutMs = 10_000): Promise<boolean> {
 
 async function getTestAssets(
   admin: any,
-): Promise<{ image: string; video: string; audio: string; mask: string }> {
+): Promise<{ image: string; video: string; audio: string; mask: string; portrait: string }> {
   const tryUrl = (path: string) => {
     const { data } = admin.storage.from("qa-test-assets").getPublicUrl(path);
     return data?.publicUrl;
@@ -185,11 +185,13 @@ async function getTestAssets(
   const candidateImage = tryUrl("test-image.png") || tryUrl("sample-1024.jpg") || FALLBACK_IMAGE;
   const candidateVideo = tryUrl("test-video-2s.mp4") || tryUrl("sample-5s.mp4") || FALLBACK_VIDEO;
   const candidateAudio = tryUrl("test-audio.mp3") || tryUrl("sample-5s.mp3") || FALLBACK_AUDIO;
+  const candidatePortrait = tryUrl("test-portrait.png") || "";
 
-  const [imgOk, vidOk, audOk] = await Promise.all([
+  const [imgOk, vidOk, audOk, portOk] = await Promise.all([
     validate(candidateImage, "image/", 1024),
     validate(candidateVideo, "video/", 50_000),
     validate(candidateAudio, "audio/", 5_000),
+    validate(candidatePortrait, "image/", 5_000),
   ]);
 
   return {
@@ -197,6 +199,7 @@ async function getTestAssets(
     video: vidOk ? candidateVideo : FALLBACK_VIDEO,
     audio: audOk ? candidateAudio : FALLBACK_AUDIO,
     mask: tryUrl("sample-mask-512.png") || "",
+    portrait: portOk ? candidatePortrait : "",
   };
 }
 
@@ -519,8 +522,11 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
   };
 
   try {
-    const portraitUrl = ctx.signedAssets.image || ctx.assets.image;
+    // HeyGen Photo-Avatar requires an image with a detectable human face.
+    // Prefer the dedicated bootstrapped portrait; fall back to generic image (likely fails face-detection).
+    const portraitUrl = ctx.assets.portrait || ctx.signedAssets.image || ctx.assets.image;
     result.validation_checks.portrait = !!portraitUrl;
+    result.validation_checks.dedicated_portrait = !!ctx.assets.portrait;
 
     const t0 = Date.now();
     const heygen = await callEdge(
@@ -541,7 +547,13 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     const predictionId = (heygen.json as any)?.predictionId;
     result.validation_checks.has_prediction_id = !!predictionId;
 
-    if (heygen.ok && url) {
+    // Detect HeyGen "no face detected" (code 400127) → soft-skip, don't count as failure.
+    const errBlob = `${heygen.error || ""} ${JSON.stringify(heygen.json || {})}`;
+    if (!heygen.ok && errBlob.includes("400127")) {
+      result.status = "skipped";
+      result.error_message =
+        "Bootstrap-Asset enthält kein Gesicht. Klicke 'Bootstrap Assets' im Live Sweep Tab, um test-portrait.png zu provisionieren, dann erneut starten.";
+    } else if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
       result.status = "success";

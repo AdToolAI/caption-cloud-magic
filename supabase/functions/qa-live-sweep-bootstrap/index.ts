@@ -176,7 +176,57 @@ Deno.serve(async (req) => {
     }, { minBytes: 5_000, expectedMimePrefix: "audio/" }),
   );
 
-  // 4. FLUX Fill mask — embedded 512x512 PNG (black bg, white centered 256x256 square).
+  // 4. Test portrait — REQUIRED by HeyGen Photo-Avatar (face detection enforced).
+  // Primary: Lovable AI Gateway (Gemini Flash Image). Fallback: thispersondoesnotexist.com (always returns a face).
+  results.push(
+    await uploadIfMissing(adminClient, "test-portrait.png", async () => {
+      if (LOVABLE_API_KEY) {
+        try {
+          const aiRes = await fetch(
+            "https://ai.gateway.lovable.dev/v1/chat/completions",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash-image",
+                messages: [
+                  {
+                    role: "user",
+                    content:
+                      "Professional studio portrait photograph of a friendly adult person, looking directly into the camera, neutral expression, clean white background, soft front lighting, sharp focus on face, photo-realistic, 1024x1024",
+                  },
+                ],
+                modalities: ["image", "text"],
+              }),
+            },
+          );
+          if (aiRes.ok) {
+            const json = await aiRes.json();
+            const dataUrl: string | undefined =
+              json?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+            if (dataUrl?.startsWith("data:image/")) {
+              const [, base64] = dataUrl.split(",");
+              const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+              return { blob: new Blob([bytes], { type: "image/png" }), contentType: "image/png" };
+            }
+          }
+        } catch (e) {
+          console.warn("[bootstrap] AI Gateway portrait gen failed, using fallback:", e);
+        }
+      }
+      // Fallback: thispersondoesnotexist.com — guarantees a synthetic face
+      const r = await fetch("https://thispersondoesnotexist.com/", {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableBootstrap/1.0)" },
+      });
+      if (!r.ok) throw new Error(`Portrait fallback fetch failed: ${r.status}`);
+      return { blob: await r.blob(), contentType: r.headers.get("content-type") || "image/jpeg" };
+    }, { minBytes: 5_000, expectedMimePrefix: "image/" }),
+  );
+
+  // 5. FLUX Fill mask — embedded 512x512 PNG (black bg, white centered 256x256 square).
   // Used by the deep-sweep Magic Edit flow. Idempotent + no external fetch.
   results.push(
     await uploadIfMissing(adminClient, "sample-mask-512.png", async () => {
