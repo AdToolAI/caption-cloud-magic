@@ -26,7 +26,7 @@ const FALLBACK_IMAGE =
 // Use a reliable, decodable MP4 — the previous lovable-public sample returned an
 // XML S3 error (~133 bytes) which crashed Lambda video playback.
 const FALLBACK_VIDEO =
-  "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+  "https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4";
 const FALLBACK_AUDIO =
   "https://download.samplelib.com/mp3/sample-3s.mp3";
 
