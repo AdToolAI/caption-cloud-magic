@@ -949,7 +949,7 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-const FilterPill = React.forwardRef<
+const FilterPill = forwardRef<
   HTMLButtonElement,
   { active: boolean; onClick: () => void; children: React.ReactNode }
 >(({ active, onClick, children }, ref) => {
