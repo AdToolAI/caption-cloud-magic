@@ -157,20 +157,22 @@ Deno.serve(async (req) => {
     }),
   );
 
-  // 2. Test video — copy public sample (small 5s clip)
+  // 2. Test video — copy a real, decodable MP4 (validates: size + mime)
   results.push(
     await uploadIfMissing(adminClient, "test-video-2s.mp4", async () => {
       const r = await fetch(SAMPLE_VIDEO_URL);
+      if (!r.ok) throw new Error(`Sample video fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "video/mp4" };
-    }),
+    }, { minBytes: 50_000, expectedMimePrefix: "video/" }),
   );
 
-  // 3. Test audio — copy public sample
+  // 3. Test audio — copy public sample (validates: size + mime)
   results.push(
     await uploadIfMissing(adminClient, "test-audio.mp3", async () => {
       const r = await fetch(SAMPLE_AUDIO_URL);
+      if (!r.ok) throw new Error(`Sample audio fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "audio/mpeg" };
-    }),
+    }, { minBytes: 5_000, expectedMimePrefix: "audio/" }),
   );
 
   // 4. FLUX Fill mask — embedded 512x512 PNG (black bg, white centered 256x256 square).
