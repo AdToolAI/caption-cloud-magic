@@ -1,6 +1,6 @@
 // Session H — Wochen-Review (Samstag 10:00 UTC)
 // Aggregiert die letzten 7 Tage und schlägt eine neue Strategie + Budget für die kommende Woche vor.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

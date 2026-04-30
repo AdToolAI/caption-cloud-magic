@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withTelemetry } from '../_shared/telemetry.ts';

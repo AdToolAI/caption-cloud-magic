@@ -1,6 +1,6 @@
 // Centralized helper for emitting Autopilot notifications.
 // Inserts into notification_queue and (optionally) triggers a Web Push.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

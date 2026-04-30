@@ -3,7 +3,7 @@
 // composer-nle-exports bucket, and registers it in composer_nle_exports.
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import {
   buildFCPXML,
   type NLEAudio,

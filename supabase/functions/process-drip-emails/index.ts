@@ -3,7 +3,7 @@
 // Idempotent: drip_email_log unique index prevents double-sends.
 // Dry-run mode: ?dry_run=true&user_id=<uuid>&step=1 sends without DB log.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 import { renderDripEmail, isSupportedLang } from "../_shared/drip-templates/index.ts";
 
 const corsHeaders = {

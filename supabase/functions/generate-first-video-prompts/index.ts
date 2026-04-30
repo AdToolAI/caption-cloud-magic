@@ -2,7 +2,7 @@
 // user's onboarding profile. Caches the result in onboarding_profiles.first_video_prompts.
 // Idempotent — skips generation if cache already exists, unless force=true.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "npm:@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

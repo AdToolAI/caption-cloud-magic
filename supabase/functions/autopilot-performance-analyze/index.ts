@@ -1,7 +1,7 @@
 // Nightly analysis: pulls real engagement from post_metrics, computes top patterns
 // per autopilot brief, persists insights for plan-week to consume.
 // Joins post_metrics ↔ autopilot_queue via (user_id, provider/platform, posted_at ±15min).
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

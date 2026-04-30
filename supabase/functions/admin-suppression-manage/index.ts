@@ -1,7 +1,7 @@
 // Admin-only Edge Function: Add or remove entries from email_suppression_list.
 // Requires the caller to have the 'admin' role (checked via has_role RPC).
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "npm:@supabase/supabase-js@2.39.3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

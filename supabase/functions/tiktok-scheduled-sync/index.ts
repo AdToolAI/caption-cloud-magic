@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import { refreshAccessToken, getUserInfo, needsRefresh } from '../_shared/tiktok-api.ts';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
 import { upsertProfile } from '../_shared/db-repo.ts';

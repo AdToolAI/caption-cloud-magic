@@ -2,7 +2,7 @@
 // Loads mission, runs Browserless smoke navigation, captures bugs (deduplicated),
 // applies muted-pattern allowlist, finalizes run.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { runBrowserlessFunction, buildSmokeNavigationScript } from "../_shared/browserlessClient.ts";
 
 const corsHeaders = {

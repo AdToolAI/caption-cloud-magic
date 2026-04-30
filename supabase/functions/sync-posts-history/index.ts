@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { decryptToken } from '../_shared/crypto.ts';
 import { withTelemetry } from '../_shared/telemetry.ts';
 

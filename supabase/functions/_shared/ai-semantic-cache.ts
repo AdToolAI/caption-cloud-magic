@@ -7,7 +7,7 @@
  * Reduces AI provider calls by ~60% on common workloads.
  */
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SIMILARITY_THRESHOLD = 0.95;
 const DEFAULT_TTL_HOURS = 24;

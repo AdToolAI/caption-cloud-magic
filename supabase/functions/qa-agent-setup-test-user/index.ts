@@ -3,7 +3,7 @@
 // allocates the 300€ QA budget, returns the user id so secrets can be saved.
 // Admin-only.
 
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",

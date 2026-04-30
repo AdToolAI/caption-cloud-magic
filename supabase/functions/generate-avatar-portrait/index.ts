@@ -3,7 +3,7 @@
 // frontal Hedra-friendly portrait, uploads to brand-characters bucket under
 // {user_id}/portraits/{uuid}.png, updates brand_characters.portrait_url.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
