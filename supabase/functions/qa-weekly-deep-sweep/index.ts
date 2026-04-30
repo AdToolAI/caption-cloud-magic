@@ -399,6 +399,10 @@ async function flowDirectorsCutRender(ctx: RunCtx, sourceVideoUrl: string): Prom
           ],
         },
         export_settings: { quality: "hd", format: "mp4" },
+        // QA stability hint: 1 Lambda worker only — minimizes AWS concurrency
+        // collisions with parallel composer/universal renders in the same sweep.
+        qa_stability_mode: true,
+        max_lambda_workers: 1,
       },
       ctx.userId,
       120_000,
