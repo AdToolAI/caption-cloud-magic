@@ -21,6 +21,7 @@ import { useErrorCapture } from '@/hooks/useErrorCapture';
 import { useProactiveTips } from '@/hooks/useProactiveTips';
 import { SlashCommandSuggestions, parseSlashCommand, generateSlashCommandResponse } from './SlashCommandHandler';
 import { TutorialOverlay, TUTORIALS } from './TutorialOverlay';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface Message {
   id: string;
