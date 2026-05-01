@@ -48,6 +48,33 @@ interface ProviderTest {
 
 const PROVIDER_MATRIX: ProviderTest[] = [
   {
+    // NOTE: Hedra is intentionally first because it's the most expensive in
+    // wall-clock time (HeyGen bootstrap + async kick-off). Running it first
+    // guarantees the row is updated before the background-worker budget runs
+    // out, even if a later provider is slow.
+    provider: "Hedra Talking Head",
+    model: "hedra/character-3",
+    mode: "A+I",
+    estimated_cost_eur: 0.30,
+    edge_function: "generate-talking-head",
+    timeoutMs: 120_000,
+    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
+      ...(talkingPhotoId ? { talkingPhotoId } : {}),
+      imageUrl: portrait || image,
+      audioUrl: audio,
+      aspectRatio: "16:9",
+      resolution: "720p",
+    }),
+    parseResponse: (json) => {
+      if (!json) return { success: false, error: "Empty response" };
+      if (json.error) return { success: false, error: String(json.error) };
+      if (json.success === true && (json.status === "processing" || json.status === "pending") && !json.videoUrl) {
+        return { success: true, asyncStarted: true, predictionId: json.predictionId };
+      }
+      return defaultParse(json);
+    },
+  },
+  {
     provider: "FLUX Schnell",
     model: "black-forest-labs/flux-schnell",
     mode: "T2I",
@@ -197,34 +224,6 @@ const PROVIDER_MATRIX: ProviderTest[] = [
       aspectRatio: "16:9",
       referenceVideoUrl: video,
     }),
-  },
-  {
-    provider: "Hedra Talking Head",
-    model: "hedra/character-3",
-    mode: "A+I",
-    estimated_cost_eur: 0.30, // HeyGen photo-avatar pricing
-    edge_function: "generate-talking-head",
-    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
-      // Prefer the cached HeyGen talking_photo_id from bootstrap (avoids the
-      // per-account 3-photo limit). Fall back to the bootstrap portrait
-      // image, then the generic test image.
-      ...(talkingPhotoId ? { talkingPhotoId } : {}),
-      imageUrl: portrait || image,
-      audioUrl: audio,
-      aspectRatio: "16:9",
-      resolution: "720p",
-    }),
-    // HeyGen is async: kick-off returns 200 with status="processing" and no
-    // videoUrl; polling completes 1–3 min later. Classify as `async_started`
-    // (yellow badge) instead of falsely marking the row as succeeded.
-    parseResponse: (json) => {
-      if (!json) return { success: false, error: "Empty response" };
-      if (json.error) return { success: false, error: String(json.error) };
-      if (json.success === true && (json.status === "processing" || json.status === "pending") && !json.videoUrl) {
-        return { success: true, asyncStarted: true, predictionId: json.predictionId };
-      }
-      return defaultParse(json);
-    },
   },
 ];
 
@@ -421,24 +420,11 @@ async function runSweep(
         started_at: new Date().toISOString(),
       }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
 
-      // HeyGen bootstrap on demand (only when the provider needs it and we
-      // don't already have a cached talking_photo_id).
-      if (test.edge_function === "generate-talking-head" && !sweepAssets.talkingPhotoId) {
-        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping now`);
-        try {
-          const result = await ensureHeyGenTalkingPhoto(adminClient);
-          if (result.ok && result.talking_photo_id) {
-            sweepAssets = { ...sweepAssets, talkingPhotoId: result.talking_photo_id };
-            console.log(
-              `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
-            );
-          } else {
-            console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
-          }
-        } catch (e) {
-          console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
-        }
-      }
+      // HeyGen bootstrap is performed in the request handler BEFORE the
+      // background worker starts, so the cached talking_photo_id is already
+      // present in `sweepAssets`. We never call `ensureHeyGenTalkingPhoto`
+      // from inside the worker — its 30–90s prune+upload would risk the
+      // worker being killed before the row is updated to `async_started`.
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
@@ -515,6 +501,18 @@ async function runSweep(
       error_message: `Worker crashed: ${e?.message || String(e)}`,
       completed_at: new Date().toISOString(),
     }).eq("sweep_id", sweepId).in("status", ["pending", "running"]);
+  } finally {
+    // Watchdog: even if the worker exits cleanly, sweep any rows that never
+    // received a terminal status (e.g. because the worker was killed by the
+    // edge runtime mid-update). Marks them as `failed` so the UI never hangs.
+    const { error: watchErr } = await adminClient.from("qa_live_runs").update({
+      status: "failed",
+      error_message: "Worker exited before status update committed (likely runtime timeout)",
+      completed_at: new Date().toISOString(),
+    }).eq("sweep_id", sweepId).in("status", ["pending", "running"]);
+    if (watchErr) {
+      console.error(`[sweep ${sweepId}] watchdog update failed:`, watchErr.message);
+    }
   }
 }
 
@@ -567,8 +565,18 @@ Deno.serve(async (req) => {
   }
 
   // Idempotency: if a sweep is already running (any pending/running rows in
-  // the last 10 min), refuse to start a new one and return the active sweep_id.
+  // Stale-recovery: any pending/running row older than 10 min is from a worker
+  // that was killed by the edge runtime. Mark it as failed so neither the UI
+  // nor the 409-idempotency check below trips on a phantom "active" sweep.
   const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+  await adminClient.from("qa_live_runs").update({
+    status: "failed",
+    error_message: "Stale: previous worker exited without committing status (auto-recovered)",
+    completed_at: new Date().toISOString(),
+  }).in("status", ["pending", "running"]).lt("started_at", tenMinAgo);
+
+  // Idempotency: if a sweep is genuinely in flight (rows updated within the
+  // last 10 min), refuse to start a new one and return the active sweep_id.
   const { data: activeRows } = await adminClient
     .from("qa_live_runs")
     .select("sweep_id, status, started_at")
@@ -633,9 +641,36 @@ Deno.serve(async (req) => {
     );
   }
 
+  // HeyGen bootstrap runs SYNCHRONOUSLY here in the request handler (before
+  // waitUntil), not inside the background worker. Reasons:
+  //  1. The request lifecycle has a 150s idle timeout — plenty for prune+upload
+  //     (typically 5–60s), and any failure surfaces as a real HTTP error.
+  //  2. Once persisted in `system_config.qa.heygen_talking_photo_id`, the next
+  //     sweep reuses it instantly (1 list call) — no more 30–90s prune cycles.
+  //  3. Keeps the background worker focused on provider calls, so it never
+  //     gets killed mid-row-update on slow accounts.
+  let bootstrappedAssets = assets;
+  const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
+  if (needsHedraBootstrap && !assets.talkingPhotoId) {
+    console.log(`[sweep ${sweepId}] HeyGen bootstrap (handler, no cached id)…`);
+    try {
+      const result = await ensureHeyGenTalkingPhoto(adminClient);
+      if (result.ok && result.talking_photo_id) {
+        bootstrappedAssets = { ...assets, talkingPhotoId: result.talking_photo_id };
+        console.log(
+          `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+        );
+      } else {
+        console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
+      }
+    } catch (e) {
+      console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
+    }
+  }
+
   // Fire-and-forget background worker. The HTTP response returns immediately.
   // @ts-ignore — EdgeRuntime is provided by Deno Deploy / Supabase Edge runtime
-  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, assets));
+  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, bootstrappedAssets));
 
   return new Response(
     JSON.stringify({
