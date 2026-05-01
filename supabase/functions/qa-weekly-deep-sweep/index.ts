@@ -803,12 +803,39 @@ Deno.serve(async (req) => {
     });
   }
 
+  // Auto-bootstrap missing assets BEFORE building ctx — saves the user from
+  // manually clicking "Bootstrap Assets" in the Live Sweep tab when running a
+  // fresh deep sweep. We invoke the bootstrap edge function with the same auth
+  // header so admin-guard passes. Failure is non-fatal (the affected flow will
+  // simply skip with a clear message, as before).
+  let assets = await getTestAssets(admin);
+  let signedAssets = await getSignedAssets(admin);
+  const needsBootstrap = !assets.portrait || !signedAssets.portrait || !signedAssets.mask;
+  if (needsBootstrap) {
+    console.log(`[deep-sweep] auto-bootstrap triggered (portrait=${!!assets.portrait}, mask=${!!signedAssets.mask})`);
+    try {
+      await fetch(`${SUPABASE_URL}/functions/v1/qa-live-sweep-bootstrap`, {
+        method: "POST",
+        headers: {
+          Authorization: req.headers.get("Authorization") ?? "",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ force: false }),
+      }).then((r) => r.text()).catch(() => null);
+      // Re-read assets after bootstrap.
+      assets = await getTestAssets(admin);
+      signedAssets = await getSignedAssets(admin);
+    } catch (e) {
+      console.warn(`[deep-sweep] auto-bootstrap failed (non-fatal):`, (e as any)?.message);
+    }
+  }
+
   const ctx: RunCtx = {
     runId: runRow.id,
     userId: userData.user.id,
     admin,
-    assets: await getTestAssets(admin),
-    signedAssets: await getSignedAssets(admin),
+    assets,
+    signedAssets,
     remainingEur: capEur,
   };
 

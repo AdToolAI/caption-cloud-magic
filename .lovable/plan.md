@@ -1,85 +1,54 @@
-## Was bereits getrackt wird (Bestand)
 
-- **Auth/Onboarding:** signup, onboarding_step_completed, onboarding_finished
-- **Content:** post_generated, caption_copied, campaign_generated, first_post_scheduled
-- **Brand:** brand_kit_created/deleted
-- **Calendar:** calendar_viewed
-- **Monetization:** upgrade_clicked, upgrade_prompt_shown/dismissed
-- **Power-Feature-Counter:** nur `directors_cut` und `video_composer`
-- **Edge-Functions:** generische `edge_fn_call`-Telemetry vorhanden
+# Bond QA Cleanup-Sprint — Schlanker Plan
 
-## Lücken, die wir schließen sollten
+## TL;DR — Gute Nachricht
+Beim Aufmachen des Codes habe ich gesehen: **3 von 4 vermeintlichen Bugs sind bereits gefixt**:
 
-### 1. Payments / Conversion-Funnel (höchste Priorität)
-Aktuell wird nur `upgrade_clicked` getrackt – wir sehen nicht, wo User in Stripe abspringen.
-- `checkout_started` (in `create-checkout` + `create-enterprise-checkout` Edge Function via `trackBusinessEvent`, mit plan_code, coupon, founders_slot)
-- `checkout_completed` (success-Page → ruft check-subscription, dann Event mit plan, amount, payment_method)
-- `checkout_abandoned` (cancel-Page Hit)
-- `payment_method_selected` (Card / PayPal / Apple / Google – aus Stripe Webhook oder check-subscription)
-- `coupon_applied` / `coupon_invalid` (URL-Coupon Hook)
-- `founders_slot_claimed`
-- `subscription_cancelled`, `subscription_renewed`, `subscription_upgraded/downgraded`
-- `trial_started`, `trial_converted`, `trial_expired`
+| # | Vermuteter Bug | Realität |
+|---|---|---|
+| 1 | Composer Stitch — `'prompt' column not found` | ✅ Fix bereits drin (`ai_prompt`). Letzte Failures (2 Stück, 30.04.) waren in Wahrheit `401 Unauthorized` |
+| 2 | DC Lambda NaN-Bug | ✅ Nur **1 historischer Vorfall** am 30.04.; jüngster Sweep am 01.05. lief 5/6 grün |
+| 3 | Long-Form Render 5× failed | ✅ Flow wurde im Code **entfernt** (Kommentar Zeile 664), die Failures sind alt |
+| 4 | HeyGen No-Face Bootstrap | 🟡 Bootstrap-Code ist **stabil** (3 Quellen, force-replace), aber Live-Sweep nutzt das Asset nur **wenn** Bootstrap vorher manuell läuft |
+| 5 | Hedra noch im Live-Sweep | 🔴 **Echter Cleanup-Bedarf** — Provider ist EOL und produziert dauerhaft 10/10 fail-Rows |
 
-### 2. Power-Features (PowerFeatureKey erweitern)
-`PowerFeatureKey` enthält nur 3 Keys – fast alle Studios fehlen für die Discovery-Logik:
-- `picture_studio`, `ai_video_toolkit`, `talking_head`, `music_studio`, `motion_studio`, `email_director`, `ad_director`, `autopilot`, `brand_characters`, `marketplace`, `news_hub`, `trend_radar`, `video_translator`, `magic_edit`, `upscaler`, `sora_long_form`
+## Zu erledigen — 3 echte Aktionen + 1 Cosmetics
 
-Jede dieser Pages bekommt `useEffect(() => trackFeatureUsage('xxx'))` analog zu DirectorsCut.
+### Action 1 (🔴 BLOCKER für QA-Statistik) — Hedra aus Live-Sweep entfernen
+**Datei:** `supabase/functions/qa-live-sweep/index.ts` (Zeilen 53-80)
+- Hedra-Eintrag aus `PROVIDER_MATRIX` löschen
+- `needsHedraBootstrap` (Zeile 411) wird damit obsolet — `ensureHeyGenTalkingPhoto`-Call entfernen oder auf HeyGen-Provider umleiten
+- **Optional:** echten HeyGen-Provider als Async-Test ins `PROVIDER_MATRIX` aufnehmen (`async_started`-Pattern wie er heute schon greift), wenn wir Talking-Head weiter live monitoren wollen
 
-### 3. Generation-Events pro Provider
-Wir sehen aktuell keinen Provider-Mix in PostHog (nur DB-Logs):
-- `video_generated` mit `{ provider, model, duration_s, credits_spent, success }`
-- `image_generated` mit `{ provider, model, mode: text2img|edit|upscale|variation }`
-- `music_generated` mit `{ tier, duration_s }`
-- `voiceover_generated` mit `{ voice_id, language, char_count }`
-- `talking_head_generated`
-- `render_failed_with_refund` (Credit-Refund-Trigger)
+### Action 2 (🟡 Cosmetic) — 12 historische "Recovered after"-Rows aufräumen
+- `qa_live_runs` mit `error_message LIKE 'Recovered after qa-live-sweep request idle timeout%'` → entweder löschen oder UI filtert sie aus den Stats raus. Aktuell verfälschen sie den Live-Sweep-Erfolgsbalken.
+- Die String-Quelle existiert nicht mehr im aktuellen Code — die Rows sind tote Altlasten von einer früheren Watchdog-Version.
 
-### 4. Social Publishing
-Nur `publish` mit Plattform-Name existiert.
-- `social_connected` / `social_disconnected` pro Plattform
-- `social_publish_success` / `social_publish_failed` mit error_code
-- `scheduled_post_executed`
-- `social_token_expired` (für Reconnect-UX)
+### Action 3 (🟡) — Deep Sweep "Long-Form Render" aus alten UI-Listen entfernen
+- Die Flow-Funktion ist im Code raus, aber das UI/Cockpit listet sie noch (5 alte Failure-Rows tauchen in der Übersicht auf). Schnell-Filter `WHERE flow_name != 'Long-Form Render (Lambda)'` in der View, oder die Rows hard-deleten.
 
-### 5. Engagement / Retention Signals
-- `feature_first_use` (einmal pro User pro Feature – wichtig für Activation-Funnel)
-- `session_started` / `session_ended` (Dauer)
-- `tutorial_started` / `tutorial_completed` / `tutorial_skipped`
-- `streak_milestone` (3, 7, 30 Tage)
-- `welcome_bonus_claimed`
+### Action 4 (🟢 Nice) — Auto-Bootstrap im Deep Sweep
+**Datei:** `supabase/functions/qa-weekly-deep-sweep/index.ts` (Talking Head HeyGen Flow, Zeilen 548-561)
+- Wenn `portraitUrl` fehlt → **automatisch** `qa-live-sweep-bootstrap` triggern statt nur skippen. Spart manuelle Schritte.
+- Gleiches für Magic Edit (Zeile 689 Mask-Bootstrap).
 
-### 6. Errors & Friction (für Bond-QA-Korrelation)
-- `error_shown_to_user` (Toast/Modal mit error_type)
-- `credit_insufficient` (welches Feature, wieviel fehlt → starkes Upgrade-Signal)
-- `rate_limit_hit_client` (UI-seitig, ergänzt server-side)
-- `quota_warning_shown` (Storage/Credits 80%/95%)
+---
 
-### 7. Marketplace
-- `character_purchased` (mit price, creator_id)
-- `character_listed` / `character_takedown`
-- `marketplace_search`
+## Was wir **nicht** anfassen (bereits gut)
+- ✅ Watchdog (alle 2 min, 0 Auto-Fails letzte 24 h)
+- ✅ Synthetic Probes (72 / Stunde, 100 % grün außer 2× HTTP 404 Cold-Start in 6 h — vernachlässigbar)
+- ✅ Live-Sweep Async-Pattern (202 + `EdgeRuntime.waitUntil`)
+- ✅ Heartbeat-Logik
+- ✅ Composer-Stitch-Code (richtige Spalten)
+- ✅ Lambda-Bundle (NaN-Bug ist seit dem letzten Deploy nicht wieder aufgetreten)
 
-## Empfohlene Reihenfolge
+---
 
-**Phase 1 (jetzt, höchster ROI):** Payments-Funnel komplett (1) + Power-Feature-Keys erweitern (2). Damit sehen wir endlich Conversion + welche Studios überhaupt benutzt werden.
+## Geschätzter Aufwand
+**~10–15 min Implementation** für alle 4 Actions. Kein DB-Schema-Migration nötig, nur:
+- 1 Edge-Function-Edit (`qa-live-sweep`)
+- 2 Daten-Cleanup-INSERTs (DELETE auf `qa_live_runs` + `qa_deep_sweep_flow_results`)
+- 1 Edge-Function-Edit (`qa-weekly-deep-sweep`) für Auto-Bootstrap
 
-**Phase 2:** Generation-Events pro Provider (3) + Social (4). Liefert Daten für Cost-Optimization und Provider-Auswahl.
-
-**Phase 3:** Engagement (5), Errors (6), Marketplace (7).
-
-## Technische Umsetzung
-
-- **Frontend:** `trackEvent()` aus `@/lib/analytics` (PostHog) + `trackFeatureUsage()` für Counter
-- **Edge Functions:** `trackBusinessEvent()` aus `supabase/functions/_shared/telemetry.ts` (PostHog Server-Side)
-- **Neue Konstanten in `ANALYTICS_EVENTS`** (analytics.ts) für Type-Safety
-- **`PowerFeatureKey`-Union erweitern** in `src/lib/featureUsageTracker.ts` + RPC `increment_feature_usage` ist bereits generisch
-- **Keine DB-Migration nötig** für PostHog-Events; nur für `feature_usage`-Counter falls neue Keys ergänzt werden (Tabelle ist bereits key-agnostisch laut RPC)
-- **Stripe-Checkout-Funnel:** Events in `create-checkout/index.ts`, success/cancel Routes (`/success`, `/cancel`), und im Webhook (falls aktiv) bzw. in `check-subscription` beim ersten Detect
-
-## Empfehlung
-
-Ich würde **Phase 1 sofort umsetzen** – das sind ~6-8 Datei-Edits und liefert dir den Payment-Funnel, den du nach den Stripe-Änderungen jetzt brauchst, plus Sichtbarkeit über alle Studios. Phase 2+3 können wir danach in separaten Runden machen.
-
-Soll ich mit Phase 1 loslegen, oder willst du eine andere Reihenfolge / nur bestimmte Punkte?
+## Frage
+Soll ich **alle 4 Actions** ausführen, oder reicht dir **Action 1 + 2** (Hedra raus + tote Rows weg) — das wäre der absolute Minimal-Cleanup, der die QA-Statistik sofort sauber macht?
