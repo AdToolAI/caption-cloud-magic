@@ -296,7 +296,7 @@ async function callProvider(
   assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
   authHeader: string,
   signal: AbortSignal,
-): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {
+): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any; predictionId?: string }> {
   const start = Date.now();
   const url = `${SUPABASE_URL}/functions/v1/${test.edge_function}`;
   const payload = test.buildPayload(assets);
@@ -353,6 +353,15 @@ async function callProvider(
         status: "failed",
         durationMs,
         error: parsed.error || "Provider returned failure",
+        raw: json,
+      };
+    }
+    if (parsed.asyncStarted) {
+      return {
+        status: "async_started",
+        durationMs,
+        assetUrl: parsed.assetUrl,
+        predictionId: parsed.predictionId,
         raw: json,
       };
     }
