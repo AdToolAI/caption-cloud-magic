@@ -501,6 +501,18 @@ async function runSweep(
       error_message: `Worker crashed: ${e?.message || String(e)}`,
       completed_at: new Date().toISOString(),
     }).eq("sweep_id", sweepId).in("status", ["pending", "running"]);
+  } finally {
+    // Watchdog: even if the worker exits cleanly, sweep any rows that never
+    // received a terminal status (e.g. because the worker was killed by the
+    // edge runtime mid-update). Marks them as `failed` so the UI never hangs.
+    const { error: watchErr } = await adminClient.from("qa_live_runs").update({
+      status: "failed",
+      error_message: "Worker exited before status update committed (likely runtime timeout)",
+      completed_at: new Date().toISOString(),
+    }).eq("sweep_id", sweepId).in("status", ["pending", "running"]);
+    if (watchErr) {
+      console.error(`[sweep ${sweepId}] watchdog update failed:`, watchErr.message);
+    }
   }
 }
 
