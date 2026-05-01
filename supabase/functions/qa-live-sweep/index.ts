@@ -268,29 +268,6 @@ async function getTestAssets(supabase: any) {
 
   let talkingPhotoId = await readCachedTalkingPhoto();
 
-  // Self-heal: if the cache is empty (or cleared), provision the photo
-  // on-the-fly so users no longer need to manually click "Bootstrap Assets"
-  // before every sweep. Best-effort — if HeyGen is hard-blocked, we still
-  // continue and let the Talking Head test report the real error.
-  if (!talkingPhotoId) {
-    console.log("[live-sweep] no cached HeyGen photo id — running on-demand bootstrap");
-    try {
-      const result = await ensureHeyGenTalkingPhoto(supabase);
-      if (result.ok && result.talking_photo_id) {
-        talkingPhotoId = result.talking_photo_id;
-        console.log(
-          `[live-sweep] on-demand bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
-        );
-      } else {
-        console.warn(
-          `[live-sweep] on-demand bootstrap failed: ${result.error ?? "unknown"}`,
-        );
-      }
-    } catch (e) {
-      console.warn("[live-sweep] on-demand bootstrap threw:", e);
-    }
-  }
-
   return {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
@@ -398,9 +375,27 @@ async function runSweep(
   const cap = Number(budget.cap_eur);
   let totalSpent = 0;
   const completed: any[] = [];
+  let sweepAssets = assets;
 
   try {
     for (const test of tests) {
+      if (test.edge_function === "generate-talking-head" && !sweepAssets.talkingPhotoId) {
+        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping in background worker`);
+        try {
+          const result = await ensureHeyGenTalkingPhoto(adminClient);
+          if (result.ok && result.talking_photo_id) {
+            sweepAssets = { ...sweepAssets, talkingPhotoId: result.talking_photo_id };
+            console.log(
+              `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+            );
+          } else {
+            console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
+          }
+        } catch (e) {
+          console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
+        }
+      }
+
       const remaining = cap - totalSpent;
       if (remaining < test.estimated_cost_eur) {
         await adminClient.from("qa_live_runs").update({
@@ -421,7 +416,7 @@ async function runSweep(
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
-      const result = await callProvider(test, assets, authHeader, ctrl.signal);
+      const result = await callProvider(test, sweepAssets, authHeader, ctrl.signal);
       clearTimeout(timer);
 
       const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
