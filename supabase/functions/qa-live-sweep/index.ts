@@ -139,6 +139,15 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "I2V",
     estimated_cost_eur: 0.60,
     edge_function: "generate-pika-video",
+    // Pika 2.2 was removed from Replicate (May 2026). The edge function
+    // intentionally returns HTTP 410 with PIKA_PROVIDER_MIGRATION until we
+    // wire up the next provider. Treat that exact response as "expected"
+    // (rendered grey "skipped" in the cockpit) rather than a real bug.
+    expectedFailure: {
+      status: 410,
+      reasonContains: "Pika",
+      note: "Provider migration in progress (intentional)",
+    },
     buildPayload: ({ image }) => ({
       prompt: "gentle parallax motion, soft cinematic vibe",
       model: "pika-2-2-standard",
