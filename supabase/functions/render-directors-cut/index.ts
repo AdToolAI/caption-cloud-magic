@@ -253,6 +253,23 @@ serve(async (req) => {
       });
     }
 
+    // Hard guard: reject malformed scene timing before invoking Lambda.
+    // This prevents the recurring crash "The 'from' prop of a sequence must be finite, but got NaN".
+    const scenesCheck = validateScenes(scenes);
+    if (!scenesCheck.ok) {
+      console.error(`[RenderDirectorsCut] Rejected: ${scenesCheck.reason}`);
+      return new Response(
+        JSON.stringify({ error: 'Invalid scenes payload', detail: scenesCheck.reason }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (duration_seconds != null && !Number.isFinite(Number(duration_seconds))) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid duration_seconds', detail: `got ${JSON.stringify(duration_seconds)}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Normalize subtitle clips and text overlays to camelCase before passing to
     // the Remotion composition (DirectorsCutVideo.tsx reads .startTime/.endTime).
     // Snake_case (start_time/end_time) callers would otherwise cause NaN sequence
