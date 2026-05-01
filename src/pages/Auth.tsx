@@ -359,6 +359,7 @@ const Auth = () => {
       />
 
       <BlackTieFooter />
+      <AuthStatusIndicator />
     </div>
   );
 };
