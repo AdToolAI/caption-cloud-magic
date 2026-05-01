@@ -22,6 +22,7 @@ import { CloudStorageConnect } from "@/components/media-library/CloudStorageConn
 import { MediaAlbumManager } from "@/components/media-library/MediaAlbumManager";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
+import { enforceLimits, deleteMediaItem, type CleanupMediaItem } from "@/lib/media-library/autoCleanup";
 
 // Storage Limits
 const MAX_VIDEOS = 500;
