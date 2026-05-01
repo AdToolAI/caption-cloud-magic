@@ -115,9 +115,17 @@ export function useSubmitCharacterToMarketplace() {
       if (error) throw error;
       return data as { ok: boolean; status?: string; error?: string };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, payload) => {
       if (res.ok) {
         toast({ title: res.status === 'published' ? 'Published live' : 'Submitted for review', description: res.status === 'published' ? 'Your character is now in the marketplace.' : 'Admins typically review within 24 hours.' });
+        trackEvent(ANALYTICS_EVENTS.CHARACTER_LISTED, {
+          character_id: payload.characterId,
+          pricing_type: payload.pricingType,
+          price_credits: payload.priceCredits,
+          origin_type: payload.originType,
+          status: res.status,
+          nsfw: !!payload.nsfwFlag,
+        });
         qc.invalidateQueries({ queryKey: ['marketplace-characters'] });
         qc.invalidateQueries({ queryKey: ['brand-characters'] });
       } else {
