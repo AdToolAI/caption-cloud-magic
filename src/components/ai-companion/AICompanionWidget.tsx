@@ -962,9 +962,15 @@ export function AICompanionWidget() {
       {activeTutorial && (
         <TutorialOverlay
           tutorialId={activeTutorial}
-          onClose={() => setActiveTutorial(null)}
+          onClose={() => {
+            if (activeTutorial) {
+              trackEvent(ANALYTICS_EVENTS.TUTORIAL_SKIPPED, { tutorial_id: activeTutorial });
+            }
+            setActiveTutorial(null);
+          }}
           onComplete={(id) => {
             console.log('Tutorial completed:', id);
+            trackEvent(ANALYTICS_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: id });
             setActiveTutorial(null);
           }}
         />
