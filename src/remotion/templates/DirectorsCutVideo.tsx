@@ -717,22 +717,26 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SVGFilters />
         <SharpnessFilter intensity={sharpness} />
         <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
-          <Video
-            src={sourceVideoUrl}
-            pauseWhenBuffering={!previewMode}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              filter: filterStr.trim(),
-            }}
-            volume={0}
-          />
+          {isValidRemoteMediaUrl(sourceVideoUrl) ? (
+            <Video
+              src={sourceVideoUrl}
+              pauseWhenBuffering={!previewMode}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: filterStr.trim(),
+              }}
+              volume={0}
+            />
+          ) : (
+            <AbsoluteFill style={{ backgroundColor: '#000' }} />
+          )}
         </div>
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
         {/* Original Audio - skip in preview mode (native audio handles it) */}
-        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
+        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && isValidRemoteMediaUrl(sourceVideoUrl) && (
           <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} pauseWhenBuffering />
         )}
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
