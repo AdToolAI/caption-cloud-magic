@@ -1,49 +1,60 @@
-## Problem
+## Status
 
-`generate-vidu-video` ruft `vidu/q2-reference`, `vidu/q2-i2v` und `vidu/q2-t2v` auf Replicate auf. Diese Slugs existieren nicht und liefern **HTTP 404** ("The requested resource could not be found.") → Live Sweep zeigt Vidu Q2 als `failed`.
+Der letzte Sweep war fast komplett grün:
 
-Der frühere Rollback von `q3-pro` → `q2-*` ging davon aus, dass die q2-Modelle unter ihren Original-Slugs auf Replicate verfügbar sind. Das ist nicht der Fall: Replicate hostet derzeit nur `vidu/q3-pro` und `vidu/q3-turbo`. Damit ist q3 die einzige verfügbare Vidu-Familie auf Replicate.
+- **11/12 succeeded**, **Vidu Q2** läuft jetzt ✓ (Q3-Mapping greift), **Pika** korrekt als `expected` (HTTP 410 = Provider-Migration) ✓
+- **Hedra Talking Head** bleibt aber in der UI auf `pending` hängen und „springt" — das ist der letzte sichtbare Bug.
 
-Das frühere 429-Throttle-Problem mit q3-pro ist mit dem aufgefüllten Replicate-Credit-Konto irrelevant geworden.
+## Root Cause
 
-## Lösung
+`generate-talking-head` wurde auf **HeyGen** migriert und ist **asynchron**:
+- Edge Function returned sofort `{ success: true, status: "processing", videoUrl: null }` und pollt im Hintergrund (1–3 min) via `EdgeRuntime.waitUntil`.
+- `qa-live-sweep` interpretiert das via `defaultParse` als **succeeded** (weil `success === true`), würde die Zeile also eigentlich auf grün setzen.
 
-### 1. `generate-vidu-video/index.ts` umstellen
+Aber zwei Probleme stören das:
 
-- **Modell-Mapping**:
-  - `vidu-q2-reference` → `vidu/q3-pro` (höchste Qualität, unterstützt Reference)
-  - `vidu-q2-i2v` → `vidu/q3-pro` (Image-to-Video)
-  - `vidu-q2-t2v` → `vidu/q3-turbo` (schneller, günstiger, Text-only)
+1. **Bootstrap blockiert die Status-Updates**: Vor dem Hedra-Test ruft der Worker `ensureHeyGenTalkingPhoto(adminClient)` synchron auf (qa-live-sweep/index.ts:385). Wenn der HeyGen-Account bereits 3 Photos hat, durchläuft das Prune+Upload und kann 10–30 s dauern — währenddessen bleibt die Zeile auf `pending`, das UI pollt alle 3 s und re-rendert ohne Statuswechsel → optisches „Springen".
+2. **Async ≠ Succeeded**: Selbst wenn die Zeile auf grün wechselt, ist das Video objektiv noch nicht fertig — `videoUrl` ist `null`. Wir markieren also einen async-Job vorzeitig als "succeeded", was die spätere Cockpit-Anzeige (Asset-Preview leer) verfälscht.
 
-- **Reference-Handling für q3-pro**: q3-pro nimmt `reference_images` nicht nativ als 1–7-Array. Stattdessen nutzt es `start_image` + Prompt-basierte Referenz-Augmentation. Daher:
-  - Erstes Reference-Bild → `start_image`
-  - Restliche Referenzen → bleiben über `buildReferenceSuffix()` im Prompt (bereits implementiert, einfach beibehalten)
-  - Wir loggen einen Hinweis, wenn `>1` Reference übergeben wird
+## Plan
 
-- **Input-Schema** an q3 anpassen:
-  - `prompt`, `seed`, `aspect_ratio`, `duration` (bleiben gleich)
-  - `start_image` statt `reference_images`
-  - `negative_prompt` falls vorhanden
+### 1. Hedra-Zeile sofort auf `running` setzen, bevor der Bootstrap startet
+In `qa-live-sweep/index.ts` den Bootstrap-Block (Zeilen 382–397) **nach** das `Mark as running`-Update (Zeile 412) verschieben. So sieht der User sofort die Spinner-Animation für Hedra statt eines stummen `pending`.
 
-### 2. Pricing-Hinweis (optional, nicht blockierend)
+### 2. Async-Status erkennen statt fälschlich als "succeeded" zu markieren
+Custom `parseResponse` für den Hedra-Test ergänzen, der `status: "processing"` + `videoUrl: null` als **`async_started`** klassifiziert (neue Status-Variante neben succeeded/failed/timeout/expected/skipped_budget).
 
-Die `FLAT_PRICE_EUR`-Werte (0.40–0.45 €) entsprechen ungefähr q3-turbo. q3-pro ist auf Replicate teurer (~0.95 USD pro 5s). Für den Live Sweep ist das egal (kostet einmal pro Run), aber ich erhöhe `vidu-q2-reference` und `vidu-q2-i2v` auf **0.95 €**, damit die Wallet-Deduction realistisch ist und kein versteckter Verlust entsteht.
+```typescript
+// In ProviderTest für Hedra:
+parseResponse: (json) => {
+  if (!json || json.error) return { success: false, error: json?.error };
+  if (json.success && json.status === "processing" && !json.videoUrl) {
+    return { success: true, asyncStarted: true, predictionId: json.predictionId };
+  }
+  return defaultParse(json);
+},
+```
 
-### 3. Live Sweep validieren
+`callProvider` und das DB-Update so erweitern, dass bei `asyncStarted: true` der Status `async_started` in `qa_live_runs` geschrieben wird (mit `predictionId` in `raw_response`).
 
-Nach Deploy:
-- `Run Live Sweep` klicken
-- Erwartung: Vidu wird `succeeded` (statt `failed`)
-- Hedra Talking Head war im letzten Run `pending` → ggf. Folge-Issue, aber separat
+### 3. UI: neuen Status `async_started` rendern
+In `LiveSweepPanel` (oder vergleichbar) das Badge mit gelbem „läuft im Hintergrund (HeyGen-Polling, 1–3 min)" anzeigen. Kein roter Bug, kein grünes Häkchen — explizit ehrlich.
 
-## Geänderte Dateien
+### 4. Optional: Sweep-Progress-Counter anpassen
+Der Counter „11/12 grün" sollte `async_started` als „in flight" zählen, nicht als pending, damit der Balken korrekt füllt.
 
-- `supabase/functions/generate-vidu-video/index.ts` — Replicate-Slugs auf `vidu/q3-pro` / `vidu/q3-turbo`, Input-Schema (`start_image`), Preise angepasst
-- Deploy via `supabase--deploy_edge_functions(["generate-vidu-video"])`
+### 5. Re-Deploy + Verifikation
+- `qa-live-sweep` neu deployen
+- Einen Sweep auslösen
+- Erwartung: Hedra-Zeile geht **direkt** von `pending → running → async_started` (gelb), kein Springen mehr; alle anderen 11 bleiben grün.
 
-## Erwartetes Ergebnis
+## Files
 
-- Vidu Q2 (Ref2V) im Live Sweep grün
-- Sweep-Score: 11/12 grün (Pika bleibt `expected`), Hedra ggf. separat zu prüfen
+- `supabase/functions/qa-live-sweep/index.ts` (Bootstrap-Reihenfolge, Hedra-`parseResponse`, neuer Status)
+- `src/components/admin/LiveSweepPanel.tsx` o.ä. (neues Status-Badge `async_started`)
+
+## Bugs nach diesem Fix
+
+Mit dem Vidu-Q3-Mapping, der Pika-Expected-Annotation und diesem Hedra-Async-Fix sollten **alle bekannten Sweep-Bugs** geschlossen sein. Die Live-Sweep-Anzeige ist dann konsistent: succeeded / async_started / expected / failed / timeout / skipped_budget — kein hängendes `pending` mehr.
 
 Soll ich loslegen?
