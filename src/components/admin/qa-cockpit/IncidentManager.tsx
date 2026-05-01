@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { Plus, CheckCircle2, AlertTriangle, Loader2, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 
@@ -47,6 +47,63 @@ const STATUSES = [
   { value: "identified", label: "Identified" },
   { value: "monitoring", label: "Monitoring" },
   { value: "resolved", label: "Resolved" },
+];
+
+// Pre-defined incident templates for fast publishing during real outages.
+// One-click fills the form; all fields remain editable (e.g. to add a concrete ETA).
+const TEMPLATES: Array<{
+  id: string;
+  label: string;
+  title: string;
+  description: string;
+  severity: "degraded" | "partial_outage" | "major_outage";
+  affected: string[];
+}> = [
+  {
+    id: "replicate_outage",
+    label: "Replicate (AI Video) outage",
+    title: "AI video generation degraded — Replicate provider issue",
+    description:
+      "We're aware of elevated error rates and slower generations on AI video models hosted via Replicate (Hailuo, Seedance, Kling, HappyHorse, Wan, Pika, Vidu). Failed generations are automatically refunded. We're monitoring the upstream provider and will update as soon as the situation changes.",
+    severity: "partial_outage",
+    affected: ["ai_generation"],
+  },
+  {
+    id: "lambda_render_slow",
+    label: "Video rendering (Lambda) slow",
+    title: "Video rendering experiencing slower-than-usual processing times",
+    description:
+      "Director's Cut and Composer renders may take longer than usual due to AWS Lambda concurrency limits. All renders will complete; failed renders are automatically refunded. We're scaling capacity now.",
+    severity: "degraded",
+    affected: ["video_rendering"],
+  },
+  {
+    id: "social_publishing_degraded",
+    label: "Social publishing degraded",
+    title: "Social publishing temporarily affected (Meta / TikTok / X)",
+    description:
+      "Some scheduled posts may be delayed or fail to publish due to upstream API issues at one or more social platforms. Posts will be retried automatically. We recommend keeping drafts saved.",
+    severity: "degraded",
+    affected: ["social_publishing"],
+  },
+  {
+    id: "scheduled_maintenance",
+    label: "Scheduled maintenance",
+    title: "Scheduled maintenance window",
+    description:
+      "We're performing scheduled maintenance to improve performance and reliability. Brief interruptions to video rendering and AI generation may occur. No data will be lost; in-flight jobs will resume automatically.",
+    severity: "degraded",
+    affected: ["video_rendering", "ai_generation"],
+  },
+  {
+    id: "major_db_outage",
+    label: "Major outage (DB / Auth)",
+    title: "Service disruption — login and data access affected",
+    description:
+      "We're investigating a service disruption affecting login, dashboard access, and saved projects. Our team has been alerted and is actively working on a fix. No data is at risk. We'll update this incident every 15 minutes.",
+    severity: "major_outage",
+    affected: ["web_app", "database"],
+  },
 ];
 
 interface Incident {
