@@ -45,6 +45,9 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-red-500/15 text-red-300 border-red-500/30",
   timeout: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   running: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  // Intentional non-2xx response (e.g. Pika 410 during provider migration).
+  // Documented in code, not a real bug — render in neutral grey.
+  expected: "bg-slate-600/20 text-slate-300 border-slate-500/40",
   skipped_budget: "bg-slate-500/15 text-slate-300 border-slate-500/30",
   pending: "bg-slate-500/15 text-slate-300 border-slate-500/30",
 };
@@ -109,8 +112,10 @@ export function LiveSweepTab() {
       });
       if (error) throw error;
       const s = data as any;
-      toast.success(`Sweep abgeschlossen — ${s.succeeded}/${s.total_tested} grün`, {
-        description: `${s.failed} failed · ${s.timeout} timeout · ${s.skipped_budget} skipped · ${s.total_spent_eur.toFixed(2)} € ausgegeben`,
+      const expected = s.expected ?? 0;
+      const effectiveOk = (s.succeeded ?? 0) + expected;
+      toast.success(`Sweep abgeschlossen — ${effectiveOk}/${s.total_tested} grün`, {
+        description: `${s.failed} failed · ${s.timeout} timeout · ${expected} expected · ${s.skipped_budget} skipped · ${s.total_spent_eur.toFixed(2)} € ausgegeben`,
       });
       await load();
     } catch (e: any) {
@@ -225,6 +230,8 @@ export function LiveSweepTab() {
         const ts = sweepRuns[0]?.created_at;
         const sweepSpent = sweepRuns.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         const ok = sweepRuns.filter((r) => r.status === "succeeded").length;
+        const expectedCount = sweepRuns.filter((r) => r.status === "expected").length;
+        const effectiveOk = ok + expectedCount;
         return (
           <Card
             key={sweepId}
@@ -236,7 +243,8 @@ export function LiveSweepTab() {
                   {sweepId.slice(0, 8)} · {ts && new Date(ts).toLocaleString()}
                 </div>
                 <div className="text-sm text-white font-medium">
-                  {ok}/{sweepRuns.length} grün · {sweepSpent.toFixed(2)} € ausgegeben
+                  {effectiveOk}/{sweepRuns.length} grün
+                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
                 </div>
               </div>
             </div>

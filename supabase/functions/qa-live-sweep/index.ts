@@ -3,6 +3,7 @@
 // Stops the moment cap_eur is reached. Records every run for auditing.
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import { ensureHeyGenTalkingPhoto } from "../_shared/heygen-bootstrap.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +32,12 @@ interface ProviderTest {
   edge_function: string;
   /** Optional per-provider timeout override (ms). Defaults to 90_000. */
   timeoutMs?: number;
+  /**
+   * Optional: a known/intentional non-2xx response that should NOT be
+   * treated as a real failure. Used e.g. for Pika 2.2 which intentionally
+   * returns HTTP 410 while the provider migration is in progress.
+   */
+  expectedFailure?: { status: number; reasonContains?: string; note: string };
   buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
@@ -132,6 +139,15 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "I2V",
     estimated_cost_eur: 0.60,
     edge_function: "generate-pika-video",
+    // Pika 2.2 was removed from Replicate (May 2026). The edge function
+    // intentionally returns HTTP 410 with PIKA_PROVIDER_MIGRATION until we
+    // wire up the next provider. Treat that exact response as "expected"
+    // (rendered grey "skipped" in the cockpit) rather than a real bug.
+    expectedFailure: {
+      status: 410,
+      reasonContains: "Pika",
+      note: "Provider migration in progress (intentional)",
+    },
     buildPayload: ({ image }) => ({
       prompt: "gentle parallax motion, soft cinematic vibe",
       model: "pika-2-2-standard",
@@ -230,24 +246,51 @@ async function getTestAssets(supabase: any) {
       return fallback;
     }
   };
+
   // Read cached HeyGen talking_photo_id (set by qa-live-sweep-bootstrap).
-  let talkingPhotoId: string | undefined;
-  try {
-    const { data: cfg } = await supabase
-      .from("system_config")
-      .select("value")
-      .eq("key", "qa.heygen_talking_photo_id")
-      .maybeSingle();
-    if (cfg?.value) {
-      talkingPhotoId = typeof cfg.value === "string"
-        ? cfg.value
-        : (typeof cfg.value === "object" && "id" in cfg.value
-            ? String((cfg.value as any).id)
-            : undefined);
+  const readCachedTalkingPhoto = async (): Promise<string | undefined> => {
+    try {
+      const { data: cfg } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "qa.heygen_talking_photo_id")
+        .maybeSingle();
+      if (!cfg?.value) return undefined;
+      if (typeof cfg.value === "string") return cfg.value;
+      if (typeof cfg.value === "object" && cfg.value && "id" in cfg.value) {
+        return String((cfg.value as any).id);
+      }
+    } catch (e) {
+      console.warn("[live-sweep] read cached talking_photo_id failed:", e);
     }
-  } catch (e) {
-    console.warn("[live-sweep] read cached talking_photo_id failed:", e);
+    return undefined;
+  };
+
+  let talkingPhotoId = await readCachedTalkingPhoto();
+
+  // Self-heal: if the cache is empty (or cleared), provision the photo
+  // on-the-fly so users no longer need to manually click "Bootstrap Assets"
+  // before every sweep. Best-effort — if HeyGen is hard-blocked, we still
+  // continue and let the Talking Head test report the real error.
+  if (!talkingPhotoId) {
+    console.log("[live-sweep] no cached HeyGen photo id — running on-demand bootstrap");
+    try {
+      const result = await ensureHeyGenTalkingPhoto(supabase);
+      if (result.ok && result.talking_photo_id) {
+        talkingPhotoId = result.talking_photo_id;
+        console.log(
+          `[live-sweep] on-demand bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+        );
+      } else {
+        console.warn(
+          `[live-sweep] on-demand bootstrap failed: ${result.error ?? "unknown"}`,
+        );
+      }
+    } catch (e) {
+      console.warn("[live-sweep] on-demand bootstrap threw:", e);
+    }
   }
+
   return {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
@@ -290,6 +333,23 @@ async function callProvider(
     const durationMs = Date.now() - start;
 
     if (!res.ok) {
+      // Honor expectedFailure annotation: providers that intentionally
+      // return a known non-2xx (e.g. Pika 410 during provider migration)
+      // should be reported as "expected" rather than counted as bugs.
+      if (test.expectedFailure && res.status === test.expectedFailure.status) {
+        const reasonOk = !test.expectedFailure.reasonContains
+          || (parsed.error || text).toLowerCase().includes(
+            test.expectedFailure.reasonContains.toLowerCase(),
+          );
+        if (reasonOk) {
+          return {
+            status: "expected",
+            durationMs,
+            error: `HTTP ${res.status} (expected): ${test.expectedFailure.note}`,
+            raw: json,
+          };
+        }
+      }
       return {
         status: "failed",
         durationMs,
@@ -488,6 +548,7 @@ Deno.serve(async (req) => {
     succeeded: results.filter((r) => r.status === "succeeded").length,
     failed: results.filter((r) => r.status === "failed").length,
     timeout: results.filter((r) => r.status === "timeout").length,
+    expected: results.filter((r) => r.status === "expected").length,
     skipped_budget: results.filter((r) => r.status === "skipped_budget").length,
     total_spent_eur: Number(totalSpent.toFixed(4)),
     cap_eur: cap,
