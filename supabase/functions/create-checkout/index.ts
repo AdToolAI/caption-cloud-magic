@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+import { trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -108,6 +109,11 @@ serve(async (req) => {
           if (!insErr) {
             foundersSlotReserved = true;
             console.log(`Reserved founders slot ${founders + 1}/${FOUNDERS_MAX_SLOTS}`);
+            await trackBusinessEvent("founders_slot_claimed", user.id, {
+              slot_number: founders + 1,
+              max_slots: FOUNDERS_MAX_SLOTS,
+              coupon: FOUNDERS_COUPON,
+            });
           } else {
             console.warn("Could not reserve founders slot:", insErr.message);
           }
@@ -147,6 +153,14 @@ serve(async (req) => {
     }
 
     const session = await stripe.checkout.sessions.create(sessionOptions);
+
+    await trackBusinessEvent("checkout_session_created", user.id, {
+      price_id: priceId,
+      coupon: resolvedCoupon,
+      promo_code: promoCode || null,
+      founders_slot_reserved: foundersSlotReserved,
+      session_id: session.id,
+    });
 
     return new Response(
       JSON.stringify({ url: session.url, applied_coupon: resolvedCoupon }),
