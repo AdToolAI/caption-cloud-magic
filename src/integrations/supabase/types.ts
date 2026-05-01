@@ -6889,6 +6889,33 @@ export type Database = {
         }
         Relationships: []
       }
+      founders_signups: {
+        Row: {
+          claimed_at: string
+          coupon_id: string
+          id: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          coupon_id: string
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string
+          coupon_id?: string
+          id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       gaming_discord_settings: {
         Row: {
           auto_notify_live: boolean | null
@@ -15491,6 +15518,7 @@ export type Database = {
         }
         Returns: string
       }
+      count_founders_claimed: { Args: never; Returns: number }
       deduct_ai_video_credits: {
         Args: { p_amount: number; p_generation_id: string; p_user_id: string }
         Returns: number

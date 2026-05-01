@@ -3869,7 +3869,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effective Marketing.",
         headline2: "Smart Campaigns.",
         subline: "Your AI-powered marketing toolkit for social media. Create, plan and analyze content like a pro.",
-        pricingHint: "From €19.99/month · 14-day trial · No auto-subscription",
+        pricingHint: "From €14.99/month (Launch promo) · 14-day trial · No auto-subscription",
         ctaPrimary: "Start for free",
         ctaSecondary: "Watch demo",
         stats: {
@@ -8536,7 +8536,7 @@ export const translations: Record<Language, any> = {
         headline1: "Effektives Marketing.",
         headline2: "Smarte Kampagnen.",
         subline: "Dein KI-gestütztes Marketing-Toolkit für Social Media. Erstelle, plane und analysiere Content wie ein Profi.",
-        pricingHint: "Ab 19,99 €/Monat · 14 Tage testen · Kein Auto-Abo",
+        pricingHint: "Ab 14,99 €/Monat (Launch-Promo) · 14 Tage testen · Kein Auto-Abo",
         ctaPrimary: "Kostenlos starten",
         ctaSecondary: "Demo ansehen",
         stats: {
@@ -12987,7 +12987,7 @@ export const translations: Record<Language, any> = {
         headline1: "Marketing Efectivo.",
         headline2: "Campañas Inteligentes.",
         subline: "Tu kit de marketing impulsado por IA para redes sociales. Crea, planifica y analiza contenido como un profesional.",
-        pricingHint: "Desde 19,99 €/mes · 14 días de prueba · Sin suscripción automática",
+        pricingHint: "Desde 14,99 €/mes (promo de lanzamiento) · 14 días de prueba · Sin suscripción automática",
         ctaPrimary: "Empezar gratis",
         ctaSecondary: "Ver demo",
         stats: {

@@ -7,6 +7,13 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
+const FOUNDERS_COUPON = "PRO-FOUNDERS-24M";
+const LAUNCH_COUPON = "PRO-LAUNCH-3M";
+const FOUNDERS_MAX_SLOTS = 1000;
+const PRO_PRICE_IDS = new Set([
+  "price_1TSLxWDRu4kfSFxjEJNi8nGN", // Pro €29.99 v2 EUR
+]);
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -14,38 +21,31 @@ serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      throw new Error("No authorization header");
-    }
+    if (!authHeader) throw new Error("No authorization header");
 
-    const { priceId, promoCode, applyIntro } = await req.json();
-    if (!priceId) {
-      throw new Error("Price ID is required");
-    }
+    const { priceId, promoCode, applyIntro, couponId } = await req.json();
+    if (!priceId) throw new Error("Price ID is required");
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
     );
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    
-    if (userError || !user) {
-      throw new Error("Not authenticated");
-    }
+    if (userError || !user) throw new Error("Not authenticated");
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2025-08-27.basil",
     });
 
-    console.log(`Creating checkout for user ${user.id} with price ${priceId}, promo: ${promoCode || 'none'}, intro: ${applyIntro || false}`);
+    console.log(`Checkout: user=${user.id} price=${priceId} promo=${promoCode || "none"} coupon=${couponId || "auto"}`);
 
-    // Check if customer exists in database
+    // Find or create Stripe customer
     const { data: profile } = await supabaseClient
       .from("profiles")
       .select("stripe_customer_id")
@@ -53,77 +53,107 @@ serve(async (req) => {
       .single();
 
     let customerId = profile?.stripe_customer_id;
-
-    // Validate if customer exists in Stripe, if an ID is stored
     if (customerId) {
       try {
         await stripe.customers.retrieve(customerId);
-        console.log(`Using existing customer: ${customerId}`);
-      } catch (error) {
-        // Customer doesn't exist in Stripe anymore, create a new one
-        console.log(`Customer ${customerId} not found in Stripe, will create new one`);
+      } catch {
         customerId = null;
       }
     }
-
-    // Create customer if doesn't exist
     if (!customerId) {
-      console.log(`Creating new Stripe customer for user ${user.id}`);
       const customer = await stripe.customers.create({
         email: user.email,
         metadata: { userId: user.id },
       });
       customerId = customer.id;
-      console.log(`Created new customer: ${customerId}`);
-
-      // Update profile with new customer ID
       await supabaseClient
         .from("profiles")
         .update({ stripe_customer_id: customerId })
         .eq("id", user.id);
     }
 
-    // Prepare checkout session options
-    const sessionOptions: any = {
+    // === Pro auto-coupon logic ===
+    let resolvedCoupon: string | null = couponId ?? null;
+    let foundersSlotReserved = false;
+
+    if (!resolvedCoupon && !promoCode && PRO_PRICE_IDS.has(priceId)) {
+      // Check if user already has a founders/launch slot
+      const { data: existing } = await supabaseAdmin
+        .from("founders_signups")
+        .select("coupon_id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (existing) {
+        resolvedCoupon = existing.coupon_id;
+        console.log(`User already has slot: ${resolvedCoupon}`);
+      } else {
+        // Count current founders slots
+        const { count } = await supabaseAdmin
+          .from("founders_signups")
+          .select("*", { count: "exact", head: true })
+          .eq("coupon_id", FOUNDERS_COUPON);
+
+        const founders = count ?? 0;
+        if (founders < FOUNDERS_MAX_SLOTS) {
+          resolvedCoupon = FOUNDERS_COUPON;
+          // Reserve the slot (subscription_id filled later by webhook if available)
+          const { error: insErr } = await supabaseAdmin
+            .from("founders_signups")
+            .insert({
+              user_id: user.id,
+              stripe_customer_id: customerId,
+              coupon_id: FOUNDERS_COUPON,
+            });
+          if (!insErr) {
+            foundersSlotReserved = true;
+            console.log(`Reserved founders slot ${founders + 1}/${FOUNDERS_MAX_SLOTS}`);
+          } else {
+            console.warn("Could not reserve founders slot:", insErr.message);
+          }
+        } else {
+          resolvedCoupon = LAUNCH_COUPON;
+          await supabaseAdmin.from("founders_signups").insert({
+            user_id: user.id,
+            stripe_customer_id: customerId,
+            coupon_id: LAUNCH_COUPON,
+          });
+          console.log("Founders sold out, applying launch coupon");
+        }
+      }
+    }
+
+    const sessionOptions: Stripe.Checkout.SessionCreateParams = {
       customer: customerId,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
       success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/billing?success=true`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
         userId: user.id,
+        ...(resolvedCoupon ? { applied_coupon: resolvedCoupon } : {}),
+        ...(foundersSlotReserved ? { founders_slot: "true" } : {}),
       },
     };
 
-    // Apply promo code if provided
     if (promoCode) {
-      console.log(`Applying promo code: ${promoCode}`);
       sessionOptions.discounts = [{ promotion_code: promoCode }];
+    } else if (resolvedCoupon) {
+      sessionOptions.discounts = [{ coupon: resolvedCoupon }];
     }
 
-    // Create checkout session
     const session = await stripe.checkout.sessions.create(sessionOptions);
 
     return new Response(
-      JSON.stringify({ url: session.url }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      }
+      JSON.stringify({ url: session.url, applied_coupon: resolvedCoupon }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 },
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Checkout error:", error);
+    const message = error instanceof Error ? error.message : "Failed to create checkout session";
     return new Response(
-      JSON.stringify({ error: 'Failed to create checkout session' }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      }
+      JSON.stringify({ error: message }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
     );
   }
 });

@@ -16,12 +16,12 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
     USD: 'price_1SO4JdDRu4kfSFxjDInm0jUQ' // Basic Plan $14.99/month
   },
   pro: {
-    EUR: 'price_1TPTYEDRu4kfSFxj0eWG34YP', // Pro Plan €19.99/month (Launch)
-    USD: 'price_1TPTZc1xgyPAUyx6WugCHBnx' // Pro Plan $19.99/month (Launch)
+    EUR: 'price_1TSLxWDRu4kfSFxjEJNi8nGN', // Pro Plan €29.99/month (Regular v2 — promo applied via coupon)
+    USD: 'price_1TSLxWDRu4kfSFxjEJNi8nGN'  // EUR-only price (USD checkout falls back to EUR)
   },
   enterprise: {
-    EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby', // UPDATE: Create new price in Stripe for €69.95/month
-    USD: 'price_1SO4LVDRu4kfSFxj8HEmHlHq' // Enterprise Plan $69.95/month
+    EUR: 'price_1SLqfFDRu4kfSFxjy2ZxDkby',
+    USD: 'price_1SO4LVDRu4kfSFxj8HEmHlHq'
   }
 };
 
@@ -29,9 +29,9 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
  * Stripe Product ID mapping (remains unchanged)
  */
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
-  free: '', // Free plan has no product
+  free: '',
   basic: 'prod_TIRSoTyzmRpbpT',
-  pro: 'prod_UOG4wbiQjDONAj', // Pro Plan (Launch €19.99)
+  pro: 'prod_UREZAv0LG9vz1E', // Pro Plan v2 (€29.99 regular)
   enterprise: 'prod_TIRYBu4fdR2BEw'
 };
 
@@ -62,3 +62,18 @@ export const INTRO_PROMO_CODES = {
     USD: 'START-ENT'
   }
 } as const;
+
+/**
+ * Pro Launch promo coupons (applied automatically by create-checkout)
+ *  - FOUNDERS: first 1000 subscribers, €15 off for 24 months
+ *  - LAUNCH:   everyone else, €15 off for 3 months
+ * Both bring €29.99 → €14.99 effective.
+ */
+export const PRO_PROMO_COUPONS = {
+  founders: 'PRO-FOUNDERS-24M',
+  launch: 'PRO-LAUNCH-3M',
+} as const;
+
+export const FOUNDERS_MAX_SLOTS = 1000;
+export const PRO_REGULAR_PRICE_EUR = 29.99;
+export const PRO_PROMO_PRICE_EUR = 14.99;
