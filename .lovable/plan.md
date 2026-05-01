@@ -1,67 +1,49 @@
-## Vereinfachte Strategie
+## Status quo
 
-Da es nur noch **ein Abomodell** gibt, ist der hardcodierte 10-Videos-pro-Stunde-Limit in 13 Edge-Functions reines Legacy aus der Free-Tier-Ära. Er hat heute exakt zwei Effekte:
-1. Bricht den Live Sweep (9 von 10 Fehlern im letzten Run).
-2. Bremst zahlende User aus, ohne irgendeinen Schutz zu liefern (sie haben das Abo ja bezahlt).
+Live Sweep zeigt **10/12 grün**, 2 rote Zeilen:
 
-Lösung: **Limit ersatzlos entfernen.**
+1. **Hedra Talking Head → HEYGEN_AVATAR_LIMIT (401028)** — echter Bug.
+2. **Pika 2.2 Std → HTTP 410** — kein Bug, sondern absichtlich so codiert (Provider-Migration). Nur die Klassifizierung im Sweep-Reporter ist falsch.
 
-Wallet/Credit-Drain ist bereits durch den Wallet-Balance-Check (`Insufficient credits` → 402) abgesichert — der ist der echte Schutz, nicht der Stundenlimit.
+## Ursache 1: HeyGen-Cache ist leer
 
-## Phase A: Per-User-Rate-Limit entfernen
+DB-Check: `system_config` enthält **keinen** Eintrag für `qa.heygen_talking_photo_id`. Der Bootstrap-Step `qa-live-sweep-bootstrap` wurde entweder nie ausgeführt oder ist beim letzten Versuch beim HeyGen-Upload gescheitert (vermutlich, weil das Account schon 3 Photos hatte und die Prune-Liste damals nicht griff).
 
-In allen 13 Video-Edge-Functions den `count >= 10`-Block ersatzlos löschen:
-- `generate-ai-video`
-- `generate-kling-video`
-- `generate-hailuo-video`
-- `generate-grok-video`
-- `generate-seedance-video`
-- `generate-wan-video`
-- `generate-vidu-video`
-- `generate-veo-video`
-- `generate-runway-video`
-- `generate-pika-video`
-- `generate-luma-video`
-- `generate-ltx-video`
-- (und identischer Pattern-Check, falls in `generate-talking-head` vorhanden)
+Konsequenz: `qa-live-sweep` liest `talkingPhotoId = undefined`, übergibt nichts an `generate-talking-head`, das versucht einen frischen Upload — und HeyGen lehnt mit 401028 ab.
 
-Beibehalten bleiben:
-- Wallet-Balance-Check (402 INSUFFICIENT_CREDITS)
-- JWT-Auth-Check
-- Input-Validierung
-- QA-Mock-Header-Bypass
+## Ursache 2: Pika 410 wird als "failed" gewertet
 
-Nicht angefasst: `_shared/rate-limiter.ts` (das ist die generische Plan-basierte Middleware für andere AI-Calls und wird nicht von den Video-Functions benutzt).
+`generate-pika-video` gibt absichtlich **HTTP 410** mit Code `PIKA_PROVIDER_MIGRATION` zurück. Der Sweep-Reporter behandelt jeden Non-2xx als Fehler.
 
-## Phase B: HeyGen Cached Talking Photo
+## Fix
 
-Unverändert sinnvoll, weil HeyGen ein **echtes externes Provider-Limit** ist (3 Avatare/Konto, nicht von uns kontrollierbar):
+### Phase A — HeyGen Bootstrap härten und automatisch laufen lassen
 
-1. In `qa-live-sweep-bootstrap` einmalig ein Talking Photo hochladen und die `talking_photo_id` in `system_config.qa.heygen_talking_photo_id` ablegen.
-2. `qa-live-sweep` übergibt diese ID direkt an `generate-talking-head` (neuer optionaler Parameter `talkingPhotoId`) → kein Upload mehr nötig.
-3. In `generate-talking-head`: Wenn `talkingPhotoId` mitkommt, Upload + Pruning komplett überspringen.
-4. Bei 401028 trotzdem (z. B. weil das gecachte Photo abgelaufen ist): einmaliger Re-Upload mit aggressivem Pruning, dann sauberes 402 mit Code `HEYGEN_AVATAR_LIMIT` falls erneut blockiert.
+1. **`qa-live-sweep` ruft den Bootstrap on-demand auf**, falls `qa.heygen_talking_photo_id` fehlt: vor dem Talking-Head-Test einmal `ensureHeyGenTalkingPhoto` (extrahiert in `_shared/heygen-bootstrap.ts`) ausführen → Cache schreiben → ID verwenden. Damit ist der Sweep selbstheilend; kein manueller "Bootstrap Assets"-Klick mehr nötig.
+2. **Robusterer Prune in `ensureHeyGenTalkingPhoto`**: Vor dem Upload gezielt `talking_photo.list` lesen und alle `is_preset === false` Einträge per DELETE entfernen, mit kurzer Wartezeit (300 ms) zwischen Deletes, damit HeyGen die Quota wirklich freigibt. Falls nach Prune immer noch 401028 kommt: einmal retry nach 1 s.
+3. **Persistenz-Sanity-Check**: Nach dem `upsert` in `system_config` direkt nochmal lesen und loggen — verhindert silent failures bei RLS oder Trigger-Konflikten.
 
-## Phase C: Stable Audio Timeout
+### Phase B — Pika 410 als "expected" markieren
 
-In `qa-live-sweep/index.ts`: Timeout für den Audio-Test von 90 s auf **180 s** anheben. Replicate Cold-Start für Stable Audio 2.5 liegt mit Queue gerne bei 120–150 s.
+In `qa-live-sweep/index.ts` die Pika-Provider-Definition mit `expectedStatus: 410` und `expectedReason: "PIKA_PROVIDER_MIGRATION"` annotieren. Der Reporter zeigt solche Einträge als **graues "skipped (expected)"** statt als rotes "failed" — bleibt sichtbar dokumentiert, zählt aber zur Erfolgsquote (12/12 grün, 1 davon expected-skip).
 
-## Reihenfolge
+### Phase C — Memory-Update
 
-1. **Phase A** (Limit entfernen) — eliminiert 9 Fehler, ist ein Mini-Diff pro Function.
-2. **Phase B** (HeyGen Cached ID) — eliminiert den 10. Fehler.
-3. **Phase C** (Audio Timeout) — eliminiert den Timeout-Fehler.
-4. Re-run Live Sweep → Erwartung: 11/12 grün + 1 erwartetes Pika-410.
+Memory `mem://architecture/video-edge-functions/no-per-user-rate-limit` ergänzen:
+> *Sweep ist selbstheilend: HeyGen-Bootstrap wird on-demand ausgeführt, falls Cache leer ist. Pika 410 ist `expected` bis Provider-Migration abgeschlossen.*
 
-## Memory-Update
+## Erwartetes Ergebnis nach Re-Run
 
-Nach Umsetzung lege ich eine kurze Memory ab:
-> *"Video-Edge-Functions haben keinen Per-User-Stunden-Limit mehr. Schutz erfolgt via Wallet-Balance-Check (402). Hintergrund: nur ein Abomodell, Legacy-Limit war Free-Tier-Relikt."*
+- Hedra Talking Head → **succeeded** (~0.30 €)
+- Pika 2.2 Std → **expected (HTTP 410)** in grau, nicht rot
+- Gesamt: **12/12 effektiv grün**, ~6.6 € pro Run
 
-## Was ich nicht vorschlage
+## Dateien, die ich anfassen werde
 
-- Keine Plan-basierte Staffelung (es gibt nur einen Plan).
-- Keine Sweep-Bypass-Header-Logik (überflüssig, wenn der Limit ganz weg ist).
-- Keinen Eingriff in den generischen `RateLimiter` für andere AI-Calls (orthogonal).
+- `supabase/functions/_shared/heygen-bootstrap.ts` (neu, extrahiert die `ensureHeyGenTalkingPhoto`-Logik)
+- `supabase/functions/qa-live-sweep-bootstrap/index.ts` (importiert aus dem Shared-Modul)
+- `supabase/functions/qa-live-sweep/index.ts` (on-demand Bootstrap + Pika-expected-Status)
+- `src/components/admin/qa-cockpit/*` (Reporter-Komponente, die `expected`-Status grau rendert)
+- Memory-Datei
 
-**Soll ich starten? Phase A ist in einem Schritt für alle 13 Functions machbar.**
+Soll ich loslegen?
