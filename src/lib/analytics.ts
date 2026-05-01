@@ -146,7 +146,57 @@ export const ANALYTICS_EVENTS = {
   RENDER_COMPLETED: 'render_completed',
   RENDER_FAILED: 'render_failed',
   RENDER_ENGINE_SELECTED: 'render_engine_selected',
+
+  // AI Generation (provider-level)
+  AI_GENERATION_STARTED: 'ai_generation_started',
+  AI_GENERATION_COMPLETED: 'ai_generation_completed',
+  AI_GENERATION_FAILED: 'ai_generation_failed',
+  AI_GENERATION_REFUNDED: 'ai_generation_refunded',
+  CREDIT_INSUFFICIENT: 'credit_insufficient',
+
+  // Social Publishing
+  SOCIAL_PUBLISH_STARTED: 'social_publish_started',
+  SOCIAL_PUBLISH_SUCCEEDED: 'social_publish_succeeded',
+  SOCIAL_PUBLISH_FAILED: 'social_publish_failed',
+  SOCIAL_ACCOUNT_CONNECTED: 'social_account_connected',
+  SOCIAL_ACCOUNT_DISCONNECTED: 'social_account_disconnected',
 } as const;
+
+/**
+ * Track AI generation lifecycle (frontend wrapper)
+ */
+export const trackAIGeneration = (
+  event: 'ai_generation_started' | 'ai_generation_completed' | 'ai_generation_failed',
+  data: {
+    provider: string;
+    model?: string;
+    duration_s?: number;
+    credits_spent?: number;
+    cost_eur?: number;
+    aspect_ratio?: string;
+    resolution?: string;
+    error_type?: string;
+    latency_ms?: number;
+  }
+) => {
+  trackEvent(event, data);
+};
+
+/**
+ * Track social publishing lifecycle (frontend wrapper)
+ */
+export const trackSocialPublish = (
+  event: 'social_publish_started' | 'social_publish_succeeded' | 'social_publish_failed',
+  data: {
+    platform: string;
+    media_type?: 'image' | 'video' | 'carousel' | 'text';
+    scheduled?: boolean;
+    error_type?: string;
+    error_message?: string;
+  }
+) => {
+  trackEvent(event, data);
+};
 
 // Remotion/Shotstack rendering analytics
 export const trackRenderEvent = (
