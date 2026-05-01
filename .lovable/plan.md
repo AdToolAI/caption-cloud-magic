@@ -1,104 +1,141 @@
-## Ziel
+# Public Status Page — Stage 1 (dezent integriert)
 
-Drei Bereiche so markieren, dass Kunden sie sehen aber **nicht klicken / nutzen** können:
-1. **Pika 2.2 (Standard + Pro)** → "Beta / Wartung" im AI Video Toolkit
-2. **Gaming Hub** → "Coming Soon"
-3. **KI Autopilot** → "Coming Soon"
+Eine kunden-freundliche, öffentlich zugängliche Status-Page unter `/status`, die Live-Daten aus Synthetic Probes, Lambda Health und manuellen Incidents auf 6 kunden-relevante Komponenten aggregiert. **Keine prominente Verlinkung** auf der Startseite — Zugang nur dezent über Einstellungen + direkten URL-Aufruf.
 
-Bestehender, unauffälliger Pattern: Es gibt schon ein `badge`-Feld in der Modell-Registry und Hub-Items. Wir bauen darauf auf — kein neues System nötig.
+## Was der Kunde sieht
 
----
-
-## Umsetzung
-
-### 1. Pika → "Beta / Wartung" im AI Video Toolkit
-
-**Datei:** `src/config/aiVideoModelRegistry.ts`
-
-Neues optionales Feld `status` zum Model-Type hinzufügen:
-```ts
-status?: 'live' | 'beta' | 'maintenance' | 'coming_soon';
-statusReason?: string;
+```text
+┌─────────────────────────────────────────────────────┐
+│  ● All Systems Operational                          │
+│  Last checked: 2 min ago                            │
+├─────────────────────────────────────────────────────┤
+│  [Banner: Manual Incident, falls aktiv]             │
+├─────────────────────────────────────────────────────┤
+│  Component                Status        90d Uptime  │
+│  ─────────────────────────────────────────────────  │
+│  ● Web App & Login        Operational   99.94%  ▁▂▁ │
+│  ● Database               Operational   99.99%  ▁▁▁ │
+│  ● Video Rendering        Operational   99.71%  ▁█▁ │
+│  ● AI Generation          Degraded      99.52%  ▁▃▁ │
+│  ● File Storage           Operational   99.98%  ▁▁▁ │
+│  ● Social Publishing      Operational   99.85%  ▁▁▂ │
+├─────────────────────────────────────────────────────┤
+│  Past Incidents (last 30 days)                      │
+│  • 2026-04-28 — Replicate API degraded (resolved)   │
+└─────────────────────────────────────────────────────┘
 ```
 
-Beide Pika-Einträge bekommen:
-```ts
-status: 'maintenance',
-statusReason: 'Provider-Wartung — Pika ist temporär offline. Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
-badge: 'Wartung',
+Status-Levels: `Operational` (grün), `Degraded` (gelb), `Partial Outage` (orange), `Major Outage` (rot).
+
+## Wo die Page verlinkt wird (dezent)
+
+- **NICHT** im globalen Footer, **NICHT** auf Landing/Dashboard.
+- **Settings → Help & Support**: Neue Sektion "System Status" mit kleinem Live-Status-Dot + Link zu `/status`.
+- **Auth-Page (Login/Signup)**: Mini-Indikator unten rechts ("● All systems operational" / "● Service issue") — nur sichtbar wenn `degraded` oder schlechter, sonst stumm. Begründung: bei Login-Problemen schauen Kunden zuerst hier.
+- **Direkter URL-Aufruf**: `/status` ist öffentlich erreichbar, indexierbar (kann später für Sales/Trust-Gespräche geteilt werden).
+
+## Komponenten-Mapping (Probe → Kunde)
+
+| Kunden-Komponente | Datenquelle | Logik |
+|---|---|---|
+| Web App & Login | `synthetic_probe_runs`: `landing_page`, `auth_endpoint` | beide pass = green; einer fail in letzter Stunde = degraded |
+| Database | `synthetic_probe_runs`: `db_read_latency` | pass = green; >threshold = degraded |
+| Video Rendering | `lambda_health_recent` (failure_rate_1h) | <2% = green; 2-10% = degraded; >10% = outage |
+| AI Generation | `synthetic_probe_runs`: `edge_generate-caption` + `edge_check-subscription` | analog |
+| File Storage | `synthetic_probe_runs`: `storage_endpoint` | analog |
+| Social Publishing | manuell (Stage 1) — Default green; via Incident-Toggle setzbar | Auto-Detection in Stage 2 |
+
+## Was gebaut wird
+
+### 1. Neue Tabelle: `status_incidents`
+
+Manuell von Admins gepflegt für externe Provider-Outages (Replicate, HeyGen, Meta, etc.) die nicht automatisch erkannt werden.
+
+```sql
+create table public.status_incidents (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  affected_components text[] not null default '{}',
+  severity text not null check (severity in ('degraded','partial_outage','major_outage')),
+  status text not null default 'investigating' check (status in ('investigating','identified','monitoring','resolved')),
+  started_at timestamptz not null default now(),
+  resolved_at timestamptz,
+  created_by uuid references auth.users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.status_incidents enable row level security;
+create policy "Public can read incidents" on public.status_incidents for select using (true);
+create policy "Admins can manage incidents" on public.status_incidents for all
+  using (public.has_role(auth.uid(), 'admin'));
 ```
 
-**UI-Effekt im Toolkit (`src/components/ai-video-studio/...`):**
-- Modell-Karte zeigt `Wartung`-Badge in **gelb** (statt gold)
-- Karte ist **disabled** (opacity-50 + cursor-not-allowed)
-- Tooltip / kleiner Hinweistext zeigt `statusReason`
-- Wenn jemand Pika trotzdem im Dropdown auswählt → Submit-Button disabled mit Hinweis
+### 2. Edge Function: `public-status` (no JWT, public)
 
-### 2. Gaming Hub → "Coming Soon"
+- `verify_jwt = false` in `supabase/config.toml`
+- 60s in-memory Cache (verhindert DB-Hammering)
+- Aggregiert aus `synthetic_probe_runs` (60min für Status, 90 Tage für Uptime), `lambda_health_recent`, `status_incidents` (active + last 30d resolved)
+- Returnt schlankes, kunden-freundliches JSON — **keine internen Probe-Namen, keine Latenz-Zahlen, keine Error-Messages**:
+  ```json
+  {
+    "overall": "operational",
+    "updated_at": "...",
+    "components": [{"key":"video_rendering","name":"Video Rendering","status":"operational","uptime_90d":99.71,"sparkline":[100,100,99.5,...]}],
+    "active_incidents": [...],
+    "past_incidents": [...]
+  }
+  ```
 
-**Datei:** `src/config/hubConfig.ts`
+### 3. Public Page: `src/pages/Status.tsx`
 
-`HubDefinition`-Type erweitern um `comingSoon?: boolean`. Dem Gaming-Hub setzen:
-```ts
-{
-  key: "gaming",
-  ...
-  comingSoon: true,
-  items: [...],
-}
-```
+- Route in `App.tsx` ohne Auth-Wrapper, ohne Sidebar-Layout (eigenständig, accessible auch ohne Login)
+- React-Query mit `refetchInterval: 60_000`, `staleTime: 30_000`
+- James-Bond-2028-Design (deep black, gold accents, glassmorphism) aber **bewusst zurückhaltend** — Status-Pages sollen ruhig wirken
+- Komponenten:
+  - `StatusHeader` (Overall-Badge + Last-Checked)
+  - `IncidentBanner` (nur wenn `active_incidents.length > 0`)
+  - `ComponentRow` × 6 (Name, Status-Dot, 90d-Uptime %, 90-Tage-Sparkline)
+  - `PastIncidentsList` (collapsible)
+  - Footer mit Link zurück zur App
 
-**UI-Effekt im HubDashboard / Sidebar:**
-- Hub-Kachel zeigt overlay-Badge **"Coming Soon"** (gold-cyan glow, James-Bond-Stil)
-- Klick auf Hub öffnet **kein** Submenu → stattdessen kleiner Toast: *"Gaming Hub kommt bald — wir benachrichtigen dich beim Launch."*
-- `/gaming`-Route bleibt erreichbar (für interne QA), aber zeigt prominentes "Coming Soon"-Banner oben
+### 4. Settings-Integration (dezent)
 
-### 3. KI Autopilot → "Coming Soon"
+In `src/pages/Account.tsx` (oder Settings-Equivalent) eine kleine neue Karte **"System Status"** unter "Help & Support":
+- Live-Dot (grün/gelb/rot) via gleichem `public-status` Endpoint
+- Text: "All systems operational" / "Service degraded — view details"
+- Sekundär-Button: "Open Status Page" → `/status`
 
-**Dateien:**
-- `src/components/autopilot/AutopilotHeroBanner.tsx` — Banner auf dem Dashboard
-- `src/pages/Autopilot.tsx` — eigentliche Page
+### 5. Auth-Page Mini-Indikator (nur bei Issues)
 
-**AutopilotHeroBanner:**
-- Großes "Coming Soon"-Overlay (semi-transparenter Glas-Effekt mit gold-Akzent)
-- CTA-Button von "Autopilot starten" → "Benachrichtigt mich" (vorerst nur visuell, no-op + Toast: *"Eingetragen — wir melden uns beim Launch"*)
-- Sub-Headline: *"Vollautonome KI-Content-Pipeline · Launch in Kürze"*
+In `Auth.tsx` (Login/Signup) ein kleiner Status-Indikator unten rechts:
+- **Stumm** wenn `operational` (kein UI-Element sichtbar)
+- **Sichtbar** wenn `degraded` / `outage` mit Link auf `/status`
+- Verhindert Support-Tickets bei Login-Problemen während Outages
 
-**Autopilot-Page (`/autopilot`):**
-- Komplette Page mit "Coming Soon"-Screen ersetzen (Wizard etc. auskommentiert lassen, nicht löschen — kommt später zurück)
-- Zeigt: Hero, kurze Feature-Vorschau (3 Cards: Auto-Briefing / Auto-Render / Weekly Review), "Benachrichtigt mich"-Button
-- Falls User Admin ist (`useUserRole`-Check) → kleiner Link "Preview öffnen (Admin)" der die echte Autopilot-UI zeigt — damit du intern weiterarbeiten kannst
+### 6. Admin-UI: Incident Manager
 
----
+Neuer Tab im bestehenden `/admin/qa-cockpit` (passt thematisch zu Watchdog/Probes):
+- Liste aktiver Incidents
+- "New Incident" Dialog: Title, Severity, betroffene Komponenten (Multi-Select), Description
+- "Resolve" Button setzt `resolved_at = now()`, `status = 'resolved'`
 
-## Technische Details
+## Was bewusst NICHT in Stage 1 ist
 
-**Dateien die angefasst werden:**
+- E-Mail/Push-Subscriptions auf Status-Updates → Stage 2
+- RSS-Feed → Stage 2
+- Externes Hosting für "wenn-Supabase-down"-Fallback → Stage 2
+- Auto-Detection für Replicate/HeyGen-Outages → Stage 2
+- Incident-Update-Timeline (mehrere Posts pro Incident) → Stage 2
+- Footer-Link / Landing-Verlinkung → bewusst weggelassen, Startseite bleibt clean
 
-| Datei | Änderung |
-|---|---|
-| `src/config/aiVideoModelRegistry.ts` | `status`-Feld + Pika-Einträge auf `maintenance` |
-| `src/components/ai-video-studio/AIVideoToolkit*.tsx` (Modell-Picker-Komponente) | `status`-aware Rendering: Badge + Disabled-State + Tooltip |
-| `src/config/hubConfig.ts` | `comingSoon?: boolean` Property + Gaming-Hub-Markierung |
-| `src/components/dashboard/HubDashboard*.tsx` o.ä. | Coming-Soon-Overlay auf Hub-Karten |
-| `src/components/autopilot/AutopilotHeroBanner.tsx` | Coming-Soon-Overlay + Notify-CTA |
-| `src/pages/Autopilot.tsx` | Coming-Soon-Screen mit Admin-Bypass |
-| `src/lib/translations.ts` | Neue Keys: `comingSoon.title`, `comingSoon.notifyMe`, `comingSoon.notified`, `pika.maintenance` (DE/EN/ES) |
+## Sicherheit
 
-**Was NICHT angefasst wird:**
-- Edge Functions für Pika (`generate-pika-video`) — bleiben deployed, falls Provider plötzlich wieder funktioniert
-- Autopilot Edge Functions / Cron Jobs — bleiben aus, kommen später zurück
-- DB-Schema — keine Migration nötig
-- Routing in `App.tsx` — alle Routen bleiben, nur Inhalt der Pages ändert sich
+- `public-status` öffentlich, gibt nur **aggregierte** Daten zurück — keine internen Details.
+- RLS auf `status_incidents`: SELECT public, Mutationen nur Admin via `has_role()`.
+- 60s Cache schützt vor Abuse.
 
-**Reaktivierung später (1-Liner pro Feature):**
-- Pika: `status: 'live'` setzen
-- Gaming: `comingSoon: false`
-- Autopilot: Coming-Soon-Wrapper aus Page entfernen
+## Geschätzter Umfang
 
-**Brand-Konsistenz (James Bond 2028):**
-- Coming-Soon-Badges: Glass-Effekt, gold-glow (`#F5C76A`), cyan-Akzent für "Notify me"-CTA
-- Wartung-Badge (Pika): subtileres Amber/Gold, kein roter Alarm-Ton
-- Konsistent mit bestehenden `Premium`/`Neu`-Badges in der Registry
-
-**Estimated changes:** ~7 Dateien, ~250 Zeilen Code, keine DB-Migration, keine Edge-Function-Änderungen.
+1 Migration, 1 Edge Function, 1 Public Page, 1 Settings-Karte, 1 Auth-Indikator, 1 Admin-Tab. Realistisch in einem Durchgang machbar.

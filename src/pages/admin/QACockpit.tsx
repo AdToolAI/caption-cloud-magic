@@ -17,6 +17,7 @@ import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 import { WatchdogTab } from "@/pages/admin/WatchdogTab";
 import { ProbesTab } from "@/pages/admin/ProbesTab";
+import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 
 
 const TIER_COLORS: Record<string, string> = {
@@ -335,6 +336,10 @@ export default function QACockpit() {
               <Activity className="h-3.5 w-3.5 mr-1.5" />
               Probes
             </TabsTrigger>
+            <TabsTrigger value="incidents" className="text-[#F5C76A]">
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+              Status
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -364,6 +369,11 @@ export default function QACockpit() {
           {/* SYNTHETIC PROBES (Layer 3) */}
           <TabsContent value="probes">
             <ProbesTab />
+          </TabsContent>
+
+          {/* STATUS PAGE INCIDENT MANAGER */}
+          <TabsContent value="incidents">
+            <IncidentManager />
           </TabsContent>
 
           {/* LIVE RUNS */}

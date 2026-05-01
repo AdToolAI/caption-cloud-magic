@@ -85,6 +85,7 @@ const Legal = lazy(() => import("./pages/Legal"));
 const DeleteData = lazy(() => import("./pages/DeleteData"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
+const Status = lazy(() => import("./pages/Status"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
@@ -201,6 +202,7 @@ function AppLayout() {
                     <Route path="/imprint" element={<Legal />} />
                     <Route path="/delete-data" element={<DeleteData />} />
                     <Route path="/coming-soon" element={<ComingSoon />} />
+                    <Route path="/status" element={<Status />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
