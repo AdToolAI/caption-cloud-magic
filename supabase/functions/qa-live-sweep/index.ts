@@ -227,6 +227,7 @@ async function getTestAssets(supabase: any) {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
     audio: await tryUrl("test-audio.mp3", FALLBACK_AUDIO),
+    portrait: await tryUrl("test-portrait.png", FALLBACK_IMAGE),
   };
 }
 
