@@ -60,17 +60,20 @@ export const useStorageQuota = () => {
           description: 'You have reached your storage limit. Please delete old files or upgrade your plan.',
           variant: 'destructive',
         });
+        trackQuotaWarning({ quota_type: 'storage', threshold_pct: 100, used_pct: Math.round(usagePercent) });
       } else if (usagePercent >= 90) {
         toast({
           title: '⚠️ Storage Almost Full',
           description: `You are using ${Math.round(usagePercent)}% of your storage. Consider cleaning up old files.`,
           variant: 'destructive',
         });
+        trackQuotaWarning({ quota_type: 'storage', threshold_pct: 90, used_pct: Math.round(usagePercent) });
       } else if (usagePercent >= 80) {
         toast({
           title: 'Storage Warning',
           description: `You are using ${Math.round(usagePercent)}% of your storage quota.`,
         });
+        trackQuotaWarning({ quota_type: 'storage', threshold_pct: 80, used_pct: Math.round(usagePercent) });
       }
 
       // Fetch breakdown
