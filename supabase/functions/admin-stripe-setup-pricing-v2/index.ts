@@ -40,21 +40,24 @@ serve(async (req) => {
       });
     }
 
-    // ---- 2. New regular Pro Price $29.99 (USD) ----
-    const lookupUsd = "pro_monthly_usd_v2_2999";
-    let priceUsd = (
-      await stripe.prices.list({ lookup_keys: [lookupUsd], limit: 1 })
-    ).data[0];
-    if (!priceUsd) {
-      priceUsd = await stripe.prices.create({
-        currency: "usd",
-        unit_amount: 2999,
-        recurring: { interval: "month" },
-        product: PRO_PRODUCT_ID_USD,
-        lookup_key: lookupUsd,
-        nickname: "Pro Plan $29.99/month (Regular v2)",
-        metadata: { plan: "pro", tier: "regular_v2" },
-      });
+    // ---- 2. USD price (skip if product not in this account) ----
+    let priceUsd: Stripe.Price | null = null;
+    try {
+      const lookupUsd = "pro_monthly_usd_v2_2999";
+      priceUsd = (await stripe.prices.list({ lookup_keys: [lookupUsd], limit: 1 })).data[0] ?? null;
+      if (!priceUsd) {
+        priceUsd = await stripe.prices.create({
+          currency: "usd",
+          unit_amount: 2999,
+          recurring: { interval: "month" },
+          product: PRO_PRODUCT_ID_USD,
+          lookup_key: lookupUsd,
+          nickname: "Pro Plan $29.99/month (Regular v2)",
+          metadata: { plan: "pro", tier: "regular_v2" },
+        });
+      }
+    } catch (err) {
+      console.warn("Skipped USD price:", err instanceof Error ? err.message : err);
     }
 
     // ---- 3. Coupon: Founders 24M (€15 off) ----
