@@ -1,60 +1,158 @@
-# Status-Page Incident-Templates
-
 ## Ziel
-Im Ernstfall (Replicate down, Lambda lahmt, Meta-API streikt) soll **niemand unter Stress Incident-Texte formulieren müssen**. Stattdessen: 1 Klick → Template lädt Titel + Beschreibung + Severity + betroffene Komponenten → "Publish".
 
-## Wo
-`src/components/admin/qa-cockpit/IncidentManager.tsx` — sichtbar im QA-Cockpit unter Tab "Status". Die Tabelle `status_incidents` und der `IncidentManager` existieren bereits; es fehlen nur die Templates.
+Drei Verbesserungen vor Launch:
 
-## Templates (5 Stück, EN, ruhiger faktischer Ton)
+1. **Support-Center upgraden** — professionelles UI, Datei-Uploads, geführter Wizard, Auto-Kontext
+2. **Support-Mails an `info@useadtool.ai`** umleiten (aktuell hart-codiert auf `bestofproducts4u@gmail.com`)
+3. **Automatischer Rechnungsversand** — bei jeder erfolgreichen Stripe-Zahlung bekommt der Kunde die Rechnung als E-Mail mit PDF-Link
 
-1. **Replicate (AI Video) outage** — `partial_outage`, betrifft `ai_generation`
-   Erwähnt explizit alle Replicate-gehosteten Modelle (Hailuo, Seedance, Kling, HappyHorse, Wan, Pika, Vidu) + Hinweis auf automatische Refunds.
+---
 
-2. **Video rendering (Lambda) slow** — `degraded`, betrifft `video_rendering`
-   AWS Lambda Concurrency Limits, automatische Refunds bei Failures.
+## Teil 1 — Support-Center Upgrade
 
-3. **Social publishing degraded** — `degraded`, betrifft `social_publishing`
-   Meta / TikTok / X, automatischer Retry, Hinweis Drafts speichern.
+### 1.1 Storage & Datenbank (Migration)
 
-4. **Scheduled maintenance** — `degraded`, betrifft `video_rendering` + `ai_generation`
-   Geplantes Wartungsfenster, in-flight jobs resumieren automatisch.
+Neuer privater Bucket `support-attachments`:
+- RLS: Pfad MUSS mit `{user_id}/...` starten (Memory: Storage Path Constraint)
+- Max 25 MB pro Datei, max 5 Dateien pro Ticket
+- Erlaubte Typen: `image/*`, `video/mp4`, `video/quicktime`, `application/pdf`, `text/plain`
 
-5. **Major outage (DB / Auth)** — `major_outage`, betrifft `web_app` + `database`
-   Login/Dashboard/Daten betroffen, Update alle 15 Minuten.
+`support_tickets` erweitern:
+- `attachments jsonb default '[]'` — Array von `{ path, name, size, type, signed_url }`
+- `severity text default 'normal'` — `low | normal | high | blocking`
+- `affected_module text` — z.B. `video-composer`, auto-detected aus URL
+- `browser_info jsonb` — `{ userAgent, viewport, language, url, plan }`
+- `expected_result text` / `actual_result text` / `reproduction_steps text`
+- CHECK-Constraint `category` erweitern: `bug | rendering | publishing | account | billing | feature | other`
 
-## UI-Änderung im "New incident"-Dialog
+### 1.2 Neue Support-Seite (Rewrite)
+
+`src/pages/Support.tsx` im James-Bond-Look (deep black, gold accents, glassmorphism), 3 Tabs:
+
+**Tab 1 — "Neuen Fall melden"** (3-Schritt-Wizard):
 
 ```text
-┌─ Publish a new incident ──────────────────┐
-│                                            │
-│  ⚡ Quick templates                        │
-│  [Replicate outage] [Lambda slow]          │
-│  [Social degraded] [Maintenance] [Major]   │
-│                                            │
-│  Title    [______________________]         │
-│  Desc.    [______________________]         │
-│  Severity [Degraded ▾]                     │
-│  Affected ☑ Web App  ☐ Database  …         │
-│                                            │
-│           [Cancel]  [Publish]              │
-└────────────────────────────────────────────┘
+Step 1: Was ist passiert?
+  - Kategorie (visuelle Karten + Icons)
+  - Schweregrad (Pills: Niedrig / Normal / Hoch / Blockierend)
+  - Betroffenes Modul (auto-vorausgewählt aus letzter URL)
+
+Step 2: Beschreibung (geführt)
+  - "Was wolltest du tun?"  (expected_result)
+  - "Was ist stattdessen passiert?"  (actual_result)
+  - "Schritte zum Reproduzieren"  (nummerierte Liste)
+  - "Zusätzliche Details"  (Freitext)
+  Hinweis-Banner: "Je präziser, desto schneller — Antwort meist <2h"
+
+Step 3: Beweise & Absenden
+  - Drag & Drop Uploader (max 5 × 25 MB)
+  - Vorschau-Thumbnails mit Entfernen-Button
+  - Auto-Kontext (read-only, einklappbar):
+    Browser, OS, Viewport, Plan, User-ID, letzte Konsolen-Errors
+  - Submit-Button mit Gold-Glow
 ```
 
-Klick auf einen Template-Chip füllt das Formular vor — alle Felder bleiben editierbar (z. B. um konkrete ETA hinzuzufügen).
+**Tab 2 — "Meine Tickets"**: Liste eigener Tickets mit Status-Badges + Detail-Drawer.
 
-## Technische Details
+**Tab 3 — "Schnelle Hilfe"**: Top-5-FAQ-Karten, Links zu `/faq` und `/status`, WhatsApp-Notfall-Button (nur sichtbar bei Severity = "blockierend").
 
-- Konstante `TEMPLATES` (Array von 5 Objekten) am Dateianfang von `IncidentManager.tsx`.
-- Neuer `applyTemplate(t)`-Handler setzt `setForm({...})`.
-- Render-Block oberhalb der existierenden Form-Felder im Dialog mit kleinen `<Button variant="outline" size="sm">`-Chips.
-- Keine DB-Änderung, keine Edge-Function-Änderung, keine neue Route.
-- Keine i18n nötig: Status-Page ist bewusst global EN (Investor-/Reviewer-fokussiert).
+### 1.3 Neue Komponenten
 
-## Out of scope für jetzt
+- `src/components/support/AttachmentUploader.tsx` — Drag & Drop, Validierung, Progress-Bar, Upload nach `support-attachments/{user_id}/{draft_id}/...`
+- `src/components/support/SupportWizard.tsx` — 3-Schritt-Wizard
+- `src/components/support/MyTicketsList.tsx`
+- `src/components/support/QuickHelpPanel.tsx`
+- `src/lib/support/contextCollector.ts` — sammelt Browser/Viewport/Plan/URL/Console-Errors
+- `src/hooks/useConsoleErrorBuffer.ts` — Ring-Buffer für letzte 20 `console.error`-Einträge (mountet einmal in `App.tsx`)
 
-- Automatisches Triggern aus Watchdog/Probes (separater zukünftiger Schritt — würde manuelle Kontrolle weniger machen, was im Launch-Stress eher Risiko ist).
-- Übersetzung der Templates (EN reicht für `/status` global).
+---
 
-## Zeitaufwand
-~10 Minuten Implementation + 1 Minute Test.
+## Teil 2 — Support-Mails an info@useadtool.ai
+
+In `supabase/functions/send-support-ticket/index.ts`:
+- Empfänger umstellen: `to: "info@useadtool.ai"` (Zeile 126, ersetzt das alte Gmail)
+- Reply-To auf User-Email setzen, damit ihr direkt antworten könnt
+- Neue Felder akzeptieren: `severity`, `affected_module`, `expected_result`, `actual_result`, `reproduction_steps`, `attachments[]`, `browser_info`
+- Anhänge via Supabase Storage Signed URLs (7 Tage Gültigkeit) generieren und in der E-Mail verlinken (mit Vorschau-Thumbnails für Bilder)
+- E-Mail-Template überarbeiten:
+  - **Betreff**: `[SEVERITY] [Modul] — Subject — User-Email`
+  - **Sektionen**: Problem-Zusammenfassung / Was wollte der User / Was ist passiert / Reproduktions-Schritte / Anhänge (Vorschau-Bilder + Links) / Tech-Kontext (eingeklappt)
+- **User-Bestätigungs-E-Mail**: kurze Bestätigung mit Ticket-ID und erwarteter Antwortzeit (24h)
+
+---
+
+## Teil 3 — Automatischer Rechnungsversand
+
+### 3.1 Stripe-Konfiguration in den Checkout-Flows
+
+In **`create-checkout`** und **`create-enterprise-checkout`** beim Anlegen der Subscription/Checkout-Session ergänzen:
+
+```text
+invoice_creation: { enabled: true }                  (für Einmal-Zahlungen)
+subscription_data: {
+  invoice_settings: { issuer: { type: 'self' } }
+}
+customer_update: { address: 'auto', name: 'auto' }   (für korrekte Rechnungsadresse)
+```
+
+Außerdem beim Customer-Create/Update sicherstellen, dass `email` gesetzt ist und Stripe-Setting `Email finalized invoices to customers` aktiv ist (Stripe sendet dann automatisch die Rechnungs-E-Mail von Stripe aus — **das ist der einfachste, zuverlässigste Weg**).
+
+### 3.2 Zusätzliche eigene Bestätigungs-E-Mail (gebrandet)
+
+Im **`stripe-webhook`** auf das Event `invoice.payment_succeeded` (zusätzlich zum bereits existierenden `invoice.paid`-Handler für Affiliate-Commissions) reagieren und eine eigene gebrandete Bestätigungs-Mail an den Kunden schicken über die bestehende Lovable-Email-Infrastruktur:
+
+- Neues Template `payment-receipt` in `_shared/transactional-email-templates/`:
+  - Im `useadtool.ai`-Branding (gold/black)
+  - Dynamische Daten: `customerName`, `amount`, `currency`, `invoiceNumber`, `periodStart`, `periodEnd`, `hostedInvoiceUrl`, `pdfUrl`
+  - Großer "Rechnung herunterladen"-Button (verlinkt auf `invoice.invoice_pdf`)
+  - Sekundärer Link auf `invoice.hosted_invoice_url`
+- Im Webhook (nach erfolgreicher Verarbeitung von `invoice.payment_succeeded`):
+  ```text
+  supabase.functions.invoke('send-transactional-email', {
+    body: {
+      templateName: 'payment-receipt',
+      recipientEmail: invoice.customer_email,
+      idempotencyKey: `receipt-${invoice.id}`,
+      templateData: { ... }
+    }
+  })
+  ```
+- `idempotencyKey: receipt-{invoice.id}` verhindert Doppel-Sends bei Webhook-Retries
+
+### 3.3 Voraussetzungen für Lovable-Email
+
+Falls noch keine Email-Domain konfiguriert ist, kommt der Setup-Dialog für `useadtool.ai` (Subdomain `notify.useadtool.ai`). Falls bereits konfiguriert, geht es direkt mit Scaffolding und Template-Erstellung weiter — beim Implementieren prüfe ich den Status zuerst.
+
+---
+
+## Dateien (Übersicht)
+
+**Neu:**
+- `supabase/migrations/<ts>_support_center_and_attachments.sql`
+- `src/components/support/AttachmentUploader.tsx`
+- `src/components/support/SupportWizard.tsx`
+- `src/components/support/MyTicketsList.tsx`
+- `src/components/support/QuickHelpPanel.tsx`
+- `src/lib/support/contextCollector.ts`
+- `src/hooks/useConsoleErrorBuffer.ts`
+- `supabase/functions/_shared/transactional-email-templates/payment-receipt.tsx`
+
+**Geändert:**
+- `src/pages/Support.tsx` (Komplett-Rewrite)
+- `src/App.tsx` (Console-Error-Buffer mounten)
+- `supabase/functions/send-support-ticket/index.ts` (Empfänger → info@useadtool.ai, neue Felder, Reply-To, Anhänge, neues Template)
+- `supabase/functions/create-checkout/index.ts` (`invoice_creation.enabled = true`)
+- `supabase/functions/create-enterprise-checkout/index.ts` (gleich)
+- `supabase/functions/stripe-webhook/index.ts` (Receipt-Email auf `invoice.payment_succeeded`)
+- `supabase/functions/_shared/transactional-email-templates/registry.ts` (neues Template registrieren)
+
+---
+
+## Out-of-Scope (für später)
+
+- Admin-Cockpit-Tab "Tickets" (Antworten direkt aus der App)
+- Live-Chat / Intercom-Integration
+- Eigene Rechnungs-PDF-Generierung (wir nutzen Stripes PDF, das spart Aufwand und ist rechtssicher)
+- Automatische Severity-Vorhersage per KI
+
+Sag Bescheid wenn ich starten soll, oder welche Teile (1, 2, 3 oder alle) ich zuerst angehen soll.
