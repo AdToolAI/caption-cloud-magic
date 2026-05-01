@@ -15,7 +15,10 @@ import { Loader2 } from "lucide-react";
 
 const SmartBackgroundTab = lazy(() => import("./BackgroundReplacer"));
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function PictureStudio() {
+  useTrackPageFeature("picture_studio");
   const [searchParams, setSearchParams] = useSearchParams();
   const defaultTab = searchParams.get('tab') || 'generate';
   const [activeTab, setActiveTab] = useState(defaultTab);

@@ -320,6 +320,7 @@ function getSparkColor(platform: string) {
 }
 
 export default function TrendRadar() {
+  useTrackPageFeature("trend_radar");
   const { t, language } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();

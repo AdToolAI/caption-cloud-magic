@@ -21,7 +21,10 @@ import { useNavigate } from 'react-router-dom';
 const GENRES = ['any', 'pop', 'rock', 'electronic', 'hip-hop', 'jazz', 'classical', 'lo-fi', 'cinematic', 'ambient', 'folk', 'r&b'];
 const MOODS = ['energetic', 'calm', 'epic', 'sad', 'happy', 'mysterious', 'romantic', 'dark', 'uplifting', 'dreamy'];
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function MusicStudio() {
+  useTrackPageFeature("music_studio");
   const navigate = useNavigate();
   const { wallet } = useAIVideoWallet();
   const { generateMusic, generateLyrics, loading, generatingLyrics } = useMusicGeneration();

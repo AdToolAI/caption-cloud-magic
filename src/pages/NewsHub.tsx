@@ -291,6 +291,7 @@ function ArticleCard({ article, index, highlighted, onPlayVideo, timeAgo, t }: {
 }
 
 export default function NewsHub() {
+  useTrackPageFeature("news_hub");
   const { t } = useTranslation();
   const timeAgo = useLocalizedTimeAgo();
   const { articles, loading, refreshing, category, setCategory, loadMore, hasMore, refreshNews, searchQuery, setSearchQuery } = useNewsHub();

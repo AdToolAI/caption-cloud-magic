@@ -28,7 +28,10 @@ import { cn } from '@/lib/utils';
 
 import { ComingSoonScreen } from '@/components/common/ComingSoonScreen';
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function Autopilot() {
+  useTrackPageFeature("autopilot");
   return (
     <ComingSoonScreen
       eyebrow="KI Autopilot"
