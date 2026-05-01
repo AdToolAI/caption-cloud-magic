@@ -336,6 +336,10 @@ export default function QACockpit() {
               <Activity className="h-3.5 w-3.5 mr-1.5" />
               Probes
             </TabsTrigger>
+            <TabsTrigger value="incidents" className="text-[#F5C76A]">
+              <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+              Status
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
