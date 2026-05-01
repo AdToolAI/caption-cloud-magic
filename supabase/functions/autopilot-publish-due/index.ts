@@ -147,7 +147,7 @@ Deno.serve(withSentryCron("autopilot-publish-due", { schedule: "* * * * *", maxR
     });
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
-});
+}));
 
 function json(b: unknown, status = 200) {
   return new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
