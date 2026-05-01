@@ -398,6 +398,12 @@ serve(async (req) => {
       },
       globalTextOverlays,
       watermark,
+      // CRITICAL: pass the precise edge-computed duration so that
+      // ComposedAdVideo.calculateMetadata produces the SAME number of frames
+      // that we put into Lambda's `frameRange`. Without this the Composition
+      // derives its own (slightly different) length and Lambda crashes with
+      // "durationInFrames was evaluated to be N, but frame range 0-M is not inbetween 0-(N-1)".
+      durationInFrames,
     };
 
     console.log('[compose-video-assemble] Audio/overlay payload:', {
