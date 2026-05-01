@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { supabase } from "@/integrations/supabase/client";
 import { ExternalLink, Download, CreditCard, FileText, Crown, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
