@@ -1473,6 +1473,14 @@ Deno.serve(withTelemetry('publish', async (req) => {
       job_id: job.id,
     });
 
+    // Track publish_started for each channel
+    const mediaType: 'image' | 'video' | 'text' = payload.media && payload.media.length
+      ? (payload.media[0].type === 'video' ? 'video' : 'image')
+      : 'text';
+    for (const channel of payload.channels) {
+      trackSocialPublish('started', user.id, { platform: channel, media_type: mediaType }).catch(() => {});
+    }
+
     // Publish to all channels
     const publishTasks = payload.channels.map(async (channel) => {
       try {
@@ -1523,6 +1531,24 @@ Deno.serve(withTelemetry('publish', async (req) => {
         };
       }
     });
+
+    // Track outcome per channel
+    for (const r of publishResults) {
+      if (r.ok) {
+        trackSocialPublish('succeeded', user.id, {
+          platform: r.provider,
+          media_type: mediaType,
+          post_id: r.external_id,
+        }).catch(() => {});
+      } else {
+        trackSocialPublish('failed', user.id, {
+          platform: r.provider,
+          media_type: mediaType,
+          error_type: r.error_code,
+          error_message: r.error_message,
+        }).catch(() => {});
+      }
+    }
 
     // Save results
     const resultsToInsert = publishResults.map((r) => ({
