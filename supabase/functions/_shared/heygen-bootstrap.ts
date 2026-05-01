@@ -208,9 +208,9 @@ export async function ensureHeyGenTalkingPhoto(admin: any): Promise<HeyGenBootst
   // 4: 401028 fallback — prune again + wait + retry
   if (up.error && (/401028/.test(up.error) || /photo avatars/i.test(up.error))) {
     console.warn(`[heygen-bootstrap] 401028 on first upload, pruning + retry`);
-    await sleep(1000);
+    await sleep(1500);
     const prunedSecond = await pruneAllCustom();
-    await sleep(1000);
+    await sleep(1500);
     up = await uploadOnce(portrait.buf, portrait.contentType);
     if (up.id) {
       await persistId(admin, up.id);
@@ -220,6 +220,27 @@ export async function ensureHeyGenTalkingPhoto(admin: any): Promise<HeyGenBootst
         reused: false,
         pruned: prunedFirst + prunedSecond,
       };
+    }
+
+    // 5: Last-resort REUSE — if HeyGen still rejects upload, grab any
+    // existing photo from the account and cache it. Better than failing
+    // the entire Live Sweep over an account-tier quirk.
+    console.warn(`[heygen-bootstrap] still 401028 after retry — falling back to reuse-any`);
+    try {
+      const remaining = await listCustomPhotos();
+      const reusable = remaining.find((x) => !x.isPreset) ?? remaining[0];
+      if (reusable?.id) {
+        await persistId(admin, reusable.id);
+        console.log(`[heygen-bootstrap] reusing existing id=${reusable.id} as last resort`);
+        return {
+          ok: true,
+          talking_photo_id: reusable.id,
+          reused: true,
+          pruned: prunedFirst + prunedSecond,
+        };
+      }
+    } catch (e) {
+      console.warn(`[heygen-bootstrap] reuse-any fallback failed`, e);
     }
   }
 
