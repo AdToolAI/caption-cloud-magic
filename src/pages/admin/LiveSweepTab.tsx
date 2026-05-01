@@ -142,7 +142,7 @@ export function LiveSweepTab() {
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1">
             <div className="text-sm text-[#F5C76A] font-medium uppercase tracking-wider">
-              Live Sweep — Hard Cap
+              Live Sweep — Hard Cap (per Run)
             </div>
             <div className="mt-1 text-3xl font-bold text-white">
               {spent.toFixed(2)} <span className="text-base text-slate-400">/ {cap.toFixed(2)} €</span>
@@ -150,7 +150,7 @@ export function LiveSweepTab() {
             <Progress value={pct} className="mt-3 h-2" />
             <div className="mt-2 text-xs text-slate-400">
               {budget?.last_run_at
-                ? `Zuletzt: ${new Date(budget.last_run_at).toLocaleString()}`
+                ? `Letzter Run: ${new Date(budget.last_run_at).toLocaleString()} · Cap wird beim nächsten Sweep auf 0 € zurückgesetzt`
                 : "Noch nie ausgeführt."}
             </div>
           </div>

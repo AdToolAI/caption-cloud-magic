@@ -446,8 +446,17 @@ Deno.serve(async (req) => {
   const sweepId = crypto.randomUUID();
   const assets = await getTestAssets(adminClient);
   const results: any[] = [];
-  let totalSpent = Number(budget.spent_eur);
   const cap = Number(budget.cap_eur);
+
+  // Reset spent_eur to 0 at the start of each sweep — the cap is per-run,
+  // not lifetime. This protects against runaway spend within a single run
+  // (e.g. infinite retry loop) without permanently exhausting the budget
+  // after a few normal runs.
+  await adminClient
+    .from("qa_live_budget")
+    .update({ spent_eur: 0, last_run_at: new Date().toISOString() })
+    .eq("id", budget.id);
+  let totalSpent = 0;
 
   // Run providers sequentially
   const tests = onlyProvider
@@ -499,18 +508,57 @@ Deno.serve(async (req) => {
     const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
     totalSpent += charged;
 
+    // Sanitize raw_response: clip to ~4KB and ensure JSON-serializable
+    // to avoid silent Postgres failures on jsonb constraint or huge payloads.
+    let safeRaw: unknown = null;
+    try {
+      const serialized = JSON.stringify(result.raw ?? null);
+      safeRaw = serialized && serialized.length > 4096
+        ? { _truncated: true, preview: serialized.slice(0, 4000) }
+        : (result.raw ?? null);
+    } catch {
+      safeRaw = { _unserializable: true };
+    }
+
     const finalRow = {
       status: result.status,
       cost_eur: charged,
       duration_ms: result.durationMs,
       asset_url: result.assetUrl ?? null,
       error_message: result.error ?? null,
-      raw_response: result.raw ?? null,
+      raw_response: safeRaw,
       completed_at: new Date().toISOString(),
     };
 
+    // Robust update: prefer pending.id, fall back to composite key.
+    // Log any update error so silent failures (like Pika's previous "stuck running")
+    // become immediately visible in edge function logs.
+    let updateErr: any = null;
     if (pending?.id) {
-      await adminClient.from("qa_live_runs").update(finalRow).eq("id", pending.id);
+      const { error } = await adminClient
+        .from("qa_live_runs")
+        .update(finalRow)
+        .eq("id", pending.id);
+      updateErr = error;
+    }
+    if (!pending?.id || updateErr) {
+      console.error(
+        `[qa-live-sweep] Update via id failed for ${test.provider}, falling back to composite key. Error:`,
+        updateErr?.message,
+      );
+      const { error: fallbackErr } = await adminClient
+        .from("qa_live_runs")
+        .update(finalRow)
+        .eq("sweep_id", sweepId)
+        .eq("provider", test.provider)
+        .eq("mode", test.mode)
+        .eq("status", "running");
+      if (fallbackErr) {
+        console.error(
+          `[qa-live-sweep] Composite-key fallback ALSO failed for ${test.provider}:`,
+          fallbackErr.message,
+        );
+      }
     }
     results.push({ ...test, ...finalRow });
 
