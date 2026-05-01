@@ -246,24 +246,51 @@ async function getTestAssets(supabase: any) {
       return fallback;
     }
   };
+
   // Read cached HeyGen talking_photo_id (set by qa-live-sweep-bootstrap).
-  let talkingPhotoId: string | undefined;
-  try {
-    const { data: cfg } = await supabase
-      .from("system_config")
-      .select("value")
-      .eq("key", "qa.heygen_talking_photo_id")
-      .maybeSingle();
-    if (cfg?.value) {
-      talkingPhotoId = typeof cfg.value === "string"
-        ? cfg.value
-        : (typeof cfg.value === "object" && "id" in cfg.value
-            ? String((cfg.value as any).id)
-            : undefined);
+  const readCachedTalkingPhoto = async (): Promise<string | undefined> => {
+    try {
+      const { data: cfg } = await supabase
+        .from("system_config")
+        .select("value")
+        .eq("key", "qa.heygen_talking_photo_id")
+        .maybeSingle();
+      if (!cfg?.value) return undefined;
+      if (typeof cfg.value === "string") return cfg.value;
+      if (typeof cfg.value === "object" && cfg.value && "id" in cfg.value) {
+        return String((cfg.value as any).id);
+      }
+    } catch (e) {
+      console.warn("[live-sweep] read cached talking_photo_id failed:", e);
     }
-  } catch (e) {
-    console.warn("[live-sweep] read cached talking_photo_id failed:", e);
+    return undefined;
+  };
+
+  let talkingPhotoId = await readCachedTalkingPhoto();
+
+  // Self-heal: if the cache is empty (or cleared), provision the photo
+  // on-the-fly so users no longer need to manually click "Bootstrap Assets"
+  // before every sweep. Best-effort — if HeyGen is hard-blocked, we still
+  // continue and let the Talking Head test report the real error.
+  if (!talkingPhotoId) {
+    console.log("[live-sweep] no cached HeyGen photo id — running on-demand bootstrap");
+    try {
+      const result = await ensureHeyGenTalkingPhoto(supabase);
+      if (result.ok && result.talking_photo_id) {
+        talkingPhotoId = result.talking_photo_id;
+        console.log(
+          `[live-sweep] on-demand bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+        );
+      } else {
+        console.warn(
+          `[live-sweep] on-demand bootstrap failed: ${result.error ?? "unknown"}`,
+        );
+      }
+    } catch (e) {
+      console.warn("[live-sweep] on-demand bootstrap threw:", e);
+    }
   }
+
   return {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
