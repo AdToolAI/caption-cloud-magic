@@ -202,6 +202,7 @@ function AppLayout() {
                     <Route path="/imprint" element={<Legal />} />
                     <Route path="/delete-data" element={<DeleteData />} />
                     <Route path="/coming-soon" element={<ComingSoon />} />
+                    <Route path="/status" element={<Status />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
