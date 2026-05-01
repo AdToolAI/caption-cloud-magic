@@ -146,9 +146,17 @@ export function useReportCharacter() {
       if (error) throw error;
       return data as { ok: boolean; reportId?: string; quarantined?: boolean; error?: string };
     },
-    onSuccess: (res) => {
-      if (res.ok) toast({ title: 'Report submitted', description: res.quarantined ? 'Character quarantined pending review.' : 'Thank you — our team will investigate.' });
-      else toast({ title: 'Report failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
+    onSuccess: (res, input) => {
+      if (res.ok) {
+        toast({ title: 'Report submitted', description: res.quarantined ? 'Character quarantined pending review.' : 'Thank you — our team will investigate.' });
+        trackEvent(ANALYTICS_EVENTS.CHARACTER_REPORTED, {
+          character_id: input.characterId,
+          reason: input.reason,
+          quarantined: !!res.quarantined,
+        });
+      } else {
+        toast({ title: 'Report failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
+      }
     },
   });
 }
