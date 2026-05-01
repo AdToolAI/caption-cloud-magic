@@ -237,10 +237,24 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
 
     // Required schema fields with safe defaults
     logLevel: (partial.logLevel as string) || 'warn',
-    frameRange: (partial.frameRange as [number, number] | null) ?? 
-      (typeof partial.durationInFrames === 'number' && partial.durationInFrames > 0 
-        ? [0, (partial.durationInFrames as number) - 1] as [number, number]
-        : null),
+    frameRange: (() => {
+      // Always derive frameRange from durationInFrames if available, to prevent
+      // "frame range 0-N is not inbetween 0-M" Lambda crashes when callers pass
+      // an inconsistent pre-computed range.
+      const dif = typeof partial.durationInFrames === 'number' && partial.durationInFrames > 0
+        ? partial.durationInFrames as number
+        : null;
+      const incoming = partial.frameRange as [number, number] | null | undefined;
+      if (dif != null) {
+        if (Array.isArray(incoming) && incoming.length === 2) {
+          const lo = Math.max(0, Math.min(dif - 1, Number(incoming[0]) || 0));
+          const hi = Math.max(lo, Math.min(dif - 1, Number(incoming[1]) || (dif - 1)));
+          return [lo, hi] as [number, number];
+        }
+        return [0, dif - 1] as [number, number];
+      }
+      return (incoming ?? null) as [number, number] | null;
+    })(),
     timeoutInMilliseconds: (partial.timeoutInMilliseconds as number) || 300000,
     chromiumOptions: (partial.chromiumOptions as Record<string, unknown>) || {},
     scale: (partial.scale as number) || 1,
