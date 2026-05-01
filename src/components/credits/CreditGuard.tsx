@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Coins } from 'lucide-react';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface CreditGuardProps {
   children: (checkAndExecute: (feature_code: string, action: () => Promise<void>) => Promise<void>) => ReactNode;
