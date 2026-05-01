@@ -436,18 +436,13 @@ async function runSweep(
         continue;
       }
 
-      // Mark as running BEFORE any slow bootstrap so the UI immediately
-      // shows the spinner instead of a stale "pending" badge.
+      // Mark as running immediately before the provider call so the UI shows
+      // active progress. Slow HeyGen bootstrap already happened above in the
+      // background worker, never in the HTTP request handler.
       await adminClient.from("qa_live_runs").update({
         status: "running",
         started_at: new Date().toISOString(),
       }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-
-      // HeyGen bootstrap is performed in the request handler BEFORE the
-      // background worker starts, so the cached talking_photo_id is already
-      // present in `sweepAssets`. We never call `ensureHeyGenTalkingPhoto`
-      // from inside the worker — its 30–90s prune+upload would risk the
-      // worker being killed before the row is updated to `async_started`.
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
