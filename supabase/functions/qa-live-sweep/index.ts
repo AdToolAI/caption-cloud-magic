@@ -259,7 +259,7 @@ async function getTestAssets(supabase: any) {
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string; portrait: string },
+  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {
@@ -427,9 +427,10 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    // 90s per-provider timeout (most providers respond < 60s)
+    // Per-provider timeout. Default 90s; providers can opt into longer
+    // windows via test.timeoutMs (e.g. Stable Audio cold-start needs 180s).
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90_000);
+    const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
 
     const result = await callProvider(test, assets, authHeader, ctrl.signal);
     clearTimeout(timer);
