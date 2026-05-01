@@ -45,6 +45,9 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-red-500/15 text-red-300 border-red-500/30",
   timeout: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   running: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  // Intentional non-2xx response (e.g. Pika 410 during provider migration).
+  // Documented in code, not a real bug — render in neutral grey.
+  expected: "bg-slate-600/20 text-slate-300 border-slate-500/40",
   skipped_budget: "bg-slate-500/15 text-slate-300 border-slate-500/30",
   pending: "bg-slate-500/15 text-slate-300 border-slate-500/30",
 };
