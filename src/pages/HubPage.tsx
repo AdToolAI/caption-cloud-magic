@@ -7,6 +7,7 @@ import { hubDefinitions, type HubSubItem } from "@/config/hubConfig";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 /* ── Floating particle positions ── */
 const particles = [
