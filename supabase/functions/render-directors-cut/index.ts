@@ -307,7 +307,7 @@ serve(async (req) => {
     }
     console.log(`[RenderDirectorsCut] Text overlays:`, JSON.stringify(text_overlays));
 
-    const duration = duration_seconds || 30;
+    const duration = Math.max(safeNum(duration_seconds, 30), 0.1);
     const quality = export_settings?.quality || 'hd';
     const format = export_settings?.format || 'mp4';
 
