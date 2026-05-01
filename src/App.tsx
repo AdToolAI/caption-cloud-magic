@@ -8,6 +8,7 @@ import { TranslationContext, useTranslationState } from "@/hooks/useTranslation"
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAnalyticsSync } from "@/hooks/useAnalyticsSync";
 import { useSessionTracking } from "@/hooks/useSessionTracking";
+import { useConsoleErrorBuffer } from "@/hooks/useConsoleErrorBuffer";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 
