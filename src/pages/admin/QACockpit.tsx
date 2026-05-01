@@ -16,6 +16,8 @@ import { E2EResultsTab } from "@/components/admin/qa-cockpit/E2EResultsTab";
 import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 import { WatchdogTab } from "@/pages/admin/WatchdogTab";
+import { ProbesTab } from "@/pages/admin/ProbesTab";
+
 
 const TIER_COLORS: Record<string, string> = {
   smoke: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
@@ -329,6 +331,10 @@ export default function QACockpit() {
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Watchdog
             </TabsTrigger>
+            <TabsTrigger value="probes" className="text-[#F5C76A]">
+              <Activity className="h-3.5 w-3.5 mr-1.5" />
+              Probes
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -353,6 +359,11 @@ export default function QACockpit() {
           {/* WATCHDOG */}
           <TabsContent value="watchdog">
             <WatchdogTab />
+          </TabsContent>
+
+          {/* SYNTHETIC PROBES (Layer 3) */}
+          <TabsContent value="probes">
+            <ProbesTab />
           </TabsContent>
 
           {/* LIVE RUNS */}

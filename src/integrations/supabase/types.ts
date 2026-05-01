@@ -12414,6 +12414,39 @@ export type Database = {
           },
         ]
       }
+      synthetic_probe_runs: {
+        Row: {
+          error_message: string | null
+          id: string
+          latency_ms: number
+          metadata: Json | null
+          probe_name: string
+          run_at: string
+          status: string
+          threshold_ms: number | null
+        }
+        Insert: {
+          error_message?: string | null
+          id?: string
+          latency_ms?: number
+          metadata?: Json | null
+          probe_name: string
+          run_at?: string
+          status: string
+          threshold_ms?: number | null
+        }
+        Update: {
+          error_message?: string | null
+          id?: string
+          latency_ms?: number
+          metadata?: Json | null
+          probe_name?: string
+          run_at?: string
+          status?: string
+          threshold_ms?: number | null
+        }
+        Relationships: []
+      }
       system_config: {
         Row: {
           description: string | null
@@ -15407,6 +15440,7 @@ export type Database = {
         Args: { keep_per_scenario?: number }
         Returns: number
       }
+      cleanup_synthetic_probe_runs: { Args: never; Returns: undefined }
       compute_content_hash: {
         Args: {
           p_caption: string
