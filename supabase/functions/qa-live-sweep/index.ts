@@ -3,6 +3,7 @@
 // Stops the moment cap_eur is reached. Records every run for auditing.
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
+import { ensureHeyGenTalkingPhoto } from "../_shared/heygen-bootstrap.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -31,6 +32,12 @@ interface ProviderTest {
   edge_function: string;
   /** Optional per-provider timeout override (ms). Defaults to 90_000. */
   timeoutMs?: number;
+  /**
+   * Optional: a known/intentional non-2xx response that should NOT be
+   * treated as a real failure. Used e.g. for Pika 2.2 which intentionally
+   * returns HTTP 410 while the provider migration is in progress.
+   */
+  expectedFailure?: { status: number; reasonContains?: string; note: string };
   buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
