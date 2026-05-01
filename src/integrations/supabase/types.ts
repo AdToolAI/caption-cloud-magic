@@ -10047,6 +10047,7 @@ export type Database = {
           provider: string
           raw_response: Json | null
           refund_verified: boolean | null
+          started_at: string
           status: string
           sweep_id: string
         }
@@ -10064,6 +10065,7 @@ export type Database = {
           provider: string
           raw_response?: Json | null
           refund_verified?: boolean | null
+          started_at?: string
           status: string
           sweep_id: string
         }
@@ -10081,6 +10083,7 @@ export type Database = {
           provider?: string
           raw_response?: Json | null
           refund_verified?: boolean | null
+          started_at?: string
           status?: string
           sweep_id?: string
         }

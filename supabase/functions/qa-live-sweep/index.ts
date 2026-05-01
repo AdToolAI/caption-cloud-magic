@@ -380,6 +380,115 @@ async function callProvider(
   }
 }
 
+// ----------------------------------------------------------------------------
+// Background worker: runs all selected providers sequentially and updates
+// the pre-inserted qa_live_runs rows in place. Triggered via
+// EdgeRuntime.waitUntil so that the HTTP request can return immediately
+// (avoiding the 150s edge idle timeout for long sweeps).
+// ----------------------------------------------------------------------------
+async function runSweep(
+  adminClient: ReturnType<typeof createClient>,
+  sweepId: string,
+  budget: any,
+  authHeader: string,
+  tests: ProviderTest[],
+  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
+) {
+  console.log(`[sweep ${sweepId}] start — ${tests.length} providers`);
+  const cap = Number(budget.cap_eur);
+  let totalSpent = 0;
+  const completed: any[] = [];
+
+  try {
+    for (const test of tests) {
+      const remaining = cap - totalSpent;
+      if (remaining < test.estimated_cost_eur) {
+        await adminClient.from("qa_live_runs").update({
+          status: "skipped_budget",
+          cost_eur: 0,
+          error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
+          completed_at: new Date().toISOString(),
+        }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+        completed.push({ provider: test.provider, status: "skipped_budget" });
+        continue;
+      }
+
+      // Mark as running
+      await adminClient.from("qa_live_runs").update({
+        status: "running",
+        started_at: new Date().toISOString(),
+      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
+      const result = await callProvider(test, assets, authHeader, ctrl.signal);
+      clearTimeout(timer);
+
+      const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
+      totalSpent += charged;
+
+      let safeRaw: unknown = null;
+      try {
+        const serialized = JSON.stringify(result.raw ?? null);
+        safeRaw = serialized && serialized.length > 4096
+          ? { _truncated: true, preview: serialized.slice(0, 4000) }
+          : (result.raw ?? null);
+      } catch {
+        safeRaw = { _unserializable: true };
+      }
+
+      const { error: updErr } = await adminClient.from("qa_live_runs").update({
+        status: result.status,
+        cost_eur: charged,
+        duration_ms: result.durationMs,
+        asset_url: result.assetUrl ?? null,
+        error_message: result.error ?? null,
+        raw_response: safeRaw,
+        completed_at: new Date().toISOString(),
+      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+
+      if (updErr) {
+        console.error(`[sweep ${sweepId}] update failed for ${test.provider}:`, updErr.message);
+      }
+      completed.push({ provider: test.provider, status: result.status });
+      console.log(`[sweep ${sweepId}] provider:${test.provider} → ${result.status} (${result.durationMs}ms)`);
+
+      await adminClient.from("qa_live_budget").update({
+        spent_eur: totalSpent,
+        last_run_at: new Date().toISOString(),
+      }).eq("id", budget.id);
+
+      if (result.status === "failed" || result.status === "timeout") {
+        await adminClient.from("qa_bug_reports").insert({
+          mission_name: "live-sweep",
+          bug_type: "provider_failure",
+          severity: "medium",
+          title: `Live Sweep: ${test.provider} (${test.mode}) failed`,
+          description: `Provider ${test.provider} via ${test.edge_function} returned: ${result.error || "unknown error"}`,
+          metadata: {
+            sweep_id: sweepId,
+            provider: test.provider,
+            model: test.model,
+            mode: test.mode,
+            duration_ms: result.durationMs,
+            raw: result.raw,
+          },
+        }).then(() => {}, () => {});
+      }
+    }
+
+    console.log(`[sweep ${sweepId}] end — completed=${completed.length}, spent=${totalSpent.toFixed(2)}€`);
+  } catch (e: any) {
+    console.error(`[sweep ${sweepId}] worker crash:`, e?.message || e);
+    // Mark any remaining pending/running rows as failed so the UI is unblocked
+    await adminClient.from("qa_live_runs").update({
+      status: "failed",
+      error_message: `Worker crashed: ${e?.message || String(e)}`,
+      completed_at: new Date().toISOString(),
+    }).eq("sweep_id", sweepId).in("status", ["pending", "running"]);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -428,6 +537,26 @@ Deno.serve(async (req) => {
     /* no body */
   }
 
+  // Idempotency: if a sweep is already running (any pending/running rows in
+  // the last 10 min), refuse to start a new one and return the active sweep_id.
+  const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+  const { data: activeRows } = await adminClient
+    .from("qa_live_runs")
+    .select("sweep_id, status, started_at")
+    .in("status", ["pending", "running"])
+    .gte("started_at", tenMinAgo)
+    .limit(1);
+  if (activeRows && activeRows.length > 0) {
+    return new Response(
+      JSON.stringify({
+        error: "sweep_already_running",
+        sweep_id: activeRows[0].sweep_id,
+        message: "A sweep is already in progress. Wait for it to finish.",
+      }),
+      { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
   // Load budget
   const { data: budget, error: budgetErr } = await adminClient
     .from("qa_live_budget")
@@ -445,165 +574,51 @@ Deno.serve(async (req) => {
 
   const sweepId = crypto.randomUUID();
   const assets = await getTestAssets(adminClient);
-  const results: any[] = [];
   const cap = Number(budget.cap_eur);
 
-  // Reset spent_eur to 0 at the start of each sweep — the cap is per-run,
-  // not lifetime. This protects against runaway spend within a single run
-  // (e.g. infinite retry loop) without permanently exhausting the budget
-  // after a few normal runs.
+  // Reset spent_eur to 0 at the start of each sweep — cap is per-run, not lifetime.
   await adminClient
     .from("qa_live_budget")
     .update({ spent_eur: 0, last_run_at: new Date().toISOString() })
     .eq("id", budget.id);
-  let totalSpent = 0;
 
-  // Run providers sequentially
   const tests = onlyProvider
     ? PROVIDER_MATRIX.filter((t) => t.provider === onlyProvider)
     : PROVIDER_MATRIX;
 
-  for (const test of tests) {
-    const remaining = cap - totalSpent;
-    if (remaining < test.estimated_cost_eur) {
-      // Skip — would exceed cap
-      const skipRow = {
-        sweep_id: sweepId,
-        provider: test.provider,
-        model: test.model,
-        mode: test.mode,
-        status: "skipped_budget",
-        cost_eur: 0,
-        estimated_cost_eur: test.estimated_cost_eur,
-        error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
-      };
-      await adminClient.from("qa_live_runs").insert(skipRow);
-      results.push(skipRow);
-      continue;
-    }
-
-    // Insert pending row
-    const { data: pending } = await adminClient
-      .from("qa_live_runs")
-      .insert({
-        sweep_id: sweepId,
-        provider: test.provider,
-        model: test.model,
-        mode: test.mode,
-        status: "running",
-        estimated_cost_eur: test.estimated_cost_eur,
-      })
-      .select()
-      .single();
-
-    // Per-provider timeout. Default 90s; providers can opt into longer
-    // windows via test.timeoutMs (e.g. Stable Audio cold-start needs 180s).
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
-
-    const result = await callProvider(test, assets, authHeader, ctrl.signal);
-    clearTimeout(timer);
-
-    // Charge estimated cost only on success (failed providers usually refund)
-    const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
-    totalSpent += charged;
-
-    // Sanitize raw_response: clip to ~4KB and ensure JSON-serializable
-    // to avoid silent Postgres failures on jsonb constraint or huge payloads.
-    let safeRaw: unknown = null;
-    try {
-      const serialized = JSON.stringify(result.raw ?? null);
-      safeRaw = serialized && serialized.length > 4096
-        ? { _truncated: true, preview: serialized.slice(0, 4000) }
-        : (result.raw ?? null);
-    } catch {
-      safeRaw = { _unserializable: true };
-    }
-
-    const finalRow = {
-      status: result.status,
-      cost_eur: charged,
-      duration_ms: result.durationMs,
-      asset_url: result.assetUrl ?? null,
-      error_message: result.error ?? null,
-      raw_response: safeRaw,
-      completed_at: new Date().toISOString(),
-    };
-
-    // Robust update: prefer pending.id, fall back to composite key.
-    // Log any update error so silent failures (like Pika's previous "stuck running")
-    // become immediately visible in edge function logs.
-    let updateErr: any = null;
-    if (pending?.id) {
-      const { error } = await adminClient
-        .from("qa_live_runs")
-        .update(finalRow)
-        .eq("id", pending.id);
-      updateErr = error;
-    }
-    if (!pending?.id || updateErr) {
-      console.error(
-        `[qa-live-sweep] Update via id failed for ${test.provider}, falling back to composite key. Error:`,
-        updateErr?.message,
-      );
-      const { error: fallbackErr } = await adminClient
-        .from("qa_live_runs")
-        .update(finalRow)
-        .eq("sweep_id", sweepId)
-        .eq("provider", test.provider)
-        .eq("mode", test.mode)
-        .eq("status", "running");
-      if (fallbackErr) {
-        console.error(
-          `[qa-live-sweep] Composite-key fallback ALSO failed for ${test.provider}:`,
-          fallbackErr.message,
-        );
-      }
-    }
-    results.push({ ...test, ...finalRow });
-
-    // Update budget spent
-    await adminClient
-      .from("qa_live_budget")
-      .update({ spent_eur: totalSpent, last_run_at: new Date().toISOString() })
-      .eq("id", budget.id);
-
-    // Auto-bug-report on failure
-    if (result.status === "failed" || result.status === "timeout") {
-      await adminClient.from("qa_bug_reports").insert({
-        mission_name: "live-sweep",
-        bug_type: "provider_failure",
-        severity: "medium",
-        title: `Live Sweep: ${test.provider} (${test.mode}) failed`,
-        description: `Provider ${test.provider} via ${test.edge_function} returned: ${
-          result.error || "unknown error"
-        }`,
-        metadata: {
-          sweep_id: sweepId,
-          provider: test.provider,
-          model: test.model,
-          mode: test.mode,
-          duration_ms: result.durationMs,
-          raw: result.raw,
-        },
-      }).then(() => {}, () => {/* table may not exist or different schema; ignore */});
-    }
+  // Pre-insert all rows as 'pending' so the UI can render the full grid
+  // immediately and poll for status changes.
+  const pendingRows = tests.map((t) => ({
+    sweep_id: sweepId,
+    provider: t.provider,
+    model: t.model,
+    mode: t.mode,
+    status: "pending",
+    estimated_cost_eur: t.estimated_cost_eur,
+  }));
+  const { error: insertErr } = await adminClient.from("qa_live_runs").insert(pendingRows);
+  if (insertErr) {
+    return new Response(
+      JSON.stringify({ error: "Failed to enqueue sweep", details: insertErr.message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   }
 
-  const summary = {
-    sweep_id: sweepId,
-    total_tested: results.length,
-    succeeded: results.filter((r) => r.status === "succeeded").length,
-    failed: results.filter((r) => r.status === "failed").length,
-    timeout: results.filter((r) => r.status === "timeout").length,
-    expected: results.filter((r) => r.status === "expected").length,
-    skipped_budget: results.filter((r) => r.status === "skipped_budget").length,
-    total_spent_eur: Number(totalSpent.toFixed(4)),
-    cap_eur: cap,
-    results,
-  };
+  // Fire-and-forget background worker. The HTTP response returns immediately.
+  // @ts-ignore — EdgeRuntime is provided by Deno Deploy / Supabase Edge runtime
+  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, assets));
 
-  return new Response(JSON.stringify(summary), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  return new Response(
+    JSON.stringify({
+      sweep_id: sweepId,
+      status: "running",
+      total: tests.length,
+      cap_eur: cap,
+      message: "Sweep enqueued. Poll qa_live_runs for status.",
+    }),
+    {
+      status: 202,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
 });
