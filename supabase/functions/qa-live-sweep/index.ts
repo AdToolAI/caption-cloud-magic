@@ -46,6 +46,8 @@ interface ProviderTest {
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string; asyncStarted?: boolean; predictionId?: string };
 }
 
+type SweepAssets = { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string };
+
 const PROVIDER_MATRIX: ProviderTest[] = [
   {
     // NOTE: Hedra is intentionally first because it's the most expensive in
@@ -292,7 +294,7 @@ async function getTestAssets(supabase: any) {
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
+  assets: SweepAssets,
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any; predictionId?: string }> {
@@ -391,7 +393,7 @@ async function runSweep(
   budget: any,
   authHeader: string,
   tests: ProviderTest[],
-  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
+  assets: SweepAssets,
 ) {
   console.log(`[sweep ${sweepId}] start — ${tests.length} providers`);
   const cap = Number(budget.cap_eur);
@@ -400,6 +402,27 @@ async function runSweep(
   let sweepAssets = assets;
 
   try {
+    // Important: this can take 30–150s on a cold HeyGen account. It MUST stay
+    // inside waitUntil/background work; doing it in the request handler causes
+    // HTTP 504 IDLE_TIMEOUT before the 202 enqueue response can be sent.
+    const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
+    if (needsHedraBootstrap && !sweepAssets.talkingPhotoId) {
+      console.log(`[sweep ${sweepId}] HeyGen bootstrap queued in background…`);
+      try {
+        const result = await ensureHeyGenTalkingPhoto(adminClient);
+        if (result.ok && result.talking_photo_id) {
+          sweepAssets = { ...sweepAssets, talkingPhotoId: result.talking_photo_id };
+          console.log(
+            `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+          );
+        } else {
+          console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
+        }
+      } catch (e) {
+        console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
+      }
+    }
+
     for (const test of tests) {
       const remaining = cap - totalSpent;
       if (remaining < test.estimated_cost_eur) {
