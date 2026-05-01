@@ -230,6 +230,8 @@ export function LiveSweepTab() {
         const ts = sweepRuns[0]?.created_at;
         const sweepSpent = sweepRuns.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         const ok = sweepRuns.filter((r) => r.status === "succeeded").length;
+        const expectedCount = sweepRuns.filter((r) => r.status === "expected").length;
+        const effectiveOk = ok + expectedCount;
         return (
           <Card
             key={sweepId}
@@ -241,7 +243,8 @@ export function LiveSweepTab() {
                   {sweepId.slice(0, 8)} · {ts && new Date(ts).toLocaleString()}
                 </div>
                 <div className="text-sm text-white font-medium">
-                  {ok}/{sweepRuns.length} grün · {sweepSpent.toFixed(2)} € ausgegeben
+                  {effectiveOk}/{sweepRuns.length} grün
+                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
                 </div>
               </div>
             </div>
