@@ -591,7 +591,8 @@ Deno.serve(async (req) => {
     status: "failed",
     error_message: "Stale: previous worker exited without committing status (auto-recovered)",
     completed_at: new Date().toISOString(),
-  }).in("status", ["pending", "running"]).lt("started_at", tenMinAgo);
+  }).in("status", ["pending", "running"])
+    .or(`started_at.lt.${tenMinAgo},started_at.is.null`);
 
   // Idempotency: if a sweep is genuinely in flight (rows updated within the
   // last 10 min), refuse to start a new one and return the active sweep_id.
@@ -650,6 +651,7 @@ Deno.serve(async (req) => {
     mode: t.mode,
     status: "pending",
     estimated_cost_eur: t.estimated_cost_eur,
+    started_at: new Date().toISOString(),
   }));
   const { error: insertErr } = await adminClient.from("qa_live_runs").insert(pendingRows);
   if (insertErr) {
