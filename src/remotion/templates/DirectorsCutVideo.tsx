@@ -560,7 +560,7 @@ const SceneVideo: React.FC<{
             ...chromaKeyStyle,
           }}
         />
-      ) : (
+      ) : isValidRemoteMediaUrl(mediaUrl) ? (
         // Render video (original source or additionalMedia video)
         <Video
           src={mediaUrl}
@@ -580,6 +580,10 @@ const SceneVideo: React.FC<{
           }}
           volume={0}
         />
+      ) : (
+        // Bug 3 fallback: invalid/missing video URL → render black frame
+        // instead of crashing Chromium with MEDIA_ERR Code 4.
+        <AbsoluteFill style={{ backgroundColor: '#000' }} />
       )}
       {/* VHS Scanlines Overlay for retro_vhs filter */}
       {needsVHSScanlines && <VHSScanlines intensity={0.25} />}
