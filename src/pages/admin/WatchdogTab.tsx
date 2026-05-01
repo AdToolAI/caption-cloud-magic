@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
-import { Activity, Loader2, Play, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Activity, Loader2, Play, AlertTriangle, CheckCircle2, ShieldCheck, ExternalLink, Bell } from "lucide-react";
 
 function ageSec(iso: string | null | undefined): number {
   if (!iso) return Number.POSITIVE_INFINITY;
@@ -51,6 +51,16 @@ export function WatchdogTab() {
       return data ?? [];
     },
     refetchInterval: 10_000,
+  });
+
+  const sentry = useQuery({
+    queryKey: ["sentry-cron-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("sentry-cron-status", { body: {} });
+      if (error) throw error;
+      return data as { enabled: boolean; org?: string; monitors: Array<{ slug: string; exists: boolean; status?: string; last_check_in?: string | null; link?: string }> };
+    },
+    refetchInterval: 30_000,
   });
 
   const trigger = useMutation({
@@ -104,6 +114,62 @@ export function WatchdogTab() {
               <span>Dauer: {lastRun.duration_ms ?? "?"}ms</span>
               <span>50-Run-Summe: {totalAnomalies} Anomalien</span>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Sentry Cron Monitors (Layer 2) */}
+      <Card className="bg-[#0A0F1F]/80 border-[#F5C76A]/10">
+        <CardHeader>
+          <CardTitle className="text-[#F5C76A] text-base flex items-center gap-2">
+            <Bell className="h-4 w-4" />
+            Sentry Cron Monitors · Layer 2
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {!sentry.data ? (
+            <p className="text-sm text-muted-foreground">Lade Sentry-Status…</p>
+          ) : !sentry.data.enabled ? (
+            <p className="text-sm text-amber-400/80">⚠ Sentry nicht konfiguriert (SENTRY_AUTH_TOKEN/ORG/PROJECT fehlen).</p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Externe Beobachtungsebene: Sentry alarmiert via Email/Slack, wenn ein Cron-Job stirbt, ohne dass unser Watchdog es merkt.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 pt-2">
+                {sentry.data.monitors.map((m) => {
+                  const ok = m.exists && (m.status === "active" || m.status === "ok");
+                  const stale = m.exists && m.status === "missed_checkin";
+                  const lastSub = m.last_check_in
+                    ? `zuletzt vor ${formatDistanceToNow(new Date(m.last_check_in))}`
+                    : m.exists ? "noch kein Check-in" : "Monitor noch nicht angelegt";
+                  return (
+                    <a
+                      key={m.slug}
+                      href={m.link ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block group"
+                    >
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-[#0A0F1F]/60 border border-[#F5C76A]/10 hover:border-[#F5C76A]/40 transition">
+                        <span className={`h-3 w-3 rounded-full ${
+                          !m.exists ? "bg-muted" : stale ? "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.8)]" : ok ? "bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.6)]" : "bg-amber-400"
+                        }`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-mono text-[#F5C76A] truncate flex items-center gap-1">
+                            {m.slug}
+                            {m.link && <ExternalLink className="h-3 w-3 opacity-50 group-hover:opacity-100" />}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {m.exists ? `${m.status} · ${lastSub}` : lastSub}
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

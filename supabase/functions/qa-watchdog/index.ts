@@ -13,6 +13,7 @@
  */
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
+import { withSentryCron } from "../_shared/sentryCron.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -58,7 +59,7 @@ async function fileBug(sb: any, a: Anomaly): Promise<boolean> {
   return true;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const start = Date.now();
@@ -257,4 +258,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));

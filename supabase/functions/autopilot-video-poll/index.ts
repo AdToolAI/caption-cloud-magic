@@ -4,6 +4,7 @@
 // On failure → refunds credits, marks slot failed, notifies user.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
+import { withSentryCron } from "../_shared/sentryCron.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +14,7 @@ const corsHeaders = {
 // Hard timeout: predictions older than 15min are considered failed
 const TIMEOUT_MIN = 15;
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const hbStart = Date.now();
@@ -164,7 +165,7 @@ Deno.serve(async (req) => {
     expectedIntervalSeconds: 60,
   });
   return json({ ok: true, polled: list.length, completed, failed, still_processing: stillProcessing });
-});
+}));
 
 async function markFailed(
   admin: ReturnType<typeof createClient>,
