@@ -29,7 +29,7 @@ interface ProviderTest {
   mode: string;
   estimated_cost_eur: number;
   edge_function: string;
-  buildPayload: (assets: { image: string; video: string; audio: string }) => Record<string, unknown>;
+  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
 }
