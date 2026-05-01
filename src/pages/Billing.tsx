@@ -37,8 +37,21 @@ const Billing = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const planInfo = getProductInfo(productId);
+
+  // Detect successful checkout return
+  useEffect(() => {
+    if (searchParams.get("success") === "true") {
+      trackEvent(ANALYTICS_EVENTS.CHECKOUT_COMPLETED, {
+        plan: productId || "unknown",
+        source: "billing_redirect",
+      });
+      searchParams.delete("success");
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, productId]);
 
   useEffect(() => {
     if (user && subscribed) {
@@ -65,6 +78,7 @@ const Billing = () => {
 
   const handleOpenPortal = async () => {
     setLoading(true);
+    trackEvent(ANALYTICS_EVENTS.CUSTOMER_PORTAL_OPENED, { plan: productId || "unknown" });
     try {
       const { data, error } = await supabase.functions.invoke("customer-portal", {
         headers: {
