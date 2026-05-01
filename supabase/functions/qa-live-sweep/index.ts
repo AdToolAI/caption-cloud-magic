@@ -46,6 +46,8 @@ interface ProviderTest {
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string; asyncStarted?: boolean; predictionId?: string };
 }
 
+type SweepAssets = { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string };
+
 const PROVIDER_MATRIX: ProviderTest[] = [
   {
     // NOTE: Hedra is intentionally first because it's the most expensive in
@@ -292,7 +294,7 @@ async function getTestAssets(supabase: any) {
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
+  assets: SweepAssets,
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any; predictionId?: string }> {
@@ -391,7 +393,7 @@ async function runSweep(
   budget: any,
   authHeader: string,
   tests: ProviderTest[],
-  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
+  assets: SweepAssets,
 ) {
   console.log(`[sweep ${sweepId}] start — ${tests.length} providers`);
   const cap = Number(budget.cap_eur);
@@ -400,6 +402,27 @@ async function runSweep(
   let sweepAssets = assets;
 
   try {
+    // Important: this can take 30–150s on a cold HeyGen account. It MUST stay
+    // inside waitUntil/background work; doing it in the request handler causes
+    // HTTP 504 IDLE_TIMEOUT before the 202 enqueue response can be sent.
+    const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
+    if (needsHedraBootstrap && !sweepAssets.talkingPhotoId) {
+      console.log(`[sweep ${sweepId}] HeyGen bootstrap queued in background…`);
+      try {
+        const result = await ensureHeyGenTalkingPhoto(adminClient);
+        if (result.ok && result.talking_photo_id) {
+          sweepAssets = { ...sweepAssets, talkingPhotoId: result.talking_photo_id };
+          console.log(
+            `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+          );
+        } else {
+          console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
+        }
+      } catch (e) {
+        console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
+      }
+    }
+
     for (const test of tests) {
       const remaining = cap - totalSpent;
       if (remaining < test.estimated_cost_eur) {
@@ -413,18 +436,13 @@ async function runSweep(
         continue;
       }
 
-      // Mark as running BEFORE any slow bootstrap so the UI immediately
-      // shows the spinner instead of a stale "pending" badge.
+      // Mark as running immediately before the provider call so the UI shows
+      // active progress. Slow HeyGen bootstrap already happened above in the
+      // background worker, never in the HTTP request handler.
       await adminClient.from("qa_live_runs").update({
         status: "running",
         started_at: new Date().toISOString(),
       }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-
-      // HeyGen bootstrap is performed in the request handler BEFORE the
-      // background worker starts, so the cached talking_photo_id is already
-      // present in `sweepAssets`. We never call `ensureHeyGenTalkingPhoto`
-      // from inside the worker — its 30–90s prune+upload would risk the
-      // worker being killed before the row is updated to `async_started`.
 
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
@@ -573,7 +591,8 @@ Deno.serve(async (req) => {
     status: "failed",
     error_message: "Stale: previous worker exited without committing status (auto-recovered)",
     completed_at: new Date().toISOString(),
-  }).in("status", ["pending", "running"]).lt("started_at", tenMinAgo);
+  }).in("status", ["pending", "running"])
+    .or(`started_at.lt.${tenMinAgo},started_at.is.null`);
 
   // Idempotency: if a sweep is genuinely in flight (rows updated within the
   // last 10 min), refuse to start a new one and return the active sweep_id.
@@ -632,6 +651,7 @@ Deno.serve(async (req) => {
     mode: t.mode,
     status: "pending",
     estimated_cost_eur: t.estimated_cost_eur,
+    started_at: new Date().toISOString(),
   }));
   const { error: insertErr } = await adminClient.from("qa_live_runs").insert(pendingRows);
   if (insertErr) {
@@ -641,36 +661,9 @@ Deno.serve(async (req) => {
     );
   }
 
-  // HeyGen bootstrap runs SYNCHRONOUSLY here in the request handler (before
-  // waitUntil), not inside the background worker. Reasons:
-  //  1. The request lifecycle has a 150s idle timeout — plenty for prune+upload
-  //     (typically 5–60s), and any failure surfaces as a real HTTP error.
-  //  2. Once persisted in `system_config.qa.heygen_talking_photo_id`, the next
-  //     sweep reuses it instantly (1 list call) — no more 30–90s prune cycles.
-  //  3. Keeps the background worker focused on provider calls, so it never
-  //     gets killed mid-row-update on slow accounts.
-  let bootstrappedAssets = assets;
-  const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
-  if (needsHedraBootstrap && !assets.talkingPhotoId) {
-    console.log(`[sweep ${sweepId}] HeyGen bootstrap (handler, no cached id)…`);
-    try {
-      const result = await ensureHeyGenTalkingPhoto(adminClient);
-      if (result.ok && result.talking_photo_id) {
-        bootstrappedAssets = { ...assets, talkingPhotoId: result.talking_photo_id };
-        console.log(
-          `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
-        );
-      } else {
-        console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
-      }
-    } catch (e) {
-      console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
-    }
-  }
-
   // Fire-and-forget background worker. The HTTP response returns immediately.
   // @ts-ignore — EdgeRuntime is provided by Deno Deploy / Supabase Edge runtime
-  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, bootstrappedAssets));
+  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, assets));
 
   return new Response(
     JSON.stringify({
