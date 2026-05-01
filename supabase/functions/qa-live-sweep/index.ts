@@ -333,6 +333,23 @@ async function callProvider(
     const durationMs = Date.now() - start;
 
     if (!res.ok) {
+      // Honor expectedFailure annotation: providers that intentionally
+      // return a known non-2xx (e.g. Pika 410 during provider migration)
+      // should be reported as "expected" rather than counted as bugs.
+      if (test.expectedFailure && res.status === test.expectedFailure.status) {
+        const reasonOk = !test.expectedFailure.reasonContains
+          || (parsed.error || text).toLowerCase().includes(
+            test.expectedFailure.reasonContains.toLowerCase(),
+          );
+        if (reasonOk) {
+          return {
+            status: "expected",
+            durationMs,
+            error: `HTTP ${res.status} (expected): ${test.expectedFailure.note}`,
+            raw: json,
+          };
+        }
+      }
       return {
         status: "failed",
         durationMs,
