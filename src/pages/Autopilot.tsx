@@ -26,7 +26,39 @@ import { useAutopilotNotifications } from '@/hooks/useAutopilotNotifications';
 import type { AutopilotSlot } from '@/hooks/useAutopilot';
 import { cn } from '@/lib/utils';
 
+import { ComingSoonScreen } from '@/components/common/ComingSoonScreen';
+
 export default function Autopilot() {
+  return (
+    <ComingSoonScreen
+      eyebrow="KI Autopilot"
+      title="Deine KI führt den Account"
+      subtitle="Vollautonome Content-Pipeline mit Wochenplan, Compliance-Score und Legal-Shield gegen Deepfakes und Copyright-Verstöße. Du briefst, die KI generiert, prüft, plant und veröffentlicht."
+      reason="Wir härten gerade das Compliance-Gate und die Approval-Inbox für Production-Workloads."
+      backHref="/home"
+      adminPreview={<AutopilotReal />}
+      features={[
+        {
+          icon: <Bot className="h-5 w-5" />,
+          title: 'Auto-Briefing & Strategie',
+          description: 'Einmal die Strategie definieren — die KI plant 14 Tage Content im Voraus, abgestimmt auf Brand, Sprache und Plattform.',
+        },
+        {
+          icon: <ShieldCheck className="h-5 w-5" />,
+          title: 'Legal Shield',
+          description: 'KI-QA prüft jeden Post auf Copyright, Deepfakes und Brand-CI. Strike-System verhindert Account-Risiko.',
+        },
+        {
+          icon: <Calendar className="h-5 w-5" />,
+          title: 'Wochenplan & Approval-Inbox',
+          description: 'Co-Pilot-Modus: Du genehmigst per Klick. Auto-Publish: Die KI veröffentlicht zu optimalen Zeiten.',
+        },
+      ]}
+    />
+  );
+}
+
+function AutopilotReal() {
   const { data: brief } = useAutopilotBrief();
   const { data: queue = [] } = useAutopilotQueue(14);
   const { data: strikes = [] } = useAutopilotStrikes();
@@ -44,6 +76,7 @@ export default function Autopilot() {
   const isLocked = !!(brief?.locked_until && new Date(brief.locked_until) > new Date());
   const isPaused = !!(brief?.paused_until && new Date(brief.paused_until) > new Date());
   const activeStrikes = strikes.filter((s) => s.is_active);
+
 
   return (
     <>
