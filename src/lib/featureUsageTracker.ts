@@ -7,7 +7,24 @@ import { supabase } from "@/integrations/supabase/client";
 export type PowerFeatureKey =
   | "directors_cut"
   | "sora_long_form"
-  | "video_composer";
+  | "video_composer"
+  | "picture_studio"
+  | "ai_video_toolkit"
+  | "talking_head"
+  | "music_studio"
+  | "motion_studio"
+  | "email_director"
+  | "ad_director"
+  | "autopilot"
+  | "brand_characters"
+  | "marketplace"
+  | "news_hub"
+  | "trend_radar"
+  | "video_translator"
+  | "magic_edit"
+  | "upscaler"
+  | "universal_creator"
+  | "universal_video_creator";
 
 const LS_PREFIX = "feature_usage_count_";
 

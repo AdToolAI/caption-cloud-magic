@@ -126,7 +126,18 @@ export const ANALYTICS_EVENTS = {
   // Monetization
   UPGRADE_CLICKED: 'upgrade_clicked',
   PAYMENT_COMPLETED: 'payment_completed',
-  
+  CHECKOUT_STARTED: 'checkout_started',
+  CHECKOUT_COMPLETED: 'checkout_completed',
+  CHECKOUT_ABANDONED: 'checkout_abandoned',
+  CHECKOUT_FAILED: 'checkout_failed',
+  COUPON_APPLIED: 'coupon_applied',
+  COUPON_INVALID: 'coupon_invalid',
+  FOUNDERS_SLOT_CLAIMED: 'founders_slot_claimed',
+  SUBSCRIPTION_DETECTED: 'subscription_detected',
+  CREDIT_PACK_CHECKOUT_STARTED: 'credit_pack_checkout_started',
+  ENTERPRISE_CHECKOUT_STARTED: 'enterprise_checkout_started',
+  CUSTOMER_PORTAL_OPENED: 'customer_portal_opened',
+
   // Performance & Limits
   USAGE_LIMIT_REACHED: 'usage_limit_reached',
   
