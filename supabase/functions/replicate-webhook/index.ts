@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { trackAIGeneration } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -134,6 +135,20 @@ serve(async (req) => {
 
       console.log('[Replicate Webhook] Generation completed and saved:', generation.id);
 
+      // Telemetry
+      const startedAt = generation.started_at ? new Date(generation.started_at).getTime() : null;
+      const latencyMs = startedAt ? Date.now() - startedAt : undefined;
+      await trackAIGeneration('completed', generation.user_id, {
+        provider: 'replicate',
+        model: generation.model,
+        duration_s: generation.duration_seconds,
+        cost_eur: Number(generation.total_cost_euros) || undefined,
+        aspect_ratio: generation.aspect_ratio,
+        resolution: generation.resolution,
+        latency_ms: latencyMs,
+        generation_id: generation.id,
+      }).catch(() => {});
+
       return new Response(JSON.stringify({ success: true, status: 'completed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -171,6 +186,24 @@ serve(async (req) => {
       }
 
       console.log('[Replicate Webhook] Generation marked as failed and credits refunded:', generation.id);
+
+      // Telemetry
+      await trackAIGeneration('failed', generation.user_id, {
+        provider: 'replicate',
+        model: generation.model,
+        cost_eur: Number(generation.total_cost_euros) || undefined,
+        error_type: status,
+        error_message: typeof errorMessage === 'string' ? errorMessage.slice(0, 500) : String(errorMessage),
+        generation_id: generation.id,
+      }).catch(() => {});
+      if (!refundError) {
+        await trackAIGeneration('refunded', generation.user_id, {
+          provider: 'replicate',
+          model: generation.model,
+          cost_eur: Number(generation.total_cost_euros) || undefined,
+          generation_id: generation.id,
+        }).catch(() => {});
+      }
 
       return new Response(JSON.stringify({ success: true, status: 'failed', refunded: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
