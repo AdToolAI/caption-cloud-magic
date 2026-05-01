@@ -135,17 +135,12 @@ serve(async (req) => {
       mode: "subscription",
       // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link.
       // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
-      // SEPA / Klarna können später hinzugefügt werden, wenn im Dashboard aktiv.
       payment_method_types: ["card", "paypal", "link"],
-      // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
+      // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden.
+      // Stripe sendet die finalisierte Rechnung danach automatisch per E-Mail an den Kunden
+      // (zusätzlich verschicken wir aus dem Webhook eine gebrandete Quittung).
       billing_address_collection: "required",
       customer_update: { address: "auto", name: "auto" },
-      // Stripe sendet die finalisierte Rechnung automatisch per E-Mail an den Kunden
-      // (zusätzlich verschicken wir aus dem Webhook eine gebrandete Quittung).
-      subscription_data: {
-        description: "AdTool AI subscription",
-      },
-      invoice_creation: undefined, // (für mode=subscription nicht gültig — Subscriptions erzeugen Invoices automatisch)
       success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/billing?success=true`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
