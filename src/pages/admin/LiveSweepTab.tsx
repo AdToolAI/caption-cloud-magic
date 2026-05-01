@@ -117,6 +117,7 @@ export function LiveSweepTab() {
       if (allTerminal || timedOut) {
         const ok = rows.filter((r) => r.status === "succeeded").length;
         const expected = rows.filter((r) => r.status === "expected").length;
+        const asyncStarted = rows.filter((r) => r.status === "async_started").length;
         const failed = rows.filter((r) => r.status === "failed").length;
         const timeout = rows.filter((r) => r.status === "timeout").length;
         const skipped = rows.filter((r) => r.status === "skipped_budget").length;
@@ -126,8 +127,8 @@ export function LiveSweepTab() {
             description: "Polling gestoppt. Reload für neuen Status.",
           });
         } else {
-          toast.success(`Sweep abgeschlossen — ${ok + expected}/${rows.length} grün`, {
-            description: `${failed} failed · ${timeout} timeout · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € ausgegeben`,
+          toast.success(`Sweep abgeschlossen — ${ok + expected + asyncStarted}/${rows.length} grün`, {
+            description: `${failed} failed · ${timeout} timeout · ${asyncStarted} async · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € ausgegeben`,
           });
         }
         setActiveSweepId(null);
