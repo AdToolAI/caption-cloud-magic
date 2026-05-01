@@ -233,7 +233,7 @@ async function getTestAssets(supabase: any) {
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string },
+  assets: { image: string; video: string; audio: string; portrait: string },
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {
