@@ -1149,24 +1149,27 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
-        <Sequence key={`sfx-${idx}`} from={Math.floor(sfx.startTime * fps)}>
-          <Audio
-            src={sfx.url}
-            volume={sfx.volume / 100}
-            pauseWhenBuffering
-          />
-        </Sequence>
-      ))}
+      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => {
+        if (!isValidRemoteMediaUrl(sfx.url)) return null;
+        return (
+          <Sequence key={`sfx-${idx}`} from={safeFrame(sfx.startTime, fps, durationInFrames - 1)}>
+            <Audio
+              src={sfx.url}
+              volume={(Number(sfx.volume) || 0) / 100}
+              pauseWhenBuffering
+            />
+          </Sequence>
+        );
+      })}
 
       {/* Text Overlays */}
       {textOverlays.map((overlay) => {
-        const startFrame = Math.floor(overlay.startTime * fps);
-        const endFrame = overlay.endTime 
-          ? Math.floor(overlay.endTime * fps) 
+        const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
+        const endFrame = overlay.endTime != null
+          ? safeFrame(overlay.endTime, fps, durationInFrames)
           : durationInFrames;
-        const overlayDuration = endFrame - startFrame;
-        
+        const overlayDuration = Math.max(1, endFrame - startFrame);
+
         return (
           <Sequence
             key={overlay.id}
@@ -1180,8 +1183,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
       {/* Subtitles */}
       {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
-        const startFrame = Math.floor(clip.startTime * fps);
-        const endFrame = Math.floor(clip.endTime * fps);
+        const startFrame = safeFrame(clip.startTime, fps, durationInFrames - 1);
+        const endFrame = safeFrame(clip.endTime, fps, durationInFrames);
         const clipDuration = Math.max(1, endFrame - startFrame);
         return (
           <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
