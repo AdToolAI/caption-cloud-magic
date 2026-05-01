@@ -9,6 +9,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id',
 };
 
+/**
+ * Coerce any value to a finite number, falling back to `fallback` if NaN/Infinity/null.
+ * Prevents the classic Lambda crash:
+ *   "The 'from' prop of a sequence must be finite, but got NaN."
+ */
+function safeNum(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Validate a scenes array. Returns { ok: false, reason } if any scene has
+ * non-finite or negative timing that would brick the Remotion render.
+ */
+function validateScenes(scenes: unknown): { ok: true } | { ok: false; reason: string } {
+  if (scenes == null) return { ok: true };
+  if (!Array.isArray(scenes)) return { ok: false, reason: 'scenes must be an array' };
+  for (let i = 0; i < scenes.length; i++) {
+    const s: any = scenes[i];
+    if (!s || typeof s !== 'object') {
+      return { ok: false, reason: `scenes[${i}] is not an object` };
+    }
+    const start = s.start_time ?? s.startTime;
+    const end = s.end_time ?? s.endTime;
+    if (start != null && !Number.isFinite(Number(start))) {
+      return { ok: false, reason: `scenes[${i}].start_time is not finite (${JSON.stringify(start)})` };
+    }
+    if (end != null && !Number.isFinite(Number(end))) {
+      return { ok: false, reason: `scenes[${i}].end_time is not finite (${JSON.stringify(end)})` };
+    }
+  }
+  return { ok: true };
+}
+
 // AWS Lambda configuration — read from secret for version consistency
 const AWS_REGION = 'eu-central-1';
 function getLambdaFunctionName(): string {
