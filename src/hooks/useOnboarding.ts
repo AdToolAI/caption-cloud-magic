@@ -29,9 +29,13 @@ export const useOnboarding = () => {
   };
 
   const completeOnboarding = () => {
+    const wasComplete = localStorage.getItem(ONBOARDING_KEY) === "true";
     localStorage.setItem(ONBOARDING_KEY, "true");
     setIsOnboardingComplete(true);
     setShowTour(false);
+    if (!wasComplete) {
+      trackEvent(ANALYTICS_EVENTS.ONBOARDING_FINISHED);
+    }
   };
 
   const resetOnboarding = () => {
