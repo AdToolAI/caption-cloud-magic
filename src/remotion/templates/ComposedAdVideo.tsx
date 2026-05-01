@@ -124,6 +124,15 @@ export const ComposedAdVideoSchema = z.object({
     size: z.enum(['small', 'medium', 'large']),
     opacity: z.number(),
   }).optional(),
+  /**
+   * Optional explicit composition length (frames). When the edge function has
+   * already computed a precise duration that includes crossfade overlap,
+   * VO-lead-in and decoder padding, it can pass it through here so the
+   * Composition's `calculateMetadata` matches the Lambda `frameRange` exactly.
+   * Without this, naive `scenes × duration` math may drift by a few frames
+   * and crash Lambda with "frame range 0-N is not inbetween 0-M".
+   */
+  durationInFrames: z.number().int().positive().optional(),
 });
 
 type ComposedAdVideoProps = z.infer<typeof ComposedAdVideoSchema>;

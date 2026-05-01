@@ -6,6 +6,7 @@ import { slide } from '@remotion/transitions/slide';
 import { wipe } from '@remotion/transitions/wipe';
 import { resolveTransitions, findActiveTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
@@ -559,7 +560,7 @@ const SceneVideo: React.FC<{
             ...chromaKeyStyle,
           }}
         />
-      ) : (
+      ) : isValidRemoteMediaUrl(mediaUrl) ? (
         // Render video (original source or additionalMedia video)
         <Video
           src={mediaUrl}
@@ -579,6 +580,10 @@ const SceneVideo: React.FC<{
           }}
           volume={0}
         />
+      ) : (
+        // Bug 3 fallback: invalid/missing video URL → render black frame
+        // instead of crashing Chromium with MEDIA_ERR Code 4.
+        <AbsoluteFill style={{ backgroundColor: '#000' }} />
       )}
       {/* VHS Scanlines Overlay for retro_vhs filter */}
       {needsVHSScanlines && <VHSScanlines intensity={0.25} />}
@@ -712,22 +717,26 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         <SVGFilters />
         <SharpnessFilter intensity={sharpness} />
         <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
-          <Video
-            src={sourceVideoUrl}
-            pauseWhenBuffering={!previewMode}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              filter: filterStr.trim(),
-            }}
-            volume={0}
-          />
+          {isValidRemoteMediaUrl(sourceVideoUrl) ? (
+            <Video
+              src={sourceVideoUrl}
+              pauseWhenBuffering={!previewMode}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                filter: filterStr.trim(),
+              }}
+              volume={0}
+            />
+          ) : (
+            <AbsoluteFill style={{ backgroundColor: '#000' }} />
+          )}
         </div>
         {/* VHS Scanlines for retro_vhs filter */}
         {filter === 'retro_vhs' && <VHSScanlines intensity={0.25} />}
         {/* Original Audio - skip in preview mode (native audio handles it) */}
-        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && (
+        {!previewMode && !voiceoverUrl && !backgroundMusicUrl && isValidRemoteMediaUrl(sourceVideoUrl) && (
           <Audio src={sourceVideoUrl} volume={masterVolume / 100} startFrom={0} pauseWhenBuffering />
         )}
         {vignette > 0 && <AbsoluteFill style={{ ...vignetteStyle, pointerEvents: 'none', zIndex: 10 }} />}
@@ -737,9 +746,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
-          const startFrame = Math.floor(overlay.startTime * fps);
-          const endFrame = overlay.endTime ? Math.floor(overlay.endTime * fps) : durationInFrames;
-          const overlayDuration = endFrame - startFrame;
+          const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
+          const endFrame = overlay.endTime != null
+            ? safeFrame(overlay.endTime, fps, durationInFrames)
+            : durationInFrames;
+          const overlayDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={overlay.id} from={startFrame} durationInFrames={overlayDuration}>
               <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
@@ -748,8 +759,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         })}
         {/* Subtitles */}
         {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
-          const startFrame = Math.floor(clip.startTime * fps);
-          const endFrame = Math.floor(clip.endTime * fps);
+          const startFrame = safeFrame(clip.startTime, fps, durationInFrames - 1);
+          const endFrame = safeFrame(clip.endTime, fps, durationInFrames);
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
@@ -924,6 +935,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         )}
         {/* Single continuous video — no decoder switches */}
         <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          {isValidRemoteMediaUrl(sourceVideoUrl) ? (
           <Video
             src={sourceVideoUrl}
             startFrom={0}
@@ -940,6 +952,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             }}
             volume={0}
           />
+          ) : (
+            <AbsoluteFill style={{ backgroundColor: '#000' }} />
+          )}
         </div>
         {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
@@ -962,9 +977,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         )}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
-          const startFrame = Math.floor(overlay.startTime * fps);
-          const endFrame = overlay.endTime ? Math.floor(overlay.endTime * fps) : durationInFrames;
-          const overlayDuration = endFrame - startFrame;
+          const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
+          const endFrame = overlay.endTime != null
+            ? safeFrame(overlay.endTime, fps, durationInFrames)
+            : durationInFrames;
+          const overlayDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={overlay.id} from={startFrame} durationInFrames={overlayDuration}>
               <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
@@ -973,8 +990,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         })}
         {/* Subtitles */}
         {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
-          const startFrame = Math.floor(clip.startTime * fps);
-          const endFrame = Math.floor(clip.endTime * fps);
+          const startFrame = safeFrame(clip.startTime, fps, durationInFrames - 1);
+          const endFrame = safeFrame(clip.endTime, fps, durationInFrames);
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
@@ -1144,24 +1161,27 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         />
       )}
 
-      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => (
-        <Sequence key={`sfx-${idx}`} from={Math.floor(sfx.startTime * fps)}>
-          <Audio
-            src={sfx.url}
-            volume={sfx.volume / 100}
-            pauseWhenBuffering
-          />
-        </Sequence>
-      ))}
+      {!previewMode && soundDesign?.enabled && soundDesign.sfxTracks?.map((sfx, idx) => {
+        if (!isValidRemoteMediaUrl(sfx.url)) return null;
+        return (
+          <Sequence key={`sfx-${idx}`} from={safeFrame(sfx.startTime, fps, durationInFrames - 1)}>
+            <Audio
+              src={sfx.url}
+              volume={(Number(sfx.volume) || 0) / 100}
+              pauseWhenBuffering
+            />
+          </Sequence>
+        );
+      })}
 
       {/* Text Overlays */}
       {textOverlays.map((overlay) => {
-        const startFrame = Math.floor(overlay.startTime * fps);
-        const endFrame = overlay.endTime 
-          ? Math.floor(overlay.endTime * fps) 
+        const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
+        const endFrame = overlay.endTime != null
+          ? safeFrame(overlay.endTime, fps, durationInFrames)
           : durationInFrames;
-        const overlayDuration = endFrame - startFrame;
-        
+        const overlayDuration = Math.max(1, endFrame - startFrame);
+
         return (
           <Sequence
             key={overlay.id}
@@ -1175,8 +1195,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
 
       {/* Subtitles */}
       {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
-        const startFrame = Math.floor(clip.startTime * fps);
-        const endFrame = Math.floor(clip.endTime * fps);
+        const startFrame = safeFrame(clip.startTime, fps, durationInFrames - 1);
+        const endFrame = safeFrame(clip.endTime, fps, durationInFrames);
         const clipDuration = Math.max(1, endFrame - startFrame);
         return (
           <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
