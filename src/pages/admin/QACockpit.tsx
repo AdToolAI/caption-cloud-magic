@@ -17,6 +17,7 @@ import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 import { WatchdogTab } from "@/pages/admin/WatchdogTab";
 import { ProbesTab } from "@/pages/admin/ProbesTab";
+import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 
 
 const TIER_COLORS: Record<string, string> = {
