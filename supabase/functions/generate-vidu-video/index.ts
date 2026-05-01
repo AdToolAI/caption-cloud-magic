@@ -346,9 +346,8 @@ serve(async (req) => {
     if (negativePrompt) viduInput.negative_prompt = negativePrompt;
 
     if (model === "vidu-q2-reference") {
-      // q3-pro has no native multi-reference; use first ref as start_image,
-      // remaining refs are already folded into prompt via buildReferenceSuffix.
-      if (referenceImages[0]) viduInput.start_image = referenceImages[0];
+      // q2-reference natively accepts up to 7 reference images.
+      if (referenceImages.length > 0) viduInput.reference_images = referenceImages;
     } else if (model === "vidu-q2-i2v") {
       const img = startImageUrl ?? referenceImages[0];
       if (img) viduInput.start_image = img;
