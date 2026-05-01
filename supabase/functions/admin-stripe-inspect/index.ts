@@ -14,16 +14,23 @@ serve(async (req) => {
   });
   const acc = await stripe.accounts.retrieve();
   const products = await stripe.products.list({ active: true, limit: 100 });
-  return new Response(
-    JSON.stringify({
-      account: { id: acc.id, country: acc.country, email: acc.email, business: acc.business_profile?.name },
-      products: products.data.map((p) => ({
-        id: p.id,
-        name: p.name,
-        default_price: p.default_price,
+  const result: any = {
+    account: { id: acc.id, country: acc.country, email: acc.email, name: acc.business_profile?.name, settings_name: acc.settings?.dashboard?.display_name },
+    products: [],
+  };
+  for (const p of products.data) {
+    const prices = await stripe.prices.list({ product: p.id, limit: 10 });
+    result.products.push({
+      id: p.id,
+      name: p.name,
+      active: p.active,
+      default_price: p.default_price,
+      prices: prices.data.map((pr) => ({
+        id: pr.id, currency: pr.currency, amount: pr.unit_amount, active: pr.active, lookup: pr.lookup_key, nickname: pr.nickname,
       })),
-      count: products.data.length,
-    }, null, 2),
-    { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
+    });
+  }
+  const coupons = await stripe.coupons.list({ limit: 20 });
+  result.coupons = coupons.data.map((c) => ({ id: c.id, name: c.name, off: c.amount_off, dur: c.duration, months: c.duration_in_months, valid: c.valid }));
+  return new Response(JSON.stringify(result, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 });
