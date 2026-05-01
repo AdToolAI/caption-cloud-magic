@@ -127,14 +127,10 @@ serve(async (req) => {
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: "subscription",
-      // Subscription-fähige Methoden für DE/EU. Apple Pay & Google Pay laufen
-      // automatisch über 'card' (sofern im Stripe-Dashboard aktiviert + Domain
-      // verifiziert). Methoden, die hier nicht im Dashboard aktiv sind, blendet
-      // Stripe automatisch aus – kein Fehler.
-      payment_method_types: ["card", "sepa_debit", "paypal", "klarna", "link"],
-      payment_method_options: {
-        sepa_debit: { setup_future_usage: "off_session" },
-      },
+      // Aktive Methoden im Stripe-Dashboard: Card, PayPal, Link.
+      // Apple Pay & Google Pay laufen automatisch über 'card' (Domain verifiziert).
+      // SEPA / Klarna können später hinzugefügt werden, wenn im Dashboard aktiv.
+      payment_method_types: ["card", "paypal", "link"],
       success_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/billing?success=true`,
       cancel_url: `${req.headers.get("origin") || Deno.env.get("SITE_URL")}/pricing?canceled=true`,
       metadata: {
