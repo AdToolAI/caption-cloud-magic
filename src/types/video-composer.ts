@@ -486,8 +486,8 @@ export const CLIP_SOURCE_COSTS: Record<ClipSource, Record<ClipQuality, number>> 
   'ai-pika':     { standard: 0.10, pro: 0.18 },
   // Vidu Q2: flat €0.45 per 5s clip → 0.09 €/s for parity
   'ai-vidu':     { standard: 0.09, pro: 0.09 },
-  // HappyHorse 1.0: standard = 720p ($0.14/s → €0.18/s), pro = 1080p ($0.28/s → €0.34/s)
-  'ai-happyhorse': { standard: 0.18, pro: 0.34 },
+  // HappyHorse 1.0: 50% margin — standard = 720p ($0.14/s → €0.28/s), pro = 1080p ($0.28/s → €0.56/s)
+  'ai-happyhorse': { standard: 0.28, pro: 0.56 },
   'ai-image':    { standard: 0.01, pro: 0.015 },
   stock:         { standard: 0, pro: 0 },
   'stock-image': { standard: 0, pro: 0 },
