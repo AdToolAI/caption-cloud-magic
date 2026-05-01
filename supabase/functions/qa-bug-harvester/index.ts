@@ -11,6 +11,7 @@
  * Schedule: daily via pg_cron (set up separately). Also callable on-demand.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
+import { recordHeartbeat } from '../_shared/heartbeat.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -72,6 +73,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const hbStart = Date.now();
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // 1. Pull failed provider calls from the last 24h
@@ -179,6 +181,13 @@ Deno.serve(async (req) => {
       created.push({ id: inserted?.id, title, severity: sev, occurrences: bucket.occurrences });
     }
   }
+
+  await recordHeartbeat({
+    jobName: 'qa-bug-harvester',
+    status: 'ok',
+    durationMs: Date.now() - hbStart,
+    expectedIntervalSeconds: 86400, // daily
+  });
 
   return new Response(
     JSON.stringify({

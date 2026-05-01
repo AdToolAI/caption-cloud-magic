@@ -4,6 +4,7 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2.95.0";
 import { ensureHeyGenTalkingPhoto } from "../_shared/heygen-bootstrap.ts";
+import { recordHeartbeat } from "../_shared/heartbeat.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -395,6 +396,7 @@ async function runSweep(
   tests: ProviderTest[],
   assets: SweepAssets,
 ) {
+  const hbStart = Date.now();
   console.log(`[sweep ${sweepId}] start — ${tests.length} providers`);
   const cap = Number(budget.cap_eur);
   let totalSpent = 0;
@@ -531,6 +533,12 @@ async function runSweep(
     if (watchErr) {
       console.error(`[sweep ${sweepId}] watchdog update failed:`, watchErr.message);
     }
+    await recordHeartbeat({
+      jobName: "qa-live-sweep",
+      status: "ok",
+      durationMs: Date.now() - hbStart,
+      expectedIntervalSeconds: 86400, // manually-triggered, daily expectation
+    });
   }
 }
 

@@ -3,6 +3,7 @@
 // On success → uploads video, runs QA gate, sets final slot status.
 // On failure → refunds credits, marks slot failed, notifies user.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { recordHeartbeat } from "../_shared/heartbeat.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,8 +16,12 @@ const TIMEOUT_MIN = 15;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  const hbStart = Date.now();
   const replicateKey = Deno.env.get("REPLICATE_API_KEY");
-  if (!replicateKey) return json({ ok: false, error: "REPLICATE_API_KEY missing" }, 500);
+  if (!replicateKey) {
+    await recordHeartbeat({ jobName: "autopilot-video-poll", status: "error", error: "REPLICATE_API_KEY missing", durationMs: Date.now() - hbStart, expectedIntervalSeconds: 60 });
+    return json({ ok: false, error: "REPLICATE_API_KEY missing" }, 500);
+  }
 
   const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -152,6 +157,12 @@ Deno.serve(async (req) => {
     }
   }
 
+  await recordHeartbeat({
+    jobName: "autopilot-video-poll",
+    status: "ok",
+    durationMs: Date.now() - hbStart,
+    expectedIntervalSeconds: 60,
+  });
   return json({ ok: true, polled: list.length, completed, failed, still_processing: stillProcessing });
 });
 
