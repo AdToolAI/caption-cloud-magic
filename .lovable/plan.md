@@ -1,97 +1,49 @@
-## Ziel
+## Problem
 
-Den Pro-Plan neu bepreisen:
+Im Stripe-Dashboard sind aktuell **zwei Pro-Produkte** sichtbar:
 
-- **Regulärer Preis:** 29,99 €/Monat (statt aktuell 19,99 €)
-- **Standard-Promo (alle Neukunden):** 14,99 €/Monat für die ersten **3 Monate**, danach 29,99 €
-- **Founders-Deal (erste 1000 Nutzer):** 14,99 €/Monat für **24 Monate**, danach 29,99 €
+1. **"Pro Plan (Launch)"** (`prod_UOG4wbiQjDONAj`) — altes Produkt mit Preisen 29,99 € + 19,99 €
+2. **"AdTool AI Pro"** (`prod_UREZAv0LG9vz1E`) — neues Produkt aus letztem Setup, **"Keine Preise"** sichtbar
 
-Nach Slot 1000 läuft automatisch nur noch die 3-Monats-Promo.
+Der neue €29,99-Preis (`price_1TSLxWDRu4kfSFxjEJNi8nGN`) wurde technisch erstellt und im Code verdrahtet, hängt aber am neuen Produkt — und wird im Dashboard offenbar nicht beim neuen Produkt gelistet (bzw. das neue Produkt zeigt fälschlich "Keine Preise"). Außerdem ist es unsauber, **zwei Pro-Produkte** parallel zu haben.
 
----
+## Lösung
 
-## Was sich für den Nutzer ändert
+Wir konsolidieren auf **ein** Pro-Produkt und machen alle relevanten Preise + Coupons im Dashboard sichtbar.
 
-- Auf der Landing-Page und `/pricing` steht zukünftig: ~~29,99 €~~ **14,99 €/Monat**, mit Hinweis-Badge:
-  - Wenn noch Founders-Slots frei sind: „Founders-Deal — 24 Monate zu 14,99 €. Noch X von 1000 Plätzen frei."
-  - Wenn ausverkauft: „Launch-Aktion — 14,99 € für 3 Monate, danach 29,99 €."
-- Bei Klick auf „Pro abonnieren" wird automatisch der passende Stripe-Coupon angewendet (24M oder 3M), abhängig davon, ob noch Founders-Slots verfügbar sind.
-- Bestehende Pro-Abos werden **nicht angetastet** (kein Preis-Update auf laufenden Subscriptions).
+### Schritt 1 — Stripe-Konsolidierung (per Edge-Function-Skript)
 
----
+Ich baue ein einmaliges Setup-Skript, das im Stripe-Live-Konto:
 
-## Umsetzung (technisch)
+1. **Altes Produkt `prod_UOG4wbiQjDONAj` ("Pro Plan (Launch)") als kanonisches Pro-Produkt behält** (umbenennen auf "AdTool AI Pro").
+2. **Alten 19,99 €-Preis archiviert** (deactivate) — wird nicht mehr verwendet.
+3. **Den 29,99 €-Preis am alten Produkt prüft/anlegt** und als `default_price` setzt → so ist er garantiert im Dashboard sichtbar.
+4. **Zusätzlich einen sichtbaren 14,99 €-Promo-Preis** am gleichen Produkt anlegt (rein zur Dokumentation/Transparenz im Dashboard — Checkout läuft weiter über 29,99 € + Coupon, damit nach 3/24 Monaten automatisch auf 29,99 € hochläuft).
+5. **Neues Produkt `prod_UREZAv0LG9vz1E` archiviert** (deactivate).
+6. **Beide Coupons verifiziert** (`PRO-FOUNDERS-24M`, `PRO-LAUNCH-3M`) — falls fehlend, neu anlegen.
 
-### 1. Stripe (per Tool-Calls in Build-Mode)
+### Schritt 2 — Code auf altes Produkt zurückmappen
 
-a) **Neuer Pro-Preis** in Stripe anlegen (€29,99/Monat, recurring) auf bestehendem Produkt `prod_UOG4wbiQjDONAj` → ergibt neue `price_…`-ID für EUR. Analog für USD ($29,99).
+- `src/config/stripe.ts` & `src/config/pricing.ts` Pro-`productId` → `prod_UOG4wbiQjDONAj` (zurück), Pro-Preis-ID bleibt der neue €29,99-Preis (am alten Produkt).
+- `supabase/functions/create-checkout` `PRO_PRICE_IDS` aktualisieren falls neue Price-ID entsteht.
+- `getProductInfo` Mapping aufräumen.
 
-b) **Zwei Coupons** anlegen:
-- `PRO-FOUNDERS-24M`: amount_off **15,00 €**, duration `repeating`, duration_in_months **24**
-- `PRO-LAUNCH-3M`: amount_off **15,00 €**, duration `repeating`, duration_in_months **3**
+### Schritt 3 — Verifikation
 
-(15 € Rabatt auf 29,99 € ≈ 14,99 €. Sauberer als percent_off, da exakter Endpreis.)
+- Setup-Skript callen → JSON-Output zeigt: 1 aktives Pro-Produkt, 2 sichtbare Preise (29,99 € aktiv + default, 14,99 € als Promo-Anzeige), 2 aktive Coupons.
+- Stripe-Dashboard-Check: Du bestätigst, dass **"AdTool AI Pro"** mit den sichtbaren Preisen 29,99 € (Standard) und 14,99 € (Promo) angezeigt wird.
+- Checkout-Smoke-Test im Preview: Klick auf "Subscribe" → Stripe-Checkout sollte 29,99 € − 15,00 € Coupon = **14,99 €** zeigen.
 
-### 2. Datenbank — Founders-Slot-Tracking
+## Technische Details
 
-Neue Tabelle `pro_founders_slots`:
+- Preise lassen sich in Stripe **nicht löschen**, nur archivieren (`active=false`). Das ist sauber und beeinflusst keine bestehenden Subscriptions.
+- Das Setup-Skript ist **idempotent**: Bei erneutem Aufruf passiert nichts Doppeltes.
+- Die zwei sichtbaren Preise (29,99 € + 14,99 €) machen das Dashboard transparent. Der tatsächliche Checkout nutzt aber **immer den 29,99 €-Preis + automatisch passenden Coupon** — sonst läuft die Subscription nach Ende der Promo-Periode nicht automatisch auf 29,99 € hoch.
+- Founders-Slot-Logik (1000 Plätze) bleibt unverändert in `create-checkout` + `founders_signups`-Tabelle.
 
-```text
-id              uuid pk
-user_id         uuid unique (auth.users)
-stripe_sub_id   text
-claimed_at      timestamptz default now()
-```
+## Was nicht passiert
 
-Plus DB-Funktion `claim_founders_slot(user_id)` mit `SELECT count(*) < 1000 FOR UPDATE`-Logik (atomar, race-condition-safe). Gibt `true/false` zurück.
+- Bestehende Subscriptions auf alten Preisen bleiben **unangetastet** (keine automatische Migration alter Kunden auf den neuen Preis).
+- Webhook bleibt unverändert.
 
-RLS: nur Service-Role schreibt, jeder authentifizierte User darf eigenen Eintrag lesen.
-
-Plus public RPC `get_founders_slots_remaining()` → `1000 - count(*)` für Live-Counter auf Landingpage (kein Auth nötig, security definer).
-
-### 3. Code-Änderungen
-
-**`src/config/pricing.ts` & `src/config/stripe.ts`:**
-- Pro-Preis von `19.99` auf `29.99` setzen
-- Neue `priceId` für €29,99 eintragen
-- Coupon-IDs als Konstanten exportieren (`FOUNDERS_COUPON_ID`, `LAUNCH_COUPON_ID`)
-
-**`supabase/functions/create-checkout/index.ts`:**
-- Vor Checkout-Session: `claim_founders_slot()` aufrufen
-- Wenn `true` → `discounts: [{ coupon: FOUNDERS_COUPON_ID }]` an Stripe übergeben
-- Wenn `false` → `LAUNCH_COUPON_ID` (3-Monats-Promo)
-- Bei erfolgreicher Subscription-Erstellung: `pro_founders_slots`-Eintrag mit `stripe_sub_id` updaten
-- Bei Checkout-Abbruch: Slot wieder freigeben (Cleanup über `stripe-webhook` bei `checkout.session.expired`)
-
-**`src/components/landing/PricingSection.tsx` + `src/pages/Pricing.tsx`:**
-- Anzeige: ~~29,99 €~~ **14,99 €/Monat**
-- Neuer Live-Badge-Komponente `FoundersSlotBadge`, holt Slots-Counter alle 60s via RPC
-- Texte: „Noch X/1000 Founders-Plätze — 14,99 € für 24 Monate" bzw. „Launch-Aktion: 14,99 € für 3 Monate"
-
-**`src/lib/intro.ts`:**
-- Alte `START-BASIC` / `START-ENT` Logik bleibt unangetastet (ist für andere Pläne)
-- Neue Helper `getProPromoLabel(slotsRemaining)` für UI-Texte
-
-### 4. i18n
-
-Neue Keys in `src/lib/translations.ts` (DE/EN/ES):
-- `landing.pricing.foundersBadge` — „Noch {count}/1000 Founders-Plätze"
-- `landing.pricing.foundersDescription` — „14,99 € für 24 Monate, danach 29,99 €"
-- `landing.pricing.launchPromo` — „14,99 € für 3 Monate, danach 29,99 €"
-- `landing.pricing.regularPrice` — „Regulär 29,99 €/Monat"
-
----
-
-## Was NICHT angefasst wird
-
-- Basic-Plan (14,95 €) und Enterprise-Plan (69,95 €) bleiben unverändert
-- Bestehende Pro-Subscriptions (alte 19,99 €) bleiben gültig — keine Migration
-- `check-subscription`-Funktion: keine Änderung nötig (liest weiterhin Product-ID)
-
----
-
-## Offene Frage
-
-Soll der **Founders-Deal nach 24 Monaten automatisch auf 29,99 €** hochlaufen (Standard-Stripe-Verhalten bei `duration: repeating`) oder willst du die Founders danach auf einem anderen, dauerhaft vergünstigten Preis halten? Aktueller Plan = automatisch auf 29,99 €. Sag Bescheid, falls anders.
-
-Wenn der Plan passt, **approve** ich's und baue es in einem Rutsch (Stripe-Setup → Migration → Edge-Function → Frontend).
+Nach Approval führe ich Schritt 1–3 in einem Rutsch aus.
