@@ -73,6 +73,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const hbStart = Date.now();
   const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // 1. Pull failed provider calls from the last 24h
@@ -180,6 +181,13 @@ Deno.serve(async (req) => {
       created.push({ id: inserted?.id, title, severity: sev, occurrences: bucket.occurrences });
     }
   }
+
+  await recordHeartbeat({
+    jobName: 'qa-bug-harvester',
+    status: 'ok',
+    durationMs: Date.now() - hbStart,
+    expectedIntervalSeconds: 86400, // daily
+  });
 
   return new Response(
     JSON.stringify({
