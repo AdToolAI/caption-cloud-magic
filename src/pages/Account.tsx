@@ -144,7 +144,10 @@ const Account = () => {
           </TabsContent>
 
           <TabsContent value="advanced">
-            <AdvancedTab />
+            <div className="space-y-6">
+              <SystemStatusCard />
+              <AdvancedTab />
+            </div>
           </TabsContent>
         </Tabs>
       </div>
