@@ -126,6 +126,55 @@ export async function trackBusinessEvent(
 }
 
 /**
+ * Track AI provider generation lifecycle (server-side)
+ */
+export async function trackAIGeneration(
+  event: 'started' | 'completed' | 'failed' | 'refunded',
+  userId: string,
+  data: {
+    provider: string;
+    model?: string;
+    duration_s?: number;
+    credits_spent?: number;
+    cost_eur?: number;
+    aspect_ratio?: string;
+    resolution?: string;
+    latency_ms?: number;
+    error_type?: string;
+    error_message?: string;
+    generation_id?: string;
+  }
+): Promise<void> {
+  await trackEvent({
+    event: `ai_generation_${event}`,
+    distinctId: userId,
+    properties: data,
+  });
+}
+
+/**
+ * Track social publishing lifecycle (server-side)
+ */
+export async function trackSocialPublish(
+  event: 'started' | 'succeeded' | 'failed',
+  userId: string,
+  data: {
+    platform: string;
+    media_type?: 'image' | 'video' | 'carousel' | 'text';
+    scheduled?: boolean;
+    error_type?: string;
+    error_message?: string;
+    post_id?: string;
+  }
+): Promise<void> {
+  await trackEvent({
+    event: `social_publish_${event}`,
+    distinctId: userId,
+    properties: data,
+  });
+}
+
+/**
  * Middleware wrapper for Edge Functions with telemetry
  */
 export function withTelemetry(
