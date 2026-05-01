@@ -164,6 +164,14 @@ serve(async (req) => {
       .update({ welcome_bonus_granted_at: new Date().toISOString() })
       .eq("id", user.id);
 
+    try {
+      await trackBusinessEvent("welcome_bonus_claimed", user.id, {
+        amount,
+        currency,
+        new_balance: newBalance,
+      });
+    } catch { /* analytics optional */ }
+
     return new Response(
       JSON.stringify({
         granted: true,
