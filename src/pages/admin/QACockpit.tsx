@@ -371,6 +371,11 @@ export default function QACockpit() {
             <ProbesTab />
           </TabsContent>
 
+          {/* STATUS PAGE INCIDENT MANAGER */}
+          <TabsContent value="incidents">
+            <IncidentManager />
+          </TabsContent>
+
           {/* LIVE RUNS */}
           <TabsContent value="live" className="space-y-3 mt-4">
             {(runs.data ?? []).map((r: any) => (
