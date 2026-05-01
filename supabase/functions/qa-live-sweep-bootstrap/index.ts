@@ -497,6 +497,18 @@ Deno.serve(async (req) => {
     }, { minBytes: 200, expectedMimePrefix: "image/" }),
   );
 
+  // 6. HeyGen cached talking_photo_id — uploaded once, reused by every sweep.
+  // Avoids HeyGen's per-account 3-photo limit (error 401028) on every run.
+  const heygenResult = await ensureHeyGenTalkingPhoto(adminClient);
+  results.push({
+    uploaded: heygenResult.ok && !heygenResult.reused,
+    repaired: heygenResult.ok && !heygenResult.reused,
+    path: "system_config:qa.heygen_talking_photo_id",
+    reason: heygenResult.reused ? "reused-cached" : (heygenResult.ok ? "uploaded-fresh" : undefined),
+    error: heygenResult.error,
+    talking_photo_id: heygenResult.talking_photo_id,
+  });
+
   return new Response(
     JSON.stringify({
       success: true,
