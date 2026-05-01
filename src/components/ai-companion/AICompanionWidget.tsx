@@ -255,6 +255,7 @@ export function AICompanionWidget() {
       const tutorialId = response.slice(10, -1);
       if (TUTORIALS[tutorialId]) {
         setActiveTutorial(tutorialId);
+        trackEvent(ANALYTICS_EVENTS.TUTORIAL_STARTED, { tutorial_id: tutorialId });
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
