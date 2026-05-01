@@ -641,9 +641,36 @@ Deno.serve(async (req) => {
     );
   }
 
+  // HeyGen bootstrap runs SYNCHRONOUSLY here in the request handler (before
+  // waitUntil), not inside the background worker. Reasons:
+  //  1. The request lifecycle has a 150s idle timeout — plenty for prune+upload
+  //     (typically 5–60s), and any failure surfaces as a real HTTP error.
+  //  2. Once persisted in `system_config.qa.heygen_talking_photo_id`, the next
+  //     sweep reuses it instantly (1 list call) — no more 30–90s prune cycles.
+  //  3. Keeps the background worker focused on provider calls, so it never
+  //     gets killed mid-row-update on slow accounts.
+  let bootstrappedAssets = assets;
+  const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
+  if (needsHedraBootstrap && !assets.talkingPhotoId) {
+    console.log(`[sweep ${sweepId}] HeyGen bootstrap (handler, no cached id)…`);
+    try {
+      const result = await ensureHeyGenTalkingPhoto(adminClient);
+      if (result.ok && result.talking_photo_id) {
+        bootstrappedAssets = { ...assets, talkingPhotoId: result.talking_photo_id };
+        console.log(
+          `[sweep ${sweepId}] HeyGen bootstrap ok: id=${result.talking_photo_id} reused=${result.reused} pruned=${result.pruned ?? 0}`,
+        );
+      } else {
+        console.warn(`[sweep ${sweepId}] HeyGen bootstrap failed: ${result.error ?? "unknown"}`);
+      }
+    } catch (e) {
+      console.warn(`[sweep ${sweepId}] HeyGen bootstrap threw:`, e);
+    }
+  }
+
   // Fire-and-forget background worker. The HTTP response returns immediately.
   // @ts-ignore — EdgeRuntime is provided by Deno Deploy / Supabase Edge runtime
-  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, assets));
+  EdgeRuntime.waitUntil(runSweep(adminClient, sweepId, budget, authHeader, tests, bootstrappedAssets));
 
   return new Response(
     JSON.stringify({
