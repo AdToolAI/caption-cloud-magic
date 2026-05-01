@@ -474,7 +474,7 @@ serve(async (req) => {
 
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
     const fps = 30;
-    const durationInFrames = Math.ceil(duration * fps);
+    const durationInFrames = Math.max(Math.ceil(duration * fps), 1);
 
     console.log(`[RenderDirectorsCut] 🔗 REMOTION_SERVE_URL: ${REMOTION_SERVE_URL}`);
     console.log(`[RenderDirectorsCut] 🎬 Subtitle meta — clips: ${subtitle_track?.clips?.length ?? 0}, visible: ${subtitle_track?.visible}, firstText: "${subtitle_track?.clips?.[0]?.text?.substring(0, 40) ?? 'NONE'}"` );
