@@ -25,6 +25,8 @@ export interface HubDefinition {
   descKey: string;
   items: HubSubItem[];
   adminOnly?: boolean;
+  /** When true: hub is visible but not navigable for non-admins. */
+  comingSoon?: boolean;
 }
 
 export const hubDefinitions: HubDefinition[] = [
@@ -106,6 +108,7 @@ export const hubDefinitions: HubDefinition[] = [
     icon: Gamepad2,
     titleKey: "hubs.gaming",
     descKey: "hubDesc.gaming",
+    comingSoon: true,
     items: [
       { route: "/gaming", titleKey: "Stream Dashboard", descKey: "hubItemDesc.streamDashboard", icon: Radio },
     ],

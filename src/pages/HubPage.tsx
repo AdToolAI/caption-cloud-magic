@@ -7,6 +7,7 @@ import { hubDefinitions, type HubSubItem } from "@/config/hubConfig";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 /* ── Floating particle positions ── */
 const particles = [
@@ -74,6 +75,7 @@ export default function HubPage() {
   };
 
   const HubIcon = hub.icon;
+  const isComingSoon = !!hub.comingSoon;
 
   return (
     <PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto">
@@ -204,12 +206,38 @@ export default function HubPage() {
         </div>
       </motion.div>
 
+      {/* ── Coming Soon Banner ── */}
+      {isComingSoon && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="mb-6 rounded-2xl border border-amber-400/30 bg-amber-400/5 backdrop-blur-md p-5 flex items-start gap-4"
+        >
+          <div className="h-10 w-10 rounded-xl bg-amber-400/15 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
+            <Lock className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h2 className="font-serif text-lg leading-tight">{t(hub.titleKey)} — Coming Soon</h2>
+              <span className="text-[10px] uppercase tracking-widest text-amber-400 border border-amber-400/30 rounded-full px-2 py-0.5">In Vorbereitung</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Dieser Bereich ist noch nicht für alle Kunden freigeschaltet. Wir polieren die letzten Integrationen und melden uns beim Launch.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* ── Bento Grid ── */}
       <motion.div
         variants={container}
         initial="hidden"
         animate="show"
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
+        className={cn(
+          "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5",
+          isComingSoon && "opacity-60 pointer-events-none",
+        )}
       >
         {hub.items.map((item) => {
           const ItemIcon = item.icon;

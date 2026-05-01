@@ -11,7 +11,7 @@ import {
 } from '@/config/aiVideoModelRegistry';
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Lock } from 'lucide-react';
+import { Lock, Wrench } from 'lucide-react';
 
 interface ModelSelectorProps {
   value: string;
@@ -81,28 +81,39 @@ export function ModelSelector({ value, onChange, currency, models, className }: 
                 {TOOLKIT_GROUP_LABELS[g][lang]}
               </SelectLabel>
               {models.map((m) => {
-                const locked = false;
+                const isMaintenance = m.status === 'maintenance';
+                const isComingSoon = m.status === 'coming_soon';
+                const locked = isMaintenance || isComingSoon;
                 return (
                   <SelectItem
                     key={m.id}
                     value={m.id}
                     disabled={locked}
                     className="py-2.5"
+                    title={locked ? m.statusReason : undefined}
                   >
                     <div className="flex items-center gap-3 w-full">
                       <m.icon className="h-4 w-4 text-muted-foreground shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{m.name}</span>
-                          {locked && <Lock className="h-3 w-3 text-muted-foreground" />}
-                          {m.badge && !locked && (
-                            <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-primary/30">
+                          {isMaintenance && <Wrench className="h-3 w-3 text-amber-400" />}
+                          {isComingSoon && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          {m.badge && (
+                            <Badge
+                              variant="outline"
+                              className={
+                                isMaintenance
+                                  ? "text-[9px] px-1 py-0 h-3.5 border-amber-400/40 text-amber-400"
+                                  : "text-[9px] px-1 py-0 h-3.5 border-primary/30"
+                              }
+                            >
                               {m.badge}
                             </Badge>
                           )}
                         </div>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {m.tagline} · {m.resolution}
+                          {locked && m.statusReason ? m.statusReason : `${m.tagline} · ${m.resolution}`}
                         </p>
                       </div>
                       <span className="text-[11px] tabular-nums text-primary font-medium shrink-0">

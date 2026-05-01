@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Home, Lock } from "lucide-react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -78,6 +79,7 @@ export function AppSidebar() {
             {visibleHubs.map((hub) => {
               const HubIcon = hub.icon;
               const active = isHubActive(hub.key);
+              const comingSoon = hub.comingSoon && !isAdmin;
 
               return (
                 <SidebarMenuItem key={hub.key}>
@@ -85,21 +87,37 @@ export function AppSidebar() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <motion.button
-                          onClick={() => navigate(`/hub/${hub.key}`)}
-                          whileHover={{ scale: 1.08 }}
+                          onClick={() => {
+                            if (comingSoon) {
+                              toast.info(`${t(hub.titleKey)} — Coming Soon`, {
+                                description: 'Wir benachrichtigen dich, sobald dieser Bereich live geht.',
+                              });
+                              return;
+                            }
+                            navigate(`/hub/${hub.key}`);
+                          }}
+                          whileHover={{ scale: comingSoon ? 1.04 : 1.08 }}
                           whileTap={{ scale: 0.95 }}
                           className={cn(
-                            "h-11 w-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200 cursor-pointer",
+                            "relative h-11 w-11 mx-auto flex items-center justify-center rounded-xl transition-all duration-200 cursor-pointer",
                             active
                               ? "bg-primary/15 text-primary shadow-[0_0_12px_rgba(124,58,237,0.25)]"
+                              : comingSoon
+                              ? "text-muted-foreground/60 hover:text-muted-foreground"
                               : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                           )}
                         >
                           <HubIcon className="h-5 w-5" />
+                          {comingSoon && (
+                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_rgb(251,191,36)]" />
+                          )}
                         </motion.button>
                       </TooltipTrigger>
                       <TooltipContent side="right" className="bg-background/95 backdrop-blur-xl border-border shadow-xl">
-                        <p className="font-medium">{t(hub.titleKey)}</p>
+                        <p className="font-medium">
+                          {t(hub.titleKey)}
+                          {comingSoon && <span className="ml-1.5 text-[10px] text-amber-400">· Coming Soon</span>}
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>

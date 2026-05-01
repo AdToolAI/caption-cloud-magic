@@ -13,8 +13,39 @@ import { YouTubeLiveTab } from "@/components/gaming/YouTubeLiveTab";
 import { GamingHubHeroHeader } from "@/components/gaming/GamingHubHeroHeader";
 import { useTwitch } from "@/hooks/useTwitch";
 import { useTranslation } from "@/hooks/useTranslation";
+import { ComingSoonScreen } from "@/components/common/ComingSoonScreen";
 
 export default function GamingHub() {
+  return (
+    <ComingSoonScreen
+      eyebrow="Gaming Hub"
+      title="Stream. Clip. Wachsen."
+      subtitle="Verbinde Twitch, YouTube Live und Discord — die KI verwandelt deine Streams in virale Shorts, moderiert den Chat und liefert Wachstums-Analytics. Vollständig integriert in den useadtool-Workflow."
+      reason="Wir feinjustieren noch die Echtzeit-Stream-Integration mit Twitch und YouTube Live, damit alles ohne Lag läuft."
+      backHref="/home"
+      adminPreview={<GamingHubReal />}
+      features={[
+        {
+          icon: <Radio className="h-5 w-5" />,
+          title: 'Live Stream Dashboard',
+          description: 'Multi-Plattform-Dashboard für Twitch, YouTube Live und Discord — Viewer, Chat und Alerts in einem Cockpit.',
+        },
+        {
+          icon: <Scissors className="h-5 w-5" />,
+          title: 'AI Clip Creator',
+          description: 'Highlights aus deinen Streams werden automatisch erkannt und als Shorts, Reels und TikToks veröffentlicht.',
+        },
+        {
+          icon: <BarChart3 className="h-5 w-5" />,
+          title: 'Growth Analytics',
+          description: 'Welche Spiele bringen Follower? Welche Clips gehen viral? Daten-getriebene Empfehlungen für deinen Channel.',
+        },
+      ]}
+    />
+  );
+}
+
+function GamingHubReal() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const { isConnected, twitchUsername } = useTwitch();
   const { t } = useTranslation();
