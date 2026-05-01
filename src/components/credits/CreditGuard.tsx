@@ -26,6 +26,12 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
           available: preflightResult.available_balance
         });
         setShowInsufficientDialog(true);
+        trackEvent(ANALYTICS_EVENTS.CREDIT_INSUFFICIENT, {
+          feature: featureCode,
+          required: preflightResult.required_credits,
+          available: preflightResult.available_balance,
+          shortfall: Math.max(0, preflightResult.required_credits - preflightResult.available_balance),
+        });
         return;
       }
 
