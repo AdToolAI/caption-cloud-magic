@@ -98,7 +98,7 @@ serve(async (req) => {
       JSON.stringify({
         ok: true,
         price_eur_id: priceEur.id,
-        price_usd_id: priceUsd.id,
+        price_usd_id: priceUsd?.id ?? null,
         founders_coupon_id: foundersCoupon!.id,
         launch_coupon_id: launchCoupon!.id,
       }),
