@@ -99,6 +99,9 @@ serve(async (req) => {
       ],
       // Aktive Methoden im Stripe-Dashboard: Card (inkl. Apple/Google Pay), PayPal, Link.
       payment_method_types: ["card", "paypal", "link"],
+      // Sammle Rechnungsadresse + Name, damit Stripe-Rechnungen korrekt ausgestellt werden
+      billing_address_collection: "required",
+      customer_update: { address: "auto", name: "auto" },
       success_url: `${req.headers.get("origin")}/team?upgrade=success`,
       cancel_url: `${req.headers.get("origin")}/team?upgrade=cancelled`,
       metadata: {
