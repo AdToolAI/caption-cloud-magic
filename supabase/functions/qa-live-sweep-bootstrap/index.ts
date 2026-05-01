@@ -29,7 +29,7 @@ async function uploadIfMissing(
   supabase: any,
   path: string,
   fetchBody: () => Promise<{ blob: Blob; contentType: string }>,
-  opts: { minBytes?: number; expectedMimePrefix?: string } = {},
+  opts: { minBytes?: number; expectedMimePrefix?: string; force?: boolean } = {},
 ): Promise<{ uploaded: boolean; repaired?: boolean; path: string; error?: string; reason?: string }> {
   // Check existing object — if it's clearly corrupt (too small, wrong mime,
   // looks like an XML S3 error response), overwrite it.
