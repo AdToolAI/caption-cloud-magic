@@ -322,6 +322,17 @@ serve(async (req) => {
           .eq('id', scene.id);
       }
 
+      // Pika 2.2 maintenance window: silently migrate ai-pika scenes to ai-hailuo
+      // until Pika Labs API is stable again. Reverse: remove this block.
+      if ((scene.clipSource as string) === 'ai-pika') {
+        console.warn(`[compose-video-clips] Scene ${scene.id} clipSource 'ai-pika' is in maintenance — migrating to ai-hailuo.`);
+        scene.clipSource = 'ai-hailuo';
+        await supabaseAdmin
+          .from('composer_scenes')
+          .update({ clip_source: 'ai-hailuo', updated_at: new Date().toISOString() })
+          .eq('id', scene.id);
+      }
+
       // Defensive: rewrite unsupported AI engines to a working default.
       if (scene.clipSource.startsWith('ai-') && !SUPPORTED_AI_SOURCES.has(scene.clipSource)) {
         console.warn(`[compose-video-clips] Scene ${scene.id} clipSource '${scene.clipSource}' not supported by composer — falling back to ai-hailuo.`);
