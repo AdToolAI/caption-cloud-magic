@@ -211,6 +211,36 @@ export function IncidentManager() {
               </DialogHeader>
               <div className="space-y-4">
                 <div>
+                  <Label className="flex items-center gap-1.5 mb-2">
+                    <Zap className="h-3.5 w-3.5 text-[#F5C76A]" />
+                    Quick templates
+                  </Label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TEMPLATES.map((t) => (
+                      <Button
+                        key={t.id}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-[11px] px-2.5"
+                        onClick={() =>
+                          setForm({
+                            title: t.title,
+                            description: t.description,
+                            severity: t.severity,
+                            affected: t.affected,
+                          })
+                        }
+                      >
+                        {t.label}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1.5">
+                    Click to prefill — all fields stay editable.
+                  </p>
+                </div>
+                <div>
                   <Label>Title</Label>
                   <Input
                     placeholder="e.g. Replicate API degraded"
