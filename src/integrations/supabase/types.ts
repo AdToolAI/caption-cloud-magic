@@ -12435,39 +12435,60 @@ export type Database = {
       }
       support_tickets: {
         Row: {
+          actual_result: string | null
+          affected_module: string | null
+          attachments: Json
+          browser_info: Json | null
           category: string
           conversation_id: string | null
           created_at: string | null
           description: string | null
+          expected_result: string | null
           id: string
           metadata: Json | null
           priority: string | null
+          reproduction_steps: string | null
+          severity: string
           status: string | null
           subject: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          actual_result?: string | null
+          affected_module?: string | null
+          attachments?: Json
+          browser_info?: Json | null
           category: string
           conversation_id?: string | null
           created_at?: string | null
           description?: string | null
+          expected_result?: string | null
           id?: string
           metadata?: Json | null
           priority?: string | null
+          reproduction_steps?: string | null
+          severity?: string
           status?: string | null
           subject: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          actual_result?: string | null
+          affected_module?: string | null
+          attachments?: Json
+          browser_info?: Json | null
           category?: string
           conversation_id?: string | null
           created_at?: string | null
           description?: string | null
+          expected_result?: string | null
           id?: string
           metadata?: Json | null
           priority?: string | null
+          reproduction_steps?: string | null
+          severity?: string
           status?: string | null
           subject?: string
           updated_at?: string | null
