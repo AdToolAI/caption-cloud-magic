@@ -225,34 +225,6 @@ const PROVIDER_MATRIX: ProviderTest[] = [
       referenceVideoUrl: video,
     }),
   },
-  {
-    provider: "Hedra Talking Head",
-    model: "hedra/character-3",
-    mode: "A+I",
-    estimated_cost_eur: 0.30, // HeyGen photo-avatar pricing
-    edge_function: "generate-talking-head",
-    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
-      // Prefer the cached HeyGen talking_photo_id from bootstrap (avoids the
-      // per-account 3-photo limit). Fall back to the bootstrap portrait
-      // image, then the generic test image.
-      ...(talkingPhotoId ? { talkingPhotoId } : {}),
-      imageUrl: portrait || image,
-      audioUrl: audio,
-      aspectRatio: "16:9",
-      resolution: "720p",
-    }),
-    // HeyGen is async: kick-off returns 200 with status="processing" and no
-    // videoUrl; polling completes 1–3 min later. Classify as `async_started`
-    // (yellow badge) instead of falsely marking the row as succeeded.
-    parseResponse: (json) => {
-      if (!json) return { success: false, error: "Empty response" };
-      if (json.error) return { success: false, error: String(json.error) };
-      if (json.success === true && (json.status === "processing" || json.status === "pending") && !json.videoUrl) {
-        return { success: true, asyncStarted: true, predictionId: json.predictionId };
-      }
-      return defaultParse(json);
-    },
-  },
 ];
 
 function defaultParse(json: any): { success: boolean; assetUrl?: string; error?: string } {
