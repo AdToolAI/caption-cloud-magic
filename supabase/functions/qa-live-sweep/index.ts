@@ -230,11 +230,30 @@ async function getTestAssets(supabase: any) {
       return fallback;
     }
   };
+  // Read cached HeyGen talking_photo_id (set by qa-live-sweep-bootstrap).
+  let talkingPhotoId: string | undefined;
+  try {
+    const { data: cfg } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", "qa.heygen_talking_photo_id")
+      .maybeSingle();
+    if (cfg?.value) {
+      talkingPhotoId = typeof cfg.value === "string"
+        ? cfg.value
+        : (typeof cfg.value === "object" && "id" in cfg.value
+            ? String((cfg.value as any).id)
+            : undefined);
+    }
+  } catch (e) {
+    console.warn("[live-sweep] read cached talking_photo_id failed:", e);
+  }
   return {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
     audio: await tryUrl("test-audio.mp3", FALLBACK_AUDIO),
     portrait: await tryUrl("test-portrait.png", FALLBACK_IMAGE),
+    talkingPhotoId,
   };
 }
 
