@@ -11,7 +11,7 @@ import {
 } from '@/config/aiVideoModelRegistry';
 import type { Currency } from '@/config/pricing';
 import { useTranslation } from '@/hooks/useTranslation';
-import { Lock } from 'lucide-react';
+import { Lock, Wrench } from 'lucide-react';
 
 interface ModelSelectorProps {
   value: string;
