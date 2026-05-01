@@ -39,8 +39,11 @@ interface ProviderTest {
    */
   expectedFailure?: { status: number; reasonContains?: string; note: string };
   buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
-  /** Optional: parses provider response into success/error + asset URL */
-  parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
+  /** Optional: parses provider response into success/error + asset URL.
+   * Set asyncStarted=true for providers that kick off a long background job
+   * (e.g. HeyGen Talking Head polls 1-3min via EdgeRuntime.waitUntil).
+   * The sweep marks those rows as `async_started` instead of `succeeded`. */
+  parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string; asyncStarted?: boolean; predictionId?: string };
 }
 
 const PROVIDER_MATRIX: ProviderTest[] = [
@@ -199,7 +202,7 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     provider: "Hedra Talking Head",
     model: "hedra/character-3",
     mode: "A+I",
-    estimated_cost_eur: 0.60,
+    estimated_cost_eur: 0.30, // HeyGen photo-avatar pricing
     edge_function: "generate-talking-head",
     buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
       // Prefer the cached HeyGen talking_photo_id from bootstrap (avoids the
@@ -211,6 +214,17 @@ const PROVIDER_MATRIX: ProviderTest[] = [
       aspectRatio: "16:9",
       resolution: "720p",
     }),
+    // HeyGen is async: kick-off returns 200 with status="processing" and no
+    // videoUrl; polling completes 1–3 min later. Classify as `async_started`
+    // (yellow badge) instead of falsely marking the row as succeeded.
+    parseResponse: (json) => {
+      if (!json) return { success: false, error: "Empty response" };
+      if (json.error) return { success: false, error: String(json.error) };
+      if (json.success === true && (json.status === "processing" || json.status === "pending") && !json.videoUrl) {
+        return { success: true, asyncStarted: true, predictionId: json.predictionId };
+      }
+      return defaultParse(json);
+    },
   },
 ];
 
@@ -282,7 +296,7 @@ async function callProvider(
   assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
   authHeader: string,
   signal: AbortSignal,
-): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {
+): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any; predictionId?: string }> {
   const start = Date.now();
   const url = `${SUPABASE_URL}/functions/v1/${test.edge_function}`;
   const payload = test.buildPayload(assets);
@@ -342,6 +356,15 @@ async function callProvider(
         raw: json,
       };
     }
+    if (parsed.asyncStarted) {
+      return {
+        status: "async_started",
+        durationMs,
+        assetUrl: parsed.assetUrl,
+        predictionId: parsed.predictionId,
+        raw: json,
+      };
+    }
     return {
       status: "succeeded",
       durationMs,
@@ -379,8 +402,29 @@ async function runSweep(
 
   try {
     for (const test of tests) {
+      const remaining = cap - totalSpent;
+      if (remaining < test.estimated_cost_eur) {
+        await adminClient.from("qa_live_runs").update({
+          status: "skipped_budget",
+          cost_eur: 0,
+          error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
+          completed_at: new Date().toISOString(),
+        }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+        completed.push({ provider: test.provider, status: "skipped_budget" });
+        continue;
+      }
+
+      // Mark as running BEFORE any slow bootstrap so the UI immediately
+      // shows the spinner instead of a stale "pending" badge.
+      await adminClient.from("qa_live_runs").update({
+        status: "running",
+        started_at: new Date().toISOString(),
+      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+
+      // HeyGen bootstrap on demand (only when the provider needs it and we
+      // don't already have a cached talking_photo_id).
       if (test.edge_function === "generate-talking-head" && !sweepAssets.talkingPhotoId) {
-        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping in background worker`);
+        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping now`);
         try {
           const result = await ensureHeyGenTalkingPhoto(adminClient);
           if (result.ok && result.talking_photo_id) {
@@ -396,30 +440,16 @@ async function runSweep(
         }
       }
 
-      const remaining = cap - totalSpent;
-      if (remaining < test.estimated_cost_eur) {
-        await adminClient.from("qa_live_runs").update({
-          status: "skipped_budget",
-          cost_eur: 0,
-          error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
-          completed_at: new Date().toISOString(),
-        }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-        completed.push({ provider: test.provider, status: "skipped_budget" });
-        continue;
-      }
-
-      // Mark as running
-      await adminClient.from("qa_live_runs").update({
-        status: "running",
-        started_at: new Date().toISOString(),
-      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
       const result = await callProvider(test, sweepAssets, authHeader, ctrl.signal);
       clearTimeout(timer);
 
-      const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
+      // Charge for both real successes and async-started jobs (the spend
+      // commits to the provider the moment the kick-off returns 200).
+      const charged = (result.status === "succeeded" || result.status === "async_started")
+        ? test.estimated_cost_eur
+        : 0;
       totalSpent += charged;
 
       let safeRaw: unknown = null;
@@ -432,12 +462,16 @@ async function runSweep(
         safeRaw = { _unserializable: true };
       }
 
+      const friendlyMessage = result.status === "async_started"
+        ? `Background polling (HeyGen, 1–3 min)${result.predictionId ? ` · video_id=${result.predictionId}` : ""}`
+        : (result.error ?? null);
+
       const { error: updErr } = await adminClient.from("qa_live_runs").update({
         status: result.status,
         cost_eur: charged,
         duration_ms: result.durationMs,
         asset_url: result.assetUrl ?? null,
-        error_message: result.error ?? null,
+        error_message: friendlyMessage,
         raw_response: safeRaw,
         completed_at: new Date().toISOString(),
       }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);

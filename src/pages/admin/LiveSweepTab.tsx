@@ -45,6 +45,9 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-red-500/15 text-red-300 border-red-500/30",
   timeout: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   running: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  // Async provider (e.g. HeyGen Talking Head) — kick-off succeeded,
+  // background polling is in flight (1–3 min). Not a bug, not yet green.
+  async_started: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
   // Intentional non-2xx response (e.g. Pika 410 during provider migration).
   // Documented in code, not a real bug — render in neutral grey.
   expected: "bg-slate-600/20 text-slate-300 border-slate-500/40",
@@ -58,6 +61,7 @@ const TERMINAL_STATUSES = new Set([
   "timeout",
   "expected",
   "skipped_budget",
+  "async_started",
 ]);
 
 export function LiveSweepTab() {
@@ -113,6 +117,7 @@ export function LiveSweepTab() {
       if (allTerminal || timedOut) {
         const ok = rows.filter((r) => r.status === "succeeded").length;
         const expected = rows.filter((r) => r.status === "expected").length;
+        const asyncStarted = rows.filter((r) => r.status === "async_started").length;
         const failed = rows.filter((r) => r.status === "failed").length;
         const timeout = rows.filter((r) => r.status === "timeout").length;
         const skipped = rows.filter((r) => r.status === "skipped_budget").length;
@@ -122,8 +127,8 @@ export function LiveSweepTab() {
             description: "Polling gestoppt. Reload für neuen Status.",
           });
         } else {
-          toast.success(`Sweep abgeschlossen — ${ok + expected}/${rows.length} grün`, {
-            description: `${failed} failed · ${timeout} timeout · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € ausgegeben`,
+          toast.success(`Sweep abgeschlossen — ${ok + expected + asyncStarted}/${rows.length} grün`, {
+            description: `${failed} failed · ${timeout} timeout · ${asyncStarted} async · ${expected} expected · ${skipped} skipped · ${spent.toFixed(2)} € ausgegeben`,
           });
         }
         setActiveSweepId(null);
@@ -303,7 +308,8 @@ export function LiveSweepTab() {
         const sweepSpent = sweepRuns.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         const ok = sweepRuns.filter((r) => r.status === "succeeded").length;
         const expectedCount = sweepRuns.filter((r) => r.status === "expected").length;
-        const effectiveOk = ok + expectedCount;
+        const asyncCount = sweepRuns.filter((r) => r.status === "async_started").length;
+        const effectiveOk = ok + expectedCount + asyncCount;
         return (
           <Card
             key={sweepId}
@@ -316,7 +322,8 @@ export function LiveSweepTab() {
                 </div>
                 <div className="text-sm text-white font-medium">
                   {effectiveOk}/{sweepRuns.length} grün
-                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
+                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""}
+                  {asyncCount > 0 ? ` (${asyncCount} async)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
                 </div>
               </div>
             </div>
