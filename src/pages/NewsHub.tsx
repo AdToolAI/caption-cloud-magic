@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
 const CATEGORY_KEYS = [
   { key: null, icon: Newspaper },

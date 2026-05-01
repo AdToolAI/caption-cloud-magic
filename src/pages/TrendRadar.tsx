@@ -17,6 +17,7 @@ import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Li
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
 import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
 
 interface Trend {
