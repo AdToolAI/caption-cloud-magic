@@ -1,6 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { decryptToken, encryptToken } from '../_shared/crypto.ts';
-import { withTelemetry } from '../_shared/telemetry.ts';
+import { withTelemetry, trackSocialPublish } from '../_shared/telemetry.ts';
 import { generateContentHash } from '../_shared/content-hash.ts';
 import { withTimeout } from '../_shared/timeout.ts';
 import { 
