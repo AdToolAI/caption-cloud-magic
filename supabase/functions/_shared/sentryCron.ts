@@ -8,7 +8,7 @@
  * Monitors are auto-created on first check-in (no manual Sentry setup).
  *
  * Usage:
- *   Deno.serve(withSentryCron("qa-watchdog", "*/2 * * * *", async (req) => {
+ *   Deno.serve(withSentryCron("qa-watchdog", "every 2min", async (req) => {
  *     // existing handler logic
  *   }, { maxRuntimeMinutes: 5 }));
  *
