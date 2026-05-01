@@ -97,7 +97,7 @@ export const PRICING_V21: Record<PlanId, PricingPlan> = {
     currency: '€',
     credits: 2500,
     priceId: 'price_1TSLxWDRu4kfSFxjEJNi8nGN',
-    productId: 'prod_UREZAv0LG9vz1E',
+    productId: 'prod_UOG4wbiQjDONAj',
     checkoutUrl: '',
     features: {
       posting: true,

@@ -31,7 +31,7 @@ export const STRIPE_PRICE_MAP: Record<PlanId, Record<Currency, string>> = {
 export const STRIPE_PRODUCT_MAP: Record<PlanId, string> = {
   free: '',
   basic: 'prod_TIRSoTyzmRpbpT',
-  pro: 'prod_UREZAv0LG9vz1E', // Pro Plan v2 (€29.99 regular)
+  pro: 'prod_UOG4wbiQjDONAj', // Pro Plan v2 (€29.99 regular, canonical "AdTool AI Pro")
   enterprise: 'prod_TIRYBu4fdR2BEw'
 };
 
