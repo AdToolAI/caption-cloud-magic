@@ -53,6 +53,16 @@ export function WatchdogTab() {
     refetchInterval: 10_000,
   });
 
+  const sentry = useQuery({
+    queryKey: ["sentry-cron-status"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("sentry-cron-status", { body: {} });
+      if (error) throw error;
+      return data as { enabled: boolean; org?: string; monitors: Array<{ slug: string; exists: boolean; status?: string; last_check_in?: string | null; link?: string }> };
+    },
+    refetchInterval: 30_000,
+  });
+
   const trigger = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("qa-watchdog", { body: {} });
