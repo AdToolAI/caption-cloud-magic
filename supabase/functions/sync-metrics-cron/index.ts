@@ -1,13 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { recordHeartbeat } from '../_shared/heartbeat.ts';
+import { withSentryCron } from '../_shared/sentryCron.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-Deno.serve(withTelemetry('sync-metrics-cron', async (req) => {
+Deno.serve(withSentryCron('sync-metrics-cron', { schedule: '0 * * * *', maxRuntime: 10 }, withTelemetry('sync-metrics-cron', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -118,4 +119,4 @@ Deno.serve(withTelemetry('sync-metrics-cron', async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
-}));
+})));

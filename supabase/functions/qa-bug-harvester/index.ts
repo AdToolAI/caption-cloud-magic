@@ -69,7 +69,7 @@ function classifyCategory(provider: string, msg: string): string {
   return 'regression';
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryCron('qa-bug-harvester', { schedule: '*/15 * * * *', maxRuntime: 5 }, async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -204,4 +204,4 @@ Deno.serve(async (req) => {
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );
-});
+}));
