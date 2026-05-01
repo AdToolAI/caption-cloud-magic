@@ -420,6 +420,94 @@ serve(withTelemetry('stripe-webhook', async (req) => {
         console.error('[STRIPE-WEBHOOK] Error processing commission:', commissionError);
         // Don't fail the webhook if commission fails
       }
+
+      // === Send branded receipt email to customer ===
+      // Idempotent via deterministic template tag using invoice.id; Resend log dedupes by template.
+      try {
+        const customerEmail = invoice.customer_email
+          || (invoice.customer_address?.email)
+          || null;
+
+        if (customerEmail) {
+          const customerName = invoice.customer_name || customerEmail.split('@')[0];
+          const amount = ((invoice.amount_paid || 0) / 100).toFixed(2);
+          const currency = (invoice.currency || 'eur').toUpperCase();
+          const invoiceNumber = invoice.number || invoice.id;
+          const periodStart = invoice.period_start
+            ? new Date(invoice.period_start * 1000).toLocaleDateString()
+            : '';
+          const periodEnd = invoice.period_end
+            ? new Date(invoice.period_end * 1000).toLocaleDateString()
+            : '';
+          const hostedUrl = invoice.hosted_invoice_url || '';
+          const pdfUrl = invoice.invoice_pdf || '';
+
+          const receiptHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8" /><style>
+  body { font-family: -apple-system, "Segoe UI", Arial, sans-serif; line-height: 1.6; color: #111; background:#f9fafb; margin:0; padding:0; }
+  .container { max-width: 600px; margin: 0 auto; padding: 24px; }
+  .header { background: linear-gradient(135deg, #050816, #1a1a2e); color: #F5C76A; padding: 32px; border-radius: 10px 10px 0 0; text-align: center; }
+  .content { background: #ffffff; padding: 32px; border: 1px solid #e5e7eb; }
+  .footer { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: 0; border-radius: 0 0 10px 10px; text-align: center; color: #6b7280; font-size: 12px; }
+  .amount { font-size: 36px; font-weight: 700; color:#F5C76A; margin: 8px 0; }
+  .meta { background:#f9fafb; padding:18px; border-radius:8px; margin:20px 0; border-left:4px solid #F5C76A; font-size:14px; }
+  .meta strong { color:#050816; }
+  .btn { display:inline-block; background:linear-gradient(135deg, #F5C76A, #d4a84a); color:#050816 !important; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; margin:8px 4px; font-size:14px; }
+  .btn-secondary { display:inline-block; background:#fff; color:#050816 !important; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:600; margin:8px 4px; border:1px solid #e5e7eb; font-size:14px; }
+</style></head><body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin:0; font-family: Georgia, serif;">Payment received</h1>
+      <div class="amount">${amount} ${currency}</div>
+      <p style="margin:0; opacity:0.85; color:#fff;">Thank you for your payment</p>
+    </div>
+    <div class="content">
+      <p>Hi ${customerName},</p>
+      <p>We've received your payment. Your invoice is attached as a PDF and also available below.</p>
+      <div class="meta">
+        <strong>Invoice:</strong> ${invoiceNumber}<br/>
+        <strong>Amount paid:</strong> ${amount} ${currency}<br/>
+        ${periodStart && periodEnd ? `<strong>Period:</strong> ${periodStart} – ${periodEnd}<br/>` : ''}
+        <strong>Date:</strong> ${new Date().toLocaleDateString()}
+      </div>
+      <div style="text-align:center; margin:28px 0;">
+        ${pdfUrl ? `<a href="${pdfUrl}" class="btn">Download invoice (PDF)</a>` : ''}
+        ${hostedUrl ? `<a href="${hostedUrl}" class="btn-secondary">View online</a>` : ''}
+      </div>
+      <p style="color:#6b7280; font-size:13px; margin-top:24px;">
+        If you have any questions about this payment, just reply to this email or contact us at
+        <a href="mailto:info@useadtool.ai" style="color:#050816;">info@useadtool.ai</a>.
+      </p>
+      <p>Best regards,<br/><strong>The AdTool AI Team</strong></p>
+    </div>
+    <div class="footer">
+      <p>This receipt was issued for invoice ${invoiceNumber}.</p>
+      <p>© ${new Date().getFullYear()} AdTool AI. All rights reserved.</p>
+    </div>
+  </div>
+</body></html>`;
+
+          const result = await sendEmail({
+            to: customerEmail,
+            subject: `Receipt for ${amount} ${currency} — Invoice ${invoiceNumber}`,
+            html: receiptHtml,
+            template: `payment_receipt:${invoice.id}`,
+            category: "transactional",
+            replyTo: "info@useadtool.ai",
+          });
+
+          if (!result.ok && !result.skipped) {
+            console.error('[STRIPE-WEBHOOK] Receipt email failed:', result.error);
+          } else {
+            console.log('[STRIPE-WEBHOOK] Receipt email sent to', customerEmail);
+          }
+        } else {
+          console.warn('[STRIPE-WEBHOOK] No customer_email on invoice', invoice.id, '— receipt skipped');
+        }
+      } catch (receiptError) {
+        console.error('[STRIPE-WEBHOOK] Receipt email error:', receiptError);
+        // Never fail the webhook because of a receipt email
+      }
     }
 
     return new Response(JSON.stringify({ received: true }), {
