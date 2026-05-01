@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
 import { withTelemetry } from '../_shared/telemetry.ts';
+import { recordHeartbeat } from '../_shared/heartbeat.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,6 +12,7 @@ Deno.serve(withTelemetry('sync-metrics-cron', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const hbStart = Date.now();
   try {
     // Webhook authentication
     const WEBHOOK_SECRET = Deno.env.get('CRON_WEBHOOK_SECRET');
