@@ -462,12 +462,16 @@ async function runSweep(
         safeRaw = { _unserializable: true };
       }
 
+      const friendlyMessage = result.status === "async_started"
+        ? `Background polling (HeyGen, 1–3 min)${result.predictionId ? ` · video_id=${result.predictionId}` : ""}`
+        : (result.error ?? null);
+
       const { error: updErr } = await adminClient.from("qa_live_runs").update({
         status: result.status,
         cost_eur: charged,
         duration_ms: result.durationMs,
         asset_url: result.assetUrl ?? null,
-        error_message: result.error ?? null,
+        error_message: friendlyMessage,
         raw_response: safeRaw,
         completed_at: new Date().toISOString(),
       }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
