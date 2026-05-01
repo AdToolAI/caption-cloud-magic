@@ -738,9 +738,11 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         {!previewMode && backgroundMusicUrl && frame >= 30 && <Audio src={backgroundMusicUrl} volume={(backgroundMusicVolume || 30) / 100} loop pauseWhenBuffering />}
         {/* Text Overlays */}
         {textOverlays.map((overlay) => {
-          const startFrame = Math.floor(overlay.startTime * fps);
-          const endFrame = overlay.endTime ? Math.floor(overlay.endTime * fps) : durationInFrames;
-          const overlayDuration = endFrame - startFrame;
+          const startFrame = safeFrame(overlay.startTime, fps, durationInFrames - 1);
+          const endFrame = overlay.endTime != null
+            ? safeFrame(overlay.endTime, fps, durationInFrames)
+            : durationInFrames;
+          const overlayDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={overlay.id} from={startFrame} durationInFrames={overlayDuration}>
               <TextOverlayRenderer overlay={overlay as TextOverlayProps} />
@@ -749,8 +751,8 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         })}
         {/* Subtitles */}
         {subtitleTrack?.visible !== false && subtitleTrack?.clips?.map((clip) => {
-          const startFrame = Math.floor(clip.startTime * fps);
-          const endFrame = Math.floor(clip.endTime * fps);
+          const startFrame = safeFrame(clip.startTime, fps, durationInFrames - 1);
+          const endFrame = safeFrame(clip.endTime, fps, durationInFrames);
           const clipDuration = Math.max(1, endFrame - startFrame);
           return (
             <Sequence key={clip.id} from={startFrame} durationInFrames={clipDuration}>
