@@ -414,8 +414,8 @@ async function runSweep(
     // Important: this can take 30–150s on a cold HeyGen account. It MUST stay
     // inside waitUntil/background work; doing it in the request handler causes
     // HTTP 504 IDLE_TIMEOUT before the 202 enqueue response can be sent.
-    const needsHedraBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
-    if (needsHedraBootstrap && !sweepAssets.talkingPhotoId) {
+    const needsHeyGenBootstrap = tests.some((t) => t.edge_function === "generate-talking-head");
+    if (needsHeyGenBootstrap && !sweepAssets.talkingPhotoId) {
       console.log(`[sweep ${sweepId}] HeyGen bootstrap queued in background…`);
       try {
         const result = await ensureHeyGenTalkingPhoto(adminClient);
