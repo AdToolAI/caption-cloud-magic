@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 const STORAGE_KEY = 'adtool_url_coupon';
 
