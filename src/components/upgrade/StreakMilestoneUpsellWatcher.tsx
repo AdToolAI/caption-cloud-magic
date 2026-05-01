@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
 import { useUpgradeTrigger } from "@/hooks/useUpgradeTrigger";
 import { PlanId } from "@/config/pricing";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 /**
  * After the user reaches a meaningful streak milestone (7d / 30d / 60d / 100d),
