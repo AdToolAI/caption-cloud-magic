@@ -22,6 +22,7 @@ import { CloudStorageConnect } from "@/components/media-library/CloudStorageConn
 import { MediaAlbumManager } from "@/components/media-library/MediaAlbumManager";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
+import { enforceLimits, deleteMediaItem, type CleanupMediaItem } from "@/lib/media-library/autoCleanup";
 
 // Storage Limits
 const MAX_VIDEOS = 500;
@@ -481,40 +482,57 @@ export default function MediaLibrary() {
     const file = e.target.files[0];
     const isVideo = file.type.startsWith('video/');
     const isImage = file.type.startsWith('image/');
-    
-    // Check specific limits
-    const currentVideoCount = media.filter(m => m.type === 'video').length;
-    const currentImageCount = media.filter(m => m.type === 'image').length;
-    
-    if (isVideo && currentVideoCount >= MAX_VIDEOS) {
-      toast({
-        title: 'Video-Limit erreicht',
-        description: `Maximal ${MAX_VIDEOS} Videos erlaubt.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    if (isImage && currentImageCount >= MAX_IMAGES) {
-      toast({
-        title: 'Bilder-Limit erreicht',
-        description: `Maximal ${MAX_IMAGES.toLocaleString('de-DE')} Bilder erlaubt.`,
-        variant: 'destructive',
-      });
-      return;
-    }
-    
-    // Check storage quota
     const fileSizeMb = file.size / 1024 / 1024;
-    if (storageQuota.used_mb + fileSizeMb > MAX_STORAGE_GB * 1024) {
-      toast({
-        title: 'Storage-Limit erreicht',
-        description: `Maximal ${MAX_STORAGE_GB} GB Speicher.`,
-        variant: 'destructive',
-      });
+
+    // Auto-FIFO cleanup (or block if cloud connected)
+    const decision = enforceLimits<CleanupMediaItem>({
+      media: media as CleanupMediaItem[],
+      incoming: { type: isVideo ? 'video' : 'image', sizeMb: fileSizeMb },
+      hasCloud: !!cloudConnection,
+      limits: { maxVideos: MAX_VIDEOS, maxImages: MAX_IMAGES, maxStorageMb: MAX_STORAGE_GB * 1024 },
+      currentUsedMb: storageQuota.used_mb,
+    });
+
+    if (decision.blocked) {
+      if (decision.blockReason === 'cloud_offload_required') {
+        toast({
+          title: 'Speicher-Limit erreicht',
+          description: 'Bitte lagere ältere Medien in deine verbundene Google Drive aus, um Platz zu schaffen.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Limit erreicht',
+          description: 'Keine alten Medien zum Freigeben gefunden. Bitte manuell löschen oder Google Drive verbinden.',
+          variant: 'destructive',
+        });
+      }
+      const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
       return;
     }
-    
+
+    if (decision.toDelete.length > 0) {
+      try {
+        for (const item of decision.toDelete) {
+          await deleteMediaItem(item);
+        }
+        toast({
+          title: 'Platz geschaffen',
+          description: `${decision.toDelete.length} ältere${decision.toDelete.length === 1 ? 's' : ''} Medi${decision.toDelete.length === 1 ? 'um wurde' : 'en wurden'} automatisch entfernt. Tipp: Verbinde Google Drive, um Medien stattdessen sicher auszulagern.`,
+        });
+      } catch (cleanupErr: any) {
+        toast({
+          title: 'Auto-Cleanup fehlgeschlagen',
+          description: cleanupErr?.message || 'Bitte manuell ältere Medien löschen.',
+          variant: 'destructive',
+        });
+        const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {

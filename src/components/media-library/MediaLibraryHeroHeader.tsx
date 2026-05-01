@@ -279,8 +279,8 @@ export const MediaLibraryHeroHeader = ({
           <p className="text-xs text-muted-foreground flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
             <span>
-              <strong>Speicherlimit:</strong> Maximal {maxVideos.toLocaleString('de-DE')} Videos oder {maxImages.toLocaleString('de-DE')} Bilder oder {maxGB} GB. 
-              Bei Überschreitung werden automatisch die ältesten Medien gelöscht.
+              <strong>Speicherlimit:</strong> Maximal {maxVideos.toLocaleString('de-DE')} Videos oder {maxImages.toLocaleString('de-DE')} Bilder oder {maxGB} GB.
+              Bei Überschreitung werden automatisch die ältesten Medien gelöscht. Verbinde Google Drive, um Medien stattdessen sicher auszulagern.
             </span>
           </p>
         </motion.div>
