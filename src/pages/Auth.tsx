@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
 import { motion } from "framer-motion";
+import { AuthStatusIndicator } from "@/components/system-status/AuthStatusIndicator";
 
 const Auth = () => {
   const { t } = useTranslation();
