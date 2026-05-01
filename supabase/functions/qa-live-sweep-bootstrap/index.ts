@@ -15,6 +15,133 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const HEYGEN_API_KEY = Deno.env.get("HEYGEN_API_KEY");
+
+const HEYGEN_UPLOAD_BASE = "https://upload.heygen.com/v1";
+const HEYGEN_BASE_V1 = "https://api.heygen.com/v1";
+const HEYGEN_BASE_V2 = "https://api.heygen.com/v2";
+
+/**
+ * Ensures we have a cached HeyGen talking_photo_id in `system_config`.
+ * This is a permanent reusable photo so the Live Sweep never trips the
+ * per-account 3-photo limit (error 401028). If a cached id exists and is
+ * still valid on HeyGen, we keep it; otherwise we prune custom photos and
+ * upload a fresh one from the bootstrap portrait.
+ */
+async function ensureHeyGenTalkingPhoto(
+  admin: any,
+): Promise<{ ok: boolean; talking_photo_id?: string; reused?: boolean; error?: string }> {
+  if (!HEYGEN_API_KEY) {
+    return { ok: false, error: "HEYGEN_API_KEY not configured" };
+  }
+
+  // 1. Try to read cached id from system_config
+  const CFG_KEY = "qa.heygen_talking_photo_id";
+  const { data: cfgRow } = await admin
+    .from("system_config")
+    .select("value")
+    .eq("key", CFG_KEY)
+    .maybeSingle();
+  const cachedId: string | undefined =
+    typeof cfgRow?.value === "string"
+      ? cfgRow.value
+      : (cfgRow?.value && typeof cfgRow.value === "object" && "id" in cfgRow.value
+          ? String((cfgRow.value as any).id)
+          : undefined);
+
+  // 2. If cached, validate by listing — if HeyGen still has it, reuse.
+  if (cachedId) {
+    try {
+      const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+        headers: { "X-Api-Key": HEYGEN_API_KEY, accept: "application/json" },
+      });
+      if (listRes.ok) {
+        const json = await listRes.json();
+        const items: any[] = Array.isArray(json?.data) ? json.data : [];
+        if (items.some((x) => x?.id === cachedId)) {
+          console.log(`[bootstrap] reusing cached HeyGen talking_photo_id=${cachedId}`);
+          return { ok: true, talking_photo_id: cachedId, reused: true };
+        }
+        console.warn(`[bootstrap] cached talking_photo_id=${cachedId} no longer on HeyGen, re-uploading`);
+      }
+    } catch (e) {
+      console.warn(`[bootstrap] HeyGen list failed, attempting fresh upload:`, e);
+    }
+  }
+
+  // 3. Aggressive prune: delete ALL custom talking photos so we have headroom.
+  try {
+    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+      headers: { "X-Api-Key": HEYGEN_API_KEY, accept: "application/json" },
+    });
+    if (listRes.ok) {
+      const json = await listRes.json();
+      const items: any[] = Array.isArray(json?.data) ? json.data : [];
+      const custom = items.filter((x) => !x?.is_preset);
+      console.log(`[bootstrap] pruning ${custom.length} custom HeyGen photos before fresh upload`);
+      for (const item of custom) {
+        if (!item?.id) continue;
+        const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${item.id}`, {
+          method: "DELETE",
+          headers: { "X-Api-Key": HEYGEN_API_KEY },
+        });
+        console.log(`[bootstrap] HeyGen delete ${item.id} -> ${dr.status}`);
+      }
+    }
+  } catch (e) {
+    console.warn(`[bootstrap] HeyGen prune failed (non-fatal):`, e);
+  }
+
+  // 4. Fetch the bootstrap portrait we already provisioned.
+  let portraitBlob: Blob;
+  let contentType = "image/jpeg";
+  try {
+    const { data: signed } = await admin.storage
+      .from("qa-test-assets")
+      .createSignedUrl("test-portrait.png", 600);
+    if (!signed?.signedUrl) throw new Error("no signed url for test-portrait.png");
+    const r = await fetch(signed.signedUrl);
+    if (!r.ok) throw new Error(`portrait fetch ${r.status}`);
+    portraitBlob = await r.blob();
+    const ct = (portraitBlob.type || "image/jpeg").toLowerCase();
+    contentType = ct === "image/png" ? "image/png" : "image/jpeg";
+  } catch (e: any) {
+    return { ok: false, error: `Failed to fetch bootstrap portrait: ${e?.message || e}` };
+  }
+
+  // 5. Upload to HeyGen.
+  try {
+    const buf = await portraitBlob.arrayBuffer();
+    const upRes = await fetch(`${HEYGEN_UPLOAD_BASE}/talking_photo`, {
+      method: "POST",
+      headers: {
+        "X-Api-Key": HEYGEN_API_KEY,
+        "Content-Type": contentType,
+        accept: "application/json",
+      },
+      body: buf,
+    });
+    const respText = await upRes.text();
+    if (!upRes.ok) {
+      return { ok: false, error: `HeyGen upload ${upRes.status}: ${respText.slice(0, 200)}` };
+    }
+    const json = JSON.parse(respText);
+    const newId = json?.data?.talking_photo_id;
+    if (!newId) {
+      return { ok: false, error: `HeyGen upload missing talking_photo_id: ${respText.slice(0, 200)}` };
+    }
+
+    // 6. Persist in system_config (upsert).
+    await admin.from("system_config").upsert(
+      { key: CFG_KEY, value: newId, updated_at: new Date().toISOString() },
+      { onConflict: "key" },
+    );
+    console.log(`[bootstrap] cached new HeyGen talking_photo_id=${newId}`);
+    return { ok: true, talking_photo_id: newId, reused: false };
+  } catch (e: any) {
+    return { ok: false, error: `HeyGen upload exception: ${e?.message || e}` };
+  }
+}
 
 // Reliable public MP4/MP3 samples — Big Buck Bunny H.264/AAC is the de-facto
 // industry test sample and plays cleanly in Chromium on Lambda. The previous
@@ -369,6 +496,18 @@ Deno.serve(async (req) => {
       return { blob: new Blob([png], { type: "image/png" }), contentType: "image/png" };
     }, { minBytes: 200, expectedMimePrefix: "image/" }),
   );
+
+  // 6. HeyGen cached talking_photo_id — uploaded once, reused by every sweep.
+  // Avoids HeyGen's per-account 3-photo limit (error 401028) on every run.
+  const heygenResult = await ensureHeyGenTalkingPhoto(adminClient);
+  results.push({
+    uploaded: heygenResult.ok && !heygenResult.reused,
+    repaired: heygenResult.ok && !heygenResult.reused,
+    path: "system_config:qa.heygen_talking_photo_id",
+    reason: heygenResult.reused ? "reused-cached" : (heygenResult.ok ? "uploaded-fresh" : undefined),
+    error: heygenResult.error,
+    talking_photo_id: heygenResult.talking_photo_id,
+  });
 
   return new Response(
     JSON.stringify({

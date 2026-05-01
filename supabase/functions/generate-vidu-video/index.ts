@@ -292,20 +292,7 @@ serve(async (req) => {
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Rate limit
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("ai_video_generations")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", oneHourAgo);
-    if (count && count >= 10) {
-      return new Response(
-        JSON.stringify({ error: "Rate limit exceeded. Max 10 videos per hour.", retryAfter: 3600 }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
+      // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Augment prompt with reference roles for better consistency
     const refSuffix = model === "vidu-q2-reference"

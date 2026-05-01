@@ -26,6 +26,12 @@ interface TalkingHeadRequest {
   customVoiceId?: string;
   aspectRatio?: '16:9' | '9:16' | '1:1';
   resolution?: '480p' | '720p';
+  /**
+   * Optional: a pre-existing HeyGen `talking_photo_id`. When supplied, the
+   * function skips the image upload entirely (and therefore the per-account
+   * 3-photo limit). Used by the QA Live Sweep to reuse a cached portrait.
+   */
+  talkingPhotoId?: string;
 }
 
 // ---------- ElevenLabs TTS (unchanged from previous version) ----------
@@ -387,10 +393,11 @@ Deno.serve(async (req) => {
       customVoiceId,
       aspectRatio = '9:16',
       resolution = '720p',
+      talkingPhotoId: presetTalkingPhotoId,
     } = body;
 
-    if (!imageUrl) {
-      return new Response(JSON.stringify({ error: 'imageUrl is required' }), {
+    if (!imageUrl && !presetTalkingPhotoId) {
+      return new Response(JSON.stringify({ error: 'imageUrl or talkingPhotoId is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -409,12 +416,20 @@ Deno.serve(async (req) => {
     }
     if (!audioUrl) throw new Error('Audio URL missing after synthesis');
 
-    // Step 2: Upload the image as a Talking Photo to HeyGen.
-    // The audio is passed directly as URL in the V2 video.generate call,
-    // which avoids a second upload round-trip + the upload subdomain quirks.
-    console.log(`[talking-head] Uploading talking-photo image to HeyGen…`);
-    const talkingPhotoId = await uploadHeyGenTalkingPhoto(imageUrl);
-    console.log(`[talking-head] talking_photo_id=${talkingPhotoId}`);
+    // Step 2: Resolve the HeyGen talking_photo_id.
+    // - If the caller supplied a preset talkingPhotoId (QA Live Sweep cached
+    //   bootstrap photo), reuse it and skip the upload entirely. This avoids
+    //   HeyGen's per-account 3-photo limit (error 401028).
+    // - Otherwise upload the image as a fresh Talking Photo.
+    let talkingPhotoId: string;
+    if (presetTalkingPhotoId) {
+      console.log(`[talking-head] reusing preset talking_photo_id=${presetTalkingPhotoId}`);
+      talkingPhotoId = presetTalkingPhotoId;
+    } else {
+      console.log(`[talking-head] Uploading talking-photo image to HeyGen…`);
+      talkingPhotoId = await uploadHeyGenTalkingPhoto(imageUrl);
+      console.log(`[talking-head] talking_photo_id=${talkingPhotoId}`);
+    }
 
     // Step 3: Create video generation job (audio passed as URL, not asset)
     const dimension = mapDimension(aspectRatio, resolution);

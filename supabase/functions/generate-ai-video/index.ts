@@ -78,27 +78,7 @@ serve(async (req) => {
     const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['sora-2-standard'];
     const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
     const totalCost = duration * costPerSecond;
-
-    // Check rate limit (max 10 videos per hour per user)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-
-    const { count, error: countError } = await supabaseAdmin
-      .from('ai_video_generations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .gte('created_at', oneHourAgo);
-
-    if (countError) throw countError;
-
-    if (count && count >= 10) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Rate limit exceeded. Max 10 videos per hour.',
-          retryAfter: 3600 
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+      // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Check wallet balance with currency
     const { data: wallet, error: walletError } = await supabaseAdmin

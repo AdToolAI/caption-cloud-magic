@@ -29,7 +29,9 @@ interface ProviderTest {
   mode: string;
   estimated_cost_eur: number;
   edge_function: string;
-  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string }) => Record<string, unknown>;
+  /** Optional per-provider timeout override (ms). Defaults to 90_000. */
+  timeoutMs?: number;
+  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
 }
@@ -54,6 +56,9 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "T2A",
     estimated_cost_eur: 0.05,
     edge_function: "generate-music-track",
+    // Stable Audio cold-starts on Replicate frequently take 120-150s. 90s was
+    // too aggressive — bump to 180s so we don't false-positive a slow render.
+    timeoutMs: 180_000,
     buildPayload: () => ({
       prompt: "calm ambient electronic background, 10 seconds",
       duration: 10,
@@ -180,9 +185,11 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "A+I",
     estimated_cost_eur: 0.60,
     edge_function: "generate-talking-head",
-    buildPayload: ({ portrait, image, audio }) => ({
-      // Prefer the dedicated face portrait (HeyGen requires a detectable face).
-      // Fallback to generic test image only if the portrait is not provisioned.
+    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
+      // Prefer the cached HeyGen talking_photo_id from bootstrap (avoids the
+      // per-account 3-photo limit). Fall back to the bootstrap portrait
+      // image, then the generic test image.
+      ...(talkingPhotoId ? { talkingPhotoId } : {}),
       imageUrl: portrait || image,
       audioUrl: audio,
       aspectRatio: "16:9",
@@ -223,17 +230,36 @@ async function getTestAssets(supabase: any) {
       return fallback;
     }
   };
+  // Read cached HeyGen talking_photo_id (set by qa-live-sweep-bootstrap).
+  let talkingPhotoId: string | undefined;
+  try {
+    const { data: cfg } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", "qa.heygen_talking_photo_id")
+      .maybeSingle();
+    if (cfg?.value) {
+      talkingPhotoId = typeof cfg.value === "string"
+        ? cfg.value
+        : (typeof cfg.value === "object" && "id" in cfg.value
+            ? String((cfg.value as any).id)
+            : undefined);
+    }
+  } catch (e) {
+    console.warn("[live-sweep] read cached talking_photo_id failed:", e);
+  }
   return {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
     audio: await tryUrl("test-audio.mp3", FALLBACK_AUDIO),
     portrait: await tryUrl("test-portrait.png", FALLBACK_IMAGE),
+    talkingPhotoId,
   };
 }
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string; portrait: string },
+  assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string },
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {
@@ -401,9 +427,10 @@ Deno.serve(async (req) => {
       .select()
       .single();
 
-    // 90s per-provider timeout (most providers respond < 60s)
+    // Per-provider timeout. Default 90s; providers can opt into longer
+    // windows via test.timeoutMs (e.g. Stable Audio cold-start needs 180s).
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 90_000);
+    const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
 
     const result = await callProvider(test, assets, authHeader, ctrl.signal);
     clearTimeout(timer);
