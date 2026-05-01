@@ -331,6 +331,10 @@ export default function QACockpit() {
               <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
               Watchdog
             </TabsTrigger>
+            <TabsTrigger value="probes" className="text-[#F5C76A]">
+              <Activity className="h-3.5 w-3.5 mr-1.5" />
+              Probes
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
