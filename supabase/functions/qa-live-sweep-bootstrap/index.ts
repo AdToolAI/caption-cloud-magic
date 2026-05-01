@@ -152,6 +152,94 @@ function adler32(buf: Uint8Array): number {
   return ((b << 16) | a) >>> 0;
 }
 
+// Force-replaces test-portrait.png with a fresh face image. Tries multiple
+// sources because HeyGen's face detector occasionally rejects synthetic faces.
+async function provisionPortrait(
+  admin: any,
+): Promise<{ uploaded: boolean; replaced: boolean; path: string; source?: string; size?: number; error?: string }> {
+  const path = "test-portrait.png";
+  const sources: Array<() => Promise<{ blob: Blob; contentType: string; source: string } | null>> = [
+    // Primary: thispersondoesnotexist.com — synthetic but reliably a single, frontal, large face.
+    async () => {
+      try {
+        const r = await fetch("https://thispersondoesnotexist.com/", {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableBootstrap/1.0)" },
+        });
+        if (!r.ok) return null;
+        const blob = await r.blob();
+        if (blob.size < 20_000) return null;
+        return { blob, contentType: r.headers.get("content-type") || "image/jpeg", source: "thispersondoesnotexist" };
+      } catch (e) {
+        console.warn("[bootstrap] thispersondoesnotexist failed:", e);
+        return null;
+      }
+    },
+    // Secondary: AI Gateway portrait generation.
+    async () => {
+      if (!LOVABLE_API_KEY) return null;
+      try {
+        const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image",
+            messages: [{
+              role: "user",
+              content:
+                "Photorealistic studio headshot of one adult person centered in frame, looking directly into camera, neutral relaxed expression, mouth closed, eyes open, full face visible, no glasses, no hat, plain light gray background, soft front lighting, shoulders visible, square 1:1 framing, sharp focus on face.",
+            }],
+            modalities: ["image", "text"],
+          }),
+        });
+        if (!aiRes.ok) return null;
+        const json = await aiRes.json();
+        const dataUrl: string | undefined = json?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        if (!dataUrl?.startsWith("data:image/")) return null;
+        const [, base64] = dataUrl.split(",");
+        const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+        if (bytes.byteLength < 20_000) return null;
+        return { blob: new Blob([bytes], { type: "image/png" }), contentType: "image/png", source: "lovable-ai-gateway" };
+      } catch (e) {
+        console.warn("[bootstrap] AI Gateway portrait failed:", e);
+        return null;
+      }
+    },
+    // Tertiary: another fresh attempt at thispersondoesnotexist (different seed each call).
+    async () => {
+      try {
+        const r = await fetch("https://thispersondoesnotexist.com/?retry=" + Date.now(), {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; LovableBootstrap/1.0)" },
+        });
+        if (!r.ok) return null;
+        const blob = await r.blob();
+        if (blob.size < 20_000) return null;
+        return { blob, contentType: r.headers.get("content-type") || "image/jpeg", source: "thispersondoesnotexist-retry" };
+      } catch {
+        return null;
+      }
+    },
+  ];
+
+  let chosen: { blob: Blob; contentType: string; source: string } | null = null;
+  for (const src of sources) {
+    chosen = await src();
+    if (chosen) break;
+  }
+  if (!chosen) {
+    return { uploaded: false, replaced: false, path, error: "All portrait sources failed" };
+  }
+
+  // Always overwrite — bootstrap call is the user's signal "give me a fresh portrait".
+  const { error } = await admin.storage
+    .from("qa-test-assets")
+    .upload(path, chosen.blob, { contentType: chosen.contentType, upsert: true });
+  if (error) {
+    return { uploaded: false, replaced: false, path, source: chosen.source, error: error.message };
+  }
+  console.log(`[bootstrap] portrait replaced via ${chosen.source}, size=${chosen.blob.size}`);
+  return { uploaded: true, replaced: true, path, source: chosen.source, size: chosen.blob.size };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
