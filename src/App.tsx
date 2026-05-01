@@ -85,6 +85,7 @@ const Legal = lazy(() => import("./pages/Legal"));
 const DeleteData = lazy(() => import("./pages/DeleteData"));
 const DeleteAccount = lazy(() => import("./pages/DeleteAccount"));
 const ComingSoon = lazy(() => import("./pages/ComingSoon"));
+const Status = lazy(() => import("./pages/Status"));
 const Credits = lazy(() => import("./pages/Credits"));
 const UpgradeEnterprise = lazy(() => import("./pages/UpgradeEnterprise"));
 const AIMonitoring = lazy(() => import("./pages/AIMonitoring"));
