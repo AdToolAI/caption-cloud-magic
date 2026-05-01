@@ -101,6 +101,13 @@ serve(async (req) => {
 
     const currencySymbol = wallet.currency === 'USD' ? '$' : '€';
     if (wallet.balance_euros < totalCost) {
+      await trackBusinessEvent('credit_insufficient', user.id, {
+        provider: 'hailuo',
+        model,
+        required: totalCost,
+        available: wallet.balance_euros,
+        currency: wallet.currency,
+      }).catch(() => {});
       return new Response(
         JSON.stringify({
           error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
