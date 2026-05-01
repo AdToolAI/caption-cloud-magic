@@ -45,6 +45,9 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "bg-red-500/15 text-red-300 border-red-500/30",
   timeout: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   running: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  // Async provider (e.g. HeyGen Talking Head) — kick-off succeeded,
+  // background polling is in flight (1–3 min). Not a bug, not yet green.
+  async_started: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
   // Intentional non-2xx response (e.g. Pika 410 during provider migration).
   // Documented in code, not a real bug — render in neutral grey.
   expected: "bg-slate-600/20 text-slate-300 border-slate-500/40",
@@ -58,6 +61,7 @@ const TERMINAL_STATUSES = new Set([
   "timeout",
   "expected",
   "skipped_budget",
+  "async_started",
 ]);
 
 export function LiveSweepTab() {
