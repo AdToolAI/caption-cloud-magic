@@ -308,7 +308,8 @@ export function LiveSweepTab() {
         const sweepSpent = sweepRuns.reduce((s, r) => s + Number(r.cost_eur || 0), 0);
         const ok = sweepRuns.filter((r) => r.status === "succeeded").length;
         const expectedCount = sweepRuns.filter((r) => r.status === "expected").length;
-        const effectiveOk = ok + expectedCount;
+        const asyncCount = sweepRuns.filter((r) => r.status === "async_started").length;
+        const effectiveOk = ok + expectedCount + asyncCount;
         return (
           <Card
             key={sweepId}
@@ -321,7 +322,8 @@ export function LiveSweepTab() {
                 </div>
                 <div className="text-sm text-white font-medium">
                   {effectiveOk}/{sweepRuns.length} grün
-                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
+                  {expectedCount > 0 ? ` (${expectedCount} expected)` : ""}
+                  {asyncCount > 0 ? ` (${asyncCount} async)` : ""} · {sweepSpent.toFixed(2)} € ausgegeben
                 </div>
               </div>
             </div>
