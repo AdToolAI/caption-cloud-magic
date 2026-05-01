@@ -1,44 +1,124 @@
-## Problem
+## Ziel
 
-Der Hedra-Eintrag im Live-Sweep bleibt dauerhaft auf **`running`** stehen (siehe DB: `started_at=15:40:41`, `completed_at=null`, `raw_response=null` — kein Error, kein Update). Status `async_started` wird also gar nicht erst geschrieben.
+Drei aufeinander aufbauende Observability-Layer einbauen, die "silent worker death"-Bugs (wie der Hedra-`running`-Stuck) **strukturell unmöglich** machen. Wir starten mit Layer 1 (Heartbeat-Watchdog), weil er sofort schützt und Voraussetzung für die anderen ist.
 
-## Root Cause
+---
 
-1. **`system_config.heygen_talking_photo_id` ist leer** (DB-Query liefert `[]`). Der Cache, der laut Memory den HeyGen-Account-3-Photo-Limit umgehen soll, existiert in dieser Cloud-Instanz nicht.
-2. Daher fällt der Sweep bei jedem Lauf in den vollen Bootstrap: `pruneAllCustom()` (mit `sleep(2000)`-Pausen) → `uploadOnce` → bei 401028 nochmal `sleep+prune+sleep+upload`. Das kann 30–90 s dauern.
-3. **Zusätzlich** macht `generate-talking-head` selbst weitere synchrone HeyGen-Calls (`/v1/asset` Upload + `/v2/video/generate`) bevor es `{success:true,status:"processing"}` zurückgibt — nochmal 10–30 s.
-4. Wenn Hedra als letzter Test in der Kette läuft, sind viele Sekunden Sweep-Zeit bereits verbraucht. Der Background-Worker (gestartet via `EdgeRuntime.waitUntil`) wird dann vom Edge-Runtime gekillt, **bevor** das DB-Update auf `async_started` geschrieben werden kann.
-5. Ergebnis: Zeile bleibt auf `running` → UI pollt ewig.
+## Layer 1 — Heartbeat-Watchdog (jetzt umsetzen)
 
-## Lösung
+### Was passiert
 
-### 1. HeyGen-Bootstrap aus dem Sweep-Worker raus
-In `qa-live-sweep/index.ts` den `ensureHeyGenTalkingPhoto`-Aufruf **vor** dem Worker erledigen — direkt im Request-Handler, der das 202 zurückgibt. Vorteil: Der teure Prune+Upload läuft im normalen Edge-Function-Lifecycle (mit Idle-Timeout), nicht im Background-Worker, und sein Ergebnis wird einmal gecached. 
+Eine **interne** Watchdog-Edge-Function läuft alle 2 Minuten per pg_cron und prüft eigenständig auf hängende Prozesse — kein externer SaaS, keine zusätzlichen Kosten, sofortige Wirkung. Bei Anomalien wird automatisch ein `qa_bug_reports`-Eintrag (severity `high`) erzeugt und im QA-Cockpit als roter Alert angezeigt.
 
-Alternative falls 150 s knapp wird: Bootstrap als **eigene Edge-Function** triggern (`qa-live-sweep-bootstrap`, existiert bereits gemäß Kommentar in Z. 264) und `EdgeRuntime.waitUntil` warten lassen. Wir wählen Variante A (inline vor `waitUntil`), da die existierende `qa-live-sweep-bootstrap`-Funktion den Cache schreibt und beim nächsten Sweep-Start sofort genutzt werden kann.
+### Geprüfte Symptome
 
-### 2. ID nach erfolgreichem Bootstrap persistieren
-`heygen-bootstrap.ts` schreibt das Ergebnis bereits via `persistId(admin, up.id)` in `system_config`. Sicherstellen, dass der Key tatsächlich `heygen_talking_photo_id` (oder `qa.heygen_talking_photo_id` gemäß Memory) lautet und nach dem nächsten Lauf in der DB landet. Falls der Key falsch geschrieben ist, korrigieren.
+1. **`qa_live_runs`**: Zeilen mit `status IN ('pending','running','async_started')` älter als 10 min → auto-fail + Bug-Report
+2. **`autopilot_queue`**: Slots in `generating_video`/`generating_image` älter als 15 min → auto-fail + Refund-Trigger + Bug-Report
+3. **Lambda-Renders**: `lambda_health_metrics` ohne `completed_at` älter als 20 min → Bug-Report
+4. **Provider-Quoten**: Wenn in den letzten 10 min >50% einer `provider_quota_log`-Provider-Gruppe failed sind → Bug-Report (Provider-Outage-Detection)
+5. **Cron-Heartbeats**: Wenn `autopilot-cron-poller` oder `qa-bug-harvester` länger als ihr 2× Intervall keinen Eintrag in einer neuen `cron_heartbeats`-Tabelle hat → Bug-Report
 
-### 3. Watchdog für stale `running`-Rows
-Direkt nach dem `for`-Loop im Background-Worker einen "finalize"-Schritt hinzufügen: alle `qa_live_runs` zu diesem `sweep_id`, die noch auf `running` oder `pending` stehen und kein `completed_at` haben, automatisch auf **`failed`** mit `error_message: "Worker timeout: status update lost"` setzen. Schützt vor jedem zukünftigen Drop-Out.
+### Neue Komponenten
 
-Zusätzlich: einen einmaligen Recovery-Aufruf vor jedem neuen Sweep, der **alte** `running`-Zeilen (>10 min ohne Update) auf `failed` setzt — bereinigt die aktuell hängende Zeile beim nächsten Klick.
+- **Tabelle** `cron_heartbeats` (job_name, last_run_at, last_status) — jeder Cron-Job schreibt am Ende seinen Heartbeat
+- **Edge-Function** `qa-watchdog` — führt die 5 Checks aus, erzeugt Bug-Reports, returnt Summary
+- **pg_cron-Job** `qa-watchdog-tick` alle 2 Minuten
+- **Cockpit-Tab** "Watchdog" in `/admin/qa-cockpit` zeigt: letzte 50 Watchdog-Runs, aktive Anomalien, Heartbeat-Status aller Cron-Jobs als grün/gelb/rote Lampen
 
-### 4. Hedra-Test als ersten Eintrag rendern
-Die `PROVIDER_TESTS`-Reihenfolge so umstellen, dass **Hedra als erster** Test läuft. Damit ist der teuerste Provider erledigt, bevor das Worker-Wall-Clock-Budget knapp wird.
+### Integration in bestehende Funktionen
 
-### 5. Re-Deploy + Verifikation
-- `qa-live-sweep` neu deployen
-- Sweep auslösen, beobachten:
-  - alte `running`-Zeile sofort auf `failed` (Recovery)
-  - Hedra-Zeile geht **direkt** auf `async_started` (gelb), nicht mehr auf `running` hängend
-  - Restliche 11 Tests grün
+- `qa-live-sweep`, `autopilot-cron-poller`, `qa-bug-harvester`, `cron-poller` schreiben am Ende `cron_heartbeats` (1 Zeile pro Job-Name, upsert)
+- `qa-watchdog` ruft am Ende auch sich selbst auf den Heartbeat
 
-## Files
+### Akzeptanzkriterien
 
-- `supabase/functions/qa-live-sweep/index.ts` (Bootstrap-Reordering, Watchdog, Test-Reihenfolge, Stale-Recovery beim Start)
-- `supabase/functions/_shared/heygen-bootstrap.ts` (sicherstellen, dass `persistId` den richtigen Key schreibt)
-- `mem://features/qa-agent/live-sweep-async-pattern` (Update: "Bootstrap läuft im Request-Handler vor `waitUntil`")
+- Hänge-Test: Manuell eine `qa_live_runs`-Zeile auf `running` mit `started_at = now() - 15 min` setzen → innerhalb von 2 min auto-failed + Bug-Report sichtbar
+- Heartbeat-Test: pg_cron für `autopilot-cron-poller` deaktivieren → nach 4 min erscheint roter Bug "autopilot-cron-poller stale heartbeat"
 
-Soll ich loslegen?
+---
+
+## Layer 2 — Sentry Cron Monitors (nach Layer 1)
+
+### Was passiert
+
+Sentry hat eingebaute **Cron Monitors**: pro Job sendet man bei Start ein "in_progress" und bei Ende "ok"/"error". Wenn das Ende-Signal ausbleibt, alarmiert Sentry automatisch — auch wenn der gesamte Edge-Function-Worker tot ist (anders als Layer 1, der von der DB lebt).
+
+### Voraussetzung
+
+Sentry-Projekt + `SENTRY_DSN`-Secret. Du nutzt Sentry bereits (`src/pages/admin/SentryDashboard.tsx`).
+
+### Neue Komponenten
+
+- **Helper** `_shared/sentry-cron.ts` mit `withSentryCron(monitorSlug, schedule, fn)`-Wrapper
+- **Wrapping** für: `qa-live-sweep`, `qa-watchdog`, `autopilot-cron-poller`, `cron-poller`, `qa-bug-harvester`, `analyze-ad-campaign-performance`
+- **Sentry-Dashboard-Link** im neuen Cockpit-Tab "Cron Health"
+
+### Akzeptanzkriterien
+
+- Edge-Function während Lauf manuell killen → Sentry-Alert "missed check-in" innerhalb 1 min in Sentry + im Cockpit-Tab als rotes Banner
+- Alle 6 Cron-Jobs im Sentry "Crons"-Dashboard mit grüner Heartbeat-Linie
+
+---
+
+## Layer 3 — Inngest Durable Workflows (nach Layer 2)
+
+### Was passiert
+
+Die fragilen `EdgeRuntime.waitUntil`-Worker (HeyGen-Bootstrap, Lambda-Polling, Replicate-Polling, Composer-Stitch) werden auf **Inngest Steps** migriert. Inngest garantiert: jeder Step retry-fähig, jeder Timeout konfigurierbar, jeder Fehler triggert automatisch Refund-Step. Connector ist bereits verfügbar (`inngest`).
+
+### Migration Scope (in dieser Reihenfolge)
+
+1. **HeyGen Talking Photo Bootstrap** (`_shared/heygen-bootstrap.ts`) → Inngest function `heygen.bootstrap`
+2. **Talking Head Render Polling** (`generate-talking-head` waitUntil-Block) → Inngest function `heygen.render.poll`
+3. **Lambda Render Polling** (`render-directors-cut` polling) → Inngest function `lambda.render.poll`
+4. **Autopilot Video Generation** (`autopilot-cron-poller` Replicate-Polling) → Inngest function `autopilot.video.generate`
+5. **Composer Multi-Scene Stitch** → Inngest function `composer.stitch`
+
+### Pattern pro Migration
+
+- Edge-Function returnt 202 + `event_id` sofort
+- `sendInngestEvent('app/heygen.bootstrap.requested', {...})` triggert durable workflow
+- Inngest function läuft mit Step-Retries (max 3, exp. backoff), `step.sleep`, `step.run`
+- Bei Failure-Step: automatischer Refund-Call + Bug-Report
+- Frontend pollt unverändert die DB-Status-Spalte (Inngest schreibt sie)
+
+### Neue Komponenten
+
+- **Edge-Function** `inngest-serve` mit allen 5 durable workflows (default-export `serve` von `inngest/deno`)
+- **Helper** `_shared/inngest.ts` mit `sendInngestEvent`-Wrapper
+- **Cockpit-Tab** "Workflows" mit Inngest-REST-API-Anbindung: zeigt letzte 100 Runs, Status, Retry-Count, Sentry-Links
+
+### Akzeptanzkriterien
+
+- HeyGen-Bootstrap manuell um 60s künstlich verzögern → Step retried 2× und completed; UI bleibt responsiv
+- Replicate-API auf 503 mocken → Autopilot-Video-Step retried, refundet automatisch nach 3 Fails
+- Inngest-Dashboard zeigt durable runs mit Step-Timeline
+
+---
+
+## Reihenfolge & Aufwand
+
+| Layer | Aufwand | Sofortiger Schutz | Wann |
+|---|---|---|---|
+| **1. Heartbeat-Watchdog** | ~1 Stunde | ✅ deckt 90% der Stuck-Bugs | **Jetzt** |
+| **2. Sentry Cron Monitors** | ~30 min | ✅ deckt komplette Worker-Deaths | Direkt nach Layer 1 |
+| **3. Inngest Durable Workflows** | ~3–4 Stunden, 5 Migrationen | ✅ macht Bugs strukturell unmöglich | Nach Layer 1+2 stabil |
+
+---
+
+## Memory-Updates
+
+- Neu: `mem://infrastructure/observability/heartbeat-watchdog-architecture` (Layer 1)
+- Neu: `mem://infrastructure/observability/sentry-cron-monitors-pattern` (Layer 2)
+- Neu: `mem://infrastructure/observability/inngest-durable-workflows-migration` (Layer 3)
+- Update: `mem://features/qa-agent/architecture` mit Watchdog-Tab-Referenz
+
+---
+
+## Was wir jetzt bauen
+
+**Nur Layer 1**: `cron_heartbeats`-Tabelle + `qa-watchdog`-Edge-Function + pg_cron + Cockpit-Tab "Watchdog" + Heartbeat-Schreiben in den 4 bestehenden Cron-Jobs.
+
+Layer 2 und 3 starten wir jeweils nach grünem Live-Sweep & Watchdog-Run.
+
+Soll ich loslegen mit Layer 1?

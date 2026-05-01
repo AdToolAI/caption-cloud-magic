@@ -6131,6 +6131,39 @@ export type Database = {
           },
         ]
       }
+      cron_heartbeats: {
+        Row: {
+          consecutive_failures: number
+          expected_interval_seconds: number
+          job_name: string
+          last_duration_ms: number | null
+          last_error: string | null
+          last_run_at: string
+          last_status: string
+          updated_at: string
+        }
+        Insert: {
+          consecutive_failures?: number
+          expected_interval_seconds?: number
+          job_name: string
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_run_at?: string
+          last_status?: string
+          updated_at?: string
+        }
+        Update: {
+          consecutive_failures?: number
+          expected_interval_seconds?: number
+          job_name?: string
+          last_duration_ms?: number | null
+          last_error?: string | null
+          last_run_at?: string
+          last_status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       custom_voices: {
         Row: {
           created_at: string | null
@@ -10328,6 +10361,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      qa_watchdog_runs: {
+        Row: {
+          anomalies_found: number
+          bugs_created: number
+          duration_ms: number | null
+          id: string
+          ran_at: string
+          rows_auto_failed: number
+          summary: Json
+        }
+        Insert: {
+          anomalies_found?: number
+          bugs_created?: number
+          duration_ms?: number | null
+          id?: string
+          ran_at?: string
+          rows_auto_failed?: number
+          summary?: Json
+        }
+        Update: {
+          anomalies_found?: number
+          bugs_created?: number
+          duration_ms?: number | null
+          id?: string
+          ran_at?: string
+          rows_auto_failed?: number
+          summary?: Json
+        }
+        Relationships: []
       }
       rate_limit_state: {
         Row: {
