@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
+import { sendEmail } from "../_shared/email-send.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
