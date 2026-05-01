@@ -70,6 +70,10 @@ export interface ToolkitModel {
   tagline?: string;
   /** Legacy URL that used to host the dedicated studio (used for redirect compat). */
   legacyRoute: string;
+  /** Operational status. Defaults to 'live' when omitted. */
+  status?: 'live' | 'beta' | 'maintenance' | 'coming_soon';
+  /** Optional human-readable reason shown in tooltip / disabled hint. */
+  statusReason?: string;
 }
 
 const sharedAspect = ['16:9', '9:16', '1:1'];
