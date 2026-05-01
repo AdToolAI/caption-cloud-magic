@@ -74,6 +74,7 @@ export default function HubPage() {
   };
 
   const HubIcon = hub.icon;
+  const isComingSoon = !!hub.comingSoon;
 
   return (
     <PageWrapper className="relative p-6 md:p-10 max-w-6xl mx-auto">
