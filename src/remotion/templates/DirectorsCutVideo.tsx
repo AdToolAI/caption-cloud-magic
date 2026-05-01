@@ -6,6 +6,7 @@ import { slide } from '@remotion/transitions/slide';
 import { wipe } from '@remotion/transitions/wipe';
 import { resolveTransitions, findActiveTransition } from '../../utils/transitionResolver';
 import { safeInterpolate as interpolate, safeDuration } from '../utils/safeInterpolate';
+import { safeFrame, safeDurationFrames, isValidRemoteMediaUrl } from '../utils/safeFrame';
 import { z } from 'zod';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter, VHSScanlines, VignetteOverlay } from '../components/SVGFilters';
 import { TextOverlayRenderer, TextOverlayProps } from '../components/TextOverlayRenderer';
