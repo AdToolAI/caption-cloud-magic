@@ -17,6 +17,17 @@ const FEATURES: Array<{ key: PowerFeatureKey; label: string }> = [
   { key: "directors_cut", label: "Director's Cut" },
   { key: "sora_long_form", label: "Sora Long-Form" },
   { key: "video_composer", label: "Motion Studio" },
+  { key: "ai_video_toolkit", label: "AI Video Toolkit" },
+  { key: "picture_studio", label: "Picture Studio" },
+  { key: "music_studio", label: "Music Studio" },
+  { key: "talking_head", label: "Talking Head" },
+  { key: "autopilot", label: "Autopilot" },
+  { key: "email_director", label: "Email Director" },
+  { key: "ad_director", label: "Ad Director" },
+  { key: "video_translator", label: "Video Translator" },
+  { key: "magic_edit", label: "Magic Edit" },
+  { key: "upscaler", label: "AI Upscaler" },
+  { key: "universal_video_creator", label: "Universal Video Creator" },
 ];
 
 const THRESHOLD = 3;
