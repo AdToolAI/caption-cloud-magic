@@ -935,6 +935,7 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
         )}
         {/* Single continuous video — no decoder switches */}
         <div style={{ width: '100%', height: '100%', ...safeZoneCropStyle }}>
+          {isValidRemoteMediaUrl(sourceVideoUrl) ? (
           <Video
             src={sourceVideoUrl}
             startFrom={0}
