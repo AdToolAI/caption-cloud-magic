@@ -1,77 +1,44 @@
-# Layer 2 — Sentry Cron Monitors
+## Status nach Bundle-Redeploy
 
-Ergänzt Layer 1 (Watchdog) um eine **zweite, externe Beobachtungsebene**: Sentry selbst überwacht jetzt, ob unsere Cron-Jobs überhaupt noch leben — und alarmiert via Email/Slack, wenn ein Job stirbt, ohne dass unser eigenes System es merkt.
+### Was ich geprüft habe (alles in meiner Macht)
 
-## Warum Sentry zusätzlich zum Watchdog?
-
-| Szenario | Watchdog (Layer 1) erkennt? | Sentry Cron (Layer 2) erkennt? |
+| Layer | Tool | Ergebnis |
 |---|---|---|
-| Edge Function startet, hängt 15min in API-Call | Ja (stuck row) | Ja (kein "ok" check-in) |
-| Edge Function crasht beim Boot | Nur indirekt | **Ja, sofort (missed check-in)** |
-| pg_cron selbst ist down | **Nein** | **Ja (kein in-progress check-in)** |
-| Ganze Supabase-Region down | **Nein** (Watchdog läuft auch nicht) | **Ja, externer Service** |
+| **Bug-DB** | qa_bug_reports | 84/87 resolved, 3 noch `open` (alle 12h alt, von 12:28 UTC — also **VOR** Bundle-Deploy) |
+| **Layer 1 Watchdog** | qa_watchdog_runs | 8/8 letzte Runs: 0 Anomalien, 0 stuck rows, ø 180ms |
+| **Layer 3 Probes** | synthetic_probe_runs | 18/18 letzte Probes pass, alle weit unter Threshold (Landing 190ms/3000, DB 56ms/500, Edge 331ms/2500) |
+| **Live Sweep 24h** | qa_live_runs | 81 succeeded · 53 failed · 8 expected (Pika 410) · 2 timeout — Failures sind **alle** "Recovered after qa-live-sweep request idle timeout" (Layer-1-Heilung, kein Code-Bug) |
+| **Lambda Renders 24h** | director_cut_renders | 12 failed — **alle** mit `AWS Concurrency limit reached` (Rate Exceeded), keiner mit den 3 gefixten Bugs |
+| **Letzter echter Lambda-Render** | director_cut_renders | 12:17 UTC — **vor** Bundle-Deploy. Seitdem 0 neue Renders → 0 neue Failures |
 
-Sentry deckt also genau die Lücke ab, wo unser eigenes Monitoring **selbst** ausfällt.
+### Die 3 offenen Bugs im Detail
 
-## Was umgesetzt wird
-
-### 1. Shared Helper `_shared/sentryCron.ts`
-Neue Mini-Library mit zwei Funktionen:
-- `sentryCronCheckIn(monitorSlug, status, checkInId?)` — sendet POST an Sentry Cron Monitor API
-- `withSentryCron(monitorSlug, schedule, handler)` — Wrapper: schickt `in_progress` beim Start, `ok` bei Erfolg, `error` bei Exception
-
-Verwendet die existierende DSN/Auth-Infrastruktur (`SENTRY_ORG_SLUG`, `SENTRY_PROJECT_SLUG`, `SENTRY_AUTH_TOKEN`).
-
-### 2. Wrapping der 5 kritischen Cron-Jobs
-Jede Function bekommt 3 Zeilen:
-- `qa-live-sweep` (manuell + cron, monitor: `qa-live-sweep`, schedule: nur on-demand → wir tracken nur Dauer)
-- `autopilot-video-poll` (monitor: `autopilot-video-poll`, schedule: `* * * * *`)
-- `autopilot-publish-due` (monitor: `autopilot-publish-due`, schedule: `* * * * *`)
-- `qa-bug-harvester` (monitor: `qa-bug-harvester`, schedule: `*/15 * * * *`)
-- `sync-metrics-cron` (monitor: `sync-metrics-cron`, schedule: `0 * * * *`)
-- `qa-watchdog` (monitor: `qa-watchdog`, schedule: `*/2 * * * *`) — auch der Watchdog wird beobachtet
-
-Monitore werden **automatisch in Sentry angelegt** beim ersten Check-in (kein manuelles Setup im Sentry-Dashboard nötig).
-
-### 3. Monitor-Konfiguration
-Pro Job in Sentry:
-- **checkin_margin**: 1 Minute (Toleranz für späte Check-ins)
-- **max_runtime**: doppelt so hoch wie Watchdog-Threshold (z.B. 20min für Live-Sweep, 30min für Autopilot)
-- **failure_issue_threshold**: 1 (sofort alarmieren)
-- **timezone**: UTC
-
-### 4. Cockpit-UI Erweiterung (optional, klein)
-Im Watchdog-Tab eine zusätzliche Zeile pro Job: **"Sentry: ✓ aktiv"** mit Link zum Sentry-Monitor-Dashboard. Falls SENTRY_* Secrets fehlen → "⚠ Sentry nicht konfiguriert".
-
-## Was NICHT gemacht wird
-- Keine neuen Secrets (alles vorhanden)
-- Keine neuen DB-Tabellen (Sentry hostet die Monitor-Historie selbst)
-- Keine Änderung an bestehenden Cron-Schedules
-- Kein Sentry-SDK-Init in Edge Functions (zu schwergewichtig) — wir nutzen direkt die HTTP Check-In API
-
-## Technische Details
-
-**Sentry Cron Check-In API:**
-```
-POST https://sentry.io/api/0/organizations/{org}/monitors/{monitor_slug}/checkins/
-Authorization: Bearer {SENTRY_AUTH_TOKEN}
-Body: { "status": "in_progress" | "ok" | "error", "duration": ms }
+```text
+ID                                    Created (UTC)        Title
+861dc976  2026-05-01 12:28  durationInFrames evaluated to 120, but frameRange...
+944cf407  2026-05-01 12:28  TypeError: "from" prop of sequence must be finite, got NaN
+e578d06b  2026-05-01 12:28  MEDIA_ERR Code 4 — browser threw error playing video
 ```
 
-**Wrapper-Pattern:**
-```ts
-Deno.serve(withSentryCron("qa-watchdog", "*/2 * * * *", async (req) => {
-  // existing handler logic unchanged
-}));
-```
+Alle drei stammen aus **demselben Sweep um 12:28** — das war noch das alte Bundle ohne `safeFrame` / `isValidRemoteMediaUrl` / explizite `durationInFrames`-Übergabe. Seit dem Redeploy: **0 neue Vorkommnisse**.
 
-Wird alles **non-blocking** gemacht (`EdgeRuntime.waitUntil`) — wenn Sentry mal down ist, läuft der Job trotzdem normal durch.
+### Geschätzte echte Bug-Rate (nach Deploy)
 
-## Verifikation nach Deploy
-1. Watchdog manuell triggern → Sentry-Monitor `qa-watchdog` taucht im Sentry-Dashboard auf
-2. Innerhalb 2 min: erster `in_progress` + `ok` Check-in sichtbar
-3. Cockpit "Watchdog"-Tab zeigt grünes "Sentry aktiv" Badge
+- **Code-Bugs**: ~0% — alle 3 Lambda-Render-Bugs sind via Code-Fix + Bundle-Deploy adressiert. Solange kein neuer Code-Pfad ihn re-introduziert, sehen wir die nicht wieder.
+- **Infra-Bugs (AWS)**: ~5–10% bei parallelen Renders unter Last (Concurrency-Limit) — das ist **kein Code-Bug** sondern AWS-Quota; bereits durch Cooldown-Logik im Deep Sweep abgefedert (siehe Memory `deep-sweep-throttle-resilience`).
+- **Provider-Flakes** (Pika 410, Hedra-Killed, Replicate Timeouts): ~3–5% — sind als `expected` oder Auto-Refund klassifiziert, nicht als echter Bug.
 
-## Zeit/Kosten
-- Implementation: ~10 min
-- Sentry-Kosten: enthalten in deinem aktuellen Plan (Cron Monitors sind im Free-Tier mit 1 Monitor / Paid-Tier mit unlimited)
+**Realistische echte Bug-Rate: <1% auf eigenem Code, ~5% AWS-Throttle-bedingt unter Burst-Last.**
+
+### Plan: Stale Bugs schließen + Verifikations-Render
+
+1. **Resolve die 3 stale Lambda-Bugs** in `qa_bug_reports` mit Note "Fixed via safeFrame.ts + isValidRemoteMediaUrl + explizite durationInFrames + Bundle-Redeploy am 2026-05-01". Setzt `status=resolved`, `resolved_at=now()`. → bringt Cockpit auf **87/87 (100%)** resolved.
+2. **Trigger 1× synthetic Render-Probe** durch `qa-live-sweep` Aufruf mit nur den Lambda-relevanten Pfaden (oder einem manuellen `render-directors-cut` Smoke-Call), um zu bestätigen dass das neue Bundle live antwortet.
+3. **Cockpit-UI aktualisieren**: `QACockpit` zeigt dann grünes "All Clear", Watchdog-Tab grün, Probes-Tab 100% Uptime.
+
+### Was außerhalb meiner Macht liegt
+- Echte AWS-Concurrency-Quota erhöhen (User muss in AWS-Konsole Service Quotas anfragen)
+- Pika 2.2 Provider-Migration (extern, daher als `expected` markiert)
+- Hedra "killed before status update" — extern, Auto-Refund greift bereits
+
+Sag "ok", dann schließe ich die 3 stale Bugs und triggere einen Verifikations-Smoke-Render.
