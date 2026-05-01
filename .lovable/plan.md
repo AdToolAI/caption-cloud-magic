@@ -1,73 +1,73 @@
 ## Befund
 
-Der aktuelle Run läuft weiterhin rot, weil Flow 2 nicht beim Triggern scheitert, sondern erst danach beim Polling:
+Der aktuelle Screenshot zeigt keinen harten roten Code-Fehler mehr, sondern zwei getrennte Themen:
 
-- `render-directors-cut` startet zunächst erfolgreich und gibt `render_id` + `remotion_render_id` zurück.
-- Kurz danach schreibt der Remotion-Webhook den Render-Job als `failed` in `director_cut_renders`, mit `Error: AWS Concurrency limit reached (Original Error: Rate Exceeded.)`.
-- `qa-weekly-deep-sweep` klassifiziert aktuell jeden `director_cut_renders.status = failed` im Polling automatisch als `failed`, auch wenn die Fehlermeldung eindeutig ein temporäres AWS-Lambda-Concurrency-Limit ist.
+1. **Flow 2 ist gelb `timeout`**  
+   Das ist aktuell korrekt klassifiziert: AWS Lambda Concurrency/`Rate Exceeded` wird nicht mehr als roter Bug gewertet. Die UI zeigt deshalb `4/5 (80%) · 1 timeout`.
 
-Zusätzlich sehe ich zwei Nebenprobleme:
+2. **Flow 4 bleibt `budget_skipped`, obwohl Bootstrap ausgeführt wurde**  
+   Ich habe die aktuellen Daten geprüft: `test-portrait.png` existiert im `qa-test-assets` Bucket. Trotzdem zeigt der Deep Sweep bei Flow 4 `dedicated_portrait: false` und HeyGen meldet `400127 No face detected`.
 
-1. Der Run zählt intern `flows_total = 7`, obwohl aktuell nur 6 Flow-Slots im UI und in der Ausführung existieren. Deshalb wird `4/7 (57%)` angezeigt statt sinnvoll `4/6` bzw. `4/5`, wenn ein Timeout separat gezählt wird.
-2. Flow 4 (Talking Head) wird gar nicht als Ergebnis gespeichert, obwohl `generate-talking-head` laut Logs mit `No face detected` scheitert. Die Funktion setzt dafür `status = skipped`, aber der Status-Typ/Counter kennt `skipped` nicht sauber. Dadurch verschwindet Flow 4 aus dem aktuellen Run.
+Die Ursache ist eine Kombination aus:
+
+- `qa-test-assets` ist ein privater Bucket.
+- `qa-weekly-deep-sweep` versucht für das Portrait aktuell eine Public URL über `getPublicUrl()`. Bei privaten Buckets ist das für externe Provider nicht zuverlässig nutzbar.
+- Für Bild und Maske gibt es bereits Signed-URL-Logik, aber **nicht für `test-portrait.png`**.
+- Zusätzlich ist der Bootstrap idempotent: Wenn ein vorhandenes Portrait technisch valide ist (Dateigröße/MIME), wird es nicht ersetzt, selbst wenn HeyGen darin kein Gesicht erkennt. Ein einmal schlecht generiertes Portrait bleibt also bestehen.
+- Der UI-Button für direkten Bootstrap-Fix hängt noch an `flow_index === 7`, obwohl Magic Edit inzwischen Flow 6 ist und Talking Head Flow 4 ist.
 
 ## Plan
 
-### 1. Throttle-Erkennung zentralisieren
+### 1. Portrait im Deep Sweep per Signed URL laden
 
-In `qa-weekly-deep-sweep/index.ts` baue ich eine gemeinsame Helper-Funktion ein, z.B. `isLambdaThrottleMessage(message)`, die alle bekannten Varianten erkennt:
+In `qa-weekly-deep-sweep/index.ts` erweitere ich `getSignedAssets()` um ein dediziertes `portrait` Feld:
 
-- `Rate Exceeded`
-- `AWS Concurrency limit reached`
-- `TooManyRequestsException`
-- `ThrottlingException`
-- `HTTP 429`
-- `RATE_LIMIT_EXCEEDED`
-- deutsche Texte wie `Render-Kapazität` / `vorübergehend erschöpft`
+- `test-portrait.png` wird per `createSignedUrl()` signiert.
+- `RunCtx.signedAssets` bekommt `{ image, mask, portrait }`.
+- `flowTalkingHead()` nutzt künftig diese Reihenfolge:
+  1. `ctx.signedAssets.portrait`
+  2. optionaler stabiler Fallback
+  3. kein generisches Produktbild mehr als stiller Portrait-Fallback
 
-Diese Helper-Funktion wird sowohl beim direkten Trigger-Fehler als auch beim Polling-Fehler verwendet.
+Damit sieht HeyGen wirklich das Bootstrapped-Portrait statt einer privaten/ungeeigneten URL oder dem generischen `test-image.png`.
 
-### 2. Flow 2 Polling-Fehler korrekt als `timeout` klassifizieren
+### 2. Bootstrap-Portrait zuverlässig reparieren, nicht nur nach MIME/Size
 
-In `flowDirectorsCutRender` ändere ich die Polling-Auswertung:
+In `qa-live-sweep-bootstrap/index.ts` ändere ich die Portrait-Strategie:
 
-- Wenn `director_cut_renders.status = completed`: bleibt `success`.
-- Wenn `status = failed` und `error_message` ein Lambda-Throttle ist: `timeout`, nicht `failed`.
-- Wenn `status = failed` mit echtem Render-/Codefehler: weiterhin `failed`.
-- Wenn der Render nach 90s noch nicht fertig ist: weiterhin `timeout`.
+- Für `test-portrait.png` wird ein robuster `force`/`replace`-Pfad eingebaut, sodass das Portrait beim Bootstrap gezielt ersetzt werden kann, statt ein altes ungeeignetes Asset zu behalten.
+- Der aktuelle AI-Gateway Modellname wird korrigiert/vereinheitlicht auf ein unterstütztes Bildmodell aus dem Projekt-Setup.
+- Falls AI-Bildgenerierung nicht klappt, wird ein klarer, HeyGen-tauglicher Fallback verwendet bzw. der Bootstrap gibt explizit zurück, dass das Portrait nicht sicher provisioniert werden konnte.
+- Zusätzlich werden Logs/Response-Felder verbessert (`uploaded`, `repaired`, `replaced`, `contentType`, grobe Größe), damit im UI sichtbar ist, was tatsächlich passiert ist.
 
-Damit wird der aktuelle Fehler nicht mehr rot als Code-Bug angezeigt, sondern gelb als temporäres Infrastruktur-Limit.
+### 3. Keine generischen Produktbilder mehr als Talking-Head-Fallback
 
-### 3. Optionalen Quick-Fix für QA-Render: Single-Lambda erzwingen
+`flowTalkingHead()` soll nicht mehr `signedAssets.image` oder `assets.image` an HeyGen schicken, wenn kein dediziertes Portrait verfügbar ist. Das erzeugt genau den aktuellen Fehler: HeyGen versucht ein Produkt-/Samplebild als Gesicht zu interpretieren.
 
-Für den Deep-Sweep-Director's-Cut-Test ist Geschwindigkeit weniger wichtig als Stabilität. Deshalb sende ich beim QA-Call an `render-directors-cut` ein internes Flag, z.B. `qa_stability_mode: true` oder `max_lambda_workers: 1`.
+Stattdessen:
 
-In `render-directors-cut/index.ts` bzw. der Payload-Normalisierung wird dieses Flag genutzt, um für diesen 10s-Test `framesPerLambda = durationInFrames` zu setzen. Ergebnis: Der QA-Render nutzt nur 1 Lambda-Worker statt 3 und kollidiert deutlich seltener mit laufenden Composer-/Remotion-Jobs.
+- Wenn kein signiertes Portrait vorhanden ist: Flow 4 wird sofort `budget_skipped` mit klarer Meldung.
+- Wenn ein Portrait vorhanden ist, aber HeyGen `400127` meldet: weiterhin Soft-Skip, aber mit präziser Meldung: „Portrait vorhanden, aber HeyGen erkennt darin kein Gesicht; Bootstrap ersetzt das Portrait jetzt gezielt.“
 
-Falls wir das minimaler halten wollen, kann ich Schritt 3 weglassen; meine Empfehlung ist aber, ihn einzubauen, weil reine Klassifizierung den roten Status verhindert, aber den Render nicht stabiler macht.
+### 4. Optionaler QA-Bypass nur für Asset-Verfügbarkeit vermeiden
 
-### 4. Flow-Gesamtzahl und Status-Counter reparieren
+Ich werde **nicht** einfach `x-qa-mock` für Talking Head setzen, weil der Deep Sweep echte Provider-Drift testen soll. Flow 4 soll nur grün werden, wenn HeyGen die echte Upload-/Create-Kette akzeptiert.
 
-Ich passe `flows_total` von `7 - skipFlows.length` auf die echte Anzahl `6 - skipFlows.length` an.
+### 5. UI-Fixes in `DeepSweepTab.tsx`
 
-Außerdem wird `skipped` als gültiger Flow-Status sauber behandelt oder in `budget_skipped` normalisiert. Dadurch verschwindet Flow 4 nicht mehr aus dem Run, sondern erscheint sichtbar als skipped/soft-skip, falls HeyGen kein Gesicht erkennt.
+Ich passe die Admin-Ansicht an:
 
-### 5. UI-Anzeige in `DeepSweepTab.tsx` korrigieren
+- Der Bootstrap-Button erscheint auch bei Flow 4 `budget_skipped`/Portrait-Fehlern, nicht nur bei altem `flow_index === 7`.
+- Text wird angepasst: „Bootstrap Assets aktualisiert. Portrait wird ersetzt; nächsten Run erneut starten.“
+- `budget_skipped` Fehlertexte werden nicht rot wie harte Failures dargestellt, sondern neutral/amber, damit Skip ≠ Bug klarer ist.
+- History-Passrate kann Timeouts analog zur aktuellen Karte separat darstellen, damit alte Runs nicht wieder irreführend rot/low aussehen.
 
-Ich passe die Anzeige an:
+## Erwartetes Ergebnis
 
-- Überschrift: `Aktueller Run — 6 Flows`
-- Pass-Rate: Timeouts separat behandeln oder klar anzeigen, damit ein Infrastruktur-Timeout nicht wie ein roter Failure wirkt.
-- Flow 2 bei Lambda-Throttle: gelber `timeout` Badge mit erklärendem Tooltip.
-- Flow 4 bei No-Face: sichtbarer Skip-/Warn-Badge statt leerer Zeile.
+Nach dem Fix und erneutem Bootstrap:
 
-## Erwartetes Ergebnis nach dem Fix
-
-Beim nächsten Deep Sweep sollte Flow 2 entweder:
-
-- grün durchlaufen, weil der QA-Render weniger Lambda-Worker nutzt, oder
-- gelb als `timeout` erscheinen, falls AWS gerade trotzdem throttelt.
-
-Er sollte nicht mehr rot als harter Code-Fehler erscheinen, solange die Ursache `Rate Exceeded` / Lambda-Concurrency ist.
-
-Außerdem sollte die Run-Anzeige nicht mehr `4/7` zeigen, sondern die echte Flow-Anzahl korrekt widerspiegeln.
+- `test-portrait.png` wird wirklich ersetzt bzw. neu provisioniert.
+- Flow 4 nutzt eine Signed URL zum Portrait und nicht mehr das generische Testbild.
+- Wenn HeyGen das Portrait akzeptiert, wird Flow 4 grün.
+- Falls HeyGen trotzdem kein Gesicht erkennt, bleibt es ein sichtbarer Soft-Skip mit korrekter Diagnose, nicht ein verwirrender Hinweis „Bootstrap ausführen“, obwohl Bootstrap schon geklickt wurde.
+- Flow 2 bleibt gelb `timeout`, solange AWS Lambda limitiert; das ist weiterhin Infrastruktur, nicht Code-Bug.
