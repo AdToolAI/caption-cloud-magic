@@ -51,12 +51,20 @@ function classifySeverity(msg: string): 'high' | 'medium' | 'low' | 'ignore' {
 }
 
 function classifyCategory(provider: string, msg: string): string {
-  if (provider === 'aws-lambda') return 'rendering';
-  if (provider === 'replicate') return 'ai-generation';
-  if (provider === 'gemini' || provider === 'openai' || provider === 'lovable-ai') return 'ai-text';
-  if (provider === 'elevenlabs') return 'audio';
-  if (provider === 'resend') return 'email';
-  return 'backend';
+  const m = (msg || '').toLowerCase();
+  if (m.includes('nan') || m.includes('finite') || m.includes('frame range') || m.includes('durationinframes')) {
+    return 'data-integrity';
+  }
+  if (m.includes('media_element_error') || m.includes('codec') || m.includes('format error')) {
+    return 'workflow';
+  }
+  if (provider === 'aws-lambda') return 'workflow';
+  if (provider === 'replicate' || provider === 'gemini' || provider === 'openai' || provider === 'lovable-ai') {
+    return 'workflow';
+  }
+  if (provider === 'elevenlabs') return 'workflow';
+  if (provider === 'resend') return 'network';
+  return 'regression';
 }
 
 Deno.serve(async (req) => {
