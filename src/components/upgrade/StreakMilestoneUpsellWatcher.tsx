@@ -4,6 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
 import { useUpgradeTrigger } from "@/hooks/useUpgradeTrigger";
 import { PlanId } from "@/config/pricing";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 /**
  * After the user reaches a meaningful streak milestone (7d / 30d / 60d / 100d),
@@ -31,6 +32,8 @@ export const StreakMilestoneUpsellWatcher = () => {
         },
         (payload) => {
           const m = payload.new as { milestone_days: number };
+          // Always track the milestone for analytics, regardless of upsell eligibility
+          trackEvent(ANALYTICS_EVENTS.STREAK_MILESTONE, { milestone_days: m.milestone_days });
           if (!UPSELL_MILESTONES.has(m.milestone_days)) return;
 
           const currentPlan = (balance?.plan_code as PlanId) ?? "free";

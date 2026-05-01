@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 interface WelcomeBonusState {
   shouldShow: boolean;
@@ -86,6 +87,10 @@ export const useWelcomeBonus = () => {
             granted = true;
             amount = grantData.amount;
             currency = grantData.currency;
+            trackEvent(ANALYTICS_EVENTS.WELCOME_BONUS_CLAIMED, {
+              amount,
+              currency,
+            });
           } else if (grantData?.reason === "email_not_verified") {
             if (!cancelled) setState({ shouldShow: false, loading: false, bonusAmount: null, bonusCurrency: null });
             return;

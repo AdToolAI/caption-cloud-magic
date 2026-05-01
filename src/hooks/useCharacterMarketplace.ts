@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 export interface MarketplaceCharacter {
   id: string;
@@ -70,9 +71,15 @@ export function usePurchaseCharacter() {
       if (error) throw error;
       return data as { ok: boolean; already_owned?: boolean; price_credits?: number; error?: string };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, characterId) => {
       if (res.ok) {
         toast({ title: res.already_owned ? 'Already owned' : 'Character unlocked', description: res.already_owned ? 'You already own this character.' : `${res.price_credits ?? 0} credits charged.` });
+        if (!res.already_owned) {
+          trackEvent(ANALYTICS_EVENTS.CHARACTER_PURCHASED, {
+            character_id: characterId,
+            price_credits: res.price_credits ?? 0,
+          });
+        }
         qc.invalidateQueries({ queryKey: ['character-purchases-mine'] });
         qc.invalidateQueries({ queryKey: ['brand-characters'] });
       } else {
@@ -108,9 +115,17 @@ export function useSubmitCharacterToMarketplace() {
       if (error) throw error;
       return data as { ok: boolean; status?: string; error?: string };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, payload) => {
       if (res.ok) {
         toast({ title: res.status === 'published' ? 'Published live' : 'Submitted for review', description: res.status === 'published' ? 'Your character is now in the marketplace.' : 'Admins typically review within 24 hours.' });
+        trackEvent(ANALYTICS_EVENTS.CHARACTER_LISTED, {
+          character_id: payload.characterId,
+          pricing_type: payload.pricingType,
+          price_credits: payload.priceCredits,
+          origin_type: payload.originType,
+          status: res.status,
+          nsfw: !!payload.nsfwFlag,
+        });
         qc.invalidateQueries({ queryKey: ['marketplace-characters'] });
         qc.invalidateQueries({ queryKey: ['brand-characters'] });
       } else {
@@ -131,9 +146,17 @@ export function useReportCharacter() {
       if (error) throw error;
       return data as { ok: boolean; reportId?: string; quarantined?: boolean; error?: string };
     },
-    onSuccess: (res) => {
-      if (res.ok) toast({ title: 'Report submitted', description: res.quarantined ? 'Character quarantined pending review.' : 'Thank you — our team will investigate.' });
-      else toast({ title: 'Report failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
+    onSuccess: (res, input) => {
+      if (res.ok) {
+        toast({ title: 'Report submitted', description: res.quarantined ? 'Character quarantined pending review.' : 'Thank you — our team will investigate.' });
+        trackEvent(ANALYTICS_EVENTS.CHARACTER_REPORTED, {
+          character_id: input.characterId,
+          reason: input.reason,
+          quarantined: !!res.quarantined,
+        });
+      } else {
+        toast({ title: 'Report failed', description: res.error ?? 'Unknown error', variant: 'destructive' });
+      }
     },
   });
 }

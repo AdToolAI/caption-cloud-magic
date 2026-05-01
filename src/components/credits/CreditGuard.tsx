@@ -2,6 +2,7 @@ import { ReactNode, useState } from 'react';
 import { useCreditReservation } from '@/hooks/useCreditReservation';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Coins } from 'lucide-react';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface CreditGuardProps {
   children: (checkAndExecute: (feature_code: string, action: () => Promise<void>) => Promise<void>) => ReactNode;
@@ -25,6 +26,12 @@ export const CreditGuard = ({ children, feature_code, estimated_cost }: CreditGu
           available: preflightResult.available_balance
         });
         setShowInsufficientDialog(true);
+        trackEvent(ANALYTICS_EVENTS.CREDIT_INSUFFICIENT, {
+          feature: featureCode,
+          required: preflightResult.required_credits,
+          available: preflightResult.available_balance,
+          shortfall: Math.max(0, preflightResult.required_credits - preflightResult.available_balance),
+        });
         return;
       }
 

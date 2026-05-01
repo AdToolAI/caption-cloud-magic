@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { trackBusinessEvent } from '../_shared/telemetry.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,6 +102,16 @@ Deno.serve(async (req) => {
         resolved_at: new Date().toISOString(),
       }).eq('id', reportId);
     }
+
+    // Telemetry: track moderation action (admin distinct id)
+    try {
+      await trackBusinessEvent('character_takedown', userData.user.id, {
+        character_id: characterId,
+        action,
+        refunded_count: refundedCount,
+        report_id: reportId ?? null,
+      });
+    } catch { /* analytics optional */ }
 
     return new Response(JSON.stringify({ ok: true, action, refundedCount }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

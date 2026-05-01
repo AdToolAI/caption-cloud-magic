@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -162,6 +163,14 @@ serve(async (req) => {
       .from("profiles")
       .update({ welcome_bonus_granted_at: new Date().toISOString() })
       .eq("id", user.id);
+
+    try {
+      await trackBusinessEvent("welcome_bonus_claimed", user.id, {
+        amount,
+        currency,
+        new_balance: newBalance,
+      });
+    } catch { /* analytics optional */ }
 
     return new Response(
       JSON.stringify({

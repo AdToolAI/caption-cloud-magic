@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 const ONBOARDING_KEY = "adtool-ai-onboarding-completed";
 
@@ -28,9 +29,13 @@ export const useOnboarding = () => {
   };
 
   const completeOnboarding = () => {
+    const wasComplete = localStorage.getItem(ONBOARDING_KEY) === "true";
     localStorage.setItem(ONBOARDING_KEY, "true");
     setIsOnboardingComplete(true);
     setShowTour(false);
+    if (!wasComplete) {
+      trackEvent(ANALYTICS_EVENTS.ONBOARDING_FINISHED);
+    }
   };
 
   const resetOnboarding = () => {

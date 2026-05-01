@@ -21,6 +21,7 @@ import { useErrorCapture } from '@/hooks/useErrorCapture';
 import { useProactiveTips } from '@/hooks/useProactiveTips';
 import { SlashCommandSuggestions, parseSlashCommand, generateSlashCommandResponse } from './SlashCommandHandler';
 import { TutorialOverlay, TUTORIALS } from './TutorialOverlay';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 interface Message {
   id: string;
@@ -254,6 +255,7 @@ export function AICompanionWidget() {
       const tutorialId = response.slice(10, -1);
       if (TUTORIALS[tutorialId]) {
         setActiveTutorial(tutorialId);
+        trackEvent(ANALYTICS_EVENTS.TUTORIAL_STARTED, { tutorial_id: tutorialId });
         setMessages(prev => [...prev, {
           id: `assistant-${Date.now()}`,
           role: 'assistant',
@@ -960,9 +962,15 @@ export function AICompanionWidget() {
       {activeTutorial && (
         <TutorialOverlay
           tutorialId={activeTutorial}
-          onClose={() => setActiveTutorial(null)}
+          onClose={() => {
+            if (activeTutorial) {
+              trackEvent(ANALYTICS_EVENTS.TUTORIAL_SKIPPED, { tutorial_id: activeTutorial });
+            }
+            setActiveTutorial(null);
+          }}
           onComplete={(id) => {
             console.log('Tutorial completed:', id);
+            trackEvent(ANALYTICS_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: id });
             setActiveTutorial(null);
           }}
         />

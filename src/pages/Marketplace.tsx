@@ -1,5 +1,5 @@
 import { Helmet } from 'react-helmet-async';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MarketplaceTemplateGallery } from '@/components/marketplace/MarketplaceTemplateGallery';
 import { CharacterMarketplaceGallery } from '@/components/marketplace/CharacterMarketplaceGallery';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -9,12 +9,17 @@ import { Store, Users } from 'lucide-react';
 import type { MarketplaceTemplate } from '@/types/marketplace';
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 export default function Marketplace() {
   useTrackPageFeature("marketplace");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tab, setTab] = useState<'templates' | 'characters'>('templates');
+
+  useEffect(() => {
+    trackEvent(ANALYTICS_EVENTS.MARKETPLACE_VIEWED, { tab });
+  }, [tab]);
 
   const handleTemplateSelected = (t: MarketplaceTemplate) => {
     try { sessionStorage.setItem('marketplace.selectedTemplateId', t.id); } catch {/* noop */}

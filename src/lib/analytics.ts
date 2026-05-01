@@ -160,7 +160,67 @@ export const ANALYTICS_EVENTS = {
   SOCIAL_PUBLISH_FAILED: 'social_publish_failed',
   SOCIAL_ACCOUNT_CONNECTED: 'social_account_connected',
   SOCIAL_ACCOUNT_DISCONNECTED: 'social_account_disconnected',
+
+  // Engagement & Retention
+  FEATURE_FIRST_USE: 'feature_first_use',
+  SESSION_STARTED: 'session_started',
+  SESSION_ENDED: 'session_ended',
+  TUTORIAL_STARTED: 'tutorial_started',
+  TUTORIAL_COMPLETED: 'tutorial_completed',
+  TUTORIAL_SKIPPED: 'tutorial_skipped',
+  STREAK_MILESTONE: 'streak_milestone',
+  WELCOME_BONUS_CLAIMED: 'welcome_bonus_claimed',
+
+  // Errors & Friction
+  ERROR_SHOWN_TO_USER: 'error_shown_to_user',
+  RATE_LIMIT_HIT_CLIENT: 'rate_limit_hit_client',
+  QUOTA_WARNING_SHOWN: 'quota_warning_shown',
+
+  // Marketplace
+  CHARACTER_PURCHASED: 'character_purchased',
+  CHARACTER_LISTED: 'character_listed',
+  CHARACTER_TAKEDOWN: 'character_takedown',
+  CHARACTER_REPORTED: 'character_reported',
+  MARKETPLACE_VIEWED: 'marketplace_viewed',
+  MARKETPLACE_SEARCH: 'marketplace_search',
 } as const;
+
+/**
+ * Track a feature's first ever use per user (idempotent via localStorage).
+ */
+export const trackFeatureFirstUse = (feature: string) => {
+  try {
+    const key = `feature_first_use_${feature}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, new Date().toISOString());
+    trackEvent(ANALYTICS_EVENTS.FEATURE_FIRST_USE, { feature });
+  } catch {
+    /* noop */
+  }
+};
+
+/**
+ * Track an error surfaced to the user (toast/modal).
+ */
+export const trackErrorShown = (data: {
+  error_type: string;
+  source?: string;
+  message?: string;
+  feature?: string;
+}) => {
+  trackEvent(ANALYTICS_EVENTS.ERROR_SHOWN_TO_USER, data);
+};
+
+/**
+ * Track a quota warning shown (storage / credits).
+ */
+export const trackQuotaWarning = (data: {
+  quota_type: 'storage' | 'credits' | 'rate_limit';
+  threshold_pct: number;
+  used_pct?: number;
+}) => {
+  trackEvent(ANALYTICS_EVENTS.QUOTA_WARNING_SHOWN, data);
+};
 
 /**
  * Track AI generation lifecycle (frontend wrapper)

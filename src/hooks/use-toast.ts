@@ -144,6 +144,29 @@ function toast({ ...props }: Toast) {
     });
   const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
 
+  // Auto-track destructive toasts as user-visible errors (Phase 3 telemetry).
+  // Lazy-imported to avoid circular deps; safely no-ops if analytics is missing.
+  if (props.variant === "destructive") {
+    import("@/lib/analytics")
+      .then(({ trackErrorShown }) => {
+        try {
+          const title = typeof props.title === "string" ? props.title : "";
+          const description =
+            typeof props.description === "string" ? props.description : "";
+          trackErrorShown({
+            error_type: title || "toast_error",
+            message: description || title || undefined,
+            source: "toast",
+          });
+        } catch {
+          /* noop */
+        }
+      })
+      .catch(() => {
+        /* analytics optional */
+      });
+  }
+
   dispatch({
     type: "ADD_TOAST",
     toast: {
