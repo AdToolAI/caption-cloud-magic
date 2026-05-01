@@ -483,11 +483,17 @@ serve(async (req) => {
     // Transform scenes from snake_case to camelCase for Remotion
     const transformedScenes = scenes?.map((scene: any) => ({
       id: scene.id,
-      startTime: scene.start_time ?? scene.startTime ?? 0,
-      endTime: scene.end_time ?? scene.endTime ?? 0,
-      originalStartTime: scene.original_start_time ?? scene.originalStartTime ?? scene.start_time ?? scene.startTime ?? 0,
-      originalEndTime: scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0,
-      playbackRate: scene.playbackRate ?? scene.playback_rate ?? 1,
+      startTime: safeNum(scene.start_time ?? scene.startTime, 0),
+      endTime: safeNum(scene.end_time ?? scene.endTime, 0),
+      originalStartTime: safeNum(
+        scene.original_start_time ?? scene.originalStartTime ?? scene.start_time ?? scene.startTime,
+        0
+      ),
+      originalEndTime: safeNum(
+        scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime,
+        0
+      ),
+      playbackRate: safeNum(scene.playbackRate ?? scene.playback_rate, 1),
       description: scene.description,
       mood: scene.mood,
       effects: scene.effects,
@@ -497,11 +503,11 @@ serve(async (req) => {
 
     // Transform transitions — preserve sceneId and offsetSeconds for parity with preview
     const transformedTransitions = transitions?.map((t: any, index: number) => ({
-      sceneIndex: t.sceneIndex ?? index,
+      sceneIndex: Number.isFinite(Number(t.sceneIndex)) ? Number(t.sceneIndex) : index,
       sceneId: t.sceneId ?? null,
       type: t.transitionType ?? t.type ?? 'crossfade',
-      duration: t.duration ?? 0.5,
-      offsetSeconds: t.offsetSeconds ?? 0,
+      duration: safeNum(t.duration, 0.5),
+      offsetSeconds: safeNum(t.offsetSeconds, 0),
     }));
 
     // Build inputProps for DirectorsCutVideo composition
