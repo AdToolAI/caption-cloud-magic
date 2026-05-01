@@ -446,8 +446,17 @@ Deno.serve(async (req) => {
   const sweepId = crypto.randomUUID();
   const assets = await getTestAssets(adminClient);
   const results: any[] = [];
-  let totalSpent = Number(budget.spent_eur);
   const cap = Number(budget.cap_eur);
+
+  // Reset spent_eur to 0 at the start of each sweep — the cap is per-run,
+  // not lifetime. This protects against runaway spend within a single run
+  // (e.g. infinite retry loop) without permanently exhausting the budget
+  // after a few normal runs.
+  await adminClient
+    .from("qa_live_budget")
+    .update({ spent_eur: 0, last_run_at: new Date().toISOString() })
+    .eq("id", budget.id);
+  let totalSpent = 0;
 
   // Run providers sequentially
   const tests = onlyProvider
