@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 interface WelcomeBonusState {
   shouldShow: boolean;
