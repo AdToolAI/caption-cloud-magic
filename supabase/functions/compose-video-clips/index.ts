@@ -281,6 +281,7 @@ serve(async (req) => {
       'ai-veo': 0.10,
       'ai-sora': 0.15,
       'ai-pika': 0.20,
+      'ai-happyhorse': 0.15,
     };
     const computeLeadInTrim = (clipSource: string, hasReference: boolean): number =>
       hasReference ? (I2V_TRIM_DEFAULTS[clipSource] ?? 0) : 0;
@@ -306,7 +307,7 @@ serve(async (req) => {
     // normalized to a working default so an upstream planner (Auto-Director,
     // manual choice) can never leave a scene stranded in 'pending' forever.
     const SUPPORTED_AI_SOURCES = new Set([
-      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-runway', 'ai-pika', 'ai-image',
+      'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance', 'ai-luma', 'ai-veo', 'ai-runway', 'ai-pika', 'ai-happyhorse', 'ai-image',
     ]);
 
     // Process each scene
@@ -824,6 +825,55 @@ serve(async (req) => {
               })
               .eq('id', scene.id);
             results.push({ sceneId: scene.id, status: 'generating', predictionId: pikaData.predictionId });
+          }
+
+        } else if (scene.clipSource === 'ai-happyhorse') {
+          // HappyHorse 1.0 (Alibaba) via Replicate — supports T2V + I2V, 3-15s
+          const isI2V = !!scene.referenceImageUrl;
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({
+              clip_status: 'generating',
+              clip_quality: quality,
+              clip_lead_in_trim_seconds: computeLeadInTrim('ai-happyhorse', isI2V),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', scene.id);
+
+          const hhDuration = snapDuration(scene.durationSeconds, [3, 5, 8, 10, 12, 15]);
+          const hhResp = await fetch(`${supabaseUrl}/functions/v1/generate-happyhorse-video`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+            body: JSON.stringify({
+              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+              model: quality === 'pro' ? 'happyhorse-pro' : 'happyhorse-standard',
+              duration: hhDuration,
+              aspectRatio: '16:9',
+              image: scene.referenceImageUrl,
+            }),
+          });
+
+          if (!hhResp.ok) {
+            const errBody = await hhResp.text();
+            console.error(`[compose-video-clips] HappyHorse scene ${scene.id} failed:`, hhResp.status, errBody);
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'failed', error: `HappyHorse ${hhResp.status}` });
+          } else {
+            const hhData = await hhResp.json();
+            await supabaseAdmin
+              .from('composer_scenes')
+              .update({
+                replicate_prediction_id: hhData.predictionId ?? hhData.generationId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', scene.id);
+            results.push({ sceneId: scene.id, status: 'generating', predictionId: hhData.predictionId });
           }
 
         } else {
