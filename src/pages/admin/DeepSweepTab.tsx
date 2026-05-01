@@ -335,7 +335,9 @@ export function DeepSweepTab() {
                   {flow?.error_message && (
                     <p
                       className={`text-xs mt-0.5 truncate ${
-                        status === "timeout" ? "text-amber-400/80" : "text-red-400/80"
+                        status === "timeout" || status === "budget_skipped"
+                          ? "text-amber-400/80"
+                          : "text-red-400/80"
                       }`}
                       title={flow.error_message}
                     >
@@ -347,7 +349,24 @@ export function DeepSweepTab() {
                       {(flow.duration_ms / 1000).toFixed(1)}s · {Number(flow.actual_cost_eur).toFixed(2)} €
                     </p>
                   )}
-                  {flow?.flow_index === 7 &&
+                  {flow?.status === "budget_skipped" &&
+                    flow?.error_message?.toLowerCase().includes("portrait") && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-1.5 h-7 text-xs border-amber-500/40 text-amber-300 hover:bg-amber-500/10"
+                        disabled={bootstrapping}
+                        onClick={runBootstrap}
+                      >
+                        {bootstrapping ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                        )}
+                        Portrait neu provisionieren
+                      </Button>
+                    )}
+                  {flow?.flow_index === 6 &&
                     flow?.status === "budget_skipped" &&
                     flow?.error_message?.includes("Bootstrap Assets") && (
                       <Button
