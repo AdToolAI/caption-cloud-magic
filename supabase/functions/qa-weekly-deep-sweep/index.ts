@@ -73,7 +73,7 @@ interface RunCtx {
   userId: string;
   admin: ReturnType<typeof createClient>;
   assets: { image: string; video: string; audio: string; mask: string; portrait: string };
-  signedAssets: { image: string; mask: string };
+  signedAssets: { image: string; mask: string; portrait: string };
   remainingEur: number;
 }
 
@@ -222,7 +222,7 @@ async function getTestAssets(
 // Hedra, etc.) need signed URLs, not public URLs.
 async function getSignedAssets(
   admin: any,
-): Promise<{ image: string; mask: string }> {
+): Promise<{ image: string; mask: string; portrait: string }> {
   const sign = async (path: string): Promise<string> => {
     try {
       const { data } = await admin.storage
@@ -233,20 +233,16 @@ async function getSignedAssets(
       return "";
     }
   };
-  // try alternatives in order
   const imageCandidates = ["test-image.png", "sample-1024.jpg"];
   const maskCandidates = ["sample-mask-512.png"];
+  const portraitCandidates = ["test-portrait.png"];
   let image = "";
-  for (const p of imageCandidates) {
-    image = await sign(p);
-    if (image) break;
-  }
+  for (const p of imageCandidates) { image = await sign(p); if (image) break; }
   let mask = "";
-  for (const p of maskCandidates) {
-    mask = await sign(p);
-    if (mask) break;
-  }
-  return { image, mask };
+  for (const p of maskCandidates) { mask = await sign(p); if (mask) break; }
+  let portrait = "";
+  for (const p of portraitCandidates) { portrait = await sign(p); if (portrait) break; }
+  return { image, mask, portrait };
 }
 
 function pickAssetUrl(json: any): string | undefined {
@@ -551,10 +547,18 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
 
   try {
     // HeyGen Photo-Avatar requires an image with a detectable human face.
-    // Prefer the dedicated bootstrapped portrait; fall back to generic image (likely fails face-detection).
-    const portraitUrl = ctx.assets.portrait || ctx.signedAssets.image || ctx.assets.image;
-    result.validation_checks.portrait = !!portraitUrl;
-    result.validation_checks.dedicated_portrait = !!ctx.assets.portrait;
+    // ONLY use the dedicated bootstrapped portrait — never fall back to the
+    // generic product test image (HeyGen will always reject it with 400127).
+    const portraitUrl = ctx.signedAssets.portrait;
+    result.validation_checks.dedicated_portrait = !!portraitUrl;
+
+    if (!portraitUrl) {
+      result.status = "skipped";
+      result.error_message =
+        "Kein dediziertes Portrait verfügbar. Klicke 'Bootstrap Assets' im Live Sweep Tab, um test-portrait.png zu provisionieren.";
+      result.duration_ms = Date.now() - start;
+      return result;
+    }
 
     const t0 = Date.now();
     const heygen = await callEdge(
@@ -580,14 +584,13 @@ async function flowTalkingHead(ctx: RunCtx): Promise<FlowResult> {
     if (!heygen.ok && errBlob.includes("400127")) {
       result.status = "skipped";
       result.error_message =
-        "Bootstrap-Asset enthält kein Gesicht. Klicke 'Bootstrap Assets' im Live Sweep Tab, um test-portrait.png zu provisionieren, dann erneut starten.";
+        "HeyGen erkennt im aktuellen Portrait kein Gesicht. Klicke erneut auf 'Bootstrap Assets' — das Portrait wird beim nächsten Bootstrap-Lauf zwingend ersetzt.";
     } else if (heygen.ok && url) {
       result.output_url = url;
       result.validation_checks.video_reachable = await headOk(url);
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
     } else if (heygen.ok && predictionId) {
-      // Async — HeyGen polling runs in background via waitUntil
       result.status = "success";
       result.actual_cost_eur = result.estimated_cost_eur;
       result.error_message = "Async — HeyGen video_id received, completion via background poll";
