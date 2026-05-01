@@ -1,73 +1,79 @@
-## Befund
+## Ausgangslage
 
-Der aktuelle Screenshot zeigt keinen harten roten Code-Fehler mehr, sondern zwei getrennte Themen:
+- Deep Sweep läuft grün (5/5 + 1 Infrastruktur-Timeout).
+- `qa_bug_reports` hat **0 offene** Einträge (84 resolved historisch).
+- `provider_quota_log` zeigt aber 3 wiederkehrende, echte Code-Bugs in Lambda-Renders, die der Sweep noch nicht trifft, weil sie nur unter bestimmten Eingabe-Kombinationen auftreten.
 
-1. **Flow 2 ist gelb `timeout`**  
-   Das ist aktuell korrekt klassifiziert: AWS Lambda Concurrency/`Rate Exceeded` wird nicht mehr als roter Bug gewertet. Die UI zeigt deshalb `4/5 (80%) · 1 timeout`.
+Wir sollten jetzt **nicht** mehr Tests dazubauen, bevor diese realen Bugs gefixt sind — sonst wachsen wir die Coverage über bekannten Schmutz.
 
-2. **Flow 4 bleibt `budget_skipped`, obwohl Bootstrap ausgeführt wurde**  
-   Ich habe die aktuellen Daten geprüft: `test-portrait.png` existiert im `qa-test-assets` Bucket. Trotzdem zeigt der Deep Sweep bei Flow 4 `dedicated_portrait: false` und HeyGen meldet `400127 No face detected`.
+## Phase 1 — Die 3 realen Render-Bugs fixen (höchste Priorität)
 
-Die Ursache ist eine Kombination aus:
+### 1.1 `durationInFrames=120 vs frame 0-149` (Off-by-one)
+- Tritt in `/render/video` auf (Composer-Pipeline, nicht DC).
+- Hypothese: `durationInFrames` wird aus Sekunden×fps berechnet, aber `Sequence` bekommt eine längere Range (vermutlich Audio-Tail oder Outro-Animation).
+- **Aktion**: `compose-video-clips` und `render-video` durchgehen, `durationInFrames` als `Math.max(scenesEnd, audioEnd, 1)` absichern. Unit-test im `tests/` Ordner mit dem konkreten Fall (4s @ 30fps + 5s Audio).
 
-- `qa-test-assets` ist ein privater Bucket.
-- `qa-weekly-deep-sweep` versucht für das Portrait aktuell eine Public URL über `getPublicUrl()`. Bei privaten Buckets ist das für externe Provider nicht zuverlässig nutzbar.
-- Für Bild und Maske gibt es bereits Signed-URL-Logik, aber **nicht für `test-portrait.png`**.
-- Zusätzlich ist der Bootstrap idempotent: Wenn ein vorhandenes Portrait technisch valide ist (Dateigröße/MIME), wird es nicht ersetzt, selbst wenn HeyGen darin kein Gesicht erkennt. Ein einmal schlecht generiertes Portrait bleibt also bestehen.
-- Der UI-Button für direkten Bootstrap-Fix hängt noch an `flow_index === 7`, obwohl Magic Edit inzwischen Flow 6 ist und Talking Head Flow 4 ist.
+### 1.2 `from prop of Sequence must be finite, but got NaN`
+- Tritt in `/render/directors-cut` auf.
+- Hypothese: Eine Scene hat `start_at_frame = NaN`, weil `start_at_seconds` undefined oder ein String aus dem Export-Payload ist.
+- **Aktion**: In `render-directors-cut/index.ts` einen `sanitizeScenes()` Guard einbauen, der jeden Scene-Eintrag mit `Number.isFinite()` validiert und bei Verstoß den Render mit einem klaren 400-Fehler ablehnt (statt Lambda zu verheizen). Plus: gleichen Guard im Director's-Cut-Studio beim "Render"-Klick clientseitig.
 
-## Plan
+### 1.3 `MEDIA_ELEMENT_ERROR Code 4` auf bestimmten MP4s
+- Betrifft sowohl Google-Sample-MP4s als auch eines unserer eigenen `test-video-2s.mp4` Bootstrap-Assets.
+- Ursache: Codec-Profil (vermutlich H.265/HEVC oder unkompatibles Pixel-Format), das Chrome-Headless im Lambda nicht decodieren kann.
+- **Aktion**: 
+  - Bootstrap (`qa-live-sweep-bootstrap`) erzeugt `test-video-2s.mp4` neu mit garantiert kompatiblem Profil (H.264 baseline, yuv420p, faststart). Falls per ffmpeg im Edge nicht möglich: ein vorgefertigtes, validiertes MP4 ins Repo legen und beim Bootstrap kopieren.
+  - In `render-directors-cut` bei `MEDIA_ELEMENT_ERROR Code 4` einen sauberen `failed`-Status mit Hinweis "Quell-Video Codec inkompatibel" loggen statt eines unverständlichen Stacktraces.
 
-### 1. Portrait im Deep Sweep per Signed URL laden
+## Phase 2 — Bug-Sichtbarkeit erhöhen
 
-In `qa-weekly-deep-sweep/index.ts` erweitere ich `getSignedAssets()` um ein dediziertes `portrait` Feld:
+Die Bugs aus 1.1–1.3 sind nur deshalb "unsichtbar", weil sie als `provider_quota_log`-Einträge versinken statt in `qa_bug_reports` zu landen.
 
-- `test-portrait.png` wird per `createSignedUrl()` signiert.
-- `RunCtx.signedAssets` bekommt `{ image, mask, portrait }`.
-- `flowTalkingHead()` nutzt künftig diese Reihenfolge:
-  1. `ctx.signedAssets.portrait`
-  2. optionaler stabiler Fallback
-  3. kein generisches Produktbild mehr als stiller Portrait-Fallback
+- Neue Edge-Funktion `qa-bug-harvester` (täglicher Cron, 1x/Tag):
+  - Liest `provider_quota_log` der letzten 24h mit `success=false`.
+  - Gruppiert nach `error_message`-Fingerprint (erste 200 Zeichen, normalisiert).
+  - Erstellt pro Fingerprint **maximal einen** offenen `qa_bug_reports`-Eintrag mit Severity-Heuristik (NaN/undefined → high, Codec → medium, Rate-Limit → low/ignoriert).
+  - Idempotent: wenn Bug schon `open` oder `resolved` mit gleichem Fingerprint < 7 Tage alt → skip.
+- Im **Bug Reports Admin-Tab** gruppierte Anzeige: "1× Sequence NaN (last seen 2h ago, 2 occurrences)" statt 84 Einzeleinträge.
 
-Damit sieht HeyGen wirklich das Bootstrapped-Portrait statt einer privaten/ungeeigneten URL oder dem generischen `test-image.png`.
+## Phase 3 — Sweep-Coverage gezielt erweitern (nicht vorher!)
 
-### 2. Bootstrap-Portrait zuverlässig reparieren, nicht nur nach MIME/Size
+Erst nach Phase 1+2 lohnt es, neue Flows hinzuzufügen. Vorschlag in dieser Reihenfolge:
 
-In `qa-live-sweep-bootstrap/index.ts` ändere ich die Portrait-Strategie:
+1. **Music Studio** (Stable Audio 2.5) — aktuell nicht im Sweep.
+2. **Picture Studio Magic Edit Outpaint** — Inpaint ist drin, Outpaint nicht.
+3. **Avatar Library + Talking Head mit Custom Avatar** (statt Default-Portrait).
+4. **Email Director Send-Test** (Resend, Self-Send only — günstig).
+5. **Auto-Director mit echtem Brand-Character-Lock** (testet Identity-Card-Injection).
 
-- Für `test-portrait.png` wird ein robuster `force`/`replace`-Pfad eingebaut, sodass das Portrait beim Bootstrap gezielt ersetzt werden kann, statt ein altes ungeeignetes Asset zu behalten.
-- Der aktuelle AI-Gateway Modellname wird korrigiert/vereinheitlicht auf ein unterstütztes Bildmodell aus dem Projekt-Setup.
-- Falls AI-Bildgenerierung nicht klappt, wird ein klarer, HeyGen-tauglicher Fallback verwendet bzw. der Bootstrap gibt explizit zurück, dass das Portrait nicht sicher provisioniert werden konnte.
-- Zusätzlich werden Logs/Response-Felder verbessert (`uploaded`, `repaired`, `replaced`, `contentType`, grobe Größe), damit im UI sichtbar ist, was tatsächlich passiert ist.
+Jeder neue Flow bekommt vorher ein Mock-Pendant in `_shared/qaMock.ts` und respektiert das 50€-Cap.
 
-### 3. Keine generischen Produktbilder mehr als Talking-Head-Fallback
+## Phase 4 — Stabilitäts-Härtung Flow 2 (Lambda Concurrency)
 
-`flowTalkingHead()` soll nicht mehr `signedAssets.image` oder `assets.image` an HeyGen schicken, wenn kein dediziertes Portrait verfügbar ist. Das erzeugt genau den aktuellen Fehler: HeyGen versucht ein Produkt-/Samplebild als Gesicht zu interpretieren.
+Aktuell ist Flow 2 chronisch gelb wegen AWS Rate Limits. Optionen:
 
-Stattdessen:
+- **A** Account-weites AWS Concurrency-Quota erhöhen (Support-Ticket bei AWS, kostet nichts).
+- **B** Deep Sweep wartet vor Flow 2 explizit, bis `aws-lambda` Provider-Health < 50% Auslastung zeigt.
+- **C** Flow 2 als "best effort" markieren und aus Pass-Rate-Berechnung entfernen.
 
-- Wenn kein signiertes Portrait vorhanden ist: Flow 4 wird sofort `budget_skipped` mit klarer Meldung.
-- Wenn ein Portrait vorhanden ist, aber HeyGen `400127` meldet: weiterhin Soft-Skip, aber mit präziser Meldung: „Portrait vorhanden, aber HeyGen erkennt darin kein Gesicht; Bootstrap ersetzt das Portrait jetzt gezielt.“
+Empfehlung: **A** beantragen, parallel **B** implementieren als Sicherheitsnetz.
 
-### 4. Optionaler QA-Bypass nur für Asset-Verfügbarkeit vermeiden
+## Reihenfolge & nächster konkreter Schritt
 
-Ich werde **nicht** einfach `x-qa-mock` für Talking Head setzen, weil der Deep Sweep echte Provider-Drift testen soll. Flow 4 soll nur grün werden, wenn HeyGen die echte Upload-/Create-Kette akzeptiert.
+Ich empfehle **streng sequenziell**:
 
-### 5. UI-Fixes in `DeepSweepTab.tsx`
+1. **Zuerst Phase 1.2** (NaN-Guard) — kleinster Fix, größter Hebel, bricht aktuell echte User-Renders.
+2. Dann 1.1 (Off-by-one Frame).
+3. Dann 1.3 (MP4-Codec-Bootstrap).
+4. Dann Phase 2 (Bug Harvester), damit zukünftige Drift sofort sichtbar wird.
+5. Erst dann Phase 3 (neue Flows).
 
-Ich passe die Admin-Ansicht an:
+## Was ich **nicht** vorschlage
 
-- Der Bootstrap-Button erscheint auch bei Flow 4 `budget_skipped`/Portrait-Fehlern, nicht nur bei altem `flow_index === 7`.
-- Text wird angepasst: „Bootstrap Assets aktualisiert. Portrait wird ersetzt; nächsten Run erneut starten.“
-- `budget_skipped` Fehlertexte werden nicht rot wie harte Failures dargestellt, sondern neutral/amber, damit Skip ≠ Bug klarer ist.
-- History-Passrate kann Timeouts analog zur aktuellen Karte separat darstellen, damit alte Runs nicht wieder irreführend rot/low aussehen.
+- Keine spekulativen Refactorings.
+- Kein neues Test-Framework — Playwright + Deep Sweep + Smoke reichen.
+- Kein "alle Edge-Functions auf einmal anfassen".
 
-## Erwartetes Ergebnis
+---
 
-Nach dem Fix und erneutem Bootstrap:
-
-- `test-portrait.png` wird wirklich ersetzt bzw. neu provisioniert.
-- Flow 4 nutzt eine Signed URL zum Portrait und nicht mehr das generische Testbild.
-- Wenn HeyGen das Portrait akzeptiert, wird Flow 4 grün.
-- Falls HeyGen trotzdem kein Gesicht erkennt, bleibt es ein sichtbarer Soft-Skip mit korrekter Diagnose, nicht ein verwirrender Hinweis „Bootstrap ausführen“, obwohl Bootstrap schon geklickt wurde.
-- Flow 2 bleibt gelb `timeout`, solange AWS Lambda limitiert; das ist weiterhin Infrastruktur, nicht Code-Bug.
+**Soll ich mit Phase 1.2 (NaN-Sanitizer in render-directors-cut + clientseitiger Guard) loslegen?**
