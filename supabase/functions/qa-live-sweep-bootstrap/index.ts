@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
       const r = await fetch(SAMPLE_VIDEO_URL);
       if (!r.ok) throw new Error(`Sample video fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "video/mp4" };
-    }, { minBytes: 50_000, expectedMimePrefix: "video/" }),
+    }, { minBytes: 50_000, expectedMimePrefix: "video/", force: true }),
   );
 
   // 3. Test audio — copy public sample (validates: size + mime)
