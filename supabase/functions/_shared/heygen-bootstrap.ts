@@ -38,7 +38,7 @@ async function readCachedId(admin: any): Promise<string | undefined> {
   return undefined;
 }
 
-async function listCustomPhotos(): Promise<{ id: string }[]> {
+async function listCustomPhotos(): Promise<{ id: string; isPreset: boolean }[]> {
   if (!HEYGEN_API_KEY) return [];
   const res = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
     headers: { "X-Api-Key": HEYGEN_API_KEY, accept: "application/json" },
@@ -49,7 +49,13 @@ async function listCustomPhotos(): Promise<{ id: string }[]> {
   }
   const json = await res.json();
   const items: any[] = Array.isArray(json?.data) ? json.data : [];
-  return items.filter((x) => x?.id && !x?.is_preset).map((x) => ({ id: String(x.id) }));
+  // Return ALL ids (we previously filtered !is_preset, but HeyGen sometimes
+  // mislabels custom uploads as presets — leading to empty prune lists and
+  // an immediate 401028 on the next upload). DELETE on a true preset just
+  // returns 4xx, which we log and continue.
+  return items
+    .filter((x) => x?.id)
+    .map((x) => ({ id: String(x.id), isPreset: Boolean(x?.is_preset) }));
 }
 
 async function pruneAllCustom(): Promise<number> {
@@ -57,18 +63,23 @@ async function pruneAllCustom(): Promise<number> {
   const items = await listCustomPhotos();
   let deleted = 0;
   for (const item of items) {
-    try {
-      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${item.id}`, {
-        method: "DELETE",
-        headers: { "X-Api-Key": HEYGEN_API_KEY },
-      });
-      console.log(`[heygen-bootstrap] DELETE ${item.id} -> ${dr.status}`);
-      if (dr.ok) deleted += 1;
-    } catch (e) {
-      console.warn(`[heygen-bootstrap] DELETE ${item.id} threw`, e);
+    // V2 first, fall back to V1 (some account tiers only accept V1 DELETE).
+    let ok = false;
+    for (const base of [HEYGEN_BASE_V2, HEYGEN_BASE_V1]) {
+      try {
+        const dr = await fetch(`${base}/talking_photo/${item.id}`, {
+          method: "DELETE",
+          headers: { "X-Api-Key": HEYGEN_API_KEY },
+        });
+        console.log(`[heygen-bootstrap] DELETE ${base}/talking_photo/${item.id} -> ${dr.status} (preset=${item.isPreset})`);
+        if (dr.ok) { ok = true; break; }
+      } catch (e) {
+        console.warn(`[heygen-bootstrap] DELETE ${base} threw`, e);
+      }
     }
-    // Give HeyGen a brief moment to release the quota slot.
-    await sleep(300);
+    if (ok) deleted += 1;
+    // HeyGen quota release is slow — give it 2 s per slot.
+    await sleep(2000);
   }
   return deleted;
 }
@@ -197,9 +208,9 @@ export async function ensureHeyGenTalkingPhoto(admin: any): Promise<HeyGenBootst
   // 4: 401028 fallback — prune again + wait + retry
   if (up.error && (/401028/.test(up.error) || /photo avatars/i.test(up.error))) {
     console.warn(`[heygen-bootstrap] 401028 on first upload, pruning + retry`);
-    await sleep(1000);
+    await sleep(1500);
     const prunedSecond = await pruneAllCustom();
-    await sleep(1000);
+    await sleep(1500);
     up = await uploadOnce(portrait.buf, portrait.contentType);
     if (up.id) {
       await persistId(admin, up.id);
@@ -209,6 +220,27 @@ export async function ensureHeyGenTalkingPhoto(admin: any): Promise<HeyGenBootst
         reused: false,
         pruned: prunedFirst + prunedSecond,
       };
+    }
+
+    // 5: Last-resort REUSE — if HeyGen still rejects upload, grab any
+    // existing photo from the account and cache it. Better than failing
+    // the entire Live Sweep over an account-tier quirk.
+    console.warn(`[heygen-bootstrap] still 401028 after retry — falling back to reuse-any`);
+    try {
+      const remaining = await listCustomPhotos();
+      const reusable = remaining.find((x) => !x.isPreset) ?? remaining[0];
+      if (reusable?.id) {
+        await persistId(admin, reusable.id);
+        console.log(`[heygen-bootstrap] reusing existing id=${reusable.id} as last resort`);
+        return {
+          ok: true,
+          talking_photo_id: reusable.id,
+          reused: true,
+          pruned: prunedFirst + prunedSecond,
+        };
+      }
+    } catch (e) {
+      console.warn(`[heygen-bootstrap] reuse-any fallback failed`, e);
     }
   }
 
