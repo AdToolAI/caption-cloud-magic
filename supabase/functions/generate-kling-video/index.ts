@@ -88,13 +88,6 @@ serve(async (req) => {
     const modelPricing = MODEL_PRICING[model] || MODEL_PRICING['kling-3-standard'];
     const costPerSecond = modelPricing[currency] || modelPricing['EUR'];
     const totalCost = duration * costPerSecond;
-
-    // Rate limit check (max 10 per hour)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from('ai_video_generations')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Check wallet balance

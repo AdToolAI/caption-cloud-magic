@@ -224,13 +224,6 @@ serve(async (req) => {
         { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
-
-    // Rate limit
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count } = await supabaseAdmin
-      .from("ai_video_generations")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
       // [legacy] Per-user video rate limit removed (single unlimited plan).
 
     // Create generation row
