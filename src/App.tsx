@@ -350,6 +350,7 @@ function AppLayout() {
 
 const AppContent = () => {
   const translationState = useTranslationState();
+  useConsoleErrorBuffer();
 
   return (
     <TranslationContext.Provider value={translationState}>
