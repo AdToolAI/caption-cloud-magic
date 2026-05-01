@@ -112,8 +112,10 @@ export function LiveSweepTab() {
       });
       if (error) throw error;
       const s = data as any;
-      toast.success(`Sweep abgeschlossen — ${s.succeeded}/${s.total_tested} grün`, {
-        description: `${s.failed} failed · ${s.timeout} timeout · ${s.skipped_budget} skipped · ${s.total_spent_eur.toFixed(2)} € ausgegeben`,
+      const expected = s.expected ?? 0;
+      const effectiveOk = (s.succeeded ?? 0) + expected;
+      toast.success(`Sweep abgeschlossen — ${effectiveOk}/${s.total_tested} grün`, {
+        description: `${s.failed} failed · ${s.timeout} timeout · ${expected} expected · ${s.skipped_budget} skipped · ${s.total_spent_eur.toFixed(2)} € ausgegeben`,
       });
       await load();
     } catch (e: any) {
