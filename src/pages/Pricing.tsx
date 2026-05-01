@@ -17,6 +17,7 @@ import { useUrlCoupon } from "@/hooks/useUrlCoupon";
 import { CouponBanner } from "@/components/pricing/CouponBanner";
 import { CompetitorComparisonCard } from "@/components/landing/CompetitorComparisonCard";
 import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
+import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -110,7 +111,7 @@ const Pricing = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
-        title="Pricing — AdTool AI Pro €19.99/month"
+        title="Pricing — AdTool AI Pro €14.99/month (Launch promo)"
         description="One simple plan. Captions, images, Director's Cut, posting & AI video credits. 14-day free trial. Cancel anytime."
         canonical="https://useadtool.ai/pricing"
         lang={language}
@@ -195,15 +196,14 @@ const Pricing = () => {
                         {currencySymbol}29.99
                       </span>
                       <span className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-gold-dark bg-clip-text text-transparent tabular-nums">
-                        {currencySymbol}19.99
+                        {currencySymbol}14.99
                       </span>
                       <span className="text-muted-foreground">
                         {t("landing.pricing.perMonth")}
                       </span>
                     </div>
-                    <div className="mt-2 inline-flex items-center gap-1.5 text-[11px] uppercase tracking-wider text-primary/80 font-medium">
-                      <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-                      {t("landing.pricing.launchBadge")}
+                    <div className="mt-3">
+                      <FoundersSlotBadge />
                     </div>
                   </div>
                 </div>
