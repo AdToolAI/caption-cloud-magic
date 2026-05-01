@@ -103,6 +103,16 @@ Deno.serve(async (req) => {
       }).eq('id', reportId);
     }
 
+    // Telemetry: track moderation action (admin distinct id)
+    try {
+      await trackBusinessEvent('character_takedown', userData.user.id, {
+        character_id: characterId,
+        action,
+        refunded_count: refundedCount,
+        report_id: reportId ?? null,
+      });
+    } catch { /* analytics optional */ }
+
     return new Response(JSON.stringify({ ok: true, action, refundedCount }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
