@@ -15,21 +15,26 @@ type ViduModel = "vidu-q2-reference" | "vidu-q2-i2v" | "vidu-q2-t2v";
 
 // Vidu Q2 charges a flat fee per generation (5s fixed clip).
 // We expose it as cost/sec for UI parity (price / 5s).
+// Pricing aligned with the q3 family on Replicate (q3-pro ≈ $0.95/5s, q3-turbo ≈ $0.40/5s).
 const FLAT_PRICE_EUR: Record<ViduModel, number> = {
-  "vidu-q2-reference": 0.45,
-  "vidu-q2-i2v": 0.40,
+  "vidu-q2-reference": 0.95,
+  "vidu-q2-i2v": 0.95,
   "vidu-q2-t2v": 0.40,
 };
 
-// Replicate slugs. Reverted from q3-pro back to q2 native models because
-// q3-pro is heavily quota-throttled on accounts < $5 credit (Replicate
-// burst-limits new models to 6 req/min, burst 1) and was returning 429s
-// in the QA Live Sweep. The q2 family supports native multi-reference for
-// the reference variant, so prompt-suffix degradation is no longer needed.
+// Replicate slugs. The original `vidu/q2-*` models were retired by Replicate
+// and now return HTTP 404. Only `vidu/q3-pro` and `vidu/q3-turbo` are hosted.
+// We map our q2-* identifiers (kept for backward compat across the codebase)
+// onto the q3 family:
+//   - reference / i2v → q3-pro (highest fidelity, supports start_image)
+//   - t2v             → q3-turbo (faster, cheaper, text-only)
+// Native multi-reference is not exposed by q3 — first reference image is sent
+// as `start_image`, the remaining references are folded into the prompt via
+// buildReferenceSuffix() (already implemented).
 const REPLICATE_MODELS: Record<ViduModel, string> = {
-  "vidu-q2-reference": "vidu/q2-reference",
-  "vidu-q2-i2v": "vidu/q2-i2v",
-  "vidu-q2-t2v": "vidu/q2-t2v",
+  "vidu-q2-reference": "vidu/q3-pro",
+  "vidu-q2-i2v": "vidu/q3-pro",
+  "vidu-q2-t2v": "vidu/q3-turbo",
 };
 
 const FIXED_DURATION = 5;
@@ -346,8 +351,14 @@ serve(async (req) => {
     if (negativePrompt) viduInput.negative_prompt = negativePrompt;
 
     if (model === "vidu-q2-reference") {
-      // q2-reference natively accepts up to 7 reference images.
-      if (referenceImages.length > 0) viduInput.reference_images = referenceImages;
+      // q3-pro does not accept a multi-image array — send the first reference
+      // as `start_image`; remaining refs were already folded into the prompt
+      // via buildReferenceSuffix() above.
+      const img = referenceImages[0];
+      if (img) viduInput.start_image = img;
+      if (referenceImages.length > 1) {
+        console.log(`[generate-vidu-video] Note: q3-pro accepts 1 start_image; ${referenceImages.length - 1} extra refs folded into prompt.`);
+      }
     } else if (model === "vidu-q2-i2v") {
       const img = startImageUrl ?? referenceImages[0];
       if (img) viduInput.start_image = img;
