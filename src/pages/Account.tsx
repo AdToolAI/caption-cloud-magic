@@ -12,6 +12,7 @@ import { ConnectionsTab } from "@/components/account/ConnectionsTab";
 import { PrivacyTab } from "@/components/account/PrivacyTab";
 import { NotificationSettings } from "@/components/account/NotificationSettings";
 import { StorageUsagePanel } from "@/components/settings/StorageUsagePanel";
+import { SystemStatusCard } from "@/components/system-status/SystemStatusCard";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 import { useTranslation } from "@/hooks/useTranslation";
 
