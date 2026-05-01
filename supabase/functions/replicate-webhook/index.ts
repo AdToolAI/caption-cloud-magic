@@ -135,6 +135,20 @@ serve(async (req) => {
 
       console.log('[Replicate Webhook] Generation completed and saved:', generation.id);
 
+      // Telemetry
+      const startedAt = generation.started_at ? new Date(generation.started_at).getTime() : null;
+      const latencyMs = startedAt ? Date.now() - startedAt : undefined;
+      await trackAIGeneration('completed', generation.user_id, {
+        provider: 'replicate',
+        model: generation.model,
+        duration_s: generation.duration_seconds,
+        cost_eur: Number(generation.total_cost_euros) || undefined,
+        aspect_ratio: generation.aspect_ratio,
+        resolution: generation.resolution,
+        latency_ms: latencyMs,
+        generation_id: generation.id,
+      }).catch(() => {});
+
       return new Response(JSON.stringify({ success: true, status: 'completed' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
