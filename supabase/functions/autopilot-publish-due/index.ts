@@ -1,13 +1,14 @@
 // Cron-driven publisher — picks scheduled slots whose time has come and publishes via the unified `publish` function.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
+import { withSentryCron } from "../_shared/sentryCron.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryCron("autopilot-publish-due", { schedule: "* * * * *", maxRuntime: 5 }, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const hbStart = Date.now();
   try {

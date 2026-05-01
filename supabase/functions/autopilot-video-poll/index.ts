@@ -165,7 +165,7 @@ Deno.serve(withSentryCron("autopilot-video-poll", { schedule: "* * * * *", maxRu
     expectedIntervalSeconds: 60,
   });
   return json({ ok: true, polled: list.length, completed, failed, still_processing: stillProcessing });
-});
+}));
 
 async function markFailed(
   admin: ReturnType<typeof createClient>,
