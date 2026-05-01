@@ -21,15 +21,15 @@ const FLAT_PRICE_EUR: Record<ViduModel, number> = {
   "vidu-q2-t2v": 0.40,
 };
 
-// Replicate slugs. Vidu Q2 was removed from Replicate (May 2026); we now use
-// q3-pro for all flavours. q3-pro does NOT support multi-reference natively
-// (only start_image / end_image), so the "reference" mode degrades gracefully:
-// it uses the first reference image as start_image and folds the remaining
-// references into the prompt suffix.
+// Replicate slugs. Reverted from q3-pro back to q2 native models because
+// q3-pro is heavily quota-throttled on accounts < $5 credit (Replicate
+// burst-limits new models to 6 req/min, burst 1) and was returning 429s
+// in the QA Live Sweep. The q2 family supports native multi-reference for
+// the reference variant, so prompt-suffix degradation is no longer needed.
 const REPLICATE_MODELS: Record<ViduModel, string> = {
-  "vidu-q2-reference": "vidu/q3-pro",
-  "vidu-q2-i2v": "vidu/q3-pro",
-  "vidu-q2-t2v": "vidu/q3-pro",
+  "vidu-q2-reference": "vidu/q2-reference",
+  "vidu-q2-i2v": "vidu/q2-i2v",
+  "vidu-q2-t2v": "vidu/q2-t2v",
 };
 
 const FIXED_DURATION = 5;
