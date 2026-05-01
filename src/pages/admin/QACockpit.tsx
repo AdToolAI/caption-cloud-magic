@@ -361,6 +361,11 @@ export default function QACockpit() {
             <WatchdogTab />
           </TabsContent>
 
+          {/* SYNTHETIC PROBES (Layer 3) */}
+          <TabsContent value="probes">
+            <ProbesTab />
+          </TabsContent>
+
           {/* LIVE RUNS */}
           <TabsContent value="live" className="space-y-3 mt-4">
             {(runs.data ?? []).map((r: any) => (
