@@ -180,8 +180,10 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "A+I",
     estimated_cost_eur: 0.60,
     edge_function: "generate-talking-head",
-    buildPayload: ({ image, audio }) => ({
-      imageUrl: image,
+    buildPayload: ({ portrait, image, audio }) => ({
+      // Prefer the dedicated face portrait (HeyGen requires a detectable face).
+      // Fallback to generic test image only if the portrait is not provisioned.
+      imageUrl: portrait || image,
       audioUrl: audio,
       aspectRatio: "16:9",
       resolution: "720p",
