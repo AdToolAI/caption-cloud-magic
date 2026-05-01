@@ -402,9 +402,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '720p',
     aspectRatios: ['16:9', '9:16', '1:1'],
     costPerSecond: { EUR: 0.10, USD: 0.10 },
-    badge: 'Pikaframes',
+    badge: 'Wartung',
     tagline: 'Smooth motion · Start+End frame morphing',
     legacyRoute: '/pika-video-studio',
+    status: 'maintenance',
+    statusReason: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
   },
   {
     id: 'pika-2-2-pro',
@@ -419,9 +421,11 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1'],
     costPerSecond: { EUR: 0.18, USD: 0.18 },
-    badge: 'Premium',
+    badge: 'Wartung',
     tagline: 'High-fidelity Pika · 1080p',
     legacyRoute: '/pika-video-studio',
+    status: 'maintenance',
+    statusReason: 'Pika ist temporär offline (Provider-Wartung). Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
   },
 
   /* ─────────── Vidu Q2 ─────────── */
