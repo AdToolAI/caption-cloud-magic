@@ -187,6 +187,24 @@ serve(async (req) => {
 
       console.log('[Replicate Webhook] Generation marked as failed and credits refunded:', generation.id);
 
+      // Telemetry
+      await trackAIGeneration('failed', generation.user_id, {
+        provider: 'replicate',
+        model: generation.model,
+        cost_eur: Number(generation.total_cost_euros) || undefined,
+        error_type: status,
+        error_message: typeof errorMessage === 'string' ? errorMessage.slice(0, 500) : String(errorMessage),
+        generation_id: generation.id,
+      }).catch(() => {});
+      if (!refundError) {
+        await trackAIGeneration('refunded', generation.user_id, {
+          provider: 'replicate',
+          model: generation.model,
+          cost_eur: Number(generation.total_cost_euros) || undefined,
+          generation_id: generation.id,
+        }).catch(() => {});
+      }
+
       return new Response(JSON.stringify({ success: true, status: 'failed', refunded: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
