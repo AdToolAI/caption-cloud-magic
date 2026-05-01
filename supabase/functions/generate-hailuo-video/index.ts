@@ -207,6 +207,16 @@ serve(async (req) => {
         })
         .eq('id', generation.id);
 
+      await trackAIGeneration('started', user.id, {
+        provider: 'hailuo',
+        model,
+        duration_s: duration,
+        cost_eur: totalCost,
+        aspect_ratio: '16:9',
+        resolution: finalResolution,
+        generation_id: generation.id,
+      }).catch(() => {});
+
     } catch (replicateError: any) {
       console.error('[generate-hailuo-video] ❌ Replicate Error:', replicateError);
 
