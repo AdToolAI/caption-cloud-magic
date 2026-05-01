@@ -39,8 +39,11 @@ interface ProviderTest {
    */
   expectedFailure?: { status: number; reasonContains?: string; note: string };
   buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
-  /** Optional: parses provider response into success/error + asset URL */
-  parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
+  /** Optional: parses provider response into success/error + asset URL.
+   * Set asyncStarted=true for providers that kick off a long background job
+   * (e.g. HeyGen Talking Head polls 1-3min via EdgeRuntime.waitUntil).
+   * The sweep marks those rows as `async_started` instead of `succeeded`. */
+  parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string; asyncStarted?: boolean; predictionId?: string };
 }
 
 const PROVIDER_MATRIX: ProviderTest[] = [
