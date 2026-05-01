@@ -48,6 +48,33 @@ interface ProviderTest {
 
 const PROVIDER_MATRIX: ProviderTest[] = [
   {
+    // NOTE: Hedra is intentionally first because it's the most expensive in
+    // wall-clock time (HeyGen bootstrap + async kick-off). Running it first
+    // guarantees the row is updated before the background-worker budget runs
+    // out, even if a later provider is slow.
+    provider: "Hedra Talking Head",
+    model: "hedra/character-3",
+    mode: "A+I",
+    estimated_cost_eur: 0.30,
+    edge_function: "generate-talking-head",
+    timeoutMs: 120_000,
+    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
+      ...(talkingPhotoId ? { talkingPhotoId } : {}),
+      imageUrl: portrait || image,
+      audioUrl: audio,
+      aspectRatio: "16:9",
+      resolution: "720p",
+    }),
+    parseResponse: (json) => {
+      if (!json) return { success: false, error: "Empty response" };
+      if (json.error) return { success: false, error: String(json.error) };
+      if (json.success === true && (json.status === "processing" || json.status === "pending") && !json.videoUrl) {
+        return { success: true, asyncStarted: true, predictionId: json.predictionId };
+      }
+      return defaultParse(json);
+    },
+  },
+  {
     provider: "FLUX Schnell",
     model: "black-forest-labs/flux-schnell",
     mode: "T2I",
