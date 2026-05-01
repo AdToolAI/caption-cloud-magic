@@ -25,6 +25,8 @@ export interface HubDefinition {
   descKey: string;
   items: HubSubItem[];
   adminOnly?: boolean;
+  /** When true: hub is visible but not navigable for non-admins. */
+  comingSoon?: boolean;
 }
 
 export const hubDefinitions: HubDefinition[] = [
