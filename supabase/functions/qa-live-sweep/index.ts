@@ -565,8 +565,18 @@ Deno.serve(async (req) => {
   }
 
   // Idempotency: if a sweep is already running (any pending/running rows in
-  // the last 10 min), refuse to start a new one and return the active sweep_id.
+  // Stale-recovery: any pending/running row older than 10 min is from a worker
+  // that was killed by the edge runtime. Mark it as failed so neither the UI
+  // nor the 409-idempotency check below trips on a phantom "active" sweep.
   const tenMinAgo = new Date(Date.now() - 10 * 60_000).toISOString();
+  await adminClient.from("qa_live_runs").update({
+    status: "failed",
+    error_message: "Stale: previous worker exited without committing status (auto-recovered)",
+    completed_at: new Date().toISOString(),
+  }).in("status", ["pending", "running"]).lt("started_at", tenMinAgo);
+
+  // Idempotency: if a sweep is genuinely in flight (rows updated within the
+  // last 10 min), refuse to start a new one and return the active sweep_id.
   const { data: activeRows } = await adminClient
     .from("qa_live_runs")
     .select("sweep_id, status, started_at")
