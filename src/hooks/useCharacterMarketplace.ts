@@ -71,9 +71,15 @@ export function usePurchaseCharacter() {
       if (error) throw error;
       return data as { ok: boolean; already_owned?: boolean; price_credits?: number; error?: string };
     },
-    onSuccess: (res) => {
+    onSuccess: (res, characterId) => {
       if (res.ok) {
         toast({ title: res.already_owned ? 'Already owned' : 'Character unlocked', description: res.already_owned ? 'You already own this character.' : `${res.price_credits ?? 0} credits charged.` });
+        if (!res.already_owned) {
+          trackEvent(ANALYTICS_EVENTS.CHARACTER_PURCHASED, {
+            character_id: characterId,
+            price_credits: res.price_credits ?? 0,
+          });
+        }
         qc.invalidateQueries({ queryKey: ['character-purchases-mine'] });
         qc.invalidateQueries({ queryKey: ['brand-characters'] });
       } else {
