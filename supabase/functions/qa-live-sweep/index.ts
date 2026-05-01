@@ -29,7 +29,9 @@ interface ProviderTest {
   mode: string;
   estimated_cost_eur: number;
   edge_function: string;
-  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string }) => Record<string, unknown>;
+  /** Optional per-provider timeout override (ms). Defaults to 90_000. */
+  timeoutMs?: number;
+  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string; talkingPhotoId?: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
 }
@@ -54,6 +56,9 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "T2A",
     estimated_cost_eur: 0.05,
     edge_function: "generate-music-track",
+    // Stable Audio cold-starts on Replicate frequently take 120-150s. 90s was
+    // too aggressive — bump to 180s so we don't false-positive a slow render.
+    timeoutMs: 180_000,
     buildPayload: () => ({
       prompt: "calm ambient electronic background, 10 seconds",
       duration: 10,
@@ -180,9 +185,11 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "A+I",
     estimated_cost_eur: 0.60,
     edge_function: "generate-talking-head",
-    buildPayload: ({ portrait, image, audio }) => ({
-      // Prefer the dedicated face portrait (HeyGen requires a detectable face).
-      // Fallback to generic test image only if the portrait is not provisioned.
+    buildPayload: ({ portrait, image, audio, talkingPhotoId }) => ({
+      // Prefer the cached HeyGen talking_photo_id from bootstrap (avoids the
+      // per-account 3-photo limit). Fall back to the bootstrap portrait
+      // image, then the generic test image.
+      ...(talkingPhotoId ? { talkingPhotoId } : {}),
       imageUrl: portrait || image,
       audioUrl: audio,
       aspectRatio: "16:9",
