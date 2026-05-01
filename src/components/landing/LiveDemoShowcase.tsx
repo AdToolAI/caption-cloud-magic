@@ -2,13 +2,15 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
+import restaurantBefore from "@/assets/landing/live-demo/restaurant-before.png";
+import restaurantAfter from "@/assets/landing/live-demo/restaurant-after.png";
 
 interface DemoCase {
   id: string;
   industryKey: string;
   metricKey: string;
-  before: { captionKey: string };
-  after: { captionKey: string };
+  before: { captionKey: string; image?: string };
+  after: { captionKey: string; image?: string };
 }
 
 const cases: DemoCase[] = [
@@ -16,8 +18,8 @@ const cases: DemoCase[] = [
     id: "restaurant",
     industryKey: "landing.liveDemo.cases.restaurant.industry",
     metricKey: "landing.liveDemo.cases.restaurant.metric",
-    before: { captionKey: "landing.liveDemo.cases.restaurant.before" },
-    after: { captionKey: "landing.liveDemo.cases.restaurant.after" },
+    before: { captionKey: "landing.liveDemo.cases.restaurant.before", image: restaurantBefore },
+    after: { captionKey: "landing.liveDemo.cases.restaurant.after", image: restaurantAfter },
   },
   {
     id: "fitness",
@@ -104,10 +106,19 @@ export const LiveDemoShowcase = () => {
                 {t("landing.liveDemo.before")}
               </div>
               <div className="pt-6">
-                <div className="aspect-square w-full bg-gradient-to-br from-muted/30 to-muted/10 mb-4 flex items-center justify-center border border-border/30">
-                  <span className="text-xs text-muted-foreground/50 uppercase tracking-widest">
-                    {t("landing.liveDemo.basicPost")}
-                  </span>
+                <div className="aspect-square w-full bg-gradient-to-br from-muted/30 to-muted/10 mb-4 flex items-center justify-center border border-border/30 overflow-hidden relative">
+                  {c.before.image ? (
+                    <img
+                      src={c.before.image}
+                      alt={t(c.before.captionKey)}
+                      loading="lazy"
+                      className="w-full h-full object-cover grayscale-[0.15]"
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground/50 uppercase tracking-widest">
+                      {t("landing.liveDemo.basicPost")}
+                    </span>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground/80 leading-relaxed italic">
                   "{t(c.before.captionKey)}"
@@ -148,10 +159,24 @@ export const LiveDemoShowcase = () => {
               </div>
               <div className="pt-6">
                 <div className="aspect-square w-full bg-gradient-to-br from-primary/20 via-gold/10 to-gold-dark/15 mb-4 flex items-center justify-center border border-primary/30 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsla(43,90%,68%,0.3),transparent_60%)]" />
-                  <span className="text-xs text-primary/80 uppercase tracking-widest font-semibold relative z-10">
-                    {t("landing.liveDemo.adtoolPost")}
-                  </span>
+                  {c.after.image ? (
+                    <>
+                      <img
+                        src={c.after.image}
+                        alt={t(c.after.captionKey)}
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsla(43,90%,68%,0.18),transparent_70%)] pointer-events-none" />
+                    </>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,hsla(43,90%,68%,0.3),transparent_60%)]" />
+                      <span className="text-xs text-primary/80 uppercase tracking-widest font-semibold relative z-10">
+                        {t("landing.liveDemo.adtoolPost")}
+                      </span>
+                    </>
+                  )}
                 </div>
                 <p className="text-sm text-foreground leading-relaxed font-medium">
                   {t(c.after.captionKey)}
