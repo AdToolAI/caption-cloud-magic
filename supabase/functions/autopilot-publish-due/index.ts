@@ -1,5 +1,6 @@
 // Cron-driven publisher — picks scheduled slots whose time has come and publishes via the unified `publish` function.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { recordHeartbeat } from "../_shared/heartbeat.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const hbStart = Date.now();
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -126,9 +128,22 @@ Deno.serve(async (req) => {
       }
     }
 
+    await recordHeartbeat({
+      jobName: "autopilot-publish-due",
+      status: "ok",
+      durationMs: Date.now() - hbStart,
+      expectedIntervalSeconds: 300,
+    });
     return json({ ok: true, generated, published, failed });
   } catch (e) {
     console.error("publish-due error", e);
+    await recordHeartbeat({
+      jobName: "autopilot-publish-due",
+      status: "error",
+      durationMs: Date.now() - hbStart,
+      error: e instanceof Error ? e.message : String(e),
+      expectedIntervalSeconds: 300,
+    });
     return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
   }
 });

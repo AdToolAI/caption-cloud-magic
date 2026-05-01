@@ -11,6 +11,7 @@
  * Schedule: daily via pg_cron (set up separately). Also callable on-demand.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2.95.0';
+import { recordHeartbeat } from '../_shared/heartbeat.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
