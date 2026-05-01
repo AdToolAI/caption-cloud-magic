@@ -151,6 +151,19 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     }),
   },
   {
+    provider: "HappyHorse 1.0",
+    model: "happyhorse-standard",
+    mode: "T2V",
+    estimated_cost_eur: 0.90, // 5s × €0.18/s
+    edge_function: "generate-happyhorse-video",
+    buildPayload: () => ({
+      prompt: "a cinematic shot of a horse galloping across a sunset prairie, dust kicked up by hooves",
+      model: "happyhorse-standard",
+      duration: 5,
+      aspectRatio: "16:9",
+    }),
+  },
+  {
     provider: "Wan 2.5 Std",
     model: "wan/wan-2.5-std",
     mode: "T2V",
