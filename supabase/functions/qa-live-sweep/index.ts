@@ -402,8 +402,29 @@ async function runSweep(
 
   try {
     for (const test of tests) {
+      const remaining = cap - totalSpent;
+      if (remaining < test.estimated_cost_eur) {
+        await adminClient.from("qa_live_runs").update({
+          status: "skipped_budget",
+          cost_eur: 0,
+          error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
+          completed_at: new Date().toISOString(),
+        }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+        completed.push({ provider: test.provider, status: "skipped_budget" });
+        continue;
+      }
+
+      // Mark as running BEFORE any slow bootstrap so the UI immediately
+      // shows the spinner instead of a stale "pending" badge.
+      await adminClient.from("qa_live_runs").update({
+        status: "running",
+        started_at: new Date().toISOString(),
+      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
+
+      // HeyGen bootstrap on demand (only when the provider needs it and we
+      // don't already have a cached talking_photo_id).
       if (test.edge_function === "generate-talking-head" && !sweepAssets.talkingPhotoId) {
-        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping in background worker`);
+        console.log(`[sweep ${sweepId}] no cached HeyGen photo id — bootstrapping now`);
         try {
           const result = await ensureHeyGenTalkingPhoto(adminClient);
           if (result.ok && result.talking_photo_id) {
@@ -419,30 +440,16 @@ async function runSweep(
         }
       }
 
-      const remaining = cap - totalSpent;
-      if (remaining < test.estimated_cost_eur) {
-        await adminClient.from("qa_live_runs").update({
-          status: "skipped_budget",
-          cost_eur: 0,
-          error_message: `Skipped: only ${remaining.toFixed(2)}€ remaining of ${cap.toFixed(2)}€ cap`,
-          completed_at: new Date().toISOString(),
-        }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-        completed.push({ provider: test.provider, status: "skipped_budget" });
-        continue;
-      }
-
-      // Mark as running
-      await adminClient.from("qa_live_runs").update({
-        status: "running",
-        started_at: new Date().toISOString(),
-      }).eq("sweep_id", sweepId).eq("provider", test.provider).eq("mode", test.mode);
-
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), test.timeoutMs ?? 90_000);
       const result = await callProvider(test, sweepAssets, authHeader, ctrl.signal);
       clearTimeout(timer);
 
-      const charged = result.status === "succeeded" ? test.estimated_cost_eur : 0;
+      // Charge for both real successes and async-started jobs (the spend
+      // commits to the provider the moment the kick-off returns 200).
+      const charged = (result.status === "succeeded" || result.status === "async_started")
+        ? test.estimated_cost_eur
+        : 0;
       totalSpent += charged;
 
       let safeRaw: unknown = null;
