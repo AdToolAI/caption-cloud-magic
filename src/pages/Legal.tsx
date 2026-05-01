@@ -153,7 +153,48 @@ const Legal = () => {
                 </ul>
               </LegalSection>
 
-              <LegalSection title="8. Schlussbestimmungen" icon="scale" index={7}>
+              <LegalSection title="8. Aktionspreise, Founders- und Launch-Angebote" icon="alert" index={7}>
+                <div className="space-y-3">
+                  <p>
+                    Sämtliche als „Founders-Deal", „Launch-Promo", „Einführungspreis" oder vergleichbar gekennzeichneten
+                    Angebote (insbesondere der Pro-Plan zu € 14,99/Monat für 24 bzw. 3 Monate) sind
+                    <strong className="text-foreground"> zeitlich und mengenmäßig begrenzte Einführungsangebote</strong>.
+                  </p>
+                  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+                    <li>
+                      Die Anzahl der Founders-Plätze ist auf <strong className="text-foreground">1.000 Subscriptions</strong> begrenzt.
+                      Sind diese vergeben, kann ohne Vorankündigung auf die Launch-Promo (3 Monate Rabatt) oder den
+                      regulären Listenpreis umgestellt werden.
+                    </li>
+                    <li>
+                      Der Anbieter behält sich vor, Aktionspreise, Rabattbedingungen, Slot-Anzahl und Laufzeit
+                      <strong className="text-foreground"> jederzeit ohne Vorankündigung zu ändern, auszusetzen oder vollständig zu beenden</strong>.
+                      Ein Anspruch auf Wiederaufnahme oder Verlängerung beendeter Aktionen besteht nicht.
+                    </li>
+                    <li>
+                      Die Aktion gilt <strong className="text-foreground">ausschließlich für die Dauer des aktiven Betriebs des Dienstes</strong>.
+                      Wird der Dienst eingestellt, erlischt jeder Anspruch auf den vergünstigten Preis. Bereits gezahlte
+                      Beträge werden anteilig nach geltendem Recht behandelt.
+                    </li>
+                    <li>
+                      Bereits abgeschlossene Subscriptions zum Founders- oder Launch-Preis bleiben für die im
+                      Buchungszeitpunkt zugesagte Rabatt-Laufzeit (24 bzw. 3 Monate) zum gebuchten Preis bestehen,
+                      sofern der Dienst weiterhin betrieben wird. Nach Ablauf dieser Laufzeit gilt automatisch der
+                      dann gültige Standard-Listenpreis.
+                    </li>
+                    <li>
+                      Rabatte werden technisch über Stripe-Coupons automatisch beim Checkout angewendet. Es besteht
+                      kein Anspruch auf manuelle Eingabe oder nachträgliche Gewährung eines Rabatts.
+                    </li>
+                    <li>
+                      Es handelt sich um ein freibleibendes Angebot. Maßgeblich für den abgeschlossenen Vertrag sind
+                      ausschließlich die im Stripe-Checkout finalisierten Konditionen.
+                    </li>
+                  </ul>
+                </div>
+              </LegalSection>
+
+              <LegalSection title="9. Schlussbestimmungen" icon="scale" index={8}>
                 <ul className="list-disc list-inside space-y-2">
                   <li>Es gilt deutsches Recht</li>
                   <li>Gerichtsstand: München, Deutschland</li>
