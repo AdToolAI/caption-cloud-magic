@@ -21,11 +21,15 @@ const FLAT_PRICE_EUR: Record<ViduModel, number> = {
   "vidu-q2-t2v": 0.40,
 };
 
-// Replicate slugs. If Replicate has renamed a path, adjust here only.
+// Replicate slugs. Vidu Q2 was removed from Replicate (May 2026); we now use
+// q3-pro for all flavours. q3-pro does NOT support multi-reference natively
+// (only start_image / end_image), so the "reference" mode degrades gracefully:
+// it uses the first reference image as start_image and folds the remaining
+// references into the prompt suffix.
 const REPLICATE_MODELS: Record<ViduModel, string> = {
-  "vidu-q2-reference": "vidu/vidu-q2-reference-to-video",
-  "vidu-q2-i2v": "vidu/vidu-q2-image-to-video",
-  "vidu-q2-t2v": "vidu/vidu-q2-text-to-video",
+  "vidu-q2-reference": "vidu/q3-pro",
+  "vidu-q2-i2v": "vidu/q3-pro",
+  "vidu-q2-t2v": "vidu/q3-pro",
 };
 
 const FIXED_DURATION = 5;
