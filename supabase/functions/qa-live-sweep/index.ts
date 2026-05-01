@@ -543,7 +543,7 @@ async function runSweep(
   }
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withSentryCron("qa-live-sweep", { schedule: null, maxRuntime: 30 }, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -687,4 +687,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     },
   );
-});
+}));
