@@ -108,6 +108,7 @@ export const hubDefinitions: HubDefinition[] = [
     icon: Gamepad2,
     titleKey: "hubs.gaming",
     descKey: "hubDesc.gaming",
+    comingSoon: true,
     items: [
       { route: "/gaming", titleKey: "Stream Dashboard", descKey: "hubItemDesc.streamDashboard", icon: Radio },
     ],
