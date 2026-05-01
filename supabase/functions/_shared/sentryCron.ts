@@ -1,50 +1,70 @@
 /**
- * Sentry Cron Monitors — Layer 2 Observability
+ * Sentry Cron Monitors — Layer 2 Observability (DSN Envelope variant)
  *
- * Sends check-in events to Sentry's Cron Monitor API. Sentry alerts via
- * Email/Slack if a check-in is missed (= worker died silently) or if
- * `error` status is reported.
+ * Sends check-in envelopes directly to the Sentry ingest endpoint using the
+ * project DSN. No auth token needed, no special scopes. Monitors are
+ * auto-provisioned in Sentry on first check-in via the embedded
+ * `monitor_config`.
  *
- * Monitors are auto-created on first check-in (no manual Sentry setup).
+ * Docs: https://docs.sentry.io/product/crons/getting-started/http/
  *
  * Usage:
- *   Deno.serve(withSentryCron("qa-watchdog", "every 2min", async (req) => {
- *     // existing handler logic
- *   }, { maxRuntimeMinutes: 5 }));
- *
- * Or manually:
- *   const id = await sentryCronCheckIn("my-job", "in_progress");
- *   try { ... await sentryCronCheckIn("my-job", "ok", id, durationMs); }
- *   catch (e) { await sentryCronCheckIn("my-job", "error", id, durationMs); }
+ *   Deno.serve(withSentryCron("qa-watchdog", { schedule: "*\/2 * * * *" }, handler));
  */
 
-const SENTRY_AUTH_TOKEN = Deno.env.get("SENTRY_AUTH_TOKEN");
-const SENTRY_ORG_SLUG = Deno.env.get("SENTRY_ORG_SLUG");
-const SENTRY_PROJECT_SLUG = Deno.env.get("SENTRY_PROJECT_SLUG");
+const SENTRY_DSN = Deno.env.get("SENTRY_DSN");
 
 export type CronStatus = "in_progress" | "ok" | "error";
 
 export interface MonitorConfig {
-  /** Crontab expression, e.g. "*\/2 * * * *". Set null for on-demand jobs. */
   schedule: string | null;
-  /** Tolerance window for late check-ins (minutes). Default 1. */
   checkinMargin?: number;
-  /** Max time a job may run before considered failed (minutes). Default 30. */
   maxRuntime?: number;
-  /** Failures before issue is created. Default 1 (alert immediately). */
   failureIssueThreshold?: number;
   timezone?: string;
 }
 
-function isEnabled(): boolean {
-  return Boolean(SENTRY_AUTH_TOKEN && SENTRY_ORG_SLUG && SENTRY_PROJECT_SLUG);
+interface ParsedDsn {
+  publicKey: string;
+  host: string;
+  projectId: string;
+  protocol: string;
+}
+
+let cachedDsn: ParsedDsn | null | undefined;
+
+function parseDsn(): ParsedDsn | null {
+  if (cachedDsn !== undefined) return cachedDsn;
+  if (!SENTRY_DSN) {
+    cachedDsn = null;
+    return null;
+  }
+  try {
+    const u = new URL(SENTRY_DSN);
+    const projectId = u.pathname.replace(/^\/+/, "");
+    if (!u.username || !u.host || !projectId) throw new Error("DSN missing parts");
+    cachedDsn = {
+      publicKey: u.username,
+      host: u.host,
+      projectId,
+      protocol: u.protocol.replace(":", ""),
+    };
+    return cachedDsn;
+  } catch (e) {
+    console.warn("[sentryCron] Invalid SENTRY_DSN:", (e as Error).message);
+    cachedDsn = null;
+    return null;
+  }
+}
+
+function uuid32(): string {
+  // Sentry envelope IDs: 32 hex chars (no dashes)
+  return crypto.randomUUID().replace(/-/g, "");
 }
 
 /**
- * Send a check-in to Sentry. Non-throwing — Sentry outages must never break
- * production cron jobs.
- *
- * Returns the check-in ID so subsequent calls (ok/error) can be linked.
+ * Send a check-in envelope to Sentry. Non-throwing.
+ * Returns the check_in_id so subsequent ok/error calls can update the same row.
  */
 export async function sentryCronCheckIn(
   monitorSlug: string,
@@ -52,50 +72,62 @@ export async function sentryCronCheckIn(
   config: MonitorConfig,
   options?: { checkInId?: string; durationMs?: number },
 ): Promise<string | null> {
-  if (!isEnabled()) return null;
+  const dsn = parseDsn();
+  if (!dsn) return null;
 
   try {
-    const url = options?.checkInId
-      ? `https://sentry.io/api/0/organizations/${SENTRY_ORG_SLUG}/monitors/${monitorSlug}/checkins/${options.checkInId}/`
-      : `https://sentry.io/api/0/organizations/${SENTRY_ORG_SLUG}/monitors/${monitorSlug}/checkins/`;
+    const eventId = uuid32();
+    const checkInId = options?.checkInId ?? uuid32();
 
-    const method = options?.checkInId ? "PUT" : "POST";
-
-    const body: Record<string, unknown> = {
+    const checkIn: Record<string, unknown> = {
+      check_in_id: checkInId,
+      monitor_slug: monitorSlug,
       status,
+      environment: "production",
       monitor_config: {
         schedule: config.schedule
           ? { type: "crontab", value: config.schedule }
-          : { type: "interval", value: 1, unit: "day" }, // dummy for on-demand
+          : { type: "interval", value: 1, unit: "day" },
         checkin_margin: config.checkinMargin ?? 1,
         max_runtime: config.maxRuntime ?? 30,
         failure_issue_threshold: config.failureIssueThreshold ?? 1,
         timezone: config.timezone ?? "UTC",
       },
-      environment: "production",
     };
-
     if (options?.durationMs !== undefined) {
-      body.duration = options.durationMs;
+      checkIn.duration = options.durationMs / 1000; // seconds
     }
 
+    const envelopeHeader = JSON.stringify({
+      event_id: eventId,
+      sent_at: new Date().toISOString(),
+      dsn: SENTRY_DSN,
+    });
+    const itemHeader = JSON.stringify({ type: "check_in" });
+    const itemPayload = JSON.stringify(checkIn);
+    const body = `${envelopeHeader}\n${itemHeader}\n${itemPayload}\n`;
+
+    const url = `${dsn.protocol}://${dsn.host}/api/${dsn.projectId}/envelope/`;
+    const auth =
+      `Sentry sentry_version=7,sentry_client=lovable-cron/1.0,sentry_key=${dsn.publicKey}`;
+
     const res = await fetch(url, {
-      method,
+      method: "POST",
       headers: {
-        Authorization: `Bearer ${SENTRY_AUTH_TOKEN}`,
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-sentry-envelope",
+        "X-Sentry-Auth": auth,
       },
-      body: JSON.stringify(body),
+      body,
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "");
-      console.warn(`[sentryCron] ${monitorSlug} ${status} → ${res.status}: ${text.slice(0, 200)}`);
+      console.warn(
+        `[sentryCron] ${monitorSlug} ${status} → ${res.status}: ${text.slice(0, 200)}`,
+      );
       return null;
     }
-
-    const data = await res.json().catch(() => ({}));
-    return data.id ?? options?.checkInId ?? null;
+    return checkInId;
   } catch (err) {
     console.warn(`[sentryCron] ${monitorSlug} ${status} failed:`, (err as Error).message);
     return null;
@@ -104,10 +136,6 @@ export async function sentryCronCheckIn(
 
 /**
  * Wrap a Deno.serve handler with Sentry Cron check-ins.
- * - Sends `in_progress` at start
- * - Sends `ok` on success (with duration)
- * - Sends `error` on thrown exception
- * - All Sentry calls are non-blocking via EdgeRuntime.waitUntil where possible
  */
 export function withSentryCron(
   monitorSlug: string,
@@ -115,7 +143,6 @@ export function withSentryCron(
   handler: (req: Request) => Promise<Response> | Response,
 ): (req: Request) => Promise<Response> {
   return async (req: Request) => {
-    // Skip check-ins for OPTIONS (CORS preflight)
     if (req.method === "OPTIONS") {
       return await handler(req);
     }
@@ -126,9 +153,7 @@ export function withSentryCron(
     try {
       const res = await handler(req);
       const duration = Date.now() - start;
-      // Fire-and-forget the success check-in
       const finalStatus: CronStatus = res.status >= 500 ? "error" : "ok";
-      // Don't await — don't add latency to user response
       sentryCronCheckIn(monitorSlug, finalStatus, config, {
         checkInId: checkInId ?? undefined,
         durationMs: duration,
@@ -146,5 +171,5 @@ export function withSentryCron(
 }
 
 export function sentryCronEnabled(): boolean {
-  return isEnabled();
+  return parseDsn() !== null;
 }
