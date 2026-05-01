@@ -1,44 +1,104 @@
-## Status nach Bundle-Redeploy
+## Ziel
 
-### Was ich geprüft habe (alles in meiner Macht)
+Drei Bereiche so markieren, dass Kunden sie sehen aber **nicht klicken / nutzen** können:
+1. **Pika 2.2 (Standard + Pro)** → "Beta / Wartung" im AI Video Toolkit
+2. **Gaming Hub** → "Coming Soon"
+3. **KI Autopilot** → "Coming Soon"
 
-| Layer | Tool | Ergebnis |
-|---|---|---|
-| **Bug-DB** | qa_bug_reports | 84/87 resolved, 3 noch `open` (alle 12h alt, von 12:28 UTC — also **VOR** Bundle-Deploy) |
-| **Layer 1 Watchdog** | qa_watchdog_runs | 8/8 letzte Runs: 0 Anomalien, 0 stuck rows, ø 180ms |
-| **Layer 3 Probes** | synthetic_probe_runs | 18/18 letzte Probes pass, alle weit unter Threshold (Landing 190ms/3000, DB 56ms/500, Edge 331ms/2500) |
-| **Live Sweep 24h** | qa_live_runs | 81 succeeded · 53 failed · 8 expected (Pika 410) · 2 timeout — Failures sind **alle** "Recovered after qa-live-sweep request idle timeout" (Layer-1-Heilung, kein Code-Bug) |
-| **Lambda Renders 24h** | director_cut_renders | 12 failed — **alle** mit `AWS Concurrency limit reached` (Rate Exceeded), keiner mit den 3 gefixten Bugs |
-| **Letzter echter Lambda-Render** | director_cut_renders | 12:17 UTC — **vor** Bundle-Deploy. Seitdem 0 neue Renders → 0 neue Failures |
+Bestehender, unauffälliger Pattern: Es gibt schon ein `badge`-Feld in der Modell-Registry und Hub-Items. Wir bauen darauf auf — kein neues System nötig.
 
-### Die 3 offenen Bugs im Detail
+---
 
-```text
-ID                                    Created (UTC)        Title
-861dc976  2026-05-01 12:28  durationInFrames evaluated to 120, but frameRange...
-944cf407  2026-05-01 12:28  TypeError: "from" prop of sequence must be finite, got NaN
-e578d06b  2026-05-01 12:28  MEDIA_ERR Code 4 — browser threw error playing video
+## Umsetzung
+
+### 1. Pika → "Beta / Wartung" im AI Video Toolkit
+
+**Datei:** `src/config/aiVideoModelRegistry.ts`
+
+Neues optionales Feld `status` zum Model-Type hinzufügen:
+```ts
+status?: 'live' | 'beta' | 'maintenance' | 'coming_soon';
+statusReason?: string;
 ```
 
-Alle drei stammen aus **demselben Sweep um 12:28** — das war noch das alte Bundle ohne `safeFrame` / `isValidRemoteMediaUrl` / explizite `durationInFrames`-Übergabe. Seit dem Redeploy: **0 neue Vorkommnisse**.
+Beide Pika-Einträge bekommen:
+```ts
+status: 'maintenance',
+statusReason: 'Provider-Wartung — Pika ist temporär offline. Wir aktivieren das Modell wieder, sobald die Pika Labs API stabil läuft.',
+badge: 'Wartung',
+```
 
-### Geschätzte echte Bug-Rate (nach Deploy)
+**UI-Effekt im Toolkit (`src/components/ai-video-studio/...`):**
+- Modell-Karte zeigt `Wartung`-Badge in **gelb** (statt gold)
+- Karte ist **disabled** (opacity-50 + cursor-not-allowed)
+- Tooltip / kleiner Hinweistext zeigt `statusReason`
+- Wenn jemand Pika trotzdem im Dropdown auswählt → Submit-Button disabled mit Hinweis
 
-- **Code-Bugs**: ~0% — alle 3 Lambda-Render-Bugs sind via Code-Fix + Bundle-Deploy adressiert. Solange kein neuer Code-Pfad ihn re-introduziert, sehen wir die nicht wieder.
-- **Infra-Bugs (AWS)**: ~5–10% bei parallelen Renders unter Last (Concurrency-Limit) — das ist **kein Code-Bug** sondern AWS-Quota; bereits durch Cooldown-Logik im Deep Sweep abgefedert (siehe Memory `deep-sweep-throttle-resilience`).
-- **Provider-Flakes** (Pika 410, Hedra-Killed, Replicate Timeouts): ~3–5% — sind als `expected` oder Auto-Refund klassifiziert, nicht als echter Bug.
+### 2. Gaming Hub → "Coming Soon"
 
-**Realistische echte Bug-Rate: <1% auf eigenem Code, ~5% AWS-Throttle-bedingt unter Burst-Last.**
+**Datei:** `src/config/hubConfig.ts`
 
-### Plan: Stale Bugs schließen + Verifikations-Render
+`HubDefinition`-Type erweitern um `comingSoon?: boolean`. Dem Gaming-Hub setzen:
+```ts
+{
+  key: "gaming",
+  ...
+  comingSoon: true,
+  items: [...],
+}
+```
 
-1. **Resolve die 3 stale Lambda-Bugs** in `qa_bug_reports` mit Note "Fixed via safeFrame.ts + isValidRemoteMediaUrl + explizite durationInFrames + Bundle-Redeploy am 2026-05-01". Setzt `status=resolved`, `resolved_at=now()`. → bringt Cockpit auf **87/87 (100%)** resolved.
-2. **Trigger 1× synthetic Render-Probe** durch `qa-live-sweep` Aufruf mit nur den Lambda-relevanten Pfaden (oder einem manuellen `render-directors-cut` Smoke-Call), um zu bestätigen dass das neue Bundle live antwortet.
-3. **Cockpit-UI aktualisieren**: `QACockpit` zeigt dann grünes "All Clear", Watchdog-Tab grün, Probes-Tab 100% Uptime.
+**UI-Effekt im HubDashboard / Sidebar:**
+- Hub-Kachel zeigt overlay-Badge **"Coming Soon"** (gold-cyan glow, James-Bond-Stil)
+- Klick auf Hub öffnet **kein** Submenu → stattdessen kleiner Toast: *"Gaming Hub kommt bald — wir benachrichtigen dich beim Launch."*
+- `/gaming`-Route bleibt erreichbar (für interne QA), aber zeigt prominentes "Coming Soon"-Banner oben
 
-### Was außerhalb meiner Macht liegt
-- Echte AWS-Concurrency-Quota erhöhen (User muss in AWS-Konsole Service Quotas anfragen)
-- Pika 2.2 Provider-Migration (extern, daher als `expected` markiert)
-- Hedra "killed before status update" — extern, Auto-Refund greift bereits
+### 3. KI Autopilot → "Coming Soon"
 
-Sag "ok", dann schließe ich die 3 stale Bugs und triggere einen Verifikations-Smoke-Render.
+**Dateien:**
+- `src/components/autopilot/AutopilotHeroBanner.tsx` — Banner auf dem Dashboard
+- `src/pages/Autopilot.tsx` — eigentliche Page
+
+**AutopilotHeroBanner:**
+- Großes "Coming Soon"-Overlay (semi-transparenter Glas-Effekt mit gold-Akzent)
+- CTA-Button von "Autopilot starten" → "Benachrichtigt mich" (vorerst nur visuell, no-op + Toast: *"Eingetragen — wir melden uns beim Launch"*)
+- Sub-Headline: *"Vollautonome KI-Content-Pipeline · Launch in Kürze"*
+
+**Autopilot-Page (`/autopilot`):**
+- Komplette Page mit "Coming Soon"-Screen ersetzen (Wizard etc. auskommentiert lassen, nicht löschen — kommt später zurück)
+- Zeigt: Hero, kurze Feature-Vorschau (3 Cards: Auto-Briefing / Auto-Render / Weekly Review), "Benachrichtigt mich"-Button
+- Falls User Admin ist (`useUserRole`-Check) → kleiner Link "Preview öffnen (Admin)" der die echte Autopilot-UI zeigt — damit du intern weiterarbeiten kannst
+
+---
+
+## Technische Details
+
+**Dateien die angefasst werden:**
+
+| Datei | Änderung |
+|---|---|
+| `src/config/aiVideoModelRegistry.ts` | `status`-Feld + Pika-Einträge auf `maintenance` |
+| `src/components/ai-video-studio/AIVideoToolkit*.tsx` (Modell-Picker-Komponente) | `status`-aware Rendering: Badge + Disabled-State + Tooltip |
+| `src/config/hubConfig.ts` | `comingSoon?: boolean` Property + Gaming-Hub-Markierung |
+| `src/components/dashboard/HubDashboard*.tsx` o.ä. | Coming-Soon-Overlay auf Hub-Karten |
+| `src/components/autopilot/AutopilotHeroBanner.tsx` | Coming-Soon-Overlay + Notify-CTA |
+| `src/pages/Autopilot.tsx` | Coming-Soon-Screen mit Admin-Bypass |
+| `src/lib/translations.ts` | Neue Keys: `comingSoon.title`, `comingSoon.notifyMe`, `comingSoon.notified`, `pika.maintenance` (DE/EN/ES) |
+
+**Was NICHT angefasst wird:**
+- Edge Functions für Pika (`generate-pika-video`) — bleiben deployed, falls Provider plötzlich wieder funktioniert
+- Autopilot Edge Functions / Cron Jobs — bleiben aus, kommen später zurück
+- DB-Schema — keine Migration nötig
+- Routing in `App.tsx` — alle Routen bleiben, nur Inhalt der Pages ändert sich
+
+**Reaktivierung später (1-Liner pro Feature):**
+- Pika: `status: 'live'` setzen
+- Gaming: `comingSoon: false`
+- Autopilot: Coming-Soon-Wrapper aus Page entfernen
+
+**Brand-Konsistenz (James Bond 2028):**
+- Coming-Soon-Badges: Glass-Effekt, gold-glow (`#F5C76A`), cyan-Akzent für "Notify me"-CTA
+- Wartung-Badge (Pika): subtileres Amber/Gold, kein roter Alarm-Ton
+- Konsistent mit bestehenden `Premium`/`Neu`-Badges in der Registry
+
+**Estimated changes:** ~7 Dateien, ~250 Zeilen Code, keine DB-Migration, keine Edge-Function-Änderungen.
