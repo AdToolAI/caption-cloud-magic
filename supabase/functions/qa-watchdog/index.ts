@@ -258,4 +258,4 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));
