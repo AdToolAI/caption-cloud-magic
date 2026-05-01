@@ -92,29 +92,30 @@ Deno.serve(withTelemetry('sync-metrics-cron', async (req) => {
 
     console.log('Cron job completed:', results);
 
+    await recordHeartbeat({
+      jobName: 'sync-metrics-cron',
+      status: 'ok',
+      durationMs: Date.now() - hbStart,
+      expectedIntervalSeconds: 3600,
+    });
+
     return new Response(
-      JSON.stringify({
-        message: 'Metrics sync completed',
-        results
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      }
+      JSON.stringify({ message: 'Metrics sync completed', results }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error) {
     console.error('Cron job error:', error);
-    const errorMessage = 'Metrics sync cron failed';
+    await recordHeartbeat({
+      jobName: 'sync-metrics-cron',
+      status: 'error',
+      durationMs: Date.now() - hbStart,
+      error: error instanceof Error ? error.message : String(error),
+      expectedIntervalSeconds: 3600,
+    });
     return new Response(
-      JSON.stringify({ 
-        error: errorMessage,
-        details: 'Failed to sync metrics automatically'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
-      }
+      JSON.stringify({ error: 'Metrics sync cron failed', details: 'Failed to sync metrics automatically' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 }));
