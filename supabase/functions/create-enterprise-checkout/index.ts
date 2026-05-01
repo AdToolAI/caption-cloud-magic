@@ -97,6 +97,11 @@ serve(async (req) => {
           quantity: 1,
         },
       ],
+      // Mehr Zahlungsmethoden für Enterprise-Checkout (DE/EU).
+      payment_method_types: ["card", "sepa_debit", "paypal", "klarna", "link"],
+      payment_method_options: {
+        sepa_debit: { setup_future_usage: "off_session" },
+      },
       success_url: `${req.headers.get("origin")}/team?upgrade=success`,
       cancel_url: `${req.headers.get("origin")}/team?upgrade=cancelled`,
       metadata: {
