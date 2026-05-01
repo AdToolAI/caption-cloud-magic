@@ -326,6 +326,22 @@ export function ExportRenderStep({
   }, [currentRenderId, renderComplete, isRendering]);
 
   const handleRender = async () => {
+    // Pre-flight: reject malformed timing client-side so we never invoke Lambda
+    // with NaN/Infinity which would crash the render with "from prop must be finite".
+    const badScene = (scenes || []).findIndex((s: any) => {
+      const start = Number(s?.start_time ?? s?.startTime);
+      const end = Number(s?.end_time ?? s?.endTime);
+      return !Number.isFinite(start) || !Number.isFinite(end);
+    });
+    if (badScene >= 0) {
+      toast.error(`Scene ${badScene + 1} hat ungültige Zeit-Angaben. Bitte erneut analysieren.`);
+      return;
+    }
+    if (!Number.isFinite(Number(videoDuration)) || Number(videoDuration) <= 0) {
+      toast.error('Video-Dauer ist ungültig. Bitte Quellvideo neu laden.');
+      return;
+    }
+
     setIsRendering(true);
     setRenderProgress(0);
     setRenderComplete(false);

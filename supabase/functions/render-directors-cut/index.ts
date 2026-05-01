@@ -9,6 +9,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock, x-qa-real-spend, x-qa-user-id',
 };
 
+/**
+ * Coerce any value to a finite number, falling back to `fallback` if NaN/Infinity/null.
+ * Prevents the classic Lambda crash:
+ *   "The 'from' prop of a sequence must be finite, but got NaN."
+ */
+function safeNum(value: unknown, fallback = 0): number {
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Validate a scenes array. Returns { ok: false, reason } if any scene has
+ * non-finite or negative timing that would brick the Remotion render.
+ */
+function validateScenes(scenes: unknown): { ok: true } | { ok: false; reason: string } {
+  if (scenes == null) return { ok: true };
+  if (!Array.isArray(scenes)) return { ok: false, reason: 'scenes must be an array' };
+  for (let i = 0; i < scenes.length; i++) {
+    const s: any = scenes[i];
+    if (!s || typeof s !== 'object') {
+      return { ok: false, reason: `scenes[${i}] is not an object` };
+    }
+    const start = s.start_time ?? s.startTime;
+    const end = s.end_time ?? s.endTime;
+    if (start != null && !Number.isFinite(Number(start))) {
+      return { ok: false, reason: `scenes[${i}].start_time is not finite (${JSON.stringify(start)})` };
+    }
+    if (end != null && !Number.isFinite(Number(end))) {
+      return { ok: false, reason: `scenes[${i}].end_time is not finite (${JSON.stringify(end)})` };
+    }
+  }
+  return { ok: true };
+}
+
 // AWS Lambda configuration — read from secret for version consistency
 const AWS_REGION = 'eu-central-1';
 function getLambdaFunctionName(): string {
@@ -219,6 +253,23 @@ serve(async (req) => {
       });
     }
 
+    // Hard guard: reject malformed scene timing before invoking Lambda.
+    // This prevents the recurring crash "The 'from' prop of a sequence must be finite, but got NaN".
+    const scenesCheck = validateScenes(scenes);
+    if (!scenesCheck.ok) {
+      console.error(`[RenderDirectorsCut] Rejected: ${scenesCheck.reason}`);
+      return new Response(
+        JSON.stringify({ error: 'Invalid scenes payload', detail: scenesCheck.reason }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    if (duration_seconds != null && !Number.isFinite(Number(duration_seconds))) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid duration_seconds', detail: `got ${JSON.stringify(duration_seconds)}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Normalize subtitle clips and text overlays to camelCase before passing to
     // the Remotion composition (DirectorsCutVideo.tsx reads .startTime/.endTime).
     // Snake_case (start_time/end_time) callers would otherwise cause NaN sequence
@@ -256,7 +307,7 @@ serve(async (req) => {
     }
     console.log(`[RenderDirectorsCut] Text overlays:`, JSON.stringify(text_overlays));
 
-    const duration = duration_seconds || 30;
+    const duration = Math.max(safeNum(duration_seconds, 30), 0.1);
     const quality = export_settings?.quality || 'hd';
     const format = export_settings?.format || 'mp4';
 
@@ -423,7 +474,7 @@ serve(async (req) => {
 
     const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
     const fps = 30;
-    const durationInFrames = Math.ceil(duration * fps);
+    const durationInFrames = Math.max(Math.ceil(duration * fps), 1);
 
     console.log(`[RenderDirectorsCut] 🔗 REMOTION_SERVE_URL: ${REMOTION_SERVE_URL}`);
     console.log(`[RenderDirectorsCut] 🎬 Subtitle meta — clips: ${subtitle_track?.clips?.length ?? 0}, visible: ${subtitle_track?.visible}, firstText: "${subtitle_track?.clips?.[0]?.text?.substring(0, 40) ?? 'NONE'}"` );
@@ -432,11 +483,17 @@ serve(async (req) => {
     // Transform scenes from snake_case to camelCase for Remotion
     const transformedScenes = scenes?.map((scene: any) => ({
       id: scene.id,
-      startTime: scene.start_time ?? scene.startTime ?? 0,
-      endTime: scene.end_time ?? scene.endTime ?? 0,
-      originalStartTime: scene.original_start_time ?? scene.originalStartTime ?? scene.start_time ?? scene.startTime ?? 0,
-      originalEndTime: scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime ?? 0,
-      playbackRate: scene.playbackRate ?? scene.playback_rate ?? 1,
+      startTime: safeNum(scene.start_time ?? scene.startTime, 0),
+      endTime: safeNum(scene.end_time ?? scene.endTime, 0),
+      originalStartTime: safeNum(
+        scene.original_start_time ?? scene.originalStartTime ?? scene.start_time ?? scene.startTime,
+        0
+      ),
+      originalEndTime: safeNum(
+        scene.original_end_time ?? scene.originalEndTime ?? scene.end_time ?? scene.endTime,
+        0
+      ),
+      playbackRate: safeNum(scene.playbackRate ?? scene.playback_rate, 1),
       description: scene.description,
       mood: scene.mood,
       effects: scene.effects,
@@ -446,11 +503,11 @@ serve(async (req) => {
 
     // Transform transitions — preserve sceneId and offsetSeconds for parity with preview
     const transformedTransitions = transitions?.map((t: any, index: number) => ({
-      sceneIndex: t.sceneIndex ?? index,
+      sceneIndex: Number.isFinite(Number(t.sceneIndex)) ? Number(t.sceneIndex) : index,
       sceneId: t.sceneId ?? null,
       type: t.transitionType ?? t.type ?? 'crossfade',
-      duration: t.duration ?? 0.5,
-      offsetSeconds: t.offsetSeconds ?? 0,
+      duration: safeNum(t.duration, 0.5),
+      offsetSeconds: safeNum(t.offsetSeconds, 0),
     }));
 
     // Build inputProps for DirectorsCutVideo composition

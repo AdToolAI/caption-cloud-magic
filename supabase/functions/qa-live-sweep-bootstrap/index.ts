@@ -29,33 +29,38 @@ async function uploadIfMissing(
   supabase: any,
   path: string,
   fetchBody: () => Promise<{ blob: Blob; contentType: string }>,
-  opts: { minBytes?: number; expectedMimePrefix?: string } = {},
+  opts: { minBytes?: number; expectedMimePrefix?: string; force?: boolean } = {},
 ): Promise<{ uploaded: boolean; repaired?: boolean; path: string; error?: string; reason?: string }> {
   // Check existing object — if it's clearly corrupt (too small, wrong mime,
   // looks like an XML S3 error response), overwrite it.
   let needsUpload = true;
   let repairing = false;
-  try {
-    const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
-    if (probe.data?.signedUrl) {
-      const head = await fetch(probe.data.signedUrl, { method: "HEAD" });
-      const len = Number(head.headers.get("content-length") || 0);
-      const ct = head.headers.get("content-type") || "";
-      const minBytes = opts.minBytes ?? 1024;
-      const expectedMime = opts.expectedMimePrefix;
-      const corrupt =
-        len < minBytes ||
-        ct.includes("xml") ||
-        (expectedMime && !ct.startsWith(expectedMime));
-      if (!corrupt) {
-        needsUpload = false;
-      } else {
-        repairing = true;
-        console.warn(`[bootstrap] repairing ${path} (size=${len}, ct=${ct})`);
+  if (opts.force) {
+    repairing = true;
+    console.log(`[bootstrap] force-replacing ${path}`);
+  } else {
+    try {
+      const probe = await supabase.storage.from("qa-test-assets").createSignedUrl(path, 60);
+      if (probe.data?.signedUrl) {
+        const head = await fetch(probe.data.signedUrl, { method: "HEAD" });
+        const len = Number(head.headers.get("content-length") || 0);
+        const ct = head.headers.get("content-type") || "";
+        const minBytes = opts.minBytes ?? 1024;
+        const expectedMime = opts.expectedMimePrefix;
+        const corrupt =
+          len < minBytes ||
+          ct.includes("xml") ||
+          (expectedMime && !ct.startsWith(expectedMime));
+        if (!corrupt) {
+          needsUpload = false;
+        } else {
+          repairing = true;
+          console.warn(`[bootstrap] repairing ${path} (size=${len}, ct=${ct})`);
+        }
       }
+    } catch {
+      // Assume missing
     }
-  } catch {
-    // Assume missing
   }
   if (!needsUpload) return { uploaded: false, path };
 
@@ -333,7 +338,7 @@ Deno.serve(async (req) => {
       const r = await fetch(SAMPLE_VIDEO_URL);
       if (!r.ok) throw new Error(`Sample video fetch failed: ${r.status}`);
       return { blob: await r.blob(), contentType: r.headers.get("content-type") || "video/mp4" };
-    }, { minBytes: 50_000, expectedMimePrefix: "video/" }),
+    }, { minBytes: 50_000, expectedMimePrefix: "video/", force: true }),
   );
 
   // 3. Test audio — copy public sample (validates: size + mime)
