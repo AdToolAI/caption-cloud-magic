@@ -145,6 +145,21 @@ serve(async (req) => {
     return qaMockResponse({ corsHeaders, kind: "video" });
   }
 
+  // Pika 2.2 was removed from Replicate (May 2026). Until we wire up the
+  // direct Pika API (or a replacement provider), this endpoint short-circuits
+  // BEFORE any wallet deduction, so users never get charged for a 404.
+  return new Response(
+    JSON.stringify({
+      error: "Pika 2.2 ist derzeit nicht verfügbar (Provider-Migration in Arbeit).",
+      code: "PROVIDER_DEPRECATED",
+      provider: "pika",
+    }),
+    { status: 410, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+
+  // ---------- legacy code below kept for reference; unreachable ----------
+  /* eslint-disable */
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -344,4 +359,5 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 },
     );
   }
+  /* eslint-enable */
 });

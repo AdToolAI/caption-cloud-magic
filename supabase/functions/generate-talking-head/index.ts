@@ -74,12 +74,51 @@ function mapDimension(aspectRatio: string, resolution: string): { width: number;
   }
 }
 
+// HeyGen Free/Starter plans cap stored Talking Photos (often 3). Each upload
+// counts. We pre-clean custom (non-preset) photos so we always have headroom
+// before the next upload — otherwise HeyGen returns code 401028 "exceeded
+// your limit of N photo avatars".
+async function pruneHeyGenTalkingPhotos(maxKeep = 0): Promise<void> {
+  try {
+    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+      method: 'GET',
+      headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+    });
+    if (!listRes.ok) {
+      console.warn(`[talking-head] prune: list failed ${listRes.status}, skipping`);
+      return;
+    }
+    const json = await listRes.json();
+    const items: any[] = Array.isArray(json?.data) ? json.data : [];
+    // Only delete user-uploaded (non-preset) photos. Presets are owned by
+    // HeyGen and shared across the account — they don't count to the quota.
+    const custom = items.filter((x) => !x?.is_preset);
+    const toDelete = custom.slice(0, Math.max(0, custom.length - maxKeep));
+    console.log(`[talking-head] prune: ${custom.length} custom, deleting ${toDelete.length}`);
+    for (const item of toDelete) {
+      const id = item?.id;
+      if (!id) continue;
+      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-Api-Key': HEYGEN_API_KEY },
+      });
+      console.log(`[talking-head] prune: delete ${id} -> ${dr.status}`);
+    }
+  } catch (e) {
+    console.warn('[talking-head] prune failed (non-fatal):', e instanceof Error ? e.message : String(e));
+  }
+}
+
 // Upload an image or audio URL to HeyGen as an asset → returns talking_photo_id or audio_asset_id
 // Upload an image URL to HeyGen as a Talking Photo → returns talking_photo_id
 // Endpoint: https://upload.heygen.com/v1/talking_photo  (NOT /v1/asset — that
 // returns a generic asset id which is NOT a valid talking_photo_id and would
 // fail later with "avatar look not found" in /v2/video/generate.)
 async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
+  // Always prune custom photos first so the next upload doesn't trip the
+  // free-plan limit. Keep 0 — we don't reuse, we re-upload per render.
+  await pruneHeyGenTalkingPhotos(0);
+
   const srcRes = await fetch(sourceUrl);
   if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
   const blob = await srcRes.blob();
@@ -104,6 +143,11 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   console.log(`[talking-head] HeyGen talking_photo upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
 
   if (!uploadRes.ok) {
+    // Surface the avatar-limit error as a structured 402-style code so the
+    // QA cockpit + UI can show "skip" rather than a generic 500.
+    if (respText.includes('401028') || /photo avatars/i.test(respText)) {
+      throw new Error(`HEYGEN_AVATAR_LIMIT: ${respText.slice(0, 200)}`);
+    }
     throw new Error(`HeyGen talking_photo upload failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
   }
 

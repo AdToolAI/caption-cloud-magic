@@ -29,7 +29,7 @@ interface ProviderTest {
   mode: string;
   estimated_cost_eur: number;
   edge_function: string;
-  buildPayload: (assets: { image: string; video: string; audio: string }) => Record<string, unknown>;
+  buildPayload: (assets: { image: string; video: string; audio: string; portrait: string }) => Record<string, unknown>;
   /** Optional: parses provider response into success/error + asset URL */
   parseResponse?: (json: any) => { success: boolean; assetUrl?: string; error?: string };
 }
@@ -180,8 +180,10 @@ const PROVIDER_MATRIX: ProviderTest[] = [
     mode: "A+I",
     estimated_cost_eur: 0.60,
     edge_function: "generate-talking-head",
-    buildPayload: ({ image, audio }) => ({
-      imageUrl: image,
+    buildPayload: ({ portrait, image, audio }) => ({
+      // Prefer the dedicated face portrait (HeyGen requires a detectable face).
+      // Fallback to generic test image only if the portrait is not provisioned.
+      imageUrl: portrait || image,
       audioUrl: audio,
       aspectRatio: "16:9",
       resolution: "720p",
@@ -225,12 +227,13 @@ async function getTestAssets(supabase: any) {
     image: await tryUrl("test-image.png", FALLBACK_IMAGE),
     video: await tryUrl("test-video-2s.mp4", FALLBACK_VIDEO),
     audio: await tryUrl("test-audio.mp3", FALLBACK_AUDIO),
+    portrait: await tryUrl("test-portrait.png", FALLBACK_IMAGE),
   };
 }
 
 async function callProvider(
   test: ProviderTest,
-  assets: { image: string; video: string; audio: string },
+  assets: { image: string; video: string; audio: string; portrait: string },
   authHeader: string,
   signal: AbortSignal,
 ): Promise<{ status: string; durationMs: number; assetUrl?: string; error?: string; raw?: any }> {

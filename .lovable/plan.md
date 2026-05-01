@@ -1,79 +1,67 @@
-## Ausgangslage
+## Kontext
 
-- Deep Sweep läuft grün (5/5 + 1 Infrastruktur-Timeout).
-- `qa_bug_reports` hat **0 offene** Einträge (84 resolved historisch).
-- `provider_quota_log` zeigt aber 3 wiederkehrende, echte Code-Bugs in Lambda-Renders, die der Sweep noch nicht trifft, weil sie nur unter bestimmten Eingabe-Kombinationen auftreten.
+Live Sweep zeigt 3 echte Fehler (keine Test-Probleme — echte Produktions-Bugs):
 
-Wir sollten jetzt **nicht** mehr Tests dazubauen, bevor diese realen Bugs gefixt sind — sonst wachsen wir die Coverage über bekannten Schmutz.
+| Provider | Symptom | Root Cause (aus Edge-Logs) |
+|---|---|---|
+| Pika 2.2 Std | HTTP 502 "Pika submission failed" | Replicate **404** auf Slug `pika-labs/pika-text-to-video` — Modell wurde umbenannt/depubliziert |
+| Vidu Q2 | HTTP 502 "Vidu submission failed" | Replicate **404** auf Slug `vidu/vidu-q2-reference-to-video` — gleicher Klasse |
+| Hedra Talking Head | HTTP 500 "HeyGen talking_photo upload failed [400]" | HeyGen-Code **401028**: "You have exceeded your limit of 3 photo avatars" — jeder Sweep-Run lädt einen neuen Avatar hoch statt zu recyclen |
 
-## Phase 1 — Die 3 realen Render-Bugs fixen (höchste Priorität)
+Alle drei sind echte Bugs, die auch normale User treffen, sobald sie Pika/Vidu nutzen oder mehrere Talking-Head-Renders machen.
 
-### 1.1 `durationInFrames=120 vs frame 0-149` (Off-by-one)
-- Tritt in `/render/video` auf (Composer-Pipeline, nicht DC).
-- Hypothese: `durationInFrames` wird aus Sekunden×fps berechnet, aber `Sequence` bekommt eine längere Range (vermutlich Audio-Tail oder Outro-Animation).
-- **Aktion**: `compose-video-clips` und `render-video` durchgehen, `durationInFrames` als `Math.max(scenesEnd, audioEnd, 1)` absichern. Unit-test im `tests/` Ordner mit dem konkreten Fall (4s @ 30fps + 5s Audio).
+## Phase A — Pika 2.2 Replicate-Slug fixen (`generate-pika-video/index.ts`)
 
-### 1.2 `from prop of Sequence must be finite, but got NaN`
-- Tritt in `/render/directors-cut` auf.
-- Hypothese: Eine Scene hat `start_at_frame = NaN`, weil `start_at_seconds` undefined oder ein String aus dem Export-Payload ist.
-- **Aktion**: In `render-directors-cut/index.ts` einen `sanitizeScenes()` Guard einbauen, der jeden Scene-Eintrag mit `Number.isFinite()` validiert und bei Verstoß den Render mit einem klaren 400-Fehler ablehnt (statt Lambda zu verheizen). Plus: gleichen Guard im Director's-Cut-Studio beim "Render"-Klick clientseitig.
+Aktuell:
+```
+'pika-2-2-standard': 'pika-labs/pika-text-to-video',
+'pika-2-2-pro':      'pika-labs/pika-text-to-video',
+```
 
-### 1.3 `MEDIA_ELEMENT_ERROR Code 4` auf bestimmten MP4s
-- Betrifft sowohl Google-Sample-MP4s als auch eines unserer eigenen `test-video-2s.mp4` Bootstrap-Assets.
-- Ursache: Codec-Profil (vermutlich H.265/HEVC oder unkompatibles Pixel-Format), das Chrome-Headless im Lambda nicht decodieren kann.
-- **Aktion**: 
-  - Bootstrap (`qa-live-sweep-bootstrap`) erzeugt `test-video-2s.mp4` neu mit garantiert kompatiblem Profil (H.264 baseline, yuv420p, faststart). Falls per ffmpeg im Edge nicht möglich: ein vorgefertigtes, validiertes MP4 ins Repo legen und beim Bootstrap kopieren.
-  - In `render-directors-cut` bei `MEDIA_ELEMENT_ERROR Code 4` einen sauberen `failed`-Status mit Hinweis "Quell-Video Codec inkompatibel" loggen statt eines unverständlichen Stacktraces.
+Aktion:
+1. Replicate-Modell-Catalog-Lookup (kurzes `curl https://api.replicate.com/v1/models?search=pika`) und korrekten aktuellen Slug für Pika 2.2 ermitteln. Erwartung: `pika/pika-v2-2` oder `pika-labs/pika-2-2`. Falls kein offizielles Modell mehr existiert, Pika temporär als "deprecated" markieren und im Toolkit ausgrauen.
+2. Beide Slugs auf den gefundenen aktuellen Pfad mappen (oder Std/Pro getrennt, falls Replicate beide hat).
+3. Input-Format gegen die neue Modell-Schema-Page abgleichen (Pika 2.2 hat `image` statt `first_frame_image` in manchen Versionen). Bei Schema-Drift Felder anpassen.
+4. Smoke-Test gegen `qa-live-sweep` mit Pika allein.
 
-## Phase 2 — Bug-Sichtbarkeit erhöhen
+## Phase B — Vidu Q2 Replicate-Slug fixen (`generate-vidu-video/index.ts`)
 
-Die Bugs aus 1.1–1.3 sind nur deshalb "unsichtbar", weil sie als `provider_quota_log`-Einträge versinken statt in `qa_bug_reports` zu landen.
+Gleiche Methode wie Pika:
+1. Korrekten aktuellen Replicate-Slug für Vidu Q2 (Reference-to-Video) ermitteln. Erwartung: `vidu-studio/vidu-q2-multi-reference` oder `vidu/q2-reference`.
+2. Slug + Inputs (Reference-Roles-Mapping) anpassen.
+3. Wenn Vidu nicht mehr auf Replicate verfügbar ist, auf Vidu-Direct-API umstellen oder Modul deprecaten.
 
-- Neue Edge-Funktion `qa-bug-harvester` (täglicher Cron, 1x/Tag):
-  - Liest `provider_quota_log` der letzten 24h mit `success=false`.
-  - Gruppiert nach `error_message`-Fingerprint (erste 200 Zeichen, normalisiert).
-  - Erstellt pro Fingerprint **maximal einen** offenen `qa_bug_reports`-Eintrag mit Severity-Heuristik (NaN/undefined → high, Codec → medium, Rate-Limit → low/ignoriert).
-  - Idempotent: wenn Bug schon `open` oder `resolved` mit gleichem Fingerprint < 7 Tage alt → skip.
-- Im **Bug Reports Admin-Tab** gruppierte Anzeige: "1× Sequence NaN (last seen 2h ago, 2 occurrences)" statt 84 Einzeleinträge.
+Beide Functions geben den Replicate-Fehler bereits sauber zurück + refunden Credits — der Refund-Pfad ist okay.
 
-## Phase 3 — Sweep-Coverage gezielt erweitern (nicht vorher!)
+## Phase C — HeyGen Avatar-Recycling (`generate-talking-head/index.ts` + `qa-live-sweep-bootstrap`)
 
-Erst nach Phase 1+2 lohnt es, neue Flows hinzuzufügen. Vorschlag in dieser Reihenfolge:
+Problem: HeyGen Free/Starter erlaubt nur 3 gespeicherte Talking Photos. Jeder Render legt einen neuen an → Limit erreicht → 401028.
 
-1. **Music Studio** (Stable Audio 2.5) — aktuell nicht im Sweep.
-2. **Picture Studio Magic Edit Outpaint** — Inpaint ist drin, Outpaint nicht.
-3. **Avatar Library + Talking Head mit Custom Avatar** (statt Default-Portrait).
-4. **Email Director Send-Test** (Resend, Self-Send only — günstig).
-5. **Auto-Director mit echtem Brand-Character-Lock** (testet Identity-Card-Injection).
+Aktion (zwei Layer):
 
-Jeder neue Flow bekommt vorher ein Mock-Pendant in `_shared/qaMock.ts` und respektiert das 50€-Cap.
+1. **In `generate-talking-head`**: Vor jedem Upload `GET https://api.heygen.com/v2/talking_photo.list` aufrufen, die ältesten Avatare (älter als z.B. 1h, mit Prefix `qa-` oder `lovable-`) per `DELETE /v2/talking_photo/{id}` entfernen. So bleibt das Free-Limit immer mit Headroom.
+2. **In `qa-live-sweep-bootstrap`**: Wenn ein Talking-Photo bereits hochgeladen wurde, dessen `talking_photo_id` in `system_config` (key `qa.heygen_talking_photo_id`) speichern und beim nächsten Sweep wiederverwenden. Nur wenn der gespeicherte Eintrag von HeyGen abgelaufen/gelöscht ist, wird neu hochgeladen.
+3. **In `qa-live-sweep`**: Optional `talkingPhotoId` direkt aus `system_config` übergeben statt `imageUrl` — spart den Upload komplett.
 
-## Phase 4 — Stabilitäts-Härtung Flow 2 (Lambda Concurrency)
+Zusätzlich: Wenn HeyGen 401028 trotzdem auftritt, in `generate-talking-head` den Fehler in eine **strukturierte 402-Response** (`HEYGEN_AVATAR_LIMIT`) verwandeln statt 500, damit Live Sweep das als "skip mit Cost-Issue" statt als roten Fail anzeigt.
 
-Aktuell ist Flow 2 chronisch gelb wegen AWS Rate Limits. Optionen:
+## Phase D — Live-Sweep-Coverage-Verbesserung (klein)
 
-- **A** Account-weites AWS Concurrency-Quota erhöhen (Support-Ticket bei AWS, kostet nichts).
-- **B** Deep Sweep wartet vor Flow 2 explizit, bis `aws-lambda` Provider-Health < 50% Auslastung zeigt.
-- **C** Flow 2 als "best effort" markieren und aus Pass-Rate-Berechnung entfernen.
+In `qa-live-sweep/index.ts` Zeile 225:
+- Für Talking-Head-Test gezielt `test-portrait.png` (das Phase-1-Asset) aus dem Bucket verwenden, nicht `test-image.png`. Das ist konsistent mit dem Deep-Sweep-Fix der vorherigen Iteration und vermeidet "no face detected" Folgefehler nach dem Avatar-Recycling-Fix.
 
-Empfehlung: **A** beantragen, parallel **B** implementieren als Sicherheitsnetz.
+## Reihenfolge
 
-## Reihenfolge & nächster konkreter Schritt
+1. **Phase A (Pika)** — kürzester Fix, höchster Hebel für User.
+2. **Phase B (Vidu)** — gleiche Mechanik.
+3. **Phase C (HeyGen Recycling)** — etwas mehr Code, aber löst dauerhaftes Limit-Problem.
+4. **Phase D** — Mini-Patch im Sweep selbst.
+5. Re-run Live Sweep → erwartet 12/12 grün (oder Pika/Vidu sauber als "model deprecated" mit klarer Meldung, falls Replicate die Modelle wirklich entfernt hat).
 
-Ich empfehle **streng sequenziell**:
+## Was ich nicht vorschlage
 
-1. **Zuerst Phase 1.2** (NaN-Guard) — kleinster Fix, größter Hebel, bricht aktuell echte User-Renders.
-2. Dann 1.1 (Off-by-one Frame).
-3. Dann 1.3 (MP4-Codec-Bootstrap).
-4. Dann Phase 2 (Bug Harvester), damit zukünftige Drift sofort sichtbar wird.
-5. Erst dann Phase 3 (neue Flows).
+- Keine generelle Replicate-Catalog-Sync-Cron — overkill für 2 Slugs. Beim nächsten 404 fixen wir punktuell.
+- Kein Wechsel weg von HeyGen — die API funktioniert, nur unsere Avatar-Hygiene fehlt.
+- Kein Aufbohren des Bug-Harvesters (der hat die 3 Bugs ja bereits aufgespürt — System funktioniert).
 
-## Was ich **nicht** vorschlage
-
-- Keine spekulativen Refactorings.
-- Kein neues Test-Framework — Playwright + Deep Sweep + Smoke reichen.
-- Kein "alle Edge-Functions auf einmal anfassen".
-
----
-
-**Soll ich mit Phase 1.2 (NaN-Sanitizer in render-directors-cut + clientseitiger Guard) loslegen?**
+**Soll ich starten mit Phase A (Pika-Slug-Fix inklusive Replicate-Catalog-Lookup)?**

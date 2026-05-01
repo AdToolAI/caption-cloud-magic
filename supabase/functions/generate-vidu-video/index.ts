@@ -21,11 +21,15 @@ const FLAT_PRICE_EUR: Record<ViduModel, number> = {
   "vidu-q2-t2v": 0.40,
 };
 
-// Replicate slugs. If Replicate has renamed a path, adjust here only.
+// Replicate slugs. Vidu Q2 was removed from Replicate (May 2026); we now use
+// q3-pro for all flavours. q3-pro does NOT support multi-reference natively
+// (only start_image / end_image), so the "reference" mode degrades gracefully:
+// it uses the first reference image as start_image and folds the remaining
+// references into the prompt suffix.
 const REPLICATE_MODELS: Record<ViduModel, string> = {
-  "vidu-q2-reference": "vidu/vidu-q2-reference-to-video",
-  "vidu-q2-i2v": "vidu/vidu-q2-image-to-video",
-  "vidu-q2-t2v": "vidu/vidu-q2-text-to-video",
+  "vidu-q2-reference": "vidu/q3-pro",
+  "vidu-q2-i2v": "vidu/q3-pro",
+  "vidu-q2-t2v": "vidu/q3-pro",
 };
 
 const FIXED_DURATION = 5;
@@ -355,10 +359,12 @@ serve(async (req) => {
     if (negativePrompt) viduInput.negative_prompt = negativePrompt;
 
     if (model === "vidu-q2-reference") {
-      // Vidu accepts an array of reference image URLs (1–7).
-      viduInput.reference_images = referenceImages;
+      // q3-pro has no native multi-reference; use first ref as start_image,
+      // remaining refs are already folded into prompt via buildReferenceSuffix.
+      if (referenceImages[0]) viduInput.start_image = referenceImages[0];
     } else if (model === "vidu-q2-i2v") {
-      viduInput.image = startImageUrl ?? referenceImages[0];
+      const img = startImageUrl ?? referenceImages[0];
+      if (img) viduInput.start_image = img;
     }
 
     let prediction;
