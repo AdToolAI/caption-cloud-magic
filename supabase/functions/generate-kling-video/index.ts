@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts"; // [qa-mock-injected]
+import { trackAIGeneration, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -106,6 +107,10 @@ serve(async (req) => {
 
     const currencySymbol = wallet.currency === 'USD' ? '$' : '€';
     if (wallet.balance_euros < totalCost) {
+      await trackBusinessEvent('credit_insufficient', user.id, {
+        provider: 'kling', model, required: totalCost,
+        available: wallet.balance_euros, currency: wallet.currency,
+      }).catch(() => {});
       return new Response(
         JSON.stringify({
           error: `Insufficient credits. Need ${currencySymbol}${totalCost.toFixed(2)}, have ${currencySymbol}${wallet.balance_euros.toFixed(2)}`,
@@ -215,6 +220,12 @@ serve(async (req) => {
           artlist_job_id: prediction.id,
         })
         .eq('id', generation.id);
+
+      await trackAIGeneration('started', user.id, {
+        provider: 'kling', model, duration_s: duration,
+        cost_eur: totalCost, aspect_ratio: aspectRatio, resolution,
+        generation_id: generation.id,
+      }).catch(() => {});
 
     } catch (replicateError: any) {
       console.error('[generate-kling-video] ❌ Replicate Error:', replicateError);
