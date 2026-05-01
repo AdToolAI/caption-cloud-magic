@@ -952,6 +952,9 @@ export const DirectorsCutVideo: React.FC<DirectorsCutVideoProps> = ({
             }}
             volume={0}
           />
+          ) : (
+            <AbsoluteFill style={{ backgroundColor: '#000' }} />
+          )}
         </div>
         {/* No second Video element — all transitions are CSS-only on the base video */}
         {/* Darkening overlay for fade transitions */}
