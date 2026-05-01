@@ -17,7 +17,7 @@ import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 import { WatchdogTab } from "@/pages/admin/WatchdogTab";
 import { ProbesTab } from "@/pages/admin/ProbesTab";
-import { Activity } from "lucide-react";
+
 
 const TIER_COLORS: Record<string, string> = {
   smoke: "bg-cyan-500/20 text-cyan-300 border-cyan-500/40",
