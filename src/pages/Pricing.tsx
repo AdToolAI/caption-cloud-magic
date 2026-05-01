@@ -18,6 +18,8 @@ import { CouponBanner } from "@/components/pricing/CouponBanner";
 import { CompetitorComparisonCard } from "@/components/landing/CompetitorComparisonCard";
 import { AI_VIDEO_CREDIT_PACKS } from "@/config/aiVideoCredits";
 import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
+import { useEffect } from "react";
 
 const Pricing = () => {
   const navigate = useNavigate();
@@ -44,12 +46,29 @@ const Pricing = () => {
     t("landing.pricing.proFeatures.f7"),
   ];
 
+  // Detect cancel return from Stripe
+  useEffect(() => {
+    if (searchParams.get("canceled") === "1" || searchParams.get("canceled") === "true") {
+      trackEvent(ANALYTICS_EVENTS.CHECKOUT_ABANDONED, {
+        plan: "pro",
+        source: "pricing_page",
+      });
+    }
+  }, [searchParams]);
+
   const handleProCheckout = async () => {
     if (!user) {
       navigate("/auth?redirect=/pricing");
       return;
     }
     setProLoading(true);
+    trackEvent(ANALYTICS_EVENTS.CHECKOUT_STARTED, {
+      plan: "pro",
+      price_id: pricingPlans.pro.priceId,
+      currency,
+      coupon: couponCode || null,
+      reactivation: isReactivation,
+    });
     try {
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
@@ -58,9 +77,20 @@ const Pricing = () => {
         },
       });
       if (error) throw error;
+      if (data?.applied_coupon) {
+        trackEvent(ANALYTICS_EVENTS.COUPON_APPLIED, {
+          coupon: data.applied_coupon,
+          plan: "pro",
+          source: couponCode ? "url" : "auto",
+        });
+      }
       if (data?.url) window.open(data.url, "_blank");
     } catch (err) {
       console.error("Checkout error:", err);
+      trackEvent(ANALYTICS_EVENTS.CHECKOUT_FAILED, {
+        plan: "pro",
+        error: err instanceof Error ? err.message : String(err),
+      });
       toast.error(t("pricingDetails.errors.checkoutFailed"));
     } finally {
       setProLoading(false);
@@ -73,6 +103,10 @@ const Pricing = () => {
       return;
     }
     setPackLoading(packId);
+    trackEvent(ANALYTICS_EVENTS.CREDIT_PACK_CHECKOUT_STARTED, {
+      pack_id: packId,
+      currency,
+    });
     try {
       const { data, error } = await supabase.functions.invoke("ai-video-purchase-credits", {
         body: { packId, currency },
@@ -81,6 +115,10 @@ const Pricing = () => {
       if (data?.url) window.open(data.url, "_blank");
     } catch (err) {
       console.error("Top-up error:", err);
+      trackEvent(ANALYTICS_EVENTS.CHECKOUT_FAILED, {
+        pack_id: packId,
+        error: err instanceof Error ? err.message : String(err),
+      });
       toast.error(t("aiVid.purchaseError"));
     } finally {
       setPackLoading(null);

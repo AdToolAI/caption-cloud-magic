@@ -17,6 +17,7 @@ import { TrendingUp, Sparkles, Bookmark, BookmarkCheck, Loader2, Search, Tag, Li
 import { TrendDetailModal } from "@/components/trends/TrendDetailModal";
 import { TrendRadarHeroHeader } from "@/components/trends/TrendRadarHeroHeader";
 import { TrendCardMedia, PopularityRing, HeroMediaBackground } from "@/components/trends/TrendCardMedia";
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
 
 interface Trend {
@@ -320,6 +321,7 @@ function getSparkColor(platform: string) {
 }
 
 export default function TrendRadar() {
+  useTrackPageFeature("trend_radar");
   const { t, language } = useTranslation();
   const { toast } = useToast();
   const navigate = useNavigate();

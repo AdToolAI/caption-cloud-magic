@@ -33,7 +33,10 @@ const LANGUAGES = [
   { value: 'sv', label: '🇸🇪 Svenska' },
 ];
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function VideoTranslator() {
+  useTrackPageFeature("video_translator");
   const { user } = useAuth();
   const { t } = useTranslation();
   const { status, translation, progressPercent, startTranslation, reset } = useVideoTranslation();

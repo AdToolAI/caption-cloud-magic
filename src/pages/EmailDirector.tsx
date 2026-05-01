@@ -30,7 +30,10 @@ interface EmailCampaign {
   created_at: string;
 }
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function EmailDirector() {
+  useTrackPageFeature("email_director");
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);

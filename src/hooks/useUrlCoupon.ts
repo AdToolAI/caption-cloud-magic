@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { trackEvent, ANALYTICS_EVENTS } from '@/lib/analytics';
 
 const STORAGE_KEY = 'adtool_url_coupon';
 
@@ -22,6 +23,10 @@ export function useUrlCoupon() {
       const normalized = fromUrl.trim().toUpperCase();
       sessionStorage.setItem(STORAGE_KEY, normalized);
       setCouponCode(normalized);
+      trackEvent(ANALYTICS_EVENTS.COUPON_APPLIED, {
+        coupon: normalized,
+        source: 'url',
+      });
 
       // Clean ?coupon= from the URL so refreshes stay tidy
       params.delete('coupon');

@@ -14,6 +14,7 @@ import { motion } from "framer-motion";
 import { useSearchParams } from "react-router-dom";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
 const CATEGORY_KEYS = [
   { key: null, icon: Newspaper },
@@ -291,6 +292,7 @@ function ArticleCard({ article, index, highlighted, onPlayVideo, timeAgo, t }: {
 }
 
 export default function NewsHub() {
+  useTrackPageFeature("news_hub");
   const { t } = useTranslation();
   const timeAgo = useLocalizedTimeAgo();
   const { articles, loading, refreshing, category, setCategory, loadMore, hasMore, refreshNews, searchQuery, setSearchQuery } = useNewsHub();

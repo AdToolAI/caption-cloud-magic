@@ -8,7 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Store, Users } from 'lucide-react';
 import type { MarketplaceTemplate } from '@/types/marketplace';
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function Marketplace() {
+  useTrackPageFeature("marketplace");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [tab, setTab] = useState<'templates' | 'characters'>('templates');

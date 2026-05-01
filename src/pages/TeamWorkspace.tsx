@@ -244,16 +244,22 @@ export default function TeamWorkspace() {
 
   const handleEnterpriseUpgrade = async () => {
     if (!selectedWorkspace || !user) return;
-    
+
     setUpgrading(true);
     try {
       const userLanguage = localStorage.getItem("language") || "en";
       const currency = userLanguage === "de" ? "EUR" : "USD";
-      
+
+      const { trackEvent, ANALYTICS_EVENTS } = await import("@/lib/analytics");
+      trackEvent(ANALYTICS_EVENTS.ENTERPRISE_CHECKOUT_STARTED, {
+        workspace_id: selectedWorkspace,
+        currency,
+      });
+
       const { data, error } = await supabase.functions.invoke("create-enterprise-checkout", {
-        body: { 
+        body: {
           workspaceId: selectedWorkspace,
-          currency 
+          currency
         },
       });
 
@@ -263,6 +269,11 @@ export default function TeamWorkspace() {
         window.open(data.url, "_blank");
       }
     } catch (error) {
+      const { trackEvent, ANALYTICS_EVENTS } = await import("@/lib/analytics");
+      trackEvent(ANALYTICS_EVENTS.CHECKOUT_FAILED, {
+        plan: "enterprise",
+        error: error instanceof Error ? error.message : String(error),
+      });
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to start upgrade",

@@ -7,7 +7,10 @@ import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacter
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { Card } from '@/components/ui/card';
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 const BrandCharacters = () => {
+  useTrackPageFeature("brand_characters");
   const { characters, isLoading } = useBrandCharacters();
   const [addOpen, setAddOpen] = useState(false);
 

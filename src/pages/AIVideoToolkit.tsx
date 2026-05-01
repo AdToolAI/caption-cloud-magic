@@ -35,7 +35,10 @@ const particles = [
   { x: '90%', y: '50%', size: 3, delay: 1.5,  dur: 6 },
 ];
 
+import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
+
 export default function AIVideoToolkit() {
+  useTrackPageFeature("ai_video_toolkit");
   const { user } = useAuth();
   const { language, t } = useTranslation();
   const { wallet, loading: walletLoading, refetch: refetchWallet } = useAIVideoWallet();
