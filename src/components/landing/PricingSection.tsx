@@ -6,6 +6,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { getCurrencyForLanguage } from "@/lib/currency";
 import { CompetitorComparisonCard } from "./CompetitorComparisonCard";
 import { AIVideoTopupHintCard } from "./AIVideoTopupHintCard";
+import { FoundersSlotBadge } from "@/components/pricing/FoundersSlotBadge";
 
 export const PricingSection = () => {
   const { t, language } = useTranslation();
