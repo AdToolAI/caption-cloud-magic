@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 
 const ONBOARDING_KEY = "adtool-ai-onboarding-completed";
 
