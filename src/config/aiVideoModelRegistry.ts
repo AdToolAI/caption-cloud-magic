@@ -25,6 +25,7 @@ import { SEEDANCE_VIDEO_MODELS } from './seedanceVideoCredits';
 import { GROK_VIDEO_MODELS } from './grokVideoCredits';
 import { AI_VIDEO_MODELS as SORA_VIDEO_MODELS } from './aiVideoCredits';
 import { VIDU_VIDEO_MODELS } from './viduVideoCredits';
+import { HAPPYHORSE_VIDEO_MODELS } from './happyhorseVideoCredits';
 
 export type ToolkitModelGroup = 'recommended' | 'fast' | 'premium' | 'audio';
 
@@ -36,7 +37,7 @@ export interface ToolkitModel {
   /** Short provider label, e.g. "Kuaishou", "Google". */
   provider: string;
   /** Family used to slot into the provider tab/icon. */
-  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika' | 'vidu';
+  family: 'kling' | 'veo' | 'ltx' | 'wan' | 'hailuo' | 'luma' | 'seedance' | 'grok' | 'sora' | 'runway' | 'pika' | 'vidu' | 'happyhorse';
   /** Edge function name to invoke (without `supabase.functions.invoke()` prefix). */
   edgeFunction: string;
   /** Grouping in the dropdown. */
@@ -482,6 +483,42 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     legacyRoute: '/vidu-studio',
   },
 
+  /* ─────────── HappyHorse 1.0 (Alibaba) ─────────── */
+  {
+    id: 'happyhorse-standard',
+    name: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].name,
+    provider: 'Alibaba',
+    family: 'happyhorse',
+    edgeFunction: 'generate-happyhorse-video',
+    group: 'recommended',
+    icon: Sparkles,
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: [3, 5, 8, 10, 12, 15],
+    resolution: '720p',
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-standard'].costPerSecond,
+    badge: 'Neu · Alibaba',
+    tagline: 'Multi-Shot Consistency · Dialog-Driven',
+    legacyRoute: '/happyhorse-video-studio',
+  },
+  {
+    id: 'happyhorse-pro',
+    name: HAPPYHORSE_VIDEO_MODELS['happyhorse-pro'].name,
+    provider: 'Alibaba',
+    family: 'happyhorse',
+    edgeFunction: 'generate-happyhorse-video',
+    group: 'premium',
+    icon: Sparkles,
+    capabilities: { t2v: true, i2v: true, audio: false },
+    durations: [3, 5, 8, 10, 12, 15],
+    resolution: '1080p',
+    aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+    costPerSecond: HAPPYHORSE_VIDEO_MODELS['happyhorse-pro'].costPerSecond,
+    badge: 'Premium · 1080p',
+    tagline: 'Multi-Shot Consistency · 1080p',
+    legacyRoute: '/happyhorse-video-studio',
+  },
+
   /* Sora 2 entfernt — OpenAI sunset 2026, Routen migrieren auf Veo 3.1 / Kling 3 Pro. */
 ];
 
@@ -513,4 +550,5 @@ export const LEGACY_ROUTE_TO_MODEL: Record<string, string> = {
   '/grok-video-studio':     'grok-imagine',
   '/sora-video-studio':     'sora-2-standard',
   '/vidu-studio':           'vidu-q2-reference',
+  '/happyhorse-video-studio': 'happyhorse-standard',
 };
