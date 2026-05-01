@@ -548,6 +548,7 @@ Deno.serve(async (req) => {
     succeeded: results.filter((r) => r.status === "succeeded").length,
     failed: results.filter((r) => r.status === "failed").length,
     timeout: results.filter((r) => r.status === "timeout").length,
+    expected: results.filter((r) => r.status === "expected").length,
     skipped_budget: results.filter((r) => r.status === "skipped_budget").length,
     total_spent_eur: Number(totalSpent.toFixed(4)),
     cap_eur: cap,
