@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import Stripe from "npm:stripe@18.5.0";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { withTelemetry } from "../_shared/telemetry.ts";
+import { withTelemetry, trackBusinessEvent } from "../_shared/telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -130,6 +130,16 @@ serve(withTelemetry("check-subscription", async (req) => {
     const subscriptionEnd = hasActiveSubscription && subscription?.current_period_end 
       ? new Date(subscription.current_period_end * 1000).toISOString() 
       : null;
+
+    if (hasActiveSubscription && subscription) {
+      trackBusinessEvent("subscription_detected", user.id, {
+        product_id: productId,
+        subscription_id: subscription.id,
+        status: subscription.status,
+        current_period_end: subscriptionEnd,
+        cancel_at_period_end: subscription.cancel_at_period_end,
+      }).catch(() => {});
+    }
 
     return new Response(
       JSON.stringify({
