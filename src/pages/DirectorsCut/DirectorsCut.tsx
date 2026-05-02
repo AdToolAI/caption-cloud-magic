@@ -605,6 +605,7 @@ export function DirectorsCut() {
         <CapCutEditor
           videoUrl={selectedVideo.url}
           videoDuration={actualTotalDuration}
+          originalVideoDuration={originalVideoDuration || actualTotalDuration}
           scenes={scenes}
           audioEnhancements={audioEnhancements}
           onAudioChange={setAudioEnhancements}
