@@ -454,35 +454,44 @@ export function DirectorsCut() {
 
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
-        for (const boundary of detectedBoundaries) {
-          const beforeIdx = timestampedFrames.findIndex(f => f.time >= boundary.time) - 1;
-          const afterIdx = timestampedFrames.findIndex(f => f.time >= boundary.time);
-          if (beforeIdx >= 0) framesForAI.push(timestampedFrames[beforeIdx]);
-          if (afterIdx >= 0 && afterIdx < timestampedFrames.length) framesForAI.push(timestampedFrames[afterIdx]);
-        }
-        
-        const boundaryTimes = [0, ...detectedBoundaries.map(b => b.time), canonicalDuration];
-        for (let s = 0; s < boundaryTimes.length - 1; s++) {
-          const midTime = (boundaryTimes[s] + boundaryTimes[s + 1]) / 2;
-          const closest = timestampedFrames.reduce((best, f) => 
-            Math.abs(f.time - midTime) < Math.abs(best.time - midTime) ? f : best
-          );
-          if (!framesForAI.find(f => Math.abs(f.time - closest.time) < 0.3)) {
-            framesForAI.push(closest);
+        if (detectedBoundaries.length > 0) {
+          // Client already found cuts — send neighbor frames so AI can describe each scene
+          for (const boundary of detectedBoundaries) {
+            const beforeIdx = timestampedFrames.findIndex(f => f.time >= boundary.time) - 1;
+            const afterIdx = timestampedFrames.findIndex(f => f.time >= boundary.time);
+            if (beforeIdx >= 0) framesForAI.push(timestampedFrames[beforeIdx]);
+            if (afterIdx >= 0 && afterIdx < timestampedFrames.length) framesForAI.push(timestampedFrames[afterIdx]);
+          }
+          const boundaryTimes = [0, ...detectedBoundaries.map(b => b.time), canonicalDuration];
+          for (let s = 0; s < boundaryTimes.length - 1; s++) {
+            const midTime = (boundaryTimes[s] + boundaryTimes[s + 1]) / 2;
+            const closest = timestampedFrames.reduce((best, f) =>
+              Math.abs(f.time - midTime) < Math.abs(best.time - midTime) ? f : best
+            );
+            if (!framesForAI.find(f => Math.abs(f.time - closest.time) < 0.3)) {
+              framesForAI.push(closest);
+            }
+          }
+        } else {
+          // Client found NO cuts — send a downsampled sweep of the whole video
+          // so the server can do AI-based boundary detection from frames.
+          const TARGET = 50;
+          const step = Math.max(1, Math.floor(timestampedFrames.length / TARGET));
+          for (let i = 0; i < timestampedFrames.length; i += step) {
+            framesForAI.push(timestampedFrames[i]);
           }
         }
-        
         framesForAI.sort((a, b) => a.time - b.time);
       }
-      
+
       const sceneBoundaries = detectedBoundaries.map(b => ({
         time: b.time,
         type: b.type,
         score: b.score,
       }));
-      
+
       const clientExtractionFailed = timestampedFrames.length === 0;
-      
+
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
           video_url: selectedVideo.url,
@@ -492,11 +501,11 @@ export function DirectorsCut() {
           client_extraction_failed: clientExtractionFailed,
         },
       });
-      
+
       if (error) throw error;
-      
+
       if (data?.ok === false) {
-        const detail = data.detail ? ` (${String(data.detail).slice(0, 140)})` : '';
+        const detail = data.detail ? ` (${String(data.detail).slice(0, 160)})` : '';
         toast.error(`${data.error || t('dc.sceneAnalysisFailed')}${detail}`);
         setIsAnalyzing(false);
         return;
