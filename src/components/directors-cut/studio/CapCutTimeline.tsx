@@ -1,11 +1,12 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
-import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2 } from 'lucide-react';
+import { SceneAnalysis, CutMarker } from '@/types/directors-cut';
+import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2, Magnet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { buildSnapTargets, snapToNearest, pxThresholdToSec, DEFAULT_SNAP_PX, type SnapTarget } from '@/lib/directors-cut/snap';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
   DropdownMenu,
@@ -40,6 +41,13 @@ interface CapCutTimelineProps {
   selectedSubtitleId?: string | null;
   onSplitAtPlayhead?: () => void;
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
+  /** AI-detected cut points used as magnetic snap targets. */
+  cutMarkers?: CutMarker[];
+  /** Master toggle for snapping (default true). */
+  snapEnabled?: boolean;
+  onSnapEnabledChange?: (enabled: boolean) => void;
+  /** Add a manual cut marker at the current playhead. */
+  onAddCutMarker?: () => void;
 }
 
 const TRACK_HEIGHT = 48;
@@ -64,7 +72,10 @@ const DraggableScene: React.FC<{
   onDelete?: () => void;
   onSplit?: () => void;
   onTrim?: (newStart: number, newEnd: number) => void;
-}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim }) => {
+  /** Optional snap function — returns the snapped time and whether a target was hit. */
+  snapFn?: (value: number, excludeSceneId?: string) => { value: number; hit: { time: number } | null };
+  onSnapPreview?: (time: number | null) => void;
+}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim, snapFn, onSnapPreview }) => {
   const { t } = useTranslation();
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const startXRef = useRef(0);
@@ -108,16 +119,23 @@ const DraggableScene: React.FC<{
       const deltaX = moveE.clientX - startXRef.current;
       const deltaTime = deltaX / zoom;
       if (edge === 'left') {
-        const newStart = Math.max(0, originalBoundsRef.current.start + deltaTime);
+        let newStart = Math.max(0, originalBoundsRef.current.start + deltaTime);
+        const snap = snapFn?.(newStart, scene.id);
+        if (snap?.hit) newStart = snap.value;
+        onSnapPreview?.(snap?.hit ? snap.value : null);
         if (newStart < scene.end_time - 1) onTrim?.(newStart, scene.end_time);
       } else {
-        const newEnd = originalBoundsRef.current.end + deltaTime;
+        let newEnd = originalBoundsRef.current.end + deltaTime;
+        const snap = snapFn?.(newEnd, scene.id);
+        if (snap?.hit) newEnd = snap.value;
+        onSnapPreview?.(snap?.hit ? snap.value : null);
         if (newEnd > scene.start_time + 1) onTrim?.(scene.start_time, newEnd);
       }
     };
 
     const handleMouseUp = () => {
       setIsResizing(null);
+      onSnapPreview?.(null);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
@@ -550,6 +568,10 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   selectedSubtitleId,
   onSplitAtPlayhead,
   onTrimScene,
+  cutMarkers = [],
+  snapEnabled = true,
+  onSnapEnabledChange,
+  onAddCutMarker,
 }) => {
   const { t } = useTranslation();
   const musicTrackIndex = tracks.findIndex(t_track => t_track.id === 'track-music');
@@ -557,7 +579,24 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   const tracksAfterSubtitle = musicTrackIndex >= 0 ? tracks.slice(musicTrackIndex + 1) : tracks.slice(-1);
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  
+
+  // Snap line preview (timeline seconds; null = hidden)
+  const [snapPreview, setSnapPreview] = useState<number | null>(null);
+
+  // Build snap targets (memoized — rebuilt when scenes/markers/playhead/duration change)
+  const snapTargets = useMemo<SnapTarget[]>(() => buildSnapTargets({
+    scenes,
+    cutMarkers: cutMarkers.filter(m => (m.confidence ?? 1) >= 0.6).map(m => m.time),
+    duration,
+    playhead: currentTime,
+  }), [scenes, cutMarkers, duration, currentTime]);
+
+  const snapFn = useCallback((value: number, excludeSceneId?: string) => {
+    if (!snapEnabled) return { value, hit: null };
+    const threshold = pxThresholdToSec(DEFAULT_SNAP_PX, zoom);
+    return snapToNearest(value, snapTargets, threshold, excludeSceneId);
+  }, [snapEnabled, snapTargets, zoom]);
+
   // Resize state
   const [resizingClip, setResizingClip] = useState<{ id: string; side: 'left' | 'right'; startX: number; originalClip: AudioClip } | null>(null);
   
@@ -615,6 +654,29 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
       <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <span className="text-xs text-[#F5C76A]/60 font-medium">Timeline</span>
+          <button
+            onClick={() => onSnapEnabledChange?.(!snapEnabled)}
+            title={snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
+            className={cn(
+              "ml-2 h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium transition-colors border",
+              snapEnabled
+                ? "bg-[#F5C76A]/15 text-[#F5C76A] border-[#F5C76A]/40"
+                : "bg-white/5 text-white/40 border-white/10 hover:text-white/70"
+            )}
+          >
+            <Magnet className="h-3 w-3" />
+            {snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
+          </button>
+          {onAddCutMarker && (
+            <button
+              onClick={onAddCutMarker}
+              title={t('dc.addCutMarker')}
+              className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/10 transition-colors"
+            >
+              <Scissors className="h-3 w-3" />
+              {t('dc.addCutMarker')}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -761,6 +823,30 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
+              {/* Cut markers (AI-detected snap points) — rendered behind scenes */}
+              {cutMarkers.map((m, idx) => {
+                const weak = (m.confidence ?? 1) < 0.6;
+                return (
+                  <div
+                    key={`cut-${idx}-${m.time}`}
+                    className={cn(
+                      "absolute top-0 bottom-0 w-px pointer-events-none z-0",
+                      weak
+                        ? "border-l border-dashed border-[#F5C76A]/30"
+                        : "bg-[#F5C76A]/50"
+                    )}
+                    style={{ left: `${m.time * zoom}px` }}
+                    title={`${weak ? 'Weak ' : ''}cut @ ${m.time.toFixed(2)}s`}
+                  />
+                );
+              })}
+              {/* Snap line (visual feedback while dragging) */}
+              {snapPreview !== null && (
+                <div
+                  className="absolute top-0 bottom-0 w-[2px] bg-[#F5C76A] z-40 pointer-events-none animate-pulse shadow-[0_0_8px_rgba(245,199,106,0.8)]"
+                  style={{ left: `${snapPreview * zoom}px` }}
+                />
+              )}
               {scenes.map((scene, i) => (
                 <DraggableScene
                   key={scene.id}
@@ -774,6 +860,8 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
                   onSplit={onSplitAtPlayhead}
                   onTrim={onTrimScene ? (newStart, newEnd) => onTrimScene(scene.id, newStart, newEnd) : undefined}
+                  snapFn={snapFn}
+                  onSnapPreview={setSnapPreview}
                 />
               ))}
               {/* Add Scene Button with Dropdown */}

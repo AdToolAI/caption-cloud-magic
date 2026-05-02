@@ -141,6 +141,16 @@ export interface TransitionAssignment {
   offsetSeconds?: number;
 }
 
+/** AI-detected (or manually placed) cut points used as magnetic snap targets. */
+export interface CutMarker {
+  /** Time in seconds (timeline domain). */
+  time: number;
+  /** Detection confidence 0-1. <0.6 = "weak" (dashed marker, no auto-snap). */
+  confidence?: number;
+  /** 'auto' = AI detected, 'manual' = user added with shortcut M. */
+  source?: 'auto' | 'manual';
+}
+
 // Wizard Step Props
 export interface VideoImportStepProps {
   selectedVideo: SelectedVideo | null;

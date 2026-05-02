@@ -157,6 +157,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [zoom, setZoom] = useState(50);
   const [activeDragItem, setActiveDragItem] = useState<{ name: string; type: string; color: string } | null>(null);
+
+  // Magnetic snap state — Artlist/CapCut-style cut markers + master toggle
+  const [snapEnabled, setSnapEnabled] = useState(true);
+  const [cutMarkers, setCutMarkers] = useState<import('@/types/directors-cut').CutMarker[]>([]);
+  const handleAddCutMarker = useCallback(() => {
+    setCutMarkers(prev => {
+      if (prev.some(m => Math.abs(m.time - currentTime) < 0.05)) return prev;
+      const next = [...prev, { time: currentTime, source: 'manual' as const, confidence: 1 }];
+      next.sort((a, b) => a.time - b.time);
+      return next;
+    });
+    toast.success(t('dc.cutMarkerAdded'));
+  }, [currentTime, t]);
   
   // Collapsible panels
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1853,6 +1866,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onSubtitleSelect={handleSubtitleSelect}
                 onSplitAtPlayhead={handleSplitAtPlayhead}
                 onTrimScene={handleTrimScene}
+                cutMarkers={cutMarkers}
+                snapEnabled={snapEnabled}
+                onSnapEnabledChange={setSnapEnabled}
+                onAddCutMarker={handleAddCutMarker}
               />
             </div>
           </div>
