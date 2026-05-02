@@ -411,32 +411,46 @@ export function DirectorsCut() {
       
       let timestampedFrames: TimestampedFrame[] = [];
       let detectedBoundaries: DetectedBoundary[] = [];
-      
-      try {
-        timestampedFrames = await extractTimestampedFrames(selectedVideo.url, canonicalDuration);
-        toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
-        
-        const coarseResult = await detectBoundariesAsync(timestampedFrames);
-        
-        if (coarseResult.boundaries.length > 0) {
-          toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
-          try {
-            const refinementFrames = await extractRefinementFrames(
-              selectedVideo.url, canonicalDuration,
-              coarseResult.boundaries.map(b => b.time)
-            );
-            const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
-            detectedBoundaries = refined.boundaries;
-          } catch {
-            detectedBoundaries = coarseResult.boundaries;
+      // Build a list of URLs to try: original first, then a CORS-friendly proxy
+      // (the Lambda S3 bucket does not send Access-Control-Allow-Origin which
+      // taints the canvas and breaks toDataURL).
+      const proxyUrl = `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/proxy-video-bytes?url=${encodeURIComponent(selectedVideo.url)}`;
+      const extractCandidates = [selectedVideo.url, proxyUrl];
+
+      for (const candidateUrl of extractCandidates) {
+        try {
+          timestampedFrames = await extractTimestampedFrames(candidateUrl, canonicalDuration);
+          if (timestampedFrames.length > 0) {
+            toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
+            const coarseResult = await detectBoundariesAsync(timestampedFrames);
+            if (coarseResult.boundaries.length > 0) {
+              toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
+              try {
+                const refinementFrames = await extractRefinementFrames(
+                  candidateUrl, canonicalDuration,
+                  coarseResult.boundaries.map(b => b.time)
+                );
+                const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
+                detectedBoundaries = refined.boundaries;
+              } catch {
+                detectedBoundaries = coarseResult.boundaries;
+              }
+            } else {
+              detectedBoundaries = coarseResult.boundaries;
+            }
+            break; // success — stop trying further candidates
           }
-        } else {
-          detectedBoundaries = coarseResult.boundaries;
+        } catch (frameError: any) {
+          const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(frameError?.message || '');
+          console.warn(`[DirectorsCut] Frame extraction failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
+          if (!isCors && candidateUrl !== proxyUrl) {
+            // non-CORS error on origin — don't waste a proxy round-trip
+            break;
+          }
+          // otherwise loop and try next candidate
         }
-      } catch (frameError) {
-        console.warn('[DirectorsCut] Frame extraction failed:', frameError);
       }
-      
+
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
         for (const boundary of detectedBoundaries) {
