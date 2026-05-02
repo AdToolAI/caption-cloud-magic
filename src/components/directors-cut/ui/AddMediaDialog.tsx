@@ -170,7 +170,7 @@ export function AddMediaDialog({
   const handleSelectVideo = useCallback((video: any) => {
     setSelectedMedia({
       type: 'video',
-      url: video.output_url,
+      url: video.url,
       duration: video.duration_seconds || 10,
       name: video.title || 'Video',
       thumbnail: video.thumbnail_url,
@@ -278,7 +278,7 @@ export function AddMediaDialog({
                       onClick={() => handleSelectVideo(video)}
                       className={cn(
                         "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
-                        selectedMedia?.url === video.output_url
+                        selectedMedia?.url === video.url
                           ? "border-primary ring-2 ring-primary/30"
                           : "border-transparent hover:border-primary/50"
                       )}
@@ -299,7 +299,7 @@ export function AddMediaDialog({
                         <p className="text-[10px] text-white truncate">{video.title || 'Video'}</p>
                         <p className="text-[9px] text-white/70">{video.duration_seconds?.toFixed(1)}s</p>
                       </div>
-                      {selectedMedia?.url === video.output_url && (
+                      {selectedMedia?.url === video.url && (
                         <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
                           <Check className="h-3 w-3 text-primary-foreground" />
                         </div>
