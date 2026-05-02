@@ -16678,7 +16678,7 @@ Object.assign(translations.es.dc, {
   videoFilesNotMovable: 'Los archivos de video no se pueden mover a pistas de audio.',
   mediaLibraryComingSoon: '¡La integración de la biblioteca de medios llegará pronto! Por ahora, usa la carga en el panel lateral.',
   playheadNotInScene: 'El cursor de reproducción no está dentro de una escena',
-      snapOn: 'Snap on', snapOff: 'Snap off', addCutMarker: 'Add marker', cutMarkerAdded: 'Cut marker added',
+      snapOn: 'Snap on', snapOff: 'Snap off', addCutMarker: 'Add marker', cutMarkerAdded: 'Cut marker added', snappedToCut: 'Escena ajustada al corte en {time}',
   tooCloseToEdge: 'Demasiado cerca del borde de la escena para dividir',
   sceneSplitAtPlayhead: 'Escena dividida en el cursor de reproducción',
   sceneDuplicated: 'Escena duplicada',
