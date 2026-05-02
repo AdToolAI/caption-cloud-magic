@@ -1,76 +1,29 @@
-Ich habe mir den konkreten Lauf angesehen: Die Backend-Logs zeigen eindeutig, warum du exakt 5-Sekunden-Szenen bekommst:
+Ich habe den konkreten Fehler gefunden: PySceneDetect wurde aufgerufen und hat laut Backend-Logs 2 Split-Clips geliefert. Daraus wurde aber nur 1 Boundary an `analyze-video-scenes` übergeben. Dort wird jede Boundary verworfen, wenn sie weniger als 3 Sekunden vor dem Videoende liegt. Bei deinem 25.77s-Video lag der Schnitt offenbar sehr nahe am Ende, deshalb wurde daraus wieder genau 1 Gesamtszene.
 
-```text
-frames: 0, boundaries: 0, client_failed: true
-Server-side detection failed: Video too large for inline analysis: 33.3MB (max 20MB)
-Falling back to uniform splits (5s)
-```
+Plan zur Korrektur:
 
-Das heißt: Die App erkennt gerade keine echten Schnitte. Weil die Client-Frame-Extraktion fehlgeschlagen ist und das Video für die alte Inline-Analyse zu groß ist, greift der Notfall-Fallback: alle 5 Sekunden schneiden. Das ist genau das, was du im Screenshot siehst.
+1. Mindestlängen-Filter für professionelle Detection entschärfen
+   - `analyze-video-scenes` so erweitern, dass vorgegebene PySceneDetect-Boundaries nicht durch den harten `MIN_SCENE_DURATION = 3.0`-Filter verschwinden.
+   - Stattdessen für externe/vertrauenswürdige Boundaries eine niedrigere Mindestlänge verwenden, z. B. 0.5s bis 1.0s, damit kurze echte Shots am Anfang oder Ende nicht zusammengeführt werden.
+   - Die 3s-Regel nur für unsichere AI-/Fallback-Erkennung beibehalten, damit keine wilden Mikro-Cuts entstehen.
 
-Plan zur Behebung auf CapCut/Artlist-Niveau:
+2. Quelle der Boundary explizit übergeben
+   - Im Frontend bei PySceneDetect-Boundaries ein Feld wie `source: 'pyscenedetect'` oder eine Option `boundary_source: 'pyscenedetect'` an `analyze-video-scenes` senden.
+   - Die Backend-Funktion nutzt diese Quelle, um die korrekte Mindestdauer und Filterlogik zu wählen.
 
-1. 5-Sekunden-Fallback entfernen bzw. degradieren
-   - Die Auto-Cut-Funktion darf nicht mehr so tun, als wären 5s-Splits echte Szenen.
-   - Wenn keine echten Grenzen erkannt werden, soll die UI klar anzeigen: „Keine echten Schnitte erkannt“ oder „Frame-Analyse fehlgeschlagen“, statt Fake-Cuts zu erzeugen.
-   - Optional nur als manuelle Aktion anbieten: „In 5s-Abschnitte teilen“.
+3. Frontend-Zusammenführung ebenfalls entschärfen
+   - In `DirectorsCut.tsx` wird nach der Analyse aktuell nochmal alles unter 3s mit der vorherigen Szene verschmolzen.
+   - Für PySceneDetect-Ergebnisse muss auch hier die Mindestdauer niedriger sein, sonst kann ein korrekt erkannter kurzer Shot wieder verschwinden.
 
-2. Client-Frame-Extraktion robuster machen
-   - `extractTimestampedFrames` so umbauen, dass Video-Seek/Decode-Fehler sauber erkannt werden.
-   - Der Proxy-Fallback soll nicht nur bei Canvas-CORS-Taint laufen, sondern auch bei typischen S3/Range/Seek/Decode-Problemen.
-   - Zusätzlich bessere Diagnose liefern: wie viele Frames geladen wurden, welche URL-Variante genutzt wurde, warum ein Versuch fehlgeschlagen ist.
+4. Diagnose verbessern
+   - In den Logs/Response zusätzliche Debug-Daten ausgeben: empfangene Boundary-Zeiten, akzeptierte Boundary-Zeiten, verworfene Boundary-Zeiten inklusive Grund.
+   - Damit sieht man künftig sofort, ob PySceneDetect falsch erkennt oder ob unsere eigene Nachbearbeitung Schnitte entfernt.
 
-3. Echte automatische Schnitt-Erkennung als primären Weg verbessern
-   - Statt nur grob 3 fps zu sampeln, eine zweistufige Erkennung einbauen:
-     - Grobscan über das ganze Video.
-     - Feinscan um auffällige Stellen mit höherer Dichte, z.B. 12–24 fps im Zeitfenster.
-   - Die Erkennung kombiniert mehrere Signale:
-     - Pixel-/Histogramm-Unterschiede
-     - Edge-/Strukturwechsel
-     - Luminanzwechsel/Fades
-     - Peak-Prominence statt fester 5s-Raster
-   - Ergebnis: echte Schnittpunkte wie z.B. `0.00–4.37`, `4.37–9.12`, `9.12–13.84`, statt immer `0–5`, `5–10`, `10–15`.
-
-4. Backend-Fallback für große Videos richtig skalieren
-   - `analyze-video-scenes` darf große Videos nicht mehr wegen `>20MB` direkt abbrechen.
-   - Wenn das Video zu groß für Inline-Videoanalyse ist, soll das Backend stattdessen mit den clientseitig extrahierten Frames arbeiten oder einen framebasierten Analysepfad nutzen.
-   - AI soll nur noch beschreiben/validieren, nicht die Szenengrenzen künstlich erfinden.
-
-5. Ergebnis-Transparenz im Studio
-   - Nach Auto-Cut eine kleine Debug-/Statusmeldung anzeigen:
-     - Quelle: `client-frame-detection`, `proxy-frame-detection`, `server-ai-video`, `manual-uniform`
-     - erkannte Schnittpunkte
-     - Anzahl extrahierter Frames
-   - So sehen wir sofort, ob echte Erkennung gelaufen ist oder ein Fallback.
-
-6. Timeline korrekt aus echten Original-Zeitankern bauen
-   - Die erkannten Boundary-Zeiten bleiben als `original_start_time` / `original_end_time` erhalten.
-   - Die Timeline wird daraus sequenziell gebaut, ohne die Schnittzeiten wieder auf feste 5s-Zellen zu normalisieren.
-   - AI-Cut-Marker werden nur aus echten Boundaries gesetzt, nicht aus Uniform-Fallbacks.
-
-Technische Änderungspunkte:
-
-- `src/lib/directors-cut-scene-detection.ts`
-  - Fehlerklassifizierung erweitern.
-  - Extraktion/Seek-Handling verbessern.
-  - präzisere zweistufige Boundary Detection.
-
-- `src/pages/DirectorsCut/DirectorsCut.tsx`
-  - Proxy-Fallback breiter triggern.
-  - Analyse-Metadaten anzeigen/toasten.
-  - Uniform-Fallback nicht mehr als echte Auto-Cuts übernehmen.
-
-- `supabase/functions/analyze-video-scenes/index.ts`
-  - 5s-Auto-Fallback entfernen.
-  - große Videos nicht mehr als „fake scenes“ behandeln.
-  - klaren `analysis_mode` und Diagnose zurückgeben.
-
-- `supabase/functions/proxy-video-bytes/index.ts`
-  - Range-/Header-Verhalten prüfen und ggf. härten, damit Browser-Seeking zuverlässig funktioniert.
+5. Optionaler robusterer Zeitcode-Pfad
+   - Wenn möglich, die Dauer der Split-Clips weiterhin summieren, aber bei Probe-Problemen keine 0-Dauer einfließen lassen.
+   - Falls PySceneDetect nur 1 Clip liefert, bleibt Fallback auf Client-/AI-Detection aktiv. Wenn PySceneDetect aber mehrere Clips liefert, sollen diese Schnitte nicht stillschweigend wegoptimiert werden.
 
 Erwartetes Ergebnis:
-
-- Auto-Cut erzeugt keine künstlichen 5-Sekunden-Szenen mehr.
-- Wenn das Video echte Schnitte enthält, erscheinen variable, realistische Szenenlängen.
-- Wenn keine Schnitte erkannt werden oder die Analyse blockiert ist, bekommst du eine ehrliche Fehlermeldung mit Ursache statt falscher Timeline.
-- Die Grundlage ist dann deutlich näher an CapCut/Artlist: echte Shot-Boundary-Erkennung statt periodisches Zerschneiden.
+- Bei deinem aktuellen Video werden statt einer Gesamtszene mindestens die von PySceneDetect erkannten Segmente angezeigt.
+- Kurze echte Szenen am Ende oder Anfang werden nicht mehr durch unsere 3-Sekunden-Schutzlogik gelöscht.
+- Falls künftig wieder nur eine Szene angezeigt wird, ist im Debug eindeutig sichtbar, ob PySceneDetect wirklich nur eine Szene gefunden hat oder ob ein Filter gegriffen hat.

@@ -35,7 +35,7 @@ serve(async (req) => {
   }
 
   try {
-    const { video_url, duration, frames, scene_boundaries, detected_cuts, client_extraction_failed } = await req.json();
+    const { video_url, duration, frames, scene_boundaries, detected_cuts, client_extraction_failed, boundary_source } = await req.json();
 
     if (!video_url) {
       return new Response(
