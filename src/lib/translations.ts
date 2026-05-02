@@ -9361,7 +9361,7 @@ export const translations: Record<Language, any> = {
       part2: "(Teil 2)",
       copy: "(Kopie)",
       newSceneBlackscreen: "Neue Szene (Blackscreen)",
-      snapOn: 'Snap on', snapOff: 'Snap off', addCutMarker: 'Add marker', cutMarkerAdded: 'Cut marker added',
+      snapOn: 'Snap on', snapOff: 'Snap off', addCutMarker: 'Add marker', cutMarkerAdded: 'Cut marker added', snappedToCut: 'Szene an Schnitt eingerastet bei {time}',
       newSceneOriginal: "Neue Szene (Original)",
       emptySceneDesc: "Leere Szene - Video oder Bild hinzufügen",
       uploadedVideo: "Hochgeladenes Video",
