@@ -563,6 +563,7 @@ export function DirectorsCut() {
           frames: framesForAI.length > 0 ? framesForAI : undefined,
           scene_boundaries: sceneBoundaries,
           client_extraction_failed: clientExtractionFailed,
+          boundary_source: pysceneSucceeded ? 'pyscenedetect' : 'auto',
         },
       });
 
@@ -577,8 +578,9 @@ export function DirectorsCut() {
 
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
-      
-      const MIN_SCENE_DURATION = 3.0;
+
+      // Trusted external detection (PySceneDetect) → keep short shots intact.
+      const MIN_SCENE_DURATION = pysceneSucceeded ? 0.5 : 3.0;
       const stableScenes: any[] = [];
       for (const scene of sortedScenes) {
         const dur = (scene.end_time || 0) - (scene.start_time || 0);
