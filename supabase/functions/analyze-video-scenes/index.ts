@@ -84,18 +84,17 @@ serve(async (req) => {
       }
     }
 
-    // If server analysis failed, return structured error
+    // If server analysis failed, fall back to deterministic uniform splits
+    // (~every 5s) instead of erroring out — better than zero scenes.
     if (analysisMode === 'server_error') {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'Serverseitige Videoanalyse fehlgeschlagen',
-          code: 'scene_detection_failed',
-          detail: detectionError,
-          analysis_mode: analysisMode,
-        }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.warn(`[analyze-video-scenes] Falling back to uniform splits (5s) — server detection failed: ${detectionError}`);
+      const step = 5;
+      const fallback: SceneBoundary[] = [];
+      for (let t = step; t < videoDuration - 1; t += step) {
+        fallback.push({ time: t, type: 'hard_cut', score: 0.5 });
+      }
+      serverBoundaries = fallback;
+      analysisMode = 'server_uniform_fallback';
     }
 
     // Build deterministic scenes
