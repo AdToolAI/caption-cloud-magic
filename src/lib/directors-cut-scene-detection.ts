@@ -87,7 +87,16 @@ export async function extractTimestampedFrames(
           });
 
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const frameData = canvas.toDataURL('image/jpeg', 0.6);
+          let frameData: string;
+          try {
+            frameData = canvas.toDataURL('image/jpeg', 0.6);
+          } catch (taintErr) {
+            video.src = '';
+            const err: any = new Error('CORS_TAINT');
+            err.code = 'cors_taint';
+            reject(err);
+            return;
+          }
           frames.push({ time: Math.round(time * 100) / 100, image: frameData });
         } catch {
           console.warn(`[scene-detection] Failed to extract frame at ${time}s`);
