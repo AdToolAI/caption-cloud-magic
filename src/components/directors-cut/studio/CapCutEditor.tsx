@@ -382,6 +382,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, []);
 
+  // Mirror isPlaying into a ref so the click handler can read the latest
+  // value without stale-closure issues.
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
   const handlePlayPause = useCallback(async () => {
     // CRITICAL: unlock the shared AudioContext from inside the click
     // gesture so the timed-playback effect can later call audio.play()
