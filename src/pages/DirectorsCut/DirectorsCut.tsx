@@ -524,6 +524,11 @@ export function DirectorsCut() {
       }
       
       setScenes(normalizedScenes);
+      setAiCutMarkers(detectedBoundaries.map(b => ({
+        time: b.time,
+        confidence: Math.min(1, Math.max(0, b.score ?? 0.7)),
+        source: 'auto' as const,
+      })));
       toast.success(t('dc.scenesDetected', { count: normalizedScenes.length }));
     } catch (error) {
       console.error('Error analyzing video:', error);
