@@ -41,6 +41,13 @@ interface CapCutTimelineProps {
   selectedSubtitleId?: string | null;
   onSplitAtPlayhead?: () => void;
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
+  /** AI-detected cut points used as magnetic snap targets. */
+  cutMarkers?: CutMarker[];
+  /** Master toggle for snapping (default true). */
+  snapEnabled?: boolean;
+  onSnapEnabledChange?: (enabled: boolean) => void;
+  /** Add a manual cut marker at the current playhead. */
+  onAddCutMarker?: () => void;
 }
 
 const TRACK_HEIGHT = 48;
