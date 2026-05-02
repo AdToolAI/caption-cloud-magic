@@ -414,8 +414,8 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     <div ref={containerRef} className="h-full flex flex-col rounded-lg overflow-hidden bg-[#0d0d0d]">
       {/* Video Container */}
       <div className="flex-1 relative flex items-center justify-center bg-black min-h-0">
-        {/* Blackscreen overlay */}
-        {currentScene?.isBlackscreen && (
+        {/* Blackscreen overlay — only when explicitly requested */}
+        {currentSourceMode === 'blackscreen' && currentScene && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-10">
             <div className="text-white/30 text-sm font-medium">{t('dc.blackscreen')}</div>
             <div className="text-white/20 text-xs mt-1">{t('dc.sceneLabel', { index: scenes.indexOf(currentScene) + 1 })}</div>
