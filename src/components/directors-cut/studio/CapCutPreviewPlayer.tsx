@@ -183,7 +183,9 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
           onPlayingChange?.(false);
           onTimeUpdate(duration);
         } else if (currentScene && newGlobalTime >= currentScene.end_time) {
-          // End of current scene → jump to next scene start (or end of timeline)
+          // End of current scene → jump to next scene start (or end of timeline).
+          // Reset scene-tracking ref so the sync effect re-evaluates the source.
+          lastSceneIdRef.current = null;
           const currentIndex = scenes.findIndex(s => s.id === currentScene.id);
           const nextScene = scenes[currentIndex + 1];
           if (nextScene) {
