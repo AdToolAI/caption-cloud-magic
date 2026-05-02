@@ -381,7 +381,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, []);
 
-  const handlePlayPause = useCallback(() => {
+  const handlePlayPause = useCallback(async () => {
+    // CRITICAL: unlock the shared AudioContext from inside the click
+    // gesture so the timed-playback effect can later call audio.play()
+    // without hitting NotAllowedError. Also prime each audio element
+    // so the browser whitelists them for autoplay.
+    await unlockAudio();
+
+    const willPlay = !isPlayingRef.current;
+    if (willPlay) {
+      const elements = Array.from(audioElementsRef.current.values());
+      // Prime in parallel — non-blocking; failures are silent on purpose.
+      await Promise.allSettled(elements.map(primeAudioElement));
+    }
+
     setIsPlaying(prev => !prev);
   }, []);
 
