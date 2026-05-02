@@ -218,10 +218,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Calculate actual total duration as max(end_time) — canonical duration source
+  // Calculate actual total duration as max(videoDuration, max(scene.end_time)).
+  // Original video is always the base; scenes can extend the timeline beyond it.
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return videoDuration;
-    return Math.max(...scenes.map(s => s.end_time));
+    return Math.max(videoDuration, ...scenes.map(s => s.end_time));
   }, [scenes, videoDuration]);
 
   // Audio effects change handler
