@@ -86,6 +86,8 @@ interface CapCutEditorProps {
   onVoiceOverGenerated?: (url: string) => void;
   onResetProject?: () => void;
   onBackToImport?: () => void;
+  /** AI-detected cut markers from the scene-detection pipeline. */
+  initialAiCutMarkers?: Array<{ time: number; confidence?: number; source?: 'auto' | 'manual' }>;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
