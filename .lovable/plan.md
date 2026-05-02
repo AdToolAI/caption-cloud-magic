@@ -1,47 +1,44 @@
-## Auto-FIFO bei Mediathek-Limit
+## Problem
 
-Wenn ein User das Limit (500 Videos / 2.500 Bilder / 10 GB) erreicht, sollen die **ältesten Medien automatisch gelöscht** werden, statt den Upload zu blockieren — **außer** der User hat Google Drive verbunden, dann wird gewarnt + auf Cloud-Auslagerung verwiesen (kein Auto-Delete).
+Im Video Composer hängen alle HappyHorse-Szenen dauerhaft auf "Wird generiert…", obwohl Replicate die Clips längst fertig hat. In der DB sind die 6 Szenen seit 18:24 Uhr unverändert auf `clip_status='generating'` mit gesetzter `replicate_prediction_id`, aber ohne `clip_url`.
 
-### Verhalten im Detail
+## Ursache
 
-**Ohne Cloud-Verbindung (`connection === null`):**
-- Vor jedem Upload (Datei oder URL-Import) wird geprüft: würde das neue Medium ein Limit überschreiten?
-- Falls ja: ältestes Medium des passenden Typs wird automatisch gelöscht (FIFO nach `createdAt`).
-- Bei Storage-Limit (GB): es werden so viele älteste Videos gelöscht, bis genug Platz frei ist.
-- Toast-Hinweis: "Ältestes Video wurde automatisch entfernt, um Platz zu schaffen."
-- Demo-Video, AI-Generator-Bilder im Album-System und manuell in Alben einsortierte Medien sind **geschützt** und werden übersprungen.
+Alle anderen 10 Composer-Provider (Hailuo, Kling, Wan, Seedance, Luma, Veo, Runway, Pika, Vidu, Image) rufen Replicate **direkt** in `compose-video-clips` auf und registrieren dabei den Composer-spezifischen Callback:
 
-**Mit Cloud-Verbindung:**
-- Kein Auto-Delete. Stattdessen Toast: "Limit erreicht — älteste Medien sollten in Google Drive ausgelagert werden." mit Button "Jetzt auslagern" (öffnet Cloud-Auslagerungs-Dialog).
-- Upload geht trotzdem durch, falls der User noch Quota hat; nur wenn das Hard-Limit erreicht wird, blockiert es wie bisher.
+```
+webhook: ${SUPABASE_URL}/functions/v1/compose-clip-webhook?scene_id=...&project_id=...
+```
 
-### Was wird gebaut
+`compose-clip-webhook` ist die einzige Funktion, die `composer_scenes.clip_status` und `clip_url` updated.
 
-1. **Neue Helper-Datei** `src/lib/media-library/autoCleanup.ts`
-   - `findOldestDeletable(media, type, count)` — sortiert nach createdAt asc, filtert Demo-Video & geschützte Items raus.
-   - `deleteMediaItem(item)` — kapselt die bestehende Lösch-Logik (storage + entsprechende Tabelle: `media_assets`, `video_creations`, `content_items`).
-   - `enforceLimits({ media, incoming, hasCloud })` — gibt zurück, ob Upload erlaubt ist und welche Items vorher gelöscht werden müssen.
+**HappyHorse ist die Ausnahme**: `compose-video-clips` ruft den Toolkit-Endpoint `generate-happyhorse-video` als HTTP-Proxy auf. Diese Toolkit-Funktion startet zwar einen Background-Task (`rehostAndPersist`), schreibt aber ausschließlich in die `generations`-Tabelle (für das Standalone-Toolkit) — sie kennt `composer_scenes` nicht und registriert auch keinen Composer-Webhook bei Replicate. Resultat: Replicate ist fertig, niemand updated die Szene.
 
-2. **`src/pages/MediaLibrary.tsx`**
-   - `handleUpload` (Zeile 478) und `handleImportFromUrl` (Zeile ~445) refactoren:
-     - Statt sofortigem `return` bei Limit-Überschreitung → `enforceLimits` aufrufen.
-     - Wenn `hasCloud === false`: alte Items löschen, Toast zeigen, Upload fortsetzen.
-     - Wenn `hasCloud === true`: bestehender Block-Toast mit Auslagerungs-Button.
-   - Lösch-Logik aus `handleDelete` (Zeile 566) wird in den neuen Helper extrahiert (DRY).
+## Lösung
 
-3. **UI-Hinweis im Header**
-   - `src/components/media-library/MediaLibraryHeroHeader.tsx`: bestehenden Speicherlimit-Hinweis aktualisieren auf:
-     "Bei Überschreitung werden automatisch die ältesten Medien gelöscht. Verbinde Google Drive, um Medien stattdessen sicher auszulagern."
+`compose-video-clips` so umbauen, dass HappyHorse genauso behandelt wird wie alle anderen Provider — direkter Replicate-Aufruf mit `compose-clip-webhook` als Callback, kein Umweg über die Toolkit-Funktion.
 
-### Technische Details
+### Änderungen
 
-- **FIFO-Quelle**: `media`-State ist bereits aus allen Quellen (uploads, AI, video-creator, campaign) zusammengeführt → ein Sort nach `createdAt` ascending reicht.
-- **Cloud-Items überspringen**: `source === 'cloud'` zählt nicht zum Limit und wird nie auto-gelöscht.
-- **Geschützt**: `id === DEMO_VIDEO.id`, sowie alles aus dem System-Albums-Pfad (Brand Characters, Avatars).
-- **Atomicity**: Löschungen laufen sequentiell vor dem Upload; bei Fehler wird der Upload abgebrochen und der User bekommt einen klaren Fehler-Toast.
-- **Reload**: nach Cleanup + Upload → ein einziges `loadMedia()` + `loadStorageQuota()` am Ende.
+1. **`supabase/functions/compose-video-clips/index.ts`** — HappyHorse-Block (Zeilen 830–877) ersetzen:
+   - Direkter `fetch` an `https://api.replicate.com/v1/predictions` mit `version: "alibaba/happyhorse-1.0"` (oder das vom Toolkit verwendete Model-Slug; aus `generate-happyhorse-video/index.ts` übernehmen).
+   - Input-Mapping wie im Toolkit: `prompt`, `duration`, `aspect_ratio`, `resolution` (720p für standard, 1080p für pro), optional `image` für I2V.
+   - `webhook: ${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}` und `webhook_events_filter: ["completed"]` mitsenden — analog zu Hailuo (Zeilen 419/420).
+   - `replicate_prediction_id` in `composer_scenes` speichern.
+   - Credits werden weiterhin im Standard-Composer-Flow (am Ende von `compose-video-clips`) abgerechnet — der Toolkit-Wallet-Abzug entfällt für Composer-Szenen.
+
+2. **One-shot Recovery für die 6 hängenden Szenen** des aktuellen Projekts (`6af4eda9-…`):
+   - SQL-Migration / einmaliger Job, der die 6 `replicate_prediction_id`s direkt bei Replicate abfragt und (bei `succeeded`) `clip_url` + `clip_status='ready'` setzt, bzw. bei `failed` auf `failed` mit Credit-Refund. Alternative: per Hand in der DB als `failed` markieren und der User regeneriert — günstiger und sauberer, da die 6 Predictions ggf. eh schon abgelaufen sind.
+   - Empfehlung: **Refund + auf `failed` setzen**, damit der User mit dem Fix neu rendern kann.
+
+3. **`compose-clip-webhook`** muss nichts ändern — die Funktion ist bereits provider-agnostisch und arbeitet nur über `replicate_prediction_id` + Output-URL.
 
 ### Out of Scope
 
-- Kein nightly Cron-Job. FIFO triggert nur bei tatsächlichem Upload — das ist deterministisch und vom User kontrollierbar.
-- Kein Soft-Delete / Trash. Wer Backups will, soll Google Drive verbinden (existiert bereits).
+- Das Standalone-HappyHorse-Toolkit (`/ai-video-toolkit?model=happyhorse-…`) bleibt unverändert. Es nutzt weiterhin `generate-happyhorse-video` mit der eigenen `generations`-Tabelle.
+- Keine Änderung an Pricing/Credits-Logik — der Composer rechnet HappyHorse über `getClipCost('ai-happyhorse', quality, duration)` ab (bereits implementiert).
+
+## Ergebnis
+
+- Neue HappyHorse-Renders im Composer schalten innerhalb von Sekunden nach Replicate-Completion auf "ready", `clip_url` füllt sich, Polling endet automatisch.
+- Die 6 aktuell hängenden Szenen werden refundiert und können neu gerendert werden.
