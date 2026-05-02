@@ -48,48 +48,118 @@ export function AddMediaDialog({
   const [imageDuration, setImageDuration] = useState(5);
   const [uploading, setUploading] = useState(false);
 
-  // Fetch videos from media library
+  // Fetch videos from the user's full media library
+  // Sources: video_creations (renders) + media_assets (uploads, type=video) + content_items (AI/campaign)
   const { data: videos, isLoading: loadingVideos } = useQuery({
-    queryKey: ['media-library-videos'],
+    queryKey: ['dc-add-media-videos'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
-      
-      const { data } = await supabase
+
+      // 1) Video creations (renders)
+      const { data: creations } = await supabase
         .from('video_creations')
-        .select('id, output_url, title, duration_seconds, thumbnail_url')
+        .select('id, output_url, thumbnail_url, created_at, metadata, customizations')
         .eq('user_id', user.id)
         .eq('status', 'completed')
+        .not('output_url', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(20);
-      
-      return data || [];
+        .limit(50);
+
+      // 2) Manual uploads
+      const { data: uploads } = await supabase
+        .from('media_assets')
+        .select('id, storage_path, type, created_at, metadata')
+        .eq('user_id', user.id)
+        .eq('type', 'video')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // 3) Content items (AI / campaign) — joined via workspace
+      const { data: ws } = await supabase
+        .from('workspace_members')
+        .select('workspace_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      let contentItems: any[] = [];
+      if (ws?.workspace_id) {
+        const { data: items } = await supabase
+          .from('content_items')
+          .select('id, title, thumb_url, duration_sec, created_at, source')
+          .eq('workspace_id', ws.workspace_id)
+          .eq('type', 'video')
+          .order('created_at', { ascending: false })
+          .limit(50);
+        contentItems = items || [];
+      }
+
+      const normCreations = (creations || []).map((v: any) => {
+        const meta = v.metadata || {};
+        const cust = v.customizations || {};
+        return {
+          id: `vc-${v.id}`,
+          url: v.output_url as string,
+          thumbnail_url: v.thumbnail_url as string | null,
+          title: meta.title || meta.name || cust.title || (meta.prompt ? String(meta.prompt).slice(0, 50) : 'Video'),
+          duration_seconds: Number(meta.duration_seconds || meta.duration || cust.duration || 10),
+          created_at: v.created_at,
+        };
+      });
+
+      const normUploads = (uploads || []).map((u: any) => {
+        const { data: { publicUrl } } = supabase.storage.from('media-assets').getPublicUrl(u.storage_path);
+        const meta = (u.metadata || {}) as any;
+        return {
+          id: `ma-${u.id}`,
+          url: publicUrl,
+          thumbnail_url: null,
+          title: meta.original_name || 'Upload',
+          duration_seconds: Number(meta.duration_seconds || 10),
+          created_at: u.created_at,
+        };
+      });
+
+      const normContent = contentItems
+        .filter((c: any) => c.thumb_url)
+        .map((c: any) => ({
+          id: `ci-${c.id}`,
+          url: c.thumb_url as string,
+          thumbnail_url: c.thumb_url as string | null,
+          title: c.title || 'Content',
+          duration_seconds: Number(c.duration_sec || 10),
+          created_at: c.created_at,
+        }));
+
+      return [...normCreations, ...normUploads, ...normContent]
+        .sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     },
     enabled: open,
   });
 
-  // Fetch images from user uploads bucket (since media_library might not exist)
+  // Fetch images from media_assets (manual uploads, type=image)
   const { data: images, isLoading: loadingImages } = useQuery({
-    queryKey: ['user-uploaded-images'],
+    queryKey: ['dc-add-media-images'],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
-      
-      // List files from user's folder in images bucket
-      const { data: files } = await supabase.storage
-        .from('images')
-        .list(user.id, { limit: 20 });
-      
-      if (!files) return [];
-      
-      return files.filter(f => !f.id.endsWith('/')).map(file => {
-        const { data: { publicUrl } } = supabase.storage
-          .from('images')
-          .getPublicUrl(`${user.id}/${file.name}`);
+
+      const { data } = await supabase
+        .from('media_assets')
+        .select('id, storage_path, created_at, metadata')
+        .eq('user_id', user.id)
+        .eq('type', 'image')
+        .order('created_at', { ascending: false })
+        .limit(60);
+
+      return (data || []).map((row: any) => {
+        const { data: { publicUrl } } = supabase.storage.from('media-assets').getPublicUrl(row.storage_path);
+        const meta = (row.metadata || {}) as any;
         return {
-          id: file.id,
+          id: row.id,
           url: publicUrl,
-          name: file.name,
+          name: meta.original_name || 'Bild',
           thumbnail_url: publicUrl,
         };
       });
@@ -100,7 +170,7 @@ export function AddMediaDialog({
   const handleSelectVideo = useCallback((video: any) => {
     setSelectedMedia({
       type: 'video',
-      url: video.output_url,
+      url: video.url,
       duration: video.duration_seconds || 10,
       name: video.title || 'Video',
       thumbnail: video.thumbnail_url,
@@ -208,7 +278,7 @@ export function AddMediaDialog({
                       onClick={() => handleSelectVideo(video)}
                       className={cn(
                         "relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all",
-                        selectedMedia?.url === video.output_url
+                        selectedMedia?.url === video.url
                           ? "border-primary ring-2 ring-primary/30"
                           : "border-transparent hover:border-primary/50"
                       )}
@@ -229,7 +299,7 @@ export function AddMediaDialog({
                         <p className="text-[10px] text-white truncate">{video.title || 'Video'}</p>
                         <p className="text-[9px] text-white/70">{video.duration_seconds?.toFixed(1)}s</p>
                       </div>
-                      {selectedMedia?.url === video.output_url && (
+                      {selectedMedia?.url === video.url && (
                         <div className="absolute top-1 right-1 bg-primary rounded-full p-0.5">
                           <Check className="h-3 w-3 text-primary-foreground" />
                         </div>
