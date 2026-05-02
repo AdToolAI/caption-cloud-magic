@@ -435,10 +435,12 @@ export function DirectorsCut() {
             }
           }
           let acc = 0;
+          let probeFailed = false;
           const boundaries: DetectedBoundary[] = [];
           for (let i = 0; i < durations.length - 1; i++) {
+            if (durations[i] <= 0) { probeFailed = true; break; }
             acc += durations[i];
-            if (acc > 0 && acc < canonicalDuration - 0.1) {
+            if (acc > 0.05 && acc < canonicalDuration - 0.05) {
               boundaries.push({
                 time: Math.round(acc * 100) / 100,
                 score: 0.95,
@@ -446,6 +448,21 @@ export function DirectorsCut() {
                 signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
               });
             }
+          }
+          if (probeFailed && sceneUrls.length > 1) {
+            // Fall back to evenly-spaced boundaries derived from clip count
+            // so we still surface multi-scene structure when probing is blocked.
+            boundaries.length = 0;
+            const segLen = canonicalDuration / sceneUrls.length;
+            for (let i = 1; i < sceneUrls.length; i++) {
+              boundaries.push({
+                time: Math.round(i * segLen * 100) / 100,
+                score: 0.7,
+                type: 'hard_cut',
+                signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
+              });
+            }
+            console.warn('[DirectorsCut] Probe failed — using evenly-spaced boundaries from', sceneUrls.length, 'scene clips');
           }
           detectedBoundaries = boundaries;
           pysceneSucceeded = true;
@@ -546,6 +563,7 @@ export function DirectorsCut() {
           frames: framesForAI.length > 0 ? framesForAI : undefined,
           scene_boundaries: sceneBoundaries,
           client_extraction_failed: clientExtractionFailed,
+          boundary_source: pysceneSucceeded ? 'pyscenedetect' : 'auto',
         },
       });
 
@@ -560,8 +578,9 @@ export function DirectorsCut() {
 
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
-      
-      const MIN_SCENE_DURATION = 3.0;
+
+      // Trusted external detection (PySceneDetect) → keep short shots intact.
+      const MIN_SCENE_DURATION = pysceneSucceeded ? 0.5 : 3.0;
       const stableScenes: any[] = [];
       for (const scene of sortedScenes) {
         const dur = (scene.end_time || 0) - (scene.start_time || 0);

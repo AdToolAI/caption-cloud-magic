@@ -35,7 +35,7 @@ serve(async (req) => {
   }
 
   try {
-    const { video_url, duration, frames, scene_boundaries, detected_cuts, client_extraction_failed } = await req.json();
+    const { video_url, duration, frames, scene_boundaries, detected_cuts, client_extraction_failed, boundary_source } = await req.json();
 
     if (!video_url) {
       return new Response(
@@ -113,9 +113,17 @@ serve(async (req) => {
     // Build deterministic scenes
     const allBoundaries = hasClientBoundaries ? boundaries : serverBoundaries;
     const allLegacyCuts = hasClientBoundaries ? legacyCuts : [];
-    const deterministicScenes = buildDeterministicScenes(allBoundaries, allLegacyCuts, videoDuration);
-    
-    console.log(`[analyze-video-scenes] Scenes: ${deterministicScenes.length} → ${deterministicScenes.map(s => `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`).join(', ')} (mode: ${analysisMode})`);
+    // Trusted external detectors (e.g. PySceneDetect) get a much lower min-scene
+    // length so genuine short shots near start/end are not silently merged.
+    const trustedSource = boundary_source === 'pyscenedetect' || boundary_source === 'trusted';
+    const minSceneDuration = trustedSource ? 0.5 : 3.0;
+    const buildResult = buildDeterministicScenes(allBoundaries, allLegacyCuts, videoDuration, minSceneDuration);
+    const deterministicScenes = buildResult.scenes;
+
+    console.log(`[analyze-video-scenes] Scenes: ${deterministicScenes.length} → ${deterministicScenes.map(s => `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`).join(', ')} (mode: ${analysisMode}, source: ${boundary_source || 'auto'}, minDur: ${minSceneDuration}s)`);
+    if (buildResult.dropped.length > 0) {
+      console.log(`[analyze-video-scenes] Dropped boundaries: ${buildResult.dropped.map(d => `${d.time.toFixed(2)}s(${d.reason})`).join(', ')}`);
+    }
 
     // Ask AI to DESCRIBE each scene
     const hasFrames = frames && frames.length > 0;
@@ -226,7 +234,10 @@ REGELN:
         source: analysisMode,
         boundaries_used: allBoundaries.length,
         analysis_mode: analysisMode,
+        boundary_source: boundary_source || 'auto',
+        min_scene_duration: minSceneDuration,
         debug_boundary_times: allBoundaries.map(b => b.time),
+        debug_dropped_boundaries: buildResult.dropped,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -381,37 +392,52 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
   return deduped;
 }
 
-// Build scenes from deterministic boundaries — AI CANNOT change these
+// Build scenes from deterministic boundaries — AI CANNOT change these.
+// Returns both the scenes and any boundaries that were dropped for diagnostics.
 function buildDeterministicScenes(
   boundaries: SceneBoundary[],
   legacyCuts: number[],
-  duration: number
-): { start_time: number; end_time: number }[] {
+  duration: number,
+  minSceneDuration = 3.0
+): { scenes: { start_time: number; end_time: number }[]; dropped: { time: number; reason: string }[] } {
   const cutTimes = boundaries.length > 0
     ? boundaries.map(b => b.time)
     : legacyCuts.length > 0
       ? legacyCuts
       : [];
 
+  const dropped: { time: number; reason: string }[] = [];
+
   if (cutTimes.length === 0) {
-    return [{ start_time: 0, end_time: duration }];
+    return { scenes: [{ start_time: 0, end_time: duration }], dropped };
   }
 
   const sorted = [...cutTimes].sort((a, b) => a - b);
-  const MIN_SCENE_DURATION = 3.0;
   const scenes: { start_time: number; end_time: number }[] = [];
   let lastStart = 0;
 
   for (const t of sorted) {
-    // Only accept boundary if it creates a scene >= 3s AND leaves >= 3s for the next scene
-    if (t > lastStart + MIN_SCENE_DURATION && t < duration - MIN_SCENE_DURATION) {
-      scenes.push({ start_time: lastStart, end_time: t });
-      lastStart = t;
+    if (t <= lastStart + minSceneDuration) {
+      dropped.push({ time: t, reason: `too_close_to_prev(<${minSceneDuration}s)` });
+      continue;
     }
+    if (t >= duration - minSceneDuration) {
+      // Tail too short — still keep the cut for trusted (low minDur) sources,
+      // but for a 3s safeguard drop it as before.
+      if (minSceneDuration <= 1.0) {
+        scenes.push({ start_time: lastStart, end_time: t });
+        lastStart = t;
+      } else {
+        dropped.push({ time: t, reason: `too_close_to_end(<${minSceneDuration}s)` });
+      }
+      continue;
+    }
+    scenes.push({ start_time: lastStart, end_time: t });
+    lastStart = t;
   }
   scenes.push({ start_time: lastStart, end_time: duration });
 
-  return scenes;
+  return { scenes, dropped };
 }
 
 function parseAIResponse(content: string): any[] | null {
