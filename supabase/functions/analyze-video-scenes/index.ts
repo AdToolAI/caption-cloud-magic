@@ -61,40 +61,53 @@ serve(async (req) => {
     let analysisMode = 'client_deterministic';
     let serverBoundaries: SceneBoundary[] = [];
     let detectionError: string | null = null;
+    const hasFramesInput = Array.isArray(frames) && frames.length >= 2;
 
     // PATH A: Client provided boundaries → use them
-    // PATH B: No boundaries → server-side scene detection by downloading video and sending to Gemini as video
+    // PATH B: Frames available (e.g. video too large for inline) → AI boundary detection from timestamped frames
+    // PATH C: No boundaries, no frames → server-side video analysis (small videos only)
     if (!hasClientBoundaries) {
-      console.log("[analyze-video-scenes] No client boundaries — running server-side video analysis");
-      analysisMode = 'server_video_analysis';
-      
-      try {
-        serverBoundaries = await detectScenesFromVideo(video_url, videoDuration, LOVABLE_API_KEY);
-        console.log(`[analyze-video-scenes] Server detected ${serverBoundaries.length} boundaries: ${serverBoundaries.map(b => `${b.time.toFixed(1)}s(${b.type})`).join(', ')}`);
-        
-        if (serverBoundaries.length === 0) {
-          analysisMode = 'server_no_cuts_found';
+      if (hasFramesInput) {
+        console.log(`[analyze-video-scenes] No client boundaries — running frame-based AI boundary detection on ${frames.length} frames`);
+        analysisMode = 'server_frame_analysis';
+        try {
+          serverBoundaries = await detectScenesFromFrames(frames, videoDuration, LOVABLE_API_KEY);
+          if (serverBoundaries.length === 0) analysisMode = 'server_frame_no_cuts_found';
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error("[analyze-video-scenes] Frame-based detection failed:", errMsg);
+          detectionError = errMsg;
+          analysisMode = 'server_error';
         }
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("[analyze-video-scenes] Server-side detection failed:", errMsg);
-        detectionError = errMsg;
-        analysisMode = 'server_error';
-        // DO NOT silently fall back to 1 scene — return error to client
+      } else {
+        console.log("[analyze-video-scenes] No client boundaries, no frames — running server-side video analysis");
+        analysisMode = 'server_video_analysis';
+        try {
+          serverBoundaries = await detectScenesFromVideo(video_url, videoDuration, LOVABLE_API_KEY);
+          console.log(`[analyze-video-scenes] Server detected ${serverBoundaries.length} boundaries: ${serverBoundaries.map(b => `${b.time.toFixed(1)}s(${b.type})`).join(', ')}`);
+          if (serverBoundaries.length === 0) analysisMode = 'server_no_cuts_found';
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error("[analyze-video-scenes] Server-side detection failed:", errMsg);
+          detectionError = errMsg;
+          analysisMode = 'server_error';
+        }
       }
     }
 
-    // If server analysis failed, fall back to deterministic uniform splits
-    // (~every 5s) instead of erroring out — better than zero scenes.
+    // No silent uniform 5s fallback anymore — return an honest error so the
+    // UI can display the cause and offer a manual split option.
     if (analysisMode === 'server_error') {
-      console.warn(`[analyze-video-scenes] Falling back to uniform splits (5s) — server detection failed: ${detectionError}`);
-      const step = 5;
-      const fallback: SceneBoundary[] = [];
-      for (let t = step; t < videoDuration - 1; t += step) {
-        fallback.push({ time: t, type: 'hard_cut', score: 0.5 });
-      }
-      serverBoundaries = fallback;
-      analysisMode = 'server_uniform_fallback';
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'scene_detection_failed',
+          detail: detectionError || 'Unknown error',
+          analysis_mode: 'server_error',
+          can_manual_split: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Build deterministic scenes
@@ -249,9 +262,9 @@ async function detectScenesFromVideo(
   const videoSizeMB = videoBytes.byteLength / (1024 * 1024);
   console.log(`[detectScenesFromVideo] Downloaded ${videoSizeMB.toFixed(1)}MB`);
   
-  // Gemini supports up to ~20MB inline video; check size
-  if (videoSizeMB > 20) {
-    throw new Error(`Video too large for inline analysis: ${videoSizeMB.toFixed(1)}MB (max 20MB)`);
+  // Raised inline limit — above this we rely on the frame-based path instead.
+  if (videoSizeMB > 40) {
+    throw new Error(`Video too large for inline analysis: ${videoSizeMB.toFixed(1)}MB (max 40MB) — client should provide frames`);
   }
   
   // Step 2: Base64 encode
@@ -438,4 +451,114 @@ function generateDefaultEffectsForMood(mood: string) {
     ]
   };
   return moodEffects[mood] || moodEffects.neutral;
+}
+
+/**
+ * Frame-based scene boundary detection. Sends a sequence of timestamped
+ * thumbnails to Gemini and asks it to identify which timestamps mark a real
+ * shot change. This works for arbitrarily large source videos because we
+ * never upload the whole video — only ~30-80 small JPEG thumbs.
+ */
+async function detectScenesFromFrames(
+  frames: Array<{ time: number; image: string }>,
+  duration: number,
+  apiKey: string
+): Promise<SceneBoundary[]> {
+  // Cap to ~60 frames evenly spaced to keep token usage sane.
+  const MAX = 60;
+  let sample = frames;
+  if (frames.length > MAX) {
+    const step = frames.length / MAX;
+    sample = [];
+    for (let i = 0; i < MAX; i++) sample.push(frames[Math.floor(i * step)]);
+  }
+
+  const indexList = sample
+    .map((f, i) => `${i}: t=${f.time.toFixed(2)}s`)
+    .join('\n');
+
+  const systemPrompt = `Du bist ein präziser Shot-Boundary-Detektor (wie PySceneDetect / CapCut Auto-Cut).
+Du bekommst nummerierte Frames eines ${duration.toFixed(1)}s langen Videos mit ihren Zeitstempeln.
+
+AUFGABE: Identifiziere die Indizes, an denen ein ECHTER Szenenwechsel zwischen Frame i-1 und Frame i stattfindet.
+
+Ein Szenenwechsel ist:
+- Harter Schnitt (komplett anderes Bild, anderer Ort/Person/Einstellung)
+- Weicher Übergang (Fade/Dissolve zu anderer Szene)
+
+KEIN Szenenwechsel ist:
+- Kamerabewegung in derselben Szene
+- Zoom/Pan in derselben Szene
+- Lichtwechsel/Helligkeit
+- Person bewegt sich, Hintergrund bleibt
+- Sprecher-Talking-Head ohne Cut
+
+Frame-Index → Zeitstempel:
+${indexList}
+
+Antworte NUR mit JSON-Array:
+[
+  { "index": 7, "time": ${sample[Math.min(7, sample.length-1)].time.toFixed(2)}, "type": "hard_cut", "confidence": 0.92 }
+]
+Wenn keine Cuts → leeres Array []. Kein weiterer Text.`;
+
+  const userContent: any[] = [{ type: "text", text: "Finde die echten Szenenwechsel." }];
+  for (const f of sample) {
+    userContent.push({ type: "image_url", image_url: { url: f.image, detail: "low" } });
+  }
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0.1,
+      max_tokens: 1024,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Gemini frame analysis failed: ${response.status} - ${errText.substring(0, 200)}`);
+  }
+
+  const ai = await response.json();
+  const content = ai.choices?.[0]?.message?.content || "";
+  console.log(`[detectScenesFromFrames] Raw AI response: ${content.substring(0, 400)}`);
+  const parsed = parseAIResponse(content);
+  if (!parsed || !Array.isArray(parsed)) return [];
+
+  const MIN_EDGE_DISTANCE = 1.5;
+  const MIN_SPACING = 2.0;
+  const boundaries: SceneBoundary[] = [];
+  for (const item of parsed) {
+    let time = typeof item.time === 'number' ? item.time : parseFloat(item.time);
+    if (isNaN(time) && typeof item.index === 'number' && sample[item.index]) {
+      time = sample[item.index].time;
+    }
+    const confidence = typeof item.confidence === 'number' ? item.confidence : 0.6;
+    if (isNaN(time) || time < MIN_EDGE_DISTANCE || time > duration - MIN_EDGE_DISTANCE) continue;
+    if (confidence < 0.5) continue;
+    boundaries.push({
+      time,
+      type: item.type === 'soft_transition' ? 'soft_transition' : 'hard_cut',
+      score: confidence,
+    });
+  }
+
+  boundaries.sort((a, b) => a.time - b.time);
+  const deduped: SceneBoundary[] = [];
+  for (const b of boundaries) {
+    if (deduped.length === 0 || b.time - deduped[deduped.length - 1].time > MIN_SPACING) {
+      deduped.push(b);
+    } else if (b.score > deduped[deduped.length - 1].score) {
+      deduped[deduped.length - 1] = b;
+    }
+  }
+  console.log(`[detectScenesFromFrames] Final boundaries: ${deduped.map(b => `${b.time.toFixed(2)}s(${b.type},${b.score.toFixed(2)})`).join(', ')}`);
+  return deduped;
 }
