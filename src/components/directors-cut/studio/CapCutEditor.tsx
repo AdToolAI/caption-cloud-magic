@@ -968,17 +968,27 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
     const newStartTime = lastScene ? lastScene.end_time : 0;
+    // If the new scene falls within the original video, default to a
+    // pass-through "original" source so the user keeps seeing their footage
+    // and can layer filters/transitions on top. Only beyond videoDuration do
+    // we actually need a true blackscreen placeholder.
+    const insideOriginal = newStartTime < videoDuration;
+    const sourceMode: 'original' | 'blackscreen' = insideOriginal ? 'original' : 'blackscreen';
+    const sceneEnd = insideOriginal
+      ? Math.min(newStartTime + 5, videoDuration)
+      : newStartTime + 5;
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
-      end_time: newStartTime + 5, // 5 seconds blackscreen
-      description: t('dc.newSceneBlackscreen'),
+      end_time: sceneEnd,
+      description: insideOriginal ? t('dc.newSceneOriginal') : t('dc.newSceneBlackscreen'),
       content_description: t('dc.emptySceneDesc'),
       suggested_effects: [],
-      isBlackscreen: true,
+      isBlackscreen: !insideOriginal,
+      sourceMode,
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, videoDuration, t]);
 
   // Add video as new scene handler
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
@@ -994,6 +1004,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       content_description: t('dc.videoFromUpload'),
       suggested_effects: [],
       isBlackscreen: false,
+      sourceMode: 'media',
       additionalMedia: {
         type: 'video',
         url: videoUrl,
