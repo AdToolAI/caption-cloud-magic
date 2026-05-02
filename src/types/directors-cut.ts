@@ -36,7 +36,15 @@ export interface SceneAnalysis {
   playbackRate?: number; // 1.0 = normal, <1 = slow-mo, >1 = fast
   // Additional media fields for extended scenes
   isFromOriginalVideo?: boolean; // false = neu hinzugefügt
-  isBlackscreen?: boolean; // true = leere Szene ohne Video/Bild
+  isBlackscreen?: boolean; // true = leere Szene ohne Video/Bild (legacy, prefer sourceMode)
+  /**
+   * Source for this scene's visual:
+   * - 'original' = passes the original video through (default for scenes inside videoDuration)
+   * - 'blackscreen' = renders solid black (placeholder)
+   * - 'media' = renders additionalMedia (uploaded video/image)
+   * If undefined, the player infers the mode for backwards compatibility.
+   */
+  sourceMode?: 'original' | 'blackscreen' | 'media';
   additionalMedia?: {
     type: 'video' | 'image';
     url: string;
