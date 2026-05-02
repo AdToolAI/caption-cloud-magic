@@ -67,10 +67,24 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   const lastSceneIdRef = useRef<string | null>(null);
   const audioConnectedRef = useRef<boolean>(false);
 
-  // Web Audio API effects
+  // Are any audio effects actually active? If not, we DO NOT route the
+  // <video> element through Web Audio — the browser plays it natively,
+  // which avoids autoplay-policy silence and CORS issues.
+  const effectsActive = useMemo(() => {
+    return (
+      audioEffects.bass !== 0 ||
+      audioEffects.mid !== 0 ||
+      audioEffects.treble !== 0 ||
+      audioEffects.reverb > 0 ||
+      audioEffects.echo > 0 ||
+      audioEffects.pitch !== 0
+    );
+  }, [audioEffects]);
+
+  // Web Audio API effects — only enabled when at least one slider is active
   const { connectToMediaElement, resumeContext } = useWebAudioEffects({
     audioEffects,
-    enabled: !autoMuteVideo && !isMuted,
+    enabled: effectsActive && !autoMuteVideo && !isMuted,
   });
 
   // Find current scene based on currentTime
