@@ -554,7 +554,14 @@ export function DirectorsCut() {
         confidence: Math.min(1, Math.max(0, b.score ?? 0.7)),
         source: 'auto' as const,
       })));
-      toast.success(t('dc.scenesDetected', { count: normalizedScenes.length }));
+      const mode = data.analysis_mode || data.source || 'unknown';
+      const modeLabel =
+        mode === 'client_deterministic' ? 'Client-Pixel-Analyse' :
+        mode === 'server_frame_analysis' ? 'AI Frame-Analyse' :
+        mode === 'server_video_analysis' ? 'AI Video-Analyse' :
+        mode === 'server_no_cuts_found' || mode === 'server_frame_no_cuts_found' ? 'Keine Cuts erkannt' :
+        mode;
+      toast.success(`${t('dc.scenesDetected', { count: normalizedScenes.length })} · ${modeLabel}`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error(t('dc.sceneAnalysisError'));
