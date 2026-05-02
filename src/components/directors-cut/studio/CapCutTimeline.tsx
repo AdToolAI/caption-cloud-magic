@@ -654,6 +654,29 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
       <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <span className="text-xs text-[#F5C76A]/60 font-medium">Timeline</span>
+          <button
+            onClick={() => onSnapEnabledChange?.(!snapEnabled)}
+            title={snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
+            className={cn(
+              "ml-2 h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium transition-colors border",
+              snapEnabled
+                ? "bg-[#F5C76A]/15 text-[#F5C76A] border-[#F5C76A]/40"
+                : "bg-white/5 text-white/40 border-white/10 hover:text-white/70"
+            )}
+          >
+            <Magnet className="h-3 w-3" />
+            {snapEnabled ? t('dc.snapOn') : t('dc.snapOff')}
+          </button>
+          {onAddCutMarker && (
+            <button
+              onClick={onAddCutMarker}
+              title={t('dc.addCutMarker')}
+              className="h-7 px-2 rounded flex items-center gap-1 text-[10px] font-medium bg-white/5 text-white/60 hover:text-white hover:bg-white/10 border border-white/10 transition-colors"
+            >
+              <Scissors className="h-3 w-3" />
+              {t('dc.addCutMarker')}
+            </button>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
