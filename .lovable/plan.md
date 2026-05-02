@@ -1,65 +1,75 @@
-# Plan: Originalvideo-Szenen korrekt erkennen statt Blackscreen
+Ich habe den Fehler jetzt konkreter eingegrenzt.
 
-## Problem
+Das eigentliche Problem ist nicht nur der einzelne Blackscreen, sondern dass im Editor aktuell die **Timeline-Länge** teilweise als **Originalvideo-Länge** verwendet wird. Sobald du die erste leere Szene 0:00–0:05 anlegst, kann die App intern denken: „Das Originalvideo endet bei 5 Sekunden“. Die nächste leere Szene ab 0:05 wird dann fälschlich als Bereich **außerhalb des Originalvideos** behandelt und deshalb als Blackscreen angelegt.
 
-Im Screenshot ist Szene 1 als **"Neue Szene (Blackscreen)"** markiert und liegt über 0:00–0:25.77. Dadurch wird das Originalvideo durch eine schwarze Fläche ersetzt, statt durchgereicht zu werden. Die angehängte 5s-Szene am Ende läuft technisch zwar, aber der gesamte Anfang ist schwarz.
+Zusätzlich ist die Auto-Cut-Logik aktuell zu hart: Die clientseitig erkannten Schnittpunkte werden als „fest“ betrachtet und die KI darf sie kaum korrigieren. Wenn die Erkennung knapp danebenliegt, entstehen miserable Szenengrenzen.
 
-Ursache: Der Auto-Cut bzw. das manuelle Anlegen einer Szene erzeugt aktuell `isBlackscreen: true` ohne `additionalMedia`. Der Player interpretiert das korrekt als „schwarzes Overlay", was hier aber unerwünscht ist.
+Do I know what the issue is? Ja: Es braucht eine saubere Trennung zwischen **Originalvideo-Dauer**, **Timeline-Dauer** und **Szenen-Quellmodus** sowie eine fehlertolerantere, editierbare Auto-Cut-Pipeline.
 
-## Ziele
+## Plan
 
-1. **Sofort-Fix:** Über den Original-Video-Bereich liegende Szenen dürfen das Originalvideo nicht versehentlich verdecken.
-2. **Komfort-Feature:** Per Klick automatisch Szenen aus dem Originalvideo anlegen (mit KI-Szenenwechsel-Erkennung), danach manuell trimmbar.
+### 1. Originalvideo-Dauer und Timeline-Dauer trennen
+- In `DirectorsCut.tsx` die Timeline-Dauer wieder korrekt berechnen als:
+  - `max(originalVideoDuration, letzte Szene / angehängte Medien)`
+- `CapCutEditor` soll als `videoDuration` wieder die echte Originalvideo-Dauer bekommen, nicht die aktuelle Timeline-Länge.
+- Falls die Dauer beim Import fehlt oder falsch ist, wird sie nachträglich per Video-Metadaten gemessen und in `selectedVideo.duration` gespeichert.
 
-## Umsetzung
+Ergebnis: Wenn dein Original 25 Sekunden lang ist, bleiben alle leeren Szenen von 0:00–0:25 automatisch „Original“, nicht Blackscreen.
 
-### 1. Neuer Szenentyp: „Original-Passthrough"
+### 2. Bestehende falsche Blackscreen-Szenen automatisch migrieren
+- Beim Laden/Rendern des Studios alle Szenen ohne eigenes Medium prüfen.
+- Wenn eine Szene innerhalb der Originalvideo-Dauer liegt, wird sie automatisch auf:
+  - `sourceMode: 'original'`
+  - `isBlackscreen: false`
+  gesetzt.
+- Nur Szenen nach dem Originalvideo-Ende bleiben echte Blackscreen-Platzhalter.
 
-In `src/types/directors-cut.ts` (oder wo `SceneAnalysis` lebt) ein optionales Flag ergänzen:
-```ts
-sourceMode?: 'original' | 'blackscreen' | 'media';
-```
-- `original` = zeigt das darunterliegende Originalvideo, erlaubt aber Filter/Übergänge/Subtitles obendrauf.
-- `blackscreen` = wie bisher (schwarz).
-- `media` = wie bisher (`additionalMedia`).
+Ergebnis: Auch bereits falsch erzeugte zweite/dritte Szenen werden repariert, ohne dass du sie manuell neu erstellen musst.
 
-### 2. Player-Anpassung (`CapCutPreviewPlayer.tsx`)
+### 3. Manuelle Szenen sauber als Original-Pass-Through anlegen
+- „Leere Szene“ innerhalb des Originalvideos wird immer eine Original-Szene.
+- „Leere Szene“ nach dem Originalvideo wird nur dann Blackscreen.
+- Die Timeline-Labels werden angepasst, damit nicht mehr irreführend „Blackscreen“ angezeigt wird, wenn eigentlich Originalvideo durchgereicht wird.
 
-Logik in der Render-Branch ändern:
-- `sourceMode === 'original'` (oder unset bei Szenen, deren Bereich innerhalb `videoDuration` liegt und kein `additionalMedia` haben) → Originalvideo durchreichen, Filter/Effekte anwenden.
-- `sourceMode === 'blackscreen'` → schwarz (nur wenn explizit gewünscht).
-- `additionalMedia` vorhanden → Replacement (wie heute).
+### 4. Source-Time-Mapping bei Split/Trim stabilisieren
+- Beim Teilen einer Original-Szene am Playhead wird die zweite Szene korrekt auf die passende Originalvideo-Zeit gemappt.
+- Beim Trimmen werden `original_start_time` / `original_end_time` konsistent mitgeführt.
+- Dadurch springt die Vorschau beim Abspielen nicht plötzlich auf falsche Quellstellen.
 
-### 3. Editor-Anpassungen (`CapCutEditor.tsx`)
+### 5. Auto-Cut-Erkennung verbessern, aber weiterhin editierbar lassen
+- Die KI-/Analysefunktion soll künftig nicht mehr blind schlechte Kandidaten übernehmen.
+- Workflow:
+  1. Client erkennt grobe Kandidaten aus Frames.
+  2. Backend-KI bekommt Video/Frames plus Kandidaten und darf die Schnittpunkte korrigieren.
+  3. Grenzen werden geglättet: Mindestdauer, keine Mikro-Szenen, keine unnötigen Schnitte bei Kamerabewegung/Lichtwechsel.
+  4. Alle erzeugten Szenen bekommen `sourceMode: 'original'`.
+- Wenn die Analyse unsicher ist, lieber weniger, größere Szenen erzeugen statt viele falsch gesetzte Cuts.
 
-- **`handleSceneAdd` („Leere Szene")**: Default ändern. Wenn der Einfügepunkt innerhalb `videoDuration` liegt → `sourceMode: 'original'`. Wenn dahinter → `sourceMode: 'blackscreen'` (wie heute, sinnvoll als Platzhalter).
-- **Sidebar**: Dropdown am Szenen-Eintrag „Quelle: Original / Schwarz / Mediathek" zum nachträglichen Wechseln.
-- **Bestehende Szenen migrieren**: Beim Laden alte `isBlackscreen: true`-Szenen, die innerhalb `videoDuration` liegen und kein `additionalMedia` haben, automatisch auf `sourceMode: 'original'` mappen. Damit verschwindet der Blackscreen im aktuellen Projekt sofort.
+Ergebnis: Die automatische Szene ist ein brauchbarer Vorschlag, bleibt aber komplett im Editor verschiebbar/trimbar.
 
-### 4. Neuer Button: „Szenen aus Video erkennen"
+### 6. UI-Verbesserung für Kontrolle
+- Szenenkarten und Timeline zeigen künftig klarer:
+  - Original
+  - Media
+  - Blackscreen
+- Optional im Eigenschaftenbereich: Quellmodus manuell wechseln, damit du eine Szene bei Bedarf explizit auf „Original“ oder „Blackscreen“ setzen kannst.
 
-Im Schnitt-Tab neben „Auto-Cut (KI-Analyse)":
-
-- Nutzt den bestehenden Auto-Cut-Flow (Gemini Scene Detection, bereits im Projekt vorhanden — siehe Memory „Server-Side Scene Analysis").
-- Erzeugte Szenen bekommen automatisch `sourceMode: 'original'` und ihre `start_time`/`end_time` aus der KI-Analyse.
-- User kann danach jede Szene per Drag/Input-Felder (sind im Screenshot bereits vorhanden: Start/End-Eingabe) manuell justieren — wie vom User gewünscht („so dass es passt").
-- Toast nach Erkennung: „N Szenen erkannt — Start/End in der Sidebar feinjustieren."
-
-### 5. UX-Detail
-
-- Szenen-Karte in der Sidebar zeigt einen kleinen Badge: `Original` / `Schwarz` / `Mediathek` mit unterscheidbaren Farben (nicht nur das blaue „Blackscreen" wie heute).
-- Bei `sourceMode: 'original'` greifen bestehende Filter/Color-Grades/Übergänge weiterhin — das war ja der ursprüngliche Use Case (eigene Übergänge über Originalmaterial legen).
+### 7. Export-Parität prüfen
+- Beim Export müssen dieselben Szeneninformationen mitgegeben werden:
+  - `sourceMode`
+  - `isFromOriginalVideo`
+  - `additionalMedia`
+  - `original_start_time` / `original_end_time`
+- Damit das gerenderte Video genauso aussieht wie die Vorschau.
 
 ## Betroffene Dateien
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/studio/CapCutEditor.tsx`
+- `src/components/directors-cut/studio/CapCutTimeline.tsx`
+- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/lib/directors-cut-scene-detection.ts`
+- `supabase/functions/analyze-video-scenes/index.ts`
+- ggf. `src/lib/translations.ts`
 
-- `src/types/directors-cut.ts` — neues Feld `sourceMode`
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — Default-Logik, Migration, neuer Button, Sidebar-Dropdown
-- `src/components/directors-cut/studio/CapCutPreviewPlayer.tsx` — Render-Branch um `sourceMode` erweitern
-- ggf. `src/components/directors-cut/studio/SceneCard.tsx` (oder wo die Szenen-Liste gerendert wird) — Badge + Dropdown
-
-## Ergebnis
-
-- Aktuelles Projekt: Der Blackscreen am Anfang verschwindet automatisch (Migration), das Originalvideo läuft 0:00–0:25.77, danach nahtlos die 5s-Mediathek-Szene.
-- Zukunft: User kann mit einem Klick KI-Szenen aus dem Originalvideo erzeugen und Start/End nachjustieren.
-
-Soll ich diesen Plan so umsetzen?
+Nach Umsetzung sollte dein Beispiel korrekt funktionieren: Originalvideo 25s + angehängte 5s = 30s Timeline, mit Original-Szenen innerhalb 0:00–0:25 statt Blackscreens und mit nachjustierbaren Auto-Cut-Grenzen.
