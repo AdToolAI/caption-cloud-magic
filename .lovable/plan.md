@@ -1,133 +1,65 @@
-## Verstandenes Konzept
+# Plan: Originalvideo-Szenen korrekt erkennen statt Blackscreen
 
-Szenen sind ein **Overlay-Layer** über dem Originalvideo, mit dem man Übergänge, Filter, Trims und optional Ersatz-Clips (`additionalMedia`) bestimmt. Bereiche ohne Szene zeigen das Originalvideo pur. Bereiche jenseits der Originaldauer zeigen nur die hinzugefügte Szene mit `additionalMedia`.
+## Problem
 
-## Root Cause (präzisiert)
+Im Screenshot ist Szene 1 als **"Neue Szene (Blackscreen)"** markiert und liegt über 0:00–0:25.77. Dadurch wird das Originalvideo durch eine schwarze Fläche ersetzt, statt durchgereicht zu werden. Die angehängte 5s-Szene am Ende läuft technisch zwar, aber der gesamte Anfang ist schwarz.
 
-In `CapCutPreviewPlayer.tsx`:
+Ursache: Der Auto-Cut bzw. das manuelle Anlegen einer Szene erzeugt aktuell `isBlackscreen: true` ohne `additionalMedia`. Der Player interpretiert das korrekt als „schwarzes Overlay", was hier aber unerwünscht ist.
 
-- Der rAF-Loop (Zeile 142–172) und der Szenen-Sync-Effekt (Zeile 200–248) machen **alles bedingt von `currentScene`** abhängig (`if (... && currentScene)` / `if (!currentScene) return`).
-- Wenn `currentScene === undefined` (Bereich ohne Szene), passieren drei Dinge **nicht**:
-  1. `onTimeUpdate(...)` wird nie aufgerufen → `currentTime` bleibt eingefroren.
-  2. Kein Erkennen von Szenenende oder Erreichen einer neuen Szene.
-  3. Kein Pause-/Switch-Handling beim Übergang zwischen Originalvideo und additionalMedia.
+## Ziele
 
-Also: Originalvideo läuft browser-nativ bis 0:25, aber `currentTime`-State bleibt bei 0, der Player bemerkt nicht, dass die Szene bei 0:25 startet, und schaltet nie auf das additionalMedia um.
+1. **Sofort-Fix:** Über den Original-Video-Bereich liegende Szenen dürfen das Originalvideo nicht versehentlich verdecken.
+2. **Komfort-Feature:** Per Klick automatisch Szenen aus dem Originalvideo anlegen (mit KI-Szenenwechsel-Erkennung), danach manuell trimmbar.
 
-## Lösung
+## Umsetzung
 
-Der Player wird so erweitert, dass er **auch ohne aktive Szene** korrekt arbeitet — das Originalvideo ist die „Default-Bühne", Szenen sind optionale Overlays.
+### 1. Neuer Szenentyp: „Original-Passthrough"
 
-### 1. rAF-Loop läuft IMMER, solange `isPlaying` (CapCutPreviewPlayer.tsx)
-
-Die Bedingung `if (... && currentScene)` entfernen. Stattdessen:
-
+In `src/types/directors-cut.ts` (oder wo `SceneAnalysis` lebt) ein optionales Flag ergänzen:
 ```ts
-const update = () => {
-  if (!isPlaying) return;
-
-  const currentScene = scenes.find(s => currentTime >= s.start_time && currentTime < s.end_time);
-  const isAdditionalMedia = currentScene?.additionalMedia?.type === 'video';
-
-  // Aktives Element bestimmen
-  const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
-
-  if (activeVideo && !activeVideo.paused) {
-    let newGlobalTime: number;
-
-    if (isAdditionalMedia && currentScene) {
-      newGlobalTime = currentScene.start_time + activeVideo.currentTime;
-    } else {
-      // Originalvideo läuft (mit oder ohne aktive Szene-Effekte)
-      // currentTime = activeVideo.currentTime (1:1, weil kein Trim)
-      newGlobalTime = activeVideo.currentTime;
-    }
-
-    // Ende der Gesamtdauer prüfen
-    if (newGlobalTime >= duration) {
-      onPlayingChange?.(false);
-      onTimeUpdate(duration);
-    } else {
-      onTimeUpdate(newGlobalTime);
-
-      // Übergang in eine Szene mit additionalMedia → main video pausieren, additional starten
-      const nextScene = scenes.find(s => newGlobalTime >= s.start_time && newGlobalTime < s.end_time);
-      if (nextScene?.additionalMedia && !isAdditionalMedia) {
-        // Szenenwechsel-Effekt übernimmt das Switching
-      }
-
-      // Originalvideo zu Ende, aber Timeline läuft weiter (additionalMedia bei 25–30)
-      if (!isAdditionalMedia && activeVideo.ended && newGlobalTime < duration) {
-        // Force advance
-        onTimeUpdate(Math.max(newGlobalTime, mainVideoRef.current?.duration ?? 0));
-      }
-    }
-  }
-
-  animationRef.current = requestAnimationFrame(update);
-};
+sourceMode?: 'original' | 'blackscreen' | 'media';
 ```
+- `original` = zeigt das darunterliegende Originalvideo, erlaubt aber Filter/Übergänge/Subtitles obendrauf.
+- `blackscreen` = wie bisher (schwarz).
+- `media` = wie bisher (`additionalMedia`).
 
-### 2. Szenen-Sync-Effekt erweitern (CapCutPreviewPlayer.tsx, Zeile 200–248)
+### 2. Player-Anpassung (`CapCutPreviewPlayer.tsx`)
 
-Den frühen Return `if (!currentScene) return;` entfernen. Stattdessen:
+Logik in der Render-Branch ändern:
+- `sourceMode === 'original'` (oder unset bei Szenen, deren Bereich innerhalb `videoDuration` liegt und kein `additionalMedia` haben) → Originalvideo durchreichen, Filter/Effekte anwenden.
+- `sourceMode === 'blackscreen'` → schwarz (nur wenn explizit gewünscht).
+- `additionalMedia` vorhanden → Replacement (wie heute).
 
-- **Wenn aktive Szene mit `additionalMedia`**: bisheriges Verhalten (additionalVideo abspielen, mainVideo pausieren).
-- **Wenn aktive Szene ohne `additionalMedia` ODER keine Szene**: mainVideo abspielen, additionalVideo pausieren.
-- Sicherstellen, dass `mainVideoRef.currentTime` der globalen `currentTime` folgt (1:1, da das Originalvideo nicht getrimmt wird).
-- Wenn `currentTime > videoDuration` und keine additionalMedia-Szene aktiv → `onPlayingChange(false)`.
+### 3. Editor-Anpassungen (`CapCutEditor.tsx`)
 
-### 3. Beim Erreichen des Originalvideo-Endes nicht stoppen
+- **`handleSceneAdd` („Leere Szene")**: Default ändern. Wenn der Einfügepunkt innerhalb `videoDuration` liegt → `sourceMode: 'original'`. Wenn dahinter → `sourceMode: 'blackscreen'` (wie heute, sinnvoll als Platzhalter).
+- **Sidebar**: Dropdown am Szenen-Eintrag „Quelle: Original / Schwarz / Mediathek" zum nachträglichen Wechseln.
+- **Bestehende Szenen migrieren**: Beim Laden alte `isBlackscreen: true`-Szenen, die innerhalb `videoDuration` liegen und kein `additionalMedia` haben, automatisch auf `sourceMode: 'original'` mappen. Damit verschwindet der Blackscreen im aktuellen Projekt sofort.
 
-Auf das `<video>`-Element einen `onEnded`-Handler:
-```tsx
-<video ref={mainVideoRef} ... onEnded={() => {
-  // Wenn Timeline länger als Originalvideo → weiterlaufen lassen
-  if (currentTime < duration) {
-    // rAF-Loop sieht das und springt in die nächste Szene
-  } else {
-    onPlayingChange?.(false);
-  }
-}} />
-```
+### 4. Neuer Button: „Szenen aus Video erkennen"
 
-Da der rAF-Loop jetzt immer läuft, wird er den Übergang automatisch erkennen.
+Im Schnitt-Tab neben „Auto-Cut (KI-Analyse)":
 
-### 4. `handleAddVideoAsScene` defensiv (CapCutEditor.tsx)
+- Nutzt den bestehenden Auto-Cut-Flow (Gemini Scene Detection, bereits im Projekt vorhanden — siehe Memory „Server-Side Scene Analysis").
+- Erzeugte Szenen bekommen automatisch `sourceMode: 'original'` und ihre `start_time`/`end_time` aus der KI-Analyse.
+- User kann danach jede Szene per Drag/Input-Felder (sind im Screenshot bereits vorhanden: Start/End-Eingabe) manuell justieren — wie vom User gewünscht („so dass es passt").
+- Toast nach Erkennung: „N Szenen erkannt — Start/End in der Sidebar feinjustieren."
 
-`newStartTime = Math.max(lastScene?.end_time ?? 0, videoDuration)` — sorgt dafür, dass die erste hinzugefügte Szene nahtlos hinter dem Originalvideo liegt.
+### 5. UX-Detail
 
-### 5. `duration`-Prop = max(videoDuration, letzte Szene)
+- Szenen-Karte in der Sidebar zeigt einen kleinen Badge: `Original` / `Schwarz` / `Mediathek` mit unterscheidbaren Farben (nicht nur das blaue „Blackscreen" wie heute).
+- Bei `sourceMode: 'original'` greifen bestehende Filter/Color-Grades/Übergänge weiterhin — das war ja der ursprüngliche Use Case (eigene Übergänge über Originalmaterial legen).
 
-In `CapCutEditor.tsx`:
-```ts
-const totalDuration = useMemo(
-  () => Math.max(videoDuration, scenes[scenes.length - 1]?.end_time ?? 0),
-  [videoDuration, scenes]
-);
-```
-und an Player als `duration={totalDuration}` weitergeben.
+## Betroffene Dateien
 
-## Geänderte Dateien
+- `src/types/directors-cut.ts` — neues Feld `sourceMode`
+- `src/components/directors-cut/studio/CapCutEditor.tsx` — Default-Logik, Migration, neuer Button, Sidebar-Dropdown
+- `src/components/directors-cut/studio/CapCutPreviewPlayer.tsx` — Render-Branch um `sourceMode` erweitern
+- ggf. `src/components/directors-cut/studio/SceneCard.tsx` (oder wo die Szenen-Liste gerendert wird) — Badge + Dropdown
 
-- **`src/components/directors-cut/studio/CapCutPreviewPlayer.tsx`**
-  - rAF-Loop: Bedingung `currentScene` entfernen, Originalvideo als Default-Bühne behandeln.
-  - Szenen-Sync-Effekt: auch ohne aktive Szene mainVideo korrekt steuern.
-  - `onEnded` auf mainVideo: nur stoppen wenn Timeline-Ende erreicht.
+## Ergebnis
 
-- **`src/components/directors-cut/studio/CapCutEditor.tsx`**
-  - `handleAddVideoAsScene`: `Math.max(lastScene?.end_time ?? 0, videoDuration)`.
-  - `totalDuration` per `useMemo` ableiten und an Player weitergeben.
+- Aktuelles Projekt: Der Blackscreen am Anfang verschwindet automatisch (Migration), das Originalvideo läuft 0:00–0:25.77, danach nahtlos die 5s-Mediathek-Szene.
+- Zukunft: User kann mit einem Klick KI-Szenen aus dem Originalvideo erzeugen und Start/End nachjustieren.
 
-## Nicht betroffen
-
-- Sidebar / Szenenliste — zeigt weiterhin nur User-Szenen (das Originalvideo ist keine Szene).
-- Render/Export-Pipeline — die Szenen-Struktur bleibt identisch.
-- AddMediaDialog — funktioniert.
-
-## Was das löst
-
-- ✅ Übergang von Originalvideo (0–25s) zu hinzugefügter Szene (25–30s) ohne Stopp.
-- ✅ Bereiche ohne Szene zeigen Originalvideo pur (so wie gewollt).
-- ✅ Szenen über dem Originalvideo bleiben weiterhin Overlay (Filter, Trim, additionalMedia).
-- ✅ Timeline läuft kontinuierlich bis zur Gesamtdauer 0:30.
+Soll ich diesen Plan so umsetzen?
