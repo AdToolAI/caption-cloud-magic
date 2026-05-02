@@ -360,7 +360,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           }
           
           if (audio.paused) {
-            audio.play().catch(err => console.log('Audio play error:', err));
+            audio.play().catch((err) => {
+              if (err?.name === 'NotAllowedError') {
+                // Autoplay was blocked — surface ONCE so the user knows
+                // they need to click play to grant audio permission.
+                if (!(window as any).__dcAudioToastShown) {
+                  (window as any).__dcAudioToastShown = true;
+                  toast.warning('Klicke erneut auf Play, um Audio zu aktivieren.');
+                  setTimeout(() => { (window as any).__dcAudioToastShown = false; }, 5000);
+                }
+              } else {
+                console.warn('[CapCutEditor] Audio play error:', err);
+              }
+            });
           }
         } else {
           if (!audio.paused) {
