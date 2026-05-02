@@ -164,7 +164,30 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
 
   // Magnetic snap state — Artlist/CapCut-style cut markers + master toggle
   const [snapEnabled, setSnapEnabled] = useState(true);
-  const [cutMarkers, setCutMarkers] = useState<import('@/types/directors-cut').CutMarker[]>([]);
+  const [cutMarkers, setCutMarkers] = useState<import('@/types/directors-cut').CutMarker[]>(
+    () => (initialAiCutMarkers ?? []).map(m => ({
+      time: m.time,
+      confidence: m.confidence ?? 1,
+      source: (m.source === 'manual' ? 'manual' : 'auto') as 'auto' | 'manual',
+    }))
+  );
+
+  // Merge in AI markers when they update from parent (e.g. after Auto-Cut).
+  // Manual markers are preserved; AI markers are replaced wholesale.
+  useEffect(() => {
+    if (!initialAiCutMarkers) return;
+    setCutMarkers(prev => {
+      const manual = prev.filter(m => m.source === 'manual');
+      const ai = initialAiCutMarkers.map(m => ({
+        time: m.time,
+        confidence: m.confidence ?? 1,
+        source: 'auto' as const,
+      }));
+      const merged = [...manual, ...ai].sort((a, b) => a.time - b.time);
+      return merged;
+    });
+  }, [initialAiCutMarkers]);
+
   const handleAddCutMarker = useCallback(() => {
     setCutMarkers(prev => {
       if (prev.some(m => Math.abs(m.time - currentTime) < 0.05)) return prev;
