@@ -196,6 +196,19 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
           onTimeUpdate(newGlobalTime);
         }
       } else if (
+        isAdditionalMedia &&
+        additionalVideo &&
+        additionalVideo.ended &&
+        currentScene
+      ) {
+        // Overlay clip finished playing — push the playhead just past the
+        // scene boundary so the next render switches back to the main video
+        // (or activates the next scene). Without this the additionalVideo
+        // sits at "ended" forever and playback freezes.
+        const advanceTo = Math.min(currentScene.end_time + 0.001, duration);
+        lastSceneIdRef.current = null;
+        onTimeUpdate(advanceTo);
+      } else if (
         !isAdditionalMedia &&
         mainVideo &&
         mainVideo.ended &&
