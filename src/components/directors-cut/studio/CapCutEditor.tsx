@@ -21,6 +21,7 @@ import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects'
 import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
 import { AddMediaDialog } from '../ui/AddMediaDialog';
+import { buildSnapTargets, snapToNearest } from '@/lib/directors-cut/snap';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
@@ -1028,20 +1029,55 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   // "after the original video" (→ true blackscreen placeholder).
   const effectiveSourceDuration = originalVideoDuration ?? videoDuration;
 
-  // Add scene handler
+  // Format helper for snap toast
+  const formatSnapTime = (s: number) => {
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
+  // Add scene handler — auto-snaps to nearest cut marker so the user
+  // does not need to manually align scene boundaries.
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
-    const newStartTime = lastScene ? lastScene.end_time : 0;
-    // If the new scene falls within the original video, default to a
-    // pass-through "original" source so the user keeps seeing their footage
-    // and can layer filters/transitions on top. Only beyond effectiveSourceDuration do
-    // we actually need a true blackscreen placeholder.
+    let newStartTime = lastScene ? lastScene.end_time : 0;
+
+    // Auto-snap start to nearest cut marker / scene edge (within 0.5s)
+    const startTargets = buildSnapTargets({
+      scenes,
+      cutMarkers: cutMarkers.map(m => m.time),
+      duration: videoDuration,
+    });
+    const startSnap = snapToNearest(newStartTime, startTargets, 0.5);
+    let snapped = false;
+    if (startSnap.hit && startSnap.hit.kind === 'cut-marker') {
+      newStartTime = startSnap.value;
+      snapped = true;
+    }
+
     const insideOriginal = newStartTime < effectiveSourceDuration - 0.01;
     const sourceMode: 'original' | 'blackscreen' = insideOriginal ? 'original' : 'blackscreen';
-    const sceneEnd = insideOriginal
+
+    // End-time: prefer the next cut marker after start within 15s window,
+    // otherwise default to start + 5s (clamped to source duration when inside).
+    let sceneEnd = insideOriginal
       ? Math.min(newStartTime + 5, effectiveSourceDuration)
       : newStartTime + 5;
+    // Candidate "next cut" times: explicit cut markers + start times of
+    // subsequent scenes (AI-detected boundaries that already became scenes).
+    const candidateMarkers = [
+      ...cutMarkers.map(m => m.time),
+      ...scenes.map(s => s.start_time).filter(t => t > newStartTime + 0.2),
+    ];
+    const nextMarker = candidateMarkers
+      .filter(t => t > newStartTime + 0.2 && t <= newStartTime + 15)
+      .sort((a, b) => a - b)[0];
+    if (nextMarker) {
+      sceneEnd = insideOriginal ? Math.min(nextMarker, effectiveSourceDuration) : nextMarker;
+      snapped = true;
+    }
+
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
@@ -1051,20 +1087,33 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       suggested_effects: [],
       isBlackscreen: !insideOriginal,
       sourceMode,
-      // Map the scene to the matching segment of the source so playback
-      // shows the correct frames — not always 0:00.
       original_start_time: insideOriginal ? newStartTime : undefined,
       original_end_time: insideOriginal ? sceneEnd : undefined,
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
+    if (snapped) {
+      toast.success(t('dc.snappedToCut', { time: formatSnapTime(newStartTime) }));
+    }
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, videoDuration, cutMarkers, t]);
 
-  // Add video as new scene handler
+  // Add video as new scene handler — also auto-snaps the start to nearest cut.
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
-    // Append seamlessly after the last scene OR after the original video — whichever ends later.
-    const newStartTime = Math.max(lastScene?.end_time ?? 0, effectiveSourceDuration);
+    let newStartTime = Math.max(lastScene?.end_time ?? 0, effectiveSourceDuration);
+
+    const startTargets = buildSnapTargets({
+      scenes,
+      cutMarkers: cutMarkers.map(m => m.time),
+      duration: videoDuration,
+    });
+    const startSnap = snapToNearest(newStartTime, startTargets, 0.5);
+    let snapped = false;
+    if (startSnap.hit && startSnap.hit.kind === 'cut-marker') {
+      newStartTime = startSnap.value;
+      snapped = true;
+    }
+
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
@@ -1082,7 +1131,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       },
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
+    if (snapped) {
+      toast.success(t('dc.snappedToCut', { time: formatSnapTime(newStartTime) }));
+    }
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, videoDuration, cutMarkers, t]);
 
   // Add Media Dialog (videos / images / upload from library)
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
