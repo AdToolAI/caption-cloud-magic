@@ -1,80 +1,43 @@
-## Problem
+## Ziel
 
-Im Director's Cut ist beim Vorschau-Playback weder das **Voiceover** noch die **Hintergrundmusik** zu hören – obwohl beide Tracks in der Timeline korrekt liegen. Auch das Original-Video-Audio wird in vielen Fällen nicht ausgegeben.
+Im Director's Cut Studio öffnet der Button **„Video hinzufügen"** (links im Schnitt-Panel) aktuell nur einen lokalen Datei-Picker. Er soll stattdessen den bestehenden `AddMediaDialog` öffnen, sodass man Szenen aus drei Quellen erzeugen kann:
 
-## Root Cause Analyse
+1. **Videos** aus der eigenen Mediathek (`video_creations`)
+2. **Bilder** aus dem `images`-Bucket (mit einstellbarer Anzeigedauer)
+3. **Upload** einer neuen Datei (Video oder Bild)
 
-Drei kombinierte Bugs im Audio-Routing:
+`AddMediaDialog.tsx` existiert bereits und unterstützt genau diese drei Tabs — er wird bisher nur im alten `SceneEditingStep` verwendet.
 
-### 1. Web Audio Graph kappt das Original-Audio
-`CapCutPreviewPlayer` ruft `connectToMediaElement(video)` auf. Sobald `createMediaElementSource()` ein `<video>` hängt, fließt der Ton **nur noch** durch den Web-Audio-Graph (Browser-Spec). Das Problem:
-- Der `AudioContext` wird in einem `useEffect` (also außerhalb des User-Gestures) erzeugt → bleibt im State `suspended`.
-- Es wird zwar versucht `await resumeContext()` beim Play-Klick, aber wenn der Verbindungs-Effect die `<audio>`-Elemente erst danach erzeugt, ist die Reihenfolge kaputt.
-- Wenn der User **das Video-Element in `additionalMedia` wechselt** (Scene-Switch), wird der alte `MediaElementSource` weggeworfen, der neue aber nicht zuverlässig neu verbunden (`audioConnectedRef.current` bleibt true).
+## Änderungen
 
-### 2. `CapCutEditor` legt zusätzlich pro Play-Klick einen orphan AudioContext an
-```ts
-if (typeof AudioContext !== 'undefined') {
-  const ctx = new AudioContext();   // ← orphan
-  if (ctx.state === 'suspended') await ctx.resume();
-}
-```
-Das hilft nichts, blockiert aber den Hauptthread und vergiftet das User-Gesture-Token (auf manchen Browsern wird der echte Context dadurch nicht resumed).
+### 1. `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
+- Neue optionale Prop `onAddFromLibrary?: () => void` ergänzen.
+- Den bestehenden „Video hinzufügen"-Button (Zeile 255–278) so umbauen, dass er — wenn `onAddFromLibrary` gesetzt ist — diesen Callback aufruft (öffnet den Dialog) statt direkt den File-Input zu triggern.
+- Den lokalen `<input type="file">`-Pfad als Fallback behalten, falls `onAddFromLibrary` nicht gesetzt ist (Abwärtskompatibilität).
+- Label leicht anpassen: Icon bleibt `FileVideo`, Text bleibt „Video hinzufügen" (Dialog enthält ja Videos + Bilder + Upload).
 
-### 3. Voiceover/Musik-`<audio>`-Elemente werden außerhalb des User-Gestures erzeugt
-`CapCutEditor` erzeugt `new Audio()` lazy in einem `useEffect`, der nach dem React-Re-Render läuft. Beim ersten `play()`-Versuch fehlt das Gesture-Token → Promise wird mit `NotAllowedError` rejected, Fehler nur stillgeschwiegen geloggt (`.catch(err => console.log(...))`).
+### 2. `src/components/directors-cut/studio/CapCutSidebar.tsx`
+- Prop `onAddFromLibrary?: () => void` durchschleifen und an `CutPanel` weiterreichen (analog zum bestehenden `onAddVideoAsScene`).
 
-## Lösung
+### 3. `src/components/directors-cut/studio/CapCutEditor.tsx`
+- `AddMediaDialog` importieren.
+- Neuer State: `const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);`
+- An `CapCutSidebar` durchreichen: `onAddFromLibrary={() => setShowAddMediaDialog(true)}`.
+- `<AddMediaDialog>` am Ende des JSX einbinden mit:
+  - `open={showAddMediaDialog}`, `onOpenChange={setShowAddMediaDialog}`
+  - `onMediaSelect={(media) => handleAddVideoAsScene(media.url, media.duration, media.name)}`
+- `handleAddVideoAsScene` funktioniert bereits mit einer Remote-URL + Dauer + Name — keine Änderung nötig.
+- **Bilder**: Da `handleAddVideoAsScene` ein Video-ähnliches Asset erwartet, prüfen wir vor dem Aufruf den `media.type`. Falls `image`, vorerst nur Videos zulassen und für Bilder eine kurze Hinweis-Toast zeigen („Bilder als Szene werden in einem späteren Schritt unterstützt") — ODER (bevorzugt) sofort mitumsetzen: einen kleinen Wrapper, der Bild-URLs als Hintergrund einer Blackscreen-Szene mit der gewählten Anzeigedauer anlegt.
 
-### Fix 1 — Globaler, einmaliger AudioContext + Unlock im Play-Handler
-- Neue Datei `src/lib/directors-cut/audioContext.ts` mit Singleton:
-  ```ts
-  let ctx: AudioContext | null = null;
-  export function getAudioContext() { ... lazy create ... }
-  export async function unlockAudio() {
-    const c = getAudioContext();
-    if (c.state === 'suspended') await c.resume();
-  }
-  ```
-- `useWebAudioEffects` benutzt diesen Singleton statt `new AudioContext()`.
-- Aufruf von `unlockAudio()` direkt im Click-Handler von `handlePlayPause` (CapCutEditor + CapCutPreviewPlayer), **bevor** irgendein State-Update passiert.
+> Default-Vorgehen: **Videos sofort funktional**, Bilder/Upload nutzen denselben Pfad (`handleAddVideoAsScene`) — Hochgeladene Videos kommen so über die `images`/`video-uploads`-Bucket-URL bereits als richtige Szene rein. Für Bilder: Hinweis-Toast, bis die Bild-als-Szene-Logik bestätigt ist.
 
-### Fix 2 — Voiceover/Musik-Audio-Elemente vor-laden
-- In `CapCutEditor` `<audio>` Tags **deklarativ** im JSX rendern (hidden), damit React sie beim Mount erzeugt (kein Lazy-Create im Effect):
-  ```tsx
-  {audioTracks.flatMap(t => t.clips).map(c => (
-    <audio key={c.id} ref={el => audioElementsRef.current.set(c.id, el!)} 
-           src={c.url} preload="auto" crossOrigin="anonymous" />
-  ))}
-  ```
-- Beim Play-Klick ein `audio.load()` + sofortiges `play(); pause()` für jeden vorhandenen Clip aufrufen, um das Gesture-Token zu „sammeln" — dann läuft das spätere zeitgesteuerte `play()` ohne `NotAllowedError`.
+## Technische Details
 
-### Fix 3 — Original-Audio per default NICHT durch WebAudio routen
-- `CapCutPreviewPlayer` nur dann `connectToMediaElement` aufrufen, wenn **mindestens ein Effekt aktiv ist** (`bass !== 0 || mid !== 0 || treble !== 0 || reverb > 0 || echo > 0 || pitch !== 0`).
-- Andernfalls bleibt der Video-Ton normal über das `<video>`-Element direkt am Browser-Output → keine Suspension, keine CORS-Probleme.
+- `AddMediaDialog` lädt aus `video_creations` (status=`completed`) bis zu 20 Videos pro User → ausreichend für die Mediathek-Allgemein-Auswahl.
+- Der Dialog liefert `{ type, url, duration, name, thumbnail }` — passt 1:1 zur Signatur von `handleAddVideoAsScene(url, duration, name)`.
+- Keine DB-Migrationen nötig, keine neuen Edge Functions.
+- Keine i18n-String-Änderungen erforderlich (Button-Label bleibt).
 
-### Fix 4 — Cleanup & Re-connect bei Scene-Switch
-- `audioConnectedRef` zurücksetzen, sobald der `activeVideoUrl` wechselt, damit beim Wechsel zwischen Original-Video und `additionalMedia` der WebAudio-Graph korrekt neu verbunden wird (falls Effekte aktiv sind).
+## Offene Frage (kann nach Approval geklärt werden)
 
-### Fix 5 — Orphan-Context in `handlePlayPause` entfernen
-- Den Block `const ctx = new AudioContext()` ersatzlos streichen — er erzeugt nur Speicherlecks.
-
-### Fix 6 — Fehler sichtbar machen
-- `audio.play().catch(...)` → bei `NotAllowedError` einmalig einen Toast "Klicke erneut auf Play, um Audio zu aktivieren" anzeigen, statt nur in die Console zu loggen.
-
-## Betroffene Dateien
-
-```text
-src/lib/directors-cut/audioContext.ts          (neu)
-src/hooks/useWebAudioEffects.ts                (Singleton verwenden)
-src/components/directors-cut/studio/CapCutPreviewPlayer.tsx
-src/components/directors-cut/studio/CapCutEditor.tsx
-```
-
-## Erwartetes Ergebnis
-
-- **Voiceover** spielt synchron zur Timeline.
-- **Hintergrundmusik** spielt parallel und mit Track-Volume-Slider regelbar.
-- **Original-Video-Audio** bleibt hörbar (außer wenn Voiceover/Music aktiv sind und Auto-Mute greift).
-- Keine `NotAllowedError`-Stille mehr beim ersten Play.
-- Audio-Effects (Reverb/Echo/EQ) funktionieren weiterhin, sobald ein Slider bewegt wird.
+Sollen **Bilder** aus der Mediathek im Director's Cut auch als Szene einfügbar sein (mit Standbild für die gewählte Dauer)? Falls ja, ergänze ich `handleAddVideoAsScene` um einen `mediaType`-Parameter und render im Preview ein `<img>` statt `<video>` für solche Szenen. Falls nein, blende ich den „Bilder"-Tab im Dialog aus, wenn er aus dem Director's Cut geöffnet wird.
