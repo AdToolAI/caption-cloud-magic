@@ -229,7 +229,47 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return Math.max(videoDuration, ...scenes.map(s => s.end_time));
   }, [scenes, videoDuration]);
 
-  // Audio effects change handler
+  // ── One-shot migration of legacy/mis-flagged scenes ──
+  // Scenes inside the original video that were flagged as blackscreen (because
+  // an earlier version of the editor didn't know about source-pass-through)
+  // are silently switched to "original" mode so the user's footage shows
+  // through. Scenes outside the source video keep their blackscreen flag.
+  const migrationDoneRef = useRef(false);
+  useEffect(() => {
+    if (migrationDoneRef.current) return;
+    if (!onScenesUpdate || scenes.length === 0) return;
+    const sourceDur = originalVideoDuration ?? videoDuration;
+    if (!sourceDur || sourceDur <= 0) return;
+
+    let changed = false;
+    const migrated = scenes.map(s => {
+      if (s.additionalMedia) return s; // media scenes untouched
+      if (s.sourceMode === 'media') return s;
+      const insideSource = s.start_time < sourceDur - 0.01;
+      // Already correctly tagged
+      if (insideSource && s.sourceMode === 'original' && !s.isBlackscreen) return s;
+      if (!insideSource && s.sourceMode === 'blackscreen') return s;
+
+      changed = true;
+      if (insideSource) {
+        return {
+          ...s,
+          sourceMode: 'original' as const,
+          isBlackscreen: false,
+          original_start_time: s.original_start_time ?? s.start_time,
+          original_end_time: s.original_end_time ?? Math.min(s.end_time, sourceDur),
+        };
+      }
+      return { ...s, sourceMode: 'blackscreen' as const, isBlackscreen: true };
+    });
+
+    if (changed) {
+      migrationDoneRef.current = true;
+      onScenesUpdate(migrated);
+    } else {
+      migrationDoneRef.current = true;
+    }
+  }, [scenes, onScenesUpdate, originalVideoDuration, videoDuration]);
   const handleAudioEffectsChange = useCallback((effects: AudioEffects) => {
     setAudioEffects(effects);
   }, []);
