@@ -441,13 +441,14 @@ export function DirectorsCut() {
             break; // success — stop trying further candidates
           }
         } catch (frameError: any) {
-          const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(frameError?.message || '');
+          const msg = String(frameError?.message || '');
+          const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(msg);
+          const isLoadOrSeek = /load|seek|decode|MEDIA|video error|timeout/i.test(msg);
           console.warn(`[DirectorsCut] Frame extraction failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
-          if (!isCors && candidateUrl !== proxyUrl) {
-            // non-CORS error on origin — don't waste a proxy round-trip
+          if (candidateUrl !== proxyUrl && !(isCors || isLoadOrSeek)) {
             break;
           }
-          // otherwise loop and try next candidate
+          // otherwise loop and try the next candidate (proxy)
         }
       }
 
