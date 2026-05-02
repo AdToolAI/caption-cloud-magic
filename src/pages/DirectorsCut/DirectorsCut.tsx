@@ -47,6 +47,9 @@ export function DirectorsCut() {
   const [scenes, setScenes] = useState<SceneAnalysis[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
+  // AI-detected cut markers — propagated into the studio so scene-add / snapping
+  // can use them as the canonical anchor grid.
+  const [aiCutMarkers, setAiCutMarkers] = useState<Array<{ time: number; confidence?: number; source?: 'auto' | 'manual' }>>([]);
 
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
