@@ -531,6 +531,10 @@ verify_jwt = true
 verify_jwt = true
 timeout_sec = 120
 
+[functions.detect-scenes-pyscenedetect]
+verify_jwt = true
+timeout_sec = 300
+
 [functions.director-cut-auto-enhance]
 verify_jwt = true
 
