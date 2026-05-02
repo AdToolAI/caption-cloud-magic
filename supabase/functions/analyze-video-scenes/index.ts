@@ -262,9 +262,9 @@ async function detectScenesFromVideo(
   const videoSizeMB = videoBytes.byteLength / (1024 * 1024);
   console.log(`[detectScenesFromVideo] Downloaded ${videoSizeMB.toFixed(1)}MB`);
   
-  // Gemini supports up to ~20MB inline video; check size
-  if (videoSizeMB > 20) {
-    throw new Error(`Video too large for inline analysis: ${videoSizeMB.toFixed(1)}MB (max 20MB)`);
+  // Raised inline limit — above this we rely on the frame-based path instead.
+  if (videoSizeMB > 40) {
+    throw new Error(`Video too large for inline analysis: ${videoSizeMB.toFixed(1)}MB (max 40MB) — client should provide frames`);
   }
   
   // Step 2: Base64 encode
