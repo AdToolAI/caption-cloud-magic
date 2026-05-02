@@ -418,7 +418,8 @@ export function DirectorsCut() {
       try {
         toast.info(t('dc.detectingScenes', { defaultValue: 'Erkenne Szenen mit PySceneDetect…' } as any));
         const { data: pyData, error: pyErr } = await supabase.functions.invoke('detect-scenes-pyscenedetect', {
-          body: { video_url: selectedVideo.url, threshold: 27 },
+          // adaptive_threshold=3 (default sensitive), min_scene_len=15 frames (~0.5s @30fps)
+          body: { video_url: selectedVideo.url, adaptive_threshold: 3, min_scene_len: 15 },
         });
         if (pyErr) throw pyErr;
         if (pyData?.ok && Array.isArray(pyData.scene_urls) && pyData.scene_urls.length > 0) {
