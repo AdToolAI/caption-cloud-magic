@@ -1853,6 +1853,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onSubtitleSelect={handleSubtitleSelect}
                 onSplitAtPlayhead={handleSplitAtPlayhead}
                 onTrimScene={handleTrimScene}
+                cutMarkers={cutMarkers}
+                snapEnabled={snapEnabled}
+                onSnapEnabledChange={setSnapEnabled}
+                onAddCutMarker={handleAddCutMarker}
               />
             </div>
           </div>
