@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
+import { AddMediaDialog } from '../ui/AddMediaDialog';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
