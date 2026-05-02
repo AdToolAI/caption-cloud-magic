@@ -1,11 +1,12 @@
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack } from '@/types/timeline';
-import { SceneAnalysis } from '@/types/directors-cut';
-import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2 } from 'lucide-react';
+import { SceneAnalysis, CutMarker } from '@/types/directors-cut';
+import { Volume2, VolumeX, Headphones, Plus, Minus, X, PlusCircle, Film, Square, ChevronDown, GripVertical, MessageSquare, Scissors, Trash2, Magnet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { buildSnapTargets, snapToNearest, pxThresholdToSec, DEFAULT_SNAP_PX, type SnapTarget } from '@/lib/directors-cut/snap';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import {
   DropdownMenu,
