@@ -601,8 +601,9 @@ export function DirectorsCut() {
         confidence: Math.min(1, Math.max(0, b.score ?? 0.7)),
         source: 'auto' as const,
       })));
-      const mode = data.analysis_mode || data.source || 'unknown';
+      const mode = pysceneSucceeded ? 'pyscenedetect' : (data.analysis_mode || data.source || 'unknown');
       const modeLabel =
+        mode === 'pyscenedetect' ? 'PySceneDetect (deterministisch)' :
         mode === 'client_deterministic' ? 'Client-Pixel-Analyse' :
         mode === 'server_frame_analysis' ? 'AI Frame-Analyse' :
         mode === 'server_video_analysis' ? 'AI Video-Analyse' :
