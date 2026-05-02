@@ -24,6 +24,7 @@ interface CutPanelProps {
   onSceneRename?: (sceneId: string, newName: string) => void;
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
   onAddVideoAsScene?: (file: File) => void;
+  onAddFromLibrary?: () => void;
 }
 
 const formatTime = (s: number) => {
@@ -174,6 +175,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onSceneRename,
   onTrimScene,
   onAddVideoAsScene,
+  onAddFromLibrary,
 }) => {
   const { t } = useTranslation();
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
@@ -252,7 +254,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             Leere Szene
           </Button>
         )}
-        {onAddVideoAsScene && (
+        {(onAddVideoAsScene || onAddFromLibrary) && (
           <>
             <input
               ref={videoInputRef}
@@ -261,12 +263,18 @@ export const CutPanel: React.FC<CutPanelProps> = ({
               accept="video/*"
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) onAddVideoAsScene(file);
+                if (file && onAddVideoAsScene) onAddVideoAsScene(file);
                 e.target.value = '';
               }}
             />
             <Button
-              onClick={() => videoInputRef.current?.click()}
+              onClick={() => {
+                if (onAddFromLibrary) {
+                  onAddFromLibrary();
+                } else {
+                  videoInputRef.current?.click();
+                }
+              }}
               variant="outline"
               size="sm"
               className="flex-1 border-white/10 text-white/70 hover:bg-white/5 hover:border-cyan-500/30"
