@@ -1070,88 +1070,74 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Add scene handler — auto-snaps to nearest cut marker so the user
-  // does not need to manually align scene boundaries.
+  // Build the canonical anchor grid (AI cuts + manual markers + scene edges
+  // + timeline ends). Every insertion uses this grid as the source of truth.
+  const anchorGrid = useMemo(() => {
+    const anchors = normalizeCutAnchors({
+      scenes,
+      cutMarkers,
+      duration: Math.max(videoDuration, effectiveSourceDuration),
+    });
+    return { anchors, cells: buildAnchorCells(anchors) };
+  }, [scenes, cutMarkers, videoDuration, effectiveSourceDuration]);
+
+  // Pick the best place for a new scene/clip. Preference: cell at playhead;
+  // else first free cell; else largest cell; else fallback to "after last".
+  const pickInsertionFit = useCallback((opts: { naturalDuration?: number }) => {
+    const occupied = scenes.map(s => ({ start: s.start_time, end: s.end_time }));
+    const cell = findBestInsertionCell({
+      cells: anchorGrid.cells,
+      playhead: currentTime,
+      occupiedRanges: occupied,
+      preferredMinDuration: 1,
+    });
+    if (cell) {
+      return {
+        ...fitSceneToCell({ cell, naturalDuration: opts.naturalDuration }),
+        snapped: cell.startSource === 'ai' || cell.startSource === 'manual',
+      };
+    }
+    // Fallback: append after last scene, frame-quantized
+    const start = quantizeToFrame(scenes[scenes.length - 1]?.end_time ?? 0);
+    const dur = opts.naturalDuration ?? 5;
+    return { start_time: start, end_time: quantizeToFrame(start + dur), snapped: false };
+  }, [anchorGrid.cells, scenes, currentTime]);
+
+  // Add empty scene — auto-fits into the right cut cell.
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
-    const lastScene = scenes[scenes.length - 1];
-    let newStartTime = lastScene ? lastScene.end_time : 0;
-
-    // Auto-snap start to nearest cut marker / scene edge (within 0.5s)
-    const startTargets = buildSnapTargets({
-      scenes,
-      cutMarkers: cutMarkers.map(m => m.time),
-      duration: videoDuration,
-    });
-    const startSnap = snapToNearest(newStartTime, startTargets, 0.5);
-    let snapped = false;
-    if (startSnap.hit && startSnap.hit.kind === 'cut-marker') {
-      newStartTime = startSnap.value;
-      snapped = true;
-    }
-
-    const insideOriginal = newStartTime < effectiveSourceDuration - 0.01;
+    const fit = pickInsertionFit({ naturalDuration: 5 });
+    const insideOriginal = fit.start_time < effectiveSourceDuration - 0.01;
     const sourceMode: 'original' | 'blackscreen' = insideOriginal ? 'original' : 'blackscreen';
-
-    // End-time: prefer the next cut marker after start within 15s window,
-    // otherwise default to start + 5s (clamped to source duration when inside).
-    let sceneEnd = insideOriginal
-      ? Math.min(newStartTime + 5, effectiveSourceDuration)
-      : newStartTime + 5;
-    // Candidate "next cut" times: explicit cut markers + start times of
-    // subsequent scenes (AI-detected boundaries that already became scenes).
-    const candidateMarkers = [
-      ...cutMarkers.map(m => m.time),
-      ...scenes.map(s => s.start_time).filter(t => t > newStartTime + 0.2),
-    ];
-    const nextMarker = candidateMarkers
-      .filter(t => t > newStartTime + 0.2 && t <= newStartTime + 15)
-      .sort((a, b) => a - b)[0];
-    if (nextMarker) {
-      sceneEnd = insideOriginal ? Math.min(nextMarker, effectiveSourceDuration) : nextMarker;
-      snapped = true;
-    }
-
+    const end = insideOriginal ? Math.min(fit.end_time, effectiveSourceDuration) : fit.end_time;
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
-      start_time: newStartTime,
-      end_time: sceneEnd,
+      start_time: fit.start_time,
+      end_time: end,
       description: insideOriginal ? t('dc.newSceneOriginal') : t('dc.newSceneBlackscreen'),
       content_description: t('dc.emptySceneDesc'),
       suggested_effects: [],
       isBlackscreen: !insideOriginal,
       sourceMode,
-      original_start_time: insideOriginal ? newStartTime : undefined,
-      original_end_time: insideOriginal ? sceneEnd : undefined,
+      original_start_time: insideOriginal ? fit.start_time : undefined,
+      original_end_time: insideOriginal ? end : undefined,
     };
     onScenesUpdate([...scenes, newScene]);
-    if (snapped) {
-      toast.success(t('dc.snappedToCut', { time: formatSnapTime(newStartTime) }));
+    if (fit.snapped) {
+      toast.success(t('dc.snappedToCut', { time: formatSnapTime(fit.start_time) }));
     }
-  }, [scenes, onScenesUpdate, effectiveSourceDuration, videoDuration, cutMarkers, t]);
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, pickInsertionFit, t]);
 
-  // Add video as new scene handler — also auto-snaps the start to nearest cut.
+  // Add an uploaded/library video as a new media scene — auto-fits into the
+  // best cut cell. The clip's natural duration is preserved when the cell is
+  // larger than the clip; longer clips get trimmed to cell length.
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
     if (!onScenesUpdate) return;
-    const lastScene = scenes[scenes.length - 1];
-    let newStartTime = Math.max(lastScene?.end_time ?? 0, effectiveSourceDuration);
-
-    const startTargets = buildSnapTargets({
-      scenes,
-      cutMarkers: cutMarkers.map(m => m.time),
-      duration: videoDuration,
-    });
-    const startSnap = snapToNearest(newStartTime, startTargets, 0.5);
-    let snapped = false;
-    if (startSnap.hit && startSnap.hit.kind === 'cut-marker') {
-      newStartTime = startSnap.value;
-      snapped = true;
-    }
-
+    const fit = pickInsertionFit({ naturalDuration: duration });
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
-      start_time: newStartTime,
-      end_time: newStartTime + duration,
+      start_time: fit.start_time,
+      end_time: fit.end_time,
       description: name || t('dc.uploadedVideo'),
       content_description: t('dc.videoFromUpload'),
       suggested_effects: [],
@@ -1165,10 +1151,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       },
     };
     onScenesUpdate([...scenes, newScene]);
-    if (snapped) {
-      toast.success(t('dc.snappedToCut', { time: formatSnapTime(newStartTime) }));
+    if (fit.snapped) {
+      toast.success(t('dc.snappedToCut', { time: formatSnapTime(fit.start_time) }));
     }
-  }, [scenes, onScenesUpdate, effectiveSourceDuration, videoDuration, cutMarkers, t]);
+  }, [scenes, onScenesUpdate, pickInsertionFit, t]);
 
   // Add Media Dialog (videos / images / upload from library)
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
