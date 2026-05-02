@@ -26,7 +26,10 @@ import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
 interface CapCutEditorProps {
   videoUrl: string;
+  /** Total timeline duration (source + appended scenes). */
   videoDuration: number;
+  /** Duration of the source video itself — used to decide pass-through vs blackscreen. */
+  originalVideoDuration?: number;
   scenes: SceneAnalysis[];
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
