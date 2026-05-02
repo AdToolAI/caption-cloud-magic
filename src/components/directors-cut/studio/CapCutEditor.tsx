@@ -1009,7 +1009,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
     // Append seamlessly after the last scene OR after the original video — whichever ends later.
-    const newStartTime = Math.max(lastScene?.end_time ?? 0, videoDuration);
+    const newStartTime = Math.max(lastScene?.end_time ?? 0, effectiveSourceDuration);
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
@@ -1018,6 +1018,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       content_description: t('dc.videoFromUpload'),
       suggested_effects: [],
       isBlackscreen: false,
+      isFromOriginalVideo: false,
       sourceMode: 'media',
       additionalMedia: {
         type: 'video',
@@ -1026,7 +1027,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       },
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, videoDuration, t]);
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
 
   // Add Media Dialog (videos / images / upload from library)
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
