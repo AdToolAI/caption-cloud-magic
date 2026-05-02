@@ -1301,7 +1301,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       setActiveDragItem({
         name: t('dc.sceneLabel', { index: data.index + 1 }),
         type: 'scene',
-        color: data.scene?.isBlackscreen ? '#3f3f46' : '#6366f1',
+        color: ((data.scene?.sourceMode ?? (data.scene?.isBlackscreen ? 'blackscreen' : undefined)) === 'blackscreen') ? '#3f3f46' : '#6366f1',
       });
     } else if (data?.source === 'sidebar') {
       setActiveDragItem({
