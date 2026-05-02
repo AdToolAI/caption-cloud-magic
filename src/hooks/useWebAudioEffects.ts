@@ -170,31 +170,19 @@ export function useWebAudioEffects({ audioEffects, enabled = true }: UseWebAudio
     }
   }, [audioEffects]);
 
-  // Resume audio context (needed for browser autoplay policy)
+  // Resume audio context (needed for browser autoplay policy).
+  // Delegates to the shared singleton so EVERY caller resumes the same ctx.
   const resumeContext = useCallback(async () => {
-    if (audioContextRef.current?.state === 'suspended') {
-      try {
-        await audioContextRef.current.resume();
-        console.log('[WebAudioEffects] AudioContext resumed');
-      } catch (e) {
-        console.error('[WebAudioEffects] Failed to resume AudioContext:', e);
-      }
-    }
+    await unlockAudio();
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup on unmount: do NOT close the shared AudioContext (other
+  // components / future re-mounts depend on it). Only release our refs.
   useEffect(() => {
     return () => {
-      if (audioContextRef.current) {
-        try {
-          audioContextRef.current.close();
-        } catch (e) {
-          console.log('AudioContext cleanup error:', e);
-        }
-        audioContextRef.current = null;
-        sourceNodeRef.current = null;
-        connectedElementRef.current = null;
-      }
+      sourceNodeRef.current = null;
+      // Keep connectedElementRef so a future remount with the same element
+      // recognises it and skips a duplicate createMediaElementSource call.
     };
   }, []);
 
