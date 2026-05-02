@@ -1,18 +1,19 @@
-// Deterministic shot-boundary detection using PySceneDetect (industry standard,
-// same engine used by CapCut/DaVinci "Scene Edit Detection"). Runs on Replicate
-// via the `hexiaochun/video_split` model (which wraps PySceneDetect's
-// content-aware detector). Returns the split scene file URLs — the client
-// probes each one's duration to build cumulative boundary timestamps.
+// Deterministic shot-boundary detection using PySceneDetect's ADAPTIVE detector
+// (magpai-app/cog-scenedetect on Replicate). Adaptive thresholding is the same
+// approach used by DaVinci Resolve / CapCut "Scene Edit Detection" — it adapts
+// to local lighting/motion and catches both hard cuts AND soft transitions
+// that the simple content-threshold detector misses.
 //
-// This replaces the unreliable Gemini-based boundary detection. LLMs remain
-// useful for describing scenes (mood/effects), not for finding them.
+// Returns split scene file URLs — the client probes each one's duration to
+// build cumulative boundary timestamps.
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const MODEL_VERSION = '1328af827594e4ec8dd2a2e69bb7b50c760c2b643a011417d5027768a17954a1';
+// magpai-app/cog-scenedetect — adaptive PySceneDetect detector, returns { videos: [urls] }
+const MODEL_VERSION = 'a27d706ef8788f49cd40ae1d2266b7355de21d48b9446789b35eebdd3817490d';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,7 +21,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { video_url, threshold = 27 } = await req.json();
+    const body = await req.json();
+    const video_url: string = body.video_url;
+    // Adaptive threshold: 3.0 = default sensitive, lower = more cuts.
+    // min_scene_len in FRAMES (15 ≈ 0.5s @30fps) — protects against duplicates,
+    // not against legitimate short shots.
+    const adaptive_threshold: number = typeof body.adaptive_threshold === 'number' ? body.adaptive_threshold : 3;
+    const min_scene_len: number = typeof body.min_scene_len === 'number' ? body.min_scene_len : 15;
+    const luma_only: boolean = body.luma_only === true;
+
     if (!video_url || typeof video_url !== 'string') {
       return new Response(JSON.stringify({ ok: false, error: 'video_url_required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -32,10 +41,9 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log('[detect-scenes-pyscenedetect] Starting prediction for', video_url, 'threshold=', threshold);
+    console.log('[detect-scenes-pyscenedetect] adaptive run for', video_url,
+      'adaptive_threshold=', adaptive_threshold, 'min_scene_len=', min_scene_len);
 
-    // Create prediction (synchronous wait via Prefer header for short videos;
-    // we still poll as fallback for longer ones)
     const createRes = await fetch('https://api.replicate.com/v1/predictions', {
       method: 'POST',
       headers: {
@@ -45,7 +53,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         version: MODEL_VERSION,
-        input: { video: video_url, threshold },
+        input: { video: video_url, adaptive_threshold, min_scene_len, luma_only },
       }),
     });
 
@@ -78,19 +86,24 @@ Deno.serve(async (req) => {
     }
 
     const output = prediction.output;
-    const sceneUrls: string[] = Array.isArray(output)
-      ? output.filter((u: any) => typeof u === 'string')
-      : Array.isArray(output?.files)
-        ? output.files.filter((u: any) => typeof u === 'string')
-        : [];
+    // magpai-app/cog-scenedetect returns { videos: [urls] }
+    const sceneUrls: string[] = Array.isArray(output?.videos)
+      ? output.videos.filter((u: any) => typeof u === 'string')
+      : Array.isArray(output)
+        ? output.filter((u: any) => typeof u === 'string')
+        : Array.isArray(output?.files)
+          ? output.files.filter((u: any) => typeof u === 'string')
+          : [];
 
-    console.log('[detect-scenes-pyscenedetect] Detected', sceneUrls.length, 'scenes');
+    console.log('[detect-scenes-pyscenedetect] adaptive detected', sceneUrls.length, 'scenes');
 
     return new Response(JSON.stringify({
       ok: true,
       scene_urls: sceneUrls,
       scene_count: sceneUrls.length,
-      threshold,
+      adaptive_threshold,
+      min_scene_len,
+      detector: 'adaptive',
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (err) {
