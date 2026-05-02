@@ -40,23 +40,17 @@ export function useWebAudioEffects({ audioEffects, enabled = true }: UseWebAudio
   // Create and connect audio graph to a media element
   const connectToMediaElement = useCallback(async (mediaElement: HTMLMediaElement) => {
     if (!enabled) return;
-    
-    // Prevent double-connection
+
+    // Prevent double-connection (a MediaElementSource can only be created
+    // ONCE per element for the lifetime of the page).
     if (connectedElementRef.current === mediaElement && audioContextRef.current) {
       return;
     }
 
-    // Clean up previous connection
-    if (audioContextRef.current) {
-      try {
-        audioContextRef.current.close();
-      } catch (e) {
-        console.log('AudioContext close error:', e);
-      }
-    }
-
     try {
-      const ctx = new AudioContext();
+      // Use the shared singleton — never create / close per hook instance,
+      // otherwise media elements lose their audio output permanently.
+      const ctx = getAudioContext();
       audioContextRef.current = ctx;
 
       // Resume context if suspended (browser autoplay policy)
