@@ -1064,8 +1064,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     let sceneEnd = insideOriginal
       ? Math.min(newStartTime + 5, effectiveSourceDuration)
       : newStartTime + 5;
-    const nextMarker = cutMarkers
-      .map(m => m.time)
+    // Candidate "next cut" times: explicit cut markers + start times of
+    // subsequent scenes (AI-detected boundaries that already became scenes).
+    const candidateMarkers = [
+      ...cutMarkers.map(m => m.time),
+      ...scenes.map(s => s.start_time).filter(t => t > newStartTime + 0.2),
+    ];
+    const nextMarker = candidateMarkers
       .filter(t => t > newStartTime + 0.2 && t <= newStartTime + 15)
       .sort((a, b) => a - b)[0];
     if (nextMarker) {
