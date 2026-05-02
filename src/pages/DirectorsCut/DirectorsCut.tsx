@@ -495,11 +495,12 @@ export function DirectorsCut() {
       if (error) throw error;
       
       if (data?.ok === false) {
-        toast.error(data.error || t('dc.sceneAnalysisFailed'));
+        const detail = data.detail ? ` (${String(data.detail).slice(0, 140)})` : '';
+        toast.error(`${data.error || t('dc.sceneAnalysisFailed')}${detail}`);
         setIsAnalyzing(false);
         return;
       }
-      
+
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
       
