@@ -119,16 +119,23 @@ const DraggableScene: React.FC<{
       const deltaX = moveE.clientX - startXRef.current;
       const deltaTime = deltaX / zoom;
       if (edge === 'left') {
-        const newStart = Math.max(0, originalBoundsRef.current.start + deltaTime);
+        let newStart = Math.max(0, originalBoundsRef.current.start + deltaTime);
+        const snap = snapFn?.(newStart, scene.id);
+        if (snap?.hit) newStart = snap.value;
+        onSnapPreview?.(snap?.hit ? snap.value : null);
         if (newStart < scene.end_time - 1) onTrim?.(newStart, scene.end_time);
       } else {
-        const newEnd = originalBoundsRef.current.end + deltaTime;
+        let newEnd = originalBoundsRef.current.end + deltaTime;
+        const snap = snapFn?.(newEnd, scene.id);
+        if (snap?.hit) newEnd = snap.value;
+        onSnapPreview?.(snap?.hit ? snap.value : null);
         if (newEnd > scene.start_time + 1) onTrim?.(scene.start_time, newEnd);
       }
     };
 
     const handleMouseUp = () => {
       setIsResizing(null);
+      onSnapPreview?.(null);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
