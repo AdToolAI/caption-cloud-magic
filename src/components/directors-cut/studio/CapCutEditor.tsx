@@ -1001,7 +1001,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate([...scenes, newScene]);
   }, [scenes, onScenesUpdate]);
 
-  // Split scene at current playhead position
+  // Add Media Dialog (videos / images / upload from library)
+  const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
+
+
   const handleSplitAtPlayhead = useCallback(() => {
     if (!onScenesUpdate || scenes.length === 0) return;
     const targetScene = scenes.find(s => currentTime >= s.start_time && currentTime < s.end_time);
@@ -1523,6 +1526,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               </div>
             ) : (
             <CapCutSidebar 
+              onAddFromLibrary={() => setShowAddMediaDialog(true)}
               videoUrl={videoUrl}
               videoDuration={actualTotalDuration}
               voiceOverUrl={voiceOverUrl}
