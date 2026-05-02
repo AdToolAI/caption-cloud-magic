@@ -47,6 +47,7 @@ interface CapCutSidebarProps {
   onSubtitleTextUpdate?: (clipId: string, text: string) => void;
   onSubtitleSelect?: (clipId: string | null) => void;
   onAddVideoAsScene?: (file: File) => void;
+  onAddFromLibrary?: () => void;
   onMusicDrop?: (track: JamendoTrack) => void;
   sceneCount?: number;
   captionCount?: number;
@@ -565,6 +566,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onSubtitleTextUpdate,
   onSubtitleSelect,
   onAddVideoAsScene,
+  onAddFromLibrary,
   onMusicDrop,
   sceneCount = 0,
   captionCount = 0,
@@ -963,6 +965,7 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onSceneRename={onSceneRename}
               onTrimScene={onTrimScene}
               onAddVideoAsScene={onAddVideoAsScene}
+              onAddFromLibrary={onAddFromLibrary}
             />
           </TabsContent>
 
