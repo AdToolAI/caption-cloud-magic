@@ -92,6 +92,22 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     s => currentTime >= s.start_time && currentTime < s.end_time
   );
 
+  // Resolve the effective source mode for a scene with backwards-compatible
+  // inference. Legacy scenes only had `isBlackscreen` and `additionalMedia`.
+  // A blackscreen-flagged scene whose timeframe sits inside the original
+  // video should pass the original through (the user wanted an overlay layer
+  // for filters/transitions, not a black hole over their footage).
+  const resolveSourceMode = useCallback((scene: SceneAnalysis | undefined): 'original' | 'blackscreen' | 'media' => {
+    if (!scene) return 'original';
+    if (scene.sourceMode) return scene.sourceMode;
+    if (scene.additionalMedia) return 'media';
+    const overlapsOriginal = scene.start_time < (duration || 0) && (scene.end_time ?? 0) > 0;
+    if (scene.isBlackscreen && !overlapsOriginal) return 'blackscreen';
+    return 'original';
+  }, [duration]);
+
+  const currentSourceMode = resolveSourceMode(currentScene);
+
   // Find current subtitles based on currentTime
   const currentSubtitles = useMemo(() => {
     if (!subtitleTrack?.visible) return [];
@@ -101,10 +117,11 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   }, [subtitleTrack, currentTime]);
 
   // Determine if we're playing additionalMedia or main video
-  const isAdditionalMedia = currentScene?.additionalMedia?.type === 'video';
+  const isAdditionalMedia = currentSourceMode === 'media' && currentScene?.additionalMedia?.type === 'video';
   const activeVideoUrl = isAdditionalMedia 
-    ? currentScene.additionalMedia!.url 
+    ? currentScene!.additionalMedia!.url 
     : videoUrl;
+
 
   // Calculate time within the current video source
   const getVideoTime = useCallback(() => {
