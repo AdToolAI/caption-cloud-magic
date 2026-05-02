@@ -587,6 +587,115 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
 
       const gapNow = performance.now();
 
+      // ===== MEDIA / BLACKSCREEN SCENE BRANCH (software clock) =====
+      // If the scene at the current timeline position is NOT backed by the
+      // original video, advance time independently. This is what allows
+      // overlay-clips and empty placeholder scenes to play through cleanly
+      // — like Artlist / CapCut treat distinct timeline clips.
+      {
+        const tlNow = visualTimeRef.current;
+        const mediaScene = sortedScenes.find(s => tlNow >= s.start_time && tlNow < s.end_time);
+        const isMediaMode = mediaScene && (
+          mediaScene.sourceMode === 'media' ||
+          mediaScene.sourceMode === 'blackscreen' ||
+          (!mediaScene.sourceMode && mediaScene.isBlackscreen)
+        );
+
+        if (isMediaMode && mediaScene) {
+          const delta = swClockLastTsRef.current > 0
+            ? (gapNow - swClockLastTsRef.current) / 1000
+            : 0;
+          swClockLastTsRef.current = gapNow;
+
+          // Pause the original-video slot + its source audio
+          if (!video.paused) video.pause();
+          video.style.opacity = '0';
+          const standby = getStandbyVideo();
+          if (standby) standby.style.opacity = '0';
+          if (sourceAudioRef.current && !sourceAudioRef.current.paused) {
+            sourceAudioRef.current.pause();
+          }
+
+          // Sync overlay <video> for media scenes (image scenes have no element)
+          const overlay = mediaVideoRef.current;
+          const isVideoOverlay = mediaScene.sourceMode === 'media' &&
+            mediaScene.additionalMedia?.type === 'video';
+          if (overlay && isVideoOverlay) {
+            // (Re)bind src on scene change
+            if (activeMediaSceneIdRef.current !== mediaScene.id) {
+              activeMediaSceneIdRef.current = mediaScene.id;
+              overlay.src = mediaScene.additionalMedia!.url;
+              overlay.currentTime = 0;
+              overlay.play().catch(() => {});
+            } else if (overlay.paused) {
+              overlay.play().catch(() => {});
+            }
+          } else {
+            // Image / blackscreen — make sure overlay <video> is idle
+            if (overlay && !overlay.paused) overlay.pause();
+            if (activeMediaSceneIdRef.current !== mediaScene.id) {
+              activeMediaSceneIdRef.current = mediaScene.id;
+              if (overlay) overlay.removeAttribute('src');
+            }
+          }
+
+          // Advance timeline by wall-clock delta
+          const nextTL = Math.min(tlNow + delta, mediaScene.end_time);
+          visualTimeRef.current = nextTL;
+          // Lock lastSceneIndex to this scene so transitions don't snap back
+          const idx = sortedScenes.indexOf(mediaScene);
+          if (idx >= 0) lastSceneIndexRef.current = idx;
+
+          // Throttled UI updates
+          setDisplayTime(nextTL);
+          onTimeUpdateRef.current?.(nextTL);
+
+          // End of scene? Hand off to next scene cleanly.
+          if (nextTL >= mediaScene.end_time - 0.001) {
+            const nextScene = sortedScenes[idx + 1];
+            activeMediaSceneIdRef.current = null;
+            if (overlay) {
+              overlay.pause();
+              overlay.removeAttribute('src');
+            }
+            if (nextScene) {
+              // Seek original video to the next scene's source position so the
+              // normal video-led branch can take over on the following frame.
+              const nextSrc = nextScene.original_start_time ?? nextScene.start_time;
+              try { video.currentTime = nextSrc + 0.02; } catch {}
+              video.playbackRate = (nextScene as any).playbackRate ?? 1;
+              if (isPlayingRef.current) video.play().catch(() => {});
+              visualTimeRef.current = nextScene.start_time;
+              pendingSceneAdvanceRef.current = { targetIndex: idx + 1, framesLeft: 15 };
+              swClockLastTsRef.current = 0;
+            } else {
+              swClockLastTsRef.current = 0;
+              handleVideoEnded();
+              return;
+            }
+          }
+
+          rafIdRef.current = requestAnimationFrame(tick);
+          return;
+        } else {
+          // Not in media mode — reset overlay state
+          if (activeMediaSceneIdRef.current !== null) {
+            activeMediaSceneIdRef.current = null;
+            const overlay = mediaVideoRef.current;
+            if (overlay) {
+              overlay.pause();
+              overlay.removeAttribute('src');
+            }
+            // Make sure original video resumes if we're playing
+            if (isPlayingRef.current && video.paused) {
+              video.play().catch(() => {});
+            }
+            video.style.opacity = '1';
+          }
+          swClockLastTsRef.current = 0;
+        }
+      }
+
       // === GAP DETECTION: check if timeline time is in a gap between scenes ===
       // When in a gap, we manually advance timeline time and hide the video
       if (inGapRef.current) {
