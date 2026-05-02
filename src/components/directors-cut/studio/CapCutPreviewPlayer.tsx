@@ -258,19 +258,24 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
 
     // No active scene → original video is the default stage (1:1 with currentTime)
     if (!currentScene) {
+      const wasMedia = lastSceneIdRef.current !== null;
       lastSceneIdRef.current = null;
 
       if (mainVideo) {
-        // Only sync if drift is significant (avoid stutter from constant seeks)
-        if (Math.abs(mainVideo.currentTime - currentTime) > 0.3) {
+        // After a media→original transition, snap currentTime exactly so the
+        // user does not see the previous frame for a beat. Otherwise rely on
+        // the 0.3s drift threshold to avoid stutter from constant seeks.
+        const snapHard = wasMedia || Math.abs(mainVideo.currentTime - currentTime) > 0.3;
+        if (snapHard) {
           mainVideo.currentTime = Math.max(0, Math.min(currentTime, mainVideo.duration || currentTime));
         }
+        // Start the main video FIRST, then pause the overlay — prevents a
+        // micro-gap where neither source is producing frames.
         if (isPlaying && mainVideo.paused && currentTime < (mainVideo.duration || Infinity)) {
           mainVideo.play().catch(() => {});
         }
       }
 
-      // Pause additional video when no scene is active
       if (additionalVideo && !additionalVideo.paused) {
         additionalVideo.pause();
       }
@@ -293,7 +298,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
         }
       }
 
-      // Pause main video
+      // Pause main video AFTER overlay starts to avoid a frame gap
       if (mainVideo && !mainVideo.paused) {
         mainVideo.pause();
       }
@@ -310,7 +315,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
         }
       }
 
-      // Pause additional video
+      // Pause overlay AFTER main resumes
       if (additionalVideo && !additionalVideo.paused) {
         additionalVideo.pause();
       }
