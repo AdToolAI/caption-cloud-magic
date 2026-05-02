@@ -92,6 +92,22 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     s => currentTime >= s.start_time && currentTime < s.end_time
   );
 
+  // Resolve the effective source mode for a scene with backwards-compatible
+  // inference. Legacy scenes only had `isBlackscreen` and `additionalMedia`.
+  // A blackscreen-flagged scene whose timeframe sits inside the original
+  // video should pass the original through (the user wanted an overlay layer
+  // for filters/transitions, not a black hole over their footage).
+  const resolveSourceMode = useCallback((scene: SceneAnalysis | undefined): 'original' | 'blackscreen' | 'media' => {
+    if (!scene) return 'original';
+    if (scene.sourceMode) return scene.sourceMode;
+    if (scene.additionalMedia) return 'media';
+    const overlapsOriginal = scene.start_time < (duration || 0) && (scene.end_time ?? 0) > 0;
+    if (scene.isBlackscreen && !overlapsOriginal) return 'blackscreen';
+    return 'original';
+  }, [duration]);
+
+  const currentSourceMode = resolveSourceMode(currentScene);
+
   // Find current subtitles based on currentTime
   const currentSubtitles = useMemo(() => {
     if (!subtitleTrack?.visible) return [];
@@ -101,10 +117,11 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
   }, [subtitleTrack, currentTime]);
 
   // Determine if we're playing additionalMedia or main video
-  const isAdditionalMedia = currentScene?.additionalMedia?.type === 'video';
+  const isAdditionalMedia = currentSourceMode === 'media' && currentScene?.additionalMedia?.type === 'video';
   const activeVideoUrl = isAdditionalMedia 
-    ? currentScene.additionalMedia!.url 
+    ? currentScene!.additionalMedia!.url 
     : videoUrl;
+
 
   // Calculate time within the current video source
   const getVideoTime = useCallback(() => {
@@ -397,8 +414,8 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     <div ref={containerRef} className="h-full flex flex-col rounded-lg overflow-hidden bg-[#0d0d0d]">
       {/* Video Container */}
       <div className="flex-1 relative flex items-center justify-center bg-black min-h-0">
-        {/* Blackscreen overlay */}
-        {currentScene?.isBlackscreen && (
+        {/* Blackscreen overlay — only when explicitly requested */}
+        {currentSourceMode === 'blackscreen' && currentScene && (
           <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-10">
             <div className="text-white/30 text-sm font-medium">{t('dc.blackscreen')}</div>
             <div className="text-white/20 text-xs mt-1">{t('dc.sceneLabel', { index: scenes.indexOf(currentScene) + 1 })}</div>
