@@ -270,6 +270,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       migrationDoneRef.current = true;
     }
   }, [scenes, onScenesUpdate, originalVideoDuration, videoDuration]);
+
+  // Audio effects change handler
   const handleAudioEffectsChange = useCallback((effects: AudioEffects) => {
     setAudioEffects(effects);
   }, []);
