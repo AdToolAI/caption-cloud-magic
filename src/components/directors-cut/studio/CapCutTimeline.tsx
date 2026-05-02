@@ -568,6 +568,10 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   selectedSubtitleId,
   onSplitAtPlayhead,
   onTrimScene,
+  cutMarkers = [],
+  snapEnabled = true,
+  onSnapEnabledChange,
+  onAddCutMarker,
 }) => {
   const { t } = useTranslation();
   const musicTrackIndex = tracks.findIndex(t_track => t_track.id === 'track-music');
@@ -575,7 +579,24 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
   const tracksAfterSubtitle = musicTrackIndex >= 0 ? tracks.slice(musicTrackIndex + 1) : tracks.slice(-1);
   const timelineRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  
+
+  // Snap line preview (timeline seconds; null = hidden)
+  const [snapPreview, setSnapPreview] = useState<number | null>(null);
+
+  // Build snap targets (memoized — rebuilt when scenes/markers/playhead/duration change)
+  const snapTargets = useMemo<SnapTarget[]>(() => buildSnapTargets({
+    scenes,
+    cutMarkers: cutMarkers.filter(m => (m.confidence ?? 1) >= 0.6).map(m => m.time),
+    duration,
+    playhead: currentTime,
+  }), [scenes, cutMarkers, duration, currentTime]);
+
+  const snapFn = useCallback((value: number, excludeSceneId?: string) => {
+    if (!snapEnabled) return { value, hit: null };
+    const threshold = pxThresholdToSec(DEFAULT_SNAP_PX, zoom);
+    return snapToNearest(value, snapTargets, threshold, excludeSceneId);
+  }, [snapEnabled, snapTargets, zoom]);
+
   // Resize state
   const [resizingClip, setResizingClip] = useState<{ id: string; side: 'left' | 'right'; startX: number; originalClip: AudioClip } | null>(null);
   
