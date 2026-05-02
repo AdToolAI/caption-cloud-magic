@@ -1777,7 +1777,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
                 onClipResize={handleClipResize}
                 onSceneDelete={handleSceneDelete}
                 onSceneAdd={handleSceneAdd}
-                onSceneAddFromMedia={() => toast.info(t('dc.mediaLibraryComingSoon'))}
+                onSceneAddFromMedia={() => setShowAddMediaDialog(true)}
                 onSubtitleUpdate={handleSubtitleUpdate}
                 onSubtitleDelete={handleSubtitleDelete}
                 onSubtitleSelect={handleSubtitleSelect}
