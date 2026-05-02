@@ -967,6 +967,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate(sorted);
   }, [scenes, onScenesUpdate]);
 
+  // Effective source video duration — falls back to timeline duration when
+  // the source duration is unknown (legacy callers). Used to decide whether
+  // a scene sits "inside the original video" (→ original pass-through) or
+  // "after the original video" (→ true blackscreen placeholder).
+  const effectiveSourceDuration = originalVideoDuration ?? videoDuration;
+
   // Add scene handler
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
@@ -974,12 +980,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const newStartTime = lastScene ? lastScene.end_time : 0;
     // If the new scene falls within the original video, default to a
     // pass-through "original" source so the user keeps seeing their footage
-    // and can layer filters/transitions on top. Only beyond videoDuration do
+    // and can layer filters/transitions on top. Only beyond effectiveSourceDuration do
     // we actually need a true blackscreen placeholder.
-    const insideOriginal = newStartTime < videoDuration;
+    const insideOriginal = newStartTime < effectiveSourceDuration - 0.01;
     const sourceMode: 'original' | 'blackscreen' = insideOriginal ? 'original' : 'blackscreen';
     const sceneEnd = insideOriginal
-      ? Math.min(newStartTime + 5, videoDuration)
+      ? Math.min(newStartTime + 5, effectiveSourceDuration)
       : newStartTime + 5;
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
@@ -990,9 +996,13 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       suggested_effects: [],
       isBlackscreen: !insideOriginal,
       sourceMode,
+      // Map the scene to the matching segment of the source so playback
+      // shows the correct frames — not always 0:00.
+      original_start_time: insideOriginal ? newStartTime : undefined,
+      original_end_time: insideOriginal ? sceneEnd : undefined,
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, videoDuration, t]);
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
 
   // Add video as new scene handler
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
