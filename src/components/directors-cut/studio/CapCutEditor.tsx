@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
 import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
+import { AddMediaDialog } from '../ui/AddMediaDialog';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
@@ -1000,7 +1001,10 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate([...scenes, newScene]);
   }, [scenes, onScenesUpdate]);
 
-  // Split scene at current playhead position
+  // Add Media Dialog (videos / images / upload from library)
+  const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
+
+
   const handleSplitAtPlayhead = useCallback(() => {
     if (!onScenesUpdate || scenes.length === 0) return;
     const targetScene = scenes.find(s => currentTime >= s.start_time && currentTime < s.end_time);
@@ -1522,6 +1526,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               </div>
             ) : (
             <CapCutSidebar 
+              onAddFromLibrary={() => setShowAddMediaDialog(true)}
               videoUrl={videoUrl}
               videoDuration={actualTotalDuration}
               voiceOverUrl={voiceOverUrl}
@@ -1854,6 +1859,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
         onConfirm={(newSettings) => {
           onExportSettingsChange?.(newSettings);
           setTimeout(() => handleExportVideo(), 50);
+        }}
+      />
+      <AddMediaDialog
+        open={showAddMediaDialog}
+        onOpenChange={setShowAddMediaDialog}
+        onMediaSelect={(media) => {
+          if (media.type === 'video') {
+            handleAddVideoAsScene(media.url, media.duration, media.name);
+            toast.success(t('dc.videoAddedAsScene', { name: media.name }));
+          } else {
+            // Images as scenes are not yet supported in the preview pipeline
+            toast.info('Bilder als Szene werden bald unterstützt. Bitte vorerst ein Video wählen.');
+          }
         }}
       />
     </div>
