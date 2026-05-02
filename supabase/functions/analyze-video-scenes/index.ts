@@ -61,40 +61,53 @@ serve(async (req) => {
     let analysisMode = 'client_deterministic';
     let serverBoundaries: SceneBoundary[] = [];
     let detectionError: string | null = null;
+    const hasFramesInput = Array.isArray(frames) && frames.length >= 2;
 
     // PATH A: Client provided boundaries → use them
-    // PATH B: No boundaries → server-side scene detection by downloading video and sending to Gemini as video
+    // PATH B: Frames available (e.g. video too large for inline) → AI boundary detection from timestamped frames
+    // PATH C: No boundaries, no frames → server-side video analysis (small videos only)
     if (!hasClientBoundaries) {
-      console.log("[analyze-video-scenes] No client boundaries — running server-side video analysis");
-      analysisMode = 'server_video_analysis';
-      
-      try {
-        serverBoundaries = await detectScenesFromVideo(video_url, videoDuration, LOVABLE_API_KEY);
-        console.log(`[analyze-video-scenes] Server detected ${serverBoundaries.length} boundaries: ${serverBoundaries.map(b => `${b.time.toFixed(1)}s(${b.type})`).join(', ')}`);
-        
-        if (serverBoundaries.length === 0) {
-          analysisMode = 'server_no_cuts_found';
+      if (hasFramesInput) {
+        console.log(`[analyze-video-scenes] No client boundaries — running frame-based AI boundary detection on ${frames.length} frames`);
+        analysisMode = 'server_frame_analysis';
+        try {
+          serverBoundaries = await detectScenesFromFrames(frames, videoDuration, LOVABLE_API_KEY);
+          if (serverBoundaries.length === 0) analysisMode = 'server_frame_no_cuts_found';
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error("[analyze-video-scenes] Frame-based detection failed:", errMsg);
+          detectionError = errMsg;
+          analysisMode = 'server_error';
         }
-      } catch (e) {
-        const errMsg = e instanceof Error ? e.message : String(e);
-        console.error("[analyze-video-scenes] Server-side detection failed:", errMsg);
-        detectionError = errMsg;
-        analysisMode = 'server_error';
-        // DO NOT silently fall back to 1 scene — return error to client
+      } else {
+        console.log("[analyze-video-scenes] No client boundaries, no frames — running server-side video analysis");
+        analysisMode = 'server_video_analysis';
+        try {
+          serverBoundaries = await detectScenesFromVideo(video_url, videoDuration, LOVABLE_API_KEY);
+          console.log(`[analyze-video-scenes] Server detected ${serverBoundaries.length} boundaries: ${serverBoundaries.map(b => `${b.time.toFixed(1)}s(${b.type})`).join(', ')}`);
+          if (serverBoundaries.length === 0) analysisMode = 'server_no_cuts_found';
+        } catch (e) {
+          const errMsg = e instanceof Error ? e.message : String(e);
+          console.error("[analyze-video-scenes] Server-side detection failed:", errMsg);
+          detectionError = errMsg;
+          analysisMode = 'server_error';
+        }
       }
     }
 
-    // If server analysis failed, fall back to deterministic uniform splits
-    // (~every 5s) instead of erroring out — better than zero scenes.
+    // No silent uniform 5s fallback anymore — return an honest error so the
+    // UI can display the cause and offer a manual split option.
     if (analysisMode === 'server_error') {
-      console.warn(`[analyze-video-scenes] Falling back to uniform splits (5s) — server detection failed: ${detectionError}`);
-      const step = 5;
-      const fallback: SceneBoundary[] = [];
-      for (let t = step; t < videoDuration - 1; t += step) {
-        fallback.push({ time: t, type: 'hard_cut', score: 0.5 });
-      }
-      serverBoundaries = fallback;
-      analysisMode = 'server_uniform_fallback';
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          error: 'scene_detection_failed',
+          detail: detectionError || 'Unknown error',
+          analysis_mode: 'server_error',
+          can_manual_split: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Build deterministic scenes
