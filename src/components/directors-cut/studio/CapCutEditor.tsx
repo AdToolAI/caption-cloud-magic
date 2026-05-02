@@ -191,6 +191,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const burnedSubsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const isPlayingRef = useRef<boolean>(false);
 
   // Render overlay state
   const [isRendering, setIsRendering] = useState(false);
