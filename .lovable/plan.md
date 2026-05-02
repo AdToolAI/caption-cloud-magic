@@ -1,43 +1,35 @@
-## Ziel
+## Problem
 
-Im Director's Cut Studio öffnet der Button **„Video hinzufügen"** (links im Schnitt-Panel) aktuell nur einen lokalen Datei-Picker. Er soll stattdessen den bestehenden `AddMediaDialog` öffnen, sodass man Szenen aus drei Quellen erzeugen kann:
+Der „Medien hinzufügen"-Dialog im Director's Cut bleibt leer, obwohl die Mediathek 527 fertige Videos enthält. Ursachen (in der DB verifiziert):
 
-1. **Videos** aus der eigenen Mediathek (`video_creations`)
-2. **Bilder** aus dem `images`-Bucket (mit einstellbarer Anzeigedauer)
-3. **Upload** einer neuen Datei (Video oder Bild)
+1. **Kaputte Query**: `AddMediaDialog` selektiert aus `video_creations` die Spalten `title` und `duration_seconds` — **die existieren in der Tabelle nicht**. Tatsächlich vorhanden: `output_url`, `thumbnail_url`, `metadata`, `customizations`. Supabase liefert dadurch leere Daten.
+2. **Falsche Bilder-Quelle**: Der Dialog listet Storage-Bucket `images/{userId}/` direkt — die zentrale Mediathek nutzt aber den Bucket `media-assets` und die Tabelle `media_assets`.
+3. **Fehlende Quellen**: Manuell hochgeladene Videos (`media_assets` mit `type='video'`) und AI/Campaign-Videos (`content_items`) tauchen gar nicht auf.
 
-`AddMediaDialog.tsx` existiert bereits und unterstützt genau diese drei Tabs — er wird bisher nur im alten `SceneEditingStep` verwendet.
+## Lösung
 
-## Änderungen
+In `src/components/directors-cut/ui/AddMediaDialog.tsx` die zwei `useQuery`-Hooks ersetzen, sodass sie dieselben drei Quellen abfragen wie `MediaLibrary.tsx`:
 
-### 1. `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
-- Neue optionale Prop `onAddFromLibrary?: () => void` ergänzen.
-- Den bestehenden „Video hinzufügen"-Button (Zeile 255–278) so umbauen, dass er — wenn `onAddFromLibrary` gesetzt ist — diesen Callback aufruft (öffnet den Dialog) statt direkt den File-Input zu triggern.
-- Den lokalen `<input type="file">`-Pfad als Fallback behalten, falls `onAddFromLibrary` nicht gesetzt ist (Abwärtskompatibilität).
-- Label leicht anpassen: Icon bleibt `FileVideo`, Text bleibt „Video hinzufügen" (Dialog enthält ja Videos + Bilder + Upload).
+### Videos-Tab — drei zusammengeführte Quellen
+- **`video_creations`**: `status='completed'` und `output_url IS NOT NULL`. Titel/Dauer aus `metadata` oder `customizations` ableiten (Fallback: 10s).
+- **`media_assets`** (`type='video'`, `user_id`): Public-URL über Bucket `media-assets`, Name aus `metadata.original_name`.
+- **`content_items`** (`type='video'`): über Workspace-Lookup (`workspace_members.workspace_id`) — falls vorhanden. `thumb_url` als Quelle.
 
-### 2. `src/components/directors-cut/studio/CapCutSidebar.tsx`
-- Prop `onAddFromLibrary?: () => void` durchschleifen und an `CutPanel` weiterreichen (analog zum bestehenden `onAddVideoAsScene`).
+Alle drei Listen normalisieren auf `{ id, url, thumbnail_url, title, duration_seconds, created_at }`, zusammenführen, sortieren (neueste zuerst), Limit 50 pro Quelle.
 
-### 3. `src/components/directors-cut/studio/CapCutEditor.tsx`
-- `AddMediaDialog` importieren.
-- Neuer State: `const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);`
-- An `CapCutSidebar` durchreichen: `onAddFromLibrary={() => setShowAddMediaDialog(true)}`.
-- `<AddMediaDialog>` am Ende des JSX einbinden mit:
-  - `open={showAddMediaDialog}`, `onOpenChange={setShowAddMediaDialog}`
-  - `onMediaSelect={(media) => handleAddVideoAsScene(media.url, media.duration, media.name)}`
-- `handleAddVideoAsScene` funktioniert bereits mit einer Remote-URL + Dauer + Name — keine Änderung nötig.
-- **Bilder**: Da `handleAddVideoAsScene` ein Video-ähnliches Asset erwartet, prüfen wir vor dem Aufruf den `media.type`. Falls `image`, vorerst nur Videos zulassen und für Bilder eine kurze Hinweis-Toast zeigen („Bilder als Szene werden in einem späteren Schritt unterstützt") — ODER (bevorzugt) sofort mitumsetzen: einen kleinen Wrapper, der Bild-URLs als Hintergrund einer Blackscreen-Szene mit der gewählten Anzeigedauer anlegt.
+### Bilder-Tab
+Statt `storage.from('images').list(userId)` jetzt aus Tabelle `media_assets` mit `type='image'`, Public-URL via Bucket `media-assets`.
 
-> Default-Vorgehen: **Videos sofort funktional**, Bilder/Upload nutzen denselben Pfad (`handleAddVideoAsScene`) — Hochgeladene Videos kommen so über die `images`/`video-uploads`-Bucket-URL bereits als richtige Szene rein. Für Bilder: Hinweis-Toast, bis die Bild-als-Szene-Logik bestätigt ist.
+### UI
+Keine Änderungen am Layout — die Karten zeigen weiterhin Thumbnail + Titel + Dauer. Beim leeren Zustand bleibt der bestehende Hinweis. Selektionslogik (`handleSelectVideo`/`handleSelectImage`) muss nicht angepasst werden, da die normalisierten Felder identisch heißen.
 
 ## Technische Details
 
-- `AddMediaDialog` lädt aus `video_creations` (status=`completed`) bis zu 20 Videos pro User → ausreichend für die Mediathek-Allgemein-Auswahl.
-- Der Dialog liefert `{ type, url, duration, name, thumbnail }` — passt 1:1 zur Signatur von `handleAddVideoAsScene(url, duration, name)`.
-- Keine DB-Migrationen nötig, keine neuen Edge Functions.
-- Keine i18n-String-Änderungen erforderlich (Button-Label bleibt).
+- Keine Migration und kein Edge-Function-Change nötig. Reine Frontend-Korrektur.
+- Query-Keys umbenennen auf `dc-add-media-videos` / `dc-add-media-images`, damit der alte falsche Cache verworfen wird.
+- Workspace-Lookup mit `maybeSingle()` (User ohne Workspace soll nicht crashen).
+- `content_items` werden nur einbezogen, wenn `thumb_url` gesetzt ist (sonst keine abspielbare URL vorhanden).
 
-## Offene Frage (kann nach Approval geklärt werden)
+## Datei
 
-Sollen **Bilder** aus der Mediathek im Director's Cut auch als Szene einfügbar sein (mit Standbild für die gewählte Dauer)? Falls ja, ergänze ich `handleAddVideoAsScene` um einen `mediaType`-Parameter und render im Preview ein `<img>` statt `<video>` für solche Szenen. Falls nein, blende ich den „Bilder"-Tab im Dialog aus, wenn er aus dem Director's Cut geöffnet wird.
+- `src/components/directors-cut/ui/AddMediaDialog.tsx` (nur die beiden `useQuery`-Blöcke, Zeilen ~51–98)
