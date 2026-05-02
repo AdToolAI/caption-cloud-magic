@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import { getAudioContext, unlockAudio } from '@/lib/directors-cut/audioContext';
 
 export interface AudioEffects {
   reverb: number;  // 0-100
