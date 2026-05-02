@@ -157,6 +157,13 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
   const gapLastTimestampRef = useRef<number>(0);
   const gapCooldownRef = useRef<number>(0);
 
+  // ===== Media-overlay (uploaded video / image / blackscreen scenes) =====
+  // Independent of the original-video clock — advanced by a software clock so that
+  // playback never stalls at scenes whose visual source is NOT the original video.
+  const mediaVideoRef = useRef<HTMLVideoElement>(null);
+  const swClockLastTsRef = useRef<number>(0);
+  const activeMediaSceneIdRef = useRef<string | null>(null);
+
   useEffect(() => { setIsMuted(initialMuted); }, [initialMuted]);
   useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
