@@ -237,11 +237,20 @@ export function DirectorsCut() {
     };
   }, [currentSnapshot]);
 
-  // Dynamic video duration
+  // Original (source) video duration — never changes based on scene edits.
+  // Used to decide whether a new/empty scene should pass-through the source
+  // or render as a true blackscreen placeholder beyond the source.
+  const originalVideoDuration = useMemo(() => {
+    return selectedVideo?.duration || 0;
+  }, [selectedVideo?.duration]);
+
+  // Timeline (composite) duration — extends beyond the source when scenes
+  // are appended (e.g. uploaded clips) but never shrinks below the source.
   const actualTotalDuration = useMemo(() => {
-    if (scenes.length === 0) return selectedVideo?.duration || 30;
-    return Math.max(...scenes.map(s => s.end_time));
-  }, [scenes, selectedVideo?.duration]);
+    const base = originalVideoDuration || 30;
+    if (scenes.length === 0) return base;
+    return Math.max(base, ...scenes.map(s => s.end_time));
+  }, [scenes, originalVideoDuration]);
 
   // AI Co-Pilot command handler
   const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
@@ -596,6 +605,7 @@ export function DirectorsCut() {
         <CapCutEditor
           videoUrl={selectedVideo.url}
           videoDuration={actualTotalDuration}
+          originalVideoDuration={originalVideoDuration || actualTotalDuration}
           scenes={scenes}
           audioEnhancements={audioEnhancements}
           onAudioChange={setAudioEnhancements}

@@ -26,7 +26,10 @@ import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
 
 interface CapCutEditorProps {
   videoUrl: string;
+  /** Total timeline duration (source + appended scenes). */
   videoDuration: number;
+  /** Duration of the source video itself — used to decide pass-through vs blackscreen. */
+  originalVideoDuration?: number;
   scenes: SceneAnalysis[];
   audioEnhancements: AudioEnhancements;
   onAudioChange: (enhancements: AudioEnhancements) => void;
@@ -94,6 +97,7 @@ const DEFAULT_TRACKS: AudioTrack[] = [
 export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   videoUrl,
   videoDuration,
+  originalVideoDuration,
   scenes,
   audioEnhancements,
   onAudioChange,
@@ -224,6 +228,48 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     if (scenes.length === 0) return videoDuration;
     return Math.max(videoDuration, ...scenes.map(s => s.end_time));
   }, [scenes, videoDuration]);
+
+  // ── One-shot migration of legacy/mis-flagged scenes ──
+  // Scenes inside the original video that were flagged as blackscreen (because
+  // an earlier version of the editor didn't know about source-pass-through)
+  // are silently switched to "original" mode so the user's footage shows
+  // through. Scenes outside the source video keep their blackscreen flag.
+  const migrationDoneRef = useRef(false);
+  useEffect(() => {
+    if (migrationDoneRef.current) return;
+    if (!onScenesUpdate || scenes.length === 0) return;
+    const sourceDur = originalVideoDuration ?? videoDuration;
+    if (!sourceDur || sourceDur <= 0) return;
+
+    let changed = false;
+    const migrated = scenes.map(s => {
+      if (s.additionalMedia) return s; // media scenes untouched
+      if (s.sourceMode === 'media') return s;
+      const insideSource = s.start_time < sourceDur - 0.01;
+      // Already correctly tagged
+      if (insideSource && s.sourceMode === 'original' && !s.isBlackscreen) return s;
+      if (!insideSource && s.sourceMode === 'blackscreen') return s;
+
+      changed = true;
+      if (insideSource) {
+        return {
+          ...s,
+          sourceMode: 'original' as const,
+          isBlackscreen: false,
+          original_start_time: s.original_start_time ?? s.start_time,
+          original_end_time: s.original_end_time ?? Math.min(s.end_time, sourceDur),
+        };
+      }
+      return { ...s, sourceMode: 'blackscreen' as const, isBlackscreen: true };
+    });
+
+    if (changed) {
+      migrationDoneRef.current = true;
+      onScenesUpdate(migrated);
+    } else {
+      migrationDoneRef.current = true;
+    }
+  }, [scenes, onScenesUpdate, originalVideoDuration, videoDuration]);
 
   // Audio effects change handler
   const handleAudioEffectsChange = useCallback((effects: AudioEffects) => {
@@ -963,6 +1009,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     onScenesUpdate(sorted);
   }, [scenes, onScenesUpdate]);
 
+  // Effective source video duration — falls back to timeline duration when
+  // the source duration is unknown (legacy callers). Used to decide whether
+  // a scene sits "inside the original video" (→ original pass-through) or
+  // "after the original video" (→ true blackscreen placeholder).
+  const effectiveSourceDuration = originalVideoDuration ?? videoDuration;
+
   // Add scene handler
   const handleSceneAdd = useCallback(() => {
     if (!onScenesUpdate) return;
@@ -970,12 +1022,12 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     const newStartTime = lastScene ? lastScene.end_time : 0;
     // If the new scene falls within the original video, default to a
     // pass-through "original" source so the user keeps seeing their footage
-    // and can layer filters/transitions on top. Only beyond videoDuration do
+    // and can layer filters/transitions on top. Only beyond effectiveSourceDuration do
     // we actually need a true blackscreen placeholder.
-    const insideOriginal = newStartTime < videoDuration;
+    const insideOriginal = newStartTime < effectiveSourceDuration - 0.01;
     const sourceMode: 'original' | 'blackscreen' = insideOriginal ? 'original' : 'blackscreen';
     const sceneEnd = insideOriginal
-      ? Math.min(newStartTime + 5, videoDuration)
+      ? Math.min(newStartTime + 5, effectiveSourceDuration)
       : newStartTime + 5;
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
@@ -986,16 +1038,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       suggested_effects: [],
       isBlackscreen: !insideOriginal,
       sourceMode,
+      // Map the scene to the matching segment of the source so playback
+      // shows the correct frames — not always 0:00.
+      original_start_time: insideOriginal ? newStartTime : undefined,
+      original_end_time: insideOriginal ? sceneEnd : undefined,
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, videoDuration, t]);
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
 
   // Add video as new scene handler
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
     // Append seamlessly after the last scene OR after the original video — whichever ends later.
-    const newStartTime = Math.max(lastScene?.end_time ?? 0, videoDuration);
+    const newStartTime = Math.max(lastScene?.end_time ?? 0, effectiveSourceDuration);
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
@@ -1004,6 +1060,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       content_description: t('dc.videoFromUpload'),
       suggested_effects: [],
       isBlackscreen: false,
+      isFromOriginalVideo: false,
       sourceMode: 'media',
       additionalMedia: {
         type: 'video',
@@ -1012,7 +1069,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       },
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate, videoDuration, t]);
+  }, [scenes, onScenesUpdate, effectiveSourceDuration, t]);
 
   // Add Media Dialog (videos / images / upload from library)
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
