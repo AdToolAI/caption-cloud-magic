@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback } from 'react';
+import { getAudioContext, unlockAudio } from '@/lib/directors-cut/audioContext';
 
 export interface AudioEffects {
   reverb: number;  // 0-100
@@ -39,23 +40,17 @@ export function useWebAudioEffects({ audioEffects, enabled = true }: UseWebAudio
   // Create and connect audio graph to a media element
   const connectToMediaElement = useCallback(async (mediaElement: HTMLMediaElement) => {
     if (!enabled) return;
-    
-    // Prevent double-connection
+
+    // Prevent double-connection (a MediaElementSource can only be created
+    // ONCE per element for the lifetime of the page).
     if (connectedElementRef.current === mediaElement && audioContextRef.current) {
       return;
     }
 
-    // Clean up previous connection
-    if (audioContextRef.current) {
-      try {
-        audioContextRef.current.close();
-      } catch (e) {
-        console.log('AudioContext close error:', e);
-      }
-    }
-
     try {
-      const ctx = new AudioContext();
+      // Use the shared singleton — never create / close per hook instance,
+      // otherwise media elements lose their audio output permanently.
+      const ctx = getAudioContext();
       audioContextRef.current = ctx;
 
       // Resume context if suspended (browser autoplay policy)
@@ -175,31 +170,19 @@ export function useWebAudioEffects({ audioEffects, enabled = true }: UseWebAudio
     }
   }, [audioEffects]);
 
-  // Resume audio context (needed for browser autoplay policy)
+  // Resume audio context (needed for browser autoplay policy).
+  // Delegates to the shared singleton so EVERY caller resumes the same ctx.
   const resumeContext = useCallback(async () => {
-    if (audioContextRef.current?.state === 'suspended') {
-      try {
-        await audioContextRef.current.resume();
-        console.log('[WebAudioEffects] AudioContext resumed');
-      } catch (e) {
-        console.error('[WebAudioEffects] Failed to resume AudioContext:', e);
-      }
-    }
+    await unlockAudio();
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup on unmount: do NOT close the shared AudioContext (other
+  // components / future re-mounts depend on it). Only release our refs.
   useEffect(() => {
     return () => {
-      if (audioContextRef.current) {
-        try {
-          audioContextRef.current.close();
-        } catch (e) {
-          console.log('AudioContext cleanup error:', e);
-        }
-        audioContextRef.current = null;
-        sourceNodeRef.current = null;
-        connectedElementRef.current = null;
-      }
+      sourceNodeRef.current = null;
+      // Keep connectedElementRef so a future remount with the same element
+      // recognises it and skips a duplicate createMediaElementSource call.
     };
   }, []);
 

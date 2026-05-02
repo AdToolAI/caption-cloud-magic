@@ -1,44 +1,80 @@
 ## Problem
 
-Im Video Composer hängen alle HappyHorse-Szenen dauerhaft auf "Wird generiert…", obwohl Replicate die Clips längst fertig hat. In der DB sind die 6 Szenen seit 18:24 Uhr unverändert auf `clip_status='generating'` mit gesetzter `replicate_prediction_id`, aber ohne `clip_url`.
+Im Director's Cut ist beim Vorschau-Playback weder das **Voiceover** noch die **Hintergrundmusik** zu hören – obwohl beide Tracks in der Timeline korrekt liegen. Auch das Original-Video-Audio wird in vielen Fällen nicht ausgegeben.
 
-## Ursache
+## Root Cause Analyse
 
-Alle anderen 10 Composer-Provider (Hailuo, Kling, Wan, Seedance, Luma, Veo, Runway, Pika, Vidu, Image) rufen Replicate **direkt** in `compose-video-clips` auf und registrieren dabei den Composer-spezifischen Callback:
+Drei kombinierte Bugs im Audio-Routing:
 
+### 1. Web Audio Graph kappt das Original-Audio
+`CapCutPreviewPlayer` ruft `connectToMediaElement(video)` auf. Sobald `createMediaElementSource()` ein `<video>` hängt, fließt der Ton **nur noch** durch den Web-Audio-Graph (Browser-Spec). Das Problem:
+- Der `AudioContext` wird in einem `useEffect` (also außerhalb des User-Gestures) erzeugt → bleibt im State `suspended`.
+- Es wird zwar versucht `await resumeContext()` beim Play-Klick, aber wenn der Verbindungs-Effect die `<audio>`-Elemente erst danach erzeugt, ist die Reihenfolge kaputt.
+- Wenn der User **das Video-Element in `additionalMedia` wechselt** (Scene-Switch), wird der alte `MediaElementSource` weggeworfen, der neue aber nicht zuverlässig neu verbunden (`audioConnectedRef.current` bleibt true).
+
+### 2. `CapCutEditor` legt zusätzlich pro Play-Klick einen orphan AudioContext an
+```ts
+if (typeof AudioContext !== 'undefined') {
+  const ctx = new AudioContext();   // ← orphan
+  if (ctx.state === 'suspended') await ctx.resume();
+}
 ```
-webhook: ${SUPABASE_URL}/functions/v1/compose-clip-webhook?scene_id=...&project_id=...
-```
+Das hilft nichts, blockiert aber den Hauptthread und vergiftet das User-Gesture-Token (auf manchen Browsern wird der echte Context dadurch nicht resumed).
 
-`compose-clip-webhook` ist die einzige Funktion, die `composer_scenes.clip_status` und `clip_url` updated.
-
-**HappyHorse ist die Ausnahme**: `compose-video-clips` ruft den Toolkit-Endpoint `generate-happyhorse-video` als HTTP-Proxy auf. Diese Toolkit-Funktion startet zwar einen Background-Task (`rehostAndPersist`), schreibt aber ausschließlich in die `generations`-Tabelle (für das Standalone-Toolkit) — sie kennt `composer_scenes` nicht und registriert auch keinen Composer-Webhook bei Replicate. Resultat: Replicate ist fertig, niemand updated die Szene.
+### 3. Voiceover/Musik-`<audio>`-Elemente werden außerhalb des User-Gestures erzeugt
+`CapCutEditor` erzeugt `new Audio()` lazy in einem `useEffect`, der nach dem React-Re-Render läuft. Beim ersten `play()`-Versuch fehlt das Gesture-Token → Promise wird mit `NotAllowedError` rejected, Fehler nur stillgeschwiegen geloggt (`.catch(err => console.log(...))`).
 
 ## Lösung
 
-`compose-video-clips` so umbauen, dass HappyHorse genauso behandelt wird wie alle anderen Provider — direkter Replicate-Aufruf mit `compose-clip-webhook` als Callback, kein Umweg über die Toolkit-Funktion.
+### Fix 1 — Globaler, einmaliger AudioContext + Unlock im Play-Handler
+- Neue Datei `src/lib/directors-cut/audioContext.ts` mit Singleton:
+  ```ts
+  let ctx: AudioContext | null = null;
+  export function getAudioContext() { ... lazy create ... }
+  export async function unlockAudio() {
+    const c = getAudioContext();
+    if (c.state === 'suspended') await c.resume();
+  }
+  ```
+- `useWebAudioEffects` benutzt diesen Singleton statt `new AudioContext()`.
+- Aufruf von `unlockAudio()` direkt im Click-Handler von `handlePlayPause` (CapCutEditor + CapCutPreviewPlayer), **bevor** irgendein State-Update passiert.
 
-### Änderungen
+### Fix 2 — Voiceover/Musik-Audio-Elemente vor-laden
+- In `CapCutEditor` `<audio>` Tags **deklarativ** im JSX rendern (hidden), damit React sie beim Mount erzeugt (kein Lazy-Create im Effect):
+  ```tsx
+  {audioTracks.flatMap(t => t.clips).map(c => (
+    <audio key={c.id} ref={el => audioElementsRef.current.set(c.id, el!)} 
+           src={c.url} preload="auto" crossOrigin="anonymous" />
+  ))}
+  ```
+- Beim Play-Klick ein `audio.load()` + sofortiges `play(); pause()` für jeden vorhandenen Clip aufrufen, um das Gesture-Token zu „sammeln" — dann läuft das spätere zeitgesteuerte `play()` ohne `NotAllowedError`.
 
-1. **`supabase/functions/compose-video-clips/index.ts`** — HappyHorse-Block (Zeilen 830–877) ersetzen:
-   - Direkter `fetch` an `https://api.replicate.com/v1/predictions` mit `version: "alibaba/happyhorse-1.0"` (oder das vom Toolkit verwendete Model-Slug; aus `generate-happyhorse-video/index.ts` übernehmen).
-   - Input-Mapping wie im Toolkit: `prompt`, `duration`, `aspect_ratio`, `resolution` (720p für standard, 1080p für pro), optional `image` für I2V.
-   - `webhook: ${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}` und `webhook_events_filter: ["completed"]` mitsenden — analog zu Hailuo (Zeilen 419/420).
-   - `replicate_prediction_id` in `composer_scenes` speichern.
-   - Credits werden weiterhin im Standard-Composer-Flow (am Ende von `compose-video-clips`) abgerechnet — der Toolkit-Wallet-Abzug entfällt für Composer-Szenen.
+### Fix 3 — Original-Audio per default NICHT durch WebAudio routen
+- `CapCutPreviewPlayer` nur dann `connectToMediaElement` aufrufen, wenn **mindestens ein Effekt aktiv ist** (`bass !== 0 || mid !== 0 || treble !== 0 || reverb > 0 || echo > 0 || pitch !== 0`).
+- Andernfalls bleibt der Video-Ton normal über das `<video>`-Element direkt am Browser-Output → keine Suspension, keine CORS-Probleme.
 
-2. **One-shot Recovery für die 6 hängenden Szenen** des aktuellen Projekts (`6af4eda9-…`):
-   - SQL-Migration / einmaliger Job, der die 6 `replicate_prediction_id`s direkt bei Replicate abfragt und (bei `succeeded`) `clip_url` + `clip_status='ready'` setzt, bzw. bei `failed` auf `failed` mit Credit-Refund. Alternative: per Hand in der DB als `failed` markieren und der User regeneriert — günstiger und sauberer, da die 6 Predictions ggf. eh schon abgelaufen sind.
-   - Empfehlung: **Refund + auf `failed` setzen**, damit der User mit dem Fix neu rendern kann.
+### Fix 4 — Cleanup & Re-connect bei Scene-Switch
+- `audioConnectedRef` zurücksetzen, sobald der `activeVideoUrl` wechselt, damit beim Wechsel zwischen Original-Video und `additionalMedia` der WebAudio-Graph korrekt neu verbunden wird (falls Effekte aktiv sind).
 
-3. **`compose-clip-webhook`** muss nichts ändern — die Funktion ist bereits provider-agnostisch und arbeitet nur über `replicate_prediction_id` + Output-URL.
+### Fix 5 — Orphan-Context in `handlePlayPause` entfernen
+- Den Block `const ctx = new AudioContext()` ersatzlos streichen — er erzeugt nur Speicherlecks.
 
-### Out of Scope
+### Fix 6 — Fehler sichtbar machen
+- `audio.play().catch(...)` → bei `NotAllowedError` einmalig einen Toast "Klicke erneut auf Play, um Audio zu aktivieren" anzeigen, statt nur in die Console zu loggen.
 
-- Das Standalone-HappyHorse-Toolkit (`/ai-video-toolkit?model=happyhorse-…`) bleibt unverändert. Es nutzt weiterhin `generate-happyhorse-video` mit der eigenen `generations`-Tabelle.
-- Keine Änderung an Pricing/Credits-Logik — der Composer rechnet HappyHorse über `getClipCost('ai-happyhorse', quality, duration)` ab (bereits implementiert).
+## Betroffene Dateien
 
-## Ergebnis
+```text
+src/lib/directors-cut/audioContext.ts          (neu)
+src/hooks/useWebAudioEffects.ts                (Singleton verwenden)
+src/components/directors-cut/studio/CapCutPreviewPlayer.tsx
+src/components/directors-cut/studio/CapCutEditor.tsx
+```
 
-- Neue HappyHorse-Renders im Composer schalten innerhalb von Sekunden nach Replicate-Completion auf "ready", `clip_url` füllt sich, Polling endet automatisch.
-- Die 6 aktuell hängenden Szenen werden refundiert und können neu gerendert werden.
+## Erwartetes Ergebnis
+
+- **Voiceover** spielt synchron zur Timeline.
+- **Hintergrundmusik** spielt parallel und mit Track-Volume-Slider regelbar.
+- **Original-Video-Audio** bleibt hörbar (außer wenn Voiceover/Music aktiv sind und Auto-Mute greift).
+- Keine `NotAllowedError`-Stille mehr beim ersten Play.
+- Audio-Effects (Reverb/Echo/EQ) funktionieren weiterhin, sobald ein Slider bewegt wird.

@@ -18,6 +18,7 @@ import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, Tou
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
@@ -190,6 +191,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const burnedSubsPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
   const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const isPlayingRef = useRef<boolean>(false);
 
   // Render overlay state
   const [isRendering, setIsRendering] = useState(false);
@@ -358,7 +360,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           }
           
           if (audio.paused) {
-            audio.play().catch(err => console.log('Audio play error:', err));
+            audio.play().catch((err) => {
+              if (err?.name === 'NotAllowedError') {
+                // Autoplay was blocked — surface ONCE so the user knows
+                // they need to click play to grant audio permission.
+                if (!(window as any).__dcAudioToastShown) {
+                  (window as any).__dcAudioToastShown = true;
+                  toast.warning('Klicke erneut auf Play, um Audio zu aktivieren.');
+                  setTimeout(() => { (window as any).__dcAudioToastShown = false; }, 5000);
+                }
+              } else {
+                console.warn('[CapCutEditor] Audio play error:', err);
+              }
+            });
           }
         } else {
           if (!audio.paused) {
@@ -380,7 +394,26 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
     };
   }, []);
 
-  const handlePlayPause = useCallback(() => {
+  // Mirror isPlaying into a ref so the click handler can read the latest
+  // value without stale-closure issues.
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const handlePlayPause = useCallback(async () => {
+    // CRITICAL: unlock the shared AudioContext from inside the click
+    // gesture so the timed-playback effect can later call audio.play()
+    // without hitting NotAllowedError. Also prime each audio element
+    // so the browser whitelists them for autoplay.
+    await unlockAudio();
+
+    const willPlay = !isPlayingRef.current;
+    if (willPlay) {
+      const elements = Array.from(audioElementsRef.current.values());
+      // Prime in parallel — non-blocking; failures are silent on purpose.
+      await Promise.allSettled(elements.map(primeAudioElement));
+    }
+
     setIsPlaying(prev => !prev);
   }, []);
 
