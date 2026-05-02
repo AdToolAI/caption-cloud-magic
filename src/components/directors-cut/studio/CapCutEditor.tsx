@@ -18,6 +18,7 @@ import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, Tou
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS } from '@/hooks/useWebAudioEffects';
+import { unlockAudio, primeAudioElement } from '@/lib/directors-cut/audioContext';
 import { supabase } from '@/integrations/supabase/client';
 
 import type { KenBurnsKeyframe } from '../features/KenBurnsEffect';
