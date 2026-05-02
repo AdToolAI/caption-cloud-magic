@@ -412,46 +412,92 @@ export function DirectorsCut() {
       
       let timestampedFrames: TimestampedFrame[] = [];
       let detectedBoundaries: DetectedBoundary[] = [];
-      // Build a list of URLs to try: original first, then a CORS-friendly proxy
-      // (the Lambda S3 bucket does not send Access-Control-Allow-Origin which
-      // taints the canvas and breaks toDataURL).
+      let pysceneSucceeded = false;
+
+      // ── PRIMARY: PySceneDetect via Replicate (industry-standard, deterministic) ──
+      try {
+        toast.info(t('dc.detectingScenes', { defaultValue: 'Erkenne Szenen mit PySceneDetect…' } as any));
+        const { data: pyData, error: pyErr } = await supabase.functions.invoke('detect-scenes-pyscenedetect', {
+          body: { video_url: selectedVideo.url, threshold: 27 },
+        });
+        if (pyErr) throw pyErr;
+        if (pyData?.ok && Array.isArray(pyData.scene_urls) && pyData.scene_urls.length > 0) {
+          const sceneUrls: string[] = pyData.scene_urls;
+          // Probe each split clip's duration to build cumulative boundaries
+          const durations: number[] = [];
+          for (const url of sceneUrls) {
+            try {
+              const d = await probeMediaDuration(url, 10000);
+              durations.push(d);
+            } catch (e) {
+              console.warn('[DirectorsCut] probe failed for scene clip', url, e);
+              durations.push(0);
+            }
+          }
+          let acc = 0;
+          const boundaries: DetectedBoundary[] = [];
+          for (let i = 0; i < durations.length - 1; i++) {
+            acc += durations[i];
+            if (acc > 0 && acc < canonicalDuration - 0.1) {
+              boundaries.push({
+                time: Math.round(acc * 100) / 100,
+                score: 0.95,
+                type: 'hard_cut',
+                signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
+              });
+            }
+          }
+          detectedBoundaries = boundaries;
+          pysceneSucceeded = true;
+          console.log('[DirectorsCut] PySceneDetect found', boundaries.length, 'boundaries from', sceneUrls.length, 'scenes');
+          toast.success(t('dc.candidatesFound', { count: boundaries.length }));
+        } else {
+          console.warn('[DirectorsCut] PySceneDetect returned no scenes, falling back', pyData);
+        }
+      } catch (pyErr) {
+        console.warn('[DirectorsCut] PySceneDetect failed, falling back to client detection:', pyErr);
+      }
+
+      // ── FALLBACK: Client-side pixel analysis (only if PySceneDetect failed) ──
       const proxyUrl = `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/proxy-video-bytes?url=${encodeURIComponent(selectedVideo.url)}`;
       const extractCandidates = [selectedVideo.url, proxyUrl];
 
-      for (const candidateUrl of extractCandidates) {
-        try {
-          timestampedFrames = await extractTimestampedFrames(candidateUrl, canonicalDuration);
-          if (timestampedFrames.length > 0) {
-            toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
-            const coarseResult = await detectBoundariesAsync(timestampedFrames);
-            if (coarseResult.boundaries.length > 0) {
-              toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
-              try {
-                const refinementFrames = await extractRefinementFrames(
-                  candidateUrl, canonicalDuration,
-                  coarseResult.boundaries.map(b => b.time)
-                );
-                const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
-                detectedBoundaries = refined.boundaries;
-              } catch {
+      if (!pysceneSucceeded) {
+        for (const candidateUrl of extractCandidates) {
+          try {
+            timestampedFrames = await extractTimestampedFrames(candidateUrl, canonicalDuration);
+            if (timestampedFrames.length > 0) {
+              toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
+              const coarseResult = await detectBoundariesAsync(timestampedFrames);
+              if (coarseResult.boundaries.length > 0) {
+                toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
+                try {
+                  const refinementFrames = await extractRefinementFrames(
+                    candidateUrl, canonicalDuration,
+                    coarseResult.boundaries.map(b => b.time)
+                  );
+                  const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
+                  detectedBoundaries = refined.boundaries;
+                } catch {
+                  detectedBoundaries = coarseResult.boundaries;
+                }
+              } else {
                 detectedBoundaries = coarseResult.boundaries;
               }
-            } else {
-              detectedBoundaries = coarseResult.boundaries;
+              break;
             }
-            break; // success — stop trying further candidates
+          } catch (frameError: any) {
+            const msg = String(frameError?.message || '');
+            const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(msg);
+            const isLoadOrSeek = /load|seek|decode|MEDIA|video error|timeout/i.test(msg);
+            console.warn(`[DirectorsCut] Frame extraction failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
+            if (candidateUrl !== proxyUrl && !(isCors || isLoadOrSeek)) {
+              break;
+            }
           }
-        } catch (frameError: any) {
-          const msg = String(frameError?.message || '');
-          const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(msg);
-          const isLoadOrSeek = /load|seek|decode|MEDIA|video error|timeout/i.test(msg);
-          console.warn(`[DirectorsCut] Frame extraction failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
-          if (candidateUrl !== proxyUrl && !(isCors || isLoadOrSeek)) {
-            break;
-          }
-          // otherwise loop and try the next candidate (proxy)
         }
       }
+
 
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
