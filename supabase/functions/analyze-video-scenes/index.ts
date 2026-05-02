@@ -234,7 +234,10 @@ REGELN:
         source: analysisMode,
         boundaries_used: allBoundaries.length,
         analysis_mode: analysisMode,
+        boundary_source: boundary_source || 'auto',
+        min_scene_duration: minSceneDuration,
         debug_boundary_times: allBoundaries.map(b => b.time),
+        debug_dropped_boundaries: buildResult.dropped,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
