@@ -220,49 +220,66 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     return originalTime;
   }, [currentScene, isAdditionalMedia, scenes]);
 
-  // Handle scene changes - sync video position
+  // Handle scene changes — sync video position. Also handles regions WITHOUT
+  // an active scene by treating the original video as the default stage.
   useEffect(() => {
-    if (!currentScene) return;
+    const mainVideo = mainVideoRef.current;
+    const additionalVideo = additionalVideoRef.current;
+
+    // No active scene → original video is the default stage (1:1 with currentTime)
+    if (!currentScene) {
+      lastSceneIdRef.current = null;
+
+      if (mainVideo) {
+        // Only sync if drift is significant (avoid stutter from constant seeks)
+        if (Math.abs(mainVideo.currentTime - currentTime) > 0.3) {
+          mainVideo.currentTime = Math.max(0, Math.min(currentTime, mainVideo.duration || currentTime));
+        }
+        if (isPlaying && mainVideo.paused && currentTime < (mainVideo.duration || Infinity)) {
+          mainVideo.play().catch(() => {});
+        }
+      }
+
+      // Pause additional video when no scene is active
+      if (additionalVideo && !additionalVideo.paused) {
+        additionalVideo.pause();
+      }
+      return;
+    }
 
     const sceneChanged = lastSceneIdRef.current !== currentScene.id;
     lastSceneIdRef.current = currentScene.id;
 
     if (isAdditionalMedia) {
       // Switch to additionalMedia video
-      const additionalVideo = additionalVideoRef.current;
-      const mainVideo = mainVideoRef.current;
-      
       if (additionalVideo) {
         const relativeTime = currentTime - currentScene.start_time;
         if (Math.abs(additionalVideo.currentTime - relativeTime) > 0.3 || sceneChanged) {
           additionalVideo.currentTime = Math.max(0, relativeTime);
         }
-        
+
         if (isPlaying && additionalVideo.paused) {
           additionalVideo.play().catch(() => {});
         }
       }
-      
+
       // Pause main video
       if (mainVideo && !mainVideo.paused) {
         mainVideo.pause();
       }
     } else {
-      // Switch to main video
-      const mainVideo = mainVideoRef.current;
-      const additionalVideo = additionalVideoRef.current;
-      
+      // Active scene without additionalMedia → original video with scene effects
       if (mainVideo) {
         const targetTime = getOriginalStartTime() + (currentTime - currentScene.start_time);
         if (Math.abs(mainVideo.currentTime - targetTime) > 0.3 || sceneChanged) {
           mainVideo.currentTime = Math.max(0, targetTime);
         }
-        
+
         if (isPlaying && mainVideo.paused) {
           mainVideo.play().catch(() => {});
         }
       }
-      
+
       // Pause additional video
       if (additionalVideo && !additionalVideo.paused) {
         additionalVideo.pause();
