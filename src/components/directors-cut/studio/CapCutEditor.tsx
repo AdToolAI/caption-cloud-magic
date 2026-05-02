@@ -148,6 +148,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onVoiceOverGenerated,
   onResetProject,
   onBackToImport,
+  initialAiCutMarkers,
 }) => {
   const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
