@@ -72,7 +72,10 @@ const DraggableScene: React.FC<{
   onDelete?: () => void;
   onSplit?: () => void;
   onTrim?: (newStart: number, newEnd: number) => void;
-}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim }) => {
+  /** Optional snap function — returns the snapped time and whether a target was hit. */
+  snapFn?: (value: number, excludeSceneId?: string) => { value: number; hit: { time: number } | null };
+  onSnapPreview?: (time: number | null) => void;
+}> = ({ scene, index, zoom, isSelected, isPlayheadInside, onSeek, onSelect, onDelete, onSplit, onTrim, snapFn, onSnapPreview }) => {
   const { t } = useTranslation();
   const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
   const startXRef = useRef(0);
