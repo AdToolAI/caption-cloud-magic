@@ -392,37 +392,52 @@ Antworte NUR mit dem JSON-Array, kein weiterer Text!`;
   return deduped;
 }
 
-// Build scenes from deterministic boundaries — AI CANNOT change these
+// Build scenes from deterministic boundaries — AI CANNOT change these.
+// Returns both the scenes and any boundaries that were dropped for diagnostics.
 function buildDeterministicScenes(
   boundaries: SceneBoundary[],
   legacyCuts: number[],
-  duration: number
-): { start_time: number; end_time: number }[] {
+  duration: number,
+  minSceneDuration = 3.0
+): { scenes: { start_time: number; end_time: number }[]; dropped: { time: number; reason: string }[] } {
   const cutTimes = boundaries.length > 0
     ? boundaries.map(b => b.time)
     : legacyCuts.length > 0
       ? legacyCuts
       : [];
 
+  const dropped: { time: number; reason: string }[] = [];
+
   if (cutTimes.length === 0) {
-    return [{ start_time: 0, end_time: duration }];
+    return { scenes: [{ start_time: 0, end_time: duration }], dropped };
   }
 
   const sorted = [...cutTimes].sort((a, b) => a - b);
-  const MIN_SCENE_DURATION = 3.0;
   const scenes: { start_time: number; end_time: number }[] = [];
   let lastStart = 0;
 
   for (const t of sorted) {
-    // Only accept boundary if it creates a scene >= 3s AND leaves >= 3s for the next scene
-    if (t > lastStart + MIN_SCENE_DURATION && t < duration - MIN_SCENE_DURATION) {
-      scenes.push({ start_time: lastStart, end_time: t });
-      lastStart = t;
+    if (t <= lastStart + minSceneDuration) {
+      dropped.push({ time: t, reason: `too_close_to_prev(<${minSceneDuration}s)` });
+      continue;
     }
+    if (t >= duration - minSceneDuration) {
+      // Tail too short — still keep the cut for trusted (low minDur) sources,
+      // but for a 3s safeguard drop it as before.
+      if (minSceneDuration <= 1.0) {
+        scenes.push({ start_time: lastStart, end_time: t });
+        lastStart = t;
+      } else {
+        dropped.push({ time: t, reason: `too_close_to_end(<${minSceneDuration}s)` });
+      }
+      continue;
+    }
+    scenes.push({ start_time: lastStart, end_time: t });
+    lastStart = t;
   }
   scenes.push({ start_time: lastStart, end_time: duration });
 
-  return scenes;
+  return { scenes, dropped };
 }
 
 function parseAIResponse(content: string): any[] | null {
