@@ -247,56 +247,53 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
   }, [currentTime, currentScene, isAdditionalMedia, isPlaying, getOriginalStartTime]);
 
-  // Connect Web Audio API when video is ready
+  // Connect Web Audio API ONLY when at least one effect is active.
+  // Otherwise the <video> element keeps its native audio output, which
+  // is more reliable and not affected by AudioContext suspension.
   useEffect(() => {
-    const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
-    
-    if (activeVideo && !audioConnectedRef.current && !autoMuteVideo) {
-      // Wait for video to be ready before connecting
-      const handleCanPlay = async () => {
-        try {
-          await connectToMediaElement(activeVideo);
-          audioConnectedRef.current = true;
-          console.log('[CapCutPreviewPlayer] Web Audio connected');
-        } catch (e) {
-          console.log('[CapCutPreviewPlayer] Web Audio connection error:', e);
-        }
-      };
+    if (!effectsActive || autoMuteVideo) return;
 
-      if (activeVideo.readyState >= 2) {
-        handleCanPlay();
-      } else {
-        activeVideo.addEventListener('canplay', handleCanPlay, { once: true });
+    const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
+    if (!activeVideo || audioConnectedRef.current) return;
+
+    const handleCanPlay = async () => {
+      try {
+        await connectToMediaElement(activeVideo);
+        audioConnectedRef.current = true;
+        console.log('[CapCutPreviewPlayer] Web Audio connected');
+      } catch (e) {
+        console.log('[CapCutPreviewPlayer] Web Audio connection error:', e);
       }
+    };
+
+    if (activeVideo.readyState >= 2) {
+      handleCanPlay();
+    } else {
+      activeVideo.addEventListener('canplay', handleCanPlay, { once: true });
+      return () => activeVideo.removeEventListener('canplay', handleCanPlay);
     }
-  }, [isAdditionalMedia, autoMuteVideo, connectToMediaElement]);
+  }, [effectsActive, isAdditionalMedia, autoMuteVideo, connectToMediaElement]);
 
   // Handle play/pause
   const handlePlayPause = useCallback(async () => {
+    // CRITICAL: unlock the shared AudioContext from inside this user
+    // gesture before doing anything async. This is the ONE place that
+    // grants every audio source (video, voiceover, music) permission
+    // to play under the browser autoplay policy.
+    await unlockAudio();
+
     const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
-    
+
     if (!activeVideo) {
       onPlayPause();
       return;
     }
 
     try {
-      // CRITICAL: Resume audio context BEFORE playing (browser autoplay policy)
-      await resumeContext();
-      
-      // Also create and resume a global AudioContext for Web Audio API
-      if (typeof AudioContext !== 'undefined') {
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') {
-          await ctx.resume();
-        }
-      }
-      
       if (isPlaying) {
         activeVideo.pause();
         onPlayingChange?.(false);
       } else {
-        // Ensure video is not muted if we want audio
         if (!autoMuteVideo && !isMuted) {
           activeVideo.muted = false;
         }
@@ -306,7 +303,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     } catch (error) {
       console.error('Video play error:', error);
     }
-  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange, resumeContext, autoMuteVideo, isMuted]);
+  }, [isPlaying, isAdditionalMedia, onPlayPause, onPlayingChange, autoMuteVideo, isMuted]);
 
   // Handle seek
   const handleSeek = useCallback((time: number) => {
