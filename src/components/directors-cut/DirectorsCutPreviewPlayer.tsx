@@ -1504,6 +1504,45 @@ export const DirectorsCutPreviewPlayer: React.FC<DirectorsCutPreviewPlayerProps>
             preload="auto"
             onEnded={handleVideoEnded}
           />
+
+          {/* Media Overlay (uploaded video clips for `media` scenes) */}
+          <video
+            ref={mediaVideoRef}
+            className="absolute inset-0 w-full h-full object-contain"
+            style={{
+              zIndex: 4,
+              opacity:
+                currentScene?.sourceMode === 'media' &&
+                currentScene?.additionalMedia?.type === 'video'
+                  ? 1
+                  : 0,
+              pointerEvents: 'none',
+              backgroundColor: '#000',
+            }}
+            muted={isMuted}
+            playsInline
+            preload="auto"
+          />
+
+          {/* Image Overlay (for `media` scenes that hold an image) */}
+          {currentScene?.sourceMode === 'media' &&
+            currentScene?.additionalMedia?.type === 'image' && (
+              <img
+                src={currentScene.additionalMedia.url}
+                alt=""
+                className="absolute inset-0 w-full h-full object-contain"
+                style={{ zIndex: 4, pointerEvents: 'none', backgroundColor: '#000' }}
+              />
+            )}
+
+          {/* Blackscreen Overlay */}
+          {(currentScene?.sourceMode === 'blackscreen' ||
+            (!currentScene?.sourceMode && currentScene?.isBlackscreen)) && (
+            <div
+              className="absolute inset-0 w-full h-full"
+              style={{ zIndex: 4, backgroundColor: '#000', pointerEvents: 'none' }}
+            />
+          )}
         </div>
         </div>
 
