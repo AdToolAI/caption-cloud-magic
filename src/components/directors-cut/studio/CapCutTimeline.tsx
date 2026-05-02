@@ -823,6 +823,30 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
               style={{ height: VIDEO_TRACK_HEIGHT }}
               onClick={() => onSceneSelect?.(null)}
             >
+              {/* Cut markers (AI-detected snap points) — rendered behind scenes */}
+              {cutMarkers.map((m, idx) => {
+                const weak = (m.confidence ?? 1) < 0.6;
+                return (
+                  <div
+                    key={`cut-${idx}-${m.time}`}
+                    className={cn(
+                      "absolute top-0 bottom-0 w-px pointer-events-none z-0",
+                      weak
+                        ? "border-l border-dashed border-[#F5C76A]/30"
+                        : "bg-[#F5C76A]/50"
+                    )}
+                    style={{ left: `${m.time * zoom}px` }}
+                    title={`${weak ? 'Weak ' : ''}cut @ ${m.time.toFixed(2)}s`}
+                  />
+                );
+              })}
+              {/* Snap line (visual feedback while dragging) */}
+              {snapPreview !== null && (
+                <div
+                  className="absolute top-0 bottom-0 w-[2px] bg-[#F5C76A] z-40 pointer-events-none animate-pulse shadow-[0_0_8px_rgba(245,199,106,0.8)]"
+                  style={{ left: `${snapPreview * zoom}px` }}
+                />
+              )}
               {scenes.map((scene, i) => (
                 <DraggableScene
                   key={scene.id}
@@ -836,6 +860,8 @@ export const CapCutTimeline: React.FC<CapCutTimelineProps> = ({
                   onDelete={onSceneDelete ? () => onSceneDelete(scene.id) : undefined}
                   onSplit={onSplitAtPlayhead}
                   onTrim={onTrimScene ? (newStart, newEnd) => onTrimScene(scene.id, newStart, newEnd) : undefined}
+                  snapFn={snapFn}
+                  onSnapPreview={setSnapPreview}
                 />
               ))}
               {/* Add Scene Button with Dropdown */}
