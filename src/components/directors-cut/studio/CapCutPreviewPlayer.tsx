@@ -7,6 +7,7 @@ import { SceneAnalysis } from '@/types/directors-cut';
 import { SubtitleTrack, DEFAULT_SUBTITLE_STYLE } from '@/types/timeline';
 import { cn } from '@/lib/utils';
 import { AudioEffects, DEFAULT_AUDIO_EFFECTS, useWebAudioEffects } from '@/hooks/useWebAudioEffects';
+import { unlockAudio } from '@/lib/directors-cut/audioContext';
 
 // Font size mapping
 const FONT_SIZES = {
