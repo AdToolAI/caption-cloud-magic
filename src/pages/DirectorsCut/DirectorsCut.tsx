@@ -47,6 +47,9 @@ export function DirectorsCut() {
   const [scenes, setScenes] = useState<SceneAnalysis[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [transitions, setTransitions] = useState<TransitionAssignment[]>([]);
+  // AI-detected cut markers — propagated into the studio so scene-add / snapping
+  // can use them as the canonical anchor grid.
+  const [aiCutMarkers, setAiCutMarkers] = useState<Array<{ time: number; confidence?: number; source?: 'auto' | 'manual' }>>([]);
 
   useEffect(() => {
     if (scenes.length > 1 && transitions.length === 0) {
@@ -521,6 +524,11 @@ export function DirectorsCut() {
       }
       
       setScenes(normalizedScenes);
+      setAiCutMarkers(detectedBoundaries.map(b => ({
+        time: b.time,
+        confidence: Math.min(1, Math.max(0, b.score ?? 0.7)),
+        source: 'auto' as const,
+      })));
       toast.success(t('dc.scenesDetected', { count: normalizedScenes.length }));
     } catch (error) {
       console.error('Error analyzing video:', error);
@@ -615,6 +623,7 @@ export function DirectorsCut() {
           textOverlays={textOverlays}
           onTextOverlaysChange={setTextOverlays}
           appliedEffects={appliedEffects}
+          initialAiCutMarkers={aiCutMarkers}
           transitions={transitions}
           onTransitionsChange={setTransitions}
           colorGrading={colorGrading}
