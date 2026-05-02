@@ -97,6 +97,7 @@ const DEFAULT_TRACKS: AudioTrack[] = [
 export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   videoUrl,
   videoDuration,
+  originalVideoDuration,
   scenes,
   audioEnhancements,
   onAudioChange,
