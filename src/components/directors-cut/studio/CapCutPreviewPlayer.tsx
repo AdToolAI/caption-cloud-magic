@@ -130,7 +130,10 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
   }, [currentTime, currentScene, isAdditionalMedia, scenes]);
 
-  // Animation loop for time updates during playback
+  // Animation loop for time updates during playback.
+  // Runs continuously while isPlaying, even in regions WITHOUT an active scene
+  // (so the original video plays as the default stage and transitions to
+  // appended scenes with additionalMedia are detected).
   useEffect(() => {
     if (!isPlaying) {
       if (animationRef.current) {
@@ -140,37 +143,57 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     }
 
     const update = () => {
-      const activeVideo = isAdditionalMedia ? additionalVideoRef.current : mainVideoRef.current;
-      
-      if (activeVideo && !activeVideo.paused && currentScene) {
+      const mainVideo = mainVideoRef.current;
+      const additionalVideo = additionalVideoRef.current;
+      const activeVideo = isAdditionalMedia ? additionalVideo : mainVideo;
+
+      if (activeVideo && !activeVideo.paused) {
         let newGlobalTime: number;
-        
-        if (isAdditionalMedia) {
+
+        if (isAdditionalMedia && currentScene) {
           // additionalMedia: scene_start + video_currentTime
           newGlobalTime = currentScene.start_time + activeVideo.currentTime;
-        } else {
-          // Original video - calculate global time
+        } else if (currentScene) {
+          // Active scene without additionalMedia → original video with scene effects
           newGlobalTime = currentScene.start_time + (activeVideo.currentTime - getOriginalStartTime());
+        } else {
+          // No active scene → original video plays as default stage, time is 1:1
+          newGlobalTime = activeVideo.currentTime;
         }
-        
-        // Check if we've reached the end of current scene
-        if (newGlobalTime >= currentScene.end_time) {
-          // Find next scene
+
+        // End of timeline reached
+        if (newGlobalTime >= duration) {
+          onPlayingChange?.(false);
+          onTimeUpdate(duration);
+        } else if (currentScene && newGlobalTime >= currentScene.end_time) {
+          // End of current scene → jump to next scene start (or end of timeline)
           const currentIndex = scenes.findIndex(s => s.id === currentScene.id);
           const nextScene = scenes[currentIndex + 1];
-          
           if (nextScene) {
             onTimeUpdate(nextScene.start_time);
           } else {
-            // End of all scenes
-            onPlayingChange?.(false);
-            onTimeUpdate(duration);
+            // No next scene but timeline continues → resume original video at scene end
+            onTimeUpdate(newGlobalTime);
           }
         } else {
           onTimeUpdate(newGlobalTime);
         }
+      } else if (
+        !isAdditionalMedia &&
+        mainVideo &&
+        mainVideo.ended &&
+        currentTime < duration
+      ) {
+        // Original video ended but timeline continues (e.g. appended scene at 25-30s).
+        // Force-advance currentTime past the video end so the next scene activates.
+        const nextScene = scenes.find(s => s.start_time >= (mainVideo.duration || 0));
+        if (nextScene) {
+          onTimeUpdate(nextScene.start_time);
+        } else {
+          onPlayingChange?.(false);
+        }
       }
-      
+
       animationRef.current = requestAnimationFrame(update);
     };
 
@@ -181,7 +204,7 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [isPlaying, isAdditionalMedia, currentScene, scenes, duration, onTimeUpdate, onPlayingChange]);
+  }, [isPlaying, isAdditionalMedia, currentScene, scenes, duration, currentTime, onTimeUpdate, onPlayingChange]);
 
   // Calculate original video start time for current scene
   const getOriginalStartTime = useCallback(() => {
@@ -197,49 +220,66 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     return originalTime;
   }, [currentScene, isAdditionalMedia, scenes]);
 
-  // Handle scene changes - sync video position
+  // Handle scene changes — sync video position. Also handles regions WITHOUT
+  // an active scene by treating the original video as the default stage.
   useEffect(() => {
-    if (!currentScene) return;
+    const mainVideo = mainVideoRef.current;
+    const additionalVideo = additionalVideoRef.current;
+
+    // No active scene → original video is the default stage (1:1 with currentTime)
+    if (!currentScene) {
+      lastSceneIdRef.current = null;
+
+      if (mainVideo) {
+        // Only sync if drift is significant (avoid stutter from constant seeks)
+        if (Math.abs(mainVideo.currentTime - currentTime) > 0.3) {
+          mainVideo.currentTime = Math.max(0, Math.min(currentTime, mainVideo.duration || currentTime));
+        }
+        if (isPlaying && mainVideo.paused && currentTime < (mainVideo.duration || Infinity)) {
+          mainVideo.play().catch(() => {});
+        }
+      }
+
+      // Pause additional video when no scene is active
+      if (additionalVideo && !additionalVideo.paused) {
+        additionalVideo.pause();
+      }
+      return;
+    }
 
     const sceneChanged = lastSceneIdRef.current !== currentScene.id;
     lastSceneIdRef.current = currentScene.id;
 
     if (isAdditionalMedia) {
       // Switch to additionalMedia video
-      const additionalVideo = additionalVideoRef.current;
-      const mainVideo = mainVideoRef.current;
-      
       if (additionalVideo) {
         const relativeTime = currentTime - currentScene.start_time;
         if (Math.abs(additionalVideo.currentTime - relativeTime) > 0.3 || sceneChanged) {
           additionalVideo.currentTime = Math.max(0, relativeTime);
         }
-        
+
         if (isPlaying && additionalVideo.paused) {
           additionalVideo.play().catch(() => {});
         }
       }
-      
+
       // Pause main video
       if (mainVideo && !mainVideo.paused) {
         mainVideo.pause();
       }
     } else {
-      // Switch to main video
-      const mainVideo = mainVideoRef.current;
-      const additionalVideo = additionalVideoRef.current;
-      
+      // Active scene without additionalMedia → original video with scene effects
       if (mainVideo) {
         const targetTime = getOriginalStartTime() + (currentTime - currentScene.start_time);
         if (Math.abs(mainVideo.currentTime - targetTime) > 0.3 || sceneChanged) {
           mainVideo.currentTime = Math.max(0, targetTime);
         }
-        
+
         if (isPlaying && mainVideo.paused) {
           mainVideo.play().catch(() => {});
         }
       }
-      
+
       // Pause additional video
       if (additionalVideo && !additionalVideo.paused) {
         additionalVideo.pause();

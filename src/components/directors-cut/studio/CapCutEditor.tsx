@@ -218,10 +218,11 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   });
   const sensors = useSensors(mouseSensor, touchSensor);
 
-  // Calculate actual total duration as max(end_time) — canonical duration source
+  // Calculate actual total duration as max(videoDuration, max(scene.end_time)).
+  // Original video is always the base; scenes can extend the timeline beyond it.
   const actualTotalDuration = useMemo(() => {
     if (scenes.length === 0) return videoDuration;
-    return Math.max(...scenes.map(s => s.end_time));
+    return Math.max(videoDuration, ...scenes.map(s => s.end_time));
   }, [scenes, videoDuration]);
 
   // Audio effects change handler
@@ -983,7 +984,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   const handleAddVideoAsScene = useCallback((videoUrl: string, duration: number, name: string) => {
     if (!onScenesUpdate) return;
     const lastScene = scenes[scenes.length - 1];
-    const newStartTime = lastScene ? lastScene.end_time : 0;
+    // Append seamlessly after the last scene OR after the original video — whichever ends later.
+    const newStartTime = Math.max(lastScene?.end_time ?? 0, videoDuration);
     const newScene: SceneAnalysis = {
       id: `scene-${Date.now()}`,
       start_time: newStartTime,
@@ -999,7 +1001,7 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       },
     };
     onScenesUpdate([...scenes, newScene]);
-  }, [scenes, onScenesUpdate]);
+  }, [scenes, onScenesUpdate, videoDuration, t]);
 
   // Add Media Dialog (videos / images / upload from library)
   const [showAddMediaDialog, setShowAddMediaDialog] = useState(false);
