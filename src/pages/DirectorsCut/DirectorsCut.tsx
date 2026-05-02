@@ -623,6 +623,7 @@ export function DirectorsCut() {
           textOverlays={textOverlays}
           onTextOverlaysChange={setTextOverlays}
           appliedEffects={appliedEffects}
+          initialAiCutMarkers={aiCutMarkers}
           transitions={transitions}
           onTransitionsChange={setTransitions}
           colorGrading={colorGrading}
