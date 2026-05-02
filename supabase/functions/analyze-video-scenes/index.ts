@@ -113,9 +113,17 @@ serve(async (req) => {
     // Build deterministic scenes
     const allBoundaries = hasClientBoundaries ? boundaries : serverBoundaries;
     const allLegacyCuts = hasClientBoundaries ? legacyCuts : [];
-    const deterministicScenes = buildDeterministicScenes(allBoundaries, allLegacyCuts, videoDuration);
-    
-    console.log(`[analyze-video-scenes] Scenes: ${deterministicScenes.length} → ${deterministicScenes.map(s => `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`).join(', ')} (mode: ${analysisMode})`);
+    // Trusted external detectors (e.g. PySceneDetect) get a much lower min-scene
+    // length so genuine short shots near start/end are not silently merged.
+    const trustedSource = boundary_source === 'pyscenedetect' || boundary_source === 'trusted';
+    const minSceneDuration = trustedSource ? 0.5 : 3.0;
+    const buildResult = buildDeterministicScenes(allBoundaries, allLegacyCuts, videoDuration, minSceneDuration);
+    const deterministicScenes = buildResult.scenes;
+
+    console.log(`[analyze-video-scenes] Scenes: ${deterministicScenes.length} → ${deterministicScenes.map(s => `${s.start_time.toFixed(1)}-${s.end_time.toFixed(1)}s`).join(', ')} (mode: ${analysisMode}, source: ${boundary_source || 'auto'}, minDur: ${minSceneDuration}s)`);
+    if (buildResult.dropped.length > 0) {
+      console.log(`[analyze-video-scenes] Dropped boundaries: ${buildResult.dropped.map(d => `${d.time.toFixed(2)}s(${d.reason})`).join(', ')}`);
+    }
 
     // Ask AI to DESCRIBE each scene
     const hasFrames = frames && frames.length > 0;
