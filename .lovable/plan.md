@@ -1,43 +1,168 @@
-## Problem
+Ja. Ich glaube, wir brauchen keinen weiteren Button, sondern eine andere interne Logik. Der aktuelle Fehler liegt nicht nur am Snapping: Im Studio wird der große `DirectorsCutPreviewPlayer` verwendet, aber der kann aktuell hinzugefügte `sourceMode: 'media'`-Szenen praktisch nicht sauber als eigene Videoquelle abspielen. Beide Video-Slots laden nur das Originalvideo. Außerdem werden AI-Cuts nicht als echte Cut-Anker in den Editor zurückgegeben, sondern nur die Szenen werden gesetzt. Dadurch schnappt die Timeline teilweise an falsche oder unvollständige Grenzen.
 
-Du hast zwei Punkte:
+Was Artlist, CapCut, Premiere & Co. im Kern machen:
+- Sie erzeugen erst eine stabile Edit-Liste: Cut-Anker, Shot-Zellen, Source-Time und Timeline-Time getrennt.
+- Neue Medien werden nicht blind angehängt, sondern in eine konkrete Cut-Zelle eingepasst.
+- Playback ist source-aware: Originalvideo, B-Roll/Overlay und Audio haben getrennte Uhren, werden aber über eine gemeinsame Timeline synchronisiert.
+- Cut-Erkennung ist mehrstufig: grobe Kandidaten, frame-nahe Verfeinerung, Confidence, manuelle Overrides.
 
-1. **Auto-Snap beim Hinzufügen** — der „An nächsten Schnitt einrasten"-Knopf funktioniert, aber du musst ihn manuell drücken. Eine neu hinzugefügte Szene soll sich **sofort** automatisch an den nächstgelegenen Cut-Marker anlegen, statt 5 s lang ab dem letzten Szenenende zu starten.
-2. **Playback stoppt nach Szene 2** — wenn das überlagerte Video von Szene 2 zu Ende ist, läuft das Originalvideo nicht weiter. Ursache: beim Wechsel von `additionalMedia` zurück auf das Originalvideo wird das `<video>`-Element zwar entstummt, aber nicht zuverlässig wieder gestartet, weil der Animation-Loop für genau diesen Übergang keine Resume-Logik hat. Außerdem wird `mainVideo.currentTime` nicht korrekt gesetzt, sodass es ins Off läuft (mainVideo ist auf seinem alten `currentTime` stehen geblieben, während die Timeline weitergesprungen ist).
+## Ziel
+Director’s Cut soll sich wie ein echter Editor verhalten:
 
-## Plan
+1. Auto-Cut erkennt echte Schnittpunkte und macht daraus sichtbare, magnetische Cut-Anker.
+2. Wenn du ein Video/eine Szene hinzufügst, wird sie automatisch in die passende Cut-Zelle gelegt und auf deren Länge gefittet.
+3. Das Originalvideo läuft nach Szene 2 und nach jedem eingefügten Clip zuverlässig weiter.
+4. Manuelle Marker bleiben als Override erhalten, aber sind nicht mehr zwingend nötig.
 
-### 1. Auto-Snap beim Szene-Hinzufügen (`CapCutEditor.tsx`)
+## Implementierungsplan
 
-In `handleSceneAdd` und `handleAddVideoAsScene`:
-- **Start-Zeit**: nach Berechnen von `newStartTime` durch `snapToNearest(newStartTime, targets, 0.5s)` schicken. Targets = `cutMarkers` + Enden anderer Szenen (über `buildSnapTargets`). Toleranz für Auto-Snap großzügig (0,5 s), damit auch ungenaue Klicks fangen.
-- **End-Zeit**: 
-  - Wenn ein nächstgelegener Cut-Marker **nach** dem Start innerhalb von 15 s liegt → End-Zeit = dieser Marker.
-  - Sonst → Default 5 s.
-- **Visual Feedback**: kurzer Toast „An Schnitt eingerastet bei 0:12" / „Bei nächstem Schnitt verankert" wenn gesnapt wurde.
+### 1. Zentrale Cut-Anker-/Edit-List-Engine einführen
+Neue Utility-Datei, z. B. `src/lib/directors-cut/timelineAnchors.ts`:
 
-Damit wird die Szene automatisch genau zwischen zwei AI-erkannte Schnitte gelegt — der „Snap to nearest cut"-Button bleibt als manueller Override für nachträgliche Korrekturen.
+- `normalizeCutAnchors(...)`
+  - kombiniert AI-Cuts, manuelle Marker, Szenenstarts/-enden und Timeline-Start/Ende
+  - sortiert, dedupliziert und quantisiert auf Frame-Grenzen, z. B. 30 fps
+  - hält Confidence und Quelle: `ai`, `manual`, `scene`, `timeline`
 
-### 2. Playback-Continuation nach Overlay-Szene (`CapCutPreviewPlayer.tsx`)
+- `buildAnchorCells(...)`
+  - erzeugt aus den Ankern echte Schnitt-Zellen:
 
-Bug: Nach Ende von Szene 2 (mit `sourceMode: 'media'`) läuft das Original nicht weiter.
+```text
+0.00 ┃ 2.48 ┃ 4.32 ┃ 8.56 ┃ 12.10 ┃ ...
+     cell1  cell2  cell3  cell4
+```
 
-Fixes im Animation-Loop und Scene-Sync-Effekt:
-- **Übergangs-Detection**: wenn `currentScene` von `media` auf `null`/`original` wechselt **und** `isPlaying` ist:
-  - `mainVideo.currentTime` explizit auf den neuen `currentTime` der Timeline setzen (statt sich auf den 0,3 s-Drift-Schwellwert zu verlassen).
-  - `mainVideo.play()` mit `.catch(() => {})` aufrufen, **bevor** `additionalVideo.pause()` läuft (verhindert eine Mikro-Pause, in der weder die eine noch die andere Quelle läuft).
-- **Animation-Loop-Hardening**: wenn `isAdditionalMedia` ist, aber das `additionalVideo.ended` ist und kein nextScene mit Media folgt → `onTimeUpdate(currentScene.end_time + epsilon)`, damit der Loop in den Original-Stage-Zweig eintritt, statt am Scene-Boundary zu stehen.
-- **Re-Sync nach Scene-Ende**: nach `onTimeUpdate(nextScene.start_time)` zusätzlich `lastSceneIdRef.current = null` setzen, damit der nächste Render-Pass den Sync-Effekt zwingt, das richtige Video auch wirklich zu starten (kein „sceneChanged"-Skip).
+- `findBestInsertionCell(...)`
+  - bevorzugt die Zelle am Playhead
+  - sonst nächste freie/nahe Zelle
+  - sonst Fallback auf nächste sinnvolle Timeline-Position
 
-### 3. Edge-Case-Polish
-- Wenn nach der Overlay-Szene noch eine **weitere** Overlay-Szene direkt anschließt (Lücke < 50 ms), keinen Mini-Switch zurück auf Main, sondern direkt das nächste `additionalMedia` laden — verhindert Flackern.
-- Wenn die Original-Szene nach dem Overlay leer ist (kein eigener Scene-Eintrag), den Original-Pass-Through-Stage-Zweig benutzen, der bereits in den useEffect-Branches enthalten ist, aber jetzt mit explizitem `play()`-Trigger.
+- `fitSceneToCell(...)`
+  - setzt `start_time` exakt auf Zellstart
+  - setzt `end_time` exakt auf Zellende
+  - verhindert 0.001s-Lücken/Überlappungen
+  - optional: passt kurze Medien per Speed-Fit/Trim-Fit an die Zielzelle an
 
-## Betroffene Dateien
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — Auto-Snap in `handleSceneAdd` + `handleAddVideoAsScene`
-- `src/components/directors-cut/studio/CapCutPreviewPlayer.tsx` — robuster Übergang Media → Original
-- `src/lib/translations.ts` — neuer Toast-String („An Schnitt eingerastet")
+### 2. AI-Cuts wirklich in den Editor übernehmen
+Aktuell werden die erkannten Grenzen in `handleStartAnalysis` verwendet, aber nicht sauber als `cutMarkers` in `CapCutEditor` gespeichert.
 
-## Ergebnis
-- **Eine neue Szene rastet automatisch** zwischen die nächstgelegenen AI-Schnitte ein, ohne dass du irgendeinen Knopf drückst.
-- **Playback läuft nahtlos weiter**, wenn ein überlagertes Video endet — das Original springt sofort an die richtige Stelle und spielt automatisch weiter, ohne Pause oder Schwarzbild.
+Änderungen in `src/pages/DirectorsCut/DirectorsCut.tsx` und `CapCutEditor.tsx`:
+
+- Parent-State für AI-Cut-Marker einführen.
+- Nach Auto-Cut:
+  - `detectedBoundaries` als Cut-Marker speichern
+  - Confidence übernehmen
+  - Marker an `CapCutEditor` weiterreichen
+- Manuelle Marker in `CapCutEditor` mit AI-Markern mergen statt getrennt im lokalen State zu verschwinden.
+
+Ergebnis: Die goldenen Cut-Linien sind nicht nur Deko, sondern die zentrale Wahrheit fürs automatische Einpassen.
+
+### 3. Scene-Add-Logik ersetzen: nicht mehr “nach letzter Szene”, sondern “in passende Cut-Zelle”
+In `src/components/directors-cut/studio/CapCutEditor.tsx`:
+
+- `handleSceneAdd` und `handleAddVideoAsScene` auf die neue Anchor-Engine umstellen.
+- Neue Szene wird nicht mehr stumpf an `lastScene.end_time` oder `effectiveSourceDuration` gehängt.
+- Verhalten:
+  - Playhead liegt in einer Cut-Zelle: neue Szene exakt in diese Zelle.
+  - Playhead liegt nahe einem Cut: Start/Ende exakt auf benachbarte Cut-Anker.
+  - Kein Cut verfügbar: 5s-Fallback, aber frame-quantisiert.
+- Bei Medien:
+  - `sourceMode: 'media'`
+  - `start_time/end_time` = Cut-Zelle
+  - `additionalMedia.duration` bleibt Originaldauer
+  - optional neues Feld für Fit-Strategie: `fitMode: 'trim' | 'speed' | 'hold'`
+
+Dadurch entsteht kein falscher Cut mehr wie im Screenshot, wo die Szene zwar optisch im Clip liegt, aber die Playback-Logik danach in einen unstabilen Zustand kommt.
+
+### 4. Den tatsächlich verwendeten Preview-Player media-aware machen
+Wichtig: Die letzte Änderung hat vor allem `CapCutPreviewPlayer.tsx` verbessert. Im Studio wird aber `DirectorsCutPreviewPlayer.tsx` verwendet.
+
+In `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`:
+
+- `resolveVisualSourceAtTime(time)` einführen:
+  - `original`: Originalvideo, Source-Time aus `original_start_time`/Timeline
+  - `media`: `additionalMedia.url`, lokale Zeit = `time - scene.start_time`
+  - `blackscreen`: schwarzer Frame, Timeline läuft weiter
+  - keine aktive Szene: Originalvideo als Pass-through, sofern `time < originalDuration`
+
+- Separate Media-Quelle ergänzen:
+  - Original bleibt in Slot A/B für bestehende Transition-Logik.
+  - Für eingefügte Medien kommt ein eigener `mediaVideoRef` darüber.
+  - Beim Wechsel `media -> original` wird das Original vorab auf die exakte Timeline-Source-Time gesetzt und gestartet, dann erst Media versteckt.
+
+- Playback-Uhr stabilisieren:
+  - Originalabschnitte bleiben video-led.
+  - Media-/Black-/Gap-Abschnitte laufen über eine Timeline-Clock und syncen das jeweilige Element.
+  - Kein Clamp mehr auf das Ende von Szene 2, wenn danach das Originalvideo weiterlaufen soll.
+
+Das behebt das “nach Szene 2 pausiert er” strukturell, nicht nur symptomatisch.
+
+### 5. Lückenlosigkeit erzwingen
+Neue kleine Utility-Funktion, z. B. `sanitizeSceneBoundaries(...)`:
+
+- Alle Szenen auf Frame-Grenzen runden.
+- Minigaps unter 2 Frames schließen.
+- Mini-Overlaps unter 2 Frames auflösen.
+- Wenn Szenen nur die ersten paar Sekunden abdecken, bleibt der Rest des Originalvideos automatisch als Pass-through sichtbar/spielbar.
+
+### 6. Cut-Erkennung präziser machen
+In `src/lib/directors-cut-scene-detection.ts`:
+
+- Coarse Scan von ca. 3 fps auf 6 fps erhöhen.
+- Refinement um Kandidaten dichter machen, z. B. 24 fps in einem kleineren Fenster.
+- Cut-Zeit nicht auf 0.1s runden, sondern frame-genau bzw. mindestens auf 0.01s.
+- Confidence stärker gewichten:
+  - Hard Cuts = hohe Priorität
+  - Soft Transitions = niedriger, aber sichtbar
+- Sehr kurze echte Schnitte nicht pauschal durch `MIN_SCENE_DURATION = 3.0` wegmergen; stattdessen:
+  - echte Cut-Anker behalten
+  - nur Szenenliste für UI optional glätten
+
+Damit werden die Cuts weniger “miserabel getroffen”.
+
+### 7. UI-Feedback wie in professionellen Editoren
+In Timeline/Sidebar:
+
+- Cut-Marker unterscheiden:
+  - AI stark
+  - AI schwach
+  - manuell
+- Beim Hinzufügen kurze Info:
+  - “In Cut-Zelle 2.48–4.32s eingepasst”
+- Optionaler Button bleibt:
+  - “Marker hinzufügen” als Override
+  - aber Auto-Fit passiert automatisch.
+
+### 8. Tests/Debug-Absicherung
+Ich würde zusätzlich kleine Debug-Logs nur für Development einbauen oder eine interne Diagnosefunktion:
+
+```text
+Timeline: 8.56s
+Visual source: original/media/blackscreen
+Source time: 8.56s
+Scene: scene-3
+Cell: 4.32–8.56s
+```
+
+Damit können wir bei weiteren Problemen sofort sehen, ob die Timeline, Source-Time oder Media-Time falsch ist.
+
+## Dateien, die ich ändern würde
+
+- `src/lib/directors-cut/timelineAnchors.ts` neu
+- `src/lib/directors-cut-scene-detection.ts`
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/studio/CapCutEditor.tsx`
+- `src/components/directors-cut/studio/CapCutTimeline.tsx`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/types/directors-cut.ts`
+- `src/lib/translations.ts`
+
+## Was ich von dir brauche
+Nichts zwingend. Ich kann das so implementieren.
+
+Optional hilfreich wäre nur ein kurzes Beispielvideo bzw. die konkrete Datei, bei der Szene 2 schwarz/pausiert. Dann könnte ich die Cut-Erkennung danach noch feiner kalibrieren. Aber für den Architektur-Fix brauche ich das nicht.
+
+<lov-actions>
+  <lov-open-history>View History</lov-open-history>
+  <lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
+</lov-actions>
