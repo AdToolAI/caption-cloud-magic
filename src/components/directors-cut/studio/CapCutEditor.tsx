@@ -1861,6 +1861,19 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
           setTimeout(() => handleExportVideo(), 50);
         }}
       />
+      <AddMediaDialog
+        open={showAddMediaDialog}
+        onOpenChange={setShowAddMediaDialog}
+        onMediaSelect={(media) => {
+          if (media.type === 'video') {
+            handleAddVideoAsScene(media.url, media.duration, media.name);
+            toast.success(t('dc.videoAddedAsScene', { name: media.name }));
+          } else {
+            // Images as scenes are not yet supported in the preview pipeline
+            toast.info('Bilder als Szene werden bald unterstützt. Bitte vorerst ein Video wählen.');
+          }
+        }}
+      />
     </div>
   );
 };
