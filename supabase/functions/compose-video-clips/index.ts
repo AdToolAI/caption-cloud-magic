@@ -828,7 +828,10 @@ serve(async (req) => {
           }
 
         } else if (scene.clipSource === 'ai-happyhorse') {
-          // HappyHorse 1.0 (Alibaba) via Replicate — supports T2V + I2V, 3-15s
+          // HappyHorse 1.0 (Alibaba) via Replicate — direct call so the
+          // composer-specific webhook fires and updates composer_scenes.
+          // (Going through generate-happyhorse-video would only update the
+          // toolkit's ai_video_generations table, leaving the scene stuck.)
           const isI2V = !!scene.referenceImageUrl;
           await supabaseAdmin
             .from('composer_scenes')
@@ -840,41 +843,34 @@ serve(async (req) => {
             })
             .eq('id', scene.id);
 
-          const hhDuration = snapDuration(scene.durationSeconds, [3, 5, 8, 10, 12, 15]);
-          const hhResp = await fetch(`${supabaseUrl}/functions/v1/generate-happyhorse-video`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': authHeader,
-            },
-            body: JSON.stringify({
-              prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-              model: quality === 'pro' ? 'happyhorse-pro' : 'happyhorse-standard',
-              duration: hhDuration,
-              aspectRatio: '16:9',
-              image: scene.referenceImageUrl,
-            }),
+          const hhDuration = Math.min(15, Math.max(3, Math.round(scene.durationSeconds)));
+          const hhResolution = quality === 'pro' ? '1080p' : '720p';
+          const hhInput: Record<string, unknown> = {
+            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            duration: hhDuration,
+            resolution: hhResolution,
+            seed: Math.floor(Math.random() * 2_147_483_647),
+          };
+          if (isI2V) {
+            hhInput.image = scene.referenceImageUrl;
+            console.log(`[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim('ai-happyhorse', true)}s)`);
+          } else {
+            hhInput.aspect_ratio = '16:9';
+          }
+
+          const prediction = await replicate.predictions.create({
+            model: "alibaba/happyhorse-1.0",
+            input: hhInput,
+            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook_events_filter: ["completed"],
           });
 
-          if (!hhResp.ok) {
-            const errBody = await hhResp.text();
-            console.error(`[compose-video-clips] HappyHorse scene ${scene.id} failed:`, hhResp.status, errBody);
-            await supabaseAdmin
-              .from('composer_scenes')
-              .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
-              .eq('id', scene.id);
-            results.push({ sceneId: scene.id, status: 'failed', error: `HappyHorse ${hhResp.status}` });
-          } else {
-            const hhData = await hhResp.json();
-            await supabaseAdmin
-              .from('composer_scenes')
-              .update({
-                replicate_prediction_id: hhData.predictionId ?? hhData.generationId,
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', scene.id);
-            results.push({ sceneId: scene.id, status: 'generating', predictionId: hhData.predictionId });
-          }
+          await supabaseAdmin
+            .from('composer_scenes')
+            .update({ replicate_prediction_id: prediction.id })
+            .eq('id', scene.id);
+
+          results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
 
         } else {
           // Unknown source, skip
