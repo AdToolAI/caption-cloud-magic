@@ -152,11 +152,17 @@ export function DirectorsCut() {
     // Install beforeunload flag so we know if the *next* load is a reload
     const removeFlag = installReloadFlag();
 
+    // Composer-Handoff hat Vorrang: ein alter Draft (z.B. von einem
+    // vorherigen Auto-Cut auf einem anderen Video) darf den Import nicht
+    // verdecken. In diesem Fall Draft komplett verwerfen.
+    const isComposerHandoff =
+      searchParams.get('source') === 'composer' && !!searchParams.get('project_id');
+
     if (!draftLoadedRef.current) {
       draftLoadedRef.current = true;
 
-      if (consumeReloadReset()) {
-        // Real browser reload while DC was open → clear everything
+      if (consumeReloadReset() || isComposerHandoff) {
+        // Reload während DC offen war ODER frischer Composer-Handoff
         clearDraft();
       } else {
         // SPA navigation back → restore previous session
