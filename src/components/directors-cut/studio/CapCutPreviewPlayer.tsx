@@ -130,22 +130,30 @@ export const CapCutPreviewPlayer: React.FC<CapCutPreviewPlayerProps> = ({
     if (isAdditionalMedia) {
       // For additionalMedia, time is relative to scene start
       return currentTime - currentScene.start_time;
-    } else {
-      // For original video, use the original start_time from the source
-      // Find cumulative original video time up to this scene
-      let originalTime = 0;
-      for (const scene of scenes) {
-        if (scene.id === currentScene.id) {
-          originalTime += (currentTime - scene.start_time);
-          break;
-        }
-        if (!scene.additionalMedia) {
-          originalTime += (scene.end_time - scene.start_time);
-        }
-      }
-      return originalTime;
     }
+
+    // If the scene carries an explicit original_start_time (e.g. from
+    // Composer-Handoff or the deterministic CV pipeline), trust it directly
+    // so the source frame is exactly where the timeline marker says.
+    const explicitOriginal = (currentScene as any).original_start_time;
+    if (typeof explicitOriginal === 'number' && Number.isFinite(explicitOriginal)) {
+      return explicitOriginal + (currentTime - currentScene.start_time);
+    }
+
+    // Legacy fallback: cumulate durations of prior original-source scenes.
+    let originalTime = 0;
+    for (const scene of scenes) {
+      if (scene.id === currentScene.id) {
+        originalTime += (currentTime - scene.start_time);
+        break;
+      }
+      if (!scene.additionalMedia) {
+        originalTime += (scene.end_time - scene.start_time);
+      }
+    }
+    return originalTime;
   }, [currentTime, currentScene, isAdditionalMedia, scenes]);
+
 
   // Animation loop for time updates during playback.
   // Runs continuously while isPlaying, even in regions WITHOUT an active scene
