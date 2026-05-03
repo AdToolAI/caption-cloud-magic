@@ -342,62 +342,111 @@ export function DirectorsCut() {
   }, [searchParams, navigate]);
 
   // ── Composer Handoff: deterministic scene import from composer_scenes ──
-  // When the video originated from the Video Composer, we already know the
-  // exact scene boundaries, prompts and order. Skip the CV pipeline entirely
-  // and rebuild the timeline 1:1 from the source-of-truth metadata.
-  // The user can still click "Auto-Cut" to re-segment via the CV pipeline.
+  // Wir bauen die Timeline 1:1 aus den Composer-Daten zusammen UND
+  // berücksichtigen dabei die exakte Render-Geometrie (echte MP4-Dauer +
+  // 15-Frame-Crossfade-Overlap), wie sie ComposedAdVideo erzeugt. So liegen
+  // die Schnittpunkte im DC-Editor exakt dort, wo sie auch im finalen MP4 sind.
   useEffect(() => {
-    if (!composerSourceProjectId || !selectedVideo || scenes.length > 0) return;
+    if (!composerSourceProjectId || !selectedVideo) return;
 
     let cancelled = false;
     (async () => {
       try {
         const { data: composerScenes, error } = await supabase
           .from('composer_scenes')
-          .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, text_overlay')
+          .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, clip_url, upload_url, upload_type, text_overlay, clip_lead_in_trim_seconds')
           .eq('project_id', composerSourceProjectId)
           .order('order_index', { ascending: true });
 
         if (error) throw error;
         if (cancelled || !composerScenes || composerScenes.length === 0) return;
 
-        const measured = selectedVideo.duration || (await measureVideoDuration(selectedVideo.url));
-        const sumDurations = composerScenes.reduce((acc: number, s: any) => acc + (Number(s.duration_seconds) || 0), 0);
-        // Scale composer durations to the actual rendered video duration if there is a mismatch
-        const scale = sumDurations > 0 && measured > 0 ? measured / sumDurations : 1;
+        // Echte Clip-Dauer pro Szene messen (best effort, parallel, mit Fallback).
+        const FPS = 30;
+        const CROSSFADE_FRAMES = 15;
+        const CROSSFADE_SEC = CROSSFADE_FRAMES / FPS;
 
-        let cursor = 0;
+        const measuredDurations = await Promise.all(
+          composerScenes.map(async (cs: any) => {
+            const url = cs.clip_url || cs.upload_url;
+            const isImage =
+              cs.clip_source === 'ai-image' ||
+              cs.upload_type === 'image' ||
+              (typeof url === 'string' && /\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(url));
+            if (!url || isImage) return Number(cs.duration_seconds) || 5;
+            try {
+              const d = await probeMediaDuration(url, 8000);
+              return d > 0 ? d : Number(cs.duration_seconds) || 5;
+            } catch {
+              return Number(cs.duration_seconds) || 5;
+            }
+          })
+        );
+
+        // Timeline-Position der Szenen im finalen Stitch nachbauen:
+        // start[i] = sum(dur[0..i-1]) - i * CROSSFADE_SEC
+        // end[i]   = start[i] + dur[i]
+        // (entspricht TransitionSeries mit uniform 15f Fade)
+        const N = composerScenes.length;
+        const starts: number[] = new Array(N).fill(0);
+        const ends: number[] = new Array(N).fill(0);
+        let acc = 0;
+        for (let i = 0; i < N; i++) {
+          starts[i] = Math.max(0, acc - i * CROSSFADE_SEC);
+          ends[i] = starts[i] + measuredDurations[i];
+          acc += measuredDurations[i];
+        }
+
+        // Optional: leichter Skalierungs-Fit gegen die tatsächlich gemessene
+        // Endvideo-Dauer (deckt Encoder-Padding ab, max ±2 % Korrektur).
+        const measuredVideoDur = selectedVideo.duration || (await measureVideoDuration(selectedVideo.url));
+        const computedTotal = ends[N - 1];
+        let scale = 1;
+        if (measuredVideoDur > 0 && computedTotal > 0) {
+          const ratio = measuredVideoDur / computedTotal;
+          if (ratio > 0.92 && ratio < 1.08) scale = ratio;
+        }
+
+        const describe = (cs: any, i: number): string => {
+          const overlay = (cs.text_overlay && typeof cs.text_overlay === 'object' && cs.text_overlay.text) ? String(cs.text_overlay.text) : '';
+          const promptLike = (overlay || cs.ai_prompt || cs.stock_keywords || '').toString().trim();
+          const sceneTypeLabel = cs.scene_type ? String(cs.scene_type) : `Szene ${i + 1}`;
+          if (promptLike) return `${sceneTypeLabel} · ${promptLike.slice(0, 80)}`;
+          return sceneTypeLabel;
+        };
+
         const normalizedScenes: SceneAnalysis[] = composerScenes.map((cs: any, i: number) => {
-          const dur = Math.max(0.3, (Number(cs.duration_seconds) || 1) * scale);
-          const start = cursor;
-          const end = cursor + dur;
-          cursor = end;
-          const promptDesc = (cs.ai_prompt || cs.stock_keywords || cs.scene_type || `Szene ${i + 1}`).toString().slice(0, 80);
+          const start = Math.round(starts[i] * scale * 100) / 100;
+          const end = Math.round(ends[i] * scale * 100) / 100;
           return {
             id: `scene-${i + 1}`,
-            start_time: Math.round(start * 100) / 100,
-            end_time: Math.round(end * 100) / 100,
-            original_start_time: Math.round(start * 100) / 100,
-            original_end_time: Math.round(end * 100) / 100,
+            start_time: start,
+            end_time: end,
+            // Im Handoff IST das Source-Video bereits das fertige Stitch-MP4.
+            // Source-Zeit == Timeline-Zeit → original_start_time = start.
+            original_start_time: start,
+            original_end_time: end,
             playbackRate: 1.0,
-            description: promptDesc,
+            description: describe(cs, i),
             mood: 'neutral',
             suggested_effects: [],
             ai_suggestions: [],
+            sourceMode: 'original',
+            isFromOriginalVideo: true,
           } as SceneAnalysis;
         });
 
         if (!cancelled) {
           setScenes(normalizedScenes);
-          setSelectedVideo(prev => prev ? { ...prev, duration: measured || prev.duration } : prev);
-          toast.success(`${normalizedScenes.length} Composer-Szenen importiert (deterministisch)`);
+          setSelectedVideo(prev => prev ? { ...prev, duration: measuredVideoDur || prev.duration } : prev);
+          toast.success(`${normalizedScenes.length} Composer-Szenen importiert (Render-Geometrie)`);
         }
       } catch (err) {
         console.warn('[DirectorsCut] Composer scene import failed, falling back to manual Auto-Cut:', err);
       }
     })();
     return () => { cancelled = true; };
-  }, [composerSourceProjectId, selectedVideo]);
+  }, [composerSourceProjectId, selectedVideo?.url]);
 
 
   const saveProject = async () => {
