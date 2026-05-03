@@ -164,7 +164,14 @@ REGELN:
     // Try AI description with frames or video URL
     const describePromptText = `Beschreibe die ${deterministicScenes.length} vorgegebenen Szenen. Antworte NUR mit JSON-Array!`;
     
-    try {
+    // Description integrity: if we have NO frames AND client_extraction_failed,
+    // do NOT ask the AI to invent descriptions — it will hallucinate
+    // ("city at night", "people walking") with zero visual grounding.
+    // Return neutral labels instead so the user knows the timeline is correct
+    // but descriptions are placeholders.
+    const skipAIDescription = !hasFrames && !!client_extraction_failed;
+
+    if (!skipAIDescription) try {
       const userContent: any[] = [{ type: "text", text: describePromptText }];
       
       if (hasFrames) {
@@ -202,6 +209,7 @@ REGELN:
     } catch (e) {
       console.error("[analyze-video-scenes] AI description error:", e);
     }
+
 
     // Merge AI descriptions into deterministic scenes
     const finalScenes: SceneAnalysis[] = deterministicScenes.map((scene, i) => {
