@@ -445,6 +445,29 @@ serve(async (req) => {
           height,
           scenesCount: remotionScenes.length,
           totalDuration,
+          // Director's-Cut-Handoff: pro Szene exakte Render-Geometrie
+          // (15-Frame-Crossfade-Overlap berücksichtigt). Wird vom DC-Editor
+          // gelesen, um Schnittpunkte 1:1 mit dem finalen MP4 abzubilden.
+          crossfadeFrames: CROSSFADE_FRAMES,
+          sceneGeometry: (() => {
+            const out: Array<{ idx: number; startFrame: number; endFrame: number; startSec: number; endSec: number; durationSec: number }> = [];
+            let cursor = 0;
+            for (let i = 0; i < remotionScenes.length; i++) {
+              const f = Math.max(1, Math.round(remotionScenes[i].durationSeconds * fps));
+              const start = Math.max(0, cursor - i * CROSSFADE_FRAMES);
+              const end = start + f;
+              out.push({
+                idx: i,
+                startFrame: start,
+                endFrame: end,
+                startSec: Math.round((start / fps) * 1000) / 1000,
+                endSec: Math.round((end / fps) * 1000) / 1000,
+                durationSec: Math.round((f / fps) * 1000) / 1000,
+              });
+              cursor += f;
+            }
+            return out;
+          })(),
         },
         subtitle_config: inputProps.subtitles,
       });
