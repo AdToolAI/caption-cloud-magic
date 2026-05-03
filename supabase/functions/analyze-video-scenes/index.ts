@@ -223,7 +223,7 @@ REGELN:
         original_start_time: scene.start_time,
         original_end_time: scene.end_time,
         playbackRate: 1.0,
-        description: aiScene?.description || (deterministicScenes.length === 1 ? "Gesamtes Video" : `Szene ${i + 1}`),
+        description: aiScene?.description || (skipAIDescription ? `Szene ${i + 1} (Beschreibung übersprungen — keine Frames)` : (deterministicScenes.length === 1 ? "Gesamtes Video" : `Szene ${i + 1}`)),
         mood,
         suggested_effects: (aiScene?.suggested_effects?.length >= 2)
           ? aiScene.suggested_effects
