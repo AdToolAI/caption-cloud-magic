@@ -1,82 +1,65 @@
-Wir bauen die Artlist/CapCut-Pipeline 1:1 nach. Beides sind im Kern PySceneDetect-Wrapper — der Trick ist Dual-Detector, niedrigere Schwellen und ehrliche Diagnose.
+Ich habe jetzt genauer nachgeschaut: Ja, die Daten für gerenderte Composer-Videos sind grundsätzlich vorhanden. Das Problem liegt sehr wahrscheinlich nicht nur in der Szenenerkennung, sondern an der Übergabe-/Mapping-Schicht zwischen Composer-Render und Director’s Cut.
 
-## 1. Dual-Detector im Backend
+Konkreter Befund:
+- Der Director’s Cut importiert aktuell Composer-Szenen aus `composer_scenes`, aber nutzt `duration_seconds` aus der Storyboard-/Clip-Tabelle und skaliert sie pauschal auf die gemessene Endvideo-Länge.
+- Das finale Render-Video ist aber nicht einfach `Summe aller duration_seconds`: In `compose-video-assemble` wird pro Clip die echte MP4-Dauer geprobt, dann rendert `ComposedAdVideo` mit festen 15 Frames Crossfade zwischen Szenen. Dadurch sind die echten Schnittpunkte im finalen Video verschoben.
+- Zusätzlich wird im Studio tatsächlich `DirectorsCutPreviewPlayer` genutzt, nicht der zuvor angepasste `CapCutPreviewPlayer`. Die frühere Timecode-Korrektur greift also im sichtbaren Editor nicht vollständig.
+- Es gibt außerdem einen Draft-Restore aus `sessionStorage`: wenn ein alter Auto-Cut-Draft vorhanden ist, kann der neue Composer-Import blockiert werden, weil `scenes.length > 0` ist. Das erklärt, warum trotz Composer-Daten weiterhin 3 falsche/random Szenen auftauchen können.
 
-Wir tauschen den aktuellen Single-Adaptive-Run gegen ein neues Replicate-Modell-Setup, das beide Klassiker laufen lässt:
+Ich plane folgende Korrektur:
 
-```text
-ContentDetector(threshold=22, min_scene_len=8)   ← harte Cuts (Standard 27, wir gehen empfindlicher)
-AdaptiveDetector(adaptive_threshold=1.5, min_scene_len=8)  ← weiche Übergänge / Drohnen-/Kamerafahrten
-```
+1. Composer-Handoff-Draft sauber priorisieren
+- Wenn URL `source=composer&project_id=...` enthält, darf ein alter Director’s-Cut-Draft nicht gewinnen.
+- Der Composer-Import soll alte Auto-Cut-Szenen überschreiben, wenn sie nicht zum aktuellen Composer-Projekt gehören.
+- Dafür markieren wir importierte Szenen intern mit Handoff-Metadaten wie `sourceProjectId`/`handoffSource`, ohne normale Upload-Videos zu beeinflussen.
 
-Konkret: `supabase/functions/detect-scenes-pyscenedetect/index.ts` wird so umgebaut, dass es das öffentliche Replicate-Modell `magpai-app/cog-scenedetect` zweimal aufruft (einmal mit `adaptive_threshold=1.5`, einmal mit höherem `adaptive_threshold` und `luma_only=true` als Cross-Check) ODER wir wechseln auf ein deterministisches FFmpeg-`scdet`-Modell, das pure Timecodes liefert. Bevorzugt: zwei Replicate-Calls parallel.
-
-Fallback bleibt der zuverlässige Pfad: wenn beide Detectoren versagen, läuft die clientseitige Pixel-/Histogramm-/Edge-Analyse (die wir schon haben).
-
-## 2. Boundary-Fusion statt Entweder-Oder
-
-Im Frontend (`DirectorsCut.tsx`) sammeln wir alle gefundenen Cuts:
-
-```text
-boundaries = unique(merge(
-  pyscenedetect_content_cuts,
-  pyscenedetect_adaptive_cuts,
-  client_pixel_cuts
-), tolerance = 0.6s)
-```
-
-Dedup-Fenster: 0.6s (nahe Cuts werden zu einem). Mindestabstand zwischen zwei finalen Szenen: 0.6s. Damit fallen Mikro-Doubles raus, aber echte 1-2-Sekunden-Shots bleiben erhalten — genau das ist der Bereich, in dem wir aktuell scheitern.
-
-## 3. Konservative Endlogik nicht mehr als Erfolg werten
-
-Aktuell gilt PySceneDetect als „erfolgreich", sobald `scene_urls.length > 0`. Wir ändern das:
-
-- Wenn nur 1 Cut zurückkommt UND er liegt im letzten 10% des Videos → als „insufficient" markieren, Client-Pixel-Detection wird zwingend zusätzlich ausgeführt.
-- Wenn die Differenz Backend-Cuts vs. Client-Cuts > 2 ist → Client-Cuts dazufusionieren statt verwerfen.
-
-## 4. Mindestlängen senken (wie Artlist)
-
-| Stelle                                      | Alt   | Neu  |
-| ------------------------------------------- | ----- | ---- |
-| Backend `min_scene_len` (frames)            | 15    | 8    |
-| Backend `adaptive_threshold`                | 3.0   | 1.5  |
-| Backend `MIN_SCENE_DURATION` (trusted)      | 0.5s  | 0.3s |
-| Frontend Final-Merge `MIN_SCENE_DURATION`   | 0.5s  | 0.3s |
-| Client-Pixel-Mindestabstand zwischen Cuts   | 2.0s  | 0.6s |
-| Client-Pixel-Sampling-Rate                  | 3 fps | 6 fps|
-
-## 5. Diagnostischer Toast wie in Artlist
-
-Statt nur „Szenen erkannt" zeigen wir die Quelle an:
+2. Echte Render-Geometrie aus Backend-Daten rekonstruieren
+- Im Composer-Import nicht mehr nur `composer_scenes.duration_seconds` verwenden.
+- Zusätzliche Daten laden:
+  - `clip_url`, `upload_url`, `upload_type`, `clip_source`, `clip_lead_in_trim_seconds`
+  - das neueste `video_renders.content_config` für diesen Composer-Render, falls vorhanden (`durationInFrames`, `fps`, `totalDuration`, `scenesCount`).
+- Für jede Szene browserseitig die echte Clip-Dauer mit `probeMediaDuration()` messen, analog zur Render-Funktion.
+- Timeline-Schnittpunkte exakt wie `ComposedAdVideo` berechnen:
 
 ```text
-✓ 5 Szenen erkannt
-   Content-Detector: 4 Cuts
-   Adaptive-Detector: 3 Cuts
-   Pixel-Analyse: 5 Cuts
-   → Fusion: 5 finale Szenen
+sceneFrames[i] = round(effectiveSceneDuration[i] * fps)
+visualStartFrame[0] = 0
+visualStartFrame[i] = sum(sceneFrames[0..i-1]) - i * CROSSFADE_FRAMES
+visualEndFrame[i] = visualStartFrame[i] + sceneFrames[i]
 ```
 
-Damit ist sofort sichtbar, welcher Pfad funktioniert hat — kein blindes Vertrauen mehr in einen einzelnen Detector.
+- Dadurch liegen die Director’s-Cut-Szenen an denselben Stellen wie das gerenderte Video, inklusive Crossfade-Overlap.
 
-## Betroffene Dateien
+3. Source-Zeit im Director’s-Cut-Preview korrekt behandeln
+- In `DirectorsCutPreviewPlayer` sicherstellen, dass `timelineToSourceTime()` und die Reverse-Mapping-Logik mit Composer-Handoff-Szenen korrekt arbeitet.
+- Für Composer-Handoff ist das finale Stitch-Video bereits eine lineare Datei. Deshalb muss die Szene im Editor die Endvideo-Zeit verwenden, nicht wieder die ursprünglichen Einzelclip-Zeiten.
+- Ergebnis: Klick auf Szene 2 springt wirklich an Szene 2 im finalen MP4, nicht an eine falsch kumulierte Position.
 
-```text
-supabase/functions/detect-scenes-pyscenedetect/index.ts   (Dual-Detector + Diagnose)
-supabase/functions/analyze-video-scenes/index.ts          (minDur 0.3s für trusted)
-src/pages/DirectorsCut/DirectorsCut.tsx                   (Boundary-Fusion + Diagnose-Toast)
-src/lib/directors-cut-scene-detection.ts                  (6 fps, 0.6s Mindestabstand)
-```
+4. Beschreibungen nicht mehr „random“ wirken lassen
+- Beschreibung der Composer-Szenen aus vorhandenen Daten bilden:
+  - zuerst `text_overlay.text` oder `scene_type` + kurzer Prompt,
+  - dann `ai_prompt`,
+  - dann `stock_keywords`,
+  - sonst neutral `Szene N`.
+- Keine KI-Beschreibung für Composer-Handoff aus dem finalen MP4 ableiten.
 
-## Erwartetes Ergebnis
+5. Eigene Uploads unverändert lassen
+- Der Upload-Flow ohne `source=composer` bleibt bei der Hybrid-/Artlist-Erkennung.
+- Auto-Cut bleibt weiterhin manuell nutzbar; wenn ein Nutzer bewusst Auto-Cut klickt, darf er den Composer-Handoff überschreiben.
 
-- Dein 25.77s-Drohnenvideo wird in mindestens die tatsächlich vorhandenen 5 Shots zerlegt.
-- Schnelle Übergänge (Drohnenfahrt, Kameraschwenk) werden vom Adaptive-Detector erkannt.
-- Harte Cuts vom Content-Detector. Soft-Fades vom Pixel-Pass.
-- Wenn mal nichts klappt, sieht man im Toast genau warum — kein „1 Szene"-Mysterium mehr.
+6. Backend-Handoff-Metadaten verbessern
+- `compose-video-assemble` soll künftig die tatsächlich verwendete `remotionScenes`-Geometrie in `video_renders.content_config` speichern: Szene-ID, effectiveDuration, frameStart, frameEnd, crossfadeFrames, fps.
+- `check-remotion-progress` soll bei abgeschlossenem Composer-Render zusätzlich `composer_projects.output_url/status` aktualisieren, damit spätere Handoffs stabil anhand der gerenderten Projekt-Daten arbeiten.
 
-Soll ich diesen Artlist-1:1-Plan jetzt umsetzen?
+Betroffene Dateien:
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
+- `src/types/directors-cut.ts`
+- `supabase/functions/compose-video-assemble/index.ts`
+- `supabase/functions/check-remotion-progress/index.ts`
 
-<lov-actions>
-<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-</lov-actions>
+Zielzustand:
+- Composer-Video mit 6 gerenderten Szenen ergibt im Director’s Cut 6 korrekt beschriftete Szenen.
+- Timecodes entsprechen dem final gerenderten MP4, nicht den nominalen Storyboard-Dauern.
+- Alte Auto-Cut-Drafts können den Composer-Handoff nicht mehr verdecken.
+- Eigene Uploads bleiben weiterhin mit Auto-Cut/Szenenerkennung nutzbar.
