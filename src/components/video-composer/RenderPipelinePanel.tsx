@@ -78,7 +78,7 @@ export default function RenderPipelinePanel({
     if (!videoUrl) return;
     navigate(
       `/universal-directors-cut?source_video=${encodeURIComponent(videoUrl)}${
-        projectId ? `&project_id=${encodeURIComponent(projectId)}` : ''
+        projectId ? `&project_id=${encodeURIComponent(projectId)}&source=composer` : ''
       }`
     );
   };
