@@ -414,113 +414,145 @@ export function DirectorsCut() {
       let detectedBoundaries: DetectedBoundary[] = [];
       let pysceneSucceeded = false;
 
-      // ── PRIMARY: PySceneDetect via Replicate (industry-standard, deterministic) ──
+      // Diagnostic counters (Artlist-style transparency)
+      const diag = {
+        adaptiveCuts: 0,
+        contentCuts: 0,
+        pixelCuts: 0,
+        fusedCuts: 0,
+        sources: [] as string[],
+      };
+
+      // Helper: probe scene-clip URLs and return cumulative cut timestamps
+      const clipsToBoundaries = async (sceneUrls: string[]): Promise<number[]> => {
+        if (!sceneUrls || sceneUrls.length < 2) return [];
+        const durations: number[] = [];
+        for (const url of sceneUrls) {
+          try {
+            const d = await probeMediaDuration(url, 10000);
+            durations.push(d);
+          } catch {
+            durations.push(0);
+          }
+        }
+        const cuts: number[] = [];
+        let acc = 0;
+        let probeFailed = false;
+        for (let i = 0; i < durations.length - 1; i++) {
+          if (durations[i] <= 0) { probeFailed = true; break; }
+          acc += durations[i];
+          if (acc > 0.05 && acc < canonicalDuration - 0.05) {
+            cuts.push(Math.round(acc * 100) / 100);
+          }
+        }
+        if (probeFailed && sceneUrls.length > 1) {
+          cuts.length = 0;
+          const segLen = canonicalDuration / sceneUrls.length;
+          for (let i = 1; i < sceneUrls.length; i++) {
+            cuts.push(Math.round(i * segLen * 100) / 100);
+          }
+        }
+        return cuts;
+      };
+
+      // ── PRIMARY: Dual PySceneDetect (Adaptive + Content-like) ──
+      let adaptiveCutTimes: number[] = [];
+      let contentCutTimes: number[] = [];
       try {
-        toast.info(t('dc.detectingScenes', { defaultValue: 'Erkenne Szenen mit PySceneDetect…' } as any));
+        toast.info(t('dc.detectingScenes', { defaultValue: 'Erkenne Szenen mit Dual-Detector…' } as any));
         const { data: pyData, error: pyErr } = await supabase.functions.invoke('detect-scenes-pyscenedetect', {
-          // adaptive_threshold=3 (default sensitive), min_scene_len=15 frames (~0.5s @30fps)
-          body: { video_url: selectedVideo.url, adaptive_threshold: 3, min_scene_len: 15 },
+          body: { video_url: selectedVideo.url },
         });
         if (pyErr) throw pyErr;
-        if (pyData?.ok && Array.isArray(pyData.scene_urls) && pyData.scene_urls.length > 0) {
-          const sceneUrls: string[] = pyData.scene_urls;
-          // Probe each split clip's duration to build cumulative boundaries
-          const durations: number[] = [];
-          for (const url of sceneUrls) {
-            try {
-              const d = await probeMediaDuration(url, 10000);
-              durations.push(d);
-            } catch (e) {
-              console.warn('[DirectorsCut] probe failed for scene clip', url, e);
-              durations.push(0);
-            }
+        if (pyData?.ok) {
+          const adaptiveUrls: string[] = pyData?.runs?.adaptive?.scene_urls || [];
+          const contentUrls: string[] = pyData?.runs?.content?.scene_urls || pyData?.scene_urls || [];
+          adaptiveCutTimes = await clipsToBoundaries(adaptiveUrls);
+          contentCutTimes = await clipsToBoundaries(contentUrls);
+          diag.adaptiveCuts = adaptiveCutTimes.length;
+          diag.contentCuts = contentCutTimes.length;
+          if (adaptiveCutTimes.length > 0 || contentCutTimes.length > 0) {
+            pysceneSucceeded = true;
+            diag.sources.push('PySceneDetect');
           }
-          let acc = 0;
-          let probeFailed = false;
-          const boundaries: DetectedBoundary[] = [];
-          for (let i = 0; i < durations.length - 1; i++) {
-            if (durations[i] <= 0) { probeFailed = true; break; }
-            acc += durations[i];
-            if (acc > 0.05 && acc < canonicalDuration - 0.05) {
-              boundaries.push({
-                time: Math.round(acc * 100) / 100,
-                score: 0.95,
-                type: 'hard_cut',
-                signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
-              });
-            }
-          }
-          if (probeFailed && sceneUrls.length > 1) {
-            // Fall back to evenly-spaced boundaries derived from clip count
-            // so we still surface multi-scene structure when probing is blocked.
-            boundaries.length = 0;
-            const segLen = canonicalDuration / sceneUrls.length;
-            for (let i = 1; i < sceneUrls.length; i++) {
-              boundaries.push({
-                time: Math.round(i * segLen * 100) / 100,
-                score: 0.7,
-                type: 'hard_cut',
-                signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
-              });
-            }
-            console.warn('[DirectorsCut] Probe failed — using evenly-spaced boundaries from', sceneUrls.length, 'scene clips');
-          }
-          detectedBoundaries = boundaries;
-          pysceneSucceeded = true;
-          console.log('[DirectorsCut] PySceneDetect found', boundaries.length, 'boundaries from', sceneUrls.length, 'scenes');
-          toast.success(t('dc.candidatesFound', { count: boundaries.length }));
-        } else {
-          console.warn('[DirectorsCut] PySceneDetect returned no scenes, falling back', pyData);
+          console.log('[DirectorsCut] Dual detector — adaptive:', adaptiveCutTimes.length, 'content:', contentCutTimes.length);
         }
       } catch (pyErr) {
-        console.warn('[DirectorsCut] PySceneDetect failed, falling back to client detection:', pyErr);
+        console.warn('[DirectorsCut] PySceneDetect failed:', pyErr);
       }
 
-      // ── FALLBACK: Client-side pixel analysis (only if PySceneDetect failed) ──
-      const proxyUrl = `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/proxy-video-bytes?url=${encodeURIComponent(selectedVideo.url)}`;
-      const extractCandidates = [selectedVideo.url, proxyUrl];
+      // ── PARALLEL: Client-side pixel pass (Artlist-style sanity check) ──
+      const backendCuts = adaptiveCutTimes.length + contentCutTimes.length;
+      const maxBackendCut = Math.max(0, ...adaptiveCutTimes, ...contentCutTimes);
+      const backendCutsTooFew =
+        backendCuts === 0 ||
+        (adaptiveCutTimes.length <= 1 && contentCutTimes.length <= 1 &&
+         maxBackendCut > canonicalDuration * 0.85);
+      const shouldRunPixelPass = canonicalDuration < 90 || backendCutsTooFew;
 
-      if (!pysceneSucceeded) {
+      let pixelCutTimes: number[] = [];
+      if (shouldRunPixelPass) {
+        const proxyUrl = `https://lbunafpxuskwmsrraqxl.supabase.co/functions/v1/proxy-video-bytes?url=${encodeURIComponent(selectedVideo.url)}`;
+        const extractCandidates = [selectedVideo.url, proxyUrl];
         for (const candidateUrl of extractCandidates) {
           try {
             timestampedFrames = await extractTimestampedFrames(candidateUrl, canonicalDuration);
             if (timestampedFrames.length > 0) {
-              toast.info(t('dc.framesExtracted', { count: timestampedFrames.length }));
               const coarseResult = await detectBoundariesAsync(timestampedFrames);
-              if (coarseResult.boundaries.length > 0) {
-                toast.info(t('dc.candidatesFound', { count: coarseResult.boundaries.length }));
+              let pixelBoundaries = coarseResult.boundaries;
+              if (pixelBoundaries.length > 0) {
                 try {
                   const refinementFrames = await extractRefinementFrames(
                     candidateUrl, canonicalDuration,
-                    coarseResult.boundaries.map(b => b.time)
+                    pixelBoundaries.map(b => b.time)
                   );
                   const refined = await detectBoundariesAsync(timestampedFrames, refinementFrames);
-                  detectedBoundaries = refined.boundaries;
-                } catch {
-                  detectedBoundaries = coarseResult.boundaries;
-                }
-              } else {
-                detectedBoundaries = coarseResult.boundaries;
+                  pixelBoundaries = refined.boundaries;
+                } catch { /* keep coarse */ }
               }
+              pixelCutTimes = pixelBoundaries.map(b => b.time);
+              diag.pixelCuts = pixelCutTimes.length;
+              if (pixelCutTimes.length > 0) diag.sources.push('Pixel');
               break;
             }
           } catch (frameError: any) {
             const msg = String(frameError?.message || '');
             const isCors = frameError?.code === 'cors_taint' || /CORS/i.test(msg);
             const isLoadOrSeek = /load|seek|decode|MEDIA|video error|timeout/i.test(msg);
-            console.warn(`[DirectorsCut] Frame extraction failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
-            if (candidateUrl !== proxyUrl && !(isCors || isLoadOrSeek)) {
-              break;
-            }
+            console.warn(`[DirectorsCut] Pixel pass failed for ${candidateUrl === proxyUrl ? 'proxy' : 'origin'}:`, frameError);
+            if (candidateUrl !== proxyUrl && !(isCors || isLoadOrSeek)) break;
           }
         }
       }
 
+      // ── BOUNDARY FUSION: merge all sources, dedup within 0.6s ──
+      const fuseBoundaries = (lists: number[][]): number[] => {
+        const all = lists.flat().filter(t => t > 0.3 && t < canonicalDuration - 0.3).sort((a, b) => a - b);
+        const merged: number[] = [];
+        for (const t of all) {
+          if (merged.length === 0 || t - merged[merged.length - 1] > 0.6) {
+            merged.push(t);
+          }
+        }
+        return merged;
+      };
+
+      const fusedTimes = fuseBoundaries([adaptiveCutTimes, contentCutTimes, pixelCutTimes]);
+      diag.fusedCuts = fusedTimes.length;
+
+      detectedBoundaries = fusedTimes.map(time => ({
+        time: Math.round(time * 100) / 100,
+        score: 0.9,
+        type: 'hard_cut' as const,
+        signals: { pixelDiff: 1, histogramDiff: 1, edgeDiff: 1 },
+      }));
+
+      const fusedSucceeded = detectedBoundaries.length > 0;
+      console.log('[DirectorsCut] Fusion result:', diag, '→', fusedTimes);
 
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
         if (detectedBoundaries.length > 0) {
-          // Client already found cuts — send neighbor frames so AI can describe each scene
           for (const boundary of detectedBoundaries) {
             const beforeIdx = timestampedFrames.findIndex(f => f.time >= boundary.time) - 1;
             const afterIdx = timestampedFrames.findIndex(f => f.time >= boundary.time);
@@ -538,8 +570,6 @@ export function DirectorsCut() {
             }
           }
         } else {
-          // Client found NO cuts — send a downsampled sweep of the whole video
-          // so the server can do AI-based boundary detection from frames.
           const TARGET = 50;
           const step = Math.max(1, Math.floor(timestampedFrames.length / TARGET));
           for (let i = 0; i < timestampedFrames.length; i += step) {
@@ -550,12 +580,13 @@ export function DirectorsCut() {
       }
 
       const sceneBoundaries = detectedBoundaries.map(b => ({
-        time: b.time,
-        type: b.type,
-        score: b.score,
+        time: b.time, type: b.type, score: b.score,
       }));
 
-      const clientExtractionFailed = timestampedFrames.length === 0;
+      const clientExtractionFailed = timestampedFrames.length === 0 && !fusedSucceeded;
+      const boundarySource = fusedSucceeded
+        ? (diag.sources.length > 1 ? 'fused' : (pysceneSucceeded ? 'pyscenedetect' : 'trusted'))
+        : 'auto';
 
       const { data, error } = await supabase.functions.invoke('analyze-video-scenes', {
         body: {
@@ -564,7 +595,7 @@ export function DirectorsCut() {
           frames: framesForAI.length > 0 ? framesForAI : undefined,
           scene_boundaries: sceneBoundaries,
           client_extraction_failed: clientExtractionFailed,
-          boundary_source: pysceneSucceeded ? 'pyscenedetect' : 'auto',
+          boundary_source: boundarySource,
         },
       });
 
@@ -580,8 +611,7 @@ export function DirectorsCut() {
       const rawScenes = data.scenes || [];
       const sortedScenes = [...rawScenes].sort((a: any, b: any) => a.start_time - b.start_time);
 
-      // Trusted external detection (PySceneDetect) → keep short shots intact.
-      const MIN_SCENE_DURATION = pysceneSucceeded ? 0.5 : 3.0;
+      const MIN_SCENE_DURATION = fusedSucceeded ? 0.3 : 3.0;
       const stableScenes: any[] = [];
       for (const scene of sortedScenes) {
         const dur = (scene.end_time || 0) - (scene.start_time || 0);
@@ -621,15 +651,16 @@ export function DirectorsCut() {
         confidence: Math.min(1, Math.max(0, b.score ?? 0.7)),
         source: 'auto' as const,
       })));
-      const mode = pysceneSucceeded ? 'pyscenedetect' : (data.analysis_mode || data.source || 'unknown');
-      const modeLabel =
-        mode === 'pyscenedetect' ? 'PySceneDetect (deterministisch)' :
-        mode === 'client_deterministic' ? 'Client-Pixel-Analyse' :
-        mode === 'server_frame_analysis' ? 'AI Frame-Analyse' :
-        mode === 'server_video_analysis' ? 'AI Video-Analyse' :
-        mode === 'server_no_cuts_found' || mode === 'server_frame_no_cuts_found' ? 'Keine Cuts erkannt' :
-        mode;
-      toast.success(`${t('dc.scenesDetected', { count: normalizedScenes.length })} · ${modeLabel}`);
+
+      // Artlist-style diagnostic toast
+      const diagParts: string[] = [];
+      if (diag.adaptiveCuts > 0) diagParts.push(`Adaptive ${diag.adaptiveCuts}`);
+      if (diag.contentCuts > 0)  diagParts.push(`Content ${diag.contentCuts}`);
+      if (diag.pixelCuts > 0)    diagParts.push(`Pixel ${diag.pixelCuts}`);
+      const sourceLabel = diagParts.length > 0
+        ? `Fusion: ${diagParts.join(' + ')} → ${diag.fusedCuts}`
+        : (data.analysis_mode || 'Keine Cuts erkannt');
+      toast.success(`${t('dc.scenesDetected', { count: normalizedScenes.length })} · ${sourceLabel}`);
     } catch (error) {
       console.error('Error analyzing video:', error);
       toast.error(t('dc.sceneAnalysisError'));

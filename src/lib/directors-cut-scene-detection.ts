@@ -53,9 +53,9 @@ export async function extractTimestampedFrames(
       clearTimeout(timeout);
       const frames: TimestampedFrame[] = [];
 
-      // Target ~3 fps for good boundary detection
-      const targetFps = 3;
-      const frameCount = Math.min(maxFrames, Math.max(20, Math.ceil(duration * targetFps)));
+      // Target ~6 fps (Artlist-style dense sampling) — catches sub-second shots
+      const targetFps = 6;
+      const frameCount = Math.min(Math.max(maxFrames, 240), Math.max(30, Math.ceil(duration * targetFps)));
       const interval = duration / frameCount;
 
       const canvas = document.createElement('canvas');
@@ -439,8 +439,8 @@ export async function detectBoundariesAsync(
   const boundaries: DetectedBoundary[] = [];
   
   for (const c of refinedCandidates) {
-    // Skip if too close to existing boundary
-    if (boundaries.length > 0 && c.time - boundaries[boundaries.length - 1].time < 2.0) {
+    // Skip if too close to existing boundary (Artlist allows ~0.6s shots)
+    if (boundaries.length > 0 && c.time - boundaries[boundaries.length - 1].time < 0.6) {
       continue;
     }
     

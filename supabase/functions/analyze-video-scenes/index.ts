@@ -115,8 +115,8 @@ serve(async (req) => {
     const allLegacyCuts = hasClientBoundaries ? legacyCuts : [];
     // Trusted external detectors (e.g. PySceneDetect) get a much lower min-scene
     // length so genuine short shots near start/end are not silently merged.
-    const trustedSource = boundary_source === 'pyscenedetect' || boundary_source === 'trusted';
-    const minSceneDuration = trustedSource ? 0.5 : 3.0;
+    const trustedSource = boundary_source === 'pyscenedetect' || boundary_source === 'trusted' || boundary_source === 'fused';
+    const minSceneDuration = trustedSource ? 0.3 : 3.0;
     const buildResult = buildDeterministicScenes(allBoundaries, allLegacyCuts, videoDuration, minSceneDuration);
     const deterministicScenes = buildResult.scenes;
 

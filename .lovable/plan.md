@@ -1,29 +1,82 @@
-Ich habe den konkreten Fehler gefunden: PySceneDetect wurde aufgerufen und hat laut Backend-Logs 2 Split-Clips geliefert. Daraus wurde aber nur 1 Boundary an `analyze-video-scenes` übergeben. Dort wird jede Boundary verworfen, wenn sie weniger als 3 Sekunden vor dem Videoende liegt. Bei deinem 25.77s-Video lag der Schnitt offenbar sehr nahe am Ende, deshalb wurde daraus wieder genau 1 Gesamtszene.
+Wir bauen die Artlist/CapCut-Pipeline 1:1 nach. Beides sind im Kern PySceneDetect-Wrapper — der Trick ist Dual-Detector, niedrigere Schwellen und ehrliche Diagnose.
 
-Plan zur Korrektur:
+## 1. Dual-Detector im Backend
 
-1. Mindestlängen-Filter für professionelle Detection entschärfen
-   - `analyze-video-scenes` so erweitern, dass vorgegebene PySceneDetect-Boundaries nicht durch den harten `MIN_SCENE_DURATION = 3.0`-Filter verschwinden.
-   - Stattdessen für externe/vertrauenswürdige Boundaries eine niedrigere Mindestlänge verwenden, z. B. 0.5s bis 1.0s, damit kurze echte Shots am Anfang oder Ende nicht zusammengeführt werden.
-   - Die 3s-Regel nur für unsichere AI-/Fallback-Erkennung beibehalten, damit keine wilden Mikro-Cuts entstehen.
+Wir tauschen den aktuellen Single-Adaptive-Run gegen ein neues Replicate-Modell-Setup, das beide Klassiker laufen lässt:
 
-2. Quelle der Boundary explizit übergeben
-   - Im Frontend bei PySceneDetect-Boundaries ein Feld wie `source: 'pyscenedetect'` oder eine Option `boundary_source: 'pyscenedetect'` an `analyze-video-scenes` senden.
-   - Die Backend-Funktion nutzt diese Quelle, um die korrekte Mindestdauer und Filterlogik zu wählen.
+```text
+ContentDetector(threshold=22, min_scene_len=8)   ← harte Cuts (Standard 27, wir gehen empfindlicher)
+AdaptiveDetector(adaptive_threshold=1.5, min_scene_len=8)  ← weiche Übergänge / Drohnen-/Kamerafahrten
+```
 
-3. Frontend-Zusammenführung ebenfalls entschärfen
-   - In `DirectorsCut.tsx` wird nach der Analyse aktuell nochmal alles unter 3s mit der vorherigen Szene verschmolzen.
-   - Für PySceneDetect-Ergebnisse muss auch hier die Mindestdauer niedriger sein, sonst kann ein korrekt erkannter kurzer Shot wieder verschwinden.
+Konkret: `supabase/functions/detect-scenes-pyscenedetect/index.ts` wird so umgebaut, dass es das öffentliche Replicate-Modell `magpai-app/cog-scenedetect` zweimal aufruft (einmal mit `adaptive_threshold=1.5`, einmal mit höherem `adaptive_threshold` und `luma_only=true` als Cross-Check) ODER wir wechseln auf ein deterministisches FFmpeg-`scdet`-Modell, das pure Timecodes liefert. Bevorzugt: zwei Replicate-Calls parallel.
 
-4. Diagnose verbessern
-   - In den Logs/Response zusätzliche Debug-Daten ausgeben: empfangene Boundary-Zeiten, akzeptierte Boundary-Zeiten, verworfene Boundary-Zeiten inklusive Grund.
-   - Damit sieht man künftig sofort, ob PySceneDetect falsch erkennt oder ob unsere eigene Nachbearbeitung Schnitte entfernt.
+Fallback bleibt der zuverlässige Pfad: wenn beide Detectoren versagen, läuft die clientseitige Pixel-/Histogramm-/Edge-Analyse (die wir schon haben).
 
-5. Optionaler robusterer Zeitcode-Pfad
-   - Wenn möglich, die Dauer der Split-Clips weiterhin summieren, aber bei Probe-Problemen keine 0-Dauer einfließen lassen.
-   - Falls PySceneDetect nur 1 Clip liefert, bleibt Fallback auf Client-/AI-Detection aktiv. Wenn PySceneDetect aber mehrere Clips liefert, sollen diese Schnitte nicht stillschweigend wegoptimiert werden.
+## 2. Boundary-Fusion statt Entweder-Oder
 
-Erwartetes Ergebnis:
-- Bei deinem aktuellen Video werden statt einer Gesamtszene mindestens die von PySceneDetect erkannten Segmente angezeigt.
-- Kurze echte Szenen am Ende oder Anfang werden nicht mehr durch unsere 3-Sekunden-Schutzlogik gelöscht.
-- Falls künftig wieder nur eine Szene angezeigt wird, ist im Debug eindeutig sichtbar, ob PySceneDetect wirklich nur eine Szene gefunden hat oder ob ein Filter gegriffen hat.
+Im Frontend (`DirectorsCut.tsx`) sammeln wir alle gefundenen Cuts:
+
+```text
+boundaries = unique(merge(
+  pyscenedetect_content_cuts,
+  pyscenedetect_adaptive_cuts,
+  client_pixel_cuts
+), tolerance = 0.6s)
+```
+
+Dedup-Fenster: 0.6s (nahe Cuts werden zu einem). Mindestabstand zwischen zwei finalen Szenen: 0.6s. Damit fallen Mikro-Doubles raus, aber echte 1-2-Sekunden-Shots bleiben erhalten — genau das ist der Bereich, in dem wir aktuell scheitern.
+
+## 3. Konservative Endlogik nicht mehr als Erfolg werten
+
+Aktuell gilt PySceneDetect als „erfolgreich", sobald `scene_urls.length > 0`. Wir ändern das:
+
+- Wenn nur 1 Cut zurückkommt UND er liegt im letzten 10% des Videos → als „insufficient" markieren, Client-Pixel-Detection wird zwingend zusätzlich ausgeführt.
+- Wenn die Differenz Backend-Cuts vs. Client-Cuts > 2 ist → Client-Cuts dazufusionieren statt verwerfen.
+
+## 4. Mindestlängen senken (wie Artlist)
+
+| Stelle                                      | Alt   | Neu  |
+| ------------------------------------------- | ----- | ---- |
+| Backend `min_scene_len` (frames)            | 15    | 8    |
+| Backend `adaptive_threshold`                | 3.0   | 1.5  |
+| Backend `MIN_SCENE_DURATION` (trusted)      | 0.5s  | 0.3s |
+| Frontend Final-Merge `MIN_SCENE_DURATION`   | 0.5s  | 0.3s |
+| Client-Pixel-Mindestabstand zwischen Cuts   | 2.0s  | 0.6s |
+| Client-Pixel-Sampling-Rate                  | 3 fps | 6 fps|
+
+## 5. Diagnostischer Toast wie in Artlist
+
+Statt nur „Szenen erkannt" zeigen wir die Quelle an:
+
+```text
+✓ 5 Szenen erkannt
+   Content-Detector: 4 Cuts
+   Adaptive-Detector: 3 Cuts
+   Pixel-Analyse: 5 Cuts
+   → Fusion: 5 finale Szenen
+```
+
+Damit ist sofort sichtbar, welcher Pfad funktioniert hat — kein blindes Vertrauen mehr in einen einzelnen Detector.
+
+## Betroffene Dateien
+
+```text
+supabase/functions/detect-scenes-pyscenedetect/index.ts   (Dual-Detector + Diagnose)
+supabase/functions/analyze-video-scenes/index.ts          (minDur 0.3s für trusted)
+src/pages/DirectorsCut/DirectorsCut.tsx                   (Boundary-Fusion + Diagnose-Toast)
+src/lib/directors-cut-scene-detection.ts                  (6 fps, 0.6s Mindestabstand)
+```
+
+## Erwartetes Ergebnis
+
+- Dein 25.77s-Drohnenvideo wird in mindestens die tatsächlich vorhandenen 5 Shots zerlegt.
+- Schnelle Übergänge (Drohnenfahrt, Kameraschwenk) werden vom Adaptive-Detector erkannt.
+- Harte Cuts vom Content-Detector. Soft-Fades vom Pixel-Pass.
+- Wenn mal nichts klappt, sieht man im Toast genau warum — kein „1 Szene"-Mysterium mehr.
+
+Soll ich diesen Artlist-1:1-Plan jetzt umsetzen?
+
+<lov-actions>
+<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
+</lov-actions>
