@@ -304,6 +304,9 @@ export function DirectorsCut() {
     onCommand: handleCoPilotCommand,
   });
 
+  // Track whether the imported video came from the Composer (deterministic scene import)
+  const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
+
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser();
@@ -317,6 +320,7 @@ export function DirectorsCut() {
     
     const sourceVideoUrl = searchParams.get('source_video');
     const sourceProjectId = searchParams.get('project_id');
+    const sourceFlag = searchParams.get('source');
     
     if (sourceVideoUrl) {
       setSelectedVideo({
@@ -325,8 +329,70 @@ export function DirectorsCut() {
         name: t('dc.importedVideo'),
         source: 'universal_creator',
       });
+      if (sourceFlag === 'composer' && sourceProjectId) {
+        setComposerSourceProjectId(sourceProjectId);
+      }
     }
   }, [searchParams, navigate]);
+
+  // ── Composer Handoff: deterministic scene import from composer_scenes ──
+  // When the video originated from the Video Composer, we already know the
+  // exact scene boundaries, prompts and order. Skip the CV pipeline entirely
+  // and rebuild the timeline 1:1 from the source-of-truth metadata.
+  // The user can still click "Auto-Cut" to re-segment via the CV pipeline.
+  useEffect(() => {
+    if (!composerSourceProjectId || !selectedVideo || scenes.length > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: composerScenes, error } = await supabase
+          .from('composer_scenes')
+          .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, text_overlay')
+          .eq('project_id', composerSourceProjectId)
+          .order('order_index', { ascending: true });
+
+        if (error) throw error;
+        if (cancelled || !composerScenes || composerScenes.length === 0) return;
+
+        const measured = selectedVideo.duration || (await measureVideoDuration(selectedVideo.url));
+        const sumDurations = composerScenes.reduce((acc: number, s: any) => acc + (Number(s.duration_seconds) || 0), 0);
+        // Scale composer durations to the actual rendered video duration if there is a mismatch
+        const scale = sumDurations > 0 && measured > 0 ? measured / sumDurations : 1;
+
+        let cursor = 0;
+        const normalizedScenes: SceneAnalysis[] = composerScenes.map((cs: any, i: number) => {
+          const dur = Math.max(0.3, (Number(cs.duration_seconds) || 1) * scale);
+          const start = cursor;
+          const end = cursor + dur;
+          cursor = end;
+          const promptDesc = (cs.ai_prompt || cs.stock_keywords || cs.scene_type || `Szene ${i + 1}`).toString().slice(0, 80);
+          return {
+            id: `scene-${i + 1}`,
+            start_time: Math.round(start * 100) / 100,
+            end_time: Math.round(end * 100) / 100,
+            original_start_time: Math.round(start * 100) / 100,
+            original_end_time: Math.round(end * 100) / 100,
+            playbackRate: 1.0,
+            description: promptDesc,
+            mood: 'neutral',
+            suggested_effects: [],
+            ai_suggestions: [],
+          } as SceneAnalysis;
+        });
+
+        if (!cancelled) {
+          setScenes(normalizedScenes);
+          setSelectedVideo(prev => prev ? { ...prev, duration: measured || prev.duration } : prev);
+          toast.success(`${normalizedScenes.length} Composer-Szenen importiert (deterministisch)`);
+        }
+      } catch (err) {
+        console.warn('[DirectorsCut] Composer scene import failed, falling back to manual Auto-Cut:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [composerSourceProjectId, selectedVideo]);
+
 
   const saveProject = async () => {
     if (!user || !selectedVideo) return null;
