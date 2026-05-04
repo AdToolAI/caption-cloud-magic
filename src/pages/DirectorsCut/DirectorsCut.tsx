@@ -336,9 +336,7 @@ export function DirectorsCut() {
     onCommand: handleCoPilotCommand,
   });
 
-  // Track whether the imported video came from the Composer (deterministic scene import)
-  const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
-  const [composerRenderId, setComposerRenderId] = useState<string | null>(null);
+  // (composerSourceProjectId / composerRenderId declared earlier so the draft snapshot can use them)
 
   useEffect(() => {
     const checkAuth = async () => {
