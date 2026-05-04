@@ -14,7 +14,7 @@ import {
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { CapCutEditor } from '@/components/directors-cut/studio';
-import { VideoImportStep } from '@/components/directors-cut/steps/VideoImportStep';
+import { VideoImportDialog } from '@/components/directors-cut/studio/VideoImportDialog';
 import { AICoPilot } from '@/components/directors-cut/ui/AICoPilot';
 import { useAICoPilot } from '@/hooks/useAICoPilot';
 import { useNavigate, useSearchParams } from 'react-router-dom';
