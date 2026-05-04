@@ -248,7 +248,9 @@ export function DirectorsCut() {
     capCutSubtitleTrack,
     subtitleSafeZone,
     cleanedVideoUrl,
-  }), [selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone, cleanedVideoUrl]);
+    composerProjectId: composerSourceProjectId,
+    composerRenderId,
+  }), [selectedVideo, scenes, transitions, appliedEffects, audioEnhancements, exportSettings, styleTransfer, colorGrading, sceneColorGrading, speedKeyframes, kenBurnsKeyframes, chromaKey, upscaling, interpolation, restoration, objectRemoval, textOverlays, voiceOverUrl, backgroundMusicUrl, capCutAudioTracks, capCutSubtitleTrack, subtitleSafeZone, cleanedVideoUrl, composerSourceProjectId, composerRenderId]);
 
   latestSnapshotRef.current = currentSnapshot;
 
