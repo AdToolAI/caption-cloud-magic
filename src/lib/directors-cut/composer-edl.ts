@@ -181,10 +181,39 @@ export function importComposerRenderGeometry(
   if (sorted.length === 0) {
     return { scenes: [], cutPoints: [], totalDuration: 0, source: 'sceneGeometry-fallback' };
   }
-  // Per-clip duration: prefer geometry.durationSec, else fall back to
-  // composer_scenes.duration_seconds, else (endSec-startSec).
+  // Prefer geometry's own startSec/endSec when present (these come from the
+  // assembler and already account for crossfade overlap). Only fall back to
+  // contiguous cursor layout if absolute timestamps are missing.
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
+  const hasAbsolute = sorted.every(g => Number.isFinite(g.startSec) && Number.isFinite(g.endSec));
   const cutPoints: number[] = [];
   const scenes: NormalizedComposerScene[] = [];
+  if (hasAbsolute) {
+    for (let i = 0; i < sorted.length; i++) {
+      const g = sorted[i];
+      const orderIdx = g.idx ?? i;
+      const cs = composerScenes?.find(c => c.order_index === orderIdx);
+      const start = r3(Number(g.startSec));
+      const end = r3(Number(g.endSec));
+      if (i < sorted.length - 1) cutPoints.push(end);
+      scenes.push({
+        id: `scene-${i + 1}`,
+        start_time: start,
+        end_time: end,
+        original_start_time: start,
+        original_end_time: end,
+        description: describeFromComposer(i, start, end, cs),
+        mood: 'neutral',
+        playbackRate: 1.0,
+        suggested_effects: [],
+        ai_suggestions: [],
+        sourceMode: 'original',
+        isFromOriginalVideo: true,
+      });
+    }
+    const total = scenes.length ? scenes[scenes.length - 1].end_time : 0;
+    return { scenes, cutPoints, totalDuration: total, source: 'sceneGeometry-fallback' };
+  }
   let cursor = 0;
   for (let i = 0; i < sorted.length; i++) {
     const g = sorted[i];
@@ -197,15 +226,15 @@ export function importComposerRenderGeometry(
       Math.max(0, Number(g.endSec) - Number(g.startSec)) ||
       5,
     );
-    const start = cursor;
-    const end = start + dur;
-    if (i < sorted.length - 1) cutPoints.push(Math.round(end * 100) / 100);
+    const start = r3(cursor);
+    const end = r3(start + dur);
+    if (i < sorted.length - 1) cutPoints.push(end);
     scenes.push({
       id: `scene-${i + 1}`,
-      start_time: Math.round(start * 100) / 100,
-      end_time: Math.round(end * 100) / 100,
-      original_start_time: Math.round(start * 100) / 100,
-      original_end_time: Math.round(end * 100) / 100,
+      start_time: start,
+      end_time: end,
+      original_start_time: start,
+      original_end_time: end,
       description: describeFromComposer(i, start, end, cs),
       mood: 'neutral',
       playbackRate: 1.0,
@@ -216,7 +245,7 @@ export function importComposerRenderGeometry(
     });
     cursor = end;
   }
-  return { scenes, cutPoints, totalDuration: cursor, source: 'sceneGeometry-fallback' };
+  return { scenes, cutPoints, totalDuration: r3(cursor), source: 'sceneGeometry-fallback' };
 }
 
 /**
