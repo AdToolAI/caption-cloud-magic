@@ -468,6 +468,59 @@ serve(async (req) => {
             }
             return out;
           })(),
+          // Edit Decision List — Artlist/CapCut-style frame-accurate truth.
+          // Each entry maps a Composer scene to its body region (no overlap)
+          // and to the two crossfade overlap zones with the neighbors. The
+          // Director's Cut editor uses this to render scenes WYSIWYG with
+          // the actual visible swap-points (midpoint of each crossfade)
+          // instead of either the early-in or late-out boundary.
+          editDecisionList: (() => {
+            const numScenes = remotionScenes.length;
+            const sceneFramesArr = remotionScenes.map(s => Math.max(1, Math.round(s.durationSeconds * fps)));
+            // Recompute outputStart for each scene (overlap-aware)
+            let cursor = 0;
+            const outStarts: number[] = [];
+            const outEnds: number[] = [];
+            for (let i = 0; i < numScenes; i++) {
+              const start = Math.max(0, cursor - i * CROSSFADE_FRAMES);
+              outStarts.push(start);
+              outEnds.push(start + sceneFramesArr[i]);
+              cursor += sceneFramesArr[i];
+            }
+            const composerSceneList = (scenes || []) as any[];
+            return outStarts.map((startF, i) => {
+              const endF = outEnds[i];
+              const cs = composerSceneList[i] || {};
+              // Body = region without overlap on either side
+              const bodyStart = i === 0 ? startF : startF + CROSSFADE_FRAMES;
+              const bodyEnd = i === numScenes - 1 ? endF : endF - CROSSFADE_FRAMES;
+              // Crossfade overlap zones in OUTPUT frames
+              const xfadeIn = i === 0 ? null : { startFrame: startF, endFrame: startF + CROSSFADE_FRAMES };
+              const xfadeOut = i === numScenes - 1 ? null : { startFrame: endF - CROSSFADE_FRAMES, endFrame: endF };
+              return {
+                sceneIndex: i,
+                composerSceneId: cs.id || null,
+                orderIndex: cs.order_index ?? i,
+                sceneType: cs.scene_type || null,
+                clipUrl: remotionScenes[i].videoUrl,
+                isImage: !!remotionScenes[i].isImage,
+                fps,
+                outputStartFrame: startF,
+                outputEndFrame: endF,
+                outputStartSec: Math.round((startF / fps) * 1000) / 1000,
+                outputEndSec: Math.round((endF / fps) * 1000) / 1000,
+                bodyStartFrame: Math.max(startF, bodyStart),
+                bodyEndFrame: Math.min(endF, bodyEnd),
+                transitionInFrameRange: xfadeIn,
+                transitionOutFrameRange: xfadeOut,
+                crossfadeFrames: CROSSFADE_FRAMES,
+                durationFrames: sceneFramesArr[i],
+                durationSec: Math.round((sceneFramesArr[i] / fps) * 1000) / 1000,
+                aiPrompt: cs.ai_prompt || null,
+                textOverlay: cs.text_overlay || null,
+              };
+            });
+          })(),
         },
         subtitle_config: inputProps.subtitles,
       });
