@@ -328,7 +328,7 @@ export function DirectorsCut() {
         }
         break;
     }
-  }, []);
+  }, [composerSourceProjectId, t]);
 
   // AI Co-Pilot
   const coPilot = useAICoPilot({
