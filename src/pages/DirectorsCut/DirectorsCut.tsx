@@ -429,25 +429,25 @@ export function DirectorsCut() {
         }
 
         // ── Normalize Composer geometry into non-overlapping editor segments ──
-        // The render geometry stores crossfade OVERLAPS (e.g. scene 2 starts at
-        // 3.5s while scene 1 ends at 4s). For an Artlist/NLE-style cut list we
-        // need contiguous, non-overlapping segments that sum to the visible
-        // timeline. We split overlap regions at the midpoint so each scene
-        // owns exactly its visible portion of the final MP4.
+        // sceneGeometry is stored WITH crossfade overlap (scene N+1 startSec
+        // is BEFORE scene N endSec). For the editor we want contiguous,
+        // non-overlapping segments that exactly mirror the visible timeline
+        // of the rendered MP4. The deterministic rule: each scene ENDS at
+        // its own `endSec`, and the next scene STARTS exactly there. The
+        // first scene starts at 0. This yields cuts at 4, 8.5, 13, 20.5, 25
+        // (matching the actual visible boundaries of the stitched render).
         const sortedGeo = [...rawGeometry].sort((a, b) => a.startSec - b.startSec);
         const normGeometry: Array<{ idx: number; start: number; end: number }> = [];
+        let cursor = 0;
         for (let i = 0; i < sortedGeo.length; i++) {
           const g = sortedGeo[i];
-          let start = g.startSec;
-          let end = g.endSec;
-          const prev = normGeometry[normGeometry.length - 1];
-          if (prev && start < prev.end) {
-            const mid = (prev.end + start) / 2;
-            prev.end = mid;
-            start = mid;
-          }
-          if (end <= start) end = start + 0.1;
+          const start = i === 0 ? 0 : cursor;
+          // End at the geometry's endSec, but never before start
+          let end = Math.max(start + 0.1, g.endSec);
+          // For the last scene, allow a tiny overshoot — it represents the
+          // final rendered duration including the trailing crossfade tail.
           normGeometry.push({ idx: g.idx ?? i, start, end });
+          cursor = end;
         }
 
         const describe = (idx: number, start: number, end: number): string => {
@@ -496,8 +496,17 @@ export function DirectorsCut() {
             totalDur,
           });
           setScenes(normalizedScenes);
+          // Propagate Composer cut points to the timeline so snapping & cut
+          // markers use the same authoritative boundaries (no AI re-detection).
+          setAiCutMarkers(
+            normalizedScenes.slice(0, -1).map(s => ({
+              time: s.end_time,
+              confidence: 1,
+              source: 'auto' as const,
+            }))
+          );
           setSelectedVideo(prev => prev ? { ...prev, duration: totalDur || prev.duration } : prev);
-          toast.success(`${normalizedScenes.length} Composer-Szenen importiert (Render-Geometrie)`);
+          toast.success(`${normalizedScenes.length} Composer-Szenen importiert`);
         }
       } catch (err) {
         console.warn('[DirectorsCut] Composer scene import failed:', err);
