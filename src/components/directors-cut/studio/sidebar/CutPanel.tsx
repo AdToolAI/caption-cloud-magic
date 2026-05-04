@@ -324,9 +324,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
             </p>
           </div>
         ) : (
-          <ScrollArea className="max-h-[400px]">
-            <div className="pr-1">
-              {scenes.map((scene, i) => (
+          <div className="pr-1 pb-4">
+            {scenes.map((scene, i) => (
                 <React.Fragment key={scene.id}>
                   {/* Scene Card */}
                   <div
@@ -443,10 +442,9 @@ export const CutPanel: React.FC<CutPanelProps> = ({
                       onTransitionChange={handleTransitionChange}
                     />
                   )}
-                </React.Fragment>
-              ))}
-            </div>
-          </ScrollArea>
+              </React.Fragment>
+            ))}
+          </div>
         )}
       </div>
     </div>
