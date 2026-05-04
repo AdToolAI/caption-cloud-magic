@@ -375,20 +375,32 @@ export function DirectorsCut() {
     }
   }, [searchParams, navigate]);
 
-  // ── Composer Handoff: deterministic scene import ──
-  // Primary source of truth: video_renders.content_config.sceneGeometry
-  // (this is exactly what Lambda used to render the final MP4, so the
-  // editor timeline must mirror it 1:1). Secondary source: composer_scenes
-  // for human-readable labels only. We never re-measure clip durations in
-  // the browser anymore — that introduces drift.
+  // ── Composer Handoff: deterministic scene import via EDL ──
+  // Primary source of truth: video_renders.content_config.editDecisionList
+  // (frame-accurate Edit Decision List written by compose-video-assemble).
+  // Fallback 1: legacy sceneGeometry. Fallback 2: composer_scenes durations.
+  // Director's Cut NEVER re-detects scenes from the stitched MP4 for
+  // composer renders — that's what was producing wrong "shot detection"
+  // results inside individual AI clips.
+  const [composerLock, setComposerLock] = useState<{
+    active: boolean;
+    sceneCount: number;
+    source: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  }>({ active: false, sceneCount: 0, source: null });
+
   useEffect(() => {
     if (!composerSourceProjectId || !selectedVideo) return;
 
     let cancelled = false;
     (async () => {
       try {
-        // 1. Load the authoritative render row. Prefer render_id from URL,
-        //    fall back to "latest composer render for this project".
+        const {
+          importComposerRenderEDL,
+          importComposerRenderGeometry,
+          importComposerScenesDurationsOnly,
+        } = await import('@/lib/directors-cut/composer-edl');
+
+        // 1. Load the authoritative render row.
         let renderRow: any = null;
         if (composerRenderId) {
           const { data } = await supabase
@@ -411,102 +423,62 @@ export function DirectorsCut() {
         }
 
         const cfg: any = renderRow?.content_config || {};
-        const rawGeometry: Array<{ idx: number; startSec: number; endSec: number; durationSec: number }> =
-          Array.isArray(cfg.sceneGeometry) ? cfg.sceneGeometry : [];
+        const edl: any[] = Array.isArray(cfg.editDecisionList) ? cfg.editDecisionList : [];
+        const rawGeometry: any[] = Array.isArray(cfg.sceneGeometry) ? cfg.sceneGeometry : [];
+        const fps = Number(cfg.fps) || 30;
+        const crossfadeFrames = Number(cfg.crossfadeFrames) || 15;
 
-        // 2. Pull labels from composer_scenes (best-effort, parallel to geometry).
+        // 2. Pull labels from composer_scenes (best-effort).
         const { data: composerScenes } = await supabase
           .from('composer_scenes')
-          .select('order_index, scene_type, ai_prompt, stock_keywords, text_overlay')
+          .select('order_index, scene_type, ai_prompt, stock_keywords, text_overlay, duration_seconds')
           .eq('project_id', composerSourceProjectId)
           .order('order_index', { ascending: true });
 
         if (cancelled) return;
 
-        if (rawGeometry.length === 0) {
-          toast.error('Render-Geometrie nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.');
+        let result: ReturnType<typeof importComposerRenderEDL> | null = null;
+        if (edl.length > 0) {
+          result = importComposerRenderEDL(edl as any, composerScenes as any);
+        } else if (rawGeometry.length > 0) {
+          result = importComposerRenderGeometry(rawGeometry, composerScenes as any, crossfadeFrames, fps);
+        } else if (composerScenes && composerScenes.length > 0) {
+          result = importComposerScenesDurationsOnly(composerScenes as any);
+        }
+
+        if (!result || result.scenes.length === 0) {
+          toast.error('Render-Metadaten nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.');
           return;
         }
 
-        // ── Normalize Composer geometry into non-overlapping editor segments ──
-        // sceneGeometry is stored WITH crossfade overlap (scene N+1 startSec
-        // is BEFORE scene N endSec). For the editor we want contiguous,
-        // non-overlapping segments that exactly mirror the visible timeline
-        // of the rendered MP4. The deterministic rule: each scene ENDS at
-        // its own `endSec`, and the next scene STARTS exactly there. The
-        // first scene starts at 0. This yields cuts at 4, 8.5, 13, 20.5, 25
-        // (matching the actual visible boundaries of the stitched render).
-        const sortedGeo = [...rawGeometry].sort((a, b) => a.startSec - b.startSec);
-        const normGeometry: Array<{ idx: number; start: number; end: number }> = [];
-        let cursor = 0;
-        for (let i = 0; i < sortedGeo.length; i++) {
-          const g = sortedGeo[i];
-          const start = i === 0 ? 0 : cursor;
-          // End at the geometry's endSec, but never before start
-          let end = Math.max(start + 0.1, g.endSec);
-          // For the last scene, allow a tiny overshoot — it represents the
-          // final rendered duration including the trailing crossfade tail.
-          normGeometry.push({ idx: g.idx ?? i, start, end });
-          cursor = end;
-        }
-
-        const describe = (idx: number, start: number, end: number): string => {
-          const cs: any = composerScenes?.[idx];
-          const fmt = (s: number) => {
-            const m = Math.floor(s / 60);
-            const sec = Math.floor(s % 60).toString().padStart(2, '0');
-            return `${m}:${sec}`;
-          };
-          const neutral = `Composer Szene ${idx + 1} · ${fmt(start)}–${fmt(end)}`;
-          if (!cs) return neutral;
-          const overlay = (cs.text_overlay && typeof cs.text_overlay === 'object' && cs.text_overlay.text)
-            ? String(cs.text_overlay.text) : '';
-          const promptLike = (overlay || cs.ai_prompt || cs.stock_keywords || '').toString().trim();
-          const sceneTypeLabel = cs.scene_type ? String(cs.scene_type) : `Szene ${idx + 1}`;
-          if (promptLike) return `${sceneTypeLabel} · ${promptLike.slice(0, 80)}`;
-          return sceneTypeLabel;
-        };
-
-        const normalizedScenes: SceneAnalysis[] = normGeometry.map((g, i) => {
-          const start = Math.round(g.start * 100) / 100;
-          const end = Math.round(g.end * 100) / 100;
-          return {
-            id: `scene-${i + 1}`,
-            start_time: start,
-            end_time: end,
-            original_start_time: start,
-            original_end_time: end,
-            playbackRate: 1.0,
-            description: describe(g.idx, start, end),
-            mood: 'neutral',
-            suggested_effects: [],
-            ai_suggestions: [],
-            sourceMode: 'original',
-            isFromOriginalVideo: true,
-          } as SceneAnalysis;
-        });
-
-        const totalDur = normGeometry[normGeometry.length - 1]?.end || selectedVideo.duration || 0;
-
         if (!cancelled) {
-          console.info('[DirectorsCut] Composer handoff complete (render geometry):', {
+          console.info('[DirectorsCut] Composer EDL import:', {
             projectId: composerSourceProjectId,
             renderId: renderRow?.render_id,
-            scenesCount: normalizedScenes.length,
-            totalDur,
+            source: result.source,
+            scenesCount: result.scenes.length,
+            cutPoints: result.cutPoints,
+            totalDuration: result.totalDuration,
           });
-          setScenes(normalizedScenes);
-          // Propagate Composer cut points to the timeline so snapping & cut
-          // markers use the same authoritative boundaries (no AI re-detection).
-          setAiCutMarkers(
-            normalizedScenes.slice(0, -1).map(s => ({
-              time: s.end_time,
-              confidence: 1,
-              source: 'auto' as const,
-            }))
+          setScenes(result.scenes as any);
+          setAiCutMarkers(result.cutPoints.map(t => ({ time: t, confidence: 1, source: 'auto' as const })));
+          setSelectedVideo(prev =>
+            prev ? { ...prev, duration: result!.totalDuration || prev.duration } : prev
           );
-          setSelectedVideo(prev => prev ? { ...prev, duration: totalDur || prev.duration } : prev);
-          toast.success(`${normalizedScenes.length} Composer-Szenen importiert`);
+          setComposerLock({
+            active: true,
+            sceneCount: result.scenes.length,
+            source: result.source,
+          });
+          if (result.source === 'edl') {
+            toast.success(`${result.scenes.length} Composer-Szenen aus EDL importiert`);
+          } else if (result.source === 'sceneGeometry-fallback') {
+            toast.success(`${result.scenes.length} Composer-Szenen importiert (Geometrie-Fallback)`);
+          } else {
+            toast.warning(
+              `${result.scenes.length} Composer-Szenen importiert (Dauern-Fallback). Für frame-genaue Übergänge bitte neu rendern.`
+            );
+          }
         }
       } catch (err) {
         console.warn('[DirectorsCut] Composer scene import failed:', err);
