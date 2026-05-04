@@ -31,6 +31,12 @@ import { CastConsistencyMap } from './CastConsistencyMap';
 interface StoryboardTabProps {
   scenes: ComposerScene[];
   onUpdateScenes: (scenes: ComposerScene[]) => void;
+  /**
+   * Inserts a new scene directly into the DB so it survives realtime
+   * refetches. Falls back to local-only when the project hasn't been
+   * persisted yet.
+   */
+  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
   onGoToClips: () => void;
   language: string;
   projectId?: string;
@@ -46,6 +52,7 @@ interface StoryboardTabProps {
 export default function StoryboardTab({
   scenes,
   onUpdateScenes,
+  onAddScene,
   onGoToClips,
   language,
   projectId,
