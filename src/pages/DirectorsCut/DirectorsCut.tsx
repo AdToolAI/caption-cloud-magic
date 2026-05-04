@@ -947,7 +947,10 @@ export function DirectorsCut() {
           exportSettings={exportSettings}
           onExportSettingsChange={setExportSettings}
           isAnalyzing={isAnalyzing}
-          onStartAnalysis={handleStartAnalysis}
+          // Lock auto-cut when scenes were imported deterministically from
+          // the Composer — running Gemini scene analysis on top would
+          // overwrite the correct geometry with hallucinated descriptions.
+          onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
           onVoiceOverGenerated={setVoiceOverUrl}
           // Callbacks for propagation
           onAudioTracksChange={setCapCutAudioTracks}
