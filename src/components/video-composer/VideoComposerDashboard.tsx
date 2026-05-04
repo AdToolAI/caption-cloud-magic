@@ -382,6 +382,10 @@ export default function VideoComposerDashboard() {
 
       setProject(prev => {
         const localById = new Map(prev.scenes.map(s => [s.id, s]));
+        // Preserve any locally-created scenes that haven't been persisted yet
+        // (non-UUID ids). Otherwise a realtime tick would wipe them before
+        // their first DB write completes.
+        const localOnly = prev.scenes.filter(s => !isUuid(s.id));
         const dbScenes: ComposerScene[] = data.map((row: any) => {
           const local = localById.get(row.id);
           return {
