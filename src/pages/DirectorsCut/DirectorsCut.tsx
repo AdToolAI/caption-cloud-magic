@@ -496,8 +496,17 @@ export function DirectorsCut() {
             totalDur,
           });
           setScenes(normalizedScenes);
+          // Propagate Composer cut points to the timeline so snapping & cut
+          // markers use the same authoritative boundaries (no AI re-detection).
+          setAiCutMarkers(
+            normalizedScenes.slice(0, -1).map(s => ({
+              time: s.end_time,
+              confidence: 1,
+              source: 'auto' as const,
+            }))
+          );
           setSelectedVideo(prev => prev ? { ...prev, duration: totalDur || prev.duration } : prev);
-          toast.success(`${normalizedScenes.length} Composer-Szenen importiert (Render-Geometrie)`);
+          toast.success(`${normalizedScenes.length} Composer-Szenen importiert`);
         }
       } catch (err) {
         console.warn('[DirectorsCut] Composer scene import failed:', err);
