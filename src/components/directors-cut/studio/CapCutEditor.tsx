@@ -160,6 +160,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onResetProject,
   onBackToImport,
   initialAiCutMarkers,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
