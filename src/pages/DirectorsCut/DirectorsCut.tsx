@@ -171,12 +171,14 @@ export function DirectorsCut() {
         const draft = loadDraft();
         const incomingSourceVideoUrl = searchParams.get('source_video');
         const incomingSourceProjectId = searchParams.get('project_id');
+        const incomingRenderId = searchParams.get('render_id');
         const draftMatches =
           !!draft &&
           !!draft.selectedVideo &&
           (
             // No incoming params at all → trust the draft
-            (!incomingSourceVideoUrl && !incomingSourceProjectId) ||
+            (!incomingSourceVideoUrl && !incomingSourceProjectId && !incomingRenderId) ||
+            (incomingRenderId && (draft as any).composerRenderId === incomingRenderId) ||
             (incomingSourceVideoUrl && draft.selectedVideo.url === incomingSourceVideoUrl) ||
             (incomingSourceProjectId && draft.selectedVideo.id === incomingSourceProjectId)
           );
