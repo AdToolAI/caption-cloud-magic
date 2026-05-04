@@ -138,7 +138,7 @@ const Pricing = () => {
     brand: { "@type": "Brand", name: "AdTool AI" },
     offers: {
       "@type": "Offer",
-      price: pricingPlans.pro.price.EUR.toString(),
+      price: "14.99",
       priceCurrency: "EUR",
       availability: "https://schema.org/OnlineOnly",
       url: "https://useadtool.ai/pricing",
