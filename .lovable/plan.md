@@ -1,48 +1,48 @@
-Ich habe den Fehler jetzt eingegrenzt: Die Erkennung selbst findet tatsächlich die richtigen 6 Segmente. In den Backend-Logs steht für dein aktuelles Video:
+Ich habe den Fehler jetzt enger eingegrenzt: Es ist nicht mehr primär die Anzahl der Szenen. Die 6 Szenen kommen zwar an, aber aktuell können zwei falsche Quellen die tatsächlichen Composer-Szenen verfälschen:
 
-- PySceneDetect: Adaptive = 6 Clips, Content = 9 Clips
-- Final im Analyse-Service: 6 Szenen mit Grenzen `0-13`, `13-15`, `15-16.17`, `16.17-17.33`, `17.33-18.17`, `18.17-29.67`
+1. Der Auto-Detect-Pfad (`PySceneDetect`/Pixel/AI) analysiert das fertig gestitchte Video erneut. Dadurch erkennt er visuelle Binnenwechsel innerhalb einzelner AI-Clips und gibt z.B. Grenzen wie `0–13s, 13–15s, ...` zurück. Das sind keine Composer-Szenen, sondern Shot-Detection-Schätzungen auf dem finalen MP4.
+2. Der Composer-Handoff nutzt zwar `sceneGeometry`, normalisiert Crossfade-Overlaps aber falsch. Dadurch wird z.B. aus den echten Clip-Grenzen ungefähr `0–3.75, 3.75–8.25, ...` nicht sauber die sichtbare Timeline `0–4, 4–8.5, 8.5–13, ...`.
 
-Der Wurm hängt danach: Die Timeline bekommt zwar 6 Zeitsegmente, aber die Beschreibungen kommen aus einem zweiten AI-Beschreibungs-Schritt ohne Frames bzw. aus altem Composer-Label-Mapping. Dadurch wirken die Szenen „falsch“, obwohl die Schnittpunkte erkannt wurden. Zusätzlich ist die Composer-Handoff-Geometrie aus dem Render (`0-4`, `3.5-8.5`, `8-13`, `12.5-20.5`, `20-25`, `24.5-29.5`) überlappend wegen Crossfades; diese Werte dürfen im Editor nicht direkt als normale Schnittliste angezeigt werden, sonst passen sie nicht wie echte Szenenblöcke.
+Plan zur Behebung:
 
-Plan zur finalen Behebung:
+1. Composer-Handoff als harte Wahrheit erzwingen
+   - Wenn `source=composer` und `render_id/project_id` vorhanden sind, wird Director’s Cut ausschließlich aus Composer-/Render-Metadaten aufgebaut.
+   - Kein Aufruf von `analyze-video-scenes`, `PySceneDetect` oder Pixel-Detection für Composer-Renders.
+   - Die Szene-Liste zeigt dann die ursprünglichen Composer-Szenen, nicht neu geschätzte Shots aus dem fertigen Video.
 
-1. Auto-Cut darf keine halluzinierten Szenenbeschreibungen mehr anzeigen
-- In `analyze-video-scenes` wird der AI-Beschreibungs-Schritt nur noch genutzt, wenn echte Frames mitgeschickt wurden.
-- Wenn keine Frames vorhanden sind, gibt der Service neutrale, ehrliche Labels zurück, z.B. `Erkannte Szene 1`, statt „Drohnenflug über Stadt bei Sonnenuntergang“ zu erfinden.
-- Die exakten Zeitgrenzen bleiben unverändert aus dem Detektor.
+2. SceneGeometry korrekt in sichtbare Schnittpunkte umrechnen
+   - Die gespeicherte `sceneGeometry` enthält Overlaps durch Crossfades.
+   - Ich ersetze die aktuelle Midpoint-Normalisierung durch eine exakte Sequenz-Geometrie:
+     - Szene 1 startet bei 0
+     - jede nächste Szene startet dort, wo die vorige sichtbare Szene endet
+     - pro Übergang wird der Crossfade-Overlap einmal von der Timeline abgezogen
+   - Für den aktuellen Render ergibt das sinngemäß:
+     - Szene 1: 0.00–4.00
+     - Szene 2: 4.00–8.50
+     - Szene 3: 8.50–13.00
+     - Szene 4: 13.00–20.50
+     - Szene 5: 20.50–25.00
+     - Szene 6: 25.00–29.50/29.67
+   - Das entspricht den echten Composer-Clip-Segmenten statt den falschen Detector-Cuts `0–13, 13–15, ...`.
 
-2. Frontend baut die Szene-Liste direkt aus den erkannten Boundaries
-- In `DirectorsCut.tsx` wird nach PySceneDetect-Fusion zuerst lokal eine deterministische Szene-Liste aus den Cut-Zeiten gebaut.
-- Diese Liste ist die Source of Truth für `setScenes`.
-- Der Analyse-Service darf dann nur noch Mood/Effekte/Beschreibungen ergänzen, aber niemals Anzahl, Start oder Endzeit verändern.
-- Wenn AI-Beschreibungen fehlen oder unplausibel sind, bleiben stabile Labels wie `Szene 1 · 0:00-0:13` erhalten.
+3. Open-in-Director’s-Cut Link robuster machen
+   - In `AssemblyTab` wird beim Öffnen aus einem bereits abgeschlossenen Render aktuell nur der lokale `renderId` State verwendet. Nach Seiten-Resume kann dieser leer sein, obwohl ein fertiger Render in der Datenbank existiert.
+   - Ich speichere/rehydriere den tatsächlichen `render_id` aus der letzten `video_renders`-Zeile und übergebe ihn immer in der URL.
+   - Dadurch lädt Director’s Cut garantiert genau den Render, den der Nutzer gerade sieht.
 
-3. Diagnose-Toast und Sidebar werden konsistent gemacht
-- Der Toast „6 Szenen erkannt“ zeigt exakt dieselben Grenzen wie die Szene-Liste.
-- Optional füge ich im Cut-Panel einen kleinen Debug-/Statushinweis ein: `Quelle: PySceneDetect/Fusion`, damit klar ist, ob die Szenen aus Detektion oder Composer-Metadaten stammen.
+4. Fallback nur noch als Warnung, nicht als stille Schätzung
+   - Falls bei einem Composer-Render keine `sceneGeometry` existiert, soll die App nicht still in die KI/Shot-Detection fallen.
+   - Stattdessen: Toast/Status-Hinweis „Render-Metadaten fehlen – bitte neu aus Motion Studio rendern/öffnen“ und optional best-effort aus `composer_scenes.duration_seconds`, aber deutlich als Fallback markiert.
+   - Keine blind geschätzten AI-Beschreibungen mehr für Composer-Handoffs.
 
-4. Composer-Handoff reparieren: Render-Geometrie in echte Editor-Segmente normalisieren
-- Die gespeicherte `sceneGeometry` enthält aktuell Crossfade-Overlaps. Für die Editor-Schnittliste müssen daraus nicht-überlappende Timeline-Segmente werden.
-- Ich normalisiere Composer-Geometrie nach dem Artlist/NLE-Prinzip:
-  - Szene 1 startet bei 0
-  - jeder nächste Start ist der vorige Endpunkt auf der sichtbaren Timeline
-  - Crossfade-Overlaps werden als Transition-Metadaten behandelt, nicht als überlappende Szenenlänge
-- Ergebnis: DC zeigt 6 aufeinanderfolgende Composer-Szenen, statt die Crossfade-Overlaps als falsche Grenzen zu interpretieren.
-
-5. Alte Einstiegswege absichern
-- Alle Links, die noch `/directors-cut?...` oder reine `source_video`-Übergaben nutzen, werden auf den aktiven `/universal-directors-cut?...` Handoff vereinheitlicht.
-- Falls ein Composer-Video ohne `render_id` geöffnet wird, wird die letzte passende Render-Zeile per `project_id + video_url` gesucht, nicht einfach irgendein letzter Render.
-
-6. UI-Scrolling im Szenenbereich final lösen
-- Der Szenenbereich bekommt unten mehr Padding und keine versteckten Max-Höhen.
-- Dadurch sind Szene 5/6 und Übergänge sicher sichtbar.
+5. Diagnose sichtbar machen
+   - In der Szene-Liste/Toast soll erkennbar sein: „6 Composer-Szenen importiert“ statt „Fusion/PySceneDetect“.
+   - Zusätzlich setze ich `aiCutMarkers` auf die echten Composer-Grenzen, damit Timeline-Snapping und Cut-Marker dieselbe Wahrheit nutzen.
 
 Betroffene Dateien:
-- `src/pages/DirectorsCut/DirectorsCut.tsx`
-- `supabase/functions/analyze-video-scenes/index.ts`
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
-- `src/components/video-composer/AssemblyTab.tsx` bzw. Handoff-Buttons, falls dort noch ein DC-Link fehlt
-- ggf. `src/components/video-composer/RenderPipelinePanel.tsx` für die strengere `render_id`-Übergabe
 
-Wichtig: Ich ändere nicht die Datenbankstruktur. Es geht um die Reihenfolge/Quelle der Daten: Detektor-Grenzen bleiben hart, AI darf nur beschreiben, und Composer-Crossfades werden als Transition behandelt statt als überlappende Szenen.
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/video-composer/AssemblyTab.tsx`
+- optional `src/components/video-composer/RenderPipelinePanel.tsx` für denselben robusten `render_id`-Handoff
+
+Nach Umsetzung sollte Director’s Cut beim Öffnen eines Composer-Renders nicht mehr versuchen, Szenen „zu erkennen“, sondern exakt die 6 Composer-Szenen aus dem Render übernehmen.
