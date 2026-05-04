@@ -1066,6 +1066,7 @@ export default function VideoComposerDashboard() {
             <StoryboardTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
+              onAddScene={addSceneToProject}
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
