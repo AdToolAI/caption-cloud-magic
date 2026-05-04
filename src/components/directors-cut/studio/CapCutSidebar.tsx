@@ -116,6 +116,9 @@ interface CapCutSidebarProps {
   onVoiceOverGenerated?: (url: string) => void;
   onVoiceoverVolumeChange?: (volume: number) => void;
   voiceoverVolume?: number;
+  // Composer EDL lock
+  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSceneCount?: number;
 }
 
 interface Caption {
@@ -631,6 +634,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onVoiceOverGenerated,
   onVoiceoverVolumeChange,
   voiceoverVolume = 100,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   // Tab state
@@ -966,6 +971,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onTrimScene={onTrimScene}
               onAddVideoAsScene={onAddVideoAsScene}
               onAddFromLibrary={onAddFromLibrary}
+              composerLockSource={composerLockSource}
+              composerLockSceneCount={composerLockSceneCount}
             />
           </TabsContent>
 

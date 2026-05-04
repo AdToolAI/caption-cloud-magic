@@ -25,6 +25,9 @@ interface CutPanelProps {
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
   onAddVideoAsScene?: (file: File) => void;
   onAddFromLibrary?: () => void;
+  /** When set, scenes were imported from a Composer render's EDL — auto-cut is locked. */
+  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSceneCount?: number;
 }
 
 const formatTime = (s: number) => {
@@ -176,6 +179,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onTrimScene,
   onAddVideoAsScene,
   onAddFromLibrary,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
@@ -286,8 +291,24 @@ export const CutPanel: React.FC<CutPanelProps> = ({
         )}
       </div>
 
+      {/* Composer EDL Lock badge */}
+      {composerLockSource && (
+        <div className="rounded-md border border-[#F5C76A]/30 bg-[#F5C76A]/5 px-3 py-2">
+          <div className="flex items-center gap-2 text-[11px] font-medium text-[#F5C76A]">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>
+              Composer {composerLockSource === 'edl' ? 'EDL' : 'Fallback'} · {composerLockSceneCount} Szenen
+            </span>
+          </div>
+          <p className="mt-1 text-[10px] text-white/40 leading-snug">
+            Szenen stammen direkt aus dem Render – Auto-Cut ist deaktiviert, damit
+            der KI-Detektor die echten Schnittpunkte nicht überschreibt.
+          </p>
+        </div>
+      )}
+
       {/* Optional Auto-Cut */}
-      {onAutocut && (
+      {onAutocut && !composerLockSource && (
         <>
           <div className="border-t border-[#F5C76A]/10" />
           <Button
