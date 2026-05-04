@@ -257,4 +257,7 @@ export interface SelectedVideo {
   source: 'media_library' | 'upload' | 'universal_creator';
   duration?: number;
   thumbnail_url?: string;
+  /** When the imported video is a Composer render, these enable EDL import. */
+  composerProjectId?: string | null;
+  composerRenderId?: string | null;
 }
