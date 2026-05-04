@@ -634,6 +634,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
   onVoiceOverGenerated,
   onVoiceoverVolumeChange,
   voiceoverVolume = 100,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   // Tab state
