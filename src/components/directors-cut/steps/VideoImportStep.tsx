@@ -133,7 +133,42 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
         if (measured > 0) duration = measured;
       } catch { /* ignore */ }
     }
-    
+
+    // Detect Composer render: prefer explicit render_id on the row, then
+    // metadata hints, then a last-resort lookup by output_url.
+    let composerProjectId: string | null = null;
+    let composerRenderId: string | null = video.render_id || metadata?.render_id || null;
+    if (composerRenderId) {
+      try {
+        const { data: r } = await supabase
+          .from('video_renders')
+          .select('project_id, source')
+          .eq('render_id', composerRenderId)
+          .maybeSingle();
+        if (r && r.source === 'composer' && r.project_id) {
+          composerProjectId = r.project_id;
+        } else {
+          composerRenderId = null;
+        }
+      } catch { composerRenderId = null; }
+    }
+    if (!composerProjectId && video.output_url) {
+      try {
+        const { data: r } = await supabase
+          .from('video_renders')
+          .select('render_id, project_id, source')
+          .eq('video_url', video.output_url)
+          .eq('source', 'composer')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (r?.project_id) {
+          composerProjectId = r.project_id;
+          composerRenderId = r.render_id;
+        }
+      } catch { /* ignore */ }
+    }
+
     const selected: SelectedVideo = {
       id: video.id,
       url: video.output_url,
@@ -141,6 +176,8 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
       duration,
       thumbnail_url: video.thumbnail_url,
       source: 'media_library',
+      composerProjectId,
+      composerRenderId,
     };
     onVideoSelect(selected);
     setPreviewUrl(video.output_url);
