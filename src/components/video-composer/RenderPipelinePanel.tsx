@@ -66,7 +66,7 @@ export default function RenderPipelinePanel({
     },
   });
 
-  const { status, overallProgress, stitchProgress, videoUrl, error, startPipeline, continueWithPartial, reset } =
+  const { status, overallProgress, stitchProgress, videoUrl, renderId, error, startPipeline, continueWithPartial, reset } =
     pipeline;
 
   const isBusy = status === 'queueing' || status === 'generating' || status === 'stitching';
@@ -84,10 +84,13 @@ export default function RenderPipelinePanel({
       console.warn('[Composer] openInDirectorsCut: missing projectId — refusing handoff');
       return;
     }
-    navigate(
-      `/universal-directors-cut?source_video=${encodeURIComponent(videoUrl)}` +
-      `&project_id=${encodeURIComponent(projectId)}&source=composer`
-    );
+    const params = new URLSearchParams({
+      source_video: videoUrl,
+      project_id: projectId,
+      source: 'composer',
+    });
+    if (renderId) params.set('render_id', renderId);
+    navigate(`/universal-directors-cut?${params.toString()}`);
   };
 
   const downloadVideo = () => {

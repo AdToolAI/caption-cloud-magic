@@ -258,6 +258,7 @@ export function useMultiSceneRender(opts: Options) {
     overallProgress,
     stitchProgress,
     videoUrl,
+    renderId,
     error,
     startPipeline,
     continueWithPartial,

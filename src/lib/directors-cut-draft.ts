@@ -86,6 +86,10 @@ export interface DirectorsCutDraft {
   capCutAudioTracks: any[];
   capCutSubtitleTrack: any;
   subtitleSafeZone?: SubtitleSafeZone;
+  /** Composer handoff fingerprint — used to detect stale drafts when a new
+   *  composer render opens Director's Cut. */
+  composerProjectId?: string | null;
+  composerRenderId?: string | null;
 }
 
 export function saveDraft(data: Omit<DirectorsCutDraft, 'version' | 'updatedAt'>): void {

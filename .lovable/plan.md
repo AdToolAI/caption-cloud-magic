@@ -1,45 +1,44 @@
-## Was ich beobachte
+Ich habe mir die echte Datenlage und den Frontend-Pfad angesehen. Die Datenbank enthält für den neuesten Motion-Studio/Composer-Render bereits die korrekte `sceneGeometry` im Render-Datensatz. Das Frontend nutzt diese aber aktuell nicht als harte Quelle: es rekonstruiert Szenen weiterhin aus `composer_scenes`, misst Clip-Dauern im Browser neu und öffnet Director's Cut ohne `render_id`. Dadurch kann es bei Race Conditions, Session-Drafts oder Auto-Cut/CoPilot-Kommandos weiterhin falsche/halluzinierte Szenen wie im Screenshot anzeigen.
 
-Im Screenshot zeigt das Director's Cut Studio 6 Szenen mit Titeln wie *"Drohnenflug über verschneite Berge", "Nahaufnahme eines schneebedeckten Baumes"* — das Video selbst ist aber ein Mann im Maisfeld (~29s lang). Die Szenenbeschreibungen passen also gar nicht zum Video. Außerdem sind die Timings (13s + 2s + 1.17s + …) typisch für eine AI-Auto-Cut-Analyse, **nicht** für die deterministische Composer-Geometrie.
+Plan zur Behebung:
 
-## Verifizierte Ursachen im Code
+1. Render-ID als Pflichtteil der Handoff-Pipeline mitgeben
+- `useMultiSceneRender` soll neben `videoUrl` auch die finale `renderId` zurückgeben.
+- `RenderPipelinePanel` soll Director's Cut mit `source=composer`, `project_id`, `source_video` und `render_id` öffnen.
+- Falls `render_id` fehlt, wird nicht still auf Auto-Cut/Browser-Rekonstruktion ausgewichen, sondern ein klarer Hinweis angezeigt.
 
-In `src/pages/DirectorsCut/DirectorsCut.tsx`:
+2. Director's Cut importiert Composer-Szenen render-genau aus `video_renders.content_config.sceneGeometry`
+- In `DirectorsCut.tsx` wird bei `source=composer` zuerst der `video_renders`-Datensatz per `render_id` geladen.
+- Die Szenen-Zeiten kommen dann ausschließlich aus `content_config.sceneGeometry`.
+- Die Beschreibungen/Labels werden nur ergänzend aus `composer_scenes` geholt, geordnet nach `order_index`.
+- Keine Browser-Neumessung der Einzelclips mehr als Primärlogik, weil das genau zu Drift führen kann.
 
-1. **Composer-Handoff-Link in `RenderPipelinePanel.tsx`** (Zeile 79–82) übergibt nur `source_video=…&project_id=…&source=composer`, aber **nur wenn `projectId` existiert**. Wenn das Composer-Projekt noch nicht persistiert ist (oder die ID anders heißt), fehlt `source=composer` und der Handoff-Pfad wird gar nicht aktiviert → es greift entweder ein alter Draft (Zeile 168–194) oder der User klickt anschließend auf „Auto-Cut" und Gemini halluziniert Beschreibungen, die nichts mit dem aktuellen Video zu tun haben.
+3. Stale Drafts endgültig blockieren
+- Der Director's-Cut-Draft bekommt Metadaten wie `sourceKind`, `composerProjectId`, `composerRenderId` und `sourceVideoUrl`.
+- Beim Öffnen eines neuen Composer-Renders wird ein alter Draft nicht nur bei anderem `project_id`, sondern auch bei anderem `render_id` verworfen.
+- Nach erfolgreichem Composer-Import wird sofort der frische Snapshot gespeichert, damit nicht wieder alte Auto-Cut-Szenen zurückkommen.
 
-2. **Composer-Handoff selbst ist still-fehlertolerant** (Zeile 354–447): Wenn `composer_scenes` leer ist *oder* der Fetch failt (RLS, Race Condition direkt nach Render), wird nur ein `console.warn` geloggt und der User landet ohne Szenen im Editor. Sobald er „Auto-Cut" drückt, kommen die Phantom-Szenen.
+4. Auto-Cut für Composer-Quellen vollständig sperren
+- Der Sidebar-Button ist bereits teilweise entfernt, aber CoPilot-Kommandos können noch `auto_cut` oder `analyze_scenes` auslösen.
+- Ich blockiere diese Kommandos in `handleCoPilotCommand`, wenn `composerSourceProjectId` aktiv ist.
+- Zusätzlich bekommt die UI einen kleinen Statushinweis: „Composer-Render: Szenen aus Render-Metadaten gesperrt“, damit klar ist, dass keine KI-Neuanalyse über die Szenen gelegt wird.
 
-3. **Draft-Restore bei SPA-Navigation** (Zeile 167–194): Wenn der User per Browser-Back/Forward kommt **ohne** `?source=composer`, werden Szenen aus einem alten Projekt 1:1 wiederhergestellt — auch wenn das `selectedVideo` ein anderes ist. Das kann genau das Symptom „Drohnenflug-Szenen über Mais-Video" erzeugen, wenn vorher ein Drohnen-Projekt offen war.
+5. Timeline/Sidebar zeigt die Quelle transparent an
+- Szene-Karten bekommen bei Composer-Import eine stabile Beschreibung aus dem jeweiligen Motion-Studio-Scene-Type/Prompt, nicht aus Gemini-Auto-Cut.
+- Wenn Render-Geometrie und `composer_scenes` unterschiedlich viele Einträge haben, werden fehlende Labels fallback-sicher als „Composer Szene 1…n“ angezeigt, aber die Zeiten bleiben trotzdem aus `sceneGeometry`.
 
-4. **Race Condition im Composer-Import**: `clip_url` ist bei manchen Szenen erst nach dem Stitch verfügbar (siehe DB-Stichprobe: Projekt `ce846cc8…` hat 5 Szenen ohne `clip_url`). `probeMediaDuration` failt dann, fällt auf `duration_seconds`-Default zurück → Timeline-Geometrie weicht von der echten ab, Szenen rasten an falschen Stellen ein.
+6. Restliches UI-Scrolling nachziehen
+- Die Cut-Tab-Scroll-Struktur wird final vereinfacht: ein Scroll-Container im Sidebar-Body, kein zusätzliches Clipping im CutPanel.
+- Unten in der Szenenliste kommt ausreichend Padding, damit die letzten Szenen/Übergänge nicht hinter Timeline oder Bildschirmrand verschwinden.
 
-## Fix-Plan
+Technische Details:
+- Primäre Quelle für Schnittzeiten: `video_renders.content_config.sceneGeometry`.
+- Sekundäre Quelle nur für Labels: `composer_scenes`.
+- URL-Vertrag: `/universal-directors-cut?source=composer&project_id=...&render_id=...&source_video=...`.
+- Kein neuer Backend-Service nötig; die RLS-Policies erlauben dem eingeloggten User bereits Zugriff auf eigene `video_renders` und `composer_scenes`.
+- Ich werde die bestehende Datenbankstruktur nicht ändern.
 
-### A. Composer-Handoff härten (`RenderPipelinePanel.tsx`)
-- `openInDirectorsCut` **immer** mit `&source=composer&project_id=…` übergeben. Falls `projectId` fehlt → erst `ensureProjectPersisted()` aufrufen, dann navigieren. Niemals ohne Marker zur DC navigieren, sonst greift der Auto-Cut-Pfad.
-
-### B. Draft-Schutz gegen falsches Video (`DirectorsCut.tsx`)
-- In der Draft-Restore-Logik (Zeile 161–195) zusätzlich prüfen: `draft.selectedVideo?.url === currentSelectedVideo?.url` **oder** `draft.selectedVideo?.id === sourceProjectId`. Wenn die URL/ID nicht matcht → Draft verwerfen statt blind Szenen zu übernehmen. Das verhindert, dass Drohnen-Szenen über einem Mais-Video auftauchen.
-
-### C. Composer-Import sichtbar fehlerhaft machen
-- Bei `composerScenes.length === 0` oder Fetch-Fehler: `toast.error("Composer-Szenen konnten nicht importiert werden — bitte erneut öffnen")` statt nur `console.warn`. So sieht der User den Fehler, statt nachher mit halluzinierten Auto-Cut-Szenen dazustehen.
-- Zusätzlich: Wenn `composerSourceProjectId` gesetzt ist, **deaktiviere den Auto-Cut-Button**, solange der Import läuft, und blockiere ihn ganz, wenn der Import erfolgreich war (Composer-Geometrie ist autoritativ).
-
-### D. Race-Condition bei `clip_url` schließen
-- Im Composer-Import-Effect zuerst prüfen, ob **alle** Szenen ein `clip_url` (oder `upload_url`) haben. Wenn nicht: ein paar Sekunden warten + retry (max. 3×) bevor `probeMediaDuration` läuft. Andernfalls Default-Dauern nutzen, aber den User mit einem Toast informieren.
-
-### E. Diagnose-Logging
-- `console.info('[DirectorsCut] Composer handoff:', { projectId, scenesCount, totalDuration, measuredVideoDur })` einbauen, damit wir bei künftigen Reports auf einen Blick sehen, welcher Pfad gegriffen hat.
-
-## Betroffene Dateien
-
-- `src/components/video-composer/RenderPipelinePanel.tsx` — Handoff-URL immer mit Marker, projektpersistierung erzwingen.
-- `src/pages/DirectorsCut/DirectorsCut.tsx` — Draft-Match-Check, sichtbare Fehler, Auto-Cut-Sperre während/nach Composer-Import, clip_url-Retry, Logging.
-
-## Akzeptanzkriterien
-
-1. „In Director's Cut öffnen" aus Motion Studio → die exakt im Composer angelegten Szenen erscheinen mit korrekten Timings (Render-Geometrie).
-2. Kein Mismatch mehr zwischen Video-Inhalt und Szenenbeschreibungen.
-3. Wenn der Composer-Import scheitert, sieht der User einen klaren Fehler-Toast — keine stillen Phantom-Szenen mehr.
-4. Browser-Back lädt nur dann den Draft, wenn das Video wirklich dasselbe ist.
+Warum das den Fehler behebt:
+- Das finale MP4 wurde mit genau dieser `sceneGeometry` gerendert. Wenn der Editor dieselbe Geometry liest, gibt es keinen zweiten Interpretationsweg mehr.
+- Browser-Dauer-Messung, Gemini-Auto-Cut und alte Session-Drafts können die Szene-Liste dann nicht mehr überschreiben.
+- Das entspricht dem Artlist/NLE-Prinzip: die Timeline-Metadaten sind die Source of Truth, nicht eine nachträgliche KI-Erkennung des finalen Videos.
