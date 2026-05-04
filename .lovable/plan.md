@@ -1,46 +1,35 @@
 ## Ziel
 
-Die separate „Video importieren"-Seite (Universal Director's Cut Vorstufe) entfällt. Stattdessen öffnet `/directors-cut` immer **direkt das Studio**. Die Video-Auswahl (Mediathek + Upload) wird als **Dialog innerhalb des Studios** verfügbar gemacht und automatisch beim Start angezeigt, wenn noch kein Video geladen ist. Das bringt zwei Vorteile:
+Der Import-Dialog soll sich **nicht mehr automatisch öffnen**. Stattdessen erscheint oben in der Topbar ein deutlicher **„Video importieren"**-Button (Film-Icon), der den Dialog manuell öffnet. Ohne Video bleibt der Player dunkel/leer und der User kann via Sidebar (Leere Szene / Video hinzufügen) eigene Szenen anlegen.
 
-1. Ein einziger, durchgängiger Editor-Kontext — kein Mode-Wechsel mehr zwischen „Import-Screen" und „Studio".
-2. Beim Video-Wechsel/Import läuft die Szenen-Erkennung im **gleichen Lebenszyklus** wie das Studio — wir können sofort nach dem Auswählen die Signal-basierte Szenenanalyse (EDL für Composer, Histogram/SSIM für Uploads) anstoßen, ohne dass dazwischen die Komponente neu gemountet wird (was bisher Drafts überschrieben hat).
+## Änderungen
 
-## Was wir bauen
+### 1. `src/pages/DirectorsCut/DirectorsCut.tsx`
+- **Auto-Open entfernen**: Der `useEffect` (Zeilen 864–868), der `setImportDialogOpen(true)` bei fehlendem Video setzt, wird gelöscht. Der Dialog startet geschlossen (`useState(false)` bleibt).
+- `onBackToImport` Prop bleibt → triggert Dialog-Öffnung über den neuen Topbar-Button.
+- Composer-Handoff (`?source_video=…`) öffnet weiterhin **kein** Dialog (Video kommt direkt rein).
 
-### 1. Studio öffnet sich immer sofort
-- `src/pages/DirectorsCut/DirectorsCut.tsx`: Den `!isInStudio` Import-Block entfernen. `CapCutEditor` wird immer gerendert. Wenn `selectedVideo === null`, wird ein Platzhalter-Editor (leere Timeline, deaktivierter Player) mit klarem CTA „Video laden" gezeigt.
-- Auto-Open: Wenn beim Mount kein `selectedVideo` und keine `source_video`-URL vorhanden ist, öffnet sich automatisch der neue Import-Dialog.
+### 2. `src/components/directors-cut/studio/CapCutEditor.tsx` (Topbar, Zeilen ~1599–1625)
+- Neuer Button **„Video importieren"** in der linken Header-Sektion, sichtbar **immer wenn `onBackToImport` gesetzt ist**:
+  - Gold-akzentuiert (passend zum Bond-2028-Design), Film-Icon (`Film` aus lucide-react), Label `t('dc.importVideo')`.
+  - Wenn `videoUrl` leer → Button visuell hervorgehoben (subtiler Gold-Glow + Pulse), damit klar ist „Hier starten".
+  - Wenn ein Video geladen ist → Button bleibt sichtbar als „Video wechseln" (gleicher Trigger, Label adaptiv via `videoUrl ? t('dc.changeVideo') : t('dc.importVideo')`).
+- Der bestehende „Zurück"-Button entfällt (war nur sinnvoll als Vorstufe-Navigation und wird durch den Importieren-Button ersetzt).
 
-### 2. Neuer `VideoImportDialog`
-- Neue Komponente `src/components/directors-cut/studio/VideoImportDialog.tsx` als shadcn-`Dialog`.
-- Wiederverwendet 1:1 die bestehende `VideoImportStep`-Logik (Tabs „Aus Mediathek" + „Hochladen", Library-Query, Upload).
-- Ergebnis-Callback `onVideoSelect(video)` → setzt `selectedVideo` im DirectorsCut-Page-State und schließt den Dialog.
+### 3. Leerer Player-Zustand
+- `DirectorsCutPreviewPlayer` rendert bei leerer `videoUrl` bereits einen dunklen Container; wir ergänzen einen dezenten Hinweistext zentriert: „Kein Video geladen – importiere ein Video oder erstelle eine leere Szene." (über eine kleine Bedingung im Editor-Bereich rund um den Player).
+- Die Sidebar (`CutPanel`) zeigt weiterhin „Leere Szene" und „Video hinzufügen" (Letzteres öffnet ebenfalls den Import-Dialog via `onBackToImport`).
 
-### 3. Trigger-Punkte im Studio
-- **Topbar** des `CapCutEditor`: neuer Button „Video laden / wechseln" (Film-Icon), öffnet `VideoImportDialog`.
-- **Cut-Panel Sidebar**: existierender Button „Video hinzufügen" wird auf den neuen Dialog umverdrahtet (statt auf die alte Vorstufe zurückzunavigieren).
-- `onBackToImport` Callback wird zu `onOpenImportDialog` umbenannt — kein State-Reset mehr nötig.
+### 4. Übersetzungen
+- `src/lib/translations.ts`: Keys ergänzen, falls nicht vorhanden:
+  - `dc.importVideo` → DE „Video importieren" / EN „Import video" / ES „Importar vídeo"
+  - `dc.changeVideo` → DE „Video wechseln" / EN „Change video" / ES „Cambiar vídeo"
 
-### 4. Szenen-Erkennung sofort nach Auswahl
-- Im `onVideoSelect`-Handler in `DirectorsCut.tsx`:
-  - Composer-Quelle (URL-Param `source=composer`): wie bisher EDL-Import via `composer-edl.ts`.
-  - Reguläre Library/Upload-Quelle: sofort `runSignalBasedSceneDetection()` triggern (bestehende `handleStartAnalysis`-Pipeline), nicht erst auf User-Klick warten.
-  - Ein Toast „Szenen werden analysiert…" während des Runs.
-
-### 5. Alte Vorstufe-Route stilllegen
-- `src/pages/UniversalDirectorsCut.tsx`: Die Landing-Card bleibt erhalten, aber der „Start Director's Cut"-Button geht direkt nach `/directors-cut` (öffnet automatisch den Import-Dialog). Keine separate Import-Page mehr.
-- Optional: Route `/universal-directors-cut` als Redirect → `/directors-cut`.
-
-## Geänderte/neue Dateien
-
-- **NEW** `src/components/directors-cut/studio/VideoImportDialog.tsx`
-- `src/pages/DirectorsCut/DirectorsCut.tsx` — Import-Mode entfernen, Dialog einbinden, Auto-Open + Auto-Analyse
-- `src/components/directors-cut/studio/CapCutEditor.tsx` — Topbar-Button + `onOpenImportDialog`-Prop
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx` — „Video hinzufügen"-Button neu verdrahten
-- `src/pages/UniversalDirectorsCut.tsx` — CTA direkt nach `/directors-cut` (kein Vorstufe-Inhalt mehr)
-- `src/lib/translations.ts` — neue Keys `dc.openImportDialog`, `dc.changeVideo` (DE/EN/ES)
+## Geänderte Dateien
+- `src/pages/DirectorsCut/DirectorsCut.tsx`
+- `src/components/directors-cut/studio/CapCutEditor.tsx`
+- `src/lib/translations.ts`
 
 ## Nicht im Scope
-
-- Änderungen am Composer-EDL-Import oder Render-Pipeline (separater offener Plan).
-- Keine Änderung der Signal-Detection selbst — nur der Trigger-Zeitpunkt verschiebt sich nach vorn.
+- Keine Änderung an Szenen-Erkennung, Composer-EDL-Import oder Auto-Analyse-Logik.
+- Auto-Analyse läuft weiterhin **nur** wenn der User aktiv ein Video im Dialog auswählt.

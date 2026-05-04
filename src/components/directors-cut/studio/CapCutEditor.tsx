@@ -12,7 +12,7 @@ import { CapCutPropertiesPanel } from './CapCutPropertiesPanel';
 import { RenderOverlay } from './RenderOverlay';
 import { AudioTrack, AudioClip, SubtitleClip, SubtitleTrack, DEFAULT_SUBTITLE_TRACK } from '@/types/timeline';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download } from 'lucide-react';
+import { Undo2, Redo2, Settings, Music, Volume2, ArrowRight, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Mic, Download, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
@@ -1600,15 +1600,20 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
       <div className="h-10 flex items-center justify-between px-3 border-b border-[#F5C76A]/10 bg-[#0a0a1a]/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           {onBackToImport && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-7 px-2 text-white/60 hover:text-white hover:bg-white/10 text-xs gap-1"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onBackToImport}
-              title={t('dc.backToImport')}
+              title={videoUrl ? t('dc.changeVideo') : t('dc.importVideo')}
+              className={cn(
+                "h-7 px-2.5 text-xs gap-1.5 border transition-all",
+                videoUrl
+                  ? "text-white/70 hover:text-white hover:bg-white/10 border-[#F5C76A]/20"
+                  : "text-[#F5C76A] hover:text-[#FFE4A0] bg-[#F5C76A]/10 hover:bg-[#F5C76A]/20 border-[#F5C76A]/40 shadow-[0_0_12px_rgba(245,199,106,0.25)] animate-pulse"
+              )}
             >
-              <ArrowRight className="h-3.5 w-3.5 rotate-180" />
-              Zurück
+              <Film className="h-3.5 w-3.5" />
+              {videoUrl ? t('dc.changeVideo') : t('dc.importVideo')}
             </Button>
           )}
           <div className="w-px h-5 bg-[#F5C76A]/15" />
