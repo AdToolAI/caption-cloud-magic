@@ -623,7 +623,7 @@ export function PreviewExportStep({
                       </Button>
                       
                       <Button
-                        onClick={() => window.location.href = `/directors-cut?source_video=${encodeURIComponent(job.downloadUrl!)}&project_id=${projectId}`}
+                        onClick={() => window.location.href = `/universal-directors-cut?source=universal_creator&source_video=${encodeURIComponent(job.downloadUrl!)}&project_id=${projectId}`}
                         variant="secondary"
                         size="sm"
                         className="w-full"
