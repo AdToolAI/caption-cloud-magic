@@ -868,113 +868,100 @@ export function DirectorsCut() {
     toast.success(t('dc.projectReset'));
   }, []);
 
-  // Two modes: Import (no video) or Studio (video selected)
-  const isInStudio = !!selectedVideo;
+  // Import dialog state — opens automatically when no video is loaded.
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  useEffect(() => {
+    if (!selectedVideo && !searchParams.get('source_video')) {
+      setImportDialogOpen(true);
+    }
+  }, [selectedVideo, searchParams]);
+
+  const handleVideoSelected = useCallback((video: SelectedVideo | null) => {
+    setSelectedVideo(video);
+    if (video) {
+      setImportDialogOpen(false);
+      // Persist the new selection.
+      saveProject();
+      // Auto-trigger signal-based scene detection for non-Composer sources.
+      const isComposer = !!searchParams.get('source') && searchParams.get('source') === 'composer';
+      if (!isComposer) {
+        // Defer to next tick so selectedVideo state is committed before
+        // handleStartAnalysis reads it.
+        setTimeout(() => {
+          try {
+            handleStartAnalysis();
+          } catch (e) {
+            console.warn('[DirectorsCut] auto-analysis trigger failed', e);
+          }
+        }, 100);
+      }
+    }
+  }, [searchParams, saveProject]);
 
   return (
     <div className="min-h-screen bg-background">
-      {/* IMPORT MODE: Show video import screen */}
-      {!isInStudio && (
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold">{t('dc.pageTitle')}</h1>
-              <p className="text-muted-foreground">
-                {t('dc.importSubtitle')}
-              </p>
-            </div>
-            <Button variant="outline" onClick={() => navigate('/mediathek')}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {t('dc.toMediaLibrary')}
-            </Button>
-          </div>
+      <CapCutEditor
+        videoUrl={selectedVideo?.url || ''}
+        videoDuration={actualTotalDuration}
+        originalVideoDuration={originalVideoDuration || actualTotalDuration}
+        scenes={scenes}
+        audioEnhancements={audioEnhancements}
+        onAudioChange={setAudioEnhancements}
+        onScenesUpdate={setScenes}
+        voiceOverUrl={voiceOverUrl}
+        textOverlays={textOverlays}
+        onTextOverlaysChange={setTextOverlays}
+        appliedEffects={appliedEffects}
+        initialAiCutMarkers={aiCutMarkers}
+        transitions={transitions}
+        onTransitionsChange={setTransitions}
+        colorGrading={colorGrading}
+        sceneColorGrading={sceneColorGrading}
+        styleTransfer={styleTransfer}
+        speedKeyframes={speedKeyframes}
+        kenBurns={kenBurnsKeyframes}
+        onEffectsChange={(global) => setAppliedEffects(prev => ({ ...prev, global }))}
+        onSceneEffectsChange={(scenes) => setAppliedEffects(prev => ({ ...prev, scenes }))}
+        onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
+        onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
+        chromaKey={chromaKey}
+        onChromaKeyChange={(ck) => setChromaKey({ ...ck, backgroundUrl: ck.backgroundUrl ?? undefined })}
+        upscaling={upscaling}
+        onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
+        interpolation={interpolation}
+        onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
+        restoration={restoration}
+        onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
+        exportSettings={exportSettings}
+        onExportSettingsChange={setExportSettings}
+        isAnalyzing={isAnalyzing}
+        onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
+        composerLockSource={
+          composerSourceProjectId
+            ? (composerLock.active ? composerLock.source : 'edl')
+            : null
+        }
+        composerLockSceneCount={composerLock.sceneCount || scenes.length}
+        onVoiceOverGenerated={setVoiceOverUrl}
+        onAudioTracksChange={setCapCutAudioTracks}
+        onSubtitleTrackChange={setCapCutSubtitleTrack}
+        onBackgroundMusicUrlChange={setBackgroundMusicUrl}
+        initialSubtitleTrack={capCutSubtitleTrack}
+        projectId={projectId}
+        onCleanedVideoUrlChange={(url) => setCleanedVideoUrl(url || undefined)}
+        onSaveProject={saveProject}
+        subtitleSafeZone={subtitleSafeZone}
+        onSubtitleSafeZoneChange={setSubtitleSafeZone}
+        onResetProject={handleResetProject}
+        onBackToImport={() => setImportDialogOpen(true)}
+      />
 
-          <div className="max-w-3xl mx-auto">
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Film className="w-5 h-5 text-primary" />
-                <div>
-                  <h2 className="text-lg font-semibold">{t('dc.importVideo')}</h2>
-                  <p className="text-sm text-muted-foreground">{t('dc.importVideoDesc')}</p>
-                </div>
-              </div>
-              
-              <VideoImportStep selectedVideo={selectedVideo} onVideoSelect={(video) => {
-                setSelectedVideo(video);
-                if (video) {
-                  saveProject();
-                }
-              }} />
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {/* STUDIO MODE: Full CapCut Editor */}
-      {isInStudio && (
-        <CapCutEditor
-          videoUrl={selectedVideo.url}
-          videoDuration={actualTotalDuration}
-          originalVideoDuration={originalVideoDuration || actualTotalDuration}
-          scenes={scenes}
-          audioEnhancements={audioEnhancements}
-          onAudioChange={setAudioEnhancements}
-          onScenesUpdate={setScenes}
-          voiceOverUrl={voiceOverUrl}
-          // Visual effects
-          textOverlays={textOverlays}
-          onTextOverlaysChange={setTextOverlays}
-          appliedEffects={appliedEffects}
-          initialAiCutMarkers={aiCutMarkers}
-          transitions={transitions}
-          onTransitionsChange={setTransitions}
-          colorGrading={colorGrading}
-          sceneColorGrading={sceneColorGrading}
-          styleTransfer={styleTransfer}
-          speedKeyframes={speedKeyframes}
-          kenBurns={kenBurnsKeyframes}
-          // New studio props
-          onEffectsChange={(global) => setAppliedEffects(prev => ({ ...prev, global }))}
-          onSceneEffectsChange={(scenes) => setAppliedEffects(prev => ({ ...prev, scenes }))}
-          onColorGradingChange={(enabled, grade, intensity) => setColorGrading(prev => ({ ...prev, enabled, grade, intensity: intensity ?? prev.intensity }))}
-          onStyleTransferChange={(enabled, style) => setStyleTransfer(prev => ({ ...prev, enabled, style }))}
-          chromaKey={chromaKey}
-          onChromaKeyChange={(ck) => setChromaKey({ ...ck, backgroundUrl: ck.backgroundUrl ?? undefined })}
-          upscaling={upscaling}
-          onUpscalingChange={(enabled, resolution) => setUpscaling({ enabled, targetResolution: resolution })}
-          interpolation={interpolation}
-          onInterpolationChange={(enabled, fps) => setInterpolation({ enabled, targetFps: fps })}
-          restoration={restoration}
-          onRestorationChange={(enabled, level) => setRestoration({ enabled, level })}
-          exportSettings={exportSettings}
-          onExportSettingsChange={setExportSettings}
-          isAnalyzing={isAnalyzing}
-          // Lock auto-cut when scenes were imported deterministically from
-          // the Composer — running Gemini scene analysis on top would
-          // overwrite the correct geometry with hallucinated descriptions.
-          onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
-          composerLockSource={
-            composerSourceProjectId
-              ? (composerLock.active ? composerLock.source : 'edl')
-              : null
-          }
-          composerLockSceneCount={composerLock.sceneCount || scenes.length}
-          onVoiceOverGenerated={setVoiceOverUrl}
-          // Callbacks for propagation
-          onAudioTracksChange={setCapCutAudioTracks}
-          onSubtitleTrackChange={setCapCutSubtitleTrack}
-          onBackgroundMusicUrlChange={setBackgroundMusicUrl}
-          initialSubtitleTrack={capCutSubtitleTrack}
-          projectId={projectId}
-          onCleanedVideoUrlChange={(url) => setCleanedVideoUrl(url || undefined)}
-          onSaveProject={saveProject}
-          subtitleSafeZone={subtitleSafeZone}
-          onSubtitleSafeZoneChange={setSubtitleSafeZone}
-          // Reset + navigation
-          onResetProject={handleResetProject}
-          onBackToImport={() => setSelectedVideo(null)}
-        />
-      )}
+      <VideoImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        selectedVideo={selectedVideo}
+        onVideoSelect={handleVideoSelected}
+      />
 
       {/* AI Co-Pilot */}
       <AICoPilot
