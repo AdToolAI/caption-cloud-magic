@@ -866,13 +866,22 @@ export function DirectorsCut() {
     setSelectedVideo(video);
     if (video) {
       setImportDialogOpen(false);
-      // Persist the new selection.
       saveProject();
-      // Auto-trigger signal-based scene detection for non-Composer sources.
-      const isComposer = !!searchParams.get('source') && searchParams.get('source') === 'composer';
-      if (!isComposer) {
-        // Defer to next tick so selectedVideo state is committed before
-        // handleStartAnalysis reads it.
+
+      // If the imported video is a Composer render (detected via render_id /
+      // metadata in VideoImportStep), wire up the same EDL import path used
+      // for the direct ?source=composer handoff. The existing useEffect that
+      // depends on composerSourceProjectId will then load the authoritative
+      // scene boundaries and lock auto-cut.
+      if (video.composerProjectId) {
+        setComposerSourceProjectId(video.composerProjectId);
+        setComposerRenderId(video.composerRenderId || null);
+        return;
+      }
+
+      // Otherwise: regular shot detection on the imported video.
+      const isComposerHandoff = searchParams.get('source') === 'composer';
+      if (!isComposerHandoff) {
         setTimeout(() => {
           try {
             handleStartAnalysis();
