@@ -32,7 +32,7 @@ import type {
   ClipQuality,
   AdCampaignMeta,
 } from '@/types/video-composer';
-import { getClipCost } from '@/types/video-composer';
+import { getClipCost, DEFAULT_TEXT_OVERLAY } from '@/types/video-composer';
 import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
