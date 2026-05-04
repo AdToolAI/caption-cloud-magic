@@ -370,14 +370,34 @@ export function DirectorsCut() {
     let cancelled = false;
     (async () => {
       try {
-        const { data: composerScenes, error } = await supabase
-          .from('composer_scenes')
-          .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, clip_url, upload_url, upload_type, text_overlay, clip_lead_in_trim_seconds')
-          .eq('project_id', composerSourceProjectId)
-          .order('order_index', { ascending: true });
+        // ── Retry-Loop: clip_url kann unmittelbar nach dem Stitch-Webhook
+        // noch fehlen (Race Condition). Bis zu 3× warten, bevor wir fallbacken.
+        let composerScenes: any[] | null = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const { data, error } = await supabase
+            .from('composer_scenes')
+            .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, clip_url, upload_url, upload_type, text_overlay, clip_lead_in_trim_seconds')
+            .eq('project_id', composerSourceProjectId)
+            .order('order_index', { ascending: true });
 
-        if (error) throw error;
-        if (cancelled || !composerScenes || composerScenes.length === 0) return;
+          if (error) throw error;
+          composerScenes = data || [];
+
+          const allHaveUrl = composerScenes.length > 0 &&
+            composerScenes.every((cs: any) => cs.clip_url || cs.upload_url || cs.clip_source === 'ai-image');
+          if (allHaveUrl || attempt === 2) break;
+
+          console.info(`[DirectorsCut] Composer scenes incomplete (attempt ${attempt + 1}/3) — waiting 2s for clip URLs…`);
+          await new Promise(r => setTimeout(r, 2000));
+          if (cancelled) return;
+        }
+
+        if (cancelled || !composerScenes || composerScenes.length === 0) {
+          if (!cancelled) {
+            toast.error('Composer-Szenen konnten nicht geladen werden – bitte das Video erneut aus dem Motion Studio öffnen.');
+          }
+          return;
+        }
 
         // Echte Clip-Dauer pro Szene messen (best effort, parallel, mit Fallback).
         const FPS = 30;
@@ -455,12 +475,22 @@ export function DirectorsCut() {
         });
 
         if (!cancelled) {
+          console.info('[DirectorsCut] Composer handoff complete:', {
+            projectId: composerSourceProjectId,
+            scenesCount: normalizedScenes.length,
+            computedTotal,
+            measuredVideoDur,
+            scale,
+          });
           setScenes(normalizedScenes);
           setSelectedVideo(prev => prev ? { ...prev, duration: measuredVideoDur || prev.duration } : prev);
           toast.success(`${normalizedScenes.length} Composer-Szenen importiert (Render-Geometrie)`);
         }
       } catch (err) {
-        console.warn('[DirectorsCut] Composer scene import failed, falling back to manual Auto-Cut:', err);
+        console.warn('[DirectorsCut] Composer scene import failed:', err);
+        if (!cancelled) {
+          toast.error('Composer-Szenen konnten nicht importiert werden – bitte erneut aus dem Motion Studio öffnen.');
+        }
       }
     })();
     return () => { cancelled = true; };
