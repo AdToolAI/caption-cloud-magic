@@ -971,8 +971,8 @@ export const CapCutSidebar: React.FC<CapCutSidebarProps> = ({
               onTrimScene={onTrimScene}
               onAddVideoAsScene={onAddVideoAsScene}
               onAddFromLibrary={onAddFromLibrary}
-              composerLockSource={(props as any).composerLockSource ?? null}
-              composerLockSceneCount={(props as any).composerLockSceneCount ?? 0}
+              composerLockSource={composerLockSource}
+              composerLockSceneCount={composerLockSceneCount}
             />
           </TabsContent>
 
