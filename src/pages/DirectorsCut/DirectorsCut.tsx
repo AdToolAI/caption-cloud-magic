@@ -859,13 +859,8 @@ export function DirectorsCut() {
     toast.success(t('dc.projectReset'));
   }, []);
 
-  // Import dialog state — opens automatically when no video is loaded.
+  // Import dialog state — opens only when the user clicks the Import button.
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  useEffect(() => {
-    if (!selectedVideo && !searchParams.get('source_video')) {
-      setImportDialogOpen(true);
-    }
-  }, [selectedVideo, searchParams]);
 
   const handleVideoSelected = useCallback((video: SelectedVideo | null) => {
     setSelectedVideo(video);
