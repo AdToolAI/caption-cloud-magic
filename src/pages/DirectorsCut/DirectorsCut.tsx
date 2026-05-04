@@ -290,6 +290,13 @@ export function DirectorsCut() {
 
   // AI Co-Pilot command handler
   const handleCoPilotCommand = useCallback((command: string, params?: Record<string, any>) => {
+    // Composer-Render: Szenen kommen deterministisch aus der Render-Geometrie.
+    // Ein KI-Auto-Cut darüber würde die korrekten Szenen mit halluzinierten
+    // Beschreibungen überschreiben — daher hart blockieren.
+    if (composerSourceProjectId && (command === 'auto_cut' || command === 'analyze_scenes')) {
+      toast.info('Composer-Render: Szenen sind aus den Render-Metadaten gesperrt.');
+      return;
+    }
     switch (command) {
       case 'apply_style':
         if (params?.style) {
