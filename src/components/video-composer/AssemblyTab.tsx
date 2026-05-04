@@ -111,14 +111,28 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
 
   useEffect(() => () => stopPolling(), []);
 
-  // Hydrate completed video from project
+  // Hydrate completed video from project — also pull the latest render_id so
+  // "Open in Director's Cut" can deterministically load the matching render.
   useEffect(() => {
     if (project?.outputUrl && !videoUrl) {
       setVideoUrl(project.outputUrl);
       setRenderStatus('completed');
       setProgress(100);
     }
-  }, [project?.outputUrl]);
+    if (project?.id && !renderId) {
+      (async () => {
+        const { data: row } = await supabase
+          .from('video_renders')
+          .select('render_id')
+          .eq('project_id', project.id)
+          .eq('source', 'composer')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (row?.render_id) setRenderId(row.render_id);
+      })();
+    }
+  }, [project?.outputUrl, project?.id]);
 
   // ─── Resume in-flight render on mount / project switch ────────────────
   useEffect(() => {
