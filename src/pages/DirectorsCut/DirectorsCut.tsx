@@ -364,113 +364,81 @@ export function DirectorsCut() {
     }
   }, [searchParams, navigate]);
 
-  // ── Composer Handoff: deterministic scene import from composer_scenes ──
-  // Wir bauen die Timeline 1:1 aus den Composer-Daten zusammen UND
-  // berücksichtigen dabei die exakte Render-Geometrie (echte MP4-Dauer +
-  // 15-Frame-Crossfade-Overlap), wie sie ComposedAdVideo erzeugt. So liegen
-  // die Schnittpunkte im DC-Editor exakt dort, wo sie auch im finalen MP4 sind.
+  // ── Composer Handoff: deterministic scene import ──
+  // Primary source of truth: video_renders.content_config.sceneGeometry
+  // (this is exactly what Lambda used to render the final MP4, so the
+  // editor timeline must mirror it 1:1). Secondary source: composer_scenes
+  // for human-readable labels only. We never re-measure clip durations in
+  // the browser anymore — that introduces drift.
   useEffect(() => {
     if (!composerSourceProjectId || !selectedVideo) return;
 
     let cancelled = false;
     (async () => {
       try {
-        // ── Retry-Loop: clip_url kann unmittelbar nach dem Stitch-Webhook
-        // noch fehlen (Race Condition). Bis zu 3× warten, bevor wir fallbacken.
-        let composerScenes: any[] | null = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const { data, error } = await supabase
-            .from('composer_scenes')
-            .select('id, order_index, scene_type, duration_seconds, ai_prompt, stock_keywords, clip_source, clip_url, upload_url, upload_type, text_overlay, clip_lead_in_trim_seconds')
+        // 1. Load the authoritative render row. Prefer render_id from URL,
+        //    fall back to "latest composer render for this project".
+        let renderRow: any = null;
+        if (composerRenderId) {
+          const { data } = await supabase
+            .from('video_renders')
+            .select('render_id, video_url, content_config, format_config')
+            .eq('render_id', composerRenderId)
+            .maybeSingle();
+          renderRow = data;
+        }
+        if (!renderRow) {
+          const { data } = await supabase
+            .from('video_renders')
+            .select('render_id, video_url, content_config, format_config')
             .eq('project_id', composerSourceProjectId)
-            .order('order_index', { ascending: true });
-
-          if (error) throw error;
-          composerScenes = data || [];
-
-          const allHaveUrl = composerScenes.length > 0 &&
-            composerScenes.every((cs: any) => cs.clip_url || cs.upload_url || cs.clip_source === 'ai-image');
-          if (allHaveUrl || attempt === 2) break;
-
-          console.info(`[DirectorsCut] Composer scenes incomplete (attempt ${attempt + 1}/3) — waiting 2s for clip URLs…`);
-          await new Promise(r => setTimeout(r, 2000));
-          if (cancelled) return;
+            .eq('source', 'composer')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          renderRow = data;
         }
 
-        if (cancelled || !composerScenes || composerScenes.length === 0) {
-          if (!cancelled) {
-            toast.error('Composer-Szenen konnten nicht geladen werden – bitte das Video erneut aus dem Motion Studio öffnen.');
-          }
+        const cfg: any = renderRow?.content_config || {};
+        const geometry: Array<{ idx: number; startSec: number; endSec: number; durationSec: number }> =
+          Array.isArray(cfg.sceneGeometry) ? cfg.sceneGeometry : [];
+
+        // 2. Pull labels from composer_scenes (best-effort, parallel to geometry).
+        const { data: composerScenes } = await supabase
+          .from('composer_scenes')
+          .select('order_index, scene_type, ai_prompt, stock_keywords, text_overlay')
+          .eq('project_id', composerSourceProjectId)
+          .order('order_index', { ascending: true });
+
+        if (cancelled) return;
+
+        if (geometry.length === 0) {
+          toast.error('Render-Geometrie nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.');
           return;
         }
 
-        // Echte Clip-Dauer pro Szene messen (best effort, parallel, mit Fallback).
-        const FPS = 30;
-        const CROSSFADE_FRAMES = 15;
-        const CROSSFADE_SEC = CROSSFADE_FRAMES / FPS;
-
-        const measuredDurations = await Promise.all(
-          composerScenes.map(async (cs: any) => {
-            const url = cs.clip_url || cs.upload_url;
-            const isImage =
-              cs.clip_source === 'ai-image' ||
-              cs.upload_type === 'image' ||
-              (typeof url === 'string' && /\.(png|jpe?g|webp|avif|gif)(\?|$)/i.test(url));
-            if (!url || isImage) return Number(cs.duration_seconds) || 5;
-            try {
-              const d = await probeMediaDuration(url, 8000);
-              return d > 0 ? d : Number(cs.duration_seconds) || 5;
-            } catch {
-              return Number(cs.duration_seconds) || 5;
-            }
-          })
-        );
-
-        // Timeline-Position der Szenen im finalen Stitch nachbauen:
-        // start[i] = sum(dur[0..i-1]) - i * CROSSFADE_SEC
-        // end[i]   = start[i] + dur[i]
-        // (entspricht TransitionSeries mit uniform 15f Fade)
-        const N = composerScenes.length;
-        const starts: number[] = new Array(N).fill(0);
-        const ends: number[] = new Array(N).fill(0);
-        let acc = 0;
-        for (let i = 0; i < N; i++) {
-          starts[i] = Math.max(0, acc - i * CROSSFADE_SEC);
-          ends[i] = starts[i] + measuredDurations[i];
-          acc += measuredDurations[i];
-        }
-
-        // Optional: leichter Skalierungs-Fit gegen die tatsächlich gemessene
-        // Endvideo-Dauer (deckt Encoder-Padding ab, max ±2 % Korrektur).
-        const measuredVideoDur = selectedVideo.duration || (await measureVideoDuration(selectedVideo.url));
-        const computedTotal = ends[N - 1];
-        let scale = 1;
-        if (measuredVideoDur > 0 && computedTotal > 0) {
-          const ratio = measuredVideoDur / computedTotal;
-          if (ratio > 0.92 && ratio < 1.08) scale = ratio;
-        }
-
-        const describe = (cs: any, i: number): string => {
-          const overlay = (cs.text_overlay && typeof cs.text_overlay === 'object' && cs.text_overlay.text) ? String(cs.text_overlay.text) : '';
+        const describe = (idx: number): string => {
+          const cs: any = composerScenes?.[idx];
+          if (!cs) return `Composer Szene ${idx + 1}`;
+          const overlay = (cs.text_overlay && typeof cs.text_overlay === 'object' && cs.text_overlay.text)
+            ? String(cs.text_overlay.text) : '';
           const promptLike = (overlay || cs.ai_prompt || cs.stock_keywords || '').toString().trim();
-          const sceneTypeLabel = cs.scene_type ? String(cs.scene_type) : `Szene ${i + 1}`;
+          const sceneTypeLabel = cs.scene_type ? String(cs.scene_type) : `Szene ${idx + 1}`;
           if (promptLike) return `${sceneTypeLabel} · ${promptLike.slice(0, 80)}`;
           return sceneTypeLabel;
         };
 
-        const normalizedScenes: SceneAnalysis[] = composerScenes.map((cs: any, i: number) => {
-          const start = Math.round(starts[i] * scale * 100) / 100;
-          const end = Math.round(ends[i] * scale * 100) / 100;
+        const normalizedScenes: SceneAnalysis[] = geometry.map((g, i) => {
+          const start = Math.round(g.startSec * 100) / 100;
+          const end = Math.round(g.endSec * 100) / 100;
           return {
             id: `scene-${i + 1}`,
             start_time: start,
             end_time: end,
-            // Im Handoff IST das Source-Video bereits das fertige Stitch-MP4.
-            // Source-Zeit == Timeline-Zeit → original_start_time = start.
             original_start_time: start,
             original_end_time: end,
             playbackRate: 1.0,
-            description: describe(cs, i),
+            description: describe(i),
             mood: 'neutral',
             suggested_effects: [],
             ai_suggestions: [],
@@ -479,16 +447,17 @@ export function DirectorsCut() {
           } as SceneAnalysis;
         });
 
+        const totalDur = geometry[geometry.length - 1]?.endSec || selectedVideo.duration || 0;
+
         if (!cancelled) {
-          console.info('[DirectorsCut] Composer handoff complete:', {
+          console.info('[DirectorsCut] Composer handoff complete (render geometry):', {
             projectId: composerSourceProjectId,
+            renderId: renderRow?.render_id,
             scenesCount: normalizedScenes.length,
-            computedTotal,
-            measuredVideoDur,
-            scale,
+            totalDur,
           });
           setScenes(normalizedScenes);
-          setSelectedVideo(prev => prev ? { ...prev, duration: measuredVideoDur || prev.duration } : prev);
+          setSelectedVideo(prev => prev ? { ...prev, duration: totalDur || prev.duration } : prev);
           toast.success(`${normalizedScenes.length} Composer-Szenen importiert (Render-Geometrie)`);
         }
       } catch (err) {
@@ -499,7 +468,7 @@ export function DirectorsCut() {
       }
     })();
     return () => { cancelled = true; };
-  }, [composerSourceProjectId, selectedVideo?.url]);
+  }, [composerSourceProjectId, composerRenderId, selectedVideo?.url]);
 
 
   const saveProject = async () => {
