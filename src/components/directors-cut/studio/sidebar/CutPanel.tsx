@@ -25,6 +25,9 @@ interface CutPanelProps {
   onTrimScene?: (sceneId: string, newStart: number, newEnd: number) => void;
   onAddVideoAsScene?: (file: File) => void;
   onAddFromLibrary?: () => void;
+  /** When set, scenes were imported from a Composer render's EDL — auto-cut is locked. */
+  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSceneCount?: number;
 }
 
 const formatTime = (s: number) => {
