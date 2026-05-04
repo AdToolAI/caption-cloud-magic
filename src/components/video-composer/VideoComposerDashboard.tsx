@@ -430,7 +430,9 @@ export default function VideoComposerDashboard() {
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
           };
         });
-        return { ...prev, scenes: dbScenes };
+        const merged = [...dbScenes, ...localOnly]
+          .map((s, i) => ({ ...s, orderIndex: i }));
+        return { ...prev, scenes: merged };
       });
     } catch (err) {
       console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
