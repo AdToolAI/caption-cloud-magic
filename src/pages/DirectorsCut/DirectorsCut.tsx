@@ -953,6 +953,8 @@ export function DirectorsCut() {
           // the Composer — running Gemini scene analysis on top would
           // overwrite the correct geometry with hallucinated descriptions.
           onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
+          composerLockSource={composerLock.active ? composerLock.source : null}
+          composerLockSceneCount={composerLock.sceneCount}
           onVoiceOverGenerated={setVoiceOverUrl}
           // Callbacks for propagation
           onAudioTracksChange={setCapCutAudioTracks}

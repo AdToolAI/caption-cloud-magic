@@ -96,6 +96,9 @@ interface CapCutEditorProps {
   onBackToImport?: () => void;
   /** AI-detected cut markers from the scene-detection pipeline. */
   initialAiCutMarkers?: Array<{ time: number; confidence?: number; source?: 'auto' | 'manual' }>;
+  /** When set, scenes were deterministically imported from a Composer render — disables Auto-Cut UI. */
+  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSceneCount?: number;
 }
 
 const DEFAULT_TRACKS: AudioTrack[] = [
@@ -157,6 +160,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
   onResetProject,
   onBackToImport,
   initialAiCutMarkers,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   const [isPlaying, setIsPlaying] = useState(false);
@@ -1822,6 +1827,8 @@ export const CapCutEditor: React.FC<CapCutEditorProps> = ({
               onSceneSelect={setSelectedSceneId}
               onAutocut={onStartAnalysis}
               isAnalyzing={isAnalyzing}
+              composerLockSource={composerLockSource}
+              composerLockSceneCount={composerLockSceneCount}
               onSceneAdd={handleSceneAdd}
               onSceneRename={handleSceneRename}
               onTrimScene={handleTrimScene}
