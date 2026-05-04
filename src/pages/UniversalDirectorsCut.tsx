@@ -1,14 +1,16 @@
-import { Helmet } from 'react-helmet-async';
-import { Card } from '@/components/ui/card';
-import { Film, Scissors, Palette, Music, Play, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from '@/hooks/useTranslation';
 
 const UniversalDirectorsCut = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation();
-  
+  useEffect(() => {
+    navigate('/directors-cut', { replace: true });
+  }, [navigate]);
+  return null;
+};
+
+export default UniversalDirectorsCut;
+
   return (
     <>
       <Helmet>
