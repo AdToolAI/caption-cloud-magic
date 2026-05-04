@@ -131,6 +131,10 @@ const Pricing = () => {
     name: "AdTool AI Pro",
     description:
       "All-in-one AI social media platform — captions, images, posting, Director's Cut & AI video credits.",
+    image: [
+      "https://useadtool.ai/og-pricing.jpg",
+      "https://useadtool.ai/og-home.jpg",
+    ],
     brand: { "@type": "Brand", name: "AdTool AI" },
     offers: {
       "@type": "Offer",
@@ -138,6 +142,40 @@ const Pricing = () => {
       priceCurrency: "EUR",
       availability: "https://schema.org/OnlineOnly",
       url: "https://useadtool.ai/pricing",
+      priceValidUntil: "2027-05-04",
+      shippingDetails: {
+        "@type": "OfferShippingDetails",
+        shippingRate: {
+          "@type": "MonetaryAmount",
+          value: "0",
+          currency: "EUR",
+        },
+        shippingDestination: {
+          "@type": "DefinedRegion",
+          addressCountry: "DE",
+        },
+        deliveryTime: {
+          "@type": "ShippingDeliveryTime",
+          handlingTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 0,
+            unitCode: "DAY",
+          },
+          transitTime: {
+            "@type": "QuantitativeValue",
+            minValue: 0,
+            maxValue: 0,
+            unitCode: "DAY",
+          },
+        },
+      },
+      hasMerchantReturnPolicy: {
+        "@type": "MerchantReturnPolicy",
+        applicableCountry: "DE",
+        returnPolicyCategory:
+          "https://schema.org/MerchantReturnNotPermitted",
+      },
     },
     aggregateRating: {
       "@type": "AggregateRating",
@@ -151,7 +189,7 @@ const Pricing = () => {
       <SEO
         title="Pricing — AdTool AI Pro €14.99/month (Launch promo)"
         description="One simple plan. Captions, images, Director's Cut, posting & AI video credits. 14-day free trial. Cancel anytime."
-        canonical="https://useadtool.ai/pricing"
+        canonical="/pricing"
         lang={language}
         ogImage="/og-pricing.jpg"
         structuredData={structuredData}
