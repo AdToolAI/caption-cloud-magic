@@ -1,65 +1,67 @@
-Ich habe jetzt genauer nachgeschaut: Ja, die Daten für gerenderte Composer-Videos sind grundsätzlich vorhanden. Das Problem liegt sehr wahrscheinlich nicht nur in der Szenenerkennung, sondern an der Übergabe-/Mapping-Schicht zwischen Composer-Render und Director’s Cut.
+## Problem
 
-Konkreter Befund:
-- Der Director’s Cut importiert aktuell Composer-Szenen aus `composer_scenes`, aber nutzt `duration_seconds` aus der Storyboard-/Clip-Tabelle und skaliert sie pauschal auf die gemessene Endvideo-Länge.
-- Das finale Render-Video ist aber nicht einfach `Summe aller duration_seconds`: In `compose-video-assemble` wird pro Clip die echte MP4-Dauer geprobt, dann rendert `ComposedAdVideo` mit festen 15 Frames Crossfade zwischen Szenen. Dadurch sind die echten Schnittpunkte im finalen Video verschoben.
-- Zusätzlich wird im Studio tatsächlich `DirectorsCutPreviewPlayer` genutzt, nicht der zuvor angepasste `CapCutPreviewPlayer`. Die frühere Timecode-Korrektur greift also im sichtbaren Editor nicht vollständig.
-- Es gibt außerdem einen Draft-Restore aus `sessionStorage`: wenn ein alter Auto-Cut-Draft vorhanden ist, kann der neue Composer-Import blockiert werden, weil `scenes.length > 0` ist. Das erklärt, warum trotz Composer-Daten weiterhin 3 falsche/random Szenen auftauchen können.
+Im Storyboard von **Motion Studio / Video Composer** verschwindet eine neu hinzugefügte Szene sofort nach dem Klick auf **„+ Szene"**.
 
-Ich plane folgende Korrektur:
+**Ursache** (verifiziert in `VideoComposerDashboard.tsx`):
 
-1. Composer-Handoff-Draft sauber priorisieren
-- Wenn URL `source=composer&project_id=...` enthält, darf ein alter Director’s-Cut-Draft nicht gewinnen.
-- Der Composer-Import soll alte Auto-Cut-Szenen überschreiben, wenn sie nicht zum aktuellen Composer-Projekt gehören.
-- Dafür markieren wir importierte Szenen intern mit Handoff-Metadaten wie `sourceProjectId`/`handoffSource`, ohne normale Upload-Videos zu beeinflussen.
+- `addScene` in `StoryboardTab.tsx` erzeugt die Szene mit einer lokalen ID `scene_<timestamp>` und ruft `onUpdateScenes` (= `setScenes` im Dashboard) auf.
+- `setScenes` startet einen debounced DB-Sync (`persistScenesToDb`), aber dieser **filtert alles raus, was keine UUID ist** (`scenes.filter(s => isUuid(s.id))`) → die neue Szene wird **nicht** in `composer_scenes` eingefügt.
+- Sobald `refetchScenesFromDb` läuft (Realtime-Subscription via `useComposerScenesRealtime`, Tab-Wechsel oder ein anderer Persist eines Mitarbeiters), wird `prev.scenes` komplett durch die DB-Antwort ersetzt → die noch nicht persistierte neue Szene wird überschrieben und verschwindet.
 
-2. Echte Render-Geometrie aus Backend-Daten rekonstruieren
-- Im Composer-Import nicht mehr nur `composer_scenes.duration_seconds` verwenden.
-- Zusätzliche Daten laden:
-  - `clip_url`, `upload_url`, `upload_type`, `clip_source`, `clip_lead_in_trim_seconds`
-  - das neueste `video_renders.content_config` für diesen Composer-Render, falls vorhanden (`durationInFrames`, `fps`, `totalDuration`, `scenesCount`).
-- Für jede Szene browserseitig die echte Clip-Dauer mit `probeMediaDuration()` messen, analog zur Render-Funktion.
-- Timeline-Schnittpunkte exakt wie `ComposedAdVideo` berechnen:
+Zusätzlich: Die neu erzeugte Szene übernimmt keine der Presets der anderen Szenen (Cinematic Preset, Style, Shot Director, Director Modifiers, Clip-Source/Quality, Dauer, Transition…), nur harte Defaults.
 
-```text
-sceneFrames[i] = round(effectiveSceneDuration[i] * fps)
-visualStartFrame[0] = 0
-visualStartFrame[i] = sum(sceneFrames[0..i-1]) - i * CROSSFADE_FRAMES
-visualEndFrame[i] = visualStartFrame[i] + sceneFrames[i]
-```
+## Lösung
 
-- Dadurch liegen die Director’s-Cut-Szenen an denselben Stellen wie das gerenderte Video, inklusive Crossfade-Overlap.
+### 1. Neue Szene direkt in der DB anlegen (kein „lokales Phantom" mehr)
 
-3. Source-Zeit im Director’s-Cut-Preview korrekt behandeln
-- In `DirectorsCutPreviewPlayer` sicherstellen, dass `timelineToSourceTime()` und die Reverse-Mapping-Logik mit Composer-Handoff-Szenen korrekt arbeitet.
-- Für Composer-Handoff ist das finale Stitch-Video bereits eine lineare Datei. Deshalb muss die Szene im Editor die Endvideo-Zeit verwenden, nicht wieder die ursprünglichen Einzelclip-Zeiten.
-- Ergebnis: Klick auf Szene 2 springt wirklich an Szene 2 im finalen MP4, nicht an eine falsch kumulierte Position.
+Neue Funktion `insertSceneToDb(projectId, scene)` im Dashboard:
 
-4. Beschreibungen nicht mehr „random“ wirken lassen
-- Beschreibung der Composer-Szenen aus vorhandenen Daten bilden:
-  - zuerst `text_overlay.text` oder `scene_type` + kurzer Prompt,
-  - dann `ai_prompt`,
-  - dann `stock_keywords`,
-  - sonst neutral `Szene N`.
-- Keine KI-Beschreibung für Composer-Handoff aus dem finalen MP4 ableiten.
+- INSERT in `composer_scenes` mit allen relevanten Feldern, lässt Postgres die UUID generieren.
+- Liefert die neue UUID zurück, dann wird die Szene mit echter ID lokal gesetzt.
 
-5. Eigene Uploads unverändert lassen
-- Der Upload-Flow ohne `source=composer` bleibt bei der Hybrid-/Artlist-Erkennung.
-- Auto-Cut bleibt weiterhin manuell nutzbar; wenn ein Nutzer bewusst Auto-Cut klickt, darf er den Composer-Handoff überschreiben.
+`StoryboardTab` ruft beim Klick auf **+ Szene** und beim Einfügen aus der **Scene Library** diese Funktion über eine neue Prop `onAddScene(partial)` auf statt nur über `onUpdateScenes`.
 
-6. Backend-Handoff-Metadaten verbessern
-- `compose-video-assemble` soll künftig die tatsächlich verwendete `remotionScenes`-Geometrie in `video_renders.content_config` speichern: Szene-ID, effectiveDuration, frameStart, frameEnd, crossfadeFrames, fps.
-- `check-remotion-progress` soll bei abgeschlossenem Composer-Render zusätzlich `composer_projects.output_url/status` aktualisieren, damit spätere Handoffs stabil anhand der gerenderten Projekt-Daten arbeiten.
+Fallback: Wenn `project.id` noch nicht existiert (brandneues, ungespeichertes Projekt), bleibt das alte Verhalten — Szene mit lokaler ID. Sobald `ensureProjectPersisted` läuft, werden die lokalen Szenen mit-persistiert (passiert bereits).
 
-Betroffene Dateien:
-- `src/pages/DirectorsCut/DirectorsCut.tsx`
-- `src/components/directors-cut/DirectorsCutPreviewPlayer.tsx`
-- `src/types/directors-cut.ts`
-- `supabase/functions/compose-video-assemble/index.ts`
-- `supabase/functions/check-remotion-progress/index.ts`
+### 2. `refetchScenesFromDb` schützt nicht-persistierte lokale Szenen
 
-Zielzustand:
-- Composer-Video mit 6 gerenderten Szenen ergibt im Director’s Cut 6 korrekt beschriftete Szenen.
-- Timecodes entsprechen dem final gerenderten MP4, nicht den nominalen Storyboard-Dauern.
-- Alte Auto-Cut-Drafts können den Composer-Handoff nicht mehr verdecken.
-- Eigene Uploads bleiben weiterhin mit Auto-Cut/Szenenerkennung nutzbar.
+In dem `setProject`-Callback in `refetchScenesFromDb` zusätzlich alle bisherigen Szenen mit nicht-UUID-ID **anhängen** (oder nach `orderIndex` einsortieren), damit sie nicht durch einen Realtime-Tick verloren gehen. Schutz für Edge-Cases.
+
+### 3. Defaults der neuen Szene aus existierenden Szenen übernehmen
+
+In `addScene` (StoryboardTab):
+
+- Wenn `scenes.length > 0`: nimm die **letzte** Szene als Vorlage und kopiere:
+  - `clipSource`, `clipQuality`, `durationSeconds`, `withAudio`
+  - `transitionType`, `transitionDuration`
+  - `shotDirector`, `directorModifiers`
+  - `cinematicPresetSlug`, `appliedStylePresetId`
+  - `textOverlay` (geleert auf `text: ''`)
+- Felder, die explizit **leer** sein müssen:
+  - `aiPrompt: ''`
+  - `promptSlots: undefined`
+  - `promptMode: undefined`
+  - `uploadUrl`, `uploadType`, `referenceImageUrl`: undefined
+  - `clipUrl`: undefined, `clipStatus: 'pending'`
+
+So wirkt die neue Szene wie eine Geschwister-Szene, nur mit leerem Prompt-Bereich.
+
+### 4. Prompt-Generator funktioniert automatisch
+
+Der Prompt-Generator wird in `SceneCard` über die bestehenden Hooks (z. B. „Würfeln", Shot Director, Style Preset, Auto-Prompt) geöffnet. Da die neue Szene jetzt eine echte UUID besitzt und in der DB liegt, funktioniert er **out-of-the-box** — keine Änderung in `SceneCard` nötig. Wir verifizieren nur am Ende, dass:
+
+- der „🎲 Neue Szenenidee"-Button greift,
+- die KI-Prompt-Optimierung speichert,
+- Shot Director / Cinematic Preset wirken.
+
+## Betroffene Dateien
+
+- `src/components/video-composer/VideoComposerDashboard.tsx` — neue `insertSceneToDb` + Prop nach unten reichen + Schutz in `refetchScenesFromDb`.
+- `src/components/video-composer/StoryboardTab.tsx` — `addScene` und `insertSnippet` nutzen die neue Insert-Funktion und übernehmen Presets der letzten Szene.
+
+## Akzeptanzkriterien
+
+1. Klick auf **+ Szene** → Szene erscheint **dauerhaft**, auch nach Tab-Wechsel und Reload.
+2. Neue Szene hat denselben Look (Style/Shot/Transition/Clip-Source) wie die übrigen Szenen.
+3. Prompt-Bereich ist leer; Prompt-Generator und „🎲 Neue Idee" funktionieren wie in bestehenden Szenen.
+4. „Scene Library"-Einfügen verschwindet ebenfalls nicht mehr.

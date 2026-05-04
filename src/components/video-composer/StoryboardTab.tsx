@@ -31,6 +31,12 @@ import { CastConsistencyMap } from './CastConsistencyMap';
 interface StoryboardTabProps {
   scenes: ComposerScene[];
   onUpdateScenes: (scenes: ComposerScene[]) => void;
+  /**
+   * Inserts a new scene directly into the DB so it survives realtime
+   * refetches. Falls back to local-only when the project hasn't been
+   * persisted yet.
+   */
+  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
   onGoToClips: () => void;
   language: string;
   projectId?: string;
@@ -46,6 +52,7 @@ interface StoryboardTabProps {
 export default function StoryboardTab({
   scenes,
   onUpdateScenes,
+  onAddScene,
   onGoToClips,
   language,
   projectId,
@@ -75,25 +82,72 @@ export default function StoryboardTab({
   // Scene Library (snippets)
   const [snippetPickerOpen, setSnippetPickerOpen] = useState(false);
 
+  /**
+   * Build a partial scene that inherits creative defaults (style, shot,
+   * transition, clip-source, duration, …) from the LAST existing scene so
+   * a newly added scene visually matches its siblings. Prompt fields are
+   * always cleared so the user can start fresh — including via the prompt
+   * generator inside the SceneCard.
+   */
+  const buildInheritedDefaults = (override: Partial<ComposerScene> = {}): Partial<ComposerScene> => {
+    const last = scenes.length > 0 ? scenes[scenes.length - 1] : undefined;
+    if (!last) return override;
+    return {
+      // Look & feel
+      clipSource: last.clipSource,
+      clipQuality: last.clipQuality,
+      durationSeconds: last.durationSeconds,
+      withAudio: last.withAudio,
+      transitionType: last.transitionType,
+      transitionDuration: last.transitionDuration,
+      shotDirector: last.shotDirector ? { ...last.shotDirector } : undefined,
+      directorModifiers: last.directorModifiers ? { ...last.directorModifiers } : undefined,
+      cinematicPresetSlug: last.cinematicPresetSlug,
+      appliedStylePresetId: last.appliedStylePresetId,
+      // Empty text overlay (same style, no copy)
+      textOverlay: { ...(last.textOverlay ?? {}), text: '' } as any,
+      // Always-empty prompt fields
+      aiPrompt: '',
+      promptSlots: undefined,
+      promptMode: undefined,
+      promptSlotOrder: undefined,
+      stockKeywords: undefined,
+      uploadUrl: undefined,
+      uploadType: undefined,
+      referenceImageUrl: undefined,
+      ...override,
+    };
+  };
+
   const insertSnippet = (snippet: SceneSnippet) => {
-    const newScene: ComposerScene = {
-      id: `scene_${Date.now()}`,
-      projectId: projectId ?? '',
-      orderIndex: scenes.length,
-      sceneType: 'custom',
+    const partial = buildInheritedDefaults({
       durationSeconds: snippet.duration_seconds ?? 5,
       clipSource: 'stock',
-      clipQuality: 'standard',
-      clipStatus: 'pending',
-      textOverlay: { ...DEFAULT_TEXT_OVERLAY },
-      transitionType: 'none',
-      transitionDuration: 0,
-      retryCount: 0,
-      costEuros: 0,
-      prompt: snippet.prompt,
+      aiPrompt: snippet.prompt,
       referenceImageUrl: snippet.reference_image_url ?? snippet.last_frame_url ?? undefined,
-    } as ComposerScene;
-    onUpdateScenes([...scenes, newScene]);
+    });
+    if (onAddScene) {
+      void onAddScene(partial);
+    } else {
+      // Fallback for legacy callers
+      const newScene: ComposerScene = {
+        id: `scene_${Date.now()}`,
+        projectId: projectId ?? '',
+        orderIndex: scenes.length,
+        sceneType: 'custom',
+        durationSeconds: 5,
+        clipSource: 'stock',
+        clipQuality: 'standard',
+        clipStatus: 'pending',
+        textOverlay: { ...DEFAULT_TEXT_OVERLAY },
+        transitionType: 'none',
+        transitionDuration: 0,
+        retryCount: 0,
+        costEuros: 0,
+        ...partial,
+      } as ComposerScene;
+      onUpdateScenes([...scenes, newScene]);
+    }
   };
 
   const openHybridDialog = (
@@ -106,6 +160,12 @@ export default function StoryboardTab({
   const dialogLang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
 
   const addScene = () => {
+    const partial = buildInheritedDefaults();
+    if (onAddScene) {
+      void onAddScene(partial);
+      return;
+    }
+    // Fallback: legacy local-only insert
     const newScene: ComposerScene = {
       id: `scene_${Date.now()}`,
       projectId: '',
@@ -120,7 +180,8 @@ export default function StoryboardTab({
       transitionDuration: 0,
       retryCount: 0,
       costEuros: 0,
-    };
+      ...partial,
+    } as ComposerScene;
     onUpdateScenes([...scenes, newScene]);
   };
 

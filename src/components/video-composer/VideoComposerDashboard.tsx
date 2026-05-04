@@ -32,7 +32,7 @@ import type {
   ClipQuality,
   AdCampaignMeta,
 } from '@/types/video-composer';
-import { getClipCost } from '@/types/video-composer';
+import { getClipCost, DEFAULT_TEXT_OVERLAY } from '@/types/video-composer';
 import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/hooks/useComposerPersistence';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -382,6 +382,10 @@ export default function VideoComposerDashboard() {
 
       setProject(prev => {
         const localById = new Map(prev.scenes.map(s => [s.id, s]));
+        // Preserve any locally-created scenes that haven't been persisted yet
+        // (non-UUID ids). Otherwise a realtime tick would wipe them before
+        // their first DB write completes.
+        const localOnly = prev.scenes.filter(s => !isUuid(s.id));
         const dbScenes: ComposerScene[] = data.map((row: any) => {
           const local = localById.get(row.id);
           return {
@@ -426,7 +430,9 @@ export default function VideoComposerDashboard() {
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
           };
         });
-        return { ...prev, scenes: dbScenes };
+        const merged = [...dbScenes, ...localOnly]
+          .map((s, i) => ({ ...s, orderIndex: i }));
+        return { ...prev, scenes: merged };
       });
     } catch (err) {
       console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
@@ -730,7 +736,94 @@ export default function VideoComposerDashboard() {
     });
   }, [persistScenesToDb]);
 
-  // Flush pending scene-edit writes on unmount so they aren't lost when
+  /**
+   * Insert a brand-new scene directly into the DB so it survives realtime
+   * refetches and tab switches. Returns the persisted scene with its real UUID
+   * so the caller can update local state.
+   *
+   * Falls back to a local-only scene (non-UUID id) when the project itself
+   * hasn't been persisted yet — those will be flushed by `ensureProjectPersisted`.
+   */
+  const addSceneToProject = useCallback(async (partial: Partial<ComposerScene>): Promise<void> => {
+    const tempId = `scene_${Date.now()}`;
+    const baseScene: ComposerScene = {
+      id: tempId,
+      projectId: '',
+      orderIndex: 0,
+      sceneType: 'custom',
+      durationSeconds: 5,
+      clipSource: 'stock',
+      clipQuality: 'standard',
+      clipStatus: 'pending',
+      textOverlay: { ...DEFAULT_TEXT_OVERLAY },
+      transitionType: 'none',
+      transitionDuration: 0,
+      retryCount: 0,
+      costEuros: 0,
+      ...partial,
+    } as ComposerScene;
+
+    const projectId = project.id;
+    if (!projectId) {
+      // No project yet → keep local; ensureProjectPersisted will flush later.
+      setProject(prev => ({
+        ...prev,
+        scenes: [...prev.scenes, { ...baseScene, orderIndex: prev.scenes.length }],
+      }));
+      return;
+    }
+
+    // Optimistic insert (so the user sees it instantly)
+    setProject(prev => ({
+      ...prev,
+      scenes: [...prev.scenes, { ...baseScene, projectId, orderIndex: prev.scenes.length }],
+    }));
+
+    try {
+      const { data, error } = await supabase
+        .from('composer_scenes')
+        .insert({
+          project_id: projectId,
+          order_index: baseScene.orderIndex,
+          scene_type: baseScene.sceneType,
+          duration_seconds: baseScene.durationSeconds,
+          clip_source: baseScene.clipSource,
+          clip_quality: baseScene.clipQuality || 'standard',
+          clip_status: 'pending',
+          with_audio: baseScene.withAudio !== false,
+          ai_prompt: baseScene.aiPrompt ?? null,
+          stock_keywords: baseScene.stockKeywords ?? null,
+          upload_url: baseScene.uploadUrl ?? null,
+          upload_type: baseScene.uploadType ?? null,
+          reference_image_url: baseScene.referenceImageUrl ?? null,
+          text_overlay: baseScene.textOverlay as any,
+          transition_type: baseScene.transitionType,
+          transition_duration: baseScene.transitionDuration,
+          director_modifiers: (baseScene.directorModifiers ?? {}) as any,
+          shot_director: (baseScene.shotDirector ?? {}) as any,
+          prompt_slots: (baseScene.promptSlots ?? null) as any,
+          prompt_mode: baseScene.promptMode ?? null,
+          prompt_slot_order: (baseScene.promptSlotOrder ?? null) as any,
+          applied_style_preset_id: baseScene.appliedStylePresetId ?? null,
+          cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
+        } as any)
+        .select('id')
+        .single();
+      if (error) throw error;
+      const newId = (data as any)?.id as string | undefined;
+      if (!newId) return;
+      // Swap temp id for real UUID
+      setProject(prev => ({
+        ...prev,
+        scenes: prev.scenes.map(s => s.id === tempId ? { ...s, id: newId, projectId } : s),
+      }));
+    } catch (err) {
+      console.warn('[VideoComposerDashboard] addSceneToProject failed:', err);
+      // Roll back optimistic insert
+      setProject(prev => ({ ...prev, scenes: prev.scenes.filter(s => s.id !== tempId) }));
+    }
+  }, [project.id]);
+
   // the user navigates away.
   useEffect(() => {
     return () => {
@@ -973,6 +1066,7 @@ export default function VideoComposerDashboard() {
             <StoryboardTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
+              onAddScene={addSceneToProject}
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
