@@ -218,7 +218,7 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   };
 
   return (
-    <div className="p-3 space-y-4">
+    <div className="p-3 pb-32 space-y-4">
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="w-1 h-4 rounded-full bg-[#F5C76A]" />
