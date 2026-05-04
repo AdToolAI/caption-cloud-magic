@@ -4,11 +4,6 @@ import { extractTimestampedFrames, extractRefinementFrames, detectBoundariesAsyn
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 
 import { useTranslation } from '@/hooks/useTranslation';
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
 import { CapCutEditor } from '@/components/directors-cut/studio';
 import { VideoImportDialog } from '@/components/directors-cut/studio/VideoImportDialog';
 import { AICoPilot } from '@/components/directors-cut/ui/AICoPilot';
