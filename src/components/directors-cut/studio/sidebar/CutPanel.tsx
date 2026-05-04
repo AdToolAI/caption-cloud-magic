@@ -179,6 +179,8 @@ export const CutPanel: React.FC<CutPanelProps> = ({
   onTrimScene,
   onAddVideoAsScene,
   onAddFromLibrary,
+  composerLockSource = null,
+  composerLockSceneCount = 0,
 }) => {
   const { t } = useTranslation();
   const [editingSceneId, setEditingSceneId] = useState<string | null>(null);
