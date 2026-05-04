@@ -556,7 +556,15 @@ export function DirectorsCut() {
 
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
-    
+    // Hard lock: never run shot detection on a Composer render — the EDL is
+    // already the authoritative scene list. Otherwise we'd overwrite the
+    // correct 6 Composer scenes with arbitrary shot-change estimates from
+    // PySceneDetect/Gemini run on the stitched MP4.
+    if (composerLock.active || composerSourceProjectId) {
+      toast.info('Composer-Render: Szenen sind aus der EDL gesperrt.');
+      return;
+    }
+
     setIsAnalyzing(true);
     
     try {
