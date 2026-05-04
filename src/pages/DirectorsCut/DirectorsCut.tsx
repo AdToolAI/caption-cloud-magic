@@ -411,7 +411,7 @@ export function DirectorsCut() {
         }
 
         const cfg: any = renderRow?.content_config || {};
-        const geometry: Array<{ idx: number; startSec: number; endSec: number; durationSec: number }> =
+        const rawGeometry: Array<{ idx: number; startSec: number; endSec: number; durationSec: number }> =
           Array.isArray(cfg.sceneGeometry) ? cfg.sceneGeometry : [];
 
         // 2. Pull labels from composer_scenes (best-effort, parallel to geometry).
@@ -423,14 +423,42 @@ export function DirectorsCut() {
 
         if (cancelled) return;
 
-        if (geometry.length === 0) {
+        if (rawGeometry.length === 0) {
           toast.error('Render-Geometrie nicht gefunden – bitte das Video erneut aus dem Motion Studio öffnen.');
           return;
         }
 
-        const describe = (idx: number): string => {
+        // ── Normalize Composer geometry into non-overlapping editor segments ──
+        // The render geometry stores crossfade OVERLAPS (e.g. scene 2 starts at
+        // 3.5s while scene 1 ends at 4s). For an Artlist/NLE-style cut list we
+        // need contiguous, non-overlapping segments that sum to the visible
+        // timeline. We split overlap regions at the midpoint so each scene
+        // owns exactly its visible portion of the final MP4.
+        const sortedGeo = [...rawGeometry].sort((a, b) => a.startSec - b.startSec);
+        const normGeometry: Array<{ idx: number; start: number; end: number }> = [];
+        for (let i = 0; i < sortedGeo.length; i++) {
+          const g = sortedGeo[i];
+          let start = g.startSec;
+          let end = g.endSec;
+          const prev = normGeometry[normGeometry.length - 1];
+          if (prev && start < prev.end) {
+            const mid = (prev.end + start) / 2;
+            prev.end = mid;
+            start = mid;
+          }
+          if (end <= start) end = start + 0.1;
+          normGeometry.push({ idx: g.idx ?? i, start, end });
+        }
+
+        const describe = (idx: number, start: number, end: number): string => {
           const cs: any = composerScenes?.[idx];
-          if (!cs) return `Composer Szene ${idx + 1}`;
+          const fmt = (s: number) => {
+            const m = Math.floor(s / 60);
+            const sec = Math.floor(s % 60).toString().padStart(2, '0');
+            return `${m}:${sec}`;
+          };
+          const neutral = `Composer Szene ${idx + 1} · ${fmt(start)}–${fmt(end)}`;
+          if (!cs) return neutral;
           const overlay = (cs.text_overlay && typeof cs.text_overlay === 'object' && cs.text_overlay.text)
             ? String(cs.text_overlay.text) : '';
           const promptLike = (overlay || cs.ai_prompt || cs.stock_keywords || '').toString().trim();
@@ -439,9 +467,9 @@ export function DirectorsCut() {
           return sceneTypeLabel;
         };
 
-        const normalizedScenes: SceneAnalysis[] = geometry.map((g, i) => {
-          const start = Math.round(g.startSec * 100) / 100;
-          const end = Math.round(g.endSec * 100) / 100;
+        const normalizedScenes: SceneAnalysis[] = normGeometry.map((g, i) => {
+          const start = Math.round(g.start * 100) / 100;
+          const end = Math.round(g.end * 100) / 100;
           return {
             id: `scene-${i + 1}`,
             start_time: start,
@@ -449,7 +477,7 @@ export function DirectorsCut() {
             original_start_time: start,
             original_end_time: end,
             playbackRate: 1.0,
-            description: describe(i),
+            description: describe(g.idx, start, end),
             mood: 'neutral',
             suggested_effects: [],
             ai_suggestions: [],
@@ -458,7 +486,7 @@ export function DirectorsCut() {
           } as SceneAnalysis;
         });
 
-        const totalDur = geometry[geometry.length - 1]?.endSec || selectedVideo.duration || 0;
+        const totalDur = normGeometry[normGeometry.length - 1]?.end || selectedVideo.duration || 0;
 
         if (!cancelled) {
           console.info('[DirectorsCut] Composer handoff complete (render geometry):', {

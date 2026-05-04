@@ -592,6 +592,25 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                     <FolderOpen className="h-4 w-4" />
                     {tt('viewInLibrary')}
                   </Button>
+                  {project?.id && videoUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        const params = new URLSearchParams({
+                          source: 'composer',
+                          project_id: project.id,
+                          source_video: videoUrl,
+                        });
+                        if (renderId) params.set('render_id', renderId);
+                        navigate(`/universal-directors-cut?${params.toString()}`);
+                      }}
+                    >
+                      <Scissors className="h-4 w-4" />
+                      In Director's Cut öffnen
+                    </Button>
+                  )}
                   <Button asChild size="sm" className="gap-2">
                     <a href={videoUrl} download target="_blank" rel="noopener noreferrer">
                       <Download className="h-4 w-4" /> {tt('download')}

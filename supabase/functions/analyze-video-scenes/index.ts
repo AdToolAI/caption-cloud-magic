@@ -164,12 +164,12 @@ REGELN:
     // Try AI description with frames or video URL
     const describePromptText = `Beschreibe die ${deterministicScenes.length} vorgegebenen Szenen. Antworte NUR mit JSON-Array!`;
     
-    // Description integrity: if we have NO frames AND client_extraction_failed,
-    // do NOT ask the AI to invent descriptions — it will hallucinate
-    // ("city at night", "people walking") with zero visual grounding.
-    // Return neutral labels instead so the user knows the timeline is correct
-    // but descriptions are placeholders.
-    const skipAIDescription = !hasFrames && !!client_extraction_failed;
+    // Description integrity: if we have NO frames at all, do NOT ask the AI
+    // to invent descriptions — without visual grounding it hallucinates
+    // ("drone flight", "city at night", "people walking") that has nothing
+    // to do with the actual footage. Neutral placeholder labels are more
+    // honest and match what NLEs (Premiere/DaVinci) show by default.
+    const skipAIDescription = !hasFrames;
 
     if (!skipAIDescription) try {
       const userContent: any[] = [{ type: "text", text: describePromptText }];
@@ -212,10 +212,16 @@ REGELN:
 
 
     // Merge AI descriptions into deterministic scenes
+    const fmt = (s: number) => {
+      const m = Math.floor(s / 60);
+      const sec = Math.floor(s % 60).toString().padStart(2, '0');
+      return `${m}:${sec}`;
+    };
     const finalScenes: SceneAnalysis[] = deterministicScenes.map((scene, i) => {
       const aiScene = aiDescriptions && aiDescriptions[i];
       const mood = aiScene?.mood || "neutral";
-      
+      const neutralLabel = `Szene ${i + 1} · ${fmt(scene.start_time)}–${fmt(scene.end_time)}`;
+
       return {
         id: `scene-${i + 1}`,
         start_time: scene.start_time,
@@ -223,7 +229,7 @@ REGELN:
         original_start_time: scene.start_time,
         original_end_time: scene.end_time,
         playbackRate: 1.0,
-        description: aiScene?.description || (skipAIDescription ? `Szene ${i + 1} (Beschreibung übersprungen — keine Frames)` : (deterministicScenes.length === 1 ? "Gesamtes Video" : `Szene ${i + 1}`)),
+        description: aiScene?.description || neutralLabel,
         mood,
         suggested_effects: (aiScene?.suggested_effects?.length >= 2)
           ? aiScene.suggested_effects
