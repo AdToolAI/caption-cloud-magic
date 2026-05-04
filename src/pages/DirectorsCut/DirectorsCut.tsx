@@ -332,6 +332,7 @@ export function DirectorsCut() {
 
   // Track whether the imported video came from the Composer (deterministic scene import)
   const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
+  const [composerRenderId, setComposerRenderId] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -347,6 +348,7 @@ export function DirectorsCut() {
     const sourceVideoUrl = searchParams.get('source_video');
     const sourceProjectId = searchParams.get('project_id');
     const sourceFlag = searchParams.get('source');
+    const sourceRenderId = searchParams.get('render_id');
     
     if (sourceVideoUrl) {
       setSelectedVideo({
@@ -357,6 +359,7 @@ export function DirectorsCut() {
       });
       if (sourceFlag === 'composer' && sourceProjectId) {
         setComposerSourceProjectId(sourceProjectId);
+        setComposerRenderId(sourceRenderId);
       }
     }
   }, [searchParams, navigate]);
