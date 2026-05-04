@@ -258,20 +258,21 @@ export function importComposerScenesDurationsOnly(
   if (!composerScenes?.length) {
     return { scenes: [], cutPoints: [], totalDuration: 0, source: 'composer-scenes-fallback' };
   }
+  const r3 = (n: number) => Math.round(n * 1000) / 1000;
   let cursor = 0;
   const scenes: NormalizedComposerScene[] = [];
   const cutPoints: number[] = [];
   composerScenes.forEach((cs, i) => {
     const dur = Math.max(0.5, Number(cs.duration_seconds) || 5);
-    const start = cursor;
-    const end = start + dur;
-    if (i < composerScenes.length - 1) cutPoints.push(Math.round(end * 100) / 100);
+    const start = r3(cursor);
+    const end = r3(start + dur);
+    if (i < composerScenes.length - 1) cutPoints.push(end);
     scenes.push({
       id: `scene-${i + 1}`,
-      start_time: Math.round(start * 100) / 100,
-      end_time: Math.round(end * 100) / 100,
-      original_start_time: Math.round(start * 100) / 100,
-      original_end_time: Math.round(end * 100) / 100,
+      start_time: start,
+      end_time: end,
+      original_start_time: start,
+      original_end_time: end,
       description: describeFromComposer(i, start, end, cs),
       mood: 'neutral',
       playbackRate: 1.0,
@@ -282,5 +283,5 @@ export function importComposerScenesDurationsOnly(
     });
     cursor = end;
   });
-  return { scenes, cutPoints, totalDuration: cursor, source: 'composer-scenes-fallback' };
+  return { scenes, cutPoints, totalDuration: r3(cursor), source: 'composer-scenes-fallback' };
 }
