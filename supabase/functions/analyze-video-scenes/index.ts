@@ -164,12 +164,12 @@ REGELN:
     // Try AI description with frames or video URL
     const describePromptText = `Beschreibe die ${deterministicScenes.length} vorgegebenen Szenen. Antworte NUR mit JSON-Array!`;
     
-    // Description integrity: if we have NO frames AND client_extraction_failed,
-    // do NOT ask the AI to invent descriptions — it will hallucinate
-    // ("city at night", "people walking") with zero visual grounding.
-    // Return neutral labels instead so the user knows the timeline is correct
-    // but descriptions are placeholders.
-    const skipAIDescription = !hasFrames && !!client_extraction_failed;
+    // Description integrity: if we have NO frames at all, do NOT ask the AI
+    // to invent descriptions — without visual grounding it hallucinates
+    // ("drone flight", "city at night", "people walking") that has nothing
+    // to do with the actual footage. Neutral placeholder labels are more
+    // honest and match what NLEs (Premiere/DaVinci) show by default.
+    const skipAIDescription = !hasFrames;
 
     if (!skipAIDescription) try {
       const userContent: any[] = [{ type: "text", text: describePromptText }];
