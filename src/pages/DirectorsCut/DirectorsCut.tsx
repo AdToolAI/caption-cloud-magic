@@ -145,6 +145,10 @@ export function DirectorsCut() {
   const [subtitleSafeZone, setSubtitleSafeZone] = useState<SubtitleSafeZone>(DEFAULT_SUBTITLE_SAFE_ZONE);
   const [cleanedVideoUrl, setCleanedVideoUrl] = useState<string | undefined>(undefined);
 
+  // Composer handoff fingerprint — declared early so the draft snapshot can include it.
+  const [composerSourceProjectId, setComposerSourceProjectId] = useState<string | null>(null);
+  const [composerRenderId, setComposerRenderId] = useState<string | null>(null);
+
   // --- On mount: real F5 reload → reset; SPA navigation → restore draft ---
   const draftLoadedRef = useRef(false);
 
