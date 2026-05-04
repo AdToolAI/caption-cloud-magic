@@ -1,156 +1,133 @@
-Ich würde das Problem nicht weiter mit kleinen Heuristik-Fixes lösen, sondern die Pipeline sauber trennen: Composer-Renders werden wie ein Schnittprojekt/EDL behandelt, normale importierte Videos wie ein echtes Shot-Detection-Problem. Artlist-ähnlich heißt: Frames/Signale bestimmen die Cuts, KI darf maximal beschreiben, aber niemals Szenengrenzen erfinden.
+Ich habe den aktuellen Zustand geprüft. Das Problem ist nicht mehr nur die KI-Analyse selbst, sondern zwei konkrete Architekturfehler:
 
-## Zielbild
+1. Die Route `/universal-directors-cut` lädt zwar inzwischen die Director’s-Cut-Seite, aber es gibt weiterhin Pfade, bei denen ein altes/legacy Composer-Render ohne echte EDL geöffnet wird. Dann greift der `sceneGeometry`/Dauer-Fallback und erzeugt Grenzen wie `0–13`, `13–15`, `15–16` usw. Das sieht wie „6 Szenen“ aus, ist aber nicht zuverlässig deckungsgleich mit den realen Composer-Clips.
+2. Für Nicht-Composer-Videos wird weiterhin eine Fusion aus PySceneDetect-Clip-Dauern, Client-Pixel-Pass und optionaler Gemini-Beschreibung verwendet. Das ist besser als reine KI, aber immer noch nicht „Artlist-like“, weil Schnittpunkte indirekt aus gesplitteten Clip-URLs zurückgerechnet werden und nicht als echte Zeitcodes/Frame-Events aus einem Shot-Detector kommen.
 
-```text
-Motion Studio / Composer
-  -> bekannte Clip-Reihenfolge + Clip-Dauern + Crossfades
-  -> Edit Decision List (EDL) speichern
-  -> Director's Cut liest EDL 1:1
-  -> keine Auto-Cut-/PySceneDetect-/Gemini-Schätzung
+Plan zur endgültigen Korrektur:
 
-Beliebiger Video-Upload
-  -> framebasierte Shot Detection
-  -> Fusion mehrerer Detektoren
-  -> KI nur für Labels, nicht für Grenzen
-  -> Confidence + manuelle Korrektur
-```
+1. Composer-Handoff wirklich hart machen
+   - `/universal-directors-cut?source=composer...` bleibt direkt im Director’s-Cut-Studio.
+   - Beim Öffnen eines Composer-Renders wird zuerst exakt der `video_renders`-Datensatz geladen, der zum `render_id` gehört.
+   - Wenn `render_id` fehlt, wird er aus `project_id + video_url` eindeutig rekonstruiert, nicht nur „letzter Render des Projekts“.
+   - Der Editor zeigt sichtbar an, welche Quelle verwendet wurde: `EDL`, `Legacy Geometry` oder `Composer durations only`.
+   - Wenn nur ein ungenauer Fallback verfügbar ist, darf der User nicht glauben, es sei präzise: klare Warnung + Button „Neu rendern für frame-genaue Szenen“.
 
-## Was aktuell noch schief läuft
+2. Alte Composer-Renders ohne EDL korrekt behandeln
+   - Die bereits vorhandene `sceneGeometry` ist bei dem aktuellen betroffenen Render vorhanden, aber sie beschreibt überlappende Clipbereiche. Die aktuelle Importlogik verwendet daraus den Mittelpunkt der Crossfades und kann dadurch gefühlt falsche Szenenlängen erzeugen.
+   - Ich werde die Fallback-Logik ändern:
+     - Für Legacy-Geometry werden Composer-Clipgrenzen aus `outputStartFrame/outputEndFrame` bzw. `sceneGeometry` rekonstruiert.
+     - In Director’s Cut werden diese Grenzen als NLE-Regionen modelliert: Szene A, Transition-Zone, Szene B. Nicht mehr als willkürlicher „eine harte Grenze mitten im Fade“.
+     - Die sichtbare Szene-Liste orientiert sich am Composer-Szenenindex und den realen Clip-Dauern, nicht an internen Detektor-Schätzungen.
+   - Ergebnis: Bei deinem aktuellen 6-Szenen-Render sollen die Grenzen aus den echten Composer-Szenen entstehen, nicht aus „blindem“ Video-Shot-Detection.
 
-1. Der Screenshot zeigt weiterhin den Auto-Cut/Fusion-Pfad: `Fusion: Adaptive 5 + Content 8 -> 5`. Das ist nicht der Composer-Handoff, sondern die Shot-Detection auf dem fertigen MP4.
-2. Für Composer-Videos ist das fachlich falsch: Das fertige MP4 wird erneut analysiert und dadurch werden Binnenwechsel innerhalb einzelner AI-Clips als Szenen erkannt.
-3. Die aktuelle `sceneGeometry` reicht nicht als professionelle Wahrheit, weil Crossfades in einem flachen MP4 überlappen. Eine Szene kann visuell schon eingeblendet sein, während die vorherige noch ausblendet. Das muss als EDL mit Transition-Zonen modelliert werden, nicht als blind geschätzte flache Liste.
+3. EDL beim Rendern nachrüsten und validieren
+   - `compose-video-assemble` schreibt bereits neue EDL-Daten, aber bestehende/alte Render haben sie nicht.
+   - Ich ergänze eine robuste EDL-Struktur mit:
+     - `composerSceneId`
+     - `orderIndex`
+     - `clipUrl`
+     - `realDurationSec`
+     - `outputStartFrame/outputEndFrame`
+     - `visibleStartFrame/visibleEndFrame`
+     - `transitionIn/transitionOut`
+   - Zusätzlich speichere ich eine `edlVersion`, damit Director’s Cut weiß, ob es echte Frame-Daten oder Legacy-Fallback lädt.
 
-## Plan zur zuverlässigen Lösung
+4. Auto-Cut für Composer-Renders endgültig sperren
+   - Der Auto-Cut-Button ist bei Composer-Lock schon versteckt, aber ich werde auch alle indirekten Pfade sperren:
+     - Co-Pilot-Kommandos
+     - leere Scene-Initialisierung
+     - Draft-Restore mit alten Szenen
+     - manuelle Reanalyse nach Navigationswechsel
+   - Bei Composer-Quelle darf `handleStartAnalysis` nie laufen, selbst wenn `composerLock.active` noch nicht gesetzt ist.
 
-### 1. Composer-EDL als einzige Wahrheit einführen
+5. Draft-/SessionStorage-Bug beheben
+   - Der aktuelle Screenshot kann noch von einem veralteten Draft oder einem Fallback-Import stammen.
+   - Ich werde den Draft-Fingerprint verschärfen:
+     - `sourceVideoUrl`
+     - `composerProjectId`
+     - `composerRenderId`
+     - `edlVersion`
+   - Wenn sich einer dieser Werte ändert, werden alte Szenen konsequent verworfen.
+   - Nach erfolgreichem Composer-Import wird der Draft sofort mit den EDL-Szenen überschrieben.
 
-Beim Rendern im Composer speichert `compose-video-assemble` zusätzlich zu `sceneGeometry` eine echte `editDecisionList` in `video_renders.content_config`:
+6. Nicht-Composer Auto-Cut auf professionelle Signal-Pipeline umbauen
+   - Für normale Uploads bleibt Auto-Cut verfügbar, aber nicht mehr als Gemini/Schätz-Pipeline.
+   - Ich ersetze die schwache Fusion durch eine verifizierbare Pipeline:
+     - Frame-Sampling mit dichterer Abtastung.
+     - Histogramm-Differenz, Pixel-Differenz, Luma-Differenz, Edge-Differenz.
+     - Peak-Prominence statt fixer Schwellen.
+     - Mindestabstand abhängig von Videolänge/FPS.
+     - Soft-Transition-Erkennung über Veränderungsfenster statt Einzelbildsprung.
+   - Gemini darf danach nur noch Beschreibungen liefern, nie Grenzen verändern.
 
-```text
-sceneIndex
-composerSceneId/orderIndex
-clipUrl
-sourceDurationFrames
-outputStartFrame
-outputEndFrame
-bodyStartFrame
-bodyEndFrame
-transitionInFrameRange
-transitionOutFrameRange
-crossfadeFrames
-fps
-```
+7. Debug-Transparenz im UI
+   - Im Schnitt-Panel ergänze ich eine Diagnosezeile:
+     - Quelle: `Composer EDL`, `Legacy Composer Geometry`, `Signal Auto-Cut`, `Manual`
+     - Anzahl Cuts
+     - Zeitpunkte der Cuts
+   - Damit sieht man sofort, ob echte Composer-Metadaten oder eine Analyse verwendet wurde.
 
-Damit weiß Director's Cut exakt:
-- welche 6 Composer-Szenen existieren,
-- welcher Composer-Clip zu welcher Szene gehört,
-- wo reine Szenenbereiche liegen,
-- wo Crossfade-/Transition-Bereiche liegen,
-- und welche Bereiche im finalen MP4 überlappen.
+8. Validierung mit deinem aktuellen Render
+   - Ich werde den aktuell betroffenen Render `5864efb7-c968-4d5d-ab46-d43dd03bb73b` als Testfall verwenden.
+   - Erwartete Grundlage aus der Datenbank:
+     - 6 Composer-Szenen
+     - reale Clip-Dauern: ca. 4s, 5s, 5s, 8s, 5s, 5s
+     - 15-Frame Crossfade-Overlap
+   - Danach muss Director’s Cut nicht mehr `0–13`, `13–15`, `15–16` anzeigen, sondern die tatsächliche Composer-Struktur mit korrekten Segmenten/Transitions.
 
-Wichtig: Die alten `sceneGeometry`-Daten bleiben für Kompatibilität erhalten, aber Director's Cut bevorzugt künftig `editDecisionList`.
-
-### 2. Director's Cut bekommt einen harten Composer-Lock
-
-Wenn die URL `source=composer` enthält oder ein Composer-Render geladen wird:
-
-- `handleStartAnalysis` bricht sofort ab.
-- laufende Auto-Cut-Analysen dürfen nachträglich nicht mehr `setScenes(...)` ausführen.
-- Sidebar, Co-Pilot und alle Auto-Cut-Buttons werden nicht nur versteckt, sondern technisch blockiert.
-- vorhandene alte Fusion-/Auto-Cut-Ergebnisse im Draft werden verworfen.
-- ein Badge zeigt: `Composer EDL · 6 Szenen · Auto-Cut deaktiviert`.
-
-Damit kann der im Screenshot sichtbare Pfad `Fusion: Adaptive + Content` einen Composer-Render nicht mehr überschreiben.
-
-### 3. Szenen im Editor korrekt darstellen: Szene + Transition statt falscher Flat-Cuts
-
-Für Composer-Renders importiert Director's Cut die EDL in zwei Ebenen:
-
-1. **Composer-Szenen**
-   - Szene 1, Szene 2, Szene 3 usw. kommen direkt aus `composer_scenes` und der EDL.
-   - Labels kommen aus `scene_type`, `text_overlay`, `ai_prompt`, nicht aus Gemini.
-
-2. **Transition-Zonen**
-   - Crossfades werden als Übergangsmarker/Transition-Blöcke angezeigt.
-   - Dadurch muss die App nicht mehr so tun, als gäbe es bei einem Crossfade einen einzigen magischen harten Schnittpunkt.
-
-Für den aktuellen Render würde die Logik also nicht mehr sagen `0–13, 13–15...`, sondern die 6 Composer-Clips mit ihren echten Übergängen anzeigen. Crossfade-Zonen werden separat markiert statt als neue/falsche Szenen missverstanden.
-
-### 4. Fallback-Verhalten korrigieren
-
-Falls ein alter Composer-Render keine EDL hat:
-
-- kein stiller Wechsel zu PySceneDetect/Gemini,
-- kein `Fusion`-Toast,
-- keine Blindschätzung,
-- stattdessen:
-  - Composer-Szenen aus `composer_scenes.duration_seconds` rekonstruieren,
-  - deutlich als `EDL-Fallback` markieren,
-  - Hinweis: „Für frame-exakte Übergänge bitte neu rendern.“
-
-Damit sieht der Nutzer nie wieder falsche KI-Szenen, wenn eigentlich Composer-Metadaten erwartet werden.
-
-### 5. Artlist-ähnliche Pipeline für normale Video-Uploads neu strukturieren
-
-Für nicht-Composer-Videos bleibt Auto-Cut erlaubt, aber professioneller:
-
-- keine Gemini-Grenzfindung als primäre Quelle,
-- keine gleichmäßige 5-Sekunden-Fallback-Aufteilung,
-- keine Browser-Dauer-Schätzung aus PySceneDetect-Split-Clips als alleinige Wahrheit.
-
-Stattdessen:
-
-1. Dense frame sampling, z.B. 6 fps bei kurzen Videos.
-2. Mehrere Detektoren:
-   - Content / Histogram Difference,
-   - Adaptive Threshold,
-   - Edge/SSIM-Differenz,
-   - Soft-transition/Fade-Erkennung,
-   - optional Audio-Onset als Zusatzsignal.
-3. Fusion mit Confidence und Mindestabstand.
-4. KI beschreibt nur die final fixierten Segmente.
-5. UI zeigt Diagnose: `Content`, `Adaptive`, `Pixel`, `Confidence`, aber nur bei echten Upload-Auto-Cuts, nie bei Composer-EDL.
-
-Das entspricht dem Prinzip professioneller Tools: Signalverarbeitung zuerst, KI nur assistierend.
-
-### 6. Konkrete Dateien
-
-Ich würde diese Dateien anfassen:
-
-- `supabase/functions/compose-video-assemble/index.ts`
-  - neue `editDecisionList` beim Composer-Render speichern.
+Technische Änderungen:
 
 - `src/pages/DirectorsCut/DirectorsCut.tsx`
-  - Composer-EDL importieren,
-  - Auto-Cut bei Composer technisch blockieren,
-  - laufende Auto-Cut-Ergebnisse gegen Überschreiben absichern,
-  - alte Draft-/Fusion-Daten verwerfen.
+  - Composer-Handoff robuster auflösen.
+  - Draft-Fingerprint verschärfen.
+  - Auto-Cut bei Composer-Quelle absolut blockieren.
+  - Import-Status/Diagnose setzen.
 
-- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
-  - Composer-Lock-Badge und Auto-Cut-Deaktivierung sichtbar machen.
+- `src/lib/directors-cut/composer-edl.ts`
+  - EDL-v2 Parser.
+  - Legacy-Geometry-Parser korrigieren.
+  - Transition-Zonen explizit modellieren.
+  - Composer-Durations-Fallback sauber begrenzen und als unpräzise markieren.
+
+- `supabase/functions/compose-video-assemble/index.ts`
+  - EDL-v2 schreiben.
+  - `edlVersion` und sichtbare Timeline-Metadaten speichern.
+  - Output-Geometrie framegenau und eindeutig machen.
 
 - `src/components/directors-cut/studio/CapCutEditor.tsx`
-  - Transition-Zonen/Cut-Marker aus EDL übernehmen.
+  - Composer-Lock dauerhaft respektieren.
+  - Timeline-Zonen/Markers aus Composer-Metadaten anzeigen.
+  - Keine automatische Migration, die Composer-Szenen überschreibt.
 
-- `src/components/video-composer/AssemblyTab.tsx`
-  - Handoff immer mit `render_id` und EDL-fähigem Render öffnen.
+- `src/components/directors-cut/studio/sidebar/CutPanel.tsx`
+  - Diagnoseanzeige für Quelle/Cuts.
+  - Warnung bei Legacy-Fallback.
+  - Auto-Cut wirklich komplett ausblenden bei Composer.
 
-- optional `src/lib/directors-cut/composer-edl.ts`
-  - zentrale Funktion für EDL -> Director's-Cut-Szenen/Transitions.
+- `src/lib/directors-cut-scene-detection.ts`
+  - Signal-basierte Auto-Cut-Pipeline für normale Uploads stabilisieren.
+  - Keine KI-Grenzen mehr als primäre Quelle.
 
-### 7. Verifikation nach Umsetzung
+- `supabase/functions/analyze-video-scenes/index.ts`
+  - KI nur noch für Labels/Beschreibungen nutzen.
+  - Grenzen unveränderlich machen.
+  - Server-Videoanalyse als Boundary-Generator deaktivieren oder nur als klar gekennzeichneter letzter Fallback.
 
-Ich würde gezielt gegen den aktuellen Render prüfen:
+Nach Umsetzung ist die Logik so:
 
-- Render-ID `5864efb7-c968-4d5d-ab46-d43dd03bb73b` lädt 6 Composer-Szenen.
-- Kein Toast `Fusion: Adaptive...` erscheint bei Composer-Handoff.
-- Der Auto-Cut-Button ist bei Composer-Renders nicht aktiv.
-- Die Szenenbeschreibungen stammen aus Composer-Metadaten, nicht aus Gemini.
-- Timeline-Marker entsprechen der EDL und Transition-Zonen.
-- Ein alter Render ohne EDL zeigt einen klaren Fallback-Hinweis statt falscher KI-Schätzung.
+```text
+Composer Render
+  -> video_renders EDL v2 vorhanden
+    -> 1:1 Szenenimport, Auto-Cut gesperrt
+  -> Legacy sceneGeometry vorhanden
+    -> Composer-Szenen + Transition-Zonen rekonstruieren, Warnung anzeigen
+  -> keine Metadaten
+    -> Composer-Szenendauern verwenden, Warnung anzeigen, Re-Render empfehlen
 
-## Ergebnis
+Normaler Upload
+  -> Signal-basierte Shot Detection
+  -> KI beschreibt nur die bereits festen Segmente
+  -> User kann manuell nachkorrigieren
+```
 
-Director's Cut wird bei Composer-Videos nicht mehr versuchen, Szenen zu „erkennen“. Er übernimmt die tatsächliche Schnittliste. Für normale Uploads gibt es weiterhin eine Artlist-ähnliche Auto-Cut-Pipeline, aber ohne blindes LLM-Raten.
+Damit bauen wir nicht weiter eine „KI schätzt Szenen“-Lösung, sondern eine echte NLE-Pipeline mit Composer-Metadaten als Source of Truth und Signal-Detection nur für freie Uploads.

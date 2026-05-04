@@ -155,33 +155,48 @@ export function importComposerRenderEDL(
 }
 
 /**
- * Legacy fallback: use sceneGeometry (older renders without EDL).
- * Same midpoint-of-crossfade rule when crossfadeFrames is known.
+ * Legacy fallback: build scenes from sceneGeometry by reconstructing
+ * contiguous, non-overlapping segments based on the REAL composer scene
+ * durations (geometry encodes overlap-aware start/end frames per clip).
+ *
+ * Strategy: take the per-clip durationSec (already nominal/probed) and lay
+ * them out contiguously starting at 0. This matches what a NLE would show:
+ * one segment per composer scene, in source order, with cut points exactly
+ * at the boundary between consecutive composer clips. We intentionally do
+ * NOT use the crossfade midpoint here — for legacy renders without an EDL
+ * it produces visually inconsistent segments and confuses users into
+ * thinking the editor "guessed" boundaries.
  */
 export function importComposerRenderGeometry(
   geometry: Array<{ idx?: number; startSec: number; endSec: number; durationSec?: number }>,
   composerScenes: ComposerScenesRow[] | null | undefined,
-  crossfadeFrames: number,
-  fps: number,
+  _crossfadeFrames: number,
+  _fps: number,
 ): NormalizedComposerImport {
-  const sorted = [...geometry].sort((a, b) => a.startSec - b.startSec);
+  const sorted = [...geometry].sort((a, b) => (a.idx ?? a.startSec) - (b.idx ?? b.startSec));
   if (sorted.length === 0) {
     return { scenes: [], cutPoints: [], totalDuration: 0, source: 'sceneGeometry-fallback' };
   }
-  const xfadeSec = (crossfadeFrames || 0) / Math.max(1, fps || 30);
+  // Per-clip duration: prefer geometry.durationSec, else fall back to
+  // composer_scenes.duration_seconds, else (endSec-startSec).
   const cutPoints: number[] = [];
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const cur = sorted[i];
-    const mid = cur.endSec - xfadeSec / 2;
-    cutPoints.push(Math.round(mid * 100) / 100);
-  }
-  const lastEndSec = sorted[sorted.length - 1].endSec;
-  const scenes: NormalizedComposerScene[] = sorted.map((g, i) => {
-    const start = i === 0 ? 0 : cutPoints[i - 1];
-    const end = i === sorted.length - 1 ? lastEndSec : cutPoints[i];
+  const scenes: NormalizedComposerScene[] = [];
+  let cursor = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const g = sorted[i];
     const orderIdx = g.idx ?? i;
     const cs = composerScenes?.find(c => c.order_index === orderIdx);
-    return {
+    const dur = Math.max(
+      0.5,
+      Number(g.durationSec) ||
+      Number(cs?.duration_seconds) ||
+      Math.max(0, Number(g.endSec) - Number(g.startSec)) ||
+      5,
+    );
+    const start = cursor;
+    const end = start + dur;
+    if (i < sorted.length - 1) cutPoints.push(Math.round(end * 100) / 100);
+    scenes.push({
       id: `scene-${i + 1}`,
       start_time: Math.round(start * 100) / 100,
       end_time: Math.round(end * 100) / 100,
@@ -194,9 +209,10 @@ export function importComposerRenderGeometry(
       ai_suggestions: [],
       sourceMode: 'original',
       isFromOriginalVideo: true,
-    };
-  });
-  return { scenes, cutPoints, totalDuration: lastEndSec, source: 'sceneGeometry-fallback' };
+    });
+    cursor = end;
+  }
+  return { scenes, cutPoints, totalDuration: cursor, source: 'sceneGeometry-fallback' };
 }
 
 /**
