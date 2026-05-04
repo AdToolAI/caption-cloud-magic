@@ -165,9 +165,23 @@ export function DirectorsCut() {
         // Reload während DC offen war ODER frischer Composer-Handoff
         clearDraft();
       } else {
-        // SPA navigation back → restore previous session
+        // SPA navigation back → restore previous session, but ONLY if the draft
+        // belongs to the same video. Otherwise we'd paste old scenes (e.g.
+        // "Drohnenflug…") on top of an unrelated freshly-imported video.
         const draft = loadDraft();
-        if (draft && draft.selectedVideo) {
+        const incomingSourceVideoUrl = searchParams.get('source_video');
+        const incomingSourceProjectId = searchParams.get('project_id');
+        const draftMatches =
+          !!draft &&
+          !!draft.selectedVideo &&
+          (
+            // No incoming params at all → trust the draft
+            (!incomingSourceVideoUrl && !incomingSourceProjectId) ||
+            (incomingSourceVideoUrl && draft.selectedVideo.url === incomingSourceVideoUrl) ||
+            (incomingSourceProjectId && draft.selectedVideo.id === incomingSourceProjectId)
+          );
+
+        if (draftMatches && draft) {
           setSelectedVideo(draft.selectedVideo);
           setScenes(draft.scenes || []);
           setTransitions(draft.transitions || []);
@@ -191,6 +205,10 @@ export function DirectorsCut() {
           setCapCutSubtitleTrack(draft.capCutSubtitleTrack);
           setSubtitleSafeZone(draft.subtitleSafeZone || DEFAULT_SUBTITLE_SAFE_ZONE);
           setCleanedVideoUrl(draft.cleanedVideoUrl);
+        } else if (draft) {
+          // Mismatch → drop the stale draft so we don't show wrong scenes.
+          console.info('[DirectorsCut] Discarding stale draft (different source video)');
+          clearDraft();
         }
       }
     }
