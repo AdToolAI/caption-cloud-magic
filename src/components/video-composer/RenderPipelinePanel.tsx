@@ -76,10 +76,17 @@ export default function RenderPipelinePanel({
 
   const openInDirectorsCut = () => {
     if (!videoUrl) return;
+    if (!projectId) {
+      // Without a persisted project we cannot deterministically import the
+      // composer scenes. Refuse navigation rather than letting Director's Cut
+      // fall back to AI Auto-Cut on a freshly stitched (and unrelated-looking)
+      // video, which is the cause of the "wrong scenes" symptom.
+      console.warn('[Composer] openInDirectorsCut: missing projectId — refusing handoff');
+      return;
+    }
     navigate(
-      `/universal-directors-cut?source_video=${encodeURIComponent(videoUrl)}${
-        projectId ? `&project_id=${encodeURIComponent(projectId)}&source=composer` : ''
-      }`
+      `/universal-directors-cut?source_video=${encodeURIComponent(videoUrl)}` +
+      `&project_id=${encodeURIComponent(projectId)}&source=composer`
     );
   };
 
