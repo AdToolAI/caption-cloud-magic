@@ -121,15 +121,19 @@ export function importComposerRenderEDL(
 
   // Compute visible boundaries: between scene i and i+1 the cut sits at the
   // midpoint of the overlap region [scene_i.outEnd - xfade, scene_i.outEnd].
+  // Keep frame-accurate float seconds (no 10ms rounding) — at 30fps a frame
+  // is 33.3ms, so rounding to 2 decimals would systematically drift cuts by
+  // up to ±17ms vs the actually rendered MP4 frame.
+  const frameToSec = (frame: number) => Math.round((frame / fps) * 1000) / 1000;
   const cutPoints: number[] = [];
   for (let i = 0; i < sorted.length - 1; i++) {
     const cur = sorted[i];
     const xfade = cur.crossfadeFrames || 0;
     const midFrame = cur.outputEndFrame - xfade / 2;
-    cutPoints.push(Math.round((midFrame / fps) * 100) / 100);
+    cutPoints.push(frameToSec(midFrame));
   }
 
-  const lastEndSec = sorted[sorted.length - 1].outputEndSec;
+  const lastEndSec = frameToSec(sorted[sorted.length - 1].outputEndFrame);
 
   const scenes: NormalizedComposerScene[] = sorted.map((entry, i) => {
     const start = i === 0 ? 0 : cutPoints[i - 1];
@@ -137,10 +141,10 @@ export function importComposerRenderEDL(
     const cs = composerScenes?.find(c => c.order_index === entry.orderIndex);
     return {
       id: `scene-${i + 1}`,
-      start_time: Math.round(start * 100) / 100,
-      end_time: Math.round(end * 100) / 100,
-      original_start_time: Math.round(start * 100) / 100,
-      original_end_time: Math.round(end * 100) / 100,
+      start_time: start,
+      end_time: end,
+      original_start_time: start,
+      original_end_time: end,
       description: describeFromComposer(i, start, end, cs, entry),
       mood: 'neutral',
       playbackRate: 1.0,
