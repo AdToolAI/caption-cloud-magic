@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Brain, Send, Sparkles, Loader2, Lock, Trash2, GitBranch, Pin, PinOff } from "lucide-react";
