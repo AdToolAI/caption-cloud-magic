@@ -55,6 +55,7 @@ interface Conversation {
 
 export default function AITextStudio() {
   const { user } = useAuth();
+  const { pinned, pin, unpin } = usePinnedChat();
   const [tab, setTab] = useState("chat");
 
   // Chat state
