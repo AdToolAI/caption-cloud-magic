@@ -737,10 +737,10 @@ export function DirectorsCut() {
 
       // ── BOUNDARY FUSION: merge all sources, dedup within 0.6s ──
       const fuseBoundaries = (lists: number[][]): number[] => {
-        const all = lists.flat().filter(t => t > 0.3 && t < canonicalDuration - 0.3).sort((a, b) => a - b);
+        const all = lists.flat().filter(t => t > 0.1 && t < canonicalDuration - 0.1).sort((a, b) => a - b);
         const merged: number[] = [];
         for (const t of all) {
-          if (merged.length === 0 || t - merged[merged.length - 1] > 0.6) {
+          if (merged.length === 0 || t - merged[merged.length - 1] > 0.25) {
             merged.push(t);
           }
         }
