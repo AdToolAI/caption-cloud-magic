@@ -13245,10 +13245,13 @@ export type Database = {
       }
       text_studio_conversations: {
         Row: {
+          branch_label: string | null
+          branched_from_message_id: string | null
           created_at: string
           id: string
           is_private: boolean
           model: string
+          parent_conversation_id: string | null
           persona_id: string | null
           title: string
           total_cost_eur: number
@@ -13258,10 +13261,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          branch_label?: string | null
+          branched_from_message_id?: string | null
           created_at?: string
           id?: string
           is_private?: boolean
           model: string
+          parent_conversation_id?: string | null
           persona_id?: string | null
           title?: string
           total_cost_eur?: number
@@ -13271,10 +13277,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          branch_label?: string | null
+          branched_from_message_id?: string | null
           created_at?: string
           id?: string
           is_private?: boolean
           model?: string
+          parent_conversation_id?: string | null
           persona_id?: string | null
           title?: string
           total_cost_eur?: number
@@ -13284,6 +13293,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "text_studio_conversations_parent_conversation_id_fkey"
+            columns: ["parent_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "text_studio_conversations"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "text_studio_conversations_persona_id_fkey"
             columns: ["persona_id"]
