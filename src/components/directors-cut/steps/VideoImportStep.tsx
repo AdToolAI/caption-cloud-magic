@@ -134,10 +134,11 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
       } catch { /* ignore */ }
     }
 
-    // Detect Composer render: prefer explicit render_id on the row, then
-    // metadata hints, then a last-resort lookup by output_url.
+    // Detect Composer render in 4 stages — first hit wins.
     let composerProjectId: string | null = null;
     let composerRenderId: string | null = video.render_id || metadata?.render_id || null;
+
+    // Stage 1: explicit render_id → video_renders
     if (composerRenderId) {
       try {
         const { data: r } = await supabase
@@ -152,6 +153,21 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
         }
       } catch { composerRenderId = null; }
     }
+
+    // Stage 2: explicit composer_project_id in metadata
+    const metaProjectId = metadata?.composer_project_id || metadata?.project_id || null;
+    if (!composerProjectId && metaProjectId) {
+      try {
+        const { data: p } = await supabase
+          .from('composer_projects')
+          .select('id')
+          .eq('id', metaProjectId)
+          .maybeSingle();
+        if (p?.id) composerProjectId = p.id;
+      } catch { /* ignore */ }
+    }
+
+    // Stage 3: lookup by output_url against video_renders.video_url AND composer_projects.output_url
     if (!composerProjectId && video.output_url) {
       try {
         const { data: r } = await supabase
@@ -167,7 +183,42 @@ export function VideoImportStep({ selectedVideo, onVideoSelect }: VideoImportSte
           composerRenderId = r.render_id;
         }
       } catch { /* ignore */ }
+
+      if (!composerProjectId) {
+        try {
+          const { data: p } = await supabase
+            .from('composer_projects')
+            .select('id')
+            .eq('output_url', video.output_url)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (p?.id) composerProjectId = p.id;
+        } catch { /* ignore */ }
+      }
     }
+
+    // Stage 4: fuzzy title match against recent composer_projects of this user
+    if (!composerProjectId && (metadata?.title || video.project_name)) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const title = (metadata?.title || video.project_name || '').toString().trim();
+        if (user && title) {
+          const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+          const { data: p } = await supabase
+            .from('composer_projects')
+            .select('id')
+            .eq('user_id', user.id)
+            .gte('created_at', since)
+            .ilike('title', title)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (p?.id) composerProjectId = p.id;
+        }
+      } catch { /* ignore */ }
+    }
+
 
     const selected: SelectedVideo = {
       id: video.id,

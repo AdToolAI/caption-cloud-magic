@@ -593,16 +593,49 @@ export function DirectorsCut() {
     });
   };
 
+  const lastEdlBackupRef = useRef<{ scenes: any[]; markers: any[] } | null>(null);
+
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
     // Hard lock: never run shot detection on a Composer render — the EDL is
-    // already the authoritative scene list. Otherwise we'd overwrite the
-    // correct 6 Composer scenes with arbitrary shot-change estimates from
-    // PySceneDetect/Gemini run on the stitched MP4.
+    // already the authoritative scene list.
     if (composerLock.active || composerSourceProjectId) {
       toast.info('Composer-Render: Szenen sind aus der EDL gesperrt.');
       return;
     }
+
+    // Soft lock: scenes look like they came from a precise EDL (non-round end times).
+    const looksLikeEdl =
+      scenes.length >= 3 &&
+      scenes.every((s: any) => {
+        const e = Number(s.end_time ?? 0);
+        return e > 0 && Math.abs(e * 100 - Math.round(e * 100)) < 0.001 && (e * 100) % 50 !== 0;
+      });
+    if (looksLikeEdl) {
+      const ok = window.confirm(
+        'Dieses Video hat bereits frame-genaue Szenen. Auto-Cut würde sie überschreiben. Trotzdem fortfahren?'
+      );
+      if (!ok) return;
+      lastEdlBackupRef.current = {
+        scenes: JSON.parse(JSON.stringify(scenes)),
+        markers: JSON.parse(JSON.stringify(aiCutMarkers)),
+      };
+      toast('Szenen werden überschrieben', {
+        action: {
+          label: 'Rückgängig',
+          onClick: () => {
+            const b = lastEdlBackupRef.current;
+            if (b) {
+              setScenes(b.scenes);
+              setAiCutMarkers(b.markers);
+              toast.success('Szenen wiederhergestellt');
+            }
+          },
+        },
+        duration: 15000,
+      });
+    }
+
 
     setIsAnalyzing(true);
     
@@ -737,10 +770,10 @@ export function DirectorsCut() {
 
       // ── BOUNDARY FUSION: merge all sources, dedup within 0.6s ──
       const fuseBoundaries = (lists: number[][]): number[] => {
-        const all = lists.flat().filter(t => t > 0.3 && t < canonicalDuration - 0.3).sort((a, b) => a - b);
+        const all = lists.flat().filter(t => t > 0.1 && t < canonicalDuration - 0.1).sort((a, b) => a - b);
         const merged: number[] = [];
         for (const t of all) {
-          if (merged.length === 0 || t - merged[merged.length - 1] > 0.6) {
+          if (merged.length === 0 || t - merged[merged.length - 1] > 0.25) {
             merged.push(t);
           }
         }
@@ -759,6 +792,9 @@ export function DirectorsCut() {
 
       const fusedSucceeded = detectedBoundaries.length > 0;
       console.log('[DirectorsCut] Fusion result:', diag, '→', fusedTimes);
+      toast.info(
+        `Detector: Adaptive ${diag.adaptiveCuts} · Content ${diag.contentCuts} · Pixel ${diag.pixelCuts} → ${diag.fusedCuts} fusioniert`
+      );
 
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
@@ -978,11 +1014,11 @@ export function DirectorsCut() {
         exportSettings={exportSettings}
         onExportSettingsChange={setExportSettings}
         isAnalyzing={isAnalyzing}
-        onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
+        onStartAnalysis={(composerSourceProjectId || composerLock.active) ? undefined : handleStartAnalysis}
         composerLockSource={
-          composerSourceProjectId
-            ? (composerLock.active ? composerLock.source : 'edl')
-            : null
+          composerLock.active
+            ? composerLock.source
+            : (composerSourceProjectId ? 'edl' : null)
         }
         composerLockSceneCount={composerLock.sceneCount || scenes.length}
         onVoiceOverGenerated={setVoiceOverUrl}

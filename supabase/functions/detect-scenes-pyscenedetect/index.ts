@@ -96,8 +96,8 @@ Deno.serve(async (req) => {
     console.log('[detect-scenes-pyscenedetect] dual run for', video_url);
 
     const [adaptiveRun, contentRun] = await Promise.all([
-      runDetector(REPLICATE_API_KEY, video_url, 1.5, 8, false),
-      runDetector(REPLICATE_API_KEY, video_url, 1.0, 8, true),
+      runDetector(REPLICATE_API_KEY, video_url, 1.2, 4, false),
+      runDetector(REPLICATE_API_KEY, video_url, 0.8, 4, true),
     ]);
 
     console.log('[detect-scenes-pyscenedetect] adaptive:', adaptiveRun.scene_urls.length, 'clips, error:', adaptiveRun.error);
