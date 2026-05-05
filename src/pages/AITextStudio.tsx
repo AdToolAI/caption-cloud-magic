@@ -484,27 +484,39 @@ export default function AITextStudio() {
           {history.length === 0 && (
             <p className="text-sm text-muted-foreground">Noch keine Konversationen.</p>
           )}
-          {history.map((c) => (
-            <Card key={c.id} className="p-3 flex items-center gap-3">
-              <button
-                onClick={() => loadConversation(c.id)}
-                className="flex-1 text-left hover:opacity-80"
+          {history.map((c) => {
+            const isBranch = !!c.parent_conversation_id;
+            return (
+              <Card
+                key={c.id}
+                className={`p-3 flex items-center gap-3 ${isBranch ? "ml-8 border-l-2 border-primary/40" : ""}`}
               >
-                <div className="text-sm font-medium truncate">{c.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {TEXT_MODELS[c.model as TextModelId]?.label || c.model} ·{" "}
-                  {new Date(c.updated_at).toLocaleString()}
-                </div>
-              </button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteConversation(c.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </Card>
-          ))}
+                {isBranch && <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
+                <button
+                  onClick={() => loadConversation(c.id)}
+                  className="flex-1 text-left hover:opacity-80"
+                >
+                  <div className="text-sm font-medium truncate">
+                    {c.title}
+                    {c.branch_label && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">{c.branch_label}</Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {TEXT_MODELS[c.model as TextModelId]?.label || c.model} ·{" "}
+                    {new Date(c.updated_at).toLocaleString()}
+                  </div>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteConversation(c.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Card>
+            );
+          })}
         </TabsContent>
       </Tabs>
 
