@@ -31,6 +31,8 @@ import { UpgradeTriggerProvider } from "@/hooks/useUpgradeTrigger";
 import { UpgradeMount } from "@/components/upgrade/UpgradeMount";
 import { TrialBanner } from "@/components/trial/TrialBanner";
 import { AccountPausedGate } from "@/components/trial/AccountPausedGate";
+import { PinnedChatProvider } from "@/contexts/PinnedChatContext";
+import PinnedChatWindow from "@/components/text-studio/PinnedChatWindow";
 
 
 const Index = lazy(() => import("./pages/Index"));
@@ -360,18 +362,21 @@ const AppContent = () => {
         <TooltipProvider>
           <SidebarProvider>
             <UpgradeTriggerProvider>
-              <Toaster />
-              <Sonner />
-              <CookieConsent />
-              <CommandBar />
-              <CommandPalette />
-              <AICompanionWidget />
-              <UpgradeMount />
-              <EmailVerificationGate>
-                <AppLayout />
-                <GettingStartedChecklist />
-                <ProductTour />
-              </EmailVerificationGate>
+              <PinnedChatProvider>
+                <Toaster />
+                <Sonner />
+                <CookieConsent />
+                <CommandBar />
+                <CommandPalette />
+                <AICompanionWidget />
+                <UpgradeMount />
+                <EmailVerificationGate>
+                  <AppLayout />
+                  <GettingStartedChecklist />
+                  <ProductTour />
+                </EmailVerificationGate>
+                <PinnedChatWindow />
+              </PinnedChatProvider>
             </UpgradeTriggerProvider>
           </SidebarProvider>
         </TooltipProvider>
