@@ -128,8 +128,6 @@ export default function MediaLibrary() {
   useEffect(() => {
     if (!workspaceId) return;
 
-    console.log("🔴 Setting up Realtime subscription for workspace:", workspaceId);
-
     const channel = supabase
       .channel('content_items_changes')
       .on(
@@ -141,21 +139,47 @@ export default function MediaLibrary() {
           filter: `workspace_id=eq.${workspaceId}`
         },
         (payload) => {
-          console.log('🔴 Realtime update empfangen:', payload);
           loadMedia();
-          toast({
-            title: "🎉 Neue Medien hinzugefügt!",
-            description: "Deine Media Library wurde aktualisiert",
-          });
+          if (payload.eventType === 'INSERT') {
+            toast({
+              title: "🎉 Neue Medien hinzugefügt!",
+              description: "Deine Media Library wurde aktualisiert",
+            });
+          }
         }
       )
       .subscribe();
 
     return () => {
-      console.log("🔴 Cleaning up Realtime subscription");
       supabase.removeChannel(channel);
     };
   }, [workspaceId]);
+
+  // Realtime subscription for media_assets (uploads + auto-cleanup)
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('media_assets_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'media_assets',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          loadMedia();
+          loadStorageQuota();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   // Realtime subscription for video_creations (AI videos)
   useEffect(() => {
@@ -867,8 +891,8 @@ export default function MediaLibrary() {
     }
   };
 
-  // Calculate counts for header
-  const videoCount = media.filter(m => m.type === 'video').length;
+  // Calculate counts for header (exclude demo placeholder video)
+  const videoCount = media.filter(m => m.type === 'video' && !isDemoVideo(m.id)).length;
   const imageCount = media.filter(m => m.type === 'image').length + studioImageCount;
   const usedGB = storageQuota.used_mb / 1024;
 
