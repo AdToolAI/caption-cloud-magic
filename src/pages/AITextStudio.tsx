@@ -117,7 +117,7 @@ export default function AITextStudio() {
   // Intercept model change: if active chat has messages, fork into a branch
   function handleModelChange(next: TextModelId) {
     if (next === model) return;
-    if (messages.length === 0 || !conversationId) {
+    if (messages.length === 0) {
       setModel(next);
       return;
     }
@@ -125,10 +125,44 @@ export default function AITextStudio() {
   }
 
   async function createBranch(targetModel: TextModelId, withContext: boolean) {
-    if (!user || !conversationId) return;
-    const parentRoot = rootId || conversationId;
+    if (!user) return;
     const targetLabel = TEXT_MODELS[targetModel].label;
-    const parentTitle = currentConv?.title || "Konversation";
+
+    // Ensure a root conversation exists. If the current chat has not been
+    // persisted yet, create it now and copy in-memory messages into it.
+    let parentRoot = rootId;
+    if (!parentRoot) {
+      const { data: rootConv, error: rootErr } = await supabase
+        .from("text_studio_conversations")
+        .insert({
+          user_id: user.id,
+          title: messages[0]?.content?.slice(0, 60) || "Konversation",
+          model,
+          persona_id: personaId && personaId !== "none" ? personaId : null,
+          is_private: isPrivate,
+        })
+        .select("id,title,model,updated_at,parent_conversation_id,branch_label")
+        .single();
+      if (rootErr || !rootConv) {
+        toast.error(rootErr?.message || "Wurzel-Chat konnte nicht angelegt werden");
+        return;
+      }
+      if (messages.length > 0) {
+        const rows = messages
+          .filter((m) => m.content?.trim())
+          .map((m) => ({
+            conversation_id: rootConv.id,
+            user_id: user.id,
+            role: m.role,
+            content: m.content,
+          }));
+        if (rows.length > 0) await supabase.from("text_studio_messages").insert(rows);
+      }
+      setHistory((h) => [rootConv as Conversation, ...h]);
+      parentRoot = rootConv.id;
+    }
+
+    const parentTitle = currentConv?.title || messages[0]?.content?.slice(0, 60) || "Konversation";
     const { data: newConv, error } = await supabase
       .from("text_studio_conversations")
       .insert({
