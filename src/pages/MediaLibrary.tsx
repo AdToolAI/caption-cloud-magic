@@ -867,8 +867,8 @@ export default function MediaLibrary() {
     }
   };
 
-  // Calculate counts for header
-  const videoCount = media.filter(m => m.type === 'video').length;
+  // Calculate counts for header (exclude demo placeholder video)
+  const videoCount = media.filter(m => m.type === 'video' && !isDemoVideo(m.id)).length;
   const imageCount = media.filter(m => m.type === 'image').length + studioImageCount;
   const usedGB = storageQuota.used_mb / 1024;
 
