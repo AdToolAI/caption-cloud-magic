@@ -298,6 +298,10 @@ export default function AITextStudio() {
 
   async function loadConversation(id: string) {
     setConversationId(id);
+    const conv = history.find((c) => c.id === id);
+    if (conv?.model && (TEXT_MODELS as any)[conv.model]) {
+      setModel(conv.model as TextModelId);
+    }
     const { data } = await supabase
       .from("text_studio_messages")
       .select("role,content")
