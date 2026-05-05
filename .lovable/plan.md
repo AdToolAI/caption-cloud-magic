@@ -1,53 +1,29 @@
-# AI Text Studio — Hybrid Branch beim Modellwechsel
+# Zwei Bugs im AI Text Studio fixen
 
-## Problem
-Wenn man mitten im Chat das Modell wechselt (z.B. Gemini → GPT-5.5 Pro), wird die volle History an das neue Modell geschickt. Reasoning-Modelle und Anthropic erwarten andere Message-Formate als Gemini → der Provider gibt einen Fehler zurück ("Upstream provider error"). Lange Verläufe sprengen zusätzlich Kontext-Limits.
+## Bug 1 — GPT-5.5 Pro Provider-Fehler (404)
+Provider sagt: *„This is not a chat model and thus not supported in the v1/chat/completions endpoint"*. Der Identifier `openai/gpt-5.5-pro` existiert in der Lovable-AI-Gateway-Doku nicht als Chat-Modell — verfügbar sind `openai/gpt-5.5` und `openai/gpt-5.5-pro` als Reasoning-Variante (nur über andere Endpoint).
 
-## Lösung
-**Hybrid Branch-Modus**: Beim Modellwechsel innerhalb eines aktiven Chats wird automatisch ein neuer "Branch" als eigene Konversation angelegt, die optional die bisherige History als Kontext mitnimmt — aber mit dem Ziel-Modell sauber neu startet. Beide Branches bleiben sichtbar und navigierbar.
+**Fix in `src/lib/text-studio/models.ts`:**
+- `apiModel` von `openai/gpt-5.5-pro` → `openai/gpt-5.5`
+- Label „GPT-5.5 Pro" → „GPT-5.5"
+- (Pricing bleibt — wir können später auf `gpt-5.5-pro` zurück, falls Lovable das als Chat-Modell exposed.)
 
-```text
-Chat "Kreuzzüge"
-├─ 🟢 Branch 1: Gemini 3 Flash       (5 Nachrichten)
-├─ ⚪ Branch 2: GPT-5.5 Pro          (ab Nachricht 5, mit Kontext-Snapshot)
-└─ ⚪ Branch 3: Claude 4.1 Opus      (ab Nachricht 5, mit Kontext-Snapshot)
-```
+## Bug 2 — Branch wird nicht erstellt, Chat bleibt im selben Verlauf
+Aktuelle Bedingung: `if (messages.length === 0 || !conversationId) { setModel(next); return; }`
+→ Beim ersten Modellwechsel **nach einer Antwort** kann `conversationId` durchaus gesetzt sein, aber wenn der User direkt nach dem allerersten Reload das Modell wechselt, ist `conversationId` `null` und der Branch-Dialog erscheint nicht — stattdessen wird einfach das Modell gewechselt und derselbe Verlauf gegen den neuen Provider geschickt.
 
-## Änderungen
+**Fix in `src/pages/AITextStudio.tsx`:**
 
-### 1. Datenbank-Migration
-Neue Spalten in `text_studio_conversations`:
-- `parent_conversation_id uuid` — Referenz zur Eltern-Konversation (NULL = Root)
-- `branched_from_message_id uuid` — ab welcher Nachricht abgezweigt wurde
-- `branch_label text` — kurzer Anzeigename ("Gemini-Branch", "GPT-Branch")
+1. **`handleModelChange` lockern**: Auch wenn nur `messages.length > 0` (ohne `conversationId`), Branch-Dialog zeigen. Falls noch keine `conversationId` existiert (Verlauf wurde z.B. aus History geladen aber nicht persistiert), legen wir die Wurzel-Konversation **on-the-fly** an, bevor wir den Branch erzeugen.
 
-Bestehende Konversationen bleiben unberührt (alle als Roots, weil `parent_conversation_id` NULL).
+2. **Branch-Erstellung garantiert frische conversationId**: `createBranch` insertet zuerst die Wurzel-Conv falls nötig, dann den Branch mit `parent_conversation_id = root.id`.
 
-### 2. Branch-Logik im Frontend (`src/pages/AITextStudio.tsx`)
-- Wenn `messages.length > 0` und User wechselt Modell → Bestätigungs-Dialog:
-  > „Mit GPT-5.5 Pro fortfahren? Es wird ein neuer Branch erstellt. Möchtest du den bisherigen Verlauf als Kontext übernehmen?"
-  - **Ja, mit Kontext** → neuer Branch, History wird als Snapshot kopiert
-  - **Ja, sauber** → neuer Branch, leer
-  - **Abbrechen** → Modell bleibt unverändert
-- Branch-Switcher-Leiste über dem Chat: zeigt alle Branches dieser Wurzel mit Modell-Badge, Klick wechselt Branch.
+3. **`loadConversation` setzt das Modell automatisch** auf das Modell der geladenen Konversation, damit Branch-Wechsel sichtbar ist.
 
-### 3. History-Sanitizer im Edge Function (`supabase/functions/text-studio-chat`)
-Robustheit gegen kreuzweise Inkompatibilität:
-- Vor dem Upstream-Call: Messages bereinigen (nur `role` + `content` als Plain-Text, keine Tool-Calls, kein Reasoning-Payload).
-- Wenn History > 60.000 Zeichen → ältere User/Assistant-Paare automatisch zusammenfassen (mit Gemini Flash) statt hart abzuschneiden.
-- Bessere Error-Surface: Statt generischem „Upstream provider error" → konkrete HTTP-Status + erste 200 Zeichen der Provider-Antwort als Toast.
+4. **Branch-Switcher always-on**: Auch bei nur 1 Branch (Wurzel allein) zeigen wir die Leiste mit „+ Branch erstellen", damit der User sieht, dass das Feature existiert.
 
-### 4. History-Tab Update
-- Konversationen werden gruppiert nach `parent_conversation_id`.
-- Root-Konversation als aufklappbare Zeile, Branches eingerückt darunter mit Modell-Badge.
-- Existing Chats werden ihrem `model`-Feld zugeordnet (Spalte ist bereits vorhanden und befüllt) — keine Daten-Migration nötig.
+5. **Aktualisierung der History sofort nach Branch-Insert** (state-update statt useEffect-Refetch warten).
 
-## Technische Details (für später)
-- Branch-Erstellung passiert client-seitig: neue Row in `text_studio_conversations` mit `parent_conversation_id = currentRoot`, dann optional `INSERT` der bestehenden Messages mit neuer `conversation_id`.
-- `currentRoot` = `parent_conversation_id ?? id` der aktuell aktiven Konversation.
-- Edge Function unverändert bzgl. Persistenz — bekommt einfach die neue `conversationId`.
-- Sanitizer: `messages.map(m => ({ role: m.role, content: String(m.content || '') })).filter(m => m.content.trim())`.
-
-## Out of Scope
-- Kein Auto-Merge von Branches (würde A/B-Vergleich brechen).
-- Kein Realtime-Sync zwischen Branches.
+## Out of scope
+- Pricing/UI-Wording bleibt unverändert.
+- Keine DB-Migration nötig.
