@@ -315,6 +315,17 @@ export default function StoryboardTab({
           <Button size="sm" variant="outline" onClick={addScene} className="gap-1 text-xs">
             <Plus className="h-3.5 w-3.5" /> Szene
           </Button>
+          {scenes.length > 1 && scenes[0]?.clipSource?.startsWith('ai-') && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={applyEngineToAll}
+              className="gap-1 text-xs"
+              title="Engine der ersten Szene auf alle anderen KI-Szenen übertragen"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Engine für alle
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
