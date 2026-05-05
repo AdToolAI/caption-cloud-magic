@@ -283,7 +283,7 @@ export default function PinnedChatWindow() {
           size="icon"
           variant="ghost"
           className="h-6 w-6 text-white/60 hover:text-white"
-          onClick={() => navigate("/ai-text-studio")}
+          onClick={() => navigate(`/ai-text-studio?conversation=${pinned.conversationId}`)}
           title="Im Studio öffnen"
         >
           <ExternalLink className="h-3.5 w-3.5" />

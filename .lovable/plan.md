@@ -1,39 +1,40 @@
 ## Problem
 
-Der "Anheften"-Button im AI Text Studio ist **disabled** (graues `pointer-events: none`), obwohl bereits Nachrichten ausgetauscht wurden. Ursache: Der Button ist an `conversationId` gebunden, aber `conversationId` bleibt im Frontend immer `null`.
+Im angehefteten Floating-Chat öffnet der Button **„Im Studio öffnen"** zwar `/ai-text-studio`, aber die Seite startet mit leerem `conversationId` (initial `useState(null)`). Der angeheftete Chat wird also nicht geladen → Verlauf wirkt „gelöscht".
 
-## Root Cause
-
-Die Edge Function `text-studio-chat` gibt die neue Conversation-ID per Response-Header `X-Conversation-Id` zurück:
-
+In `PinnedChatWindow.tsx` (Zeile 286):
 ```ts
-"X-Conversation-Id": conversationId!
+onClick={() => navigate("/ai-text-studio")}
 ```
+→ keine Conversation-ID übergeben.
 
-Das Frontend liest sie via `resp.headers.get("X-Conversation-Id")`. **Aber:** Bei CORS-Streaming-Responses sind benutzerdefinierte Header standardmäßig **nicht** für den Browser sichtbar. Es fehlt:
+In `AITextStudio.tsx` gibt es keinen Code, der einen angeheftete Chat oder URL-Parameter beim Mount übernimmt.
 
-```
-Access-Control-Expose-Headers: X-Conversation-Id
-```
-
-Folge: `resp.headers.get("X-Conversation-Id")` liefert `null` → `setConversationId(...)` wird nie aufgerufen → Button bleibt für immer disabled.
+Daten sind nicht weg — sie liegen weiter in `text_studio_messages`. Es ist reine UI-Wiederaufnahme.
 
 ## Fix
 
-**1. `supabase/functions/text-studio-chat/index.ts`** — `corsHeaders` ergänzen:
-
+**1. `PinnedChatWindow.tsx`** — Conversation-ID via URL-Parameter übergeben:
 ```ts
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Expose-Headers": "X-Conversation-Id",
-};
+onClick={() => navigate(`/ai-text-studio?conversation=${pinned.conversationId}`)}
 ```
 
-**2. `src/pages/AITextStudio.tsx`** — Button-Disabling lockern als zusätzliche Absicherung: statt `disabled={!conversationId}` auf `disabled={!conversationId && messages.length === 0}` umstellen und im `onClick` notfalls `conversationId` aus dem aktuellen Stream/letzter History-Conv rekonstruieren. Hauptsächlich aber Punkt 1 (das ist der echte Bug).
+**2. `src/pages/AITextStudio.tsx`** — beim Mount Conversation aus URL **oder** aus `pinned` (Context) laden:
+- `useSearchParams()` lesen → `conversation` Parameter
+- Falls vorhanden: `loadConversation(id)` triggern (lädt Messages + setzt Model aus History)
+- Fallback: wenn kein URL-Param aber `pinned?.conversationId` existiert → ebenfalls laden
+- Damit das auch klappt, wenn `history` noch nicht geladen ist: `loadConversation` so anpassen, dass das Model notfalls direkt aus der DB (`text_studio_conversations` Single-Row-Query) geholt wird, statt nur aus dem `history`-State
+- Nach dem Laden den `?conversation=` Param aus der URL entfernen (`setSearchParams({}, { replace: true })`), damit Reload nicht in einer Schleife landet
 
-**3. Sanity-Check:** Console-Log nach erstem Send entfernen / Toast wenn Header weiterhin fehlt, damit künftig sichtbar.
+**3. Sanity:** Der bestehende „Loslösen"-Button soll weiter funktionieren — keine Änderung nötig, nur sicherstellen, dass beim Eintritt ins Studio `pinned` **nicht** automatisch ge-unpinnt wird (ist aktuell auch nicht der Fall).
 
 ## Out of scope
 
-Keine DB-Migration, keine UI-Refactors. Reine 2-Zeilen-Korrektur.
+- Keine DB-Änderungen
+- Keine neuen Komponenten
+- Keine Änderung an `PinnedChatContext`
+
+## Files
+
+- `src/components/text-studio/PinnedChatWindow.tsx` (1 Zeile)
+- `src/pages/AITextStudio.tsx` (~15 Zeilen: useSearchParams + Mount-Effect + kleine Anpassung in `loadConversation`)

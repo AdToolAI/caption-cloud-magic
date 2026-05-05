@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Brain, Send, Sparkles, Loader2, Lock, Trash2, GitBranch, Pin, PinOff } from "lucide-react";
@@ -79,6 +80,23 @@ export default function AITextStudio() {
 
   // Branch confirmation dialog state
   const [branchPrompt, setBranchPrompt] = useState<{ targetModel: TextModelId } | null>(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Resume pinned/url conversation on mount
+  useEffect(() => {
+    const urlConv = searchParams.get("conversation");
+    const target = urlConv || pinned?.conversationId;
+    if (target && target !== conversationId) {
+      void loadConversation(target);
+      if (urlConv) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("conversation");
+        setSearchParams(next, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -300,7 +318,15 @@ export default function AITextStudio() {
 
   async function loadConversation(id: string) {
     setConversationId(id);
-    const conv = history.find((c) => c.id === id);
+    let conv = history.find((c) => c.id === id);
+    if (!conv) {
+      const { data } = await supabase
+        .from("text_studio_conversations")
+        .select("id,title,model,updated_at,parent_conversation_id,branch_label")
+        .eq("id", id)
+        .maybeSingle();
+      if (data) conv = data as Conversation;
+    }
     if (conv?.model && (TEXT_MODELS as any)[conv.model]) {
       setModel(conv.model as TextModelId);
     }
