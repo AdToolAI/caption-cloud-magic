@@ -8608,6 +8608,7 @@ export const translations: Record<Language, any> = {
         }
       },
       featureGrid: {
+        title1: "Alles was du brauchst für ",
         title2: "Social Media Erfolg",
         subtitle: "Eine komplette Toolsuite für professionelles Social Media Marketing.",
         contentPlanning: "Content Planung",
