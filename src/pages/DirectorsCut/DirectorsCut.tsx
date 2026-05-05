@@ -1011,11 +1011,11 @@ export function DirectorsCut() {
         exportSettings={exportSettings}
         onExportSettingsChange={setExportSettings}
         isAnalyzing={isAnalyzing}
-        onStartAnalysis={composerSourceProjectId ? undefined : handleStartAnalysis}
+        onStartAnalysis={(composerSourceProjectId || composerLock.active) ? undefined : handleStartAnalysis}
         composerLockSource={
-          composerSourceProjectId
-            ? (composerLock.active ? composerLock.source : 'edl')
-            : null
+          composerLock.active
+            ? composerLock.source
+            : (composerSourceProjectId ? 'edl' : null)
         }
         composerLockSceneCount={composerLock.sceneCount || scenes.length}
         onVoiceOverGenerated={setVoiceOverUrl}
