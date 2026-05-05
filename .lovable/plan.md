@@ -1,29 +1,57 @@
-# Zwei Bugs im AI Text Studio fixen
+# Floating Pinned Chat — App-weites Mini-Fenster
 
-## Bug 1 — GPT-5.5 Pro Provider-Fehler (404)
-Provider sagt: *„This is not a chat model and thus not supported in the v1/chat/completions endpoint"*. Der Identifier `openai/gpt-5.5-pro` existiert in der Lovable-AI-Gateway-Doku nicht als Chat-Modell — verfügbar sind `openai/gpt-5.5` und `openai/gpt-5.5-pro` als Reasoning-Variante (nur über andere Endpoint).
+## Ziel
+Im AI Text Studio kann der User den aktuellen Chat **anheften** ("Pin"). Danach erscheint überall in der App (Picture Studio, Composer, Director's Cut, Hub …) ein schwebendes, verschiebbares Fenster mit dem laufenden Chat. Der User kann darin weiterschreiben, ohne das Modul zu verlassen.
 
-**Fix in `src/lib/text-studio/models.ts`:**
-- `apiModel` von `openai/gpt-5.5-pro` → `openai/gpt-5.5`
-- Label „GPT-5.5 Pro" → „GPT-5.5"
-- (Pricing bleibt — wir können später auf `gpt-5.5-pro` zurück, falls Lovable das als Chat-Modell exposed.)
+## UX
+- **Pin-Button** im AI Text Studio Header (Pin-Icon neben „Neue Konversation").
+- Klick → Chat wird in einen globalen Floating-Container überführt; im Studio erscheint ein Hinweis „Chat angeheftet — sichtbar in allen Modulen".
+- **Floating-Fenster** (default ~360×480 px, bottom-right):
+  - **Drag** an der Titelleiste (frei positionierbar, snap an Viewport-Ränder).
+  - **Resize** über Eckgriff (min 280×320, max 720×900).
+  - **Minimieren** → schrumpft zur kleinen Pille mit Modell-Label + ungelesen-Dot.
+  - **Maximieren** → öffnet wieder Floating, oder „Im Studio öffnen" springt zurück zu `/ai-text-studio`.
+  - **Schließen (X)** → unpin + Fenster zu (Chat bleibt in DB erhalten).
+- Position + Größe in `localStorage` persistiert.
+- Versteckt sich automatisch auf der Studio-Seite selbst (kein Doppel-UI).
 
-## Bug 2 — Branch wird nicht erstellt, Chat bleibt im selben Verlauf
-Aktuelle Bedingung: `if (messages.length === 0 || !conversationId) { setModel(next); return; }`
-→ Beim ersten Modellwechsel **nach einer Antwort** kann `conversationId` durchaus gesetzt sein, aber wenn der User direkt nach dem allerersten Reload das Modell wechselt, ist `conversationId` `null` und der Branch-Dialog erscheint nicht — stattdessen wird einfach das Modell gewechselt und derselbe Verlauf gegen den neuen Provider geschickt.
+## Architektur
 
-**Fix in `src/pages/AITextStudio.tsx`:**
+### 1. Globaler State — `PinnedChatProvider`
+Neuer Context in `src/contexts/PinnedChatContext.tsx`:
+- `pinnedConversationId: string | null`
+- `pinnedModel: TextModelId`
+- `pinnedPersonaId / pinnedReasoning / pinnedIsPrivate`
+- `windowState: { x, y, w, h, minimized }`
+- Actions: `pin(conv)`, `unpin()`, `setWindowState(...)`
+- Persistenz: gesamter State in `localStorage('pinned-chat-v1')`.
+- Provider in `src/App.tsx` ganz außen einhängen.
 
-1. **`handleModelChange` lockern**: Auch wenn nur `messages.length > 0` (ohne `conversationId`), Branch-Dialog zeigen. Falls noch keine `conversationId` existiert (Verlauf wurde z.B. aus History geladen aber nicht persistiert), legen wir die Wurzel-Konversation **on-the-fly** an, bevor wir den Branch erzeugen.
+### 2. Floating-Komponente — `PinnedChatWindow.tsx`
+- Rendered einmal global (z.B. in `App.tsx` neben `<Toaster/>`), nur wenn `pinnedConversationId` gesetzt ist und aktuelle Route ≠ `/ai-text-studio`.
+- Nutzt **react-rnd** (bereits leichtgewichtige Dependency, sonst manueller Drag mit `useRef + pointer events`).
+  - Falls keine Lib-Erweiterung gewünscht: minimaler eigener Drag-Hook (mousedown auf Header → onMouseMove update x/y).
+- Inhalt: schlanker Re-use der bestehenden Chat-Logik (Messages-Liste, Input, send via `text-studio-chat` edge function). Wird in eigene wiederverwendbare Komponente extrahiert: `src/components/text-studio/ChatPane.tsx` (Props: `conversationId`, `model`, `persona`, `reasoning`, `isPrivate`, `compact?`).
+- Header: Modell-Badge, Drag-Handle, Buttons (Minimize, Open in Studio, Close).
+- z-index: `z-[60]`, Glassmorphism passend zum Bond-Design (deep black + gold accent border).
 
-2. **Branch-Erstellung garantiert frische conversationId**: `createBranch` insertet zuerst die Wurzel-Conv falls nötig, dann den Branch mit `parent_conversation_id = root.id`.
+### 3. Refactor `AITextStudio.tsx`
+- Bestehende Chat-Logik (Messages-State, send-Funktion, Stream-Handling) in die neue `ChatPane.tsx` extrahieren → wird sowohl im Studio (full size) als auch im Floating-Fenster (compact) verwendet.
+- Pin-Button im Header: ruft `pin({ conversationId, model, personaId, reasoning, isPrivate })`.
+- Wenn `pinnedConversationId === conversationId` → Button zeigt „Pinned" + erlaubt Unpin.
 
-3. **`loadConversation` setzt das Modell automatisch** auf das Modell der geladenen Konversation, damit Branch-Wechsel sichtbar ist.
+### 4. Synchronisation
+- Beide Instanzen (Studio + Floating) lesen Messages aus DB über die gleiche `conversationId`.
+- Live-Sync via Supabase Realtime auf `text_studio_messages` (filter `conversation_id`) — neue Nachrichten erscheinen sofort in beiden Ansichten.
+- Bei `unpin` bleibt der Chat in der DB; nur das Fenster schließt.
 
-4. **Branch-Switcher always-on**: Auch bei nur 1 Branch (Wurzel allein) zeigen wir die Leiste mit „+ Branch erstellen", damit der User sieht, dass das Feature existiert.
-
-5. **Aktualisierung der History sofort nach Branch-Insert** (state-update statt useEffect-Refetch warten).
+## Technische Details
+- Drag/Resize: eigener Hook `useDraggableResizable` (ohne neue Dependency) — Pointer Events, Boundary-Clamping an `window.innerWidth/Height`.
+- Mobile: auf Viewport < 768 px wird das Floating-Fenster zur Bottom-Sheet (full-width, swipe-to-dismiss). Pin-Button auf Mobile versteckt (oder zeigt Hinweis „Nur auf Desktop").
+- Realtime-Channel wird einmal im Provider angelegt, nicht pro Komponente.
+- Keine DB-Migration nötig.
 
 ## Out of scope
-- Pricing/UI-Wording bleibt unverändert.
-- Keine DB-Migration nötig.
+- Multi-Chat-Pinning (nur 1 angehefteter Chat gleichzeitig).
+- Drag zwischen Monitoren / Multi-Window.
+- Branch-Switcher im Floating-Fenster (nur im Studio sichtbar; Floating zeigt aktuellen Branch).
