@@ -47,7 +47,7 @@ export default function AITextStudio() {
   // Chat state
   const [model, setModel] = useState<TextModelId>(DEFAULT_TEXT_MODEL);
   const [reasoning, setReasoning] = useState<ReasoningEffort>("medium");
-  const [personaId, setPersonaId] = useState<string>("");
+  const [personaId, setPersonaId] = useState<string>("none");
   const [isPrivate, setIsPrivate] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -120,7 +120,7 @@ export default function AITextStudio() {
           model,
           reasoningEffort: selectedModel.supportsReasoningEffort ? reasoning : undefined,
           systemPrompt: selectedPersona?.system_prompt,
-          personaId: personaId || undefined,
+          personaId: personaId && personaId !== "none" ? personaId : undefined,
           isPrivate,
         }),
       });
@@ -259,7 +259,7 @@ export default function AITextStudio() {
               <Select value={personaId} onValueChange={setPersonaId}>
                 <SelectTrigger><SelectValue placeholder="(keine)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">— Keine —</SelectItem>
+                  <SelectItem value="none">— Keine —</SelectItem>
                   {personas.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
