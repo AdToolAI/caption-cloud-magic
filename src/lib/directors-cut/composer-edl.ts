@@ -60,12 +60,22 @@ export interface NormalizedComposerScene {
   isFromOriginalVideo: true;
 }
 
+export type ComposerImportSource =
+  | 'edl'
+  | 'edl-rebuilt'
+  | 'sceneGeometry-fallback'
+  | 'composer-scenes-fallback';
+
 export interface NormalizedComposerImport {
   scenes: NormalizedComposerScene[];
   /** Visible cut points (midpoint of each crossfade) for snapping/markers. */
   cutPoints: number[];
   totalDuration: number;
-  source: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback';
+  source: ComposerImportSource;
+  /** True if total was scaled to match the real MP4 duration. */
+  calibratedToMp4?: boolean;
+  /** Real MP4 duration used for calibration, if any. */
+  realMp4Duration?: number;
 }
 
 const fmt = (s: number) => {
@@ -284,4 +294,107 @@ export function importComposerScenesDurationsOnly(
     cursor = end;
   });
   return { scenes, cutPoints, totalDuration: r3(cursor), source: 'composer-scenes-fallback' };
+}
+
+/**
+ * Deterministic EDL rebuild from composer_scenes when neither editDecisionList
+ * nor sceneGeometry is present in content_config (older renders). Mirrors the
+ * exact overlap math used by compose-video-assemble:
+ *   start_i = max(0, cursor - i * crossfadeFrames)
+ *   end_i   = start_i + duration_i_frames
+ *   cursor += duration_i_frames
+ *
+ * If realMp4Duration is provided and differs from the nominal computed total
+ * by >0.2s, all frame counts are linearly scaled so that the last endFrame
+ * aligns exactly with the rendered MP4. This eliminates the ~0.5–1.0s drift
+ * users see when AI clips render slightly shorter/longer than requested.
+ *
+ * Returns a structure compatible with `importComposerRenderEDL` so the cut
+ * points come out at the visible crossfade midpoint with ms-level precision.
+ */
+export function rebuildEDLFromComposerScenes(
+  composerScenes: ComposerScenesRow[],
+  opts: {
+    fps?: number;
+    crossfadeFrames?: number;
+    realMp4Duration?: number | null;
+  } = {},
+): NormalizedComposerImport {
+  if (!composerScenes?.length) {
+    return { scenes: [], cutPoints: [], totalDuration: 0, source: 'edl-rebuilt' };
+  }
+  const fps = opts.fps && opts.fps > 0 ? opts.fps : 30;
+  const xfade = Number.isFinite(opts.crossfadeFrames) ? Number(opts.crossfadeFrames) : 15;
+  const sorted = [...composerScenes].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+
+  // 1) Per-scene nominal frame counts.
+  let frames = sorted.map(cs => Math.max(1, Math.round((Number(cs.duration_seconds) || 5) * fps)));
+
+  // 2) Compute nominal output total (with overlap).
+  const computeTotalFrames = (arr: number[]) => {
+    let cursor = 0;
+    let lastEnd = 0;
+    for (let i = 0; i < arr.length; i++) {
+      const start = Math.max(0, cursor - i * xfade);
+      const end = start + arr[i];
+      lastEnd = end;
+      cursor += arr[i];
+    }
+    return lastEnd;
+  };
+  const nominalTotalFrames = computeTotalFrames(frames);
+  const nominalTotalSec = nominalTotalFrames / fps;
+
+  // 3) Calibrate to real MP4 duration if known and meaningfully different.
+  let calibrated = false;
+  if (opts.realMp4Duration && Math.abs(opts.realMp4Duration - nominalTotalSec) > 0.2) {
+    const targetFrames = Math.max(1, Math.round(opts.realMp4Duration * fps));
+    const scale = targetFrames / nominalTotalFrames;
+    frames = frames.map(f => Math.max(1, Math.round(f * scale)));
+    calibrated = true;
+  }
+
+  // 4) Build EDL entries with the same math as compose-video-assemble.
+  let cursor = 0;
+  const edlEntries: ComposerEDLEntry[] = sorted.map((cs, i) => {
+    const f = frames[i];
+    const start = Math.max(0, cursor - i * xfade);
+    const end = start + f;
+    cursor += f;
+    const bodyStart = i === 0 ? start : start + xfade;
+    const bodyEnd = i === sorted.length - 1 ? end : end - xfade;
+    const xfadeIn = i === 0 ? null : { startFrame: start, endFrame: start + xfade };
+    const xfadeOut = i === sorted.length - 1 ? null : { startFrame: end - xfade, endFrame: end };
+    return {
+      sceneIndex: i,
+      composerSceneId: null,
+      orderIndex: cs.order_index ?? i,
+      sceneType: cs.scene_type ?? null,
+      clipUrl: '',
+      isImage: false,
+      fps,
+      outputStartFrame: start,
+      outputEndFrame: end,
+      outputStartSec: Math.round((start / fps) * 1000) / 1000,
+      outputEndSec: Math.round((end / fps) * 1000) / 1000,
+      bodyStartFrame: Math.max(start, bodyStart),
+      bodyEndFrame: Math.min(end, bodyEnd),
+      transitionInFrameRange: xfadeIn,
+      transitionOutFrameRange: xfadeOut,
+      crossfadeFrames: xfade,
+      durationFrames: f,
+      durationSec: Math.round((f / fps) * 1000) / 1000,
+      aiPrompt: cs.ai_prompt ?? null,
+      textOverlay: cs.text_overlay ?? null,
+    };
+  });
+
+  // 5) Reuse the frame-accurate EDL importer for cut-point math.
+  const result = importComposerRenderEDL(edlEntries, sorted);
+  return {
+    ...result,
+    source: 'edl-rebuilt',
+    calibratedToMp4: calibrated,
+    realMp4Duration: opts.realMp4Duration ?? undefined,
+  };
 }

@@ -117,7 +117,7 @@ interface CapCutSidebarProps {
   onVoiceoverVolumeChange?: (volume: number) => void;
   voiceoverVolume?: number;
   // Composer EDL lock
-  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSource?: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
   composerLockSceneCount?: number;
 }
 
