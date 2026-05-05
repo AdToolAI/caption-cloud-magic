@@ -37,6 +37,17 @@ import { estimateTokens, estimateCost, formatEUR } from "@/lib/text-studio/prici
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+const LAST_CONV_KEY = "text-studio-last-conversation";
+const readLastConv = () => {
+  try { return localStorage.getItem(LAST_CONV_KEY); } catch { return null; }
+};
+const writeLastConv = (id: string | null) => {
+  try {
+    if (id) localStorage.setItem(LAST_CONV_KEY, id);
+    else localStorage.removeItem(LAST_CONV_KEY);
+  } catch {}
+};
+
 interface Persona {
   id: string;
   name: string;
