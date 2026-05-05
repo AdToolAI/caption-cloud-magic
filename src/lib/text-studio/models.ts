@@ -44,10 +44,10 @@ export const TEXT_MODELS: Record<TextModelId, TextModel> = {
   },
   "openai-gpt-5-5-pro": {
     id: "openai-gpt-5-5-pro",
-    label: "GPT-5.5 Pro",
+    label: "GPT-5.5",
     provider: "lovable-gateway",
-    apiModel: "openai/gpt-5.5-pro",
-    description: "State-of-the-Art Reasoning · komplexe Logik & Code",
+    apiModel: "openai/gpt-5.5",
+    description: "OpenAI Top-Modell · Reasoning · Code · komplexe Aufgaben",
     inputPricePer1k: 0.0195,
     outputPricePer1k: 0.0975,
     strengths: ["Reasoning", "Code", "Premium"],
