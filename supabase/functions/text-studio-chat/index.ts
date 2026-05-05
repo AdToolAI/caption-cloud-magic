@@ -146,6 +146,9 @@ Deno.serve(async (req) => {
           model: modelId,
           persona_id: personaId || null,
           is_private: !!isPrivate,
+          parent_conversation_id: parentConversationId || null,
+          branched_from_message_id: branchedFromMessageId || null,
+          branch_label: branchLabel || null,
         })
         .select("id")
         .single();
