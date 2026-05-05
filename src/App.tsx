@@ -362,18 +362,21 @@ const AppContent = () => {
         <TooltipProvider>
           <SidebarProvider>
             <UpgradeTriggerProvider>
-              <Toaster />
-              <Sonner />
-              <CookieConsent />
-              <CommandBar />
-              <CommandPalette />
-              <AICompanionWidget />
-              <UpgradeMount />
-              <EmailVerificationGate>
-                <AppLayout />
-                <GettingStartedChecklist />
-                <ProductTour />
-              </EmailVerificationGate>
+              <PinnedChatProvider>
+                <Toaster />
+                <Sonner />
+                <CookieConsent />
+                <CommandBar />
+                <CommandPalette />
+                <AICompanionWidget />
+                <UpgradeMount />
+                <EmailVerificationGate>
+                  <AppLayout />
+                  <GettingStartedChecklist />
+                  <ProductTour />
+                </EmailVerificationGate>
+                <PinnedChatWindow />
+              </PinnedChatProvider>
             </UpgradeTriggerProvider>
           </SidebarProvider>
         </TooltipProvider>
