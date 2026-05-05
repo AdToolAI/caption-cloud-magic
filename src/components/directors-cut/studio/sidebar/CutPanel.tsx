@@ -297,12 +297,21 @@ export const CutPanel: React.FC<CutPanelProps> = ({
           <div className="flex items-center gap-2 text-[11px] font-medium text-[#F5C76A]">
             <Sparkles className="h-3.5 w-3.5" />
             <span>
-              Composer {composerLockSource === 'edl' ? 'EDL' : 'Fallback'} · {composerLockSceneCount} Szenen
+              Composer{' '}
+              {composerLockSource === 'edl'
+                ? 'EDL (frame-genau)'
+                : composerLockSource === 'edl-rebuilt'
+                  ? 'EDL rekonstruiert'
+                  : composerLockSource === 'sceneGeometry-fallback'
+                    ? 'Geometrie'
+                    : 'Nur Dauern'}{' '}
+              · {composerLockSceneCount} Szenen
             </span>
           </div>
           <p className="mt-1 text-[10px] text-white/40 leading-snug">
-            Szenen stammen direkt aus dem Render – Auto-Cut ist deaktiviert, damit
-            der KI-Detektor die echten Schnittpunkte nicht überschreibt.
+            Diese Szenen kommen direkt aus deinem Composer-Render – Auto-Cut
+            ist deaktiviert, damit die echten Schnittpunkte nicht überschrieben
+            werden.
           </p>
         </div>
       )}
