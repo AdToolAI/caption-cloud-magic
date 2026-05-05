@@ -91,7 +91,7 @@ export const LaptopFrame3D = ({ children }: LaptopFrame3DProps) => {
           </div>
 
           {/* Subtle bottom hairline */}
-          <div className="absolute inset-x-12 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+          <div className="absolute inset-x-12 bottom-0 h-px bg-gradient-to-r from-transparent via-primary/45 to-transparent" />
         </div>
 
         {/* Floor reflection / grounding shadow */}
