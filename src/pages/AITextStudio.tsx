@@ -374,6 +374,29 @@ export default function AITextStudio() {
             </Button>
           </div>
 
+          {/* Branch switcher: visible when this chat has siblings */}
+          {branches.length > 1 && (
+            <Card className="p-2 flex flex-wrap items-center gap-2">
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+              <span className="text-xs text-muted-foreground mr-1">Branches:</span>
+              {branches.map((b) => {
+                const m = TEXT_MODELS[b.model as TextModelId];
+                const active = b.id === conversationId;
+                return (
+                  <Button
+                    key={b.id}
+                    size="sm"
+                    variant={active ? "default" : "outline"}
+                    className="h-7 text-xs"
+                    onClick={() => !active && loadConversation(b.id)}
+                  >
+                    {m?.label || b.model}
+                  </Button>
+                );
+              })}
+            </Card>
+          )}
+
           <Card className="p-4 h-[480px] overflow-y-auto" ref={scrollRef as any}>
             {messages.length === 0 && (
               <div className="text-sm text-muted-foreground text-center py-12">
