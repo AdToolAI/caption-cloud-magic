@@ -390,10 +390,23 @@ export function DirectorsCut() {
         const {
           importComposerRenderEDL,
           importComposerRenderGeometry,
-          importComposerScenesDurationsOnly,
+          rebuildEDLFromComposerScenes,
         } = await import('@/lib/directors-cut/composer-edl');
+        const { probeMediaDuration } = await import('@/lib/probeMp4Duration');
 
         // 1. Load the authoritative render row.
+        // Strategy: prefer the row that ACTUALLY has an editDecisionList. If
+        // composerRenderId is set but that row has no EDL (older render),
+        // fall back to the newest composer render for the project that does.
+        const hasEDL = (row: any) => {
+          const cfg = row?.content_config;
+          return !!cfg && Array.isArray(cfg.editDecisionList) && cfg.editDecisionList.length > 0;
+        };
+        const hasGeometry = (row: any) => {
+          const cfg = row?.content_config;
+          return !!cfg && Array.isArray(cfg.sceneGeometry) && cfg.sceneGeometry.length > 0;
+        };
+
         let renderRow: any = null;
         if (composerRenderId) {
           const { data } = await supabase
@@ -403,17 +416,22 @@ export function DirectorsCut() {
             .maybeSingle();
           renderRow = data;
         }
-        if (!renderRow) {
-          const { data } = await supabase
-            .from('video_renders')
-            .select('render_id, video_url, content_config, format_config')
-            .eq('project_id', composerSourceProjectId)
-            .eq('source', 'composer')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          renderRow = data;
-        }
+        // Always also fetch the newest composer render so we can prefer one with EDL.
+        const { data: latestRow } = await supabase
+          .from('video_renders')
+          .select('render_id, video_url, content_config, format_config')
+          .eq('project_id', composerSourceProjectId)
+          .eq('source', 'composer')
+          .order('created_at', { ascending: false })
+          .limit(5);
+        const candidates: any[] = [renderRow, ...((latestRow as any[]) || [])].filter(Boolean);
+        // Prefer EDL > geometry > anything > nothing
+        const best =
+          candidates.find(hasEDL) ||
+          candidates.find(hasGeometry) ||
+          candidates[0] ||
+          null;
+        renderRow = best;
 
         const cfg: any = renderRow?.content_config || {};
         const edl: any[] = Array.isArray(cfg.editDecisionList) ? cfg.editDecisionList : [];
@@ -430,13 +448,30 @@ export function DirectorsCut() {
 
         if (cancelled) return;
 
+        // 3. Probe REAL mp4 duration for calibration (used by rebuild fallback).
+        let realMp4Duration: number | null = null;
+        try {
+          if (selectedVideo?.url) {
+            realMp4Duration = await probeMediaDuration(selectedVideo.url, 6000);
+          }
+        } catch (e) {
+          console.info('[DirectorsCut] MP4 duration probe failed (non-fatal):', e);
+        }
+        if (cancelled) return;
+
         let result: ReturnType<typeof importComposerRenderEDL> | null = null;
         if (edl.length > 0) {
           result = importComposerRenderEDL(edl as any, composerScenes as any);
         } else if (rawGeometry.length > 0) {
           result = importComposerRenderGeometry(rawGeometry, composerScenes as any, crossfadeFrames, fps);
         } else if (composerScenes && composerScenes.length > 0) {
-          result = importComposerScenesDurationsOnly(composerScenes as any);
+          // Frame-accurate rebuild from composer_scenes durations + crossfade
+          // math, optionally calibrated to the real MP4 duration.
+          result = rebuildEDLFromComposerScenes(composerScenes as any, {
+            fps,
+            crossfadeFrames,
+            realMp4Duration,
+          });
         }
 
         if (!result || result.scenes.length === 0) {
@@ -448,10 +483,14 @@ export function DirectorsCut() {
           console.info('[DirectorsCut] Composer EDL import:', {
             projectId: composerSourceProjectId,
             renderId: renderRow?.render_id,
+            renderHasEDL: edl.length > 0,
+            renderHasGeometry: rawGeometry.length > 0,
+            realMp4Duration,
             source: result.source,
             scenesCount: result.scenes.length,
             cutPoints: result.cutPoints,
             totalDuration: result.totalDuration,
+            calibratedToMp4: (result as any).calibratedToMp4,
           });
           setScenes(result.scenes as any);
           setAiCutMarkers(result.cutPoints.map(t => ({ time: t, confidence: 1, source: 'auto' as const })));
@@ -462,9 +501,16 @@ export function DirectorsCut() {
             active: true,
             sceneCount: result.scenes.length,
             source: result.source,
+            calibratedToMp4: (result as any).calibratedToMp4,
+            realMp4Duration: (result as any).realMp4Duration,
           });
           if (result.source === 'edl') {
-            toast.success(`${result.scenes.length} Composer-Szenen aus EDL importiert`);
+            toast.success(`${result.scenes.length} Composer-Szenen frame-genau importiert`);
+          } else if (result.source === 'edl-rebuilt') {
+            const calNote = (result as any).calibratedToMp4
+              ? ` · auf ${realMp4Duration?.toFixed(1)}s kalibriert`
+              : '';
+            toast.success(`${result.scenes.length} Szenen rekonstruiert${calNote}`);
           } else if (result.source === 'sceneGeometry-fallback') {
             toast.success(`${result.scenes.length} Composer-Szenen importiert (Geometrie-Fallback)`);
           } else {
