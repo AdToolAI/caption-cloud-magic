@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Brain, Send, Sparkles, Loader2, Lock, Trash2 } from "lucide-react";
+import { Brain, Send, Sparkles, Loader2, Lock, Trash2, GitBranch } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -13,6 +13,16 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   TEXT_MODEL_LIST,
   TEXT_MODELS,
@@ -38,6 +48,8 @@ interface Conversation {
   title: string;
   model: string;
   updated_at: string;
+  parent_conversation_id?: string | null;
+  branch_label?: string | null;
 }
 
 export default function AITextStudio() {
@@ -63,6 +75,9 @@ export default function AITextStudio() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Branch confirmation dialog state
+  const [branchPrompt, setBranchPrompt] = useState<{ targetModel: TextModelId } | null>(null);
+
   useEffect(() => {
     if (!user) return;
     void supabase
@@ -72,9 +87,9 @@ export default function AITextStudio() {
       .then(({ data }) => setPersonas((data as Persona[]) || []));
     void supabase
       .from("text_studio_conversations")
-      .select("id,title,model,updated_at")
+      .select("id,title,model,updated_at,parent_conversation_id,branch_label")
       .order("updated_at", { ascending: false })
-      .limit(50)
+      .limit(100)
       .then(({ data }) => setHistory((data as Conversation[]) || []));
   }, [user, conversationId]);
 
@@ -85,11 +100,75 @@ export default function AITextStudio() {
   const selectedModel = TEXT_MODELS[model];
   const selectedPersona = personas.find((p) => p.id === personaId);
 
+  // Current chat root + sibling branches (same root)
+  const currentConv = history.find((c) => c.id === conversationId);
+  const rootId = currentConv?.parent_conversation_id || currentConv?.id || null;
+  const branches = useMemo(() => {
+    if (!rootId) return [] as Conversation[];
+    return history.filter((c) => c.id === rootId || c.parent_conversation_id === rootId);
+  }, [history, rootId]);
+
   const inputTokens = useMemo(
     () => estimateTokens(input + messages.map((m) => m.content).join("\n")),
     [input, messages],
   );
   const estCostEur = useMemo(() => estimateCost(model, inputTokens, 800), [model, inputTokens]);
+
+  // Intercept model change: if active chat has messages, fork into a branch
+  function handleModelChange(next: TextModelId) {
+    if (next === model) return;
+    if (messages.length === 0 || !conversationId) {
+      setModel(next);
+      return;
+    }
+    setBranchPrompt({ targetModel: next });
+  }
+
+  async function createBranch(targetModel: TextModelId, withContext: boolean) {
+    if (!user || !conversationId) return;
+    const parentRoot = rootId || conversationId;
+    const targetLabel = TEXT_MODELS[targetModel].label;
+    const parentTitle = currentConv?.title || "Konversation";
+    const { data: newConv, error } = await supabase
+      .from("text_studio_conversations")
+      .insert({
+        user_id: user.id,
+        title: parentTitle,
+        model: targetModel,
+        persona_id: personaId && personaId !== "none" ? personaId : null,
+        is_private: isPrivate,
+        parent_conversation_id: parentRoot,
+        branch_label: `${targetLabel}-Branch`,
+      })
+      .select("id,title,model,updated_at,parent_conversation_id,branch_label")
+      .single();
+    if (error || !newConv) {
+      toast.error(error?.message || "Branch konnte nicht erstellt werden");
+      return;
+    }
+
+    if (withContext && messages.length > 0) {
+      const rows = messages
+        .filter((m) => m.content?.trim())
+        .map((m) => ({
+          conversation_id: newConv.id,
+          user_id: user.id,
+          role: m.role,
+          content: m.content,
+        }));
+      if (rows.length > 0) {
+        await supabase.from("text_studio_messages").insert(rows);
+      }
+    } else {
+      setMessages([]);
+    }
+
+    setHistory((h) => [newConv as Conversation, ...h]);
+    setConversationId(newConv.id);
+    setModel(targetModel);
+    setBranchPrompt(null);
+    toast.success(`Neuer Branch: ${targetLabel}`);
+  }
 
   async function send() {
     if (!input.trim() || streaming || !user) return;
@@ -243,7 +322,7 @@ export default function AITextStudio() {
           <Card className="p-4 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
             <div>
               <Label className="text-xs">Modell</Label>
-              <Select value={model} onValueChange={(v) => setModel(v as TextModelId)}>
+              <Select value={model} onValueChange={(v) => handleModelChange(v as TextModelId)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TEXT_MODEL_LIST.map((m) => (
@@ -294,6 +373,29 @@ export default function AITextStudio() {
               <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
             </Button>
           </div>
+
+          {/* Branch switcher: visible when this chat has siblings */}
+          {branches.length > 1 && (
+            <Card className="p-2 flex flex-wrap items-center gap-2">
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+              <span className="text-xs text-muted-foreground mr-1">Branches:</span>
+              {branches.map((b) => {
+                const m = TEXT_MODELS[b.model as TextModelId];
+                const active = b.id === conversationId;
+                return (
+                  <Button
+                    key={b.id}
+                    size="sm"
+                    variant={active ? "default" : "outline"}
+                    className="h-7 text-xs"
+                    onClick={() => !active && loadConversation(b.id)}
+                  >
+                    {m?.label || b.model}
+                  </Button>
+                );
+              })}
+            </Card>
+          )}
 
           <Card className="p-4 h-[480px] overflow-y-auto" ref={scrollRef as any}>
             {messages.length === 0 && (
@@ -382,29 +484,70 @@ export default function AITextStudio() {
           {history.length === 0 && (
             <p className="text-sm text-muted-foreground">Noch keine Konversationen.</p>
           )}
-          {history.map((c) => (
-            <Card key={c.id} className="p-3 flex items-center gap-3">
-              <button
-                onClick={() => loadConversation(c.id)}
-                className="flex-1 text-left hover:opacity-80"
+          {history.map((c) => {
+            const isBranch = !!c.parent_conversation_id;
+            return (
+              <Card
+                key={c.id}
+                className={`p-3 flex items-center gap-3 ${isBranch ? "ml-8 border-l-2 border-primary/40" : ""}`}
               >
-                <div className="text-sm font-medium truncate">{c.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {TEXT_MODELS[c.model as TextModelId]?.label || c.model} ·{" "}
-                  {new Date(c.updated_at).toLocaleString()}
-                </div>
-              </button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => deleteConversation(c.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </Card>
-          ))}
+                {isBranch && <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
+                <button
+                  onClick={() => loadConversation(c.id)}
+                  className="flex-1 text-left hover:opacity-80"
+                >
+                  <div className="text-sm font-medium truncate">
+                    {c.title}
+                    {c.branch_label && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">{c.branch_label}</Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {TEXT_MODELS[c.model as TextModelId]?.label || c.model} ·{" "}
+                    {new Date(c.updated_at).toLocaleString()}
+                  </div>
+                </button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => deleteConversation(c.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </Card>
+            );
+          })}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!branchPrompt} onOpenChange={(o) => !o && setBranchPrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mit {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""} fortfahren?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Beim Modellwechsel mitten im Chat können Provider-Fehler auftreten, weil jedes
+              Modell ein eigenes Format erwartet. Stattdessen erstellen wir einen neuen
+              <strong> Branch</strong> in dieser Konversation. Beide Verläufe bleiben sichtbar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, false)}
+            >
+              Sauberer Start
+            </Button>
+            <AlertDialogAction
+              onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, true)}
+            >
+              Mit Kontext übernehmen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

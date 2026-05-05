@@ -65,6 +65,9 @@ Deno.serve(async (req) => {
       systemPrompt,
       personaId,
       isPrivate,
+      parentConversationId,
+      branchedFromMessageId,
+      branchLabel,
     } = body as {
       conversationId?: string;
       messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
@@ -73,6 +76,9 @@ Deno.serve(async (req) => {
       systemPrompt?: string;
       personaId?: string;
       isPrivate?: boolean;
+      parentConversationId?: string;
+      branchedFromMessageId?: string;
+      branchLabel?: string;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -140,11 +146,28 @@ Deno.serve(async (req) => {
           model: modelId,
           persona_id: personaId || null,
           is_private: !!isPrivate,
+          parent_conversation_id: parentConversationId || null,
+          branched_from_message_id: branchedFromMessageId || null,
+          branch_label: branchLabel || null,
         })
         .select("id")
         .single();
       if (convErr) return jsonResponse({ error: convErr.message }, 500);
       conversationId = conv.id;
+    }
+
+    // --- Sanitize history (strip non-text, drop empties, normalize roles) ---
+    // Different providers (OpenAI reasoning, Anthropic, Gemini) reject foreign payload shapes.
+    // We force a strict {role, content:string} shape and drop assistant-empty placeholders.
+    const cleanMessages = (messages || [])
+      .map((m) => ({
+        role: (m.role === "system" || m.role === "user" || m.role === "assistant") ? m.role : "user",
+        content: typeof m.content === "string" ? m.content : String(m.content ?? ""),
+      }))
+      .filter((m) => m.content.trim().length > 0);
+
+    if (cleanMessages.length === 0) {
+      return jsonResponse({ error: "No non-empty messages to send" }, 400);
     }
 
     // --- Build upstream request ---
@@ -154,7 +177,7 @@ Deno.serve(async (req) => {
     if (route.provider === "gateway") {
       const reqBody: Record<string, unknown> = {
         model: route.apiModel,
-        messages: [...sysMsg, ...messages],
+        messages: [...sysMsg, ...cleanMessages],
         stream: true,
       };
       if (reasoningEffort && PRICING[modelId] && modelId === "openai-gpt-5-5-pro") {
@@ -169,7 +192,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify(reqBody),
       });
     } else {
-      // Anthropic streaming
+      // Anthropic streaming — Claude requires alternating user/assistant and starts with user
+      const anthroMsgs = cleanMessages
+        .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.content }))
+        .filter((m, i, arr) => i === 0 ? m.role === "user" : true); // drop leading assistant
       upstream = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -181,7 +207,7 @@ Deno.serve(async (req) => {
           model: route.apiModel,
           max_tokens: 4096,
           system: systemPrompt || undefined,
-          messages: messages.map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.content })),
+          messages: anthroMsgs,
           stream: true,
         }),
       });
@@ -192,7 +218,12 @@ Deno.serve(async (req) => {
       console.error("[text-studio-chat] upstream error", upstream.status, errText);
       if (upstream.status === 429) return jsonResponse({ error: "Rate limited, try again." }, 429);
       if (upstream.status === 402) return jsonResponse({ error: "AI credits exhausted." }, 402);
-      return jsonResponse({ error: "Upstream provider error", details: errText.slice(0, 500) }, 500);
+      // Surface a useful snippet so the user sees the real reason in the toast
+      const snippet = errText.replace(/\s+/g, " ").slice(0, 200);
+      return jsonResponse(
+        { error: `Provider error (${upstream.status}): ${snippet || "unknown"}`, details: errText.slice(0, 500) },
+        502,
+      );
     }
 
     // --- Stream + capture full assistant text for DB write after end ---

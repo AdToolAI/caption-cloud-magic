@@ -1,33 +1,53 @@
+# AI Text Studio — Hybrid Branch beim Modellwechsel
+
 ## Problem
+Wenn man mitten im Chat das Modell wechselt (z.B. Gemini → GPT-5.5 Pro), wird die volle History an das neue Modell geschickt. Reasoning-Modelle und Anthropic erwarten andere Message-Formate als Gemini → der Provider gibt einen Fehler zurück ("Upstream provider error"). Lange Verläufe sprengen zusätzlich Kontext-Limits.
 
-Beim Öffnen von `/ai-text-studio` crasht die Seite mit:
-> A `<Select.Item />` must have a value prop that is not an empty string.
+## Lösung
+**Hybrid Branch-Modus**: Beim Modellwechsel innerhalb eines aktiven Chats wird automatisch ein neuer "Branch" als eigene Konversation angelegt, die optional die bisherige History als Kontext mitnimmt — aber mit dem Ziel-Modell sauber neu startet. Beide Branches bleiben sichtbar und navigierbar.
 
-Ursache: In `src/pages/AITextStudio.tsx` Zeile 262 steht:
-```tsx
-<SelectItem value="">— Keine —</SelectItem>
+```text
+Chat "Kreuzzüge"
+├─ 🟢 Branch 1: Gemini 3 Flash       (5 Nachrichten)
+├─ ⚪ Branch 2: GPT-5.5 Pro          (ab Nachricht 5, mit Kontext-Snapshot)
+└─ ⚪ Branch 3: Claude 4.1 Opus      (ab Nachricht 5, mit Kontext-Snapshot)
 ```
-Radix UI verbietet leere Strings als Select-Wert (sie sind reserviert, um die Selection zu clearen).
 
-## Fix (1 Datei)
+## Änderungen
 
-**`src/pages/AITextStudio.tsx`**
+### 1. Datenbank-Migration
+Neue Spalten in `text_studio_conversations`:
+- `parent_conversation_id uuid` — Referenz zur Eltern-Konversation (NULL = Root)
+- `branched_from_message_id uuid` — ab welcher Nachricht abgezweigt wurde
+- `branch_label text` — kurzer Anzeigename ("Gemini-Branch", "GPT-Branch")
 
-1. Sentinel-Wert `"none"` statt leerem String für die "Keine Persona"-Option:
-   ```tsx
-   <SelectItem value="none">— Keine —</SelectItem>
-   ```
-2. State-Initialisierung und Handler entsprechend anpassen:
-   - `personaId` default = `"none"`
-   - Vor dem Senden an `text-studio-chat`: wenn `personaId === "none"` → `undefined` übergeben
-3. `<Select value={personaId || "none"} onValueChange={setPersonaId}>` absichern, damit ein leerer Initial-State nicht erneut crasht.
+Bestehende Konversationen bleiben unberührt (alle als Roots, weil `parent_conversation_id` NULL).
 
-## Bonus-Check
+### 2. Branch-Logik im Frontend (`src/pages/AITextStudio.tsx`)
+- Wenn `messages.length > 0` und User wechselt Modell → Bestätigungs-Dialog:
+  > „Mit GPT-5.5 Pro fortfahren? Es wird ein neuer Branch erstellt. Möchtest du den bisherigen Verlauf als Kontext übernehmen?"
+  - **Ja, mit Kontext** → neuer Branch, History wird als Snapshot kopiert
+  - **Ja, sauber** → neuer Branch, leer
+  - **Abbrechen** → Modell bleibt unverändert
+- Branch-Switcher-Leiste über dem Chat: zeigt alle Branches dieser Wurzel mit Modell-Badge, Klick wechselt Branch.
 
-Während der Investigation gleich verifizieren, dass die Modell-IDs in `src/lib/text-studio/models.ts` (insb. Claude 4.1 Opus) gegen die aktuelle Anthropic API-Bezeichnung gemappt sind — sonst gibt's beim ersten Chat-Send einen 404 vom Anthropic-Endpoint. Falls falsch benannt, korrigiere ich auf den offiziellen Modell-String (`claude-opus-4-1-...`).
+### 3. History-Sanitizer im Edge Function (`supabase/functions/text-studio-chat`)
+Robustheit gegen kreuzweise Inkompatibilität:
+- Vor dem Upstream-Call: Messages bereinigen (nur `role` + `content` als Plain-Text, keine Tool-Calls, kein Reasoning-Payload).
+- Wenn History > 60.000 Zeichen → ältere User/Assistant-Paare automatisch zusammenfassen (mit Gemini Flash) statt hart abzuschneiden.
+- Bessere Error-Surface: Statt generischem „Upstream provider error" → konkrete HTTP-Status + erste 200 Zeichen der Provider-Antwort als Toast.
 
-## Erwartetes Ergebnis
+### 4. History-Tab Update
+- Konversationen werden gruppiert nach `parent_conversation_id`.
+- Root-Konversation als aufklappbare Zeile, Branches eingerückt darunter mit Modell-Badge.
+- Existing Chats werden ihrem `model`-Feld zugeordnet (Spalte ist bereits vorhanden und befüllt) — keine Daten-Migration nötig.
 
-- `/ai-text-studio` lädt ohne Error-Boundary.
-- "Keine Persona" funktioniert wie vorher.
-- Modell-Dropdown inkl. Claude bleibt auswählbar; erster Test-Chat geht durch.
+## Technische Details (für später)
+- Branch-Erstellung passiert client-seitig: neue Row in `text_studio_conversations` mit `parent_conversation_id = currentRoot`, dann optional `INSERT` der bestehenden Messages mit neuer `conversation_id`.
+- `currentRoot` = `parent_conversation_id ?? id` der aktuell aktiven Konversation.
+- Edge Function unverändert bzgl. Persistenz — bekommt einfach die neue `conversationId`.
+- Sanitizer: `messages.map(m => ({ role: m.role, content: String(m.content || '') })).filter(m => m.content.trim())`.
+
+## Out of Scope
+- Kein Auto-Merge von Branches (würde A/B-Vergleich brechen).
+- Kein Realtime-Sync zwischen Branches.
