@@ -33,9 +33,10 @@ export const FloatingAppHeader = () => {
         style={{
           borderRadius: "4px",
           boxShadow: `
-            0 0 0 1px hsla(43, 90%, 68%, 0.35),
+            0 0 0 1px hsla(43, 90%, 68%, 0.6),
+            inset 0 0 0 1px rgba(0, 0, 0, 0.85),
             0 12px 30px -8px rgba(0, 0, 0, 0.9),
-            0 0 24px -8px hsla(43, 90%, 68%, 0.25)
+            0 0 24px -8px hsla(43, 90%, 68%, 0.3)
           `,
         }}
       >
@@ -49,7 +50,7 @@ export const FloatingAppHeader = () => {
           </span>
         </div>
 
-        <div className="w-px h-4 bg-primary/20" />
+        <div className="w-px h-4 bg-primary/45" />
 
         {/* Plan badge */}
         <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary border border-primary/40 px-1.5 py-0.5">
