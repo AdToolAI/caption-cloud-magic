@@ -60,12 +60,22 @@ export interface NormalizedComposerScene {
   isFromOriginalVideo: true;
 }
 
+export type ComposerImportSource =
+  | 'edl'
+  | 'edl-rebuilt'
+  | 'sceneGeometry-fallback'
+  | 'composer-scenes-fallback';
+
 export interface NormalizedComposerImport {
   scenes: NormalizedComposerScene[];
   /** Visible cut points (midpoint of each crossfade) for snapping/markers. */
   cutPoints: number[];
   totalDuration: number;
-  source: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback';
+  source: ComposerImportSource;
+  /** True if total was scaled to match the real MP4 duration. */
+  calibratedToMp4?: boolean;
+  /** Real MP4 duration used for calibration, if any. */
+  realMp4Duration?: number;
 }
 
 const fmt = (s: number) => {
