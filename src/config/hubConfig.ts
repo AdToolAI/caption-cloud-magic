@@ -67,7 +67,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/analytics/posthog", titleKey: "PostHog Dashboard", descKey: "hubItemDesc.posthog", icon: BarChart3 },
       { route: "/analytics/usage-reports", titleKey: "Usage Reports", descKey: "hubItemDesc.usageReports", icon: Coins },
       { route: "/trend-radar", titleKey: "nav.trendRadar", descKey: "hubItemDesc.trendRadar", icon: Radar },
-      
+      { route: "/ai-text-studio", titleKey: "AI Text Studio", descKey: "GPT-5.5 Pro, Gemini 3.1 Pro & Claude 4.1 Opus in einem Reasoning-Hub", icon: Sparkles },
     ],
   },
   {

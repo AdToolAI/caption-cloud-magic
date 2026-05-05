@@ -96,6 +96,7 @@ const UniversalCreator = lazy(() => import("./pages/UniversalCreator"));
 const UniversalVideoCreator = lazy(() => import("./pages/UniversalVideoCreator"));
 const UniversalDirectorsCut = lazy(() => import("./pages/DirectorsCut"));
 const CompareLab = lazy(() => import("./pages/CompareLab"));
+const AITextStudio = lazy(() => import("./pages/AITextStudio"));
 
 
 const PersonalizedDashboard = lazy(() => import("./pages/PersonalizedDashboard"));
@@ -207,6 +208,7 @@ function AppLayout() {
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
+                    <Route path="/ai-text-studio" element={<AITextStudio />} />
                     <Route path="/prompt-wizard" element={<Navigate to="/generator" replace />} />
                     
                     <Route path="/rewriter" element={<Rewriter />} />
