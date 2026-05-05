@@ -168,7 +168,7 @@ Deno.serve(async (req) => {
     if (route.provider === "gateway") {
       const reqBody: Record<string, unknown> = {
         model: route.apiModel,
-        messages: [...sysMsg, ...messages],
+        messages: [...sysMsg, ...cleanMessages],
         stream: true,
       };
       if (reasoningEffort && PRICING[modelId] && modelId === "openai-gpt-5-5-pro") {
@@ -183,7 +183,10 @@ Deno.serve(async (req) => {
         body: JSON.stringify(reqBody),
       });
     } else {
-      // Anthropic streaming
+      // Anthropic streaming — Claude requires alternating user/assistant and starts with user
+      const anthroMsgs = cleanMessages
+        .map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.content }))
+        .filter((m, i, arr) => i === 0 ? m.role === "user" : true); // drop leading assistant
       upstream = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: {
@@ -195,7 +198,7 @@ Deno.serve(async (req) => {
           model: route.apiModel,
           max_tokens: 4096,
           system: systemPrompt || undefined,
-          messages: messages.map((m) => ({ role: m.role === "system" ? "user" : m.role, content: m.content })),
+          messages: anthroMsgs,
           stream: true,
         }),
       });
@@ -206,7 +209,12 @@ Deno.serve(async (req) => {
       console.error("[text-studio-chat] upstream error", upstream.status, errText);
       if (upstream.status === 429) return jsonResponse({ error: "Rate limited, try again." }, 429);
       if (upstream.status === 402) return jsonResponse({ error: "AI credits exhausted." }, 402);
-      return jsonResponse({ error: "Upstream provider error", details: errText.slice(0, 500) }, 500);
+      // Surface a useful snippet so the user sees the real reason in the toast
+      const snippet = errText.replace(/\s+/g, " ").slice(0, 200);
+      return jsonResponse(
+        { error: `Provider error (${upstream.status}): ${snippet || "unknown"}`, details: errText.slice(0, 500) },
+        502,
+      );
     }
 
     // --- Stream + capture full assistant text for DB write after end ---
