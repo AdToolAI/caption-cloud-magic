@@ -1,57 +1,234 @@
-## Problem
 
-Aktuell zeigt die Mediathek `512 / 500` Videos und `10.06 / 10 GB`. Ursachen:
+# AI Text Studio – Vollständiger Implementierungsplan
 
-1. Der neue DB-Trigger zählt **nur `video_creations`** (jetzt korrekt auf 500 begrenzt: 500/500 für den betroffenen User).
-2. Zusätzlich liegen **31 Video-Einträge in `content_items`** (Universal Creator / Kampagnen), die im UI on-top gezählt werden → 500 + 31 + 1 Demo = 512.
-3. Für die **10 GB Speichergrenze gibt es überhaupt keinen Server-Enforcer** – die Schätzung im Frontend kann beliebig überlaufen.
-4. Manuelle Uploads werden über `enforceLimits` blockiert, aber **AI-/Render-Pipelines schreiben ungebremst** in `video_creations` und `content_items`.
+Ein konsolidiertes Premium-Text-Studio für Reasoning, Analyse und Schreiben – analog zum AI Video Toolkit, aber für Text. Drei Top-Tier-Modelle in einer einheitlichen UI, eingeordnet unter **Analyze** in der Sidebar.
 
-## Ziel
+---
 
-Es darf **nie** möglich sein, mehr als 500 Videos oder mehr als 10 GB zu haben — egal aus welcher Quelle (Upload, KI-Studios, Renderer, Composer, Universal Creator, Director's Cut, Kampagnen).
+## 1. Modelle & Provider
 
-## Plan
+| Provider | Modell-ID intern | Quelle | Kosten (1M Tokens) | Stärke |
+|---|---|---|---|---|
+| OpenAI | `openai-gpt-5-5-pro` | Lovable AI Gateway | ~$15 / $75 | Reasoning, Code |
+| Google | `google-gemini-3-1-pro` | Lovable AI Gateway | ~$1.25 / $10 | Multimodal, 1M Context |
+| Anthropic | `anthropic-claude-4-1-opus` | Direkte Anthropic API (`ANTHROPIC_API_KEY`) | $15 / $75 | Schreiben, lange Texte |
 
-### 1. DB-Trigger erweitern (neue Migration)
+Standard-Modell beim Öffnen: **Gemini 3.1 Pro** (günstigstes Pro-Modell).
 
-Eine neue Funktion `enforce_user_video_library_limits(_user_id, max_videos=500, max_storage_mb=10240)` führt **nach jedem relevanten Insert/Update**:
+---
 
-- **Video-Cap (500 total):** Zählt `video_creations(status='completed')` **+** `content_items(type='video')` (über Workspace-Mitgliedschaft) zusammen. Löscht überschüssige Einträge nach `created_at ASC` — älteste zuerst, quellenübergreifend.
-- **Storage-Cap (10 GB):** Summiert `media_assets.size_bytes` + `content_items.file_size_mb` + geschätzte 20 MB pro `video_creations`-Row ohne Größe. Löscht älteste Einträge bis unter 10 GB.
-- Idempotent + `SECURITY DEFINER` + `search_path=public`.
+## 2. Routen & Sidebar-Einbettung
 
-Trigger jeweils `AFTER INSERT OR UPDATE` auf:
-- `video_creations` (ersetzt bestehenden Trigger)
-- `content_items` (neu, nur wenn `type='video'`)
-- `media_assets` (neu, für Uploads)
+- Neue Route: `/ai-text-studio`
+- Sidebar-Eintrag „AI Text Studio" unter **Analyze**, oberhalb von Trend Radar (Icon: `Brain` von lucide).
+- Hub-Card auf `/hubs/analyze` (falls vorhanden) mit gleicher Bento-Tile-Optik wie Video-Studios.
 
-### 2. One-Shot Backfill
+---
 
-In derselben Migration: für jeden User mit Überlauf einmalig `enforce_user_video_library_limits()` ausführen, sodass sofort `≤ 500 Videos` und `≤ 10 GB` gilt.
+## 3. Seiten-Layout (Tabs)
 
-### 3. Storage-Bucket-Cleanup
+```text
+[ AI Text Studio ]                        Wallet: 12.40€  •  Modell: Gemini 3.1 Pro
+─────────────────────────────────────────────────────────────────────
+| Chat | Compare | Personas | History |
+─────────────────────────────────────────────────────────────────────
+```
 
-Beim Löschen einer `video_creations`-Row mit interner Storage-URL (`director-cut-renders`, `motion-studio-clips`, `talking-head-renders` …) auch das zugehörige Storage-Objekt entfernen — über eine `BEFORE DELETE`-Trigger-Funktion, die `storage.objects` per RPC bereinigt (best-effort, ignoriert Fehler).
+### Tab 1 – Chat (MVP)
+- Chat-Verlauf mit Markdown-Renderer (`react-markdown` + `remark-gfm`, bereits im Projekt vorhanden).
+- Eingabefeld unten, Streaming-Antworten Token-für-Token.
+- Top-Bar: Modell-Dropdown, Reasoning-Effort-Slider (nur GPT-5.5 Pro: minimal/low/medium/high/xhigh), System-Prompt-Picker (aus Personas).
+- Live-Cost-Estimator: zeigt geschätzte Kosten basierend auf Input-Tokens.
+- Buttons: „Neue Konversation", „Export (Markdown)", „Kopieren".
 
-### 4. Realtime-Sync Frontend
+### Tab 2 – Compare (Killer-Feature)
+- Eingabefeld oben, darunter 3 Spalten (eine pro Modell).
+- „Run on all 3" → parallele Streaming-Antworten.
+- Pro Spalte: Latenz, Kosten, Token-Count, Bewertungs-Buttons (👍/👎) → speichert in `text_studio_comparisons`.
 
-`MediaLibrary.tsx` lauscht bereits auf `video_creations DELETE` — zusätzlich auch auf `content_items DELETE` und `media_assets DELETE` subscriben, damit das UI sofort auf den neuen Stand aktualisiert.
+### Tab 3 – Personas
+- Vordefinierte System-Prompts: Strategy Analyst, Copywriter, Senior Coder, Researcher, Brand Voice Editor, Translator (DE/EN/ES), Social Media Strategist.
+- User kann eigene Personas anlegen (gespeichert in `text_studio_personas`).
 
-### 5. Demo-Video aus Zählung ausnehmen
+### Tab 4 – History
+- Liste aller Konversationen, suchbar, mit Modell-Badge & Datum.
+- Klick öffnet Chat im Read/Continue-Modus.
 
-Der "Demo Video"-Platzhalter wird aktuell mitgezählt (zeigt 1 extra wenn der User unter 500 ist). Im Counter (`videoCount`) Demo-IDs explizit ausfiltern, damit `500 / 500` exakt stimmt.
+---
 
-## Technische Details
+## 4. Datenbank (Migration)
 
-**Neue Migration:** `supabase/migrations/<timestamp>_enforce_global_video_limits.sql`
-- Funktion `enforce_user_video_library_limits`
-- 3 Trigger (`video_creations`, `content_items`, `media_assets`)
-- `BEFORE DELETE` Trigger für Storage-Cleanup auf `video_creations`
-- DO-Block für Backfill aller Über-Limit-User
+```sql
+-- Konversationen
+create table public.text_studio_conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text not null default 'Neue Konversation',
+  model text not null,
+  persona_id uuid references public.text_studio_personas(id) on delete set null,
+  total_input_tokens int not null default 0,
+  total_output_tokens int not null default 0,
+  total_cost_eur numeric(10,4) not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
-**Frontend:** `src/pages/MediaLibrary.tsx`
-- Realtime-Subscriptions für `content_items` und `media_assets` `DELETE` Events
-- `videoCount` filtert `isDemoVideo()` raus
+-- Nachrichten
+create table public.text_studio_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.text_studio_conversations(id) on delete cascade,
+  user_id uuid not null,
+  role text not null check (role in ('system','user','assistant')),
+  content text not null,
+  model text,
+  input_tokens int,
+  output_tokens int,
+  cost_eur numeric(10,4),
+  reasoning_effort text,
+  created_at timestamptz not null default now()
+);
 
-Keine API-Breaking-Changes; alle KI-Studios und Renderer profitieren automatisch.
+-- Personas (system prompts)
+create table public.text_studio_personas (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade, -- null = system preset
+  name text not null,
+  description text,
+  system_prompt text not null,
+  is_system_preset boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Compare runs
+create table public.text_studio_comparisons (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null,
+  prompt text not null,
+  results jsonb not null, -- { model: { content, latency_ms, tokens, cost, rating } }
+  created_at timestamptz not null default now()
+);
+
+-- RLS auf allen 4 Tabellen: user_id = auth.uid()
+-- Personas zusätzlich: SELECT auch wenn is_system_preset = true
+```
+
+System-Personas werden per Seed-Insert (Insert-Tool) eingespielt.
+
+---
+
+## 5. Edge Functions
+
+### `text-studio-chat` (Streaming)
+- Input: `{ conversationId, messages, model, reasoningEffort?, systemPrompt? }`
+- Validiert JWT, prüft Wallet-Balance (≥ geschätzte Cost).
+- Router:
+  - `openai-gpt-5-5-pro` / `google-gemini-3-1-pro` → Lovable AI Gateway (OpenAI-kompatibles SSE).
+  - `anthropic-claude-4-1-opus` → Anthropic API `messages?stream=true`, SSE-Format wird in OpenAI-kompatibles Delta-Format umgewandelt, damit der Client einheitlich parsen kann.
+- Streamt Tokens an Client.
+- `EdgeRuntime.waitUntil(...)` speichert nach Abschluss: User-Message + Assistant-Message + Token-Counts + Cost in DB, dekrementiert Wallet.
+- Fehler-Handling: 402 → „Wallet leer", 429 → „Rate Limit", 500 → idempotenter Refund (kein Spend).
+
+### `text-studio-compare`
+- Input: `{ prompt, systemPrompt? }`
+- Ruft alle 3 Modelle **parallel** (kein Streaming, einfacher Sammelmodus).
+- Returnt JSON `{ results: { model: { content, latency, tokens, cost } } }`.
+- Speichert Run in `text_studio_comparisons`.
+
+### `text-studio-rate-comparison`
+- Input: `{ comparisonId, model, rating }` → updated `results` jsonb.
+
+Alle 3 Functions im `supabase/config.toml` mit `verify_jwt = false` (manuelle JWT-Validierung im Code, Standard-Pattern im Projekt).
+
+---
+
+## 6. Secrets & Setup
+
+- `LOVABLE_API_KEY` – bereits vorhanden (für Gateway).
+- **`ANTHROPIC_API_KEY`** – muss vom User per `add_secret` hinzugefügt werden. Anleitung: `https://console.anthropic.com` → API Keys → Create Key.
+- Falls Key fehlt: Claude-Option im UI greyed-out mit Tooltip „Anthropic API-Key in Settings hinzufügen".
+
+---
+
+## 7. Cost-Modell für End-User
+
+Wallet-Abrechnung in EUR mit **30 % Marge** auf Provider-Kosten (analog zu HappyHorse-Pattern):
+
+| Modell | Endkunden-Preis pro 1k In/Out Tokens |
+|---|---|
+| Gemini 3.1 Pro | €0.0016 / €0.013 |
+| GPT-5.5 Pro | €0.0195 / €0.0975 |
+| Claude 4.1 Opus | €0.0195 / €0.0975 |
+
+UI zeigt geschätzten Preis live an, bevor User „Senden" drückt.
+
+---
+
+## 8. Frontend-Struktur
+
+```text
+src/pages/AITextStudio.tsx                 # Tab-Wrapper
+src/components/text-studio/
+├── ModelSelector.tsx                      # Dropdown mit Badges
+├── ReasoningEffortSlider.tsx              # Nur sichtbar bei GPT-5.5 Pro
+├── ChatView.tsx                           # Streaming Chat
+├── MessageBubble.tsx                      # Markdown render
+├── CompareView.tsx                        # 3-Spalten parallel
+├── PersonaPicker.tsx
+├── PersonaEditor.tsx
+├── ConversationHistory.tsx
+├── CostEstimator.tsx
+└── WalletGuard.tsx
+src/hooks/
+├── useTextStudioChat.ts                   # Streaming-Hook
+├── useTextStudioCompare.ts
+└── useTextStudioConversations.ts
+src/lib/text-studio/
+├── models.ts                              # 3-Modell-Registry mit Pricing
+└── pricing.ts                             # Token→EUR-Berechnung
+```
+
+---
+
+## 9. Lokalisierung
+
+Alle UI-Strings in DE/EN/ES (Core-Memory-Regel). System-Personas in 3 Sprachen. **Prompts/Inhalte selbst** werden in der UI-Sprache des Users generiert (analog Universal Content Creator Localization Policy).
+
+---
+
+## 10. Compliance & Sicherheit
+
+- Footer-Disclaimer „Powered by OpenAI, Google & Anthropic" (analog AI Video Hub Compliance).
+- Streaming-Antworten dürfen nicht gespeichert werden, falls User „Privater Modus" aktiviert (Toggle in Top-Bar) – dann kein DB-Write der Inhalte, nur Token-Counts für Billing.
+- RLS strikt user-scoped. System-Personas read-only.
+
+---
+
+## 11. Implementierungs-Reihenfolge
+
+1. **DB-Migration** (4 Tabellen + RLS + Seed Personas via Insert).
+2. **Models Registry** (`src/lib/text-studio/models.ts`) + Pricing.
+3. **Edge Function `text-studio-chat`** mit Gateway-Routing (ohne Anthropic).
+4. **MVP-UI**: AITextStudio-Page mit ChatView + ModelSelector + History.
+5. **Sidebar/Routing-Eintrag** unter Analyze.
+6. **Anthropic-Integration**: Secret-Request, Provider-Branch in Edge Function, UI-Greyout-Logik.
+7. **Compare-Tab** + `text-studio-compare` Edge Function.
+8. **Personas-Tab** mit CRUD + System-Personas-Seed.
+9. **Cost-Estimator + Wallet-Guard**.
+10. **Privater Modus, Export-Buttons, Lokalisierung-Pass DE/EN/ES**.
+11. **Memory-Eintrag** für AI Text Studio Architecture.
+
+---
+
+## 12. Out of Scope (Phase 2)
+
+- File/Image-Upload für multimodale Anfragen
+- Voice-Input (Whisper)
+- Tool-Use / Web-Search innerhalb des Chats
+- Team-Sharing von Konversationen
+- A/B-Auto-Routing („wähle automatisch das beste Modell")
+
+---
+
+**Bevor wir starten:**
+- Ich beginne mit Phase 1–5 (MVP mit Gemini & GPT-5.5 Pro, ohne Claude). Sobald die UI steht, frage ich dich nach dem **Anthropic API-Key** und schalte Claude scharf.
+- Sag Bescheid, ob du das so freigibst, oder ob du noch Anpassungen am Scope/Naming/Tab-Struktur möchtest.
