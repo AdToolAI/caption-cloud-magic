@@ -1,44 +1,39 @@
-## Problem
+## Ziel
 
-Auf dem Dashboard erscheinen zwei vertikale Scrollbars direkt nebeneinander am rechten Rand (siehe Screenshots).
+Den Hero-Block (Sith Command Deck — Floating Header, Laptop, Holo Pills) optisch **schärfer und definierter** machen, ohne den Look zu verändern. Aktuell wirken die Goldränder leicht weich/verwaschen.
 
-## Ursache
+## Was schärfer wird
 
-In `src/index.css` (Zeile 181–186) ist aktuell:
+### 1. `LaptopFrame3D.tsx` — Laptop-Bezel & Außenkante
 
-```css
-html, body {
-  overflow-x: hidden;
-  max-width: 100vw;
-}
-```
+- Outer Carbon Shell bekommt eine **Triple-Ring Border** (1px Gold solid → 1px schwarz → 1px Gold soft) statt nur einer 18 %-Goldlinie. Dadurch wird die Außenkante deutlich definierter.
+- Inneres Bezel: Inset-Border von 0.25 → 0.65 Opazität, plus zusätzliche 1px schwarze Trennlinie nach innen für klare „Display sitzt im Rahmen"-Wirkung.
+- Top-Hairline: Von `via-primary/50` mit `inset-x-8` auf `via-primary` mit `inset-x-4` und `opacity-90` → kräftigere, längere Goldlinie oben am Deckel.
+- Camera-Notch Ring: `ring-primary/20` → `ring-primary/40`.
+- Keyboard-Base bottom hairline: `via-primary/20` → `via-primary/45`.
 
-`overflow-x: hidden` auf **beiden** (html *und* body) setzt für `body` automatisch auch `overflow-y: auto` (CSS-Spezifikation: wenn eine Achse `hidden`/`scroll` ist, wird die andere zu `auto`). Dadurch wird `body` selbst zum Scroll-Container — zusätzlich zum `html`-Scroll-Container. Ergebnis: **zwei Scrollbars**.
+### 2. `FloatingAppHeader.tsx` — Schwebender App-Header
 
-Das war ursprünglich nötig, damit der E2E-Test `tests/mobile-responsive.spec.ts` (kein horizontaler Scroll auf 375px) grün bleibt.
+- Border von 0.35 auf **0.6 Opazität** + zusätzliche 1px schwarze Inset-Trennlinie, damit die Pille kantiger im Raum sitzt.
+- Innerer Trenn-Strich (`bg-primary/20`) → `bg-primary/45` (deutlichere Sektionstrennung).
+- Plan-Badge Border `border-primary/40` → `border-primary/70` und +0.5px feinere Innenkontur.
+- Hairline darunter: `via-primary/30` → `via-primary/60`.
 
-## Fix
+### 3. `HoloDataPills.tsx` — Stat-Pills (+43 %, 19:00, 2.4M)
 
-In `src/index.css` `overflow-x: hidden` durch `overflow-x: clip` ersetzen — und nur auf `html` anwenden, nicht zusätzlich auf `body`. `overflow-x: clip` verhindert horizontalen Overflow ohne einen neuen Scroll-Container zu erzeugen, also entsteht auch keine zweite Scrollbar.
-
-```css
-html {
-  overflow-x: clip;
-  max-width: 100vw;
-}
-body {
-  /* keine overflow-Regel — nur das html-Element scrollt */
-}
-```
-
-`overflow-x: clip` wird von allen modernen Browsern (Chrome ≥90, Safari ≥16, Firefox ≥81) unterstützt und ist hier der korrekte Mechanismus, um horizontalen Overflow von dekorativen Blur-Orbs / Hero-Transforms abzuschneiden, ohne einen Scroll-Kontext zu erzeugen.
-
-## Geänderte Datei
-
-- `src/index.css` (nur die `html, body { … }`-Regel im `@layer base`)
+- Gold-Pills Border-Opacity 0.4 → **0.65**, Rote Pille 0.55 → **0.8**.
+- Doppelte Border via zweiter Box-Shadow-Layer (1px Gold/Rot solid + 1px schwarz innen) für „etched"-Wirkung.
+- Top-Hairline Opazität 0.7 → 0.9.
+- Icon- und Wert-Farben bleiben gleich (Brand-Gold/Rot).
 
 ## Was sich nicht ändert
 
-- Sidebar, Header, NewsTicker, Pinned Chat: unverändert.
-- Mobile-Responsive-Test: bleibt grün, da `clip` ebenfalls horizontalen Overflow verhindert.
-- Vertikales Scrolling der Seite: funktioniert weiter wie gewohnt — nur eben mit nur **einer** Scrollbar.
+- Layout, Tilt-Animation, Größen, Texte, Fonts, Animations-Timing.
+- Farbpalette: weiterhin nur `hsl(var(--primary))` Gold, `hsl(355 …)` Rot, schwarzer Carbon.
+- Lightsaber-Slit & Floor-Reflection: bleiben unverändert.
+
+## Geänderte Dateien
+
+- `src/components/landing/LaptopFrame3D.tsx`
+- `src/components/landing/FloatingAppHeader.tsx`
+- `src/components/landing/HoloDataPills.tsx`

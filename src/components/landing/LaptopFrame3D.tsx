@@ -27,15 +27,17 @@ export const LaptopFrame3D = ({ children }: LaptopFrame3DProps) => {
           style={{
             borderRadius: "10px 10px 4px 4px",
             boxShadow: `
-              0 0 0 1px hsla(43, 90%, 68%, 0.18),
-              0 30px 60px -20px rgba(0, 0, 0, 0.9),
-              0 50px 100px -30px hsla(355, 75%, 35%, 0.22),
-              inset 0 1px 0 hsla(43, 90%, 68%, 0.08)
+              0 0 0 1px hsla(43, 90%, 68%, 0.6),
+              0 0 0 2px rgba(0, 0, 0, 0.95),
+              0 0 0 3px hsla(43, 90%, 68%, 0.18),
+              0 30px 60px -20px rgba(0, 0, 0, 0.95),
+              0 50px 100px -30px hsla(355, 75%, 35%, 0.28),
+              inset 0 1px 0 hsla(43, 90%, 68%, 0.22)
             `,
           }}
         >
-          {/* Top gold hairline */}
-          <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+          {/* Top gold hairline — sharper, fuller bleed */}
+          <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent opacity-90" />
 
           {/* Screen bezel (inner) */}
           <div
@@ -43,13 +45,14 @@ export const LaptopFrame3D = ({ children }: LaptopFrame3DProps) => {
             style={{
               borderRadius: "4px",
               boxShadow: `
-                inset 0 0 0 1px hsla(43, 90%, 68%, 0.25),
+                inset 0 0 0 1px hsla(43, 90%, 68%, 0.65),
+                inset 0 0 0 2px rgba(0, 0, 0, 0.95),
                 inset 0 0 30px rgba(0, 0, 0, 0.95)
               `,
             }}
           >
             {/* Camera notch */}
-            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 w-1 h-1 rounded-full bg-neutral-900 ring-1 ring-primary/20" />
+            <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-10 w-1 h-1 rounded-full bg-neutral-900 ring-1 ring-primary/40" />
 
             {/* 16:9 video slot */}
             <div className="relative w-full" style={{ aspectRatio: "16 / 9" }}>
