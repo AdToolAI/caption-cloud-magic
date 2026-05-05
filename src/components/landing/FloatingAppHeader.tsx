@@ -53,7 +53,7 @@ export const FloatingAppHeader = () => {
         <div className="w-px h-4 bg-primary/45" />
 
         {/* Plan badge */}
-        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary border border-primary/40 px-1.5 py-0.5">
+        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary border border-primary/70 px-1.5 py-0.5">
           {t("landing.hero.deck.headerPlan")}
         </span>
 
