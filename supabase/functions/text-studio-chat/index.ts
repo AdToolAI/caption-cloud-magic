@@ -65,6 +65,9 @@ Deno.serve(async (req) => {
       systemPrompt,
       personaId,
       isPrivate,
+      parentConversationId,
+      branchedFromMessageId,
+      branchLabel,
     } = body as {
       conversationId?: string;
       messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
@@ -73,6 +76,9 @@ Deno.serve(async (req) => {
       systemPrompt?: string;
       personaId?: string;
       isPrivate?: boolean;
+      parentConversationId?: string;
+      branchedFromMessageId?: string;
+      branchLabel?: string;
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
