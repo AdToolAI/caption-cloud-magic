@@ -201,10 +201,17 @@ export const DashboardVideoCarousel = ({
     setSelectedIndex(emblaApi.selectedScrollSnap());
   }, [emblaApi]);
 
-  // Auto-play active video, pause others
+  // Auto-play active video, pause others. While the preview dialog is open,
+  // pause ALL carousel videos so we never get double audio playback.
   useEffect(() => {
+    const dialogOpen = !!selectedVideo;
     videoRefs.current.forEach((el, i) => {
       if (!el) return;
+      if (dialogOpen) {
+        el.pause();
+        el.muted = true;
+        return;
+      }
       if (i === selectedIndex) {
         el.muted = isMuted;
         if (el.readyState === 0) el.load();
@@ -220,7 +227,7 @@ export const DashboardVideoCarousel = ({
         el.currentTime = 0;
       }
     });
-  }, [selectedIndex, isMuted]);
+  }, [selectedIndex, isMuted, selectedVideo]);
 
   useEffect(() => {
     if (!emblaApi) return;
