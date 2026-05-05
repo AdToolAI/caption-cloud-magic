@@ -1,32 +1,57 @@
-Ich habe die Ursache gefunden: Die 500er-Regel läuft aktuell nur beim manuellen Upload in der Mediathek. KI-/Render-Videos aus `video_creations` werden von vielen Generatoren direkt im Backend gespeichert und umgehen diese Client-Logik komplett. Deshalb stehen bei dir jetzt 545/500 Videos. Zusätzlich blockiert die aktuelle Upload-Logik bei verbundener Cloud eher, statt wirklich konsequent das älteste lokale Video zu löschen.
+## Problem
 
-Plan zur Reparatur:
+Aktuell zeigt die Mediathek `512 / 500` Videos und `10.06 / 10 GB`. Ursachen:
 
-1. Zentrale Backend-Cleanup-Regel einführen
-   - Eine Datenbankfunktion erstellt die verbindliche Regel: Pro Nutzer dürfen maximal 500 abgeschlossene Mediathek-Videos sichtbar bleiben.
-   - Sobald mehr als 500 vorhanden sind, werden genau die ältesten Videos gelöscht: `ORDER BY created_at ASC, id ASC`.
-   - Demo-/geschützte Einträge bleiben ausgenommen.
+1. Der neue DB-Trigger zählt **nur `video_creations`** (jetzt korrekt auf 500 begrenzt: 500/500 für den betroffenen User).
+2. Zusätzlich liegen **31 Video-Einträge in `content_items`** (Universal Creator / Kampagnen), die im UI on-top gezählt werden → 500 + 31 + 1 Demo = 512.
+3. Für die **10 GB Speichergrenze gibt es überhaupt keinen Server-Enforcer** – die Schätzung im Frontend kann beliebig überlaufen.
+4. Manuelle Uploads werden über `enforceLimits` blockiert, aber **AI-/Render-Pipelines schreiben ungebremst** in `video_creations` und `content_items`.
 
-2. KI- und Render-Videos automatisch abfangen
-   - Einen Trigger auf abgeschlossene Video-Einträge setzen, damit auch Motion Studio, Director’s Cut, Universal Creator und AI Video Toolkit nach jedem neuen Video automatisch bereinigt werden.
-   - Damit ist die Regel nicht mehr davon abhängig, ob ein bestimmter Generator die Cleanup-Funktion manuell aufruft.
+## Ziel
 
-3. Bestehenden Überhang bereinigen
-   - Einmalig die aktuell überzähligen Videos des betroffenen Nutzers bereinigen, sodass aus 545/500 wieder 500/500 wird.
-   - Es werden die ältesten Einträge entfernt, nicht die neuesten.
+Es darf **nie** möglich sein, mehr als 500 Videos oder mehr als 10 GB zu haben — egal aus welcher Quelle (Upload, KI-Studios, Renderer, Composer, Universal Creator, Director's Cut, Kampagnen).
 
-4. Mediathek-Frontend korrigieren
-   - Die Client-Cleanup-Logik bleibt für manuelle Uploads erhalten, wird aber so angepasst, dass sie konsistent mit der Backend-Regel ist.
-   - Nach Upload/Import/Realtime-Update wird die Mediathek erneut geladen, damit der Zähler sofort korrekt ist.
-   - Die Warnung „Limit erreicht“ bleibt sichtbar bei 500/500, aber nicht mehr dauerhaft bei 545/500.
+## Plan
 
-5. Optionales Storage-Aufräumen best-effort
-   - Wo Speicherpfade eindeutig erkennbar sind, wird beim Löschen auch das zugehörige Storage-Objekt entfernt.
-   - Für externe/alte URLs ohne internen Speicherpfad wird mindestens der Datenbankeintrag entfernt, damit die Mediathek und das Limit korrekt bleiben.
+### 1. DB-Trigger erweitern (neue Migration)
 
-Technische Details:
-- Primär betroffen: `src/pages/MediaLibrary.tsx`, `src/lib/media-library/autoCleanup.ts` und eine neue Datenbankmigration.
-- Die eigentliche Ursache liegt darin, dass `handleUpload()` `enforceLimits()` nutzt, aber neue KI-Videos direkt in `video_creations` landen.
-- Die neue Server-Regel stellt sicher, dass alle zukünftigen Generatoren automatisch unter das Limit fallen, auch wenn später weitere Video-Funktionen hinzukommen.
+Eine neue Funktion `enforce_user_video_library_limits(_user_id, max_videos=500, max_storage_mb=10240)` führt **nach jedem relevanten Insert/Update**:
 
-Nach Freigabe implementiere ich das und prüfe anschließend per Datenbankabfrage, dass der betroffene Account nicht mehr über 500 Videos liegt.
+- **Video-Cap (500 total):** Zählt `video_creations(status='completed')` **+** `content_items(type='video')` (über Workspace-Mitgliedschaft) zusammen. Löscht überschüssige Einträge nach `created_at ASC` — älteste zuerst, quellenübergreifend.
+- **Storage-Cap (10 GB):** Summiert `media_assets.size_bytes` + `content_items.file_size_mb` + geschätzte 20 MB pro `video_creations`-Row ohne Größe. Löscht älteste Einträge bis unter 10 GB.
+- Idempotent + `SECURITY DEFINER` + `search_path=public`.
+
+Trigger jeweils `AFTER INSERT OR UPDATE` auf:
+- `video_creations` (ersetzt bestehenden Trigger)
+- `content_items` (neu, nur wenn `type='video'`)
+- `media_assets` (neu, für Uploads)
+
+### 2. One-Shot Backfill
+
+In derselben Migration: für jeden User mit Überlauf einmalig `enforce_user_video_library_limits()` ausführen, sodass sofort `≤ 500 Videos` und `≤ 10 GB` gilt.
+
+### 3. Storage-Bucket-Cleanup
+
+Beim Löschen einer `video_creations`-Row mit interner Storage-URL (`director-cut-renders`, `motion-studio-clips`, `talking-head-renders` …) auch das zugehörige Storage-Objekt entfernen — über eine `BEFORE DELETE`-Trigger-Funktion, die `storage.objects` per RPC bereinigt (best-effort, ignoriert Fehler).
+
+### 4. Realtime-Sync Frontend
+
+`MediaLibrary.tsx` lauscht bereits auf `video_creations DELETE` — zusätzlich auch auf `content_items DELETE` und `media_assets DELETE` subscriben, damit das UI sofort auf den neuen Stand aktualisiert.
+
+### 5. Demo-Video aus Zählung ausnehmen
+
+Der "Demo Video"-Platzhalter wird aktuell mitgezählt (zeigt 1 extra wenn der User unter 500 ist). Im Counter (`videoCount`) Demo-IDs explizit ausfiltern, damit `500 / 500` exakt stimmt.
+
+## Technische Details
+
+**Neue Migration:** `supabase/migrations/<timestamp>_enforce_global_video_limits.sql`
+- Funktion `enforce_user_video_library_limits`
+- 3 Trigger (`video_creations`, `content_items`, `media_assets`)
+- `BEFORE DELETE` Trigger für Storage-Cleanup auf `video_creations`
+- DO-Block für Backfill aller Über-Limit-User
+
+**Frontend:** `src/pages/MediaLibrary.tsx`
+- Realtime-Subscriptions für `content_items` und `media_assets` `DELETE` Events
+- `videoCount` filtert `isDemoVideo()` raus
+
+Keine API-Breaking-Changes; alle KI-Studios und Renderer profitieren automatisch.

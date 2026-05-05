@@ -15551,6 +15551,14 @@ export type Database = {
           success: boolean
         }[]
       }
+      enforce_user_video_library_limits: {
+        Args: {
+          _max_storage_mb?: number
+          _max_videos?: number
+          _user_id: string
+        }
+        Returns: undefined
+      }
       enforce_video_creations_limit_for_user: {
         Args: { _max_videos?: number; _user_id: string }
         Returns: number
