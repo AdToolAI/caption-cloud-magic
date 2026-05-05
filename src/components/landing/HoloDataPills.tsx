@@ -44,8 +44,8 @@ const Pill = ({ icon: Icon, value, label, accent = "gold", delay = "0s" }: PillP
         className="absolute inset-x-2 top-0 h-px"
         style={{
           background: isRed
-            ? "linear-gradient(90deg, transparent, hsla(355, 75%, 58%, 0.7), transparent)"
-            : "linear-gradient(90deg, transparent, hsla(43, 90%, 68%, 0.7), transparent)",
+            ? "linear-gradient(90deg, transparent, hsla(355, 75%, 58%, 0.9), transparent)"
+            : "linear-gradient(90deg, transparent, hsla(43, 90%, 68%, 0.9), transparent)",
         }}
       />
     </div>
