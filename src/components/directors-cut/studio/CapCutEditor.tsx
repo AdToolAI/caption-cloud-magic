@@ -97,7 +97,7 @@ interface CapCutEditorProps {
   /** AI-detected cut markers from the scene-detection pipeline. */
   initialAiCutMarkers?: Array<{ time: number; confidence?: number; source?: 'auto' | 'manual' }>;
   /** When set, scenes were deterministically imported from a Composer render — disables Auto-Cut UI. */
-  composerLockSource?: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+  composerLockSource?: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
   composerLockSceneCount?: number;
 }
 
