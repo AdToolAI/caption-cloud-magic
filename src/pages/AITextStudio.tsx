@@ -507,6 +507,35 @@ export default function AITextStudio() {
           ))}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={!!branchPrompt} onOpenChange={(o) => !o && setBranchPrompt(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Mit {branchPrompt ? TEXT_MODELS[branchPrompt.targetModel].label : ""} fortfahren?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Beim Modellwechsel mitten im Chat können Provider-Fehler auftreten, weil jedes
+              Modell ein eigenes Format erwartet. Stattdessen erstellen wir einen neuen
+              <strong> Branch</strong> in dieser Konversation. Beide Verläufe bleiben sichtbar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <Button
+              variant="outline"
+              onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, false)}
+            >
+              Sauberer Start
+            </Button>
+            <AlertDialogAction
+              onClick={() => branchPrompt && createBranch(branchPrompt.targetModel, true)}
+            >
+              Mit Kontext übernehmen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
