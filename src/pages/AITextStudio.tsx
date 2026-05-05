@@ -94,10 +94,10 @@ export default function AITextStudio() {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Resume pinned/url conversation on mount
+  // Resume pinned/url/last conversation on mount
   useEffect(() => {
     const urlConv = searchParams.get("conversation");
-    const target = urlConv || pinned?.conversationId;
+    const target = urlConv || pinned?.conversationId || readLastConv();
     if (target && target !== conversationId) {
       void loadConversation(target);
       if (urlConv) {
