@@ -81,6 +81,23 @@ export default function AITextStudio() {
   // Branch confirmation dialog state
   const [branchPrompt, setBranchPrompt] = useState<{ targetModel: TextModelId } | null>(null);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Resume pinned/url conversation on mount
+  useEffect(() => {
+    const urlConv = searchParams.get("conversation");
+    const target = urlConv || pinned?.conversationId;
+    if (target && target !== conversationId) {
+      void loadConversation(target);
+      if (urlConv) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("conversation");
+        setSearchParams(next, { replace: true });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     void supabase
