@@ -182,6 +182,20 @@ export default function MediaLibrary() {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'video_creations',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          // Triggered when the 500-video auto-cleanup removes oldest entries.
+          console.log('🧹 Video aus Mediathek entfernt (Auto-Cleanup):', payload);
+          loadMedia();
+        }
+      )
       .subscribe();
 
     return () => {

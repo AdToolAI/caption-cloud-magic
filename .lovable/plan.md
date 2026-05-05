@@ -1,27 +1,32 @@
-## Problem
+Ich habe die Ursache gefunden: Die 500er-Regel läuft aktuell nur beim manuellen Upload in der Mediathek. KI-/Render-Videos aus `video_creations` werden von vielen Generatoren direkt im Backend gespeichert und umgehen diese Client-Logik komplett. Deshalb stehen bei dir jetzt 545/500 Videos. Zusätzlich blockiert die aktuelle Upload-Logik bei verbundener Cloud eher, statt wirklich konsequent das älteste lokale Video zu löschen.
 
-Auf dem Dashboard läuft das Hintergrund-Karussell-Video (`DashboardVideoCarousel`) weiter, wenn man es **unmuted** und dann auf die Karte / Expand-Button klickt. Das öffnet den `VideoPreviewPlayer`-Dialog, der dasselbe Video erneut mit `autoPlay` startet — Ergebnis: zwei parallele Audio-Spuren.
+Plan zur Reparatur:
 
-Der Demo-Video-Pfad (Zeilen 386–393, 428–433) pausiert die Demo bereits korrekt vor dem Öffnen und spielt sie nach dem Schließen weiter. Für die echten User-Videos (Pfad ab Zeile 444 / `handleCardClick`) fehlt diese Logik komplett.
+1. Zentrale Backend-Cleanup-Regel einführen
+   - Eine Datenbankfunktion erstellt die verbindliche Regel: Pro Nutzer dürfen maximal 500 abgeschlossene Mediathek-Videos sichtbar bleiben.
+   - Sobald mehr als 500 vorhanden sind, werden genau die ältesten Videos gelöscht: `ORDER BY created_at ASC, id ASC`.
+   - Demo-/geschützte Einträge bleiben ausgenommen.
 
-## Lösung
+2. KI- und Render-Videos automatisch abfangen
+   - Einen Trigger auf abgeschlossene Video-Einträge setzen, damit auch Motion Studio, Director’s Cut, Universal Creator und AI Video Toolkit nach jedem neuen Video automatisch bereinigt werden.
+   - Damit ist die Regel nicht mehr davon abhängig, ob ein bestimmter Generator die Cleanup-Funktion manuell aufruft.
 
-In `src/components/dashboard/DashboardVideoCarousel.tsx`:
+3. Bestehenden Überhang bereinigen
+   - Einmalig die aktuell überzähligen Videos des betroffenen Nutzers bereinigen, sodass aus 545/500 wieder 500/500 wird.
+   - Es werden die ältesten Einträge entfernt, nicht die neuesten.
 
-1. **`handleCardClick`** so erweitern, dass beim Öffnen des Dialogs **alle** `videoRefs` pausiert werden (nicht nur die aktive — defensiv) und das aktive Video stumm gestellt wird, bevor `setSelectedVideo(...)` gefeuert wird.
-2. **Dialog-Close-Handler** für den nicht-Demo-Pfad ergänzen (analog zum Demo-Pfad): nach dem Schließen das Karussell-Video an `selectedIndex` mit dem aktuellen `isMuted`-Zustand wieder anwerfen.
-3. **`toggleMute`** absichern: wenn der Dialog offen ist, soll das Mute-Toggle des Karussells den im Hintergrund laufenden Audio-Stream nicht „aufdecken“ — wir lassen das Karussell-Video während eines offenen Dialogs immer pausiert/muted.
+4. Mediathek-Frontend korrigieren
+   - Die Client-Cleanup-Logik bleibt für manuelle Uploads erhalten, wird aber so angepasst, dass sie konsistent mit der Backend-Regel ist.
+   - Nach Upload/Import/Realtime-Update wird die Mediathek erneut geladen, damit der Zähler sofort korrekt ist.
+   - Die Warnung „Limit erreicht“ bleibt sichtbar bei 500/500, aber nicht mehr dauerhaft bei 545/500.
 
-Optional als kleine Härtung: ein einziger `useEffect`, der auf `selectedVideo !== null` reagiert und in dem Fall **alle** Refs pausiert — dann brauchen wir keine Inline-Pause-Calls mehr verstreut.
+5. Optionales Storage-Aufräumen best-effort
+   - Wo Speicherpfade eindeutig erkennbar sind, wird beim Löschen auch das zugehörige Storage-Objekt entfernt.
+   - Für externe/alte URLs ohne internen Speicherpfad wird mindestens der Datenbankeintrag entfernt, damit die Mediathek und das Limit korrekt bleiben.
 
-## Geänderte Datei
+Technische Details:
+- Primär betroffen: `src/pages/MediaLibrary.tsx`, `src/lib/media-library/autoCleanup.ts` und eine neue Datenbankmigration.
+- Die eigentliche Ursache liegt darin, dass `handleUpload()` `enforceLimits()` nutzt, aber neue KI-Videos direkt in `video_creations` landen.
+- Die neue Server-Regel stellt sicher, dass alle zukünftigen Generatoren automatisch unter das Limit fallen, auch wenn später weitere Video-Funktionen hinzukommen.
 
-- `src/components/dashboard/DashboardVideoCarousel.tsx`
-
-Keine Backend-Änderungen, keine neuen Dependencies.
-
-## Akzeptanzkriterien
-
-- Karussell-Video unmuten → auf die Karte oder den Expand-Button klicken → der Dialog öffnet sich, das Karussell-Video pausiert sofort, **nur** der Dialog-Player ist hörbar.
-- Dialog schließen → Karussell-Video läuft an der ursprünglichen Position weiter, Mute-Zustand bleibt erhalten.
-- Demo-Pfad funktioniert weiterhin wie bisher.
+Nach Freigabe implementiere ich das und prüfe anschließend per Datenbankabfrage, dass der betroffene Account nicht mehr über 500 Videos liegt.

@@ -15551,6 +15551,10 @@ export type Database = {
           success: boolean
         }[]
       }
+      enforce_video_creations_limit_for_user: {
+        Args: { _max_videos?: number; _user_id: string }
+        Returns: number
+      }
       get_ai_superuser_id: { Args: never; Returns: string }
       get_conversion_funnel: { Args: { days?: number }; Returns: Json }
       get_template_performance_summary: {
