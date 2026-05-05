@@ -13213,6 +13213,169 @@ export type Database = {
         }
         Relationships: []
       }
+      text_studio_comparisons: {
+        Row: {
+          created_at: string
+          id: string
+          prompt: string
+          results: Json
+          system_prompt: string | null
+          total_cost_eur: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt: string
+          results?: Json
+          system_prompt?: string | null
+          total_cost_eur?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt?: string
+          results?: Json
+          system_prompt?: string | null
+          total_cost_eur?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      text_studio_conversations: {
+        Row: {
+          created_at: string
+          id: string
+          is_private: boolean
+          model: string
+          persona_id: string | null
+          title: string
+          total_cost_eur: number
+          total_input_tokens: number
+          total_output_tokens: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_private?: boolean
+          model: string
+          persona_id?: string | null
+          title?: string
+          total_cost_eur?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_private?: boolean
+          model?: string
+          persona_id?: string | null
+          title?: string
+          total_cost_eur?: number
+          total_input_tokens?: number
+          total_output_tokens?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "text_studio_conversations_persona_id_fkey"
+            columns: ["persona_id"]
+            isOneToOne: false
+            referencedRelation: "text_studio_personas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      text_studio_messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          cost_eur: number | null
+          created_at: string
+          id: string
+          input_tokens: number | null
+          model: string | null
+          output_tokens: number | null
+          reasoning_effort: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          cost_eur?: number | null
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          reasoning_effort?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          cost_eur?: number | null
+          created_at?: string
+          id?: string
+          input_tokens?: number | null
+          model?: string | null
+          output_tokens?: number | null
+          reasoning_effort?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "text_studio_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "text_studio_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      text_studio_personas: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_system_preset: boolean
+          name: string
+          system_prompt: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system_preset?: boolean
+          name: string
+          system_prompt: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_system_preset?: boolean
+          name?: string
+          system_prompt?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tiktok_sync_logs: {
         Row: {
           error_details: Json | null
@@ -15551,6 +15714,10 @@ export type Database = {
           success: boolean
         }[]
       }
+      deduct_text_studio_credits: {
+        Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
+        Returns: number
+      }
       enforce_user_video_library_limits: {
         Args: {
           _max_storage_mb?: number
@@ -15710,6 +15877,10 @@ export type Database = {
           p_generation_id: string
           p_user_id: string
         }
+        Returns: number
+      }
+      refund_text_studio_credits: {
+        Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
         Returns: number
       }
       reset_monthly_credits: { Args: never; Returns: undefined }
