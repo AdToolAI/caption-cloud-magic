@@ -792,6 +792,9 @@ export function DirectorsCut() {
 
       const fusedSucceeded = detectedBoundaries.length > 0;
       console.log('[DirectorsCut] Fusion result:', diag, '→', fusedTimes);
+      toast.info(
+        `Detector: Adaptive ${diag.adaptiveCuts} · Content ${diag.contentCuts} · Pixel ${diag.pixelCuts} → ${diag.fusedCuts} fusioniert`
+      );
 
       const framesForAI: Array<{ time: number; image: string }> = [];
       if (timestampedFrames.length > 0) {
