@@ -186,10 +186,27 @@ export default function StoryboardTab({
   };
 
   const updateScene = (id: string, updates: Partial<ComposerScene>) => {
+    let invalidatedAiClip = false;
     onUpdateScenes(
       scenes.map((s) => {
         if (s.id !== id) return s;
-        const updated = { ...s, ...updates };
+        const updated: ComposerScene = { ...s, ...updates };
+
+        // Engine-Wechsel auf einer KI-generierten Szene → bestehenden Clip
+        // invalidieren, damit "Alle generieren" im Clips-Tab die Szene wieder
+        // aufgreift und mit dem neuen Modell rendert.
+        const sourceChanged =
+          updates.clipSource !== undefined && updates.clipSource !== s.clipSource;
+        const wasAiClip = (s.clipSource || '').startsWith('ai-');
+        const newIsAi = (updated.clipSource || '').startsWith('ai-');
+        if (sourceChanged && wasAiClip && newIsAi && s.clipStatus === 'ready') {
+          updated.clipStatus = 'pending';
+          updated.clipUrl = undefined;
+          (updated as any).replicatePredictionId = undefined;
+          (updated as any).uploadType = undefined;
+          invalidatedAiClip = true;
+        }
+
         if (updates.clipSource || updates.durationSeconds || updates.clipQuality) {
           updated.costEuros = getClipCost(
             updated.clipSource,
@@ -200,6 +217,53 @@ export default function StoryboardTab({
         return updated;
       })
     );
+    if (invalidatedAiClip) {
+      // Lazy-import to avoid pulling sonner into module init
+      import('sonner').then(({ toast }) => {
+        toast.info('Engine geändert', {
+          description: 'Szene wird mit dem neuen Modell neu generiert, sobald du auf „Alle generieren" klickst.',
+        });
+      });
+    }
+  };
+
+  /**
+   * Bulk-Action: aktuellen Engine (clipSource + clipQuality) der ersten Szene
+   * auf alle anderen KI-Szenen übertragen. Spart Klicks bei vielen Szenen.
+   * Stock- und Upload-Szenen bleiben unangetastet.
+   */
+  const applyEngineToAll = () => {
+    const first = scenes[0];
+    if (!first || !first.clipSource?.startsWith('ai-')) return;
+    let changed = 0;
+    const next = scenes.map((s, idx) => {
+      if (idx === 0) return s;
+      if (!s.clipSource?.startsWith('ai-')) return s;
+      if (s.clipSource === first.clipSource && s.clipQuality === first.clipQuality) return s;
+      changed++;
+      const updated: ComposerScene = {
+        ...s,
+        clipSource: first.clipSource,
+        clipQuality: first.clipQuality,
+      };
+      if (s.clipStatus === 'ready') {
+        updated.clipStatus = 'pending';
+        updated.clipUrl = undefined;
+        (updated as any).replicatePredictionId = undefined;
+        (updated as any).uploadType = undefined;
+      }
+      updated.costEuros = getClipCost(
+        updated.clipSource,
+        updated.clipQuality || 'standard',
+        updated.durationSeconds
+      );
+      return updated;
+    });
+    if (changed === 0) return;
+    onUpdateScenes(next);
+    import('sonner').then(({ toast }) => {
+      toast.success(`Engine auf ${changed} Szene${changed === 1 ? '' : 'n'} übertragen`);
+    });
   };
 
   const deleteScene = (id: string) => {
