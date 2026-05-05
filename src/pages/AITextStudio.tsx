@@ -413,8 +413,8 @@ export default function AITextStudio() {
               size="sm"
               variant="ghost"
               className="ml-auto h-7"
-              disabled={!conversationId}
-              title={!conversationId ? "Erst eine Nachricht senden, dann anheften" : undefined}
+              disabled={!conversationId && messages.length === 0}
+              title={!conversationId && messages.length === 0 ? "Erst eine Nachricht senden, dann anheften" : undefined}
               onClick={() => {
                 if (!conversationId) return;
                 if (pinned?.conversationId === conversationId) {

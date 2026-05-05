@@ -8,6 +8,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Expose-Headers": "X-Conversation-Id",
 };
 
 // --- Pricing (EUR per 1k tokens, end-user prices with margin) ---
