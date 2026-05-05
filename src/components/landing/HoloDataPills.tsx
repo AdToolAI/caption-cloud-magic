@@ -17,8 +17,8 @@ const Pill = ({ icon: Icon, value, label, accent = "gold", delay = "0s" }: PillP
       style={{
         borderRadius: "3px",
         boxShadow: isRed
-          ? `0 0 0 1px hsla(355, 75%, 48%, 0.55), 0 8px 24px -6px rgba(0,0,0,0.8), 0 0 24px -6px hsla(355, 75%, 48%, 0.45)`
-          : `0 0 0 1px hsla(43, 90%, 68%, 0.4), 0 8px 24px -6px rgba(0,0,0,0.8), 0 0 18px -6px hsla(43, 90%, 68%, 0.35)`,
+          ? `0 0 0 1px hsla(355, 75%, 48%, 0.8), inset 0 0 0 1px rgba(0,0,0,0.85), 0 8px 24px -6px rgba(0,0,0,0.85), 0 0 24px -6px hsla(355, 75%, 48%, 0.5)`
+          : `0 0 0 1px hsla(43, 90%, 68%, 0.65), inset 0 0 0 1px rgba(0,0,0,0.85), 0 8px 24px -6px rgba(0,0,0,0.85), 0 0 18px -6px hsla(43, 90%, 68%, 0.4)`,
         animation: `holo-float 4.5s ease-in-out infinite`,
         animationDelay: delay,
       }}
@@ -44,8 +44,8 @@ const Pill = ({ icon: Icon, value, label, accent = "gold", delay = "0s" }: PillP
         className="absolute inset-x-2 top-0 h-px"
         style={{
           background: isRed
-            ? "linear-gradient(90deg, transparent, hsla(355, 75%, 58%, 0.7), transparent)"
-            : "linear-gradient(90deg, transparent, hsla(43, 90%, 68%, 0.7), transparent)",
+            ? "linear-gradient(90deg, transparent, hsla(355, 75%, 58%, 0.9), transparent)"
+            : "linear-gradient(90deg, transparent, hsla(43, 90%, 68%, 0.9), transparent)",
         }}
       />
     </div>

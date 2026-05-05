@@ -33,9 +33,10 @@ export const FloatingAppHeader = () => {
         style={{
           borderRadius: "4px",
           boxShadow: `
-            0 0 0 1px hsla(43, 90%, 68%, 0.35),
+            0 0 0 1px hsla(43, 90%, 68%, 0.6),
+            inset 0 0 0 1px rgba(0, 0, 0, 0.85),
             0 12px 30px -8px rgba(0, 0, 0, 0.9),
-            0 0 24px -8px hsla(43, 90%, 68%, 0.25)
+            0 0 24px -8px hsla(43, 90%, 68%, 0.3)
           `,
         }}
       >
@@ -49,10 +50,10 @@ export const FloatingAppHeader = () => {
           </span>
         </div>
 
-        <div className="w-px h-4 bg-primary/20" />
+        <div className="w-px h-4 bg-primary/45" />
 
         {/* Plan badge */}
-        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary border border-primary/40 px-1.5 py-0.5">
+        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-primary border border-primary/70 px-1.5 py-0.5">
           {t("landing.hero.deck.headerPlan")}
         </span>
 
@@ -90,7 +91,7 @@ export const FloatingAppHeader = () => {
       </div>
 
       {/* Hairline shadow line below */}
-      <div className="absolute inset-x-8 -bottom-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      <div className="absolute inset-x-8 -bottom-1 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
     </div>
   );
 };
