@@ -409,7 +409,38 @@ export default function AITextStudio() {
               <Badge key={s} variant="secondary">{s}</Badge>
             ))}
             <Badge variant="outline">~{formatEUR(estCostEur)} geschätzt</Badge>
-            <Button size="sm" variant="ghost" onClick={newConversation} className="ml-auto h-7">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="ml-auto h-7"
+              disabled={!conversationId}
+              title={!conversationId ? "Erst eine Nachricht senden, dann anheften" : undefined}
+              onClick={() => {
+                if (!conversationId) return;
+                if (pinned?.conversationId === conversationId) {
+                  unpin();
+                  toast.success("Chat losgelöst");
+                } else {
+                  pin({
+                    conversationId,
+                    model,
+                    personaId,
+                    systemPrompt: selectedPersona?.system_prompt || null,
+                    reasoning,
+                    isPrivate,
+                    title: currentConv?.title,
+                  });
+                  toast.success("Chat angeheftet — sichtbar in allen Modulen");
+                }
+              }}
+            >
+              {pinned?.conversationId === conversationId ? (
+                <><PinOff className="h-3 w-3 mr-1" /> Loslösen</>
+              ) : (
+                <><Pin className="h-3 w-3 mr-1" /> Anheften</>
+              )}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={newConversation} className="h-7">
               <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
             </Button>
           </div>
