@@ -330,6 +330,7 @@ export default function AITextStudio() {
     setConversationId(null);
     setMessages([]);
     setInput("");
+    writeLastConv(null);
   }
 
   async function loadConversation(id: string) {
@@ -343,7 +344,13 @@ export default function AITextStudio() {
         .maybeSingle();
       if (data) conv = data as Conversation;
     }
-    if (conv?.model && (TEXT_MODELS as any)[conv.model]) {
+    if (!conv) {
+      // Conversation no longer exists (deleted or not accessible) — clear stale pointer
+      writeLastConv(null);
+      setConversationId(null);
+      return;
+    }
+    if (conv.model && (TEXT_MODELS as any)[conv.model]) {
       setModel(conv.model as TextModelId);
     }
     const { data } = await supabase
@@ -352,12 +359,14 @@ export default function AITextStudio() {
       .eq("conversation_id", id)
       .order("created_at");
     setMessages(((data as Msg[]) || []).filter((m) => m.role !== "system" as any));
+    writeLastConv(id);
     setTab("chat");
   }
 
   async function deleteConversation(id: string) {
     await supabase.from("text_studio_conversations").delete().eq("id", id);
     setHistory((h) => h.filter((c) => c.id !== id));
+    if (readLastConv() === id) writeLastConv(null);
     if (conversationId === id) newConversation();
   }
 
