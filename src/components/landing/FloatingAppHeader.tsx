@@ -91,7 +91,7 @@ export const FloatingAppHeader = () => {
       </div>
 
       {/* Hairline shadow line below */}
-      <div className="absolute inset-x-8 -bottom-1 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      <div className="absolute inset-x-8 -bottom-1 h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
     </div>
   );
 };
