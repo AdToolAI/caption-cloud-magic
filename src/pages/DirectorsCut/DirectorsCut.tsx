@@ -376,7 +376,9 @@ export function DirectorsCut() {
   const [composerLock, setComposerLock] = useState<{
     active: boolean;
     sceneCount: number;
-    source: 'edl' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+    source: 'edl' | 'edl-rebuilt' | 'sceneGeometry-fallback' | 'composer-scenes-fallback' | null;
+    calibratedToMp4?: boolean;
+    realMp4Duration?: number;
   }>({ active: false, sceneCount: 0, source: null });
 
   useEffect(() => {
