@@ -147,6 +147,20 @@ Deno.serve(async (req) => {
       conversationId = conv.id;
     }
 
+    // --- Sanitize history (strip non-text, drop empties, normalize roles) ---
+    // Different providers (OpenAI reasoning, Anthropic, Gemini) reject foreign payload shapes.
+    // We force a strict {role, content:string} shape and drop assistant-empty placeholders.
+    const cleanMessages = (messages || [])
+      .map((m) => ({
+        role: (m.role === "system" || m.role === "user" || m.role === "assistant") ? m.role : "user",
+        content: typeof m.content === "string" ? m.content : String(m.content ?? ""),
+      }))
+      .filter((m) => m.content.trim().length > 0);
+
+    if (cleanMessages.length === 0) {
+      return jsonResponse({ error: "No non-empty messages to send" }, 400);
+    }
+
     // --- Build upstream request ---
     const sysMsg = systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : [];
 
