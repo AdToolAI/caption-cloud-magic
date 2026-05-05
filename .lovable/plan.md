@@ -1,40 +1,45 @@
-## Problem
+## Ziel
 
-Im angehefteten Floating-Chat öffnet der Button **„Im Studio öffnen"** zwar `/ai-text-studio`, aber die Seite startet mit leerem `conversationId` (initial `useState(null)`). Der angeheftete Chat wird also nicht geladen → Verlauf wirkt „gelöscht".
+Aktive Chat-Sitzung bleibt erhalten, auch wenn man das Modul verlässt, zurückkommt oder die Seite neu lädt — solange man nicht explizit auf "Neue Konversation" klickt. Bei Logout / komplettem Schließen landet der Chat (wie bisher) sauber in der History und kann dort wieder geöffnet werden.
 
-In `PinnedChatWindow.tsx` (Zeile 286):
-```ts
-onClick={() => navigate("/ai-text-studio")}
-```
-→ keine Conversation-ID übergeben.
+## Was sich ändert
 
-In `AITextStudio.tsx` gibt es keinen Code, der einen angeheftete Chat oder URL-Parameter beim Mount übernimmt.
+### 1. Letzte aktive Konversation merken (`src/pages/AITextStudio.tsx`)
 
-Daten sind nicht weg — sie liegen weiter in `text_studio_messages`. Es ist reine UI-Wiederaufnahme.
+- Neuer kleiner Helfer (gleiche Datei, kein neues File): liest/schreibt `text-studio-last-conversation` in `localStorage` (nur die ID, max ein paar Bytes).
+- Beim `send()`: sobald `X-Conversation-Id` zurückkommt oder `conversationId` gesetzt wird → in localStorage speichern.
+- Beim `loadConversation(id)`: ebenfalls speichern.
+- Beim `newConversation()`: localStorage-Eintrag löschen (damit "Neue Konversation" wirklich resettet).
+- Beim `deleteConversation(id)`: wenn es die aktive war → Eintrag löschen.
 
-## Fix
+### 2. Auto-Resume beim Mount (`src/pages/AITextStudio.tsx`)
 
-**1. `PinnedChatWindow.tsx`** — Conversation-ID via URL-Parameter übergeben:
-```ts
-onClick={() => navigate(`/ai-text-studio?conversation=${pinned.conversationId}`)}
-```
+Bestehender Mount-Effect (Zeile 87–99) wird erweitert um eine dritte Quelle mit klarer Priorität:
 
-**2. `src/pages/AITextStudio.tsx`** — beim Mount Conversation aus URL **oder** aus `pinned` (Context) laden:
-- `useSearchParams()` lesen → `conversation` Parameter
-- Falls vorhanden: `loadConversation(id)` triggern (lädt Messages + setzt Model aus History)
-- Fallback: wenn kein URL-Param aber `pinned?.conversationId` existiert → ebenfalls laden
-- Damit das auch klappt, wenn `history` noch nicht geladen ist: `loadConversation` so anpassen, dass das Model notfalls direkt aus der DB (`text_studio_conversations` Single-Row-Query) geholt wird, statt nur aus dem `history`-State
-- Nach dem Laden den `?conversation=` Param aus der URL entfernen (`setSearchParams({}, { replace: true })`), damit Reload nicht in einer Schleife landet
+1. URL-Param `?conversation=…` (von "Im Studio öffnen" aus dem Pinned Window)
+2. `pinned.conversationId` (aktiver gepinnter Chat)
+3. **NEU:** `localStorage["text-studio-last-conversation"]` (zuletzt benutzte Konversation)
 
-**3. Sanity:** Der bestehende „Loslösen"-Button soll weiter funktionieren — keine Änderung nötig, nur sicherstellen, dass beim Eintritt ins Studio `pinned` **nicht** automatisch ge-unpinnt wird (ist aktuell auch nicht der Fall).
+Damit: Modul verlassen → zurückkommen → Chat ist noch da. Refresh (F5) → Chat ist noch da. Erst "Neue Konversation" leert ihn.
 
-## Out of scope
+Sicherheitscheck: vor dem Laden prüfen, ob die Konversation dem eingeloggten User gehört (RLS macht das ohnehin, `loadConversation` liefert dann einfach leer und wir clearen die ID).
 
-- Keine DB-Änderungen
-- Keine neuen Komponenten
-- Keine Änderung an `PinnedChatContext`
+### 3. Auto-Resume auch im Pinned Window (`src/components/text-studio/PinnedChatWindow.tsx`)
 
-## Files
+Wenn das Pinned Window geöffnet ist und kein `pinned.conversationId` gesetzt ist, aber `localStorage` einen Wert hat → den Chat dort ebenfalls automatisch laden, damit Studio und Pinned Window konsistent dieselbe letzte Konversation zeigen.
 
-- `src/components/text-studio/PinnedChatWindow.tsx` (1 Zeile)
-- `src/pages/AITextStudio.tsx` (~15 Zeilen: useSearchParams + Mount-Effect + kleine Anpassung in `loadConversation`)
+### 4. UI-Klarheit
+
+- Button "Neue Konversation" bekommt einen Tooltip: *"Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History."* — damit klar ist, dass es der explizite Refresh ist.
+- Kein zusätzlicher Refresh-Button nötig (würde doppelt zur bestehenden "Neue Konversation"-Aktion sein). Falls gewünscht, kann ich daneben ein kleines RefreshCw-Icon ergänzen — sag bitte Bescheid, sonst lasse ich es weg.
+
+## Was sich NICHT ändert
+
+- DB-Schema / RLS / Edge Functions: nichts neu.
+- History-Tab: funktioniert weiter wie gehabt (alle gespeicherten Konversationen). Nichts wird automatisch gelöscht — Logout/Close ändert nur, dass beim nächsten Login der Resume-Effekt feuert.
+- Privat-Modus (`isPrivate`): bleibt respektiert (private Chats werden auch heute schon nicht in der DB persistiert; in dem Fall speichern wir auch keine `lastConversation`-ID).
+
+## Geänderte Dateien
+
+- `src/pages/AITextStudio.tsx` (Resume-Logik + localStorage Hooks im send/load/new/delete)
+- `src/components/text-studio/PinnedChatWindow.tsx` (Resume aus localStorage, falls nichts gepinnt)
