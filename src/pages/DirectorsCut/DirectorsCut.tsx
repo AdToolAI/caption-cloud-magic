@@ -593,16 +593,49 @@ export function DirectorsCut() {
     });
   };
 
+  const lastEdlBackupRef = useRef<{ scenes: any[]; markers: any[] } | null>(null);
+
   const handleStartAnalysis = async () => {
     if (!selectedVideo) return;
     // Hard lock: never run shot detection on a Composer render — the EDL is
-    // already the authoritative scene list. Otherwise we'd overwrite the
-    // correct 6 Composer scenes with arbitrary shot-change estimates from
-    // PySceneDetect/Gemini run on the stitched MP4.
+    // already the authoritative scene list.
     if (composerLock.active || composerSourceProjectId) {
       toast.info('Composer-Render: Szenen sind aus der EDL gesperrt.');
       return;
     }
+
+    // Soft lock: scenes look like they came from a precise EDL (non-round end times).
+    const looksLikeEdl =
+      scenes.length >= 3 &&
+      scenes.every((s: any) => {
+        const e = Number(s.end_time ?? 0);
+        return e > 0 && Math.abs(e * 100 - Math.round(e * 100)) < 0.001 && (e * 100) % 50 !== 0;
+      });
+    if (looksLikeEdl) {
+      const ok = window.confirm(
+        'Dieses Video hat bereits frame-genaue Szenen. Auto-Cut würde sie überschreiben. Trotzdem fortfahren?'
+      );
+      if (!ok) return;
+      lastEdlBackupRef.current = {
+        scenes: JSON.parse(JSON.stringify(scenes)),
+        markers: JSON.parse(JSON.stringify(aiCutMarkers)),
+      };
+      toast('Szenen werden überschrieben', {
+        action: {
+          label: 'Rückgängig',
+          onClick: () => {
+            const b = lastEdlBackupRef.current;
+            if (b) {
+              setScenes(b.scenes);
+              setAiCutMarkers(b.markers);
+              toast.success('Szenen wiederhergestellt');
+            }
+          },
+        },
+        duration: 15000,
+      });
+    }
+
 
     setIsAnalyzing(true);
     
