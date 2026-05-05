@@ -312,7 +312,7 @@ export default function AITextStudio() {
           <Card className="p-4 grid gap-4 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
             <div>
               <Label className="text-xs">Modell</Label>
-              <Select value={model} onValueChange={(v) => setModel(v as TextModelId)}>
+              <Select value={model} onValueChange={(v) => handleModelChange(v as TextModelId)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {TEXT_MODEL_LIST.map((m) => (
