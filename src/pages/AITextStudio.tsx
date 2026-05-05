@@ -90,11 +90,75 @@ export default function AITextStudio() {
   const selectedModel = TEXT_MODELS[model];
   const selectedPersona = personas.find((p) => p.id === personaId);
 
+  // Current chat root + sibling branches (same root)
+  const currentConv = history.find((c) => c.id === conversationId);
+  const rootId = currentConv?.parent_conversation_id || currentConv?.id || null;
+  const branches = useMemo(() => {
+    if (!rootId) return [] as Conversation[];
+    return history.filter((c) => c.id === rootId || c.parent_conversation_id === rootId);
+  }, [history, rootId]);
+
   const inputTokens = useMemo(
     () => estimateTokens(input + messages.map((m) => m.content).join("\n")),
     [input, messages],
   );
   const estCostEur = useMemo(() => estimateCost(model, inputTokens, 800), [model, inputTokens]);
+
+  // Intercept model change: if active chat has messages, fork into a branch
+  function handleModelChange(next: TextModelId) {
+    if (next === model) return;
+    if (messages.length === 0 || !conversationId) {
+      setModel(next);
+      return;
+    }
+    setBranchPrompt({ targetModel: next });
+  }
+
+  async function createBranch(targetModel: TextModelId, withContext: boolean) {
+    if (!user || !conversationId) return;
+    const parentRoot = rootId || conversationId;
+    const targetLabel = TEXT_MODELS[targetModel].label;
+    const parentTitle = currentConv?.title || "Konversation";
+    const { data: newConv, error } = await supabase
+      .from("text_studio_conversations")
+      .insert({
+        user_id: user.id,
+        title: parentTitle,
+        model: targetModel,
+        persona_id: personaId && personaId !== "none" ? personaId : null,
+        is_private: isPrivate,
+        parent_conversation_id: parentRoot,
+        branch_label: `${targetLabel}-Branch`,
+      })
+      .select("id,title,model,updated_at,parent_conversation_id,branch_label")
+      .single();
+    if (error || !newConv) {
+      toast.error(error?.message || "Branch konnte nicht erstellt werden");
+      return;
+    }
+
+    if (withContext && messages.length > 0) {
+      const rows = messages
+        .filter((m) => m.content?.trim())
+        .map((m) => ({
+          conversation_id: newConv.id,
+          user_id: user.id,
+          role: m.role,
+          content: m.content,
+        }));
+      if (rows.length > 0) {
+        await supabase.from("text_studio_messages").insert(rows);
+      }
+    } else {
+      setMessages([]);
+    }
+
+    setHistory((h) => [newConv as Conversation, ...h]);
+    setConversationId(newConv.id);
+    setModel(targetModel);
+    setBranchPrompt(null);
+    toast.success(`Neuer Branch: ${targetLabel}`);
+  }
 
   async function send() {
     if (!input.trim() || streaming || !user) return;
