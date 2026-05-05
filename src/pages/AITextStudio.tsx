@@ -38,6 +38,8 @@ interface Conversation {
   title: string;
   model: string;
   updated_at: string;
+  parent_conversation_id?: string | null;
+  branch_label?: string | null;
 }
 
 export default function AITextStudio() {
