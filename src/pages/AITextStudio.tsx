@@ -491,7 +491,13 @@ export default function AITextStudio() {
                 <><Pin className="h-3 w-3 mr-1" /> Anheften</>
               )}
             </Button>
-            <Button size="sm" variant="ghost" onClick={newConversation} className="h-7">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={newConversation}
+              className="h-7"
+              title="Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History."
+            >
               <Sparkles className="h-3 w-3 mr-1" /> Neue Konversation
             </Button>
           </div>
