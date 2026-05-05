@@ -301,7 +301,15 @@ export default function AITextStudio() {
 
   async function loadConversation(id: string) {
     setConversationId(id);
-    const conv = history.find((c) => c.id === id);
+    let conv = history.find((c) => c.id === id);
+    if (!conv) {
+      const { data } = await supabase
+        .from("text_studio_conversations")
+        .select("id,title,model,updated_at,parent_conversation_id,branch_label")
+        .eq("id", id)
+        .maybeSingle();
+      if (data) conv = data as Conversation;
+    }
     if (conv?.model && (TEXT_MODELS as any)[conv.model]) {
       setModel(conv.model as TextModelId);
     }
