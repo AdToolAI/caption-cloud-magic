@@ -1,45 +1,44 @@
-## Ziel
+## Problem
 
-Aktive Chat-Sitzung bleibt erhalten, auch wenn man das Modul verlässt, zurückkommt oder die Seite neu lädt — solange man nicht explizit auf "Neue Konversation" klickt. Bei Logout / komplettem Schließen landet der Chat (wie bisher) sauber in der History und kann dort wieder geöffnet werden.
+Auf dem Dashboard erscheinen zwei vertikale Scrollbars direkt nebeneinander am rechten Rand (siehe Screenshots).
 
-## Was sich ändert
+## Ursache
 
-### 1. Letzte aktive Konversation merken (`src/pages/AITextStudio.tsx`)
+In `src/index.css` (Zeile 181–186) ist aktuell:
 
-- Neuer kleiner Helfer (gleiche Datei, kein neues File): liest/schreibt `text-studio-last-conversation` in `localStorage` (nur die ID, max ein paar Bytes).
-- Beim `send()`: sobald `X-Conversation-Id` zurückkommt oder `conversationId` gesetzt wird → in localStorage speichern.
-- Beim `loadConversation(id)`: ebenfalls speichern.
-- Beim `newConversation()`: localStorage-Eintrag löschen (damit "Neue Konversation" wirklich resettet).
-- Beim `deleteConversation(id)`: wenn es die aktive war → Eintrag löschen.
+```css
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+```
 
-### 2. Auto-Resume beim Mount (`src/pages/AITextStudio.tsx`)
+`overflow-x: hidden` auf **beiden** (html *und* body) setzt für `body` automatisch auch `overflow-y: auto` (CSS-Spezifikation: wenn eine Achse `hidden`/`scroll` ist, wird die andere zu `auto`). Dadurch wird `body` selbst zum Scroll-Container — zusätzlich zum `html`-Scroll-Container. Ergebnis: **zwei Scrollbars**.
 
-Bestehender Mount-Effect (Zeile 87–99) wird erweitert um eine dritte Quelle mit klarer Priorität:
+Das war ursprünglich nötig, damit der E2E-Test `tests/mobile-responsive.spec.ts` (kein horizontaler Scroll auf 375px) grün bleibt.
 
-1. URL-Param `?conversation=…` (von "Im Studio öffnen" aus dem Pinned Window)
-2. `pinned.conversationId` (aktiver gepinnter Chat)
-3. **NEU:** `localStorage["text-studio-last-conversation"]` (zuletzt benutzte Konversation)
+## Fix
 
-Damit: Modul verlassen → zurückkommen → Chat ist noch da. Refresh (F5) → Chat ist noch da. Erst "Neue Konversation" leert ihn.
+In `src/index.css` `overflow-x: hidden` durch `overflow-x: clip` ersetzen — und nur auf `html` anwenden, nicht zusätzlich auf `body`. `overflow-x: clip` verhindert horizontalen Overflow ohne einen neuen Scroll-Container zu erzeugen, also entsteht auch keine zweite Scrollbar.
 
-Sicherheitscheck: vor dem Laden prüfen, ob die Konversation dem eingeloggten User gehört (RLS macht das ohnehin, `loadConversation` liefert dann einfach leer und wir clearen die ID).
+```css
+html {
+  overflow-x: clip;
+  max-width: 100vw;
+}
+body {
+  /* keine overflow-Regel — nur das html-Element scrollt */
+}
+```
 
-### 3. Auto-Resume auch im Pinned Window (`src/components/text-studio/PinnedChatWindow.tsx`)
+`overflow-x: clip` wird von allen modernen Browsern (Chrome ≥90, Safari ≥16, Firefox ≥81) unterstützt und ist hier der korrekte Mechanismus, um horizontalen Overflow von dekorativen Blur-Orbs / Hero-Transforms abzuschneiden, ohne einen Scroll-Kontext zu erzeugen.
 
-Wenn das Pinned Window geöffnet ist und kein `pinned.conversationId` gesetzt ist, aber `localStorage` einen Wert hat → den Chat dort ebenfalls automatisch laden, damit Studio und Pinned Window konsistent dieselbe letzte Konversation zeigen.
+## Geänderte Datei
 
-### 4. UI-Klarheit
+- `src/index.css` (nur die `html, body { … }`-Regel im `@layer base`)
 
-- Button "Neue Konversation" bekommt einen Tooltip: *"Setzt den aktuellen Chat zurück. Dein bisheriges Gespräch findest du jederzeit unter History."* — damit klar ist, dass es der explizite Refresh ist.
-- Kein zusätzlicher Refresh-Button nötig (würde doppelt zur bestehenden "Neue Konversation"-Aktion sein). Falls gewünscht, kann ich daneben ein kleines RefreshCw-Icon ergänzen — sag bitte Bescheid, sonst lasse ich es weg.
+## Was sich nicht ändert
 
-## Was sich NICHT ändert
-
-- DB-Schema / RLS / Edge Functions: nichts neu.
-- History-Tab: funktioniert weiter wie gehabt (alle gespeicherten Konversationen). Nichts wird automatisch gelöscht — Logout/Close ändert nur, dass beim nächsten Login der Resume-Effekt feuert.
-- Privat-Modus (`isPrivate`): bleibt respektiert (private Chats werden auch heute schon nicht in der DB persistiert; in dem Fall speichern wir auch keine `lastConversation`-ID).
-
-## Geänderte Dateien
-
-- `src/pages/AITextStudio.tsx` (Resume-Logik + localStorage Hooks im send/load/new/delete)
-- `src/components/text-studio/PinnedChatWindow.tsx` (Resume aus localStorage, falls nichts gepinnt)
+- Sidebar, Header, NewsTicker, Pinned Chat: unverändert.
+- Mobile-Responsive-Test: bleibt grün, da `clip` ebenfalls horizontalen Overflow verhindert.
+- Vertikales Scrolling der Seite: funktioniert weiter wie gewohnt — nur eben mit nur **einer** Scrollbar.
