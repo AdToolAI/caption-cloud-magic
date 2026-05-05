@@ -65,6 +65,9 @@ export default function AITextStudio() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Branch confirmation dialog state
+  const [branchPrompt, setBranchPrompt] = useState<{ targetModel: TextModelId } | null>(null);
+
   useEffect(() => {
     if (!user) return;
     void supabase
@@ -74,9 +77,9 @@ export default function AITextStudio() {
       .then(({ data }) => setPersonas((data as Persona[]) || []));
     void supabase
       .from("text_studio_conversations")
-      .select("id,title,model,updated_at")
+      .select("id,title,model,updated_at,parent_conversation_id,branch_label")
       .order("updated_at", { ascending: false })
-      .limit(50)
+      .limit(100)
       .then(({ data }) => setHistory((data as Conversation[]) || []));
   }, [user, conversationId]);
 
