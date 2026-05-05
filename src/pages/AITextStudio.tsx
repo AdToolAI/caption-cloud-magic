@@ -280,7 +280,12 @@ export default function AITextStudio() {
       }
 
       const newConvId = resp.headers.get("X-Conversation-Id");
-      if (newConvId && !conversationId) setConversationId(newConvId);
+      if (newConvId && !conversationId) {
+        setConversationId(newConvId);
+        if (!isPrivate) writeLastConv(newConvId);
+      } else if (conversationId && !isPrivate) {
+        writeLastConv(conversationId);
+      }
 
       const reader = resp.body!.getReader();
       const decoder = new TextDecoder();
