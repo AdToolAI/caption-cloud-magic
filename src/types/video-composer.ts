@@ -70,6 +70,16 @@ export interface ComposerCharacter {
   name: string;
   appearance: string;
   signatureItems: string;
+  /**
+   * If linked from the Avatar / Brand Character Library, this is the source id.
+   * When present, the composer uses the portrait as i2v anchor frame and the
+   * Gemini-generated identity-card prompt for far stronger face consistency.
+   */
+  brandCharacterId?: string;
+  /** Hedra-optimised portrait or original reference image — used as i2v anchor. */
+  referenceImageUrl?: string;
+  /** Pre-built identity-card prompt fragment from the Brand Character. */
+  identityCardPrompt?: string;
 }
 
 /**

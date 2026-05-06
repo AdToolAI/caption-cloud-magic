@@ -5,7 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, User, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, User, Lightbulb, Library, Sparkles, ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
+import { buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import type { ComposerCharacter } from '@/types/video-composer';
 
 interface CharacterManagerProps {
@@ -20,6 +24,15 @@ const labels = {
     subtitle:
       'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.',
     add: 'Charakter hinzufügen',
+    pickFromLibrary: 'Aus Avatar-Bibliothek wählen',
+    pickerTitle: 'Avatar als Charakter verknüpfen',
+    pickerDesc:
+      'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.',
+    pickerEmpty: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.',
+    use: 'Verknüpfen',
+    anchorBadge: 'Portrait-Anker aktiv',
+    anchorHint:
+      'Dieser Charakter ist mit einem Avatar verknüpft. Sein Portrait wird automatisch als erster Frame (i2v) genutzt — höchste Gesichts-Konsistenz.',
     name: 'Name',
     namePlaceholder: 'z. B. Richard Löwenherz',
     appearance: 'Aussehen (Englisch empfohlen)',
@@ -30,7 +43,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro-Tipp: Sherlock-Holmes-Effekt',
     proTipBody:
-      'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Die KI variiert automatisch Kamerawinkel, damit nicht jede Szene ein Gesichts-Closeup ist.',
+      'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).',
     empty: 'Keine Charaktere definiert.',
     delete: 'Löschen',
   },
@@ -39,6 +52,15 @@ const labels = {
     subtitle:
       'Helps the AI keep people looking similar across scenes — pixel-perfect face identity is technically impossible with text-to-video.',
     add: 'Add character',
+    pickFromLibrary: 'Pick from Avatar Library',
+    pickerTitle: 'Link an avatar as character',
+    pickerDesc:
+      'Link an avatar from your library. Its portrait is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
+    pickerEmpty: 'No avatars in your library yet. Create one under "Avatars".',
+    use: 'Link',
+    anchorBadge: 'Portrait anchor active',
+    anchorHint:
+      'This character is linked to an avatar. The portrait is automatically used as the first frame (i2v) for maximum face consistency.',
     name: 'Name',
     namePlaceholder: 'e.g. Richard the Lionheart',
     appearance: 'Appearance (English recommended)',
@@ -49,7 +71,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro tip: the Sherlock Holmes effect',
     proTipBody:
-      'Describe signature clothing & objects in detail (cloak, crown, weapon). The AI repeats these far more reliably than faces — viewers recognise the person by them. The AI also varies camera angles automatically so not every scene is a face close-up.',
+      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link an avatar from your library (button top-right).',
     empty: 'No characters defined.',
     delete: 'Delete',
   },
@@ -58,6 +80,15 @@ const labels = {
     subtitle:
       'Ayuda a la IA a mantener a las personas con apariencia similar entre escenas — la identidad facial exacta no es técnicamente posible con texto a vídeo.',
     add: 'Añadir personaje',
+    pickFromLibrary: 'Elegir de la biblioteca de avatares',
+    pickerTitle: 'Vincular un avatar como personaje',
+    pickerDesc:
+      'Vincula un avatar de tu biblioteca. Su retrato se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
+    pickerEmpty: 'No hay avatares en tu biblioteca. Crea uno en "Avatares".',
+    use: 'Vincular',
+    anchorBadge: 'Ancla de retrato activa',
+    anchorHint:
+      'Este personaje está vinculado a un avatar. Su retrato se usa automáticamente como primer frame (i2v) para máxima consistencia facial.',
     name: 'Nombre',
     namePlaceholder: 'p. ej. Ricardo Corazón de León',
     appearance: 'Apariencia (recomendado en inglés)',
@@ -68,7 +99,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Consejo Pro: el efecto Sherlock Holmes',
     proTipBody:
-      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). La IA los repite mucho más fiablemente que los rostros — el espectador reconoce a la persona por ellos. La IA varía automáticamente los ángulos de cámara para que no toda escena sea un primer plano.',
+      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un avatar de tu biblioteca (botón arriba a la derecha).',
     empty: 'Sin personajes definidos.',
     delete: 'Eliminar',
   },
@@ -91,11 +122,12 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   const t = labels[lang];
 
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const { data: avatars = [], isLoading: avatarsLoading } = useAccessibleCharacters();
 
   const addCharacter = () => {
     if (!draft.name.trim()) return;
     const id = makeId(draft.name.trim());
-    // Avoid duplicate IDs
     const uniqueId = characters.some((c) => c.id === id) ? `${id}-${Date.now().toString(36)}` : id;
     onChange([
       ...characters,
@@ -109,6 +141,37 @@ export default function CharacterManager({ characters, language, onChange }: Cha
     setDraft({ name: '', appearance: '', signatureItems: '' });
   };
 
+  const linkAvatar = (avatar: { id: string; name: string; reference_image_url?: string | null; portrait_url?: string | null } & Record<string, any>) => {
+    // Avoid duplicates: if already linked, just close.
+    if (characters.some((c) => c.brandCharacterId === avatar.id)) {
+      setPickerOpen(false);
+      return;
+    }
+    const baseId = makeId(avatar.name || 'avatar');
+    const uniqueId = characters.some((c) => c.id === baseId) ? `${baseId}-${avatar.id.slice(0, 6)}` : baseId;
+    const portrait = avatar.portrait_url || avatar.reference_image_url || undefined;
+    const idCard = (() => {
+      try {
+        return buildCharacterPromptInjection(avatar as any);
+      } catch {
+        return '';
+      }
+    })();
+    onChange([
+      ...characters,
+      {
+        id: uniqueId,
+        name: avatar.name,
+        appearance: '',
+        signatureItems: '',
+        brandCharacterId: avatar.id,
+        referenceImageUrl: portrait || undefined,
+        identityCardPrompt: idCard || undefined,
+      },
+    ]);
+    setPickerOpen(false);
+  };
+
   const removeCharacter = (id: string) => {
     onChange(characters.filter((c) => c.id !== id));
   };
@@ -120,11 +183,25 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   return (
     <Card className="border-border/40 bg-card/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <User className="h-4 w-4 text-primary" />
-          {t.title}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">{t.subtitle}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              {t.title}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">{t.subtitle}</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setPickerOpen(true)}
+            className="gap-1.5 shrink-0"
+          >
+            <Library className="h-3.5 w-3.5" />
+            {t.pickFromLibrary}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Pro-tip box */}
@@ -143,49 +220,78 @@ export default function CharacterManager({ characters, language, onChange }: Cha
           <p className="text-xs text-muted-foreground italic">{t.empty}</p>
         ) : (
           <div className="space-y-3">
-            {characters.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-lg border border-border/40 bg-background/40 p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    👤 {c.name}
-                  </Badge>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 text-destructive"
-                    onClick={() => removeCharacter(c.id)}
-                    aria-label={t.delete}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">{t.appearance}</Label>
-                    <Textarea
-                      value={c.appearance}
-                      onChange={(e) => updateCharacter(c.id, { appearance: e.target.value })}
-                      placeholder={t.appearancePlaceholder}
-                      rows={2}
-                      className="text-xs bg-background/50 resize-none"
-                    />
+            {characters.map((c) => {
+              const linked = !!c.brandCharacterId && !!c.referenceImageUrl;
+              return (
+                <div
+                  key={c.id}
+                  className={`rounded-lg border p-3 space-y-2 ${
+                    linked
+                      ? 'border-primary/40 bg-primary/5'
+                      : 'border-border/40 bg-background/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {linked && c.referenceImageUrl ? (
+                        <img
+                          src={c.referenceImageUrl}
+                          alt={c.name}
+                          className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        👤 {c.name}
+                      </Badge>
+                      {linked && (
+                        <Badge className="text-[10px] gap-1 bg-primary/15 text-primary border-primary/30">
+                          <Sparkles className="h-3 w-3" />
+                          {t.anchorBadge}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 text-destructive"
+                      onClick={() => removeCharacter(c.id)}
+                      aria-label={t.delete}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">{t.signature}</Label>
-                    <Textarea
-                      value={c.signatureItems}
-                      onChange={(e) => updateCharacter(c.id, { signatureItems: e.target.value })}
-                      placeholder={t.signaturePlaceholder}
-                      rows={2}
-                      className="text-xs bg-background/50 resize-none"
-                    />
+                  {linked && (
+                    <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">{t.appearance}</Label>
+                      <Textarea
+                        value={c.appearance}
+                        onChange={(e) => updateCharacter(c.id, { appearance: e.target.value })}
+                        placeholder={t.appearancePlaceholder}
+                        rows={2}
+                        className="text-xs bg-background/50 resize-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">{t.signature}</Label>
+                      <Textarea
+                        value={c.signatureItems}
+                        onChange={(e) => updateCharacter(c.id, { signatureItems: e.target.value })}
+                        placeholder={t.signaturePlaceholder}
+                        rows={2}
+                        className="text-xs bg-background/50 resize-none"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -232,6 +338,72 @@ export default function CharacterManager({ characters, language, onChange }: Cha
           </Button>
         </div>
       </CardContent>
+
+      {/* Avatar Library Picker */}
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Library className="h-4 w-4 text-primary" />
+              {t.pickerTitle}
+            </DialogTitle>
+            <DialogDescription className="text-xs leading-relaxed">
+              {t.pickerDesc}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-2">
+            {avatarsLoading ? (
+              <p className="text-xs text-muted-foreground py-6 text-center">…</p>
+            ) : avatars.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-6 text-center">{t.pickerEmpty}</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {avatars.map((a: any) => {
+                  const portrait = a.portrait_url || a.reference_image_url;
+                  const alreadyLinked = characters.some((c) => c.brandCharacterId === a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => linkAvatar(a)}
+                      disabled={alreadyLinked}
+                      className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
+                        alreadyLinked
+                          ? 'border-primary/40 opacity-60 cursor-not-allowed'
+                          : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
+                      }`}
+                    >
+                      <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
+                        {portrait ? (
+                          <img
+                            src={portrait}
+                            alt={a.name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <p className="text-xs font-semibold truncate">{a.name}</p>
+                        <p className="text-[10px] text-muted-foreground capitalize">
+                          {a.source === 'purchased' ? '★ marketplace' : 'own'}
+                        </p>
+                      </div>
+                      {!alreadyLinked && (
+                        <div className="absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] text-center text-primary-foreground bg-primary opacity-0 group-hover:opacity-100 transition">
+                          {t.use}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -1,47 +1,49 @@
-## Ziel
+## Problem
 
-Die eingeloggte Startseite (`/home`) wirkt aktuell zusammengequetscht: Heatmap + Aktivitäten + Streak teilen sich eine enge Zeile, Performance-KPIs stehen winzig neben den KI-Tipps, und der Inhalt nutzt die Breite bei mittleren Viewports (~1060px) schlecht. Wir bauen ein ruhigeres, modernes Layout im James‑Bond‑2028‑Stil mit mehr Atemraum und klarer Hierarchie – ohne neue Features.
+Im Video Composer wirken die Charaktere im generierten Clip völlig anders als die definierte Person. Ursache (im Code verifiziert):
 
-## Was sich für den Nutzer ändert
+1. Die "Charaktere" im Composer (`CharacterManager.tsx`) sind **reiner Freitext** (Name, Aussehen, Signature Items). Es gibt **kein Bild / keinen Anker**.
+2. In `compose-video-clips/index.ts` wird dieser Text nur als Prompt-Prefix injiziert (`injectCharacter`). Bei reinem Text-zu-Video (z.B. Hailuo 2.3 Standard im Screenshot) ist das Gesicht damit faktisch **zufällig** — Modelle halten Kleidung/Props zuverlässig, Gesichter nicht (steht so auch im Pro-Tipp).
+3. Die bereits existierende **Brand Character Library** (mit `reference_image_url` + Hedra-optimiertem `portrait_url`) wird im Composer aktuell **nur passiv** mitinjiziert (Favorit oder erster), aber **nicht** an die Cast-Slots gebunden, die der User in der "Cast Consistency Map" sieht. Reference-Image wird außerdem nicht automatisch als i2v-Startframe gesetzt — d.h. der einzige Hebel, der wirklich Gesichts-Konsistenz erzeugt, bleibt ungenutzt.
 
-- Mehr Luft zwischen den Blöcken, größere Section-Überschriften, klare visuelle Hierarchie.
-- Performance bekommt eine eigene, breite Zeile mit großen KPI-Karten (statt drei Mini-Tiles neben einem Tipps-Block).
-- Heatmap nimmt die volle Breite ein (deutlich besser lesbar) – Recent Activity rückt darunter.
-- Streak wandert in eine schmale rechte Sidebar-Spalte neben Recent Activity, statt mit drei Spalten in eine Section gequetscht.
-- KI-Empfehlungen + News-Insight sitzen als ruhige 2‑Spalten-Zeile unter Performance.
-- Auf Tablet/Notebook (≈1060px) wird zuerst auf 1‑Spalten-Stack umgeschaltet, statt zwei Spalten zu quetschen – sauberer Breakpoint bei `xl` (1280px) statt `lg`.
+## Lösung — Cast = Brand Character + Auto-i2v
 
-## Neue Reihenfolge der Sektionen
-
-```text
-1. FirstVideoExpressHero (unverändert, nur mehr Margin)
-2. DashboardVideoCarousel (Hero-Banner, unverändert)
-3. Diese Woche – Wochen-Timeline (volle Breite, mehr Padding)
-4. Schnellaktionen / FeatureGrid (unverändert)
-5. Performance-Überblick (volle Breite, 3 große KPI-Karten + Sparkline-Akzent)
-6. KI-Empfehlungen | News-Insight  (xl: 2 Spalten, sonst gestapelt)
-7. Beste Posting-Zeiten – Heatmap (volle Breite)
-8. Letzte Aktivitäten (2/3) | Streak (1/3)  (xl: 2 Spalten, sonst gestapelt)
+### 1. Cast aus der Brand Character Library wählen
+`CharacterManager.tsx` bekommt oben einen Button **"Aus Avatar-Bibliothek wählen"** (nutzt `useAccessibleCharacters`). Beim Anlegen wird der Composer-Character mit Referenz auf den Brand Character verknüpft:
 ```
+ComposerCharacter {
+  id, name, appearance, signatureItems,
+  brandCharacterId?: string,        // NEU
+  referenceImageUrl?: string,       // NEU (portrait_url || reference_image_url)
+  identityCardPrompt?: string,      // NEU (buildCharacterPromptInjection)
+}
+```
+Freitext-Charaktere bleiben weiterhin möglich (Fallback wie heute).
+
+### 2. Auto-i2v pro Szene wenn Charakter zugewiesen
+In `SceneCard` / Storyboard: Sobald eine Szene einen `characterShot` mit `shotType !== 'absent'` für einen Charakter mit `referenceImageUrl` hat **und** noch keine eigene `referenceImageUrl` an der Szene gesetzt ist:
+- Szene bekommt visuell ein Badge "Anker: Avatar-Portrait"
+- `scene.referenceImageUrl` wird (nicht-destruktiv, nur als Fallback) auf das Portrait gesetzt
+- Dieser Fallback wird in `compose-video-clips/index.ts` für i2v-fähige Modelle (`hailuo`, `kling`, `wan`, `seedance`, `luma`, `veo`, `happyhorse`, `pika`) übernommen — das funktioniert dort bereits, sobald `referenceImageUrl` gesetzt ist.
+
+### 3. Identity-Card-Prompt statt nur Appearance
+`injectCharacter` in `compose-video-clips/index.ts` wird erweitert: wenn der Cast-Eintrag `identityCardPrompt` mitliefert, wird dieser anstelle von `appearance + signatureItems` injiziert (höhere Qualität, Gemini-generiert). Fallback bleibt der bisherige Pfad.
+
+### 4. UX-Hinweis in der Cast Consistency Map
+`CastConsistencyMap.tsx` zeigt für jede Szene mit gebundenem Brand Character ein grünes Anchor-Badge (statt nur "reference"), damit klar ist: Diese Szene nutzt das echte Portrait als ersten Frame → höchste Gesichts-Konsistenz.
+
+### 5. Warnung bei T2V-only Modellen
+Wenn der User einen Brand Character zugewiesen hat, aber für die Szene ein Modell ohne i2v-Support (aktuell nur ältere/spezielle Pfade) gewählt ist: kleiner Inline-Hinweis "Wechsle zu Hailuo / Kling / Seedance für echte Gesichts-Konsistenz."
 
 ## Technische Änderungen
 
-Nur `src/pages/Home.tsx` wird angefasst – keine neuen Dependencies, keine Backend-Changes.
+- `src/types/video-composer.ts` — `ComposerCharacter` um `brandCharacterId`, `referenceImageUrl`, `identityCardPrompt` erweitern
+- `src/components/video-composer/CharacterManager.tsx` — "Aus Avatar-Bibliothek wählen"-Dialog (`useAccessibleCharacters`), Avatar-Vorschau pro Cast-Eintrag
+- `src/components/video-composer/SceneCard.tsx` — Auto-Fill `scene.referenceImageUrl` aus Cast-Portrait + Anchor-Badge + T2V-Warnung
+- `src/components/video-composer/CastConsistencyMap.tsx` — neuer Status `'portrait-anchor'` mit goldenem Indicator
+- `supabase/functions/compose-video-clips/index.ts` — `injectCharacter` nutzt `identityCardPrompt` wenn vorhanden; neue Type-Felder im `ComposerCharacter`-Interface der Function spiegeln
 
-- Container-Spacing: `py-4 space-y-4` → `py-8 space-y-10`, `max-w-7xl` bleibt.
-- Alle Grids von `lg:grid-cols-2` → `xl:grid-cols-2` und `gap-4` → `gap-6`, damit bei 1060px kein 2‑Spalten-Quetsch mehr passiert.
-- Performance-Section eigenständig in voller Breite, KPI-Karten mit `p-6`, größerer Value-Schrift (Tailwind: `text-3xl`/`text-4xl`) – nutzt vorhandene `MetricCard` (ggf. `size="lg"` Prop, sonst Wrapper-Klassen).
-- Heatmap-Section eigenständig in voller Breite (raus aus dem 2‑Spalten-Grid mit Recent Activity).
-- Recent Activity + Streak in neue Zeile: `grid xl:grid-cols-3 gap-6` mit `xl:col-span-2` für Activity, `xl:col-span-1` für Streak.
-- KI-Empfehlungen + (optional) News-Insight als neue 2‑Spalten-Zeile direkt unter Performance.
-- `Section`-Komponente: konsistente `bg`-Nutzung – abwechselnd `default` / `muted`, damit Blöcke optisch trennen.
-
-## Was NICHT geändert wird
-
-- Datenquellen, Hooks, KPI-Berechnung, Strategy-Mode-Logik, Carousel, Editor-Dialoge.
-- Andere Seiten (`/`, `/personalized-dashboard` etc.) bleiben unberührt.
-- Keine neuen Bilder/Assets.
-
-## Nach Approval
-
-Ich setze die Layout-Änderungen direkt in `src/pages/Home.tsx` um und prüfe das Ergebnis bei 1060px und 1440px Viewport.
+## Out of Scope
+- Kein neues Modell, kein neuer Provider-Key
+- Kein Eingriff in den Wizard / Auto-Director-Flow
+- Bestehende reine Freitext-Charaktere bleiben unverändert funktional

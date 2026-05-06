@@ -303,6 +303,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             libraryCharacters: libCharacters,
             libraryLocations: libLocations,
           });
+          // Sherlock-Holmes Anchor: when this scene targets a cast member that
+          // is linked to a Brand Character (avatar portrait), fall back to
+          // their portrait as the i2v anchor frame for vastly better face
+          // consistency. We only override when the scene has no own anchor.
+          const castMember = s.characterShot && s.characterShot.shotType !== 'absent'
+            ? characters?.find((c) => c.id === s.characterShot!.characterId)
+            : undefined;
+          const castAnchor = castMember?.referenceImageUrl;
           return {
             id: s.id,
             clipSource: s.clipSource,
@@ -311,7 +319,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composed.negativePrompt || undefined,
             stockKeywords: s.stockKeywords,
             uploadUrl: s.uploadUrl,
-            referenceImageUrl: s.referenceImageUrl || composed.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
+            referenceImageUrl:
+              s.referenceImageUrl ||
+              composed.referenceImageUrl ||
+              castAnchor ||
+              brandCharacterInput?.referenceImageUrl,
             durationSeconds: s.durationSeconds,
             characterShot: s.characterShot,
             withAudio: s.withAudio !== false,
@@ -429,7 +441,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: targetScene.referenceImageUrl || composedSingle.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
+            referenceImageUrl: (() => {
+              const cm = targetScene.characterShot && targetScene.characterShot.shotType !== 'absent'
+                ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
+                : undefined;
+              return targetScene.referenceImageUrl || composedSingle.referenceImageUrl || cm?.referenceImageUrl || brandCharacterInput?.referenceImageUrl;
+            })(),
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
