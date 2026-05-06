@@ -140,6 +140,19 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
         </div>
       </TooltipProvider>
 
+      {(() => {
+        const orphans = characters.filter((c) =>
+          scenes.every((s, i) => getAnchor(s, c, i) === 'absent')
+        );
+        if (orphans.length === 0) return null;
+        return (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200">
+            ⚠️ {orphans.map((o) => o.name).join(', ')} {orphans.length === 1 ? 'kommt' : 'kommen'} in keiner Szene vor.
+            Klicke in einer Szene auf den Charakter-Button, um {orphans.length === 1 ? 'ihn' : 'sie'} als Anker hinzuzufügen — oder generiere das Storyboard neu.
+          </div>
+        );
+      })()}
+
       <p className="text-[10px] text-muted-foreground leading-relaxed">
         Reference-Image (🟢) liefert die stärkste visuelle Konsistenz über mehrere Shots.
         Wenn ein Charakter ohne Anker erscheint, wird automatisch der letzte Frame der vorherigen Szene
