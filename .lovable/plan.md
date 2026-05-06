@@ -1,52 +1,36 @@
+# Bug: Avatar erscheint in 0 von 5 Szenen
 
-## Bestätigte Ursache
+## Diagnose
+Kein Zufall — strukturelles Problem im Storyboard-Generator (`supabase/functions/compose-video-storyboard/index.ts`).
 
-DB-Beweise (gerade abgefragt):
-- `video_creations` für deinen User: 209 Zeilen mit `metadata.source='motion-studio-clip'`, **alle mit `created_at = 2026-05-06 20:35:17.825355+00`** (= Zeitpunkt der Backfill-Migration von gestern).
-- Echte Render-Zeit liegt aber in `composer_scenes.updated_at` (z. B. 20:17:24, 19:28:29, …).
-- Sowohl Dashboard-Carousel als auch Mediathek sortieren `ORDER BY created_at DESC LIMIT N` → bei 209 identischen Timestamps liefert Postgres **eine willkürliche** 10er-/N-Auswahl. Deshalb siehst du an beiden Stellen denselben „eingefrorenen" Stapel statt deiner echten letzten Clips.
-- Titel sind generisch („Video 62537168") weil das Backfill kein `metadata.title` gesetzt hat.
+Der System-Prompt sagt aktuell:
+- **Default = "absent"** (kein Charakter)
+- Charakter soll nur in ~30–50% der Szenen vorkommen
+- "Erfinde keine Gründe ihn einzubauen"
 
-Neue Clips ab jetzt bekommen über den Trigger korrekt `created_at = now()` — aber 209 Backfill-Zeilen blockieren die Sortierung.
+Es gibt **keinen serverseitigen Mindest-Floor**. Wenn das LLM (Gemini 3 Flash) sich entscheidet, den Charakter in 0 Szenen zu setzen, akzeptiert der Code das stillschweigend. Genau das ist passiert: Cast Consistency Map zeigt `Matthew Dus… — S1..S5: alle leer`.
 
-## Plan
+## Fix (3 kleine Änderungen, nur Storyboard-Edge-Function + UI-Hinweis)
 
-### 1. Backfill-Timestamps korrigieren
-SQL-Update auf `video_creations` für alle Composer-Clips mit dem Backfill-Stempel: `created_at` aus `composer_scenes.updated_at` (echte Ready-Zeit) übernehmen, Fallback auf `composer_projects.created_at`.
+### 1. Prompt-Guidance verschärfen
+In `compose-video-storyboard/index.ts`:
+- "30–50%" → **"mindestens 40–60%, niemals 0"**
+- Explizite Regel: "Wenn der User einen Avatar definiert hat, MUSS er in mindestens `ceil(sceneCount * 0.4)` Szenen vorkommen, mindestens aber in 2."
+- Hook und CTA bleiben bevorzugte Anker, wenn nicht anders sinnvoll.
 
-```sql
-UPDATE video_creations vc
-SET created_at = COALESCE(cs.updated_at, cp.created_at, vc.created_at)
-FROM composer_scenes cs
-JOIN composer_projects cp ON cp.id = cs.project_id
-WHERE vc.metadata->>'source' = 'motion-studio-clip'
-  AND vc.metadata->>'scene_id' = cs.id::text
-  AND vc.created_at = TIMESTAMPTZ '2026-05-06 20:35:17.825355+00';
-```
+### 2. Server-Side Floor (Auto-Repair)
+Nach dem LLM-Call, vor dem Response:
+- Zähle wie viele Szenen ein gültiges `characterShot` (≠ absent) haben.
+- Wenn `< max(2, ceil(N * 0.4))` und `briefing.characters.length > 0`:
+  - Wähle die fehlenden Szenen heuristisch (bevorzugt Hook → CTA → mittlere Szene), die noch `absent` sind und **nicht** rein produkt-/B-Roll-typisch sind.
+  - Setze dort `characterShot = { characterId: <primary>, shotType: 'profile' | 'detail' | 'silhouette' }` (rotierend, damit Variety bleibt).
+  - Stelle sicher, dass für diese Szenen nicht `clipSource='stock'` gesetzt wird (Re-Run von `pickClipSource` mit dem neuen Shot).
 
-### 2. Sprechende Titel nachziehen
-Titel aus Projekt-Name + Szenen-Order setzen, damit Dashboard/Mediathek nicht „Video abc12345" zeigt.
+### 3. UI-Hinweis (defensiv)
+In `CastConsistencyMap.tsx`: Wenn ein Charakter in **0** Szenen erscheint, kleines Warn-Banner unter der Tabelle:
+> „Matthew Dus… kommt in keiner Szene vor. Klicke in einer Szene auf den Charakter-Button, um ihn als Anker hinzuzufügen — oder generiere das Storyboard neu."
 
-```sql
-UPDATE video_creations vc
-SET metadata = vc.metadata || jsonb_build_object(
-  'title', COALESCE(cp.title, 'Composer-Video') ||
-           ' · Szene ' || (COALESCE((vc.metadata->>'scene_order')::int, 0) + 1)
-)
-FROM composer_scenes cs JOIN composer_projects cp ON cp.id = cs.project_id
-WHERE vc.metadata->>'source' = 'motion-studio-clip'
-  AND vc.metadata->>'scene_id' = cs.id::text
-  AND (vc.metadata ? 'title') = false;
-```
+Kein Backend-Refactor, keine DB-Änderung, keine Logik in `compose-video-clips`.
 
-### 3. Trigger-Funktion ergänzen (für die Zukunft)
-`archive_composer_scene_to_library` so erweitern, dass sie für jede neue Composer-Szene direkt `metadata.title` (Projektname + Szene N) mitschreibt. Verhindert, dass künftig wieder generische Titel auftauchen.
-
-### 4. Verifikation (mache ich selbst per read_query)
-- `SELECT created_at, metadata->>'title' FROM video_creations WHERE source='motion-studio-clip' ORDER BY created_at DESC LIMIT 10;` → muss eine echte zeitliche Spreizung über mehrere Tage zeigen, **nicht** 10× denselben Timestamp.
-- Carousel/Mediathek nach Reload → deine wirklich zuletzt erzeugten Clips erscheinen oben mit Projekt-/Szenennamen.
-
-## Was nicht angefasst wird
-- Trigger `archive_composer_scene_trg` selbst (funktioniert für neue Clips korrekt).
-- Auto-Cleanup, Wallet-Logik, Composer-Renderpfad.
-- Bestehende Nicht-Composer-Einträge in `video_creations`.
+## Erwartetes Ergebnis
+Bei 5 Szenen + 1 definierter Avatar erscheinen automatisch **mindestens 2 Szenen** mit Matthew als Anker (mit Reference-Image-Anchor → 🟢 in der Cast Map), Reference-Image-URL wird wie zuletzt implementiert für i2v genutzt.
