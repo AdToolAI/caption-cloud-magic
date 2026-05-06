@@ -18,6 +18,18 @@ interface ComposerCharacter {
   name: string;
   appearance: string;
   signatureItems: string;
+  appearanceFrequency?: 'cameo' | 'balanced' | 'lead';
+}
+
+// Maps user-chosen frequency to a (minRatio, maxRatio) of total scenes.
+// `balanced` matches the previous default behaviour.
+function freqRange(freq?: 'cameo' | 'balanced' | 'lead'): { min: number; max: number } {
+  switch (freq) {
+    case 'cameo': return { min: 0.15, max: 0.4 };
+    case 'lead': return { min: 0.8, max: 1.0 };
+    case 'balanced':
+    default: return { min: 0.4, max: 0.6 };
+  }
 }
 
 type VideoMode = 'video' | 'image' | 'mixed';
