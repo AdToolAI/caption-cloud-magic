@@ -69,10 +69,12 @@ export const useBrandCharacters = () => {
         .upload(path, input.file, { contentType: input.file.type, upsert: false });
       if (upErr) throw upErr;
 
-      // 2) Create signed URL for AI extraction
+      // 2) Create a long-lived (~5 years) signed URL — this URL is persisted to the DB
+      //    so it must outlive the upload session. A short 10-min URL would expire and break
+      //    every avatar's reference image after 10 minutes.
       const { data: signed } = await supabase.storage
         .from('brand-characters')
-        .createSignedUrl(path, 60 * 10);
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
       const imageUrl = signed?.signedUrl;
       if (!imageUrl) throw new Error('Could not create signed URL');
 

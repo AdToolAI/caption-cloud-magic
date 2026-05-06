@@ -1,36 +1,34 @@
-# Bug: Avatar erscheint in 0 von 5 Szenen
+# Avatar-Bilder reparieren
 
-## Diagnose
-Kein Zufall — strukturelles Problem im Storyboard-Generator (`supabase/functions/compose-video-storyboard/index.ts`).
+## Was wirklich passiert ist
+Das Bild von Matthew Dusatko ist **nicht gelöscht** — es liegt unverändert im Storage (`brand-characters/8948d3d9…/1ec6e573….jpeg`).
 
-Der System-Prompt sagt aktuell:
-- **Default = "absent"** (kein Charakter)
-- Charakter soll nur in ~30–50% der Szenen vorkommen
-- "Erfinde keine Gründe ihn einzubauen"
+Der Fehler liegt in `src/hooks/useBrandCharacters.ts` (Zeile 75 + 98): Beim Anlegen eines Charakters wird eine **signierte URL mit nur 10 Minuten Gültigkeit** erzeugt und genau diese kurzlebige URL als `reference_image_url` in der DB gespeichert. Sobald die 10 Minuten vorbei sind, liefert Supabase 400/403 und der Browser zeigt nur noch das gebrochene `<img>`-Icon mit "Matthew Dusatko" alt-text.
 
-Es gibt **keinen serverseitigen Mindest-Floor**. Wenn das LLM (Gemini 3 Flash) sich entscheidet, den Charakter in 0 Szenen zu setzen, akzeptiert der Code das stillschweigend. Genau das ist passiert: Cast Consistency Map zeigt `Matthew Dus… — S1..S5: alle leer`.
+Das betrifft potenziell **alle Charaktere**, deren `reference_image_url` älter als 10 Minuten ist.
 
-## Fix (3 kleine Änderungen, nur Storyboard-Edge-Function + UI-Hinweis)
+## Fix in 3 Schritten
 
-### 1. Prompt-Guidance verschärfen
-In `compose-video-storyboard/index.ts`:
-- "30–50%" → **"mindestens 40–60%, niemals 0"**
-- Explizite Regel: "Wenn der User einen Avatar definiert hat, MUSS er in mindestens `ceil(sceneCount * 0.4)` Szenen vorkommen, mindestens aber in 2."
-- Hook und CTA bleiben bevorzugte Anker, wenn nicht anders sinnvoll.
+### 1. Bug an der Quelle beheben (`src/hooks/useBrandCharacters.ts`)
+- Beim Erstellen statt 10 Min eine **langlebige** Signed URL ausstellen (5 Jahre, gleiches Muster wie schon in `generate-avatar-portrait` für `portrait_url`).
+- Damit werden alle neu erstellten Charaktere ab sofort dauerhaft sichtbar.
 
-### 2. Server-Side Floor (Auto-Repair)
-Nach dem LLM-Call, vor dem Response:
-- Zähle wie viele Szenen ein gültiges `characterShot` (≠ absent) haben.
-- Wenn `< max(2, ceil(N * 0.4))` und `briefing.characters.length > 0`:
-  - Wähle die fehlenden Szenen heuristisch (bevorzugt Hook → CTA → mittlere Szene), die noch `absent` sind und **nicht** rein produkt-/B-Roll-typisch sind.
-  - Setze dort `characterShot = { characterId: <primary>, shotType: 'profile' | 'detail' | 'silhouette' }` (rotierend, damit Variety bleibt).
-  - Stelle sicher, dass für diese Szenen nicht `clipSource='stock'` gesetzt wird (Re-Run von `pickClipSource` mit dem neuen Shot).
+### 2. Bestehende Charaktere reparieren (Backfill)
+Neue Edge-Function `repair-brand-character-urls` (oder einmaliges SQL+Storage-Script):
+- Liest alle `brand_characters` mit gesetztem `storage_path`.
+- Erzeugt für jedes eine neue 5-Jahres-Signed-URL.
+- Schreibt sie in `reference_image_url` zurück.
+- Macht das Gleiche für `portrait_url`, falls dort ein abgelaufenes Token steht (Pfad ist `…/portraits/…`).
+- Wird einmal manuell aufgerufen, läuft idempotent.
 
-### 3. UI-Hinweis (defensiv)
-In `CastConsistencyMap.tsx`: Wenn ein Charakter in **0** Szenen erscheint, kleines Warn-Banner unter der Tabelle:
-> „Matthew Dus… kommt in keiner Szene vor. Klicke in einer Szene auf den Charakter-Button, um ihn als Anker hinzuzufügen — oder generiere das Storyboard neu."
+### 3. Defensive UI-Komponente
+Kleiner Wrapper `<AvatarImage character={…} />`, der bei `onError` automatisch eine frische Signed URL über eine RPC/Edge-Function nachlädt. Optional, aber verhindert das gleiche Problem in Zukunft falls sich Tokens irgendwann doch ändern.
 
-Kein Backend-Refactor, keine DB-Änderung, keine Logik in `compose-video-clips`.
+## Technische Details
+- Bucket: `brand-characters`, RLS verlangt `user_id` als ersten Pfad-Segment — bleibt unverändert.
+- Lebensdauer: `60 * 60 * 24 * 365 * 5` Sekunden (~5 Jahre, wie in `generate-avatar-portrait`).
+- Keine DB-Migration nötig, nur UPDATE-Statements auf `brand_characters`.
+- `useBrandCharacters.createCharacter`: Die kurzlebige URL für die KI-Extraction kann bestehen bleiben (10 Min reichen für den Edge-Function-Call), aber die in der DB gespeicherte URL muss separat als langlebige Variante geschrieben werden.
 
-## Erwartetes Ergebnis
-Bei 5 Szenen + 1 definierter Avatar erscheinen automatisch **mindestens 2 Szenen** mit Matthew als Anker (mit Reference-Image-Anchor → 🟢 in der Cast Map), Reference-Image-URL wird wie zuletzt implementiert für i2v genutzt.
+## Ergebnis
+Nach Approval: Matthew Dusatko (und alle anderen) zeigen wieder ihr Portraitbild — sowohl in der Avatar-Bibliothek als auch im Talking-Head-Dialog ("Use original image" wird wieder klickbar mit echter Vorschau).
