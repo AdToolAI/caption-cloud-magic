@@ -185,10 +185,9 @@ Available characters:
 ${charList}
 
 CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
-- The character is a recurring NARRATIVE ANCHOR, NOT the subject of every shot. The story comes first.
-- DEFAULT for every scene = NO character (shotType="absent" or omit characterShot entirely).
-- Only feature the character in scenes where the storyline genuinely calls for them. Environmental, atmospheric, product, location, b-roll and metaphorical scenes are equally valuable and should NOT be forced to include the character.
-- Aim for the character to actually appear in roughly 30–50% of the scenes — not more. The remaining majority of scenes focus on world, mood, objects, environments, action without the character, abstract beats, or the product itself.
+- The character is a recurring NARRATIVE ANCHOR. They MUST appear in a meaningful share of scenes.
+- 🚨 HARD MINIMUM: When the user has defined a character, that character MUST be featured (characterShot.shotType ≠ "absent") in **at least 40–60% of all scenes**, and **never in zero scenes**. The Hook (scene 1) and CTA (last scene) are strongly preferred anchor points unless the brief makes that impossible.
+- Beyond the minimum, you may also include environmental, product, or atmospheric scenes WITHOUT the character — but those are the supporting cast, not the majority.
 
 WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
 - "full": full character visible (rare — reserve for 1, maybe 2 hero/establishing moments). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
@@ -197,12 +196,13 @@ WHEN you do feature the character, vary the framing across those scenes (no quot
 - "pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
 
 CRITICAL RULES:
-- If a scene works narratively without the character, ALWAYS prefer "absent" / no characterShot. Do not invent reasons to insert the character.
+- 🚨 The character MUST appear in at least ceil(sceneCount * 0.4) scenes (minimum 2). Never return a storyboard where the character is absent from every scene.
+- Prefer the Hook and CTA scenes as character anchors unless the brief explicitly says otherwise.
 - Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
 - ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
 - DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
 - For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
-- For scenes WITHOUT any character (the majority), omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
+- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
 
 If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
 })()}
@@ -237,7 +237,7 @@ ${structure}
 🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
 
 ${(briefing.characters && briefing.characters.length > 0)
-  ? `🎭 CHARACTER GUIDANCE: The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => c.name).join(', ')}. Use them as a NARRATIVE ANCHOR where the storyline genuinely calls for them — NOT as the subject of every shot. The story comes first. Roughly 30–50% of scenes should feature the character with varied shotType (per the SMART CHARACTER USAGE rules in the system prompt). The remaining majority of scenes should focus on environment, atmosphere, the product, action, or symbolic beats — without the character. For those scenes, omit characterShot entirely. Do NOT force the character into a scene that works better without them.`
+  ? `🎭 CHARACTER GUIDANCE: The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => c.name).join(', ')}. They are the NARRATIVE ANCHOR of this story. The character MUST be featured (characterShot.shotType ≠ "absent") in at least ${Math.max(2, Math.ceil((briefing.duration / 5) * 0.4))} of the scenes — and ideally include the Hook (scene 1) and the CTA (last scene) as anchor moments. Vary the shotType across those scenes per the SMART CHARACTER USAGE rules. Returning a storyboard with zero character scenes is not acceptable.`
   : `🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.`}
 
 Generate the storyboard using the create_storyboard function.`;
@@ -452,6 +452,42 @@ Generate the storyboard using the create_storyboard function.`;
           : {}),
       };
     });
+
+    // 🛡️ SERVER-SIDE CHARACTER FLOOR — auto-repair if LLM returned 0 / too few
+    // character scenes despite the user defining a recurring avatar.
+    if (hasCharacters && scenes.length > 0) {
+      const primaryCharId = briefing.characters![0].id;
+      const minRequired = Math.max(2, Math.ceil(scenes.length * 0.4));
+      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent';
+      const currentCount = scenes.filter(hasShot).length;
+
+      if (currentCount < minRequired) {
+        const needed = minRequired - currentCount;
+        const candidateOrder: number[] = [0];
+        if (scenes.length > 1) candidateOrder.push(scenes.length - 1);
+        for (let i = 1; i < scenes.length - 1; i++) candidateOrder.push(i);
+
+        const rotation: Array<'profile' | 'detail' | 'silhouette' | 'back' | 'full'> =
+          ['profile', 'detail', 'silhouette', 'back', 'full'];
+        let inserted = 0;
+        let rotIdx = 0;
+        for (const idx of candidateOrder) {
+          if (inserted >= needed) break;
+          const sc = scenes[idx];
+          if (hasShot(sc)) continue;
+          const shotType = rotation[rotIdx % rotation.length];
+          rotIdx++;
+          sc.characterShot = { characterId: primaryCharId, shotType };
+          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
+          if (newSource !== sc.clipSource) {
+            sc.clipSource = newSource;
+            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
+          }
+          inserted++;
+        }
+        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount}, need ${minRequired})`);
+      }
+    }
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
