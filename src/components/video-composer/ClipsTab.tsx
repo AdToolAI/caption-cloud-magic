@@ -66,6 +66,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
+  const { save: saveSceneToLibrary, savingSceneId, savedSceneIds } = useSaveSceneToLibrary();
   // Library for @-mention resolution at generation time
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   const { characters: brandChars } = useBrandCharacters();
