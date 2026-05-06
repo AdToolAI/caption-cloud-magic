@@ -212,7 +212,7 @@ WHEN you do feature the character, vary the framing across those scenes (no quot
 - "pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
 
 CRITICAL RULES:
-- 🚨 The character MUST appear within their per-character target range (see "frequency" tag in the list above). For `cameo` aim for the LOW end (1–2 scenes only). For `lead` aim for the HIGH end. Never return a storyboard where a character is absent from every scene.
+- 🚨 The character MUST appear within their per-character target range (see "frequency" tag in the list above). For \`cameo\` aim for the LOW end (1–2 scenes only). For \`lead\` aim for the HIGH end. Never return a storyboard where a character is absent from every scene.
 - Prefer the Hook and CTA scenes as character anchors unless the brief explicitly says otherwise.
 - Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
 - ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
