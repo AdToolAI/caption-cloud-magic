@@ -202,7 +202,7 @@ ${charList}
 
 CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
 - The character is a recurring NARRATIVE ANCHOR. They MUST appear in a meaningful share of scenes.
-- 🚨 USER-CHOSEN FREQUENCY: Each character has a "frequency" tag — `cameo` (1–2 scenes only, ≈15–40%), `balanced` (40–60%, the default), or `lead` (80–100%, almost every scene). RESPECT THE TARGET RANGE listed for each character. Do NOT exceed the upper bound for cameo characters and do NOT fall below the lower bound for any character.
+- 🚨 USER-CHOSEN FREQUENCY: Each character has a "frequency" tag — \`cameo\` (1–2 scenes only, ≈15–40%), \`balanced\` (40–60%, the default), or \`lead\` (80–100%, almost every scene). RESPECT THE TARGET RANGE listed for each character. Do NOT exceed the upper bound for cameo characters and do NOT fall below the lower bound for any character.
 - Beyond the minimum, you may also include environmental, product, or atmospheric scenes WITHOUT the character — but those are the supporting cast, not the majority.
 
 WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
