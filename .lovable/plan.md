@@ -1,46 +1,52 @@
-## Root cause
 
-Deine Mediathek (`video_creations`) bekommt seit dem 02.05. keine neuen Einträge mehr — **nicht weil Auto-Cleanup falsch löscht**, sondern weil deine neueren Renders gar nicht erst gespeichert werden.
+## Bestätigte Ursache
 
-Was die DB zeigt:
-- Letzter `ai_video_generations`-Eintrag: 02.05.2026 (Solo-Generator HappyHorse)
-- Seit 03.05. nur noch **Composer-Projekte** (`composer_projects` / `composer_scenes`): 5 Projekte, alle mit ready Clips
-- Wallet wurde brav belastet (24 Transaktionen seit 03.05.), aber `generation_id` zeigt auf `composer_projects`-IDs, nicht auf `ai_video_generations`
-- Auto-Save-Trigger `auto_save_ai_video_to_library_trg` hängt aber **ausschließlich an `ai_video_generations`** — Composer-Clips lösen ihn nie aus
+DB-Beweise (gerade abgefragt):
+- `video_creations` für deinen User: 209 Zeilen mit `metadata.source='motion-studio-clip'`, **alle mit `created_at = 2026-05-06 20:35:17.825355+00`** (= Zeitpunkt der Backfill-Migration von gestern).
+- Echte Render-Zeit liegt aber in `composer_scenes.updated_at` (z. B. 20:17:24, 19:28:29, …).
+- Sowohl Dashboard-Carousel als auch Mediathek sortieren `ORDER BY created_at DESC LIMIT N` → bei 209 identischen Timestamps liefert Postgres **eine willkürliche** 10er-/N-Auswahl. Deshalb siehst du an beiden Stellen denselben „eingefrorenen" Stapel statt deiner echten letzten Clips.
+- Titel sind generisch („Video 62537168") weil das Backfill kein `metadata.title` gesetzt hat.
 
-→ Ergebnis: Du nutzt seit 4 Tagen primär den Motion Studio / Composer, dessen fertige Clips & Stitches **nie in die Mediathek wandern**. Auto-Cleanup ist unschuldig.
+Neue Clips ab jetzt bekommen über den Trigger korrekt `created_at = now()` — aber 209 Backfill-Zeilen blockieren die Sortierung.
 
 ## Plan
 
-### 1. Composer-Clips automatisch in die Mediathek speichern
-In `supabase/functions/compose-video-clips/index.ts` an der Stelle, wo eine Szene nach Webhook/Polling auf `clip_status='ready'` gesetzt wird (auch in `replicate-webhook` und in `compose-video-assemble`), zusätzlich einen `video_creations`-Insert ausführen:
+### 1. Backfill-Timestamps korrigieren
+SQL-Update auf `video_creations` für alle Composer-Clips mit dem Backfill-Stempel: `created_at` aus `composer_scenes.updated_at` (echte Ready-Zeit) übernehmen, Fallback auf `composer_projects.created_at`.
 
-```ts
-await supabaseAdmin.from('video_creations').insert({
-  user_id, output_url: clip_url, status: 'completed', credits_used: 0,
-  metadata: { source: 'motion-studio-clip', composer_scene_id, composer_project_id, model: clipSource }
-});
+```sql
+UPDATE video_creations vc
+SET created_at = COALESCE(cs.updated_at, cp.created_at, vc.created_at)
+FROM composer_scenes cs
+JOIN composer_projects cp ON cp.id = cs.project_id
+WHERE vc.metadata->>'source' = 'motion-studio-clip'
+  AND vc.metadata->>'scene_id' = cs.id::text
+  AND vc.created_at = TIMESTAMPTZ '2026-05-06 20:35:17.825355+00';
 ```
-Idempotent über `metadata @> {composer_scene_id}` Check (analog zum bestehenden `ai_generation_id`-Pattern).
 
-### 2. Composer-Stitch (final montiertes Video) speichern
-In `compose-video-assemble` nach erfolgreichem Render des finalen Stitches denselben Insert mit `source: 'motion-studio-stitch'` und `composer_project_id` ausführen.
+### 2. Sprechende Titel nachziehen
+Titel aus Projekt-Name + Szenen-Order setzen, damit Dashboard/Mediathek nicht „Video abc12345" zeigt.
 
-### 3. Backfill der letzten 4 Tage
-SQL-Migration, die für alle `composer_scenes` mit `clip_status='ready'` und `clip_url IS NOT NULL` der letzten 14 Tage einen `video_creations`-Eintrag nachzieht — sofern nicht bereits vorhanden. Damit sind deine fehlenden Videos vom 03.–06.05. sofort wieder da.
+```sql
+UPDATE video_creations vc
+SET metadata = vc.metadata || jsonb_build_object(
+  'title', COALESCE(cp.title, 'Composer-Video') ||
+           ' · Szene ' || (COALESCE((vc.metadata->>'scene_order')::int, 0) + 1)
+)
+FROM composer_scenes cs JOIN composer_projects cp ON cp.id = cs.project_id
+WHERE vc.metadata->>'source' = 'motion-studio-clip'
+  AND vc.metadata->>'scene_id' = cs.id::text
+  AND (vc.metadata ? 'title') = false;
+```
 
-### 4. Trigger erweitern (Verteidigung in Tiefe)
-`auto_save_ai_video_to_library_trg` triggert nur auf `ai_video_generations`. Zusätzlich einen Trigger auf `composer_scenes AFTER UPDATE OF clip_status` legen, der bei Übergang `→ ready` ebenfalls in `video_creations` inserted. Damit ist auch jeder zukünftige neue Composer-Pfad automatisch abgedeckt.
+### 3. Trigger-Funktion ergänzen (für die Zukunft)
+`archive_composer_scene_to_library` so erweitern, dass sie für jede neue Composer-Szene direkt `metadata.title` (Projektname + Szene N) mitschreibt. Verhindert, dass künftig wieder generische Titel auftauchen.
 
-### 5. Sanity-Check Cleanup-Limits
-`enforce_user_video_library_limits(_user_id, 500, 10240)` lassen wie es ist — der greift erst ab 500 Videos / 10 GB und du bist mit ~25 Items weit drunter. Keine Änderung nötig.
+### 4. Verifikation (mache ich selbst per read_query)
+- `SELECT created_at, metadata->>'title' FROM video_creations WHERE source='motion-studio-clip' ORDER BY created_at DESC LIMIT 10;` → muss eine echte zeitliche Spreizung über mehrere Tage zeigen, **nicht** 10× denselben Timestamp.
+- Carousel/Mediathek nach Reload → deine wirklich zuletzt erzeugten Clips erscheinen oben mit Projekt-/Szenennamen.
 
-### 6. Verifikation
-Nach Migration:
-- `SELECT count(*) FROM video_creations WHERE user_id='8948…' AND created_at > '2026-05-03'` → sollte den Backfill-Count zeigen
-- Dashboard-Carousel neu laden, deine Renders der letzten Tage müssen erscheinen
-
-## Was NICHT geändert wird
-- Auto-Cleanup-Funktion bleibt unangetastet
-- Bestehende `ai_video_generations` → `video_creations` Trigger bleibt
-- Solo-Generatoren (HappyHorse, Hailuo, Kling…) brauchen keine Änderung — die schreiben bereits korrekt
+## Was nicht angefasst wird
+- Trigger `archive_composer_scene_trg` selbst (funktioniert für neue Clips korrekt).
+- Auto-Cleanup, Wallet-Logik, Composer-Renderpfad.
+- Bestehende Nicht-Composer-Einträge in `video_creations`.
