@@ -21,7 +21,7 @@ import { toast } from "sonner";
 import { FeatureGrid } from "@/components/home/FeatureGrid";
 import { DashboardVideoCarousel } from "@/components/dashboard/DashboardVideoCarousel";
 import { FirstVideoExpressHero } from "@/components/dashboard/FirstVideoExpressHero";
-import { StreakCard } from "@/components/streak/StreakCard";
+
 
 import { useNewsRadar } from "@/hooks/useNewsRadar";
 import { RecoCard } from "@/features/recommendations/RecoCard";
@@ -778,17 +778,10 @@ const Home = () => {
           </Section>
         )}
 
-        {/* Recent Activity (2/3) + Streak (1/3) */}
+        {/* Recent Activity — full width */}
         {user && (
           <Section title={t("dashboard.sections.recentActivity")}>
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                <RecentActivityFeed />
-              </div>
-              <div>
-                <StreakCard />
-              </div>
-            </div>
+            <RecentActivityFeed />
           </Section>
         )}
 
