@@ -185,10 +185,9 @@ Available characters:
 ${charList}
 
 CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
-- The character is a recurring NARRATIVE ANCHOR, NOT the subject of every shot. The story comes first.
-- DEFAULT for every scene = NO character (shotType="absent" or omit characterShot entirely).
-- Only feature the character in scenes where the storyline genuinely calls for them. Environmental, atmospheric, product, location, b-roll and metaphorical scenes are equally valuable and should NOT be forced to include the character.
-- Aim for the character to actually appear in roughly 30–50% of the scenes — not more. The remaining majority of scenes focus on world, mood, objects, environments, action without the character, abstract beats, or the product itself.
+- The character is a recurring NARRATIVE ANCHOR. They MUST appear in a meaningful share of scenes.
+- 🚨 HARD MINIMUM: When the user has defined a character, that character MUST be featured (characterShot.shotType ≠ "absent") in **at least 40–60% of all scenes**, and **never in zero scenes**. The Hook (scene 1) and CTA (last scene) are strongly preferred anchor points unless the brief makes that impossible.
+- Beyond the minimum, you may also include environmental, product, or atmospheric scenes WITHOUT the character — but those are the supporting cast, not the majority.
 
 WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
 - "full": full character visible (rare — reserve for 1, maybe 2 hero/establishing moments). Include BOTH appearance + signatureItems verbatim at the start of aiPrompt.
