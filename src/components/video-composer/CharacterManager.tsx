@@ -47,6 +47,13 @@ const labels = {
       'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).',
     empty: 'Keine Charaktere definiert.',
     delete: 'Löschen',
+    frequency: 'Auftritte im Storyboard',
+    freqCameo: 'Cameo',
+    freqCameoHint: '1–2 Szenen — kurzer Auftritt',
+    freqBalanced: 'Ausgewogen',
+    freqBalancedHint: '40–60% der Szenen (Standard)',
+    freqLead: 'Hauptrolle',
+    freqLeadHint: 'In fast jeder Szene präsent',
   },
   en: {
     title: 'Characters (optional)',
