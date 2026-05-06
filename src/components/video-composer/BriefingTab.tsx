@@ -627,45 +627,10 @@ export default function BriefingTab({
       />
 
       {/* Recurring Characters — drives consistency across scenes */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setLibraryPickerOpen(true)}
-            className="gap-1.5"
-          >
-            <Library className="h-3.5 w-3.5" />
-            {language === 'de'
-              ? 'Aus Library wählen'
-              : language === 'es'
-                ? 'Elegir de Library'
-                : 'Pick from Library'}
-          </Button>
-        </div>
-        <CharacterManager
-          characters={briefing.characters || []}
-          language={language}
-          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-        />
-      </div>
-
-      <LibraryPicker
-        open={libraryPickerOpen}
-        onOpenChange={setLibraryPickerOpen}
-        modes={['character']}
-        selectedCharacterIds={(briefing.characters || [])
-          .filter((c) => c.id.startsWith('lib:'))
-          .map((c) => c.id.slice(4))}
-        onSelect={handleLibraryPick}
-        title={
-          language === 'de'
-            ? 'Charakter aus Library hinzufügen'
-            : language === 'es'
-              ? 'Añadir personaje desde Library'
-              : 'Add character from Library'
-        }
+      <CharacterManager
+        characters={briefing.characters || []}
+        language={language}
+        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
       />
 
       {/* Visual Style — drives consistent look across all AI-generated scenes */}
