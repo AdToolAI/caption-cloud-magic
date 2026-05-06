@@ -187,7 +187,11 @@ Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo 
   const charList = chars.map(c => {
     const appearance = c.appearance ? `appearance="${c.appearance}"` : 'appearance=(none provided)';
     const items = c.signatureItems ? `signatureItems="${c.signatureItems}"` : 'signatureItems=(none provided)';
-    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}`;
+    const freq = c.appearanceFrequency || 'balanced';
+    const r = freqRange(freq);
+    const minS = Math.max(1, Math.ceil(targetSceneCount * r.min));
+    const maxS = Math.max(minS, Math.floor(targetSceneCount * r.max));
+    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}, frequency="${freq}" (target ${minS}–${maxS} of ${targetSceneCount} scenes)`;
   }).join('\n');
 
   return `🎭 SMART CHARACTER USAGE (the user defined recurring characters):
