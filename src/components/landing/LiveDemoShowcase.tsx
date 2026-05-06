@@ -6,6 +6,8 @@ import restaurantBefore from "@/assets/landing/live-demo/restaurant-before.png";
 import restaurantAfter from "@/assets/landing/live-demo/restaurant-after.png";
 import fitnessBefore from "@/assets/landing/live-demo/fitness-before.png";
 import fitnessAfter from "@/assets/landing/live-demo/fitness-after.png";
+import fashionBefore from "@/assets/landing/live-demo/fashion-before.png";
+import fashionAfter from "@/assets/landing/live-demo/fashion-after.png";
 
 interface DemoCase {
   id: string;
@@ -34,8 +36,8 @@ const cases: DemoCase[] = [
     id: "fashion",
     industryKey: "landing.liveDemo.cases.fashion.industry",
     metricKey: "landing.liveDemo.cases.fashion.metric",
-    before: { captionKey: "landing.liveDemo.cases.fashion.before" },
-    after: { captionKey: "landing.liveDemo.cases.fashion.after" },
+    before: { captionKey: "landing.liveDemo.cases.fashion.before", image: fashionBefore },
+    after: { captionKey: "landing.liveDemo.cases.fashion.after", image: fashionAfter },
   },
 ];
 
