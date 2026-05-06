@@ -5,7 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, User, Lightbulb } from 'lucide-react';
+import { Plus, Trash2, User, Lightbulb, Library, Sparkles, ImageIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
+import { buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import type { ComposerCharacter } from '@/types/video-composer';
 
 interface CharacterManagerProps {
