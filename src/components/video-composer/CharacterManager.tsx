@@ -24,6 +24,15 @@ const labels = {
     subtitle:
       'Hilft der KI, Personen über mehrere Szenen hinweg ähnlich aussehen zu lassen — exakte Gesichts-Identität ist mit Text-zu-Video technisch nicht möglich.',
     add: 'Charakter hinzufügen',
+    pickFromLibrary: 'Aus Avatar-Bibliothek wählen',
+    pickerTitle: 'Avatar als Charakter verknüpfen',
+    pickerDesc:
+      'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.',
+    pickerEmpty: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.',
+    use: 'Verknüpfen',
+    anchorBadge: 'Portrait-Anker aktiv',
+    anchorHint:
+      'Dieser Charakter ist mit einem Avatar verknüpft. Sein Portrait wird automatisch als erster Frame (i2v) genutzt — höchste Gesichts-Konsistenz.',
     name: 'Name',
     namePlaceholder: 'z. B. Richard Löwenherz',
     appearance: 'Aussehen (Englisch empfohlen)',
@@ -34,7 +43,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro-Tipp: Sherlock-Holmes-Effekt',
     proTipBody:
-      'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Die KI variiert automatisch Kamerawinkel, damit nicht jede Szene ein Gesichts-Closeup ist.',
+      'Beschreibe markante Kleidung & Objekte ausführlich (Mantel, Krone, Waffe). Die KI wiederholt diese viel zuverlässiger als Gesichter — der Zuschauer erkennt die Person daran. Für echte Gesichts-Konsistenz nutze einen Avatar aus der Bibliothek (Button oben rechts).',
     empty: 'Keine Charaktere definiert.',
     delete: 'Löschen',
   },
@@ -43,6 +52,15 @@ const labels = {
     subtitle:
       'Helps the AI keep people looking similar across scenes — pixel-perfect face identity is technically impossible with text-to-video.',
     add: 'Add character',
+    pickFromLibrary: 'Pick from Avatar Library',
+    pickerTitle: 'Link an avatar as character',
+    pickerDesc:
+      'Link an avatar from your library. Its portrait is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
+    pickerEmpty: 'No avatars in your library yet. Create one under "Avatars".',
+    use: 'Link',
+    anchorBadge: 'Portrait anchor active',
+    anchorHint:
+      'This character is linked to an avatar. The portrait is automatically used as the first frame (i2v) for maximum face consistency.',
     name: 'Name',
     namePlaceholder: 'e.g. Richard the Lionheart',
     appearance: 'Appearance (English recommended)',
@@ -53,7 +71,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Pro tip: the Sherlock Holmes effect',
     proTipBody:
-      'Describe signature clothing & objects in detail (cloak, crown, weapon). The AI repeats these far more reliably than faces — viewers recognise the person by them. The AI also varies camera angles automatically so not every scene is a face close-up.',
+      'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link an avatar from your library (button top-right).',
     empty: 'No characters defined.',
     delete: 'Delete',
   },
@@ -62,6 +80,15 @@ const labels = {
     subtitle:
       'Ayuda a la IA a mantener a las personas con apariencia similar entre escenas — la identidad facial exacta no es técnicamente posible con texto a vídeo.',
     add: 'Añadir personaje',
+    pickFromLibrary: 'Elegir de la biblioteca de avatares',
+    pickerTitle: 'Vincular un avatar como personaje',
+    pickerDesc:
+      'Vincula un avatar de tu biblioteca. Su retrato se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
+    pickerEmpty: 'No hay avatares en tu biblioteca. Crea uno en "Avatares".',
+    use: 'Vincular',
+    anchorBadge: 'Ancla de retrato activa',
+    anchorHint:
+      'Este personaje está vinculado a un avatar. Su retrato se usa automáticamente como primer frame (i2v) para máxima consistencia facial.',
     name: 'Nombre',
     namePlaceholder: 'p. ej. Ricardo Corazón de León',
     appearance: 'Apariencia (recomendado en inglés)',
@@ -72,7 +99,7 @@ const labels = {
       'crimson tunic with golden lion crest, fur-lined cloak, golden crown with red rubies, ornate longsword',
     proTipTitle: 'Consejo Pro: el efecto Sherlock Holmes',
     proTipBody:
-      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). La IA los repite mucho más fiablemente que los rostros — el espectador reconoce a la persona por ellos. La IA varía automáticamente los ángulos de cámara para que no toda escena sea un primer plano.',
+      'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un avatar de tu biblioteca (botón arriba a la derecha).',
     empty: 'Sin personajes definidos.',
     delete: 'Eliminar',
   },
