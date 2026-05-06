@@ -562,7 +562,7 @@ const Home = () => {
         </section>
       )}
 
-      <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
+      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-10">
         {/* Express start: First-time users with starter credits → Hailuo 2.3 in 90 seconds */}
         {user && <FirstVideoExpressHero />}
 
@@ -722,72 +722,74 @@ const Home = () => {
           <FeatureGrid />
         )}
 
-        {/* Performance + KI-Empfehlungen side by side */}
+        {/* Performance — full width with large KPI cards */}
         {user && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Section title={t("dashboard.sections.performance")} bg="muted">
-              <div className="grid grid-cols-3 gap-3">
-                <MetricCard
-                  label={t("dashboard.metrics.reach7d")}
-                  value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
-                  subtitle={t("dashboard.metrics.vsLastWeek")}
-                  icon={<TrendingUp className="h-4 w-4" />}
-                  trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
-                />
-                <MetricCard
-                  label={t("dashboard.metrics.engagementRate")}
-                  value={`${performanceKPIs.engagementRate}%`}
-                  subtitle={t("dashboard.metrics.avgAllPosts")}
-                  icon={<TrendingUp className="h-4 w-4" />}
-                  trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
-                />
-                <MetricCard
-                  label={t("dashboard.metrics.publishedPosts")}
-                  value={String(performanceKPIs.publishedPosts)}
-                  subtitle={t("dashboard.metrics.thisMonth")}
-                  icon={<Send className="h-4 w-4" />}
-                  trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
-                />
-              </div>
-            </Section>
-            <Section 
-              title={t("reco.title")}
-              action={
-                <Button asChild variant="link">
-                  <Link to="/personalized-dashboard">
-                    {t("homePage.personalizedDashboard")} →
-                  </Link>
-                </Button>
-              }
-            >
-              <RecoCard />
-            </Section>
-          </div>
+          <Section title={t("dashboard.sections.performance")} bg="muted">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <MetricCard
+                label={t("dashboard.metrics.reach7d")}
+                value={performanceKPIs.reach >= 1000 ? `${(performanceKPIs.reach / 1000).toFixed(1)}K` : String(performanceKPIs.reach)}
+                subtitle={t("dashboard.metrics.vsLastWeek")}
+                icon={<TrendingUp className="h-4 w-4" />}
+                trend={{ value: Math.abs(performanceKPIs.reachTrend), isPositive: performanceKPIs.reachTrend >= 0 }}
+              />
+              <MetricCard
+                label={t("dashboard.metrics.engagementRate")}
+                value={`${performanceKPIs.engagementRate}%`}
+                subtitle={t("dashboard.metrics.avgAllPosts")}
+                icon={<TrendingUp className="h-4 w-4" />}
+                trend={{ value: Math.abs(performanceKPIs.engagementTrend), isPositive: performanceKPIs.engagementTrend >= 0 }}
+              />
+              <MetricCard
+                label={t("dashboard.metrics.publishedPosts")}
+                value={String(performanceKPIs.publishedPosts)}
+                subtitle={t("dashboard.metrics.thisMonth")}
+                icon={<Send className="h-4 w-4" />}
+                trend={{ value: Math.abs(performanceKPIs.postsTrend), isPositive: performanceKPIs.postsTrend >= 0 }}
+              />
+            </div>
+          </Section>
         )}
 
-        {/* Heatmap + Recent Activity side by side */}
+        {/* AI Recommendations — own row, full width */}
         {user && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Section 
-              title={t("dashboard.sections.bestTimes")}
-            >
-              <BestTimeHeatmap 
-                heatmap={heatmapData} 
-                loading={postingTimesLoading}
-                onViewDetails={() => navigate('/posting-times')}
-              />
-            </Section>
-            <Section title={t("dashboard.sections.recentActivity")} bg="muted">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <RecentActivityFeed />
-                </div>
-                <div>
-                  <StreakCard />
-                </div>
+          <Section
+            title={t("reco.title")}
+            action={
+              <Button asChild variant="link">
+                <Link to="/personalized-dashboard">
+                  {t("homePage.personalizedDashboard")} →
+                </Link>
+              </Button>
+            }
+          >
+            <RecoCard />
+          </Section>
+        )}
+
+        {/* Heatmap — full width */}
+        {user && (
+          <Section title={t("dashboard.sections.bestTimes")} bg="muted">
+            <BestTimeHeatmap
+              heatmap={heatmapData}
+              loading={postingTimesLoading}
+              onViewDetails={() => navigate('/posting-times')}
+            />
+          </Section>
+        )}
+
+        {/* Recent Activity (2/3) + Streak (1/3) */}
+        {user && (
+          <Section title={t("dashboard.sections.recentActivity")}>
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2">
+                <RecentActivityFeed />
               </div>
-            </Section>
-          </div>
+              <div>
+                <StreakCard />
+              </div>
+            </div>
+          </Section>
         )}
 
       </div>
