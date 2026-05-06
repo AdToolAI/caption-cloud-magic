@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2 } from 'lucide-react';
+import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2, Save, Check } from 'lucide-react';
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
+import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import {
@@ -65,6 +66,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
+  const { save: saveSceneToLibrary, savingSceneId, savedSceneIds } = useSaveSceneToLibrary();
   // Library for @-mention resolution at generation time
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
   const { characters: brandChars } = useBrandCharacters();
@@ -781,6 +783,30 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                         Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
+                    {/* Save single scene to media library (manual, no auto-save) */}
+                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                      const isSaved = savedSceneIds.has(scene.id);
+                      const isSaving = savingSceneId === scene.id;
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1 text-[10px] h-7 px-2 border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-60"
+                          title={isSaved ? 'Diese Szene ist bereits in deiner Mediathek' : 'Diese Szene als eigenständigen Clip in deiner Mediathek ablegen'}
+                          disabled={isSaving || isSaved}
+                          onClick={() => saveSceneToLibrary(scene, projectId)}
+                        >
+                          {isSaving ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : isSaved ? (
+                            <Check className="h-3 w-3" />
+                          ) : (
+                            <Save className="h-3 w-3" />
+                          )}
+                          {isSaved ? 'Gespeichert' : 'In Mediathek'}
+                        </Button>
+                      );
+                    })()}
                     {/* Frame-to-Shot Continuity → use last frame as next scene's start */}
                     {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
                       const next = scenes[i + 1];

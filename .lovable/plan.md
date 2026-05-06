@@ -1,30 +1,43 @@
-## Problem
-Klick auf "Repair images" → Toast "Edge Function returned a non-2xx status code".
-Edge-Function-Logs zeigen: `[repair-brand-character-urls] error: Unauthorized`.
+## Goal
+Im Motion Studio (Composer → Clips-Tab) soll **jede einzelne Szene** über einen kleinen Button manuell in der Mediathek gespeichert werden können — Auto-Save bleibt bewusst aus, damit die Library nicht mit Throwaway-Szenen vollläuft.
 
-Ursache: In `supabase/functions/repair-brand-character-urls/index.ts` wird der User über
-```ts
-const supabaseUser = createClient(URL, ANON, { global: { headers: { Authorization: authHeader } } });
-await supabaseUser.auth.getUser();
-```
-geholt. Bei aktivem JWT-Verify-Default kommt das Token aber gar nicht in der Funktion an, bzw. `getUser()` ohne explizites Token schlägt fehl. Außerdem fehlt für diese Function ein expliziter `verify_jwt`-Eintrag in `supabase/config.toml`, der das Verhalten deterministisch macht.
+## UX
 
-## Fix in 2 kleinen Schritten
+In der `ClipsTab`-Szenenleiste (rechts neben "Neu generieren" / "Continuity → #X") erscheint bei jeder Szene mit `clipStatus === 'ready'` und vorhandener `clipUrl` ein neuer Button:
 
-### 1. `supabase/config.toml`
-Funktions-Block hinzufügen, damit das JWT garantiert an die Function durchgereicht wird:
-```
-[functions.repair-brand-character-urls]
-verify_jwt = false
-```
+- Icon: `Save` (lucide)
+- Text: **"In Mediathek"** (nach erfolgreichem Save: **"Gespeichert ✓"**, disabled)
+- Style: konsistent zu den anderen 7-px-Outline-Buttons (gold-Akzent, James-Bond-2028-Tokens — keine hardcoded Farben)
+- Tooltip: *"Diese Szene als eigenständigen Clip in deiner Mediathek ablegen"*
 
-### 2. `supabase/functions/repair-brand-character-urls/index.ts`
-Auth robust machen — Token explizit aus dem Authorization-Header extrahieren und `getUser(token)` aufrufen, statt sich auf den Header-Fallback zu verlassen:
-```ts
-const token = authHeader.replace(/^Bearer\s+/i, '');
-const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-if (error || !user) throw new Error('Unauthorized');
-```
-Der bestehende Service-Role-Client (`supabaseAdmin`) wird sowieso schon für Storage/DB benutzt — der separate User-Client kann entfallen.
+Toast bei Erfolg: *"Szene in Mediathek gespeichert"* mit Action-Button *"Öffnen"* → `/video-management`.
 
-Danach Re-Deploy + Test des "Repair images"-Buttons. Erwartung: 200er Response mit `{ repaired: 1, total: 1 }` und Matthews Bild lädt wieder.
+## Technische Umsetzung
+
+### 1. Neue Edge Function `save-composer-scene-to-library`
+   - Input: `{ project_id, scene_id, clip_url, prompt, duration_seconds, clip_source, clip_quality }`
+   - Auth: Bearer-Token → `supabaseAdmin.auth.getUser(token)` (gleiches Pattern wie `repair-brand-character-urls`)
+   - Schritte:
+     1. Idempotenz-Check via `video_creations.metadata @> { composer_scene_id: scene_id }`
+     2. Download der `clip_url` (Replicate-CDN, 30 s Timeout) → Blob
+     3. Upload nach `ai-videos/<user_id>/composer-<scene_id>.mp4` (gleicher Bucket wie Sora-Saves)
+     4. Insert in `public.video_creations` mit `metadata = { source: 'video-composer', composer_scene_id, composer_project_id, prompt, clip_source, clip_quality }`, `credits_used: 0`
+   - Refund-Verhalten: keine Credits berührt — Generierung wurde bereits separat bezahlt
+   - `verify_jwt = false` in `supabase/config.toml` (Pattern wie repair-Function)
+
+### 2. Neuer Hook `useSaveSceneToLibrary`
+   - `src/hooks/useSaveSceneToLibrary.ts`, parallel zu `useAvatarPortrait` (loading, toast, queryClient invalidate für `['video-creations']` und `['media-library']`)
+   - Returnt `{ save(scene, projectId), saving, savedSceneIds: Set<string> }` — letzteres aus `sessionStorage` gehydriert, damit Re-Mounts den "Gespeichert ✓"-Zustand behalten
+
+### 3. UI-Integration
+   - `src/components/video-composer/ClipsTab.tsx`: Hook importieren, Button im Action-Cluster (~Zeile 783, direkt nach "Re-roll") einfügen
+   - Conditional rendering identisch zu Re-roll: `scene.clipStatus === 'ready' && scene.clipUrl`
+
+### 4. Keine Schema-Änderung nötig
+   - `video_creations` existiert mit `metadata jsonb` und akzeptiert beliebige Keys
+   - `ai-videos`-Bucket existiert bereits und nutzt `<user_id>/...`-Pfad-Konvention (RLS-konform)
+
+## Out of Scope
+- Kein Auto-Save beim Generieren (bewusst — User-Wunsch)
+- Kein Bulk-Save-All-Button (kann später nachgereicht werden)
+- Keine Änderung am Render-Pipeline-Flow / Stitch-Output (der wird bereits separat persistiert)
