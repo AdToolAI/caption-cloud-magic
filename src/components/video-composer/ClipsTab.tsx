@@ -441,7 +441,12 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: targetScene.referenceImageUrl || composedSingle.referenceImageUrl || brandCharacterInput?.referenceImageUrl,
+            referenceImageUrl: (() => {
+              const cm = targetScene.characterShot && targetScene.characterShot.shotType !== 'absent'
+                ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
+                : undefined;
+              return targetScene.referenceImageUrl || composedSingle.referenceImageUrl || cm?.referenceImageUrl || brandCharacterInput?.referenceImageUrl;
+            })(),
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
