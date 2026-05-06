@@ -4,6 +4,8 @@ import { ArrowRight, TrendingUp, ChevronLeft, ChevronRight } from "lucide-react"
 import { useTranslation } from "@/hooks/useTranslation";
 import restaurantBefore from "@/assets/landing/live-demo/restaurant-before.png";
 import restaurantAfter from "@/assets/landing/live-demo/restaurant-after.png";
+import fitnessBefore from "@/assets/landing/live-demo/fitness-before.png";
+import fitnessAfter from "@/assets/landing/live-demo/fitness-after.png";
 
 interface DemoCase {
   id: string;
@@ -25,8 +27,8 @@ const cases: DemoCase[] = [
     id: "fitness",
     industryKey: "landing.liveDemo.cases.fitness.industry",
     metricKey: "landing.liveDemo.cases.fitness.metric",
-    before: { captionKey: "landing.liveDemo.cases.fitness.before" },
-    after: { captionKey: "landing.liveDemo.cases.fitness.after" },
+    before: { captionKey: "landing.liveDemo.cases.fitness.before", image: fitnessBefore },
+    after: { captionKey: "landing.liveDemo.cases.fitness.after", image: fitnessAfter },
   },
   {
     id: "fashion",
