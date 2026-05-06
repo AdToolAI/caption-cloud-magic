@@ -8730,6 +8730,8 @@ export const translations: Record<Language, any> = {
           brandLock: { name: "Brand Character Lock", tagline: "Persistente Charaktere über alle Studios." }
         }
       },
+      pricing: {
+        title1: "Ein Plan. ",
         title2: "Alles inklusive.",
         subtitle: "14 Tage kostenlos · Keine Kreditkarte nötig · Jederzeit kündbar.",
         perMonth: "/Monat",
