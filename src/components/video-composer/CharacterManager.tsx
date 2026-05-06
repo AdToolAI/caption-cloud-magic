@@ -174,6 +174,25 @@ export default function CharacterManager({ characters, language, onChange }: Cha
     setPickerOpen(false);
   };
 
+  const linkLibraryCharacter = (lc: any) => {
+    const libIdToken = `lib:${lc.id}`;
+    if (characters.some((c) => c.id === libIdToken)) {
+      setPickerOpen(false);
+      return;
+    }
+    onChange([
+      ...characters,
+      {
+        id: libIdToken,
+        name: lc.name,
+        appearance: lc.description || '',
+        signatureItems: lc.signature_items || '',
+        referenceImageUrl: lc.reference_image_url || undefined,
+      },
+    ]);
+    setPickerOpen(false);
+  };
+
   const removeCharacter = (id: string) => {
     onChange(characters.filter((c) => c.id !== id));
   };
