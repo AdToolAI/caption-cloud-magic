@@ -87,6 +87,14 @@ export interface ComposerCharacter {
    * - `lead`    → 80–100% — present in nearly every scene
    */
   appearanceFrequency?: 'cameo' | 'balanced' | 'lead';
+  /**
+   * When true, the linked portrait is forced as the i2v first frame for every
+   * scene where the character appears (very rigid, "photo-to-video" look).
+   * Default false — the portrait then only acts as a look reference (description
+   * anchor + signature items in the prompt) so the AI keeps the character
+   * recognisable without locking the opening frame.
+   */
+  usePortraitAsFirstFrame?: boolean;
 }
 
 /**
