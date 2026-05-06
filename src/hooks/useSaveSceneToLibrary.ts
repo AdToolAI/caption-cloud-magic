@@ -55,7 +55,7 @@ export function useSaveSceneToLibrary() {
             project_id: projectId,
             scene_id: scene.id,
             clip_url: scene.clipUrl,
-            prompt: scene.prompt,
+            prompt: scene.aiPrompt,
             duration_seconds: scene.durationSeconds,
             clip_source: scene.clipSource,
             clip_quality: scene.clipQuality,
