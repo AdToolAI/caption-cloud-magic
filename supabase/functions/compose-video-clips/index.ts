@@ -47,6 +47,11 @@ interface ComposerCharacter {
   name: string;
   appearance: string;
   signatureItems: string;
+  /** Optional pre-built identity-card prompt from the Brand Character library. */
+  identityCardPrompt?: string;
+  /** Optional anchor portrait — surfaced for logging; the i2v wiring stays on `scene.referenceImageUrl`. */
+  referenceImageUrl?: string;
+  brandCharacterId?: string;
 }
 
 type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
