@@ -309,6 +309,36 @@ export default function CharacterManager({ characters, language, onChange }: Cha
                   {linked && (
                     <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
                   )}
+                  {/* Frequency toggle: how often this character should appear */}
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">{t.frequency}</Label>
+                    <div className="grid grid-cols-3 gap-1 rounded-md border border-border/40 bg-background/40 p-1">
+                      {([
+                        { v: 'cameo', label: t.freqCameo, hint: t.freqCameoHint, icon: '🎬' },
+                        { v: 'balanced', label: t.freqBalanced, hint: t.freqBalancedHint, icon: '⚖️' },
+                        { v: 'lead', label: t.freqLead, hint: t.freqLeadHint, icon: '⭐' },
+                      ] as const).map((opt) => {
+                        const current = c.appearanceFrequency || 'balanced';
+                        const active = current === opt.v;
+                        return (
+                          <button
+                            key={opt.v}
+                            type="button"
+                            title={opt.hint}
+                            onClick={() => updateCharacter(c.id, { appearanceFrequency: opt.v })}
+                            className={`text-[10px] rounded px-1.5 py-1 transition flex flex-col items-center gap-0.5 ${
+                              active
+                                ? 'bg-primary/15 text-primary border border-primary/40'
+                                : 'text-muted-foreground hover:bg-accent/40 border border-transparent'
+                            }`}
+                          >
+                            <span className="text-xs leading-none">{opt.icon}</span>
+                            <span className="font-medium leading-none">{opt.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div className="space-y-1">
                       <Label className="text-[10px] text-muted-foreground">{t.appearance}</Label>
