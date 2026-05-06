@@ -9,6 +9,7 @@ import { Plus, Trash2, User, Lightbulb, Library, Sparkles, ImageIcon } from 'luc
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
+import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import type { ComposerCharacter } from '@/types/video-composer';
 
