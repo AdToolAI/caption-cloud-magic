@@ -80,6 +80,13 @@ export interface ComposerCharacter {
   referenceImageUrl?: string;
   /** Pre-built identity-card prompt fragment from the Brand Character. */
   identityCardPrompt?: string;
+  /**
+   * How often this character should appear in the storyboard.
+   * - `cameo`   → 1–2 scenes (~20%) — short appearance only
+   * - `balanced` → 40–60% (default — current behaviour)
+   * - `lead`    → 80–100% — present in nearly every scene
+   */
+  appearanceFrequency?: 'cameo' | 'balanced' | 'lead';
 }
 
 /**

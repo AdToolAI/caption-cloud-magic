@@ -28,9 +28,16 @@ type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
 function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: number): Anchor {
   const shot = scene.characterShot;
-  if (!shot || shot.characterId !== character.id || shot.shotType === 'absent') return 'absent';
+  if (!shot || !shot.shotType || shot.shotType === 'absent') return 'absent';
+  // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
+  const idMatch = shot.characterId === character.id;
+  const nameMatch =
+    !!shot.characterId &&
+    !!character.name &&
+    shot.characterId.toLowerCase().includes(character.name.toLowerCase().split(/\s+/)[0]);
+  if (!idMatch && !nameMatch) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
-  if (character.signatureItems?.trim() && scene.clipSource?.startsWith('ai-')) return 'reference';
+  if ((character.signatureItems?.trim() || character.referenceImageUrl) && scene.clipSource?.startsWith('ai-')) return 'reference';
   // First scene with the character → no chain possible, prompt-only
   if (idx === 0) return 'prompt';
   // Otherwise frame-chain anchor (extract-video-last-frame between AI scenes)

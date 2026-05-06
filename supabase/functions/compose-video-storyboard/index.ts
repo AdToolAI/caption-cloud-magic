@@ -18,6 +18,18 @@ interface ComposerCharacter {
   name: string;
   appearance: string;
   signatureItems: string;
+  appearanceFrequency?: 'cameo' | 'balanced' | 'lead';
+}
+
+// Maps user-chosen frequency to a (minRatio, maxRatio) of total scenes.
+// `balanced` matches the previous default behaviour.
+function freqRange(freq?: 'cameo' | 'balanced' | 'lead'): { min: number; max: number } {
+  switch (freq) {
+    case 'cameo': return { min: 0.15, max: 0.4 };
+    case 'lead': return { min: 0.8, max: 1.0 };
+    case 'balanced':
+    default: return { min: 0.4, max: 0.6 };
+  }
 }
 
 type VideoMode = 'video' | 'image' | 'mixed';
@@ -175,7 +187,11 @@ Each scene is generated INDEPENDENTLY by a separate AI video model call (Hailuo 
   const charList = chars.map(c => {
     const appearance = c.appearance ? `appearance="${c.appearance}"` : 'appearance=(none provided)';
     const items = c.signatureItems ? `signatureItems="${c.signatureItems}"` : 'signatureItems=(none provided)';
-    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}`;
+    const freq = c.appearanceFrequency || 'balanced';
+    const r = freqRange(freq);
+    const minS = Math.max(1, Math.ceil(targetSceneCount * r.min));
+    const maxS = Math.max(minS, Math.floor(targetSceneCount * r.max));
+    return `  • id="${c.id}" name="${c.name}" — ${appearance}, ${items}, frequency="${freq}" (target ${minS}–${maxS} of ${targetSceneCount} scenes)`;
   }).join('\n');
 
   return `🎭 SMART CHARACTER USAGE (the user defined recurring characters):
@@ -186,7 +202,7 @@ ${charList}
 
 CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
 - The character is a recurring NARRATIVE ANCHOR. They MUST appear in a meaningful share of scenes.
-- 🚨 HARD MINIMUM: When the user has defined a character, that character MUST be featured (characterShot.shotType ≠ "absent") in **at least 40–60% of all scenes**, and **never in zero scenes**. The Hook (scene 1) and CTA (last scene) are strongly preferred anchor points unless the brief makes that impossible.
+- 🚨 USER-CHOSEN FREQUENCY: Each character has a "frequency" tag — `cameo` (1–2 scenes only, ≈15–40%), `balanced` (40–60%, the default), or `lead` (80–100%, almost every scene). RESPECT THE TARGET RANGE listed for each character. Do NOT exceed the upper bound for cameo characters and do NOT fall below the lower bound for any character.
 - Beyond the minimum, you may also include environmental, product, or atmospheric scenes WITHOUT the character — but those are the supporting cast, not the majority.
 
 WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
@@ -196,7 +212,7 @@ WHEN you do feature the character, vary the framing across those scenes (no quot
 - "pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
 
 CRITICAL RULES:
-- 🚨 The character MUST appear in at least ceil(sceneCount * 0.4) scenes (minimum 2). Never return a storyboard where the character is absent from every scene.
+- 🚨 The character MUST appear within their per-character target range (see "frequency" tag in the list above). For `cameo` aim for the LOW end (1–2 scenes only). For `lead` aim for the HIGH end. Never return a storyboard where a character is absent from every scene.
 - Prefer the Hook and CTA scenes as character anchors unless the brief explicitly says otherwise.
 - Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
 - ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
@@ -237,7 +253,7 @@ ${structure}
 🚨 INTEGRATION REQUIREMENT (non-negotiable): The product must appear *within* real-world scenes — used by people, in real environments, in lifestyle moments. The product is part of the story, not the story itself. Avoid isolated product shots entirely, except for AT MOST ONE hero scene if the briefing genuinely calls for a clean beauty-shot. Every other scene must feature a human or life situation with the product integrated naturally.
 
 ${(briefing.characters && briefing.characters.length > 0)
-  ? `🎭 CHARACTER GUIDANCE: The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => c.name).join(', ')}. They are the NARRATIVE ANCHOR of this story. The character MUST be featured (characterShot.shotType ≠ "absent") in at least ${Math.max(2, Math.ceil((briefing.duration / 5) * 0.4))} of the scenes — and ideally include the Hook (scene 1) and the CTA (last scene) as anchor moments. Vary the shotType across those scenes per the SMART CHARACTER USAGE rules. Returning a storyboard with zero character scenes is not acceptable.`
+  ? `🎭 CHARACTER GUIDANCE: The user defined ${briefing.characters.length} recurring character(s): ${briefing.characters.map(c => `${c.name} [${c.appearanceFrequency || 'balanced'}]`).join(', ')}. STRICTLY follow each character's per-character target scene range from the SMART CHARACTER USAGE block. Cameo = a brief 1–2 scene appearance only (do NOT spam them into every scene). Balanced = 40–60%. Lead = 80–100%. Vary the shotType when the character does appear.`
   : `🚨 INDEPENDENCE REQUIREMENT (non-negotiable): Every scene is rendered by a SEPARATE AI generation with no memory of other scenes. Describe each human subject FROM SCRATCH in each scene — no "same person", no "she/he from before", no continuity pronouns. Treat each scene as a standalone shot in a montage. If you want a recurring type, describe the archetype generically in every scene rather than claiming identity continuity.`}
 
 Generate the storyboard using the create_storyboard function.`;
@@ -453,14 +469,23 @@ Generate the storyboard using the create_storyboard function.`;
       };
     });
 
-    // 🛡️ SERVER-SIDE CHARACTER FLOOR — auto-repair if LLM returned 0 / too few
-    // character scenes despite the user defining a recurring avatar.
+    // 🛡️ SERVER-SIDE CHARACTER FLOOR + CAP — auto-repair if LLM ignored the
+    // per-character frequency target. Adds anchors when below the floor and
+    // strips anchors (→ shotType: "absent") when above the cap (cameo).
     if (hasCharacters && scenes.length > 0) {
-      const primaryCharId = briefing.characters![0].id;
-      const minRequired = Math.max(2, Math.ceil(scenes.length * 0.4));
-      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent';
-      const currentCount = scenes.filter(hasShot).length;
+      const primaryChar = briefing.characters![0];
+      const primaryCharId = primaryChar.id;
+      const r = freqRange(primaryChar.appearanceFrequency);
+      const minRequired = Math.max(1, Math.ceil(scenes.length * r.min));
+      const maxAllowed = Math.max(minRequired, Math.floor(scenes.length * r.max));
+      const matchesPrimary = (s: any) =>
+        s.characterShot?.characterId === primaryCharId ||
+        // Tolerate id-drift: any non-empty shot counts as primary when only one character is defined
+        (briefing.characters!.length === 1 && s.characterShot?.shotType && s.characterShot.shotType !== 'absent');
+      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent' && matchesPrimary(s);
+      let currentCount = scenes.filter(hasShot).length;
 
+      // FLOOR: insert if too few
       if (currentCount < minRequired) {
         const needed = minRequired - currentCount;
         const candidateOrder: number[] = [0];
@@ -485,7 +510,31 @@ Generate the storyboard using the create_storyboard function.`;
           }
           inserted++;
         }
-        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount}, need ${minRequired})`);
+        currentCount += inserted;
+        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount - inserted}, need ${minRequired}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
+      }
+
+      // CAP: strip excess anchors when over the upper bound (e.g. cameo cap)
+      if (currentCount > maxAllowed) {
+        const excess = currentCount - maxAllowed;
+        // Prefer to keep hook (idx 0) and CTA (last) — strip from the middle.
+        const stripOrder: number[] = [];
+        for (let i = 1; i < scenes.length - 1; i++) stripOrder.push(i);
+        stripOrder.push(scenes.length - 1, 0);
+        let removed = 0;
+        for (const idx of stripOrder) {
+          if (removed >= excess) break;
+          const sc = scenes[idx];
+          if (!hasShot(sc)) continue;
+          sc.characterShot = { characterId: '', shotType: 'absent' };
+          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
+          if (newSource !== sc.clipSource) {
+            sc.clipSource = newSource;
+            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
+          }
+          removed++;
+        }
+        console.log(`[storyboard] character-cap auto-repair: removed ${removed} anchor(s) (had ${currentCount}, max ${maxAllowed}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
       }
     }
 
