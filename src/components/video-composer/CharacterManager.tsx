@@ -117,6 +117,13 @@ const labels = {
       'Describe la ropa y objetos distintivos con detalle (capa, corona, arma). Para una consistencia facial real, vincula un avatar de tu biblioteca (botón arriba a la derecha).',
     empty: 'Sin personajes definidos.',
     delete: 'Eliminar',
+    frequency: 'Apariciones en el storyboard',
+    freqCameo: 'Cameo',
+    freqCameoHint: '1–2 escenas — aparición breve',
+    freqBalanced: 'Equilibrado',
+    freqBalancedHint: '40–60% de las escenas (predet.)',
+    freqLead: 'Protagonista',
+    freqLeadHint: 'Presente en casi todas las escenas',
   },
 };
 
