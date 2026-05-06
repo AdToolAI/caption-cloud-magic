@@ -198,6 +198,7 @@ export default function CharacterManager({ characters, language, onChange }: Cha
         signatureItems: '',
         brandCharacterId: avatar.id,
         referenceImageUrl: portrait || undefined,
+        usePortraitAsFirstFrame: false,
         identityCardPrompt: idCard || undefined,
       },
     ]);
@@ -299,9 +300,13 @@ export default function CharacterManager({ characters, language, onChange }: Cha
                         👤 {c.name}
                       </Badge>
                       {linked && (
-                        <Badge className="text-[10px] gap-1 bg-primary/15 text-primary border-primary/30">
+                        <Badge className={`text-[10px] gap-1 border ${
+                          c.usePortraitAsFirstFrame
+                            ? 'bg-primary/20 text-primary border-primary/50'
+                            : 'bg-muted/40 text-muted-foreground border-border/40'
+                        }`}>
                           <Sparkles className="h-3 w-3" />
-                          {t.anchorBadge}
+                          {c.usePortraitAsFirstFrame ? t.anchorBadgeLocked : t.anchorBadge}
                         </Badge>
                       )}
                     </div>
@@ -316,7 +321,21 @@ export default function CharacterManager({ characters, language, onChange }: Cha
                     </Button>
                   </div>
                   {linked && (
-                    <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                    <>
+                      <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                      <label className="flex items-start gap-2 rounded-md border border-border/40 bg-background/40 p-2 cursor-pointer hover:bg-accent/30 transition">
+                        <input
+                          type="checkbox"
+                          checked={!!c.usePortraitAsFirstFrame}
+                          onChange={(e) => updateCharacter(c.id, { usePortraitAsFirstFrame: e.target.checked })}
+                          className="mt-0.5 accent-primary"
+                        />
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] font-medium text-foreground leading-none">{t.lockToggle}</p>
+                          <p className="text-[10px] text-muted-foreground leading-snug">{t.lockToggleHint}</p>
+                        </div>
+                      </label>
+                    </>
                   )}
                   {/* Frequency toggle: how often this character should appear */}
                   <div className="space-y-1">
