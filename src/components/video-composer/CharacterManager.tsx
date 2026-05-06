@@ -31,9 +31,12 @@ const labels = {
       'Verknüpfe einen Avatar aus deiner Bibliothek. Sein Portrait wird automatisch als Anker-Frame (i2v) für Szenen mit diesem Charakter genutzt — das ist der einzige zuverlässige Hebel für echte Gesichts-Konsistenz.',
     pickerEmpty: 'Keine Avatare in der Bibliothek. Lege einen unter „Avatare" an.',
     use: 'Verknüpfen',
-    anchorBadge: 'Portrait-Anker aktiv',
+    anchorBadge: 'Look-Referenz',
+    anchorBadgeLocked: 'Erster Frame fixiert',
     anchorHint:
-      'Dieser Charakter ist mit einem Avatar verknüpft. Sein Portrait wird automatisch als erster Frame (i2v) genutzt — höchste Gesichts-Konsistenz.',
+      'Das Portrait dient als Look-Referenz — die KI orientiert sich am Aussehen, ohne dass jede Szene starr mit dem Portrait beginnt.',
+    lockToggle: 'Portrait als ersten Frame erzwingen',
+    lockToggleHint: 'Aus = Charakter sieht so aus wie das Portrait. An = Szene startet exakt mit dem Portrait-Bild (sehr starr).',
     name: 'Name',
     namePlaceholder: 'z. B. Richard Löwenherz',
     appearance: 'Aussehen (Englisch empfohlen)',
@@ -66,9 +69,12 @@ const labels = {
       'Link an avatar from your library. Its portrait is automatically used as the anchor frame (i2v) for any scene featuring this character — the only reliable lever for real face consistency.',
     pickerEmpty: 'No avatars in your library yet. Create one under "Avatars".',
     use: 'Link',
-    anchorBadge: 'Portrait anchor active',
+    anchorBadge: 'Look reference',
+    anchorBadgeLocked: 'First frame locked',
     anchorHint:
-      'This character is linked to an avatar. The portrait is automatically used as the first frame (i2v) for maximum face consistency.',
+      'The portrait acts as a look reference — the AI matches the appearance without forcing every scene to start with the portrait image.',
+    lockToggle: 'Force portrait as first frame',
+    lockToggleHint: 'Off = character looks like the portrait. On = scene starts exactly on the portrait image (very rigid).',
     name: 'Name',
     namePlaceholder: 'e.g. Richard the Lionheart',
     appearance: 'Appearance (English recommended)',
@@ -101,9 +107,12 @@ const labels = {
       'Vincula un avatar de tu biblioteca. Su retrato se usa automáticamente como frame ancla (i2v) en las escenas con este personaje — la única palanca fiable para una consistencia facial real.',
     pickerEmpty: 'No hay avatares en tu biblioteca. Crea uno en "Avatares".',
     use: 'Vincular',
-    anchorBadge: 'Ancla de retrato activa',
+    anchorBadge: 'Referencia visual',
+    anchorBadgeLocked: 'Primer frame fijado',
     anchorHint:
-      'Este personaje está vinculado a un avatar. Su retrato se usa automáticamente como primer frame (i2v) para máxima consistencia facial.',
+      'El retrato sirve como referencia visual — la IA imita la apariencia sin forzar cada escena a empezar con el retrato.',
+    lockToggle: 'Forzar retrato como primer frame',
+    lockToggleHint: 'Off = el personaje se parece al retrato. On = la escena empieza exactamente con la imagen del retrato (muy rígido).',
     name: 'Nombre',
     namePlaceholder: 'p. ej. Ricardo Corazón de León',
     appearance: 'Apariencia (recomendado en inglés)',
@@ -189,6 +198,7 @@ export default function CharacterManager({ characters, language, onChange }: Cha
         signatureItems: '',
         brandCharacterId: avatar.id,
         referenceImageUrl: portrait || undefined,
+        usePortraitAsFirstFrame: false,
         identityCardPrompt: idCard || undefined,
       },
     ]);
@@ -290,9 +300,13 @@ export default function CharacterManager({ characters, language, onChange }: Cha
                         👤 {c.name}
                       </Badge>
                       {linked && (
-                        <Badge className="text-[10px] gap-1 bg-primary/15 text-primary border-primary/30">
+                        <Badge className={`text-[10px] gap-1 border ${
+                          c.usePortraitAsFirstFrame
+                            ? 'bg-primary/20 text-primary border-primary/50'
+                            : 'bg-muted/40 text-muted-foreground border-border/40'
+                        }`}>
                           <Sparkles className="h-3 w-3" />
-                          {t.anchorBadge}
+                          {c.usePortraitAsFirstFrame ? t.anchorBadgeLocked : t.anchorBadge}
                         </Badge>
                       )}
                     </div>
@@ -307,7 +321,21 @@ export default function CharacterManager({ characters, language, onChange }: Cha
                     </Button>
                   </div>
                   {linked && (
-                    <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                    <>
+                      <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                      <label className="flex items-start gap-2 rounded-md border border-border/40 bg-background/40 p-2 cursor-pointer hover:bg-accent/30 transition">
+                        <input
+                          type="checkbox"
+                          checked={!!c.usePortraitAsFirstFrame}
+                          onChange={(e) => updateCharacter(c.id, { usePortraitAsFirstFrame: e.target.checked })}
+                          className="mt-0.5 accent-primary"
+                        />
+                        <div className="space-y-0.5">
+                          <p className="text-[11px] font-medium text-foreground leading-none">{t.lockToggle}</p>
+                          <p className="text-[10px] text-muted-foreground leading-snug">{t.lockToggleHint}</p>
+                        </div>
+                      </label>
+                    </>
                   )}
                   {/* Frequency toggle: how often this character should appear */}
                   <div className="space-y-1">

@@ -312,7 +312,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           const castMember = s.characterShot && s.characterShot.shotType !== 'absent'
             ? characters?.find((c) => c.id === s.characterShot!.characterId)
             : undefined;
-          const castAnchor = castMember?.referenceImageUrl;
+          // Only use the cast member's portrait as i2v first-frame anchor when
+          // the user explicitly opted in via `usePortraitAsFirstFrame`. Otherwise
+          // the portrait stays a look reference (description anchor) only.
+          const castAnchor = castMember?.usePortraitAsFirstFrame ? castMember.referenceImageUrl : undefined;
+          const brandAnchor = brandCharacterInput && (brandCharacterInput as any).usePortraitAsFirstFrame !== false
+            ? brandCharacterInput.referenceImageUrl
+            : undefined;
           return {
             id: s.id,
             clipSource: s.clipSource,
@@ -325,7 +331,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
               s.referenceImageUrl ||
               composed.referenceImageUrl ||
               castAnchor ||
-              brandCharacterInput?.referenceImageUrl,
+              brandAnchor,
             durationSeconds: s.durationSeconds,
             characterShot: s.characterShot,
             withAudio: s.withAudio !== false,
@@ -447,7 +453,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
               const cm = targetScene.characterShot && targetScene.characterShot.shotType !== 'absent'
                 ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
                 : undefined;
-              return targetScene.referenceImageUrl || composedSingle.referenceImageUrl || cm?.referenceImageUrl || brandCharacterInput?.referenceImageUrl;
+              const cmAnchor = cm?.usePortraitAsFirstFrame ? cm.referenceImageUrl : undefined;
+              const brandAnchor = brandCharacterInput && (brandCharacterInput as any).usePortraitAsFirstFrame !== false
+                ? brandCharacterInput.referenceImageUrl
+                : undefined;
+              return targetScene.referenceImageUrl || composedSingle.referenceImageUrl || cmAnchor || brandAnchor;
             })(),
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
