@@ -35,9 +35,7 @@ import { VISUAL_STYLES } from '@/config/composerVisualStyles';
 import { suggestShotDirectorForStyle, getStyleLabel } from '@/config/styleToShotDirector';
 import CharacterManager from './CharacterManager';
 import VideoModeSelector from './VideoModeSelector';
-import LibraryPicker, { type LibraryItem } from '@/components/motion-studio/LibraryPicker';
 import BrandKitApplyPanel from './BrandKitApplyPanel';
-import { Library } from 'lucide-react';
 import type { VideoMode, AssemblyConfig } from '@/types/video-composer';
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string; desc: string }[] = [
@@ -168,26 +166,7 @@ export default function BriefingTab({
   const { t } = useTranslation();
   const [uspInput, setUspInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [libraryPickerOpen, setLibraryPickerOpen] = useState(false);
 
-  const handleLibraryPick = (item: LibraryItem) => {
-    if (item.kind !== 'character') return;
-    const c = item.data;
-    const existing = briefing.characters || [];
-    const libIdToken = `lib:${c.id}`;
-    if (existing.some((x) => x.id === libIdToken)) {
-      toast({ title: `„${c.name}" ist bereits hinzugefügt` });
-      return;
-    }
-    const snapshot: ComposerCharacter = {
-      id: libIdToken,
-      name: c.name,
-      appearance: c.description,
-      signatureItems: c.signature_items || '',
-    };
-    onUpdateBriefing({ characters: [...existing, snapshot] });
-    toast({ title: `„${c.name}" aus Library hinzugefügt` });
-  };
   const TIPS_KEY = 'video-composer-briefing-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(TIPS_KEY) === '1'; } catch { return false; }
@@ -627,45 +606,10 @@ export default function BriefingTab({
       />
 
       {/* Recurring Characters — drives consistency across scenes */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setLibraryPickerOpen(true)}
-            className="gap-1.5"
-          >
-            <Library className="h-3.5 w-3.5" />
-            {language === 'de'
-              ? 'Aus Library wählen'
-              : language === 'es'
-                ? 'Elegir de Library'
-                : 'Pick from Library'}
-          </Button>
-        </div>
-        <CharacterManager
-          characters={briefing.characters || []}
-          language={language}
-          onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
-        />
-      </div>
-
-      <LibraryPicker
-        open={libraryPickerOpen}
-        onOpenChange={setLibraryPickerOpen}
-        modes={['character']}
-        selectedCharacterIds={(briefing.characters || [])
-          .filter((c) => c.id.startsWith('lib:'))
-          .map((c) => c.id.slice(4))}
-        onSelect={handleLibraryPick}
-        title={
-          language === 'de'
-            ? 'Charakter aus Library hinzufügen'
-            : language === 'es'
-              ? 'Añadir personaje desde Library'
-              : 'Add character from Library'
-        }
+      <CharacterManager
+        characters={briefing.characters || []}
+        language={language}
+        onChange={(characters: ComposerCharacter[]) => onUpdateBriefing({ characters })}
       />
 
       {/* Visual Style — drives consistent look across all AI-generated scenes */}
