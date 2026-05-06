@@ -453,6 +453,42 @@ Generate the storyboard using the create_storyboard function.`;
       };
     });
 
+    // 🛡️ SERVER-SIDE CHARACTER FLOOR — auto-repair if LLM returned 0 / too few
+    // character scenes despite the user defining a recurring avatar.
+    if (hasCharacters && scenes.length > 0) {
+      const primaryCharId = briefing.characters![0].id;
+      const minRequired = Math.max(2, Math.ceil(scenes.length * 0.4));
+      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent';
+      const currentCount = scenes.filter(hasShot).length;
+
+      if (currentCount < minRequired) {
+        const needed = minRequired - currentCount;
+        const candidateOrder: number[] = [0];
+        if (scenes.length > 1) candidateOrder.push(scenes.length - 1);
+        for (let i = 1; i < scenes.length - 1; i++) candidateOrder.push(i);
+
+        const rotation: Array<'profile' | 'detail' | 'silhouette' | 'back' | 'full'> =
+          ['profile', 'detail', 'silhouette', 'back', 'full'];
+        let inserted = 0;
+        let rotIdx = 0;
+        for (const idx of candidateOrder) {
+          if (inserted >= needed) break;
+          const sc = scenes[idx];
+          if (hasShot(sc)) continue;
+          const shotType = rotation[rotIdx % rotation.length];
+          rotIdx++;
+          sc.characterShot = { characterId: primaryCharId, shotType };
+          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
+          if (newSource !== sc.clipSource) {
+            sc.clipSource = newSource;
+            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
+          }
+          inserted++;
+        }
+        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount}, need ${minRequired})`);
+      }
+    }
+
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
