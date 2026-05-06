@@ -634,11 +634,8 @@ export const DashboardVideoCarousel = ({
         </div>
       )}
 
-      {/* Autopilot Hero Banner — KI-Steuerung */}
-      <AutopilotHeroBanner />
-
       {/* News Section */}
-      <div className="mt-6 pt-6 border-t border-border/50">
+      <div>
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">News & Updates</h3>
@@ -652,6 +649,11 @@ export const DashboardVideoCarousel = ({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Autopilot Hero Banner — KI-Steuerung */}
+      <div className="mt-6 pt-6 border-t border-border/50">
+        <AutopilotHeroBanner />
       </div>
 
       {/* Video Player Dialog */}
