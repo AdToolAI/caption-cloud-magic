@@ -13183,8 +13183,45 @@ export const translations: Record<Language, any> = {
           veo: { name: "Veo", tagline: "Calidad insignia de Google" }
         }
       },
-      pricing: {
-        title1: "Un plan. ",
+      aiArsenal: {
+        badge: "Arsenal IA Premium",
+        title1: "20+ modelos ",
+        title2: "Premium de IA con licencia",
+        subtitle: "Video, imagen, audio y avatares — todos los mejores modelos en un solo lugar, listos para producción.",
+        recommended: "Destacado",
+        totalLabel: "modelos listos para producción",
+        categories: { all: "Todos", video: "Video", image: "Imagen", audio: "Audio", avatar: "Avatares" },
+        caps: {
+          t2v: "Texto→Video", i2v: "Imagen→Video", v2v: "Video→Video", t2i: "Texto→Imagen",
+          p1080: "1080p", camera: "Ctrl Cámara", director: "Ctrl Director", fast: "Rápido",
+          frames: "Keyframes", multiref: "Multi-Ref", edit: "Editar", inpaint: "Inpaint",
+          upscale4x: "4× Upscale", styleRef: "Style Ref", music: "Música", sfx: "SFX",
+          vocal: "Vocales", voice: "Voz TTS", multilang: "30+ idiomas", talkingHead: "Talking Head",
+          lipSync: "Lip Sync", consistency: "Char Lock"
+        },
+        models: {
+          kling: { name: "Kling 3 Omni", tagline: "Mejor movimiento y física — generador cinematográfico estrella." },
+          sora: { name: "OpenAI Sora 2", tagline: "Storytelling fotorrealista con comprensión profunda del prompt." },
+          wan: { name: "Wan 2.5", tagline: "1080p cinematográfico nativo." },
+          luma: { name: "Luma Ray 2", tagline: "Iluminación fotorrealista con control de cámara." },
+          hailuo: { name: "Hailuo 2.3", tagline: "Control de director sobre personajes." },
+          seedance: { name: "Seedance 2", tagline: "Rápido y expresivo." },
+          veo: { name: "Google Veo", tagline: "Calidad insignia de Google." },
+          pika: { name: "Pika 2.2", tagline: "Control de start- & end-frame para cortes precisos." },
+          vidu: { name: "Vidu Q2", tagline: "Multi-referencia para personajes consistentes." },
+          runway: { name: "Runway Gen-4 Aleph", tagline: "Especialista premium video-a-video." },
+          happyhorse: { name: "HappyHorse 1.0", tagline: "T2V & I2V eficiente." },
+          nanoBanana: { name: "Nano Banana 2", tagline: "Generación y edición de imagen Gemini 3." },
+          fluxFill: { name: "FLUX Fill Pro", tagline: "Magic Edit, Inpaint y Outpaint." },
+          clarity: { name: "Clarity Upscaler", tagline: "Hasta 4× más nítido sin perder detalle." },
+          styleRef: { name: "Style Reference", tagline: "Look de marca consistente en todos los renders." },
+          stableAudio: { name: "Stable Audio 2.5", tagline: "Música y diseño sonoro cinematográfico." },
+          miniMax: { name: "MiniMax Music 1.5", tagline: "Pistas vocales con AI-Lyrics." },
+          elevenLabs: { name: "ElevenLabs", tagline: "Voiceover de estudio en 30+ idiomas." },
+          heygen: { name: "HeyGen Photo Avatar", tagline: "Talking heads desde una sola foto." },
+          brandLock: { name: "Brand Character Lock", tagline: "Personajes persistentes en todos los estudios." }
+        }
+      },
         title2: "Todo incluido.",
         subtitle: "14 días gratis · Sin tarjeta · Cancela cuando quieras.",
         perMonth: "/mes",
