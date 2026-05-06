@@ -125,6 +125,7 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });
   const [pickerOpen, setPickerOpen] = useState(false);
   const { data: avatars = [], isLoading: avatarsLoading } = useAccessibleCharacters();
+  const { characters: libChars, loading: libLoading } = useMotionStudioLibrary();
 
   const addCharacter = () => {
     if (!draft.name.trim()) return;
