@@ -84,6 +84,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", descKey: "hubItemDesc.directorsCut", icon: Edit },
       { route: "/ai-video-studio", titleKey: "AI Video Studio", descKey: "hubItemDesc.aiVideoStudio", icon: Sparkles },
       { route: "/video-composer", titleKey: "videoComposer.title", descKey: "hubItemDesc.videoComposer", icon: Scissors },
+      { route: "/avatars", titleKey: "Avatare", descKey: "Eigene Avatare anlegen — Portrait + Stimme für konsistente Gesichter", icon: User },
       { route: "/motion-studio/library", titleKey: "Motion Studio Library", descKey: "Wiederverwendbare Charaktere & Locations für deine AI-Videos", icon: Users },
       { route: "/video-translator", titleKey: "vidTrans.hubTitle", descKey: "hubItemDesc.videoTranslator", icon: Languages },
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
