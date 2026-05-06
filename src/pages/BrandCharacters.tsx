@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
-import { Plus, Sparkles, Lock, Users } from 'lucide-react';
+import { Plus, Sparkles, Lock, Users, Wrench, Loader2 } from 'lucide-react';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacterCard';
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
@@ -13,6 +16,22 @@ const BrandCharacters = () => {
   useTrackPageFeature("brand_characters");
   const { characters, isLoading } = useBrandCharacters();
   const [addOpen, setAddOpen] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRepair = async () => {
+    setRepairing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('repair-brand-character-urls');
+      if (error) throw error;
+      toast.success(`Repaired ${data?.repaired ?? 0} of ${data?.total ?? 0} avatar images`);
+      queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Repair failed');
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   return (
     <>
@@ -35,13 +54,25 @@ const BrandCharacters = () => {
                 Recurring on-screen talent — one click to make them speak. Upload once, pick a voice, and reuse the same avatar across Kling, Veo, Hailuo, Picture Studio and Talking Head renders.
               </p>
             </div>
-            <Button
-              onClick={() => setAddOpen(true)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              size="lg"
-            >
-              <Plus className="h-4 w-4 mr-2" /> New Avatar
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setAddOpen(true)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                size="lg"
+              >
+                <Plus className="h-4 w-4 mr-2" /> New Avatar
+              </Button>
+              <Button
+                onClick={handleRepair}
+                variant="outline"
+                size="lg"
+                disabled={repairing || characters.length === 0}
+                title="Re-sign expired image URLs for all your avatars"
+              >
+                {repairing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+                Repair images
+              </Button>
+            </div>
           </div>
 
           {/* How it works */}
