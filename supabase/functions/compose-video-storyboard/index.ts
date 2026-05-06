@@ -202,7 +202,7 @@ ${charList}
 
 CHARACTER-AS-ANCHOR PHILOSOPHY (read carefully):
 - The character is a recurring NARRATIVE ANCHOR. They MUST appear in a meaningful share of scenes.
-- 🚨 HARD MINIMUM: When the user has defined a character, that character MUST be featured (characterShot.shotType ≠ "absent") in **at least 40–60% of all scenes**, and **never in zero scenes**. The Hook (scene 1) and CTA (last scene) are strongly preferred anchor points unless the brief makes that impossible.
+- 🚨 USER-CHOSEN FREQUENCY: Each character has a "frequency" tag — `cameo` (1–2 scenes only, ≈15–40%), `balanced` (40–60%, the default), or `lead` (80–100%, almost every scene). RESPECT THE TARGET RANGE listed for each character. Do NOT exceed the upper bound for cameo characters and do NOT fall below the lower bound for any character.
 - Beyond the minimum, you may also include environmental, product, or atmospheric scenes WITHOUT the character — but those are the supporting cast, not the majority.
 
 WHEN you do feature the character, vary the framing across those scenes (no quotas — just variety):
