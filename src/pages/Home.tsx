@@ -562,7 +562,7 @@ const Home = () => {
         </section>
       )}
 
-      <div className="container mx-auto px-4 py-4 max-w-7xl space-y-4">
+      <div className="container mx-auto px-4 py-8 max-w-7xl space-y-10">
         {/* Express start: First-time users with starter credits → Hailuo 2.3 in 90 seconds */}
         {user && <FirstVideoExpressHero />}
 
