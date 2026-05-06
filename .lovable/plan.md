@@ -1,49 +1,46 @@
-## Problem
+## Root cause
 
-Im Video Composer wirken die Charaktere im generierten Clip völlig anders als die definierte Person. Ursache (im Code verifiziert):
+Deine Mediathek (`video_creations`) bekommt seit dem 02.05. keine neuen Einträge mehr — **nicht weil Auto-Cleanup falsch löscht**, sondern weil deine neueren Renders gar nicht erst gespeichert werden.
 
-1. Die "Charaktere" im Composer (`CharacterManager.tsx`) sind **reiner Freitext** (Name, Aussehen, Signature Items). Es gibt **kein Bild / keinen Anker**.
-2. In `compose-video-clips/index.ts` wird dieser Text nur als Prompt-Prefix injiziert (`injectCharacter`). Bei reinem Text-zu-Video (z.B. Hailuo 2.3 Standard im Screenshot) ist das Gesicht damit faktisch **zufällig** — Modelle halten Kleidung/Props zuverlässig, Gesichter nicht (steht so auch im Pro-Tipp).
-3. Die bereits existierende **Brand Character Library** (mit `reference_image_url` + Hedra-optimiertem `portrait_url`) wird im Composer aktuell **nur passiv** mitinjiziert (Favorit oder erster), aber **nicht** an die Cast-Slots gebunden, die der User in der "Cast Consistency Map" sieht. Reference-Image wird außerdem nicht automatisch als i2v-Startframe gesetzt — d.h. der einzige Hebel, der wirklich Gesichts-Konsistenz erzeugt, bleibt ungenutzt.
+Was die DB zeigt:
+- Letzter `ai_video_generations`-Eintrag: 02.05.2026 (Solo-Generator HappyHorse)
+- Seit 03.05. nur noch **Composer-Projekte** (`composer_projects` / `composer_scenes`): 5 Projekte, alle mit ready Clips
+- Wallet wurde brav belastet (24 Transaktionen seit 03.05.), aber `generation_id` zeigt auf `composer_projects`-IDs, nicht auf `ai_video_generations`
+- Auto-Save-Trigger `auto_save_ai_video_to_library_trg` hängt aber **ausschließlich an `ai_video_generations`** — Composer-Clips lösen ihn nie aus
 
-## Lösung — Cast = Brand Character + Auto-i2v
+→ Ergebnis: Du nutzt seit 4 Tagen primär den Motion Studio / Composer, dessen fertige Clips & Stitches **nie in die Mediathek wandern**. Auto-Cleanup ist unschuldig.
 
-### 1. Cast aus der Brand Character Library wählen
-`CharacterManager.tsx` bekommt oben einen Button **"Aus Avatar-Bibliothek wählen"** (nutzt `useAccessibleCharacters`). Beim Anlegen wird der Composer-Character mit Referenz auf den Brand Character verknüpft:
+## Plan
+
+### 1. Composer-Clips automatisch in die Mediathek speichern
+In `supabase/functions/compose-video-clips/index.ts` an der Stelle, wo eine Szene nach Webhook/Polling auf `clip_status='ready'` gesetzt wird (auch in `replicate-webhook` und in `compose-video-assemble`), zusätzlich einen `video_creations`-Insert ausführen:
+
+```ts
+await supabaseAdmin.from('video_creations').insert({
+  user_id, output_url: clip_url, status: 'completed', credits_used: 0,
+  metadata: { source: 'motion-studio-clip', composer_scene_id, composer_project_id, model: clipSource }
+});
 ```
-ComposerCharacter {
-  id, name, appearance, signatureItems,
-  brandCharacterId?: string,        // NEU
-  referenceImageUrl?: string,       // NEU (portrait_url || reference_image_url)
-  identityCardPrompt?: string,      // NEU (buildCharacterPromptInjection)
-}
-```
-Freitext-Charaktere bleiben weiterhin möglich (Fallback wie heute).
+Idempotent über `metadata @> {composer_scene_id}` Check (analog zum bestehenden `ai_generation_id`-Pattern).
 
-### 2. Auto-i2v pro Szene wenn Charakter zugewiesen
-In `SceneCard` / Storyboard: Sobald eine Szene einen `characterShot` mit `shotType !== 'absent'` für einen Charakter mit `referenceImageUrl` hat **und** noch keine eigene `referenceImageUrl` an der Szene gesetzt ist:
-- Szene bekommt visuell ein Badge "Anker: Avatar-Portrait"
-- `scene.referenceImageUrl` wird (nicht-destruktiv, nur als Fallback) auf das Portrait gesetzt
-- Dieser Fallback wird in `compose-video-clips/index.ts` für i2v-fähige Modelle (`hailuo`, `kling`, `wan`, `seedance`, `luma`, `veo`, `happyhorse`, `pika`) übernommen — das funktioniert dort bereits, sobald `referenceImageUrl` gesetzt ist.
+### 2. Composer-Stitch (final montiertes Video) speichern
+In `compose-video-assemble` nach erfolgreichem Render des finalen Stitches denselben Insert mit `source: 'motion-studio-stitch'` und `composer_project_id` ausführen.
 
-### 3. Identity-Card-Prompt statt nur Appearance
-`injectCharacter` in `compose-video-clips/index.ts` wird erweitert: wenn der Cast-Eintrag `identityCardPrompt` mitliefert, wird dieser anstelle von `appearance + signatureItems` injiziert (höhere Qualität, Gemini-generiert). Fallback bleibt der bisherige Pfad.
+### 3. Backfill der letzten 4 Tage
+SQL-Migration, die für alle `composer_scenes` mit `clip_status='ready'` und `clip_url IS NOT NULL` der letzten 14 Tage einen `video_creations`-Eintrag nachzieht — sofern nicht bereits vorhanden. Damit sind deine fehlenden Videos vom 03.–06.05. sofort wieder da.
 
-### 4. UX-Hinweis in der Cast Consistency Map
-`CastConsistencyMap.tsx` zeigt für jede Szene mit gebundenem Brand Character ein grünes Anchor-Badge (statt nur "reference"), damit klar ist: Diese Szene nutzt das echte Portrait als ersten Frame → höchste Gesichts-Konsistenz.
+### 4. Trigger erweitern (Verteidigung in Tiefe)
+`auto_save_ai_video_to_library_trg` triggert nur auf `ai_video_generations`. Zusätzlich einen Trigger auf `composer_scenes AFTER UPDATE OF clip_status` legen, der bei Übergang `→ ready` ebenfalls in `video_creations` inserted. Damit ist auch jeder zukünftige neue Composer-Pfad automatisch abgedeckt.
 
-### 5. Warnung bei T2V-only Modellen
-Wenn der User einen Brand Character zugewiesen hat, aber für die Szene ein Modell ohne i2v-Support (aktuell nur ältere/spezielle Pfade) gewählt ist: kleiner Inline-Hinweis "Wechsle zu Hailuo / Kling / Seedance für echte Gesichts-Konsistenz."
+### 5. Sanity-Check Cleanup-Limits
+`enforce_user_video_library_limits(_user_id, 500, 10240)` lassen wie es ist — der greift erst ab 500 Videos / 10 GB und du bist mit ~25 Items weit drunter. Keine Änderung nötig.
 
-## Technische Änderungen
+### 6. Verifikation
+Nach Migration:
+- `SELECT count(*) FROM video_creations WHERE user_id='8948…' AND created_at > '2026-05-03'` → sollte den Backfill-Count zeigen
+- Dashboard-Carousel neu laden, deine Renders der letzten Tage müssen erscheinen
 
-- `src/types/video-composer.ts` — `ComposerCharacter` um `brandCharacterId`, `referenceImageUrl`, `identityCardPrompt` erweitern
-- `src/components/video-composer/CharacterManager.tsx` — "Aus Avatar-Bibliothek wählen"-Dialog (`useAccessibleCharacters`), Avatar-Vorschau pro Cast-Eintrag
-- `src/components/video-composer/SceneCard.tsx` — Auto-Fill `scene.referenceImageUrl` aus Cast-Portrait + Anchor-Badge + T2V-Warnung
-- `src/components/video-composer/CastConsistencyMap.tsx` — neuer Status `'portrait-anchor'` mit goldenem Indicator
-- `supabase/functions/compose-video-clips/index.ts` — `injectCharacter` nutzt `identityCardPrompt` wenn vorhanden; neue Type-Felder im `ComposerCharacter`-Interface der Function spiegeln
-
-## Out of Scope
-- Kein neues Modell, kein neuer Provider-Key
-- Kein Eingriff in den Wizard / Auto-Director-Flow
-- Bestehende reine Freitext-Charaktere bleiben unverändert funktional
+## Was NICHT geändert wird
+- Auto-Cleanup-Funktion bleibt unangetastet
+- Bestehende `ai_video_generations` → `video_creations` Trigger bleibt
+- Solo-Generatoren (HappyHorse, Hailuo, Kling…) brauchen keine Änderung — die schreiben bereits korrekt
