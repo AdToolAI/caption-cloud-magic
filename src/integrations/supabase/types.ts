@@ -15662,6 +15662,10 @@ export type Database = {
         }
         Returns: number
       }
+      archive_composer_scene_to_library: {
+        Args: { _scene_id: string }
+        Returns: undefined
+      }
       break_stale_streaks: { Args: never; Returns: number }
       calculate_template_conversion_rates: {
         Args: { p_date_from: string; p_date_to: string; p_template_id: string }
