@@ -196,12 +196,13 @@ WHEN you do feature the character, vary the framing across those scenes (no quot
 - "pov": point-of-view of the character (we see what they see — character not visible at all). Include 1 signature item naturally present in their visual field if possible.
 
 CRITICAL RULES:
-- If a scene works narratively without the character, ALWAYS prefer "absent" / no characterShot. Do not invent reasons to insert the character.
+- 🚨 The character MUST appear in at least ceil(sceneCount * 0.4) scenes (minimum 2). Never return a storyboard where the character is absent from every scene.
+- Prefer the Hook and CTA scenes as character anchors unless the brief explicitly says otherwise.
 - Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
 - ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
 - DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
 - For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
-- For scenes WITHOUT any character (the majority), omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
+- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
 
 If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
 })()}
