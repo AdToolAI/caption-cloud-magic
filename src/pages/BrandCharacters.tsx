@@ -61,6 +61,16 @@ const BrandCharacters = () => {
             >
               <Plus className="h-4 w-4 mr-2" /> New Avatar
             </Button>
+            <Button
+              onClick={handleRepair}
+              variant="outline"
+              size="lg"
+              disabled={repairing || characters.length === 0}
+              title="Re-sign expired image URLs for all your avatars"
+            >
+              {repairing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+              Repair images
+            </Button>
           </div>
 
           {/* How it works */}
