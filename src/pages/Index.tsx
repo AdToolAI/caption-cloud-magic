@@ -10,7 +10,7 @@ import { BlackTieHero } from "@/components/landing/BlackTieHero";
 import { SocialProofStrip } from "@/components/landing/SocialProofStrip";
 import { MissionFeatures } from "@/components/landing/MissionFeatures";
 import { FeatureGrid } from "@/components/landing/FeatureGrid";
-import { AIModelsArsenal } from "@/components/landing/AIModelsArsenal";
+import { AIArsenalShowcase } from "@/components/landing/AIArsenalShowcase";
 import { LiveDemoShowcase } from "@/components/landing/LiveDemoShowcase";
 import { TestimonialSpotlight } from "@/components/landing/TestimonialSpotlight";
 
@@ -107,8 +107,8 @@ const Index = () => {
           {/* Live Demo Showcase - Before/After */}
           <LiveDemoShowcase />
 
-          {/* AI Models Arsenal - 6 licensed premium models */}
-          <AIModelsArsenal />
+          {/* AI Arsenal - all integrated AI modules */}
+          <AIArsenalShowcase />
 
           {/* Feature Grid */}
           <FeatureGrid />
