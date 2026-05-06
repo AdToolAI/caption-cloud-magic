@@ -372,56 +372,102 @@ export default function CharacterManager({ characters, language, onChange }: Cha
               {t.pickerDesc}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-2">
-            {avatarsLoading ? (
-              <p className="text-xs text-muted-foreground py-6 text-center">…</p>
-            ) : avatars.length === 0 ? (
-              <p className="text-xs text-muted-foreground py-6 text-center">{t.pickerEmpty}</p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {avatars.map((a: any) => {
-                  const portrait = a.portrait_url || a.reference_image_url;
-                  const alreadyLinked = characters.some((c) => c.brandCharacterId === a.id);
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => linkAvatar(a)}
-                      disabled={alreadyLinked}
-                      className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
-                        alreadyLinked
-                          ? 'border-primary/40 opacity-60 cursor-not-allowed'
-                          : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
-                      }`}
-                    >
-                      <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
-                        {portrait ? (
-                          <img
-                            src={portrait}
-                            alt={a.name}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div className="p-2">
-                        <p className="text-xs font-semibold truncate">{a.name}</p>
-                        <p className="text-[10px] text-muted-foreground capitalize">
-                          {a.source === 'purchased' ? '★ marketplace' : 'own'}
-                        </p>
-                      </div>
-                      {!alreadyLinked && (
-                        <div className="absolute inset-x-0 bottom-0 px-2 py-1 text-[10px] text-center text-primary-foreground bg-primary opacity-0 group-hover:opacity-100 transition">
-                          {t.use}
+          <ScrollArea className="max-h-[60vh] pr-2 space-y-4">
+            {/* Avatars section */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-primary/80">
+                {lang === 'de' ? 'Avatare (mit Portrait-Anker)' : lang === 'es' ? 'Avatares (con ancla)' : 'Avatars (portrait anchor)'}
+              </p>
+              {avatarsLoading ? (
+                <p className="text-xs text-muted-foreground py-3 text-center">…</p>
+              ) : avatars.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-3 text-center">{t.pickerEmpty}</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {avatars.map((a: any) => {
+                    const portrait = a.portrait_url || a.reference_image_url;
+                    const alreadyLinked = characters.some((c) => c.brandCharacterId === a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => linkAvatar(a)}
+                        disabled={alreadyLinked}
+                        className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
+                          alreadyLinked
+                            ? 'border-primary/40 opacity-60 cursor-not-allowed'
+                            : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
+                          {portrait ? (
+                            <img src={portrait} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          )}
                         </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                        <div className="p-2">
+                          <p className="text-xs font-semibold truncate">{a.name}</p>
+                          <p className="text-[10px] text-muted-foreground capitalize">
+                            {a.source === 'purchased' ? '★ marketplace' : 'own'}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Library characters section */}
+            <div className="space-y-2 mt-4 pt-4 border-t border-border/40">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {lang === 'de' ? 'Library-Charaktere (nur Beschreibung)' : lang === 'es' ? 'Personajes de Library (solo descripción)' : 'Library characters (description only)'}
+              </p>
+              {libLoading ? (
+                <p className="text-xs text-muted-foreground py-3 text-center">…</p>
+              ) : libChars.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-3 text-center italic">
+                  {lang === 'de' ? 'Keine Library-Charaktere.' : lang === 'es' ? 'Sin personajes.' : 'No library characters.'}
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {libChars.map((lc: any) => {
+                    const portrait = lc.reference_image_url;
+                    const alreadyLinked = characters.some((c) => c.id === `lib:${lc.id}`);
+                    return (
+                      <button
+                        key={lc.id}
+                        type="button"
+                        onClick={() => linkLibraryCharacter(lc)}
+                        disabled={alreadyLinked}
+                        className={`group relative rounded-lg border bg-card/60 overflow-hidden text-left transition ${
+                          alreadyLinked
+                            ? 'border-primary/40 opacity-60 cursor-not-allowed'
+                            : 'border-border/40 hover:border-primary/60 hover:bg-primary/5'
+                        }`}
+                      >
+                        <div className="aspect-[3/4] bg-muted flex items-center justify-center overflow-hidden">
+                          {portrait ? (
+                            <img src={portrait} alt={lc.name} className="h-full w-full object-cover" loading="lazy" />
+                          ) : (
+                            <User className="h-8 w-8 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <p className="text-xs font-semibold truncate">{lc.name}</p>
+                          {!portrait && (
+                            <p className="text-[10px] text-amber-500/80">
+                              {lang === 'de' ? '⚠ Nur Text' : lang === 'es' ? '⚠ Solo texto' : '⚠ Text only'}
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </ScrollArea>
         </DialogContent>
       </Dialog>
