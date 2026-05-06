@@ -28,14 +28,22 @@ type Anchor = 'reference' | 'chain' | 'prompt' | 'absent';
 
 function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: number): Anchor {
   const shot = scene.characterShot;
-  if (!shot || !shot.shotType || shot.shotType === 'absent') return 'absent';
+  const hasShot = !!shot && !!shot.shotType && shot.shotType !== 'absent';
   // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
-  const idMatch = shot.characterId === character.id;
-  const nameMatch =
-    !!shot.characterId &&
-    !!character.name &&
-    shot.characterId.toLowerCase().includes(character.name.toLowerCase().split(/\s+/)[0]);
-  if (!idMatch && !nameMatch) return 'absent';
+  const idMatch = hasShot && shot!.characterId === character.id;
+  const firstName = character.name?.trim().toLowerCase().split(/\s+/)[0] || '';
+  const nameMatchInId =
+    hasShot &&
+    !!shot!.characterId &&
+    !!firstName &&
+    shot!.characterId.toLowerCase().includes(firstName);
+  // Fallback: character's name appears verbatim in the scene prompt.
+  const promptText = (scene.aiPrompt || '').toLowerCase();
+  const nameMatchInPrompt =
+    !!firstName &&
+    (promptText.includes(character.name.toLowerCase()) || promptText.includes(firstName));
+
+  if (!idMatch && !nameMatchInId && !nameMatchInPrompt) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
   if ((character.signatureItems?.trim() || character.referenceImageUrl) && scene.clipSource?.startsWith('ai-')) return 'reference';
   // First scene with the character → no chain possible, prompt-only
