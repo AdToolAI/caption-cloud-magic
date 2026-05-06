@@ -1,33 +1,57 @@
 ## Problem
 
-Beim Klick auf "In Mediathek" gibt die Edge Function `save-composer-scene-to-library` den Fehler `DELETE requires a WHERE clause` zurück.
+Im **Storyboard** vom Motion Studio gibt es zwei Probleme mit dem Charakter "Matthew Dusatko":
 
-Ursache: Der Insert in `video_creations` triggert die Funktion `enforce_user_video_library_limits`, die zwei Statements ohne WHERE-Klausel enthält:
+1. **Falsche Warnung**: Die Cast-Consistency-Map zeigt _„Matthew Dusatko kommt in keiner Szene vor"_, obwohl er tatsächlich in jeder Szene als Anker gesetzt ist.
+2. **Zu viele Auftritte**: Er taucht in **allen 5 Szenen** auf — gewünscht wären eher **2–3 Szenen**.
 
-```sql
-DELETE FROM _media_all;
-DELETE FROM _media_to_keep;
+Aktuell zwingt der Server-Floor in `compose-video-storyboard` jeden Charakter in mindestens **40–60 %** der Szenen, ohne dass der User das beeinflussen kann. Wird ein Avatar aus der Bibliothek verknüpft, bekommt er außerdem eine ID wie `lib:abc…`, während die Storyboard-KI nur die einfache ID aus der Charakter-Liste kennt — dadurch matcht `characterShot.characterId` nicht und die Cast-Map zeigt fälschlicherweise „absent".
+
+## Lösung
+
+### 1. Bug-Fix: Cast-Consistency-Map erkennt verknüpfte Avatare nicht
+
+In `src/components/video-composer/CastConsistencyMap.tsx` → `getAnchor()` zusätzlich zur exakten ID auch nach Namens-Match fallen-back. Das deckt sowohl `lib:…`-IDs als auch ID-Drift durch die LLM ab, ohne die Datenstruktur zu ändern.
+
+### 2. Neuer Toggle: „Wie oft soll der Charakter auftreten?"
+
+**a) Datenmodell** (`src/types/video-composer.ts`)
+
+Neues optionales Feld auf `ComposerCharacter`:
+```ts
+appearanceFrequency?: 'cameo' | 'balanced' | 'lead'; // Default: 'balanced'
 ```
 
-Supabase aktiviert global den `sql_safeupdates`-Schutz, der DELETE/UPDATE ohne WHERE blockiert — auch auf TEMP-Tabellen. Dadurch schlägt jeder Insert in `video_creations` mit `status = 'completed'` fehl (nicht nur unser Composer-Save, sondern alle Saves, die diesen Trigger auslösen).
+| Stufe | Bedeutung | Min/Max-Anteil der Szenen |
+|---|---|---|
+| `cameo` | Kurzer Auftritt | 1–2 Szenen (≈20 %) |
+| `balanced` | Ausgewogen (Default) | 40–60 % (= heutiges Verhalten) |
+| `lead` | Dauerpräsenz | 80–100 % |
 
-## Fix
+**b) UI** in `CharacterManager.tsx`
 
-Eine Migration, die `enforce_user_video_library_limits` neu erstellt und die zwei nackten DELETEs durch `TRUNCATE` ersetzt:
+Pro Charakter-Karte ein kompakter Segmented-Toggle direkt unter dem Namen, mit Tooltips in DE/EN/ES:
+- 🎬 _Cameo_ · ⚖️ _Balanced_ · ⭐ _Lead_
 
-```sql
-TRUNCATE _media_all;
-TRUNCATE _media_to_keep;
-```
+**c) Storyboard-Generierung** (`supabase/functions/compose-video-storyboard/index.ts`)
 
-Rest der Funktion bleibt unverändert. Trigger-Definition bleibt unverändert.
+- Den hartcodierten Faktor `0.4` durch eine pro Charakter berechnete Spanne ersetzen, abgeleitet aus `appearanceFrequency`.
+- Den Floor-Auto-Repair am Ende (Zeilen 456–490) so anpassen, dass er die User-Wahl respektiert: bei `cameo` werden überschüssige Szenen sogar **entfernt** (characterShot → absent + ggf. clipSource neu picken), bei `balanced`/`lead` wird wie bisher aufgefüllt.
+- Im LLM-Prompt die User-Vorgabe explizit nennen, damit das Model nicht selbst eine andere Quote wählt.
 
-## Verifikation
+### 3. Mini-Verbesserung in der Cast-Map
 
-Nach der Migration nochmal "In Mediathek" klicken — Toast sollte "In Mediathek gespeichert" zeigen, Eintrag erscheint in `/video-management`.
+Wenn Cameo gewählt ist und alle Szenen besetzt sind, wird die orange Warnung ohnehin nicht mehr fälschlich getriggert (durch Bug-Fix #1) — zusätzlich kein Hinweis bei `cameo` zwingend nötig.
 
-## Out of Scope
+## Out of scope
 
-- Keine Änderungen an der Edge Function selbst (die ist korrekt)
-- Keine Änderungen am Hook oder UI
-- Keine Änderung der Limits-Logik (500 Videos / 10 GB bleiben)
+- Keine DB-Migration nötig (Charaktere sind nur im Composer-Sessionstate, nicht in einer Tabelle).
+- Frequenz pro Charakter, nicht pro Szene — feiner steuern bleibt manuell über den Charakter-Button pro Szene möglich.
+- Re-Generierung: User klickt nach Toggle-Änderung wie bisher auf „Storyboard generieren".
+
+## Geänderte Dateien (Übersicht)
+
+- `src/types/video-composer.ts` — neues Feld `appearanceFrequency`
+- `src/components/video-composer/CharacterManager.tsx` — Segmented-Toggle UI + Labels DE/EN/ES
+- `src/components/video-composer/CastConsistencyMap.tsx` — Namens-Fallback in `getAnchor`
+- `supabase/functions/compose-video-storyboard/index.ts` — Quote pro Charakter, Floor + Cap, Prompt-Hinweis
