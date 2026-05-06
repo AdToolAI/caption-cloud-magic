@@ -458,10 +458,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
                 : undefined;
               const cmAnchor = cm?.usePortraitAsFirstFrame ? cm.referenceImageUrl : undefined;
-              const brandAnchor = brandCharacterInput && (brandCharacterInput as any).usePortraitAsFirstFrame !== false
-                ? brandCharacterInput.referenceImageUrl
+              const brandAnchor = (brandCharacterInput as any)?.usePortraitAsFirstFrame === true
+                ? brandCharacterInput?.referenceImageUrl
                 : undefined;
-              return targetScene.referenceImageUrl || composedSingle.referenceImageUrl || cmAnchor || brandAnchor;
+              return targetScene.referenceImageUrl || cmAnchor || brandAnchor;
             })(),
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
