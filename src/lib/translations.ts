@@ -4021,6 +4021,10 @@ export const translations: Record<Language, any> = {
           brandLock: { name: "Brand Character Lock", tagline: "Persistent characters across every studio." }
         }
       },
+      pricing: {
+        title1: "One plan. ",
+        title2: "Everything included.",
+        subtitle: "14 days free · No credit card required · Cancel anytime.",
         perMonth: "/month",
         launchBadge: "Launch pricing · limited time",
         credits50: "50 Credits",
