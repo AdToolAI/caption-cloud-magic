@@ -215,9 +215,21 @@ serve(async (req) => {
       if (!char) return prompt;
       const appearance = (char.appearance || '').trim();
       const items = (char.signatureItems || '').trim();
+      const identityCard = (char.identityCardPrompt || '').trim();
       let prefix = '';
-      // Skip if the prompt already contains the signatureItems verbatim
       const lowerPrompt = prompt.toLowerCase();
+
+      // Brand-Character path: a Gemini-built identity card carries far more
+      // signal than appearance+items text. Prefer it whenever present and use
+      // it for ALL non-absent shot types so face anchoring is consistent.
+      if (identityCard) {
+        const idProbe = identityCard.slice(0, 40).toLowerCase();
+        const hasId = lowerPrompt.includes(idProbe);
+        if (!hasId) prefix += identityCard.endsWith(',') ? identityCard + ' ' : identityCard + ', ';
+        return prefix ? prefix + prompt : prompt;
+      }
+
+      // Legacy free-text Sherlock-Holmes anchor.
       const itemsProbe = items.slice(0, 30).toLowerCase();
       const appearanceProbe = appearance.slice(0, 30).toLowerCase();
       const hasItems = items && lowerPrompt.includes(itemsProbe);
