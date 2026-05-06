@@ -469,14 +469,23 @@ Generate the storyboard using the create_storyboard function.`;
       };
     });
 
-    // 🛡️ SERVER-SIDE CHARACTER FLOOR — auto-repair if LLM returned 0 / too few
-    // character scenes despite the user defining a recurring avatar.
+    // 🛡️ SERVER-SIDE CHARACTER FLOOR + CAP — auto-repair if LLM ignored the
+    // per-character frequency target. Adds anchors when below the floor and
+    // strips anchors (→ shotType: "absent") when above the cap (cameo).
     if (hasCharacters && scenes.length > 0) {
-      const primaryCharId = briefing.characters![0].id;
-      const minRequired = Math.max(2, Math.ceil(scenes.length * 0.4));
-      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent';
-      const currentCount = scenes.filter(hasShot).length;
+      const primaryChar = briefing.characters![0];
+      const primaryCharId = primaryChar.id;
+      const r = freqRange(primaryChar.appearanceFrequency);
+      const minRequired = Math.max(1, Math.ceil(scenes.length * r.min));
+      const maxAllowed = Math.max(minRequired, Math.floor(scenes.length * r.max));
+      const matchesPrimary = (s: any) =>
+        s.characterShot?.characterId === primaryCharId ||
+        // Tolerate id-drift: any non-empty shot counts as primary when only one character is defined
+        (briefing.characters!.length === 1 && s.characterShot?.shotType && s.characterShot.shotType !== 'absent');
+      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent' && matchesPrimary(s);
+      let currentCount = scenes.filter(hasShot).length;
 
+      // FLOOR: insert if too few
       if (currentCount < minRequired) {
         const needed = minRequired - currentCount;
         const candidateOrder: number[] = [0];
@@ -501,7 +510,31 @@ Generate the storyboard using the create_storyboard function.`;
           }
           inserted++;
         }
-        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount}, need ${minRequired})`);
+        currentCount += inserted;
+        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount - inserted}, need ${minRequired}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
+      }
+
+      // CAP: strip excess anchors when over the upper bound (e.g. cameo cap)
+      if (currentCount > maxAllowed) {
+        const excess = currentCount - maxAllowed;
+        // Prefer to keep hook (idx 0) and CTA (last) — strip from the middle.
+        const stripOrder: number[] = [];
+        for (let i = 1; i < scenes.length - 1; i++) stripOrder.push(i);
+        stripOrder.push(scenes.length - 1, 0);
+        let removed = 0;
+        for (const idx of stripOrder) {
+          if (removed >= excess) break;
+          const sc = scenes[idx];
+          if (!hasShot(sc)) continue;
+          sc.characterShot = { characterId: '', shotType: 'absent' };
+          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
+          if (newSource !== sc.clipSource) {
+            sc.clipSource = newSource;
+            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
+          }
+          removed++;
+        }
+        console.log(`[storyboard] character-cap auto-repair: removed ${removed} anchor(s) (had ${currentCount}, max ${maxAllowed}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
       }
     }
 
