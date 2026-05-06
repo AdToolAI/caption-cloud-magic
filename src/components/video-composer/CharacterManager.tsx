@@ -82,6 +82,13 @@ const labels = {
       'Describe signature clothing & objects in detail (cloak, crown, weapon). For real face consistency, link an avatar from your library (button top-right).',
     empty: 'No characters defined.',
     delete: 'Delete',
+    frequency: 'Storyboard appearances',
+    freqCameo: 'Cameo',
+    freqCameoHint: '1–2 scenes — short appearance',
+    freqBalanced: 'Balanced',
+    freqBalancedHint: '40–60% of scenes (default)',
+    freqLead: 'Lead role',
+    freqLeadHint: 'Present in nearly every scene',
   },
   es: {
     title: 'Personajes (opcional)',
