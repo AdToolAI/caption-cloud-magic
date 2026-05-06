@@ -122,11 +122,12 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   const t = labels[lang];
 
   const [draft, setDraft] = useState({ name: '', appearance: '', signatureItems: '' });
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const { data: avatars = [], isLoading: avatarsLoading } = useAccessibleCharacters();
 
   const addCharacter = () => {
     if (!draft.name.trim()) return;
     const id = makeId(draft.name.trim());
-    // Avoid duplicate IDs
     const uniqueId = characters.some((c) => c.id === id) ? `${id}-${Date.now().toString(36)}` : id;
     onChange([
       ...characters,
@@ -140,6 +141,37 @@ export default function CharacterManager({ characters, language, onChange }: Cha
     setDraft({ name: '', appearance: '', signatureItems: '' });
   };
 
+  const linkAvatar = (avatar: { id: string; name: string; reference_image_url?: string | null; portrait_url?: string | null } & Record<string, any>) => {
+    // Avoid duplicates: if already linked, just close.
+    if (characters.some((c) => c.brandCharacterId === avatar.id)) {
+      setPickerOpen(false);
+      return;
+    }
+    const baseId = makeId(avatar.name || 'avatar');
+    const uniqueId = characters.some((c) => c.id === baseId) ? `${baseId}-${avatar.id.slice(0, 6)}` : baseId;
+    const portrait = avatar.portrait_url || avatar.reference_image_url || undefined;
+    const idCard = (() => {
+      try {
+        return buildCharacterPromptInjection(avatar as any);
+      } catch {
+        return '';
+      }
+    })();
+    onChange([
+      ...characters,
+      {
+        id: uniqueId,
+        name: avatar.name,
+        appearance: '',
+        signatureItems: '',
+        brandCharacterId: avatar.id,
+        referenceImageUrl: portrait || undefined,
+        identityCardPrompt: idCard || undefined,
+      },
+    ]);
+    setPickerOpen(false);
+  };
+
   const removeCharacter = (id: string) => {
     onChange(characters.filter((c) => c.id !== id));
   };
@@ -151,11 +183,25 @@ export default function CharacterManager({ characters, language, onChange }: Cha
   return (
     <Card className="border-border/40 bg-card/80">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <User className="h-4 w-4 text-primary" />
-          {t.title}
-        </CardTitle>
-        <p className="text-xs text-muted-foreground mt-1">{t.subtitle}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4 text-primary" />
+              {t.title}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">{t.subtitle}</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setPickerOpen(true)}
+            className="gap-1.5 shrink-0"
+          >
+            <Library className="h-3.5 w-3.5" />
+            {t.pickFromLibrary}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Pro-tip box */}
@@ -174,49 +220,78 @@ export default function CharacterManager({ characters, language, onChange }: Cha
           <p className="text-xs text-muted-foreground italic">{t.empty}</p>
         ) : (
           <div className="space-y-3">
-            {characters.map((c) => (
-              <div
-                key={c.id}
-                className="rounded-lg border border-border/40 bg-background/40 p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    👤 {c.name}
-                  </Badge>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 text-destructive"
-                    onClick={() => removeCharacter(c.id)}
-                    aria-label={t.delete}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">{t.appearance}</Label>
-                    <Textarea
-                      value={c.appearance}
-                      onChange={(e) => updateCharacter(c.id, { appearance: e.target.value })}
-                      placeholder={t.appearancePlaceholder}
-                      rows={2}
-                      className="text-xs bg-background/50 resize-none"
-                    />
+            {characters.map((c) => {
+              const linked = !!c.brandCharacterId && !!c.referenceImageUrl;
+              return (
+                <div
+                  key={c.id}
+                  className={`rounded-lg border p-3 space-y-2 ${
+                    linked
+                      ? 'border-primary/40 bg-primary/5'
+                      : 'border-border/40 bg-background/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {linked && c.referenceImageUrl ? (
+                        <img
+                          src={c.referenceImageUrl}
+                          alt={c.name}
+                          className="h-8 w-8 rounded-full object-cover ring-1 ring-primary/40"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        👤 {c.name}
+                      </Badge>
+                      {linked && (
+                        <Badge className="text-[10px] gap-1 bg-primary/15 text-primary border-primary/30">
+                          <Sparkles className="h-3 w-3" />
+                          {t.anchorBadge}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 text-destructive"
+                      onClick={() => removeCharacter(c.id)}
+                      aria-label={t.delete}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">{t.signature}</Label>
-                    <Textarea
-                      value={c.signatureItems}
-                      onChange={(e) => updateCharacter(c.id, { signatureItems: e.target.value })}
-                      placeholder={t.signaturePlaceholder}
-                      rows={2}
-                      className="text-xs bg-background/50 resize-none"
-                    />
+                  {linked && (
+                    <p className="text-[10px] leading-relaxed text-primary/80">{t.anchorHint}</p>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">{t.appearance}</Label>
+                      <Textarea
+                        value={c.appearance}
+                        onChange={(e) => updateCharacter(c.id, { appearance: e.target.value })}
+                        placeholder={t.appearancePlaceholder}
+                        rows={2}
+                        className="text-xs bg-background/50 resize-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">{t.signature}</Label>
+                      <Textarea
+                        value={c.signatureItems}
+                        onChange={(e) => updateCharacter(c.id, { signatureItems: e.target.value })}
+                        placeholder={t.signaturePlaceholder}
+                        rows={2}
+                        className="text-xs bg-background/50 resize-none"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
