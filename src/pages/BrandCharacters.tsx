@@ -1,11 +1,14 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
-import { Plus, Sparkles, Lock, Users } from 'lucide-react';
+import { Plus, Sparkles, Lock, Users, Wrench, Loader2 } from 'lucide-react';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacterCard';
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { Card } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
 
@@ -13,6 +16,22 @@ const BrandCharacters = () => {
   useTrackPageFeature("brand_characters");
   const { characters, isLoading } = useBrandCharacters();
   const [addOpen, setAddOpen] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const queryClient = useQueryClient();
+
+  const handleRepair = async () => {
+    setRepairing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('repair-brand-character-urls');
+      if (error) throw error;
+      toast.success(`Repaired ${data?.repaired ?? 0} of ${data?.total ?? 0} avatar images`);
+      queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
+    } catch (e: any) {
+      toast.error(e.message || 'Repair failed');
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   return (
     <>
