@@ -54,23 +54,25 @@ const BrandCharacters = () => {
                 Recurring on-screen talent — one click to make them speak. Upload once, pick a voice, and reuse the same avatar across Kling, Veo, Hailuo, Picture Studio and Talking Head renders.
               </p>
             </div>
-            <Button
-              onClick={() => setAddOpen(true)}
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              size="lg"
-            >
-              <Plus className="h-4 w-4 mr-2" /> New Avatar
-            </Button>
-            <Button
-              onClick={handleRepair}
-              variant="outline"
-              size="lg"
-              disabled={repairing || characters.length === 0}
-              title="Re-sign expired image URLs for all your avatars"
-            >
-              {repairing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
-              Repair images
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setAddOpen(true)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                size="lg"
+              >
+                <Plus className="h-4 w-4 mr-2" /> New Avatar
+              </Button>
+              <Button
+                onClick={handleRepair}
+                variant="outline"
+                size="lg"
+                disabled={repairing || characters.length === 0}
+                title="Re-sign expired image URLs for all your avatars"
+              >
+                {repairing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+                Repair images
+              </Button>
+            </div>
           </div>
 
           {/* How it works */}
