@@ -31,7 +31,7 @@ export interface SceneAnchor {
   /** Original portrait URL (always present). */
   referenceImageUrl: string;
   /** Where the candidate came from. */
-  source: 'explicit-shot' | 'cast-name-match' | 'brand-name-match';
+  source: 'explicit-shot' | 'cast-slot' | 'cast-name-match' | 'brand-name-match';
   /** How the portrait should be used by the provider. */
   strategy: AnchorStrategy;
 }
@@ -100,7 +100,7 @@ export function resolveSceneCharacterAnchor(
  * composer can place ALL of them in one frame.
  */
 export function resolveSceneCharacterAnchorsAll(
-  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'clipSource'> & {
+  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'characterShots' | 'clipSource'> & {
     forcePortraitAsFirstFrame?: boolean;
   },
   characters: ComposerCharacter[] | undefined,
@@ -110,16 +110,22 @@ export function resolveSceneCharacterAnchorsAll(
   const seen = new Set<string>();
   const out: SceneAnchor[] = [];
 
-  // 1) Explicit characterShot
-  const shot = scene.characterShot;
-  if (shot && shot.shotType && shot.shotType !== 'absent' && characters) {
-    const cm = characters.find((c) => c.id === shot.characterId);
-    if (cm?.referenceImageUrl) {
+  // 1) Explicit cast slots (multi-character UI). Falls back to legacy
+  //    `characterShot` (singular) when `characterShots` is not yet populated.
+  const slots = (scene.characterShots && scene.characterShots.length > 0)
+    ? scene.characterShots
+    : (scene.characterShot ? [scene.characterShot] : []);
+  if (characters && slots.length > 0) {
+    for (const slot of slots) {
+      if (!slot || !slot.shotType || slot.shotType === 'absent') continue;
+      if (seen.has(slot.characterId)) continue;
+      const cm = characters.find((c) => c.id === slot.characterId);
+      if (!cm?.referenceImageUrl) continue;
       out.push({
         characterId: cm.id,
         name: cm.name,
         referenceImageUrl: cm.referenceImageUrl,
-        source: 'explicit-shot',
+        source: out.length === 0 ? 'explicit-shot' : 'cast-slot',
         strategy: 'first-frame-direct', // recomputed below
       });
       seen.add(cm.id);
@@ -162,10 +168,16 @@ export function resolveSceneCharacterAnchorsAll(
     });
   }
 
-  // Recompute strategies with multi-flag.
+  // Recompute strategies with multi-flag. Each anchor uses ITS OWN shotType
+  // (from the matching cast slot) when available; falls back to primary.
   const multi = out.length > 1;
-  return out.map((a) => ({
-    ...a,
-    strategy: pickStrategy(shot?.shotType, scene.clipSource, a.source, forceDirect, multi),
-  }));
+  const primaryShot = slots[0]?.shotType;
+  return out.map((a) => {
+    const ownSlot = slots.find((s) => s.characterId === a.characterId);
+    const shotType = ownSlot?.shotType ?? primaryShot;
+    return {
+      ...a,
+      strategy: pickStrategy(shotType, scene.clipSource, a.source, forceDirect, multi),
+    };
+  });
 }

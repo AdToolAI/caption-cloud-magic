@@ -166,8 +166,15 @@ export interface ComposerScene {
   uploadType?: 'video' | 'image';
   /** Optional reference image used as a visual guide for AI sources (image-to-video). */
   referenceImageUrl?: string;
-  /** Optional shot-strategy hint for character continuity. */
+  /** Optional shot-strategy hint for character continuity (primary cast slot — kept for backwards-compat). */
   characterShot?: CharacterShot;
+  /**
+   * Multi-character cast for this scene (max 4). When >1, the anchor compositor
+   * (Nano Banana 2 / Vidu Q2) places ALL of them in the first frame.
+   * `characterShot` is treated as the primary (= characterShots[0]) for older
+   * pipeline code paths; new code should prefer `characterShots`.
+   */
+  characterShots?: CharacterShot[];
   /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly

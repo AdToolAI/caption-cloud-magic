@@ -35,7 +35,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALIT
 import SceneMediaUpload from './SceneMediaUpload';
 import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
-import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
+import { CharacterShotBadge } from './CharacterShotBadge';
+import { CharacterCastPicker } from './CharacterCastPicker';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
 import SceneShotDirectorPanel from './SceneShotDirectorPanel';
 import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
@@ -334,9 +335,23 @@ export default function SceneCard({
 
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
                 <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
-                {scene.characterShot && scene.characterShot.shotType !== 'absent' && (
-                  <CharacterShotBadge shot={scene.characterShot} characterName={activeChar?.name} />
-                )}
+                {(() => {
+                  const slots = scene.characterShots && scene.characterShots.length > 0
+                    ? scene.characterShots
+                    : (scene.characterShot ? [scene.characterShot] : []);
+                  return slots
+                    .filter((s) => s.shotType !== 'absent')
+                    .map((s) => {
+                      const ch = characters?.find((c) => c.id === s.characterId);
+                      return (
+                        <CharacterShotBadge
+                          key={s.characterId}
+                          shot={s}
+                          characterName={ch?.name}
+                        />
+                      );
+                    });
+                })()}
                 {scene.hybridMode && (
                   <Badge
                     variant="outline"
@@ -633,12 +648,19 @@ export default function SceneCard({
               </div>
             )}
 
-            {/* Character Shot picker — only when characters are defined in the briefing AND it's an AI scene */}
+            {/* Character Cast picker (multi, max 4) — only when characters are defined in the briefing AND it's an AI scene */}
             {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
-              <CharacterShotPicker
+              <CharacterCastPicker
                 characters={characters}
-                value={scene.characterShot}
-                onChange={(next) => onUpdate({ characterShot: next })}
+                value={scene.characterShots}
+                legacyValue={scene.characterShot}
+                onChange={(next) =>
+                  onUpdate({
+                    characterShots: next,
+                    // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
+                    characterShot: next[0],
+                  })
+                }
                 language={lang as 'en' | 'de' | 'es'}
               />
             )}
