@@ -398,6 +398,7 @@ export default function VideoComposerDashboard() {
             clipSource: row.clip_source as ClipSource,
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
+            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
             aiPrompt: row.ai_prompt ?? local?.aiPrompt,
             stockKeywords: row.stock_keywords ?? local?.stockKeywords,
             uploadUrl: row.upload_url ?? local?.uploadUrl,
