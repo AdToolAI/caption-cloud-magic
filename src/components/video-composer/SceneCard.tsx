@@ -35,7 +35,8 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALIT
 import SceneMediaUpload from './SceneMediaUpload';
 import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
-import { CharacterShotBadge, CharacterShotPicker } from './CharacterShotBadge';
+import { CharacterShotBadge } from './CharacterShotBadge';
+import { CharacterCastPicker } from './CharacterCastPicker';
 import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
 import SceneShotDirectorPanel from './SceneShotDirectorPanel';
 import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
