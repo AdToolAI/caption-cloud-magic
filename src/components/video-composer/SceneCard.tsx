@@ -127,7 +127,7 @@ export default function SceneCard({
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
   // Library for live mention resolution preview
-  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const { characters: libCharacters, locations: libLocations } = useUnifiedMentionLibrary();
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
