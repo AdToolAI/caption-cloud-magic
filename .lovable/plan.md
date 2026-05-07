@@ -1,81 +1,69 @@
-## Problem
+## Was du beobachtest
 
-Im Talking-Head-Dialog (Motion Studio → Button „Talking-Head"):
-1. **Keine Avatar-Auswahl** — du musst jedes Mal manuell ein Foto hochladen, obwohl du in `/avatars` bereits Avatare wie „Matthew Dusatko" mit Portrait + Default-Voice gespeichert hast. „Sarah" ist im Dialog nur die **Stimme**, kein Charakter.
-2. **Ergebnis verschwindet** — beim Aufruf aus dem Storyboard wird keine Szene mitgegeben, das fertige Video landet nur in der Media Library, nicht im Storyboard. Deshalb siehst du außer Matthew (Cast Consistency Map = AI-Reference, anderes Feature) keinen neuen Charakter im Projekt.
+1. **„Sarah" war keine Charakter-Anlage, sondern eine Stimme.** Der Talking-Head-Dialog hat sie als Voice-Preset (`Sarah – warm female`) gespeichert — es wurde also nie ein neuer Charakter angelegt, sondern nur ein Video mit dem hochgeladenen Foto + Sarahs Stimme generiert.
+2. **Kein Namensfeld.** Der Dialog hat heute nur ein Foto-Upload + Avatar-Grid (aus `useAccessibleCharacters`, also `/avatars`). Es gibt keinen Input „Name dieses Charakters" — weil bisher kein neuer Charakter erzeugt werden sollte, sondern nur ein Talking-Head-Clip.
+3. **Szene zeigt nichts Neues.** Die Edge-Function setzt `composer_scenes.clip_status='processing'` + `clip_source='talking-head'`, aber das Storyboard-UI rendert in der Szenen-Card weiterhin den Cast-Avatar (Matthew aus dem Briefing). Erst wenn HeyGen nach 1–3 Min liefert, kommt `clip_url` rein — und auch dann landet es als Clip, nicht als „Cast-Mitglied im Briefing".
 
-## Lösung
+Kurz: Der Talking-Head-Dialog erzeugt **Clips**, nicht **Cast-Charaktere**. Deine Intuition ist genau richtig — die beiden Welten sollten zusammen­gezogen werden.
 
-### 1. Avatar-Picker im Dialog (Tab „Charakter")
+## Vorschlag (deckt sich mit deiner Idee)
 
-Tab „Charakter" um ein **Grid mit deinen Avataren** erweitern, gleichwertig neben dem manuellen Upload:
+**Talking-Head wird zur „Stimme & Performance" für einen Briefing-Charakter, nicht zur Foto-Upload-Bühne.**
 
-```text
-┌─ Tab: Charakter ──────────────────────────────────┐
-│ Deine Avatare                                     │
-│ ┌────┐ ┌────┐ ┌────┐ ┌─────────┐                  │
-│ │ MD │ │ AB │ │ CD │ │ + Foto  │                  │
-│ │Matt│ │Anna│ │Carl│ │ hoch-   │                  │
-│ │hew │ │    │ │    │ │ laden   │                  │
-│ └────┘ └────┘ └────┘ └─────────┘                  │
-│ Ausgewählt: Matthew Dusatko ✓ (Voice: George)     │
-└───────────────────────────────────────────────────┘
-```
-
-- Lädt via `useAccessibleCharacters()` (Single-Source-of-Truth, owned + purchased).
-- Karte = Portrait (`portrait_url` falls vorhanden, sonst `reference_image_url`) + Name.
-- Klick → setzt `imageUrl`, `voiceId` (aus `default_voice_id` falls gesetzt), und zeigt unten welcher Avatar aktiv ist + „Wechseln"-Button.
-- Manuelle Upload-Card bleibt als gleichwertige letzte Kachel im Grid.
-- Wenn der Avatar `portrait_url` hat (Hedra-optimiert), bevorzugen wir das gegenüber `reference_image_url`.
-
-### 2. Optionale Szenen-Zuweisung (Tab „Skript & Stimme")
-
-Neuer Block unter „Qualität":
+### Tab „Charakter" im Talking-Head-Dialog (neu)
 
 ```text
-Ziel (optional)
-┌────────────────────────────────────────────┐
-│ ▾  Nur in Media Library                    │
-│    Szene 1 — Hook                          │
-│    Szene 2 — Body                          │
-│    …                                       │
-└────────────────────────────────────────────┘
+┌─ Charakter wählen ─────────────────────────────┐
+│ Aus deinem Briefing-Cast:                      │
+│ ┌────┐ ┌────┐ ┌────┐                           │
+│ │ MA │ │ AN │ │ CA │                           │
+│ │Matt│ │Anna│ │Carl│                           │
+│ └────┘ └────┘ └────┘                           │
+│                                                │
+│ Kein passender Charakter?                      │
+│ ┌──────────────────────────────────────────┐   │
+│ │ + Neuen Charakter ins Briefing aufnehmen │   │
+│ │   Name: [_________]   Foto: [Upload]     │   │
+│ │   ✓ Wird auch im Cast Consistency Map    │   │
+│ │     für andere Szenen verfügbar          │   │
+│ └──────────────────────────────────────────┘   │
+└────────────────────────────────────────────────┘
 ```
 
-- Default: „Nur in Media Library" (heutiges Verhalten).
-- Wenn Szene gewählt → `sceneId` an `generate(...)` übergeben → Edge-Function hängt das fertige Video automatisch als Clip an die Szene (passiert bereits via `videoUrl`-Field auf der scene row, sobald `sceneId` mitkommt).
+Konkret:
+- **Quelle = `briefing.characters`** (`ComposerCharacter[]`), nicht mehr `useAccessibleCharacters`. Damit ist der Talking-Head zwingend Teil deines Storyboard-Casts und taucht in der Cast Consistency Map auf.
+- **Pflichtfeld Name** — entweder über Auswahl eines bestehenden Cast-Mitglieds oder über das Inline-Formular „neuen Charakter hinzufügen".
+- **Inline-Formular** macht zwei Dinge atomar:
+  1. Lädt Foto in `brand-characters` Bucket hoch (gleicher Path wie Avatar Library).
+  2. Hängt einen neuen `ComposerCharacter` (`{ id, name, referenceImageUrl, brandCharacterId? }`) an `briefing.characters` an → wird sofort in `BriefingTab` / `CastConsistencyMap` sichtbar.
+- **Optional aus `/avatars` importieren** — kleiner Link „Avatar aus Bibliothek übernehmen" öffnet ein Mini-Picker (deine `useAccessibleCharacters`), kopiert Portrait + Default-Voice in einen neuen `ComposerCharacter`. So bleibt die Brand-Character-Bibliothek nutzbar, ohne dass sie *direkt* zur Talking-Head-Quelle wird.
 
-### 3. Storyboard-Integration
+### Tab „Skript & Stimme"
 
-`StoryboardTab.tsx` reicht die Szenen-Liste in den Dialog:
-- Neue Prop `availableScenes: { id; index; sceneType }[]` für das Dropdown.
-- `onSuccess` zeigt zusätzlich Toast „Talking-Head zu Szene {index} hinzugefügt — Anschauen" mit Auto-Scroll zur Szene, wenn eine ID gewählt wurde.
+Bleibt wie heute (Skript, Voice-Preset/Custom Voice, Aspect, Resolution, optionales Szenen-Target).
 
-## Technical Details
+### Szenen-Anbindung
 
-**Geänderte Dateien (Frontend only, keine DB-/Edge-Änderungen):**
-- `src/components/video-composer/TalkingHeadDialog.tsx`
-  - Import `useAccessibleCharacters`
-  - Neuer State `selectedAvatarId`, `targetSceneId`
-  - Avatar-Grid in Tab „Charakter" (Cards mit `aspect-square`, gold-Ring bei selected, James-Bond-Design-Tokens)
-  - Beim Avatar-Klick: `setImageUrl(c.portrait_url ?? c.reference_image_url)`, `setVoiceId(c.default_voice_id ?? voiceId)`
-  - Neue Prop `availableScenes?: Array<{ id: string; label: string }>`
-  - Szenen-Select in Tab „Skript & Stimme"
-  - `handleGenerate` übergibt `sceneId: targetSceneId || undefined`
-- `src/components/video-composer/StoryboardTab.tsx`
-  - `<TalkingHeadDialog availableScenes={scenes.map((s,i)=>({ id: s.id, label: \`S${i+1} — ${s.sceneType}\` }))} />`
-  - `onSuccess({sceneId})`: bei vorhandenem `sceneId` smooth-scroll zum Card-Element + Erfolgs-Toast.
+- Wenn eine Szene gewählt ist, schreibt die Edge-Function zusätzlich `composer_scenes.character_ids = [composerCharacterId]`, damit die `CastConsistencyMap` den richtigen Punkt setzt und die Szenen-Card im Storyboard den richtigen Avatar im Header zeigt — auch *bevor* HeyGen fertig ist.
+- Während `clip_status='processing'` zeigt die Szenen-Card einen Skeleton + „Talking-Head wird generiert (1–3 Min)" mit dem Foto des Charakters als Vorschau, statt nur dem alten Storyboard-Bild.
 
-**Out of Scope:**
-- Keine Änderungen an `generate-talking-head` Edge Function (akzeptiert bereits `imageUrl`, `voiceId`, `sceneId`).
-- Keine DB-Migration.
-- Kein neuer Hook; `useAccessibleCharacters` existiert bereits.
-- Kein Eingriff in Cast Consistency Map (das ist Reference-Image für AI-Video-Modelle, nicht für Talking-Head).
+### Geänderte Dateien (Frontend + 1 Edge-Function-Patch)
 
-## Verifikation
+- `src/components/video-composer/TalkingHeadDialog.tsx` — Avatar-Quelle umstellen auf `briefing.characters`, Name-Pflicht, Inline-„Neuer Charakter"-Block, optional Library-Import.
+- `src/components/video-composer/StoryboardTab.tsx` — `briefing` + `onUpdateBriefing` an Dialog reichen; nach Anlage neuen Charakter via `onUpdateBriefing({ characters: [...] })`.
+- `src/components/video-composer/SceneCard.tsx` (oder `SortableSceneItem.tsx`) — Wenn `clip_source='talking-head'` & `clip_status='processing'`, Foto + Loader anzeigen.
+- `supabase/functions/generate-talking-head/index.ts` — `composerCharacterId` annehmen, in `composer_scenes.character_ids` schreiben (UPDATE auf Array-Spalte).
 
-1. Talking-Head-Dialog öffnen → Tab „Charakter" zeigt Grid mit „Matthew Dusatko" + Upload-Card.
-2. Matthew anklicken → Foto + Voice (George) automatisch gesetzt, Tab „Skript & Stimme" wird klickbar.
-3. Szene 2 im neuen Dropdown wählen, Skript schreiben, „Generieren".
-4. Erwartung: Toast „Talking-Head zu S2 hinzugefügt", nach 1–3 Min taucht das Video als Clip in Szene 2 auf, Storyboard scrollt dorthin.
-5. Zweiter Test ohne Szene-Auswahl → Video erscheint nur in der Video-History (Dashboard).
+### Verifikation
+
+1. Dialog öffnen → Tab „Charakter" zeigt Briefing-Cast (Matthew) + „+ Neuer Charakter".
+2. „Sarah" anlegen mit Foto-Upload → erscheint sofort in Cast Consistency Map als zweite Zeile mit Spalten-Punkten.
+3. Skript schreiben, Szene 2 wählen, generieren → Szene-Card S2 zeigt sofort Sarahs Foto + „Generiert…", Cast-Map setzt grünen Punkt in Spalte S2.
+4. Nach 1–3 Min: HeyGen-Video ersetzt Skeleton in S2.
+5. Zweiter Talking-Head in S4 mit *bestehendem* Charakter Sarah → kein neuer Cast-Eintrag, Cast-Map bekommt zusätzlichen Punkt in Spalte S4.
+
+### Nicht im Scope
+
+- Kein Marketplace-/Avatar-Library-Umbau.
+- Kein neuer DB-Trigger; alles über bestehende `composer_scenes`/`composer_briefings`-Spalten.
+- Kein Hedra/HeyGen-Modellwechsel.
