@@ -60,6 +60,7 @@ export default function ComposerSequencePreview({
   voiceoverUrl,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
+  sceneAudioClips,
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
