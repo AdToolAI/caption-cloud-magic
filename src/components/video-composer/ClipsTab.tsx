@@ -26,6 +26,7 @@ import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
+import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
@@ -303,46 +304,68 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       }
       const { projectId: pid, scenes: pScenes } = persisted;
 
-      const scenesPayload = pScenes
-        .filter(s => s.clipStatus !== 'ready' && !(s.clipSource === 'upload' && s.uploadUrl))
-        .map(s => {
-          // Centralized prompt composer (Phase 1) — replaces the previous
-          // resolveMentions + applyDirectorModifiers + buildShotPromptSuffix
-          // chain. Resolves axis conflicts, injects brand character, and
-          // splits negative phrases out of the positive prompt.
-          const brandCharacterInput = buildBrandInputForScene(s);
-          const composed = composePromptLayers({
-            rawPrompt: s.aiPrompt || '',
-            directorModifiers: s.directorModifiers,
-            shotDirector: s.shotDirector,
-            cinematicStylePresetId: (s as any).cinematicStylePresetId,
-            brandCharacter: brandCharacterInput,
-            libraryCharacters: libCharacters,
-            libraryLocations: libLocations,
-          });
-          // Per-scene cast-aware anchor: send the portrait of the character
-          // who actually appears in this scene (explicit shot OR name match)
-          // so i2v providers (Hailuo first_frame_image, Kling start_image,
-          // Wan image, Seedance image, Luma start_image, Veo image,
-          // HappyHorse image) lock onto the right face.
-          const sceneAnchor = resolveSceneCharacterAnchor(s, characters, activeBrandChar);
-          if (sceneAnchor && !s.referenceImageUrl) {
-            console.log(`[ClipsTab] scene ${s.id} → anchor ${sceneAnchor.source} (${sceneAnchor.name})`);
-          }
-          return {
-            id: s.id,
-            clipSource: s.clipSource,
-            clipQuality: s.clipQuality || 'standard',
-            aiPrompt: composed.finalPrompt,
-            negativePrompt: composed.negativePrompt || undefined,
-            stockKeywords: s.stockKeywords,
-            uploadUrl: s.uploadUrl,
-            referenceImageUrl: s.referenceImageUrl || sceneAnchor?.referenceImageUrl,
-            durationSeconds: s.durationSeconds,
-            characterShot: s.characterShot,
-            withAudio: s.withAudio !== false,
-          };
-        });
+      const eligibleScenes = pScenes.filter(
+        s => s.clipStatus !== 'ready' && !(s.clipSource === 'upload' && s.uploadUrl),
+      );
+
+      // First pass: compose prompts (so the scene-anchor compose call gets the
+      // FINAL English prompt, not the raw one).
+      const composedByScene = new Map<string, ReturnType<typeof composePromptLayers>>();
+      for (const s of eligibleScenes) {
+        const brandCharacterInput = buildBrandInputForScene(s);
+        composedByScene.set(s.id, composePromptLayers({
+          rawPrompt: s.aiPrompt || '',
+          directorModifiers: s.directorModifiers,
+          shotDirector: s.shotDirector,
+          cinematicStylePresetId: (s as any).cinematicStylePresetId,
+          brandCharacter: brandCharacterInput,
+          libraryCharacters: libCharacters,
+          libraryLocations: libLocations,
+        }));
+      }
+
+      // Second pass (parallel): scene-aware character anchor.
+      // Uses Nano Banana 2 to render the character INTO the scene composition
+      // for non-close-up shots, instead of locking the first frame to a face.
+      const anchorByScene = new Map<string, Awaited<ReturnType<typeof prepareSceneAnchor>>>();
+      await Promise.all(
+        eligibleScenes
+          .filter(s => s.clipSource.startsWith('ai-'))
+          .map(async (s) => {
+            const composed = composedByScene.get(s.id);
+            const prepared = await prepareSceneAnchor(
+              s,
+              characters,
+              activeBrandChar,
+              composed?.finalPrompt || s.aiPrompt || '',
+            );
+            anchorByScene.set(s.id, prepared);
+            if (prepared.anchor) {
+              console.log(
+                `[ClipsTab] scene ${s.id} → ${prepared.anchor.strategy} (${prepared.anchor.name}, source=${prepared.anchor.source}, composed=${prepared.composed})`,
+              );
+            }
+          }),
+      );
+
+      const scenesPayload = eligibleScenes.map(s => {
+        const composed = composedByScene.get(s.id)!;
+        const prepared = anchorByScene.get(s.id);
+        return {
+          id: s.id,
+          clipSource: s.clipSource,
+          clipQuality: s.clipQuality || 'standard',
+          aiPrompt: composed.finalPrompt,
+          negativePrompt: composed.negativePrompt || undefined,
+          stockKeywords: s.stockKeywords,
+          uploadUrl: s.uploadUrl,
+          referenceImageUrl: prepared?.firstFrameUrl,
+          subjectReferenceUrl: prepared?.subjectReferenceUrl,
+          durationSeconds: s.durationSeconds,
+          characterShot: s.characterShot,
+          withAudio: s.withAudio !== false,
+        };
+      });
 
       if (scenesPayload.length === 0) {
         toast({ title: 'Alle Clips sind bereits fertig!' });
@@ -442,6 +465,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         libraryLocations: libLocations,
       });
 
+      const preparedSingle = targetScene.clipSource.startsWith('ai-')
+        ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt)
+        : undefined;
+      if (preparedSingle?.anchor) {
+        console.log(
+          `[ClipsTab] single scene ${targetScene.id} → ${preparedSingle.anchor.strategy} (${preparedSingle.anchor.name}, source=${preparedSingle.anchor.source}, composed=${preparedSingle.composed})`,
+        );
+      }
+
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
@@ -455,13 +487,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: (() => {
-              const sceneAnchor = resolveSceneCharacterAnchor(targetScene, characters, activeBrandChar);
-              if (sceneAnchor && !targetScene.referenceImageUrl) {
-                console.log(`[ClipsTab] single scene ${targetScene.id} → anchor ${sceneAnchor.source} (${sceneAnchor.name})`);
-              }
-              return targetScene.referenceImageUrl || sceneAnchor?.referenceImageUrl;
-            })(),
+            referenceImageUrl: preparedSingle?.firstFrameUrl,
+            subjectReferenceUrl: preparedSingle?.subjectReferenceUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
