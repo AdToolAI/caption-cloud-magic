@@ -689,7 +689,7 @@ export default function ComposerSequencePreview({
     });
   }, [playing, muted, globalTime, sfxClipsTimeline]);
 
-
+  const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
     return (
       subtitles.segments.find(
