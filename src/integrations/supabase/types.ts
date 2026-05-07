@@ -5190,6 +5190,7 @@ export type Database = {
           character_image_url: string | null
           character_script: string | null
           character_shot: Json | null
+          character_shots: Json
           character_voice_id: string | null
           cinematic_preset_slug: string | null
           clip_lead_in_trim_seconds: number
@@ -5251,6 +5252,7 @@ export type Database = {
           character_image_url?: string | null
           character_script?: string | null
           character_shot?: Json | null
+          character_shots?: Json
           character_voice_id?: string | null
           cinematic_preset_slug?: string | null
           clip_lead_in_trim_seconds?: number
@@ -5312,6 +5314,7 @@ export type Database = {
           character_image_url?: string | null
           character_script?: string | null
           character_shot?: Json | null
+          character_shots?: Json
           character_voice_id?: string | null
           cinematic_preset_slug?: string | null
           clip_lead_in_trim_seconds?: number
