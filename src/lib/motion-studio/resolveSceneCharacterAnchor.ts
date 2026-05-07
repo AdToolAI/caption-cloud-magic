@@ -1,6 +1,6 @@
 // Per-scene character anchor resolver.
 //
-// Decides HOW the chosen character should be sent to the AI provider so the
+// Decides HOW the chosen character(s) should be sent to the AI provider so the
 // scene composition (wide shot, back-shot, drone, etc.) is preserved instead
 // of being overridden by a centered face close-up.
 //
@@ -58,9 +58,12 @@ function pickStrategy(
   clipSource: string | undefined,
   source: SceneAnchor['source'],
   forceDirect: boolean,
+  multi: boolean = false,
 ): AnchorStrategy {
-  if (forceDirect) return 'first-frame-direct';
+  if (forceDirect && !multi) return 'first-frame-direct';
   if (clipSource && SUBJECT_REF_SOURCES.has(clipSource)) return 'subject-reference';
+  // Multi-character scenes ALWAYS need composition — direct never works for >1.
+  if (multi) return 'first-frame-composed';
   // Tight shots: portrait directly is fine — composition IS the face.
   if (shotType === 'detail' || shotType === 'pov') return 'first-frame-direct';
   // Explicit framing that is NOT a tight close-up → compose.
@@ -82,52 +85,87 @@ export function resolveSceneCharacterAnchor(
   characters: ComposerCharacter[] | undefined,
   brandChar: BrandCharLike | null | undefined,
 ): SceneAnchor | undefined {
+  const all = resolveSceneCharacterAnchorsAll(scene, characters, brandChar);
+  return all[0];
+}
+
+/**
+ * Multi-character variant. Returns an ordered array of anchors:
+ *   1. Explicit characterShot (if any)
+ *   2. ALL cast members whose names appear in the prompt
+ *   3. Brand character (if its name appears and not already in cast)
+ *
+ * The `strategy` of each anchor is recomputed with `multi=true` when more
+ * than one anchor is returned, forcing `first-frame-composed` so the scene
+ * composer can place ALL of them in one frame.
+ */
+export function resolveSceneCharacterAnchorsAll(
+  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'clipSource'> & {
+    forcePortraitAsFirstFrame?: boolean;
+  },
+  characters: ComposerCharacter[] | undefined,
+  brandChar: BrandCharLike | null | undefined,
+): SceneAnchor[] {
   const forceDirect = scene.forcePortraitAsFirstFrame === true;
+  const seen = new Set<string>();
+  const out: SceneAnchor[] = [];
 
   // 1) Explicit characterShot
   const shot = scene.characterShot;
   if (shot && shot.shotType && shot.shotType !== 'absent' && characters) {
     const cm = characters.find((c) => c.id === shot.characterId);
     if (cm?.referenceImageUrl) {
-      return {
+      out.push({
         characterId: cm.id,
         name: cm.name,
         referenceImageUrl: cm.referenceImageUrl,
         source: 'explicit-shot',
-        strategy: pickStrategy(shot.shotType, scene.clipSource, 'explicit-shot', forceDirect),
-      };
+        strategy: 'first-frame-direct', // recomputed below
+      });
+      seen.add(cm.id);
     }
   }
 
   const prompt = (scene.aiPrompt || '').toLowerCase();
-  if (!prompt) return undefined;
 
-  // 2) Any cast member whose name appears in the prompt
-  if (characters && characters.length > 0) {
+  // 2) Any cast members whose names appear in the prompt
+  if (prompt && characters && characters.length > 0) {
     for (const cm of characters) {
+      if (seen.has(cm.id)) continue;
       if (!cm.referenceImageUrl) continue;
       if (nameMatchesPrompt(cm.name, prompt)) {
-        return {
+        out.push({
           characterId: cm.id,
           name: cm.name,
           referenceImageUrl: cm.referenceImageUrl,
           source: 'cast-name-match',
-          strategy: pickStrategy(shot?.shotType, scene.clipSource, 'cast-name-match', forceDirect),
-        };
+          strategy: 'text-only', // recomputed below
+        });
+        seen.add(cm.id);
       }
     }
   }
 
-  // 3) Favourite Brand Character
-  if (brandChar?.reference_image_url && nameMatchesPrompt(brandChar.name, prompt)) {
-    return {
+  // 3) Favourite Brand Character (if not already in cast)
+  if (
+    prompt &&
+    brandChar?.reference_image_url &&
+    nameMatchesPrompt(brandChar.name, prompt) &&
+    !seen.has(brandChar.id || `brand:${brandChar.name}`)
+  ) {
+    out.push({
       characterId: brandChar.id || `brand:${brandChar.name}`,
       name: brandChar.name || 'Brand Character',
       referenceImageUrl: brandChar.reference_image_url,
       source: 'brand-name-match',
-      strategy: pickStrategy(shot?.shotType, scene.clipSource, 'brand-name-match', forceDirect),
-    };
+      strategy: 'text-only', // recomputed below
+    });
   }
 
-  return undefined;
+  // Recompute strategies with multi-flag.
+  const multi = out.length > 1;
+  return out.map((a) => ({
+    ...a,
+    strategy: pickStrategy(shot?.shotType, scene.clipSource, a.source, forceDirect, multi),
+  }));
 }
