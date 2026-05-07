@@ -824,6 +824,9 @@ export default function SceneCard({
                           {brandCharacterInput && composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
                             <Badge variant="outline" className="text-[8px] h-3 px-1 border-emerald-500/40 text-emerald-400">brand</Badge>
                           )}
+                          {brandCharacterInput && !composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
+                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-muted-foreground/30 text-muted-foreground/60">brand · skipped</Badge>
+                          )}
                           {promptPreviewOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </div>
                       </button>
