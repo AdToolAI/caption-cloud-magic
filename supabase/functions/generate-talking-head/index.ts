@@ -154,7 +154,23 @@ async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promi
 async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   // Always prune custom photos first so the next upload doesn't trip the
   // free-plan limit. Keep 0 — we don't reuse, we re-upload per render.
-  await pruneHeyGenTalkingPhotos(0);
+  // Read the cached QA preset id (if any) so we never delete it.
+  let preserveId: string | undefined;
+  try {
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    const { data: cfgRow } = await admin
+      .from('system_config')
+      .select('value')
+      .eq('key', 'qa.heygen_talking_photo_id')
+      .maybeSingle();
+    const v: any = cfgRow?.value;
+    preserveId = typeof v === 'string' ? v : (v && typeof v === 'object' && 'id' in v ? String(v.id) : undefined);
+  } catch (_e) { /* non-fatal */ }
+
+  await pruneHeyGenTalkingPhotos(0, preserveId);
+  // Also prune via the legacy talking_photo.list endpoint as a fallback
+  // (different plans expose different listing endpoints).
+  await pruneLegacyTalkingPhotos(preserveId);
 
   const srcRes = await fetch(sourceUrl);
   if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
@@ -180,10 +196,9 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   console.log(`[talking-head] HeyGen talking_photo upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
 
   if (!uploadRes.ok) {
-    // Surface the avatar-limit error as a structured 402-style code so the
-    // QA cockpit + UI can show "skip" rather than a generic 500.
+    // Surface the avatar-limit error with a friendly, user-facing message.
     if (respText.includes('401028') || /photo avatars/i.test(respText)) {
-      throw new Error(`HEYGEN_AVATAR_LIMIT: ${respText.slice(0, 200)}`);
+      throw new Error('HEYGEN_AVATAR_LIMIT: HeyGen-Avatar-Kontingent voll — bitte einen Moment warten und erneut versuchen. (Auto-Cleanup läuft.)');
     }
     throw new Error(`HeyGen talking_photo upload failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
   }
@@ -193,6 +208,33 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   const talkingPhotoId = json?.data?.talking_photo_id;
   if (!talkingPhotoId) throw new Error(`HeyGen talking_photo upload missing talking_photo_id in response: ${JSON.stringify(json).slice(0, 200)}`);
   return talkingPhotoId;
+}
+
+// Legacy fallback prune via /v1/talking_photo.list (some plans only expose this).
+async function pruneLegacyTalkingPhotos(preserveId?: string): Promise<void> {
+  try {
+    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+      method: 'GET',
+      headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+    });
+    if (!listRes.ok) return;
+    const json = await listRes.json();
+    const items: any[] = Array.isArray(json?.data) ? json.data : [];
+    // Try deleting ALL ids (HeyGen sometimes mislabels uploads as preset).
+    // True presets just return 4xx and we move on.
+    const targets = items.filter((x) => x?.id && (!preserveId || x.id !== preserveId));
+    console.log(`[talking-head] prune (legacy talking_photo.list): ${items.length} total, attempting ${targets.length}`);
+    for (const item of targets) {
+      const id = item.id;
+      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
+        method: 'DELETE',
+        headers: { 'X-Api-Key': HEYGEN_API_KEY },
+      });
+      console.log(`[talking-head] prune (legacy): delete ${id} -> ${dr.status}`);
+    }
+  } catch (e) {
+    console.warn('[talking-head] legacy prune failed (non-fatal):', e instanceof Error ? e.message : String(e));
+  }
 }
 
 // Create a video generation request → returns video_id
