@@ -35,14 +35,6 @@ export interface SceneAnchor {
   /** How the portrait should be used by the provider. */
   strategy: AnchorStrategy;
 }
-  name: string;
-  /** Original portrait URL (always present). */
-  referenceImageUrl: string;
-  /** Where the candidate came from. */
-  source: 'explicit-shot' | 'cast-name-match' | 'brand-name-match';
-  /** How the portrait should be used by the provider. */
-  strategy: AnchorStrategy;
-}
 
 interface BrandCharLike {
   id?: string;
