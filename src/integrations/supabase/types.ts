@@ -5167,6 +5167,7 @@ export type Database = {
           id: string
           last_drift_check_at: string | null
           last_frame_url: string | null
+          lip_sync_with_voiceover: boolean
           lock_reference_url: string | null
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
@@ -5227,6 +5228,7 @@ export type Database = {
           id?: string
           last_drift_check_at?: string | null
           last_frame_url?: string | null
+          lip_sync_with_voiceover?: boolean
           lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
@@ -5287,6 +5289,7 @@ export type Database = {
           id?: string
           last_drift_check_at?: string | null
           last_frame_url?: string | null
+          lip_sync_with_voiceover?: boolean
           lock_reference_url?: string | null
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
