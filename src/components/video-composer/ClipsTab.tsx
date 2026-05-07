@@ -25,6 +25,7 @@ import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
+import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
