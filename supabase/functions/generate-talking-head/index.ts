@@ -526,6 +526,7 @@ Deno.serve(async (req) => {
       aspectRatio = '9:16',
       resolution = '720p',
       talkingPhotoId: presetTalkingPhotoId,
+      composerCharacterId,
     } = body;
 
     if (!imageUrl && !presetTalkingPhotoId) {
