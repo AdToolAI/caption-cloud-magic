@@ -638,6 +638,7 @@ export default function SceneCard({
                 value={scene.characterShot}
                 onChange={(next) => onUpdate({ characterShot: next })}
                 language={lang as 'en' | 'de' | 'es'}
+              />
             )}
 
             {/* Lip-Sync toggle — for character scenes */}
