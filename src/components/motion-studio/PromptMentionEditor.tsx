@@ -83,7 +83,7 @@ export default function PromptMentionEditor({
   className,
   disabled,
 }: PromptMentionEditorProps) {
-  const { characters, locations } = useMotionStudioLibrary();
+  const { characters, locations } = useUnifiedMentionLibrary();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [trigger, setTrigger] = useState<{ query: string; start: number } | null>(
     null
