@@ -123,7 +123,9 @@ async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promi
       const id = x?.id || x?.photo_avatar_id || x?.avatar_id;
       return id && (!preserveId || id !== preserveId);
     });
-    const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep));
+    // Hard-cap: never delete more than 10 per invocation to avoid blocking the
+    // function for minutes if HeyGen returns a large/unexpected list.
+    const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep)).slice(0, 10);
     console.log(`[talking-head] prune (${source}): ${items.length} total, ${candidates.length} deletable, deleting ${toDelete.length}`);
     for (const item of toDelete) {
       const id = item?.id || item?.photo_avatar_id || item?.avatar_id;
@@ -168,9 +170,9 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   } catch (_e) { /* non-fatal */ }
 
   await pruneHeyGenTalkingPhotos(0, preserveId);
-  // Also prune via the legacy talking_photo.list endpoint as a fallback
-  // (different plans expose different listing endpoints).
-  await pruneLegacyTalkingPhotos(preserveId);
+  // Note: legacy /v1/talking_photo.list returns HeyGen's preset library (hundreds
+  // of items, all 404 on DELETE) and used to block this function for minutes.
+  // The /v2/photo_avatar/photo/list path above is the correct quota source.
 
   const srcRes = await fetch(sourceUrl);
   if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
@@ -210,32 +212,7 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   return talkingPhotoId;
 }
 
-// Legacy fallback prune via /v1/talking_photo.list (some plans only expose this).
-async function pruneLegacyTalkingPhotos(preserveId?: string): Promise<void> {
-  try {
-    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
-      method: 'GET',
-      headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
-    });
-    if (!listRes.ok) return;
-    const json = await listRes.json();
-    const items: any[] = Array.isArray(json?.data) ? json.data : [];
-    // Try deleting ALL ids (HeyGen sometimes mislabels uploads as preset).
-    // True presets just return 4xx and we move on.
-    const targets = items.filter((x) => x?.id && (!preserveId || x.id !== preserveId));
-    console.log(`[talking-head] prune (legacy talking_photo.list): ${items.length} total, attempting ${targets.length}`);
-    for (const item of targets) {
-      const id = item.id;
-      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-Api-Key': HEYGEN_API_KEY },
-      });
-      console.log(`[talking-head] prune (legacy): delete ${id} -> ${dr.status}`);
-    }
-  } catch (e) {
-    console.warn('[talking-head] legacy prune failed (non-fatal):', e instanceof Error ? e.message : String(e));
-  }
-}
+// (legacy preset prune removed — see comment in uploadHeyGenTalkingPhoto)
 
 // Create a video generation request → returns video_id
 // Uses talking_photo character + audio voice with direct URL (no audio asset upload needed)
