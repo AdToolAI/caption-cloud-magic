@@ -24,6 +24,7 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
+import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
@@ -72,13 +73,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const { characters: brandChars } = useBrandCharacters();
   // Phase 2 — auto-inject the user's favorite Brand Character (if any).
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
-  const brandCharacterInput = activeBrandChar
-    ? {
+  const buildBrandInputForScene = useCallback(
+    (scene: ComposerScene) => {
+      if (!activeBrandChar) return undefined;
+      return {
         name: activeBrandChar.name,
         identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
         referenceImageUrl: activeBrandChar.reference_image_url,
-      }
-    : undefined;
+        // Gate: only inject identity card when the scene actually features
+        // the character (explicit characterShot or name in the prompt).
+        appliesToScene: sceneFeaturesCharacter(scene, { name: activeBrandChar.name }),
+        usePortraitAsFirstFrame: (activeBrandChar as any).use_portrait_as_first_frame === true,
+      };
+    },
+    [activeBrandChar],
+  );
 
   /**
    * Frame-to-Shot Continuity:
@@ -296,6 +305,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // resolveMentions + applyDirectorModifiers + buildShotPromptSuffix
           // chain. Resolves axis conflicts, injects brand character, and
           // splits negative phrases out of the positive prompt.
+          const brandCharacterInput = buildBrandInputForScene(s);
           const composed = composePromptLayers({
             rawPrompt: s.aiPrompt || '',
             directorModifiers: s.directorModifiers,
@@ -316,10 +326,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // the user explicitly opted in via `usePortraitAsFirstFrame`. Otherwise
           // the portrait stays a look reference (description anchor) only.
           const castAnchor = castMember?.usePortraitAsFirstFrame ? castMember.referenceImageUrl : undefined;
-          // Brand character portrait is now opt-in (default OFF). Otherwise every
-          // scene would start with the exact portrait frame ("photo-to-video" look).
-          const brandAnchor = (brandCharacterInput as any)?.usePortraitAsFirstFrame === true
-            ? brandCharacterInput?.referenceImageUrl
+          // Brand character portrait is now opt-in (default OFF) AND only when
+          // the scene features the character.
+          const brandAnchor = brandCharacterInput?.appliesToScene && brandCharacterInput?.usePortraitAsFirstFrame
+            ? brandCharacterInput.referenceImageUrl
             : undefined;
           return {
             id: s.id,
@@ -329,9 +339,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composed.negativePrompt || undefined,
             stockKeywords: s.stockKeywords,
             uploadUrl: s.uploadUrl,
-            // Only manual `s.referenceImageUrl` (Frame-Chain / Continuity button)
-            // or explicit opt-in anchors. `composed.referenceImageUrl` from
-            // @-mentions is intentionally NOT auto-piped — it stays a look reference.
             referenceImageUrl:
               s.referenceImageUrl ||
               castAnchor ||
@@ -429,13 +436,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(optimistic);
       }
 
-      // Centralized prompt composer (Phase 1)
+      const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
       const composedSingle = composePromptLayers({
         rawPrompt: targetScene.aiPrompt || '',
         directorModifiers: targetScene.directorModifiers,
         shotDirector: targetScene.shotDirector,
         cinematicStylePresetId: (targetScene as any).cinematicStylePresetId,
-        brandCharacter: brandCharacterInput,
+        brandCharacter: brandCharacterInputSingle,
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
       });
@@ -458,8 +465,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
                 : undefined;
               const cmAnchor = cm?.usePortraitAsFirstFrame ? cm.referenceImageUrl : undefined;
-              const brandAnchor = (brandCharacterInput as any)?.usePortraitAsFirstFrame === true
-                ? brandCharacterInput?.referenceImageUrl
+              const brandAnchor = brandCharacterInputSingle?.appliesToScene && brandCharacterInputSingle?.usePortraitAsFirstFrame
+                ? brandCharacterInputSingle.referenceImageUrl
                 : undefined;
               return targetScene.referenceImageUrl || cmAnchor || brandAnchor;
             })(),

@@ -47,6 +47,7 @@ import MultiEnginePromptPreview from '@/components/motion-studio/MultiEngineProm
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
 import { resolveMentions } from '@/lib/motion-studio/mentionParser';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
+import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
   stitchSlots,
@@ -134,6 +135,7 @@ export default function SceneCard({
         name: activeBrandChar.name,
         identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
         referenceImageUrl: activeBrandChar.reference_image_url,
+        appliesToScene: sceneFeaturesCharacter(scene, { name: activeBrandChar.name }),
       }
     : undefined;
   // Phase 6 — Live Prompt Preview expanded state.
@@ -821,6 +823,9 @@ export default function SceneCard({
                           )}
                           {brandCharacterInput && composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
                             <Badge variant="outline" className="text-[8px] h-3 px-1 border-emerald-500/40 text-emerald-400">brand</Badge>
+                          )}
+                          {brandCharacterInput && !composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
+                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-muted-foreground/30 text-muted-foreground/60">brand · skipped</Badge>
                           )}
                           {promptPreviewOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                         </div>
