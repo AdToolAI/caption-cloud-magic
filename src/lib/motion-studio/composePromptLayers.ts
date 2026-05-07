@@ -43,6 +43,12 @@ export interface ComposerInputs {
     name?: string;
     identityCardPrompt?: string;
     referenceImageUrl?: string;
+    /**
+     * When true, the brand character's identity-card description is injected
+     * into the positive prompt. Default: false — so B-roll scenes that do not
+     * feature the character don't end up rendering them anyway.
+     */
+    appliesToScene?: boolean;
   };
   /** Library lookups for @character / @location mentions (Phase 4 logic). */
   libraryCharacters?: MotionStudioCharacter[];
@@ -192,12 +198,21 @@ export function composePromptLayers(inputs: ComposerInputs): ComposerResult {
     });
   }
 
-  // 2) Brand character auto-inject (only if not already described).
-  const brandStep = injectBrandCharacter(resolved.prompt, inputs.brandCharacter);
+  // 2) Brand character auto-inject — gated on `appliesToScene` so B-roll
+  //    scenes (no character featured) don't accidentally render the character.
+  const sceneFeaturesBrand = inputs.brandCharacter?.appliesToScene === true;
+  const brandStep = sceneFeaturesBrand
+    ? injectBrandCharacter(resolved.prompt, inputs.brandCharacter)
+    : { text: resolved.prompt, injected: false };
   if (inputs.brandCharacter?.identityCardPrompt) {
+    const skipReason = !sceneFeaturesBrand
+      ? 'skipped — scene not featuring character'
+      : 'skipped — already described';
     layers.push({
       source: 'brandCharacter',
-      label: brandStep.injected ? 'Brand Character (injected)' : 'Brand Character (skipped — already described)',
+      label: brandStep.injected
+        ? 'Brand Character (injected)'
+        : `Brand Character (${skipReason})`,
       text: inputs.brandCharacter.identityCardPrompt,
       applied: brandStep.injected,
     });
