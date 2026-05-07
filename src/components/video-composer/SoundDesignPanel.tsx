@@ -118,11 +118,13 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
   const updateVolume = async (id: string, vol: number) => {
     setClips((cs) => cs.map((c) => c.id === id ? { ...c, volume: vol } : c));
     await supabase.from('scene_audio_clips').update({ volume: vol }).eq('id', id);
+    emitSceneAudioClipsChanged(projectId);
   };
 
   const removeClip = async (id: string) => {
     await supabase.from('scene_audio_clips').delete().eq('id', id);
     setClips((cs) => cs.filter((c) => c.id !== id));
+    emitSceneAudioClipsChanged(projectId);
   };
 
   const grouped = useMemo(() => ({
