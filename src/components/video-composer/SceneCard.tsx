@@ -641,6 +641,49 @@ export default function SceneCard({
               />
             )}
 
+            {/* Scene-Aware Character Anchor — strategy badge + override */}
+            {scene.clipSource.startsWith('ai-') && (() => {
+              const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);
+              if (!anchor) return null;
+              const labels: Record<string, { de: string; cost: string; tone: string }> = {
+                'first-frame-direct':   { de: 'Anker: Porträt direkt', cost: '0,00€', tone: 'border-amber-500/40 bg-amber-500/10 text-amber-200' },
+                'first-frame-composed': { de: 'Anker: In Szene komponiert', cost: '~0,02€', tone: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' },
+                'subject-reference':    { de: 'Anker: Subject-Reference', cost: '0,00€', tone: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200' },
+                'text-only':            { de: 'Identität nur über Text', cost: '0,00€', tone: 'border-border bg-muted/30 text-muted-foreground' },
+              };
+              const meta = labels[anchor.strategy];
+              return (
+                <div className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${meta.tone}`}>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold">{meta.de} · {anchor.name}</span>
+                    <span className="text-[9px] opacity-80">
+                      {anchor.strategy === 'first-frame-composed'
+                        ? 'Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)'
+                        : anchor.strategy === 'first-frame-direct'
+                        ? 'Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht'
+                        : anchor.strategy === 'subject-reference'
+                        ? 'Porträt geht in den Reference-Slot — keine Komposition-Sperre'
+                        : 'Kein Bild-Anker, Identität bleibt im Text-Prompt'}
+                      {' · '}{meta.cost}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ forcePortraitAsFirstFrame: !scene.forcePortraitAsFirstFrame })}
+                    title="Porträt direkt als erstes Bild verwenden (face-lock)"
+                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all whitespace-nowrap ${
+                      scene.forcePortraitAsFirstFrame
+                        ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
+                        : 'text-muted-foreground hover:text-foreground border border-border'
+                    }`}
+                  >
+                    Face-Lock {scene.forcePortraitAsFirstFrame ? 'AN' : 'AUS'}
+                  </button>
+                </div>
+              );
+            })()}
+
+
             {/* Lip-Sync toggle — for character scenes */}
             {scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
               <div className="flex items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
