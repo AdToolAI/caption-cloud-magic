@@ -5,7 +5,7 @@ import {
   type ShotCategory,
 } from '@/config/shotDirector';
 
-const ORDER: ShotCategory[] = ['framing', 'angle', 'movement', 'lighting'];
+const ORDER: ShotCategory[] = ['framing', 'angle', 'movement', 'lighting', 'camera', 'lens'];
 
 /**
  * Builds an English cinematic prompt suffix from the user's Shot Director

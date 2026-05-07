@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, Sun, Move, Crop, RotateCcw, Check } from 'lucide-react';
+import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { Card } from '@/components/ui/card';
@@ -38,6 +38,14 @@ const CATEGORY_META: Record<
   lighting: {
     icon: Sun,
     title: { en: 'Lighting', de: 'Licht', es: 'Iluminación' },
+  },
+  camera: {
+    icon: Film,
+    title: { en: 'Camera Body', de: 'Kamera', es: 'Cámara' },
+  },
+  lens: {
+    icon: Aperture,
+    title: { en: 'Lens', de: 'Objektiv', es: 'Objetivo' },
   },
 };
 
