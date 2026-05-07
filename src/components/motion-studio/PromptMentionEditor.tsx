@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { User, MapPin, AtSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import {
   findMentions,
   getActiveMentionTrigger,
