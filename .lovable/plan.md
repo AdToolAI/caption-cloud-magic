@@ -1,79 +1,66 @@
-## Was passiert (Beobachtung)
+## Problem
 
-Der vorherige Fix hat zwei Schalter scharf gestellt:
-- `appliesToScene` (Identity-Card nur in Charakter-Szenen) ✅
-- `usePortraitAsFirstFrame` (Portrait als i2v-Anchor) — **default OFF** ❌
+Bei der Szene "Matthew Dusatko, a middle-aged farmer..." wird kein Referenzbild an den AI-Provider geschickt. Sichtbare Symptome im Screenshot:
+- `Charakter: — keiner —` (kein `characterShot` gesetzt)
+- Kein Referenzbild-Thumbnail im rechten Slot
+- Modell erfindet ein Gesicht statt das Avatar-Foto zu nutzen
 
-Resultat: Matthew-Szenen bekommen jetzt zwar die Identity-Card im Prompt, aber **kein** `referenceImageUrl` mehr → Hailuo/Kling/Wan generieren irgendeinen passenden Mann, nicht Matthew. Gesicht-Konsistenz ist weg.
+## Root Cause (verifiziert in Code)
 
-## Ziel
+In `ClipsTab.tsx` gibt es zwei getrennte Pfade, die ein `referenceImageUrl` an den Edge-Function-Payload anhängen — und beide sind in dieser Konstellation tot:
 
-Wenn die Szene den Charakter featured, soll dessen Portrait automatisch als Identitäts-Referenz an die Engine gehen — **ohne** dass das Portrait dabei zwangsläufig als 1:1 erstes Frame eingeblendet wird (Charakter darf später in der Szene erscheinen, anders gekleidet sein, Kamera kann woanders starten).
+1. **Cast-Pfad** (`castMember.usePortraitAsFirstFrame`)
+   - Greift nur, wenn `scene.characterShot.shotType !== 'absent'`. Im Screenshot ist `Charakter: — keiner —` → `castMember = undefined` → kein Anker.
+   - Selbst wenn ein Cast gesetzt wäre, ist `usePortraitAsFirstFrame` per Default `false` (siehe `CharacterManager.tsx:201`) → Anker bleibt aus.
 
-## Realität der Provider
+2. **Brand-Char-Pfad** (`activeBrandChar` = Favorite aus `/brand-characters`)
+   - Funktioniert nur für **eine einzige** Brand-Character-Karte (`brandChars.find(c => c.is_favorite) ?? brandChars[0]`).
+   - Wenn der Nutzer Matthew über die Composer-Cast-Library hinzugefügt hat (er aber kein favorisierter Brand-Character ist), zieht dieser Pfad nicht — oder zieht für eine andere Person.
+   - Außerdem hängt der Pfad zusätzlich an `usePortraitAsFirstFrame` — das wir in `SceneCard`/`ClipsTab` zwar auf `_brandApplies` mappen, aber nur für Brand-Chars, nicht für Cast-Mitglieder mit `brandCharacterId`.
 
-Composer unterstützt heute (`compose-video-clips/index.ts`):
+Ergebnis: `referenceImageUrl` bleibt `undefined` → `compose-video-clips` baut T2V (`hailuoInput.first_frame_image` wird nie gesetzt) → Hailuo erfindet einen Mann.
 
-| Provider   | Reference-Slot               | Modus               |
-|------------|------------------------------|---------------------|
-| Hailuo 2.3 | `first_frame_image`          | hard first frame    |
-| Kling 3    | `start_image`                | hard first frame    |
-| Wan 2.5    | `image` (i2v variant)        | hard first frame    |
-| Seedance   | i2v `image`                  | hard first frame    |
-| Luma Ray 2 | `start_image`                | hard first frame    |
-| Vidu Q2    | `reference_images[]`         | **subject ref**, kein first-frame ✨
-| Runway Gen-4| `reference_images[]`        | **subject ref**, kein first-frame ✨
+## Lösung
 
-→ Echte „Charakter passt rein, ist aber nicht der Start" gibt es nur bei **Vidu Q2** und **Runway Gen-4**. Bei den i2v-Providern ist die Portrait-Referenz immer ein hartes Startbild.
+Wir machen die Anker-Resolution **per-Szene cast-zentriert** und entkoppeln sie vom (verwirrenden) `usePortraitAsFirstFrame`-Toggle. Das matcht das Mental-Modell des Users: "Wenn ich einen Charakter in der Cast-Liste habe und er kommt in der Szene vor, nimm sein Bild als Referenz."
 
-## Plan
+### 1. Neuer Helper `src/lib/motion-studio/resolveSceneCharacterAnchor.ts`
 
-### 1. Portrait-Anchor wieder default-aktiv machen (für Charakter-Szenen)
-**`src/components/brand-characters/...`** & **CharacterManager.tsx (Z. 201, 329)**
-- `usePortraitAsFirstFrame` Default → **`true`** für neu gelinkte Brand-Characters.
-- Bestehende Cast-Einträge: beim Mount migrieren (`usePortraitAsFirstFrame ?? true`).
-- Toggle-Label umbenennen in „Portrait als Charakter-Referenz nutzen" (nicht mehr „first frame").
+Reine Funktion. Gibt für eine Szene den besten Anker (`{ characterId, name, referenceImageUrl, source }`) zurück.
 
-### 2. Anchor-Mode pro Szene/Provider unterscheiden
-**`src/components/video-composer/ClipsTab.tsx` (Z. 308–345 und 463–471)**
-Statt einer einzigen `referenceImageUrl`, zwei semantische Felder an die Engine schicken:
+Reihenfolge:
+1. Explizit gewählter Cast (`scene.characterShot.shotType !== 'absent'` und Cast hat `referenceImageUrl`).
+2. Cast-Member, dessen Name (oder First-Name-Token, ≥3 Zeichen) im `aiPrompt` vorkommt — über alle `characters` der Szene, nicht nur die favorisierte Brand-Karte.
+3. Favorisierte Brand-Character-Karte, falls Name dort matcht (Backup, wie bisher).
+4. Sonst `undefined`.
 
-```ts
-{
-  referenceImageUrl: s.referenceImageUrl,        // explizite Frame-Chain / Upload (hart)
-  characterReferenceUrl: brandAnchor || castAnchor, // Identity-Hint (soft, falls Provider kann)
-}
-```
+Lebt in `lib/motion-studio/`, neben `sceneFeaturesCharacter.ts`. Keine DB-/Backend-Änderungen.
 
-`brandAnchor` greift künftig sobald **`appliesToScene === true`** (kein zweiter Toggle nötig).
+### 2. `src/components/video-composer/ClipsTab.tsx`
 
-### 3. Engine: Subject-Reference vs First-Frame korrekt routen
-**`supabase/functions/compose-video-clips/index.ts`**
-- Neuer Helper `resolveAnchor(scene, provider)`:
-  - **Vidu / Runway**: `characterReferenceUrl` → in `reference_images[]` (Tag `character`), `referenceImageUrl` separat als Start-Frame falls gesetzt.
-  - **Hailuo / Kling / Wan / Seedance / Luma**: Fallback `referenceImageUrl ?? characterReferenceUrl` → `first_frame_image / start_image / image`. Log-Hinweis „provider supports first-frame only — character reference will be used as start frame".
-- Keine Schema-Changes in der DB nötig (Felder bleiben in der Function-Payload, persistiert wird weiterhin nur `reference_image_url` wenn explizit gesetzt).
+- `buildBrandInputForScene`: bleibt für Identity-Card-Text-Injection (das funktioniert ja).
+- Neue Helper-Aufrufe in `handleGenerateAll` (Zeile ~338) **und** im Single-Clip-Pfad (Zeile ~467):
+  - `const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);`
+  - `referenceImageUrl: scene.referenceImageUrl || anchor?.referenceImageUrl`
+- Die alten `castAnchor` / `brandAnchor`-Blöcke (mit `usePortraitAsFirstFrame`-Gate) werden ersetzt — der Toggle bleibt im UI als "Force always" Option erhalten (legacy), ist aber für den Default-Flow nicht mehr nötig.
 
-### 4. UI-Transparenz (Cast-Map + SceneCard)
-- **CastConsistencyMap**: neue Anchor-Klasse `'character-ref'` (gold-cyan Punkt) für Szenen, in denen das Portrait automatisch als Identity-Referenz mitfließt. Tooltip: „Portrait wird als Charakter-Referenz an die Engine geschickt — bei Hailuo/Kling als Startbild, bei Vidu/Runway als Subject-Reference".
-- **SceneCard Live-Preview**: Badge `character-ref · auto` neben `brand`-Badge, wenn Anchor aktiv.
-- **Hinweis-Banner** in CharacterManager: „Für Szenen, in denen der Charakter erst später auftaucht, wechsle zu Vidu Q2 oder Runway Gen-4 — sonst wird das Portrait als Startframe verwendet."
+### 3. `src/components/video-composer/SceneCard.tsx`
 
-### 5. Per-Szene Override
-SceneCard erhält in der Charakter-Sektion einen kleinen Schalter „Portrait-Referenz für diese Szene": `auto` (default, folgt `appliesToScene`) | `force on` | `force off`. Persistiert als `scene.characterAnchorMode` (lokaler Composer-State, kein DB-Migration jetzt — Storyboard-Save erweitern in eigenem Schritt).
+- "i2v ref"-Badge in der Live-Preview liest jetzt aus dem gleichen Helper, damit das, was angezeigt wird, exakt dem entspricht, was das Edge-Function-Payload bekommt.
+- Kleiner sichtbarer Anker-Hint unter dem Charakter-Dropdown: wenn ein Anker via Name-Match gefunden wurde, kleines Avatar-Thumb + Tooltip "Referenzbild: {Name}".
 
-## Verifikation
+### 4. `src/components/video-composer/CastConsistencyMap.tsx`
 
-1. Matthew-Projekt, „Alle Clips neu generieren":
-   - S1, S5 (Matthew genannt) → Hailuo bekommt `first_frame_image = portrait` → Matthew-Gesicht.
-   - S2 („spray pump"), S3 („Matthew's hands" — Name match!) → S3 bekommt Anchor, S2 nicht.
-   - S4 („drone") → kein Anchor.
-2. Im SceneCard-Preview: `brand` + `character-ref · auto` Badges sichtbar in S1/S3/S5.
-3. Cast-Map zeigt Gold-Cyan-Punkte exakt in den Charakter-Szenen.
-4. Modell auf Vidu Q2 wechseln in S5 → Edge-Function-Log: „Vidu scene S5 uses subject reference (no start_frame lock)".
+- `getAnchor` greift den neuen Resolver, sodass die Map-Punkte (🟢 Reference) konsistent mit dem tatsächlichen Edge-Payload sind. Kein optisches Re-Design.
 
-## Out of Scope
-- Keine DB-Migration (Anchor-Mode bleibt im Composer-State).
-- Kein Eingriff in `compose-video-storyboard`, Auto-Director oder Director's Cut.
-- Library-Character `@-mention`-Pfad bleibt unverändert (User-getrieben).
-- Subject-Reference-Routing für Pika/HappyHorse/Sora wird in einem Folge-Schritt geprüft (heute first-frame-only behandelt).
+## Out-of-Scope
+
+- Keine DB-Migration, kein neues Schema.
+- Kein Eingriff in `compose-video-clips/index.ts` (das Backend wertet `scene.referenceImageUrl` bereits korrekt aus — siehe Hailuo Z. 408/428, Kling 471, Wan 564, Seedance 606, Luma 647, Veo 697, HappyHorse 872).
+- Vidu/Runway-spezifische Multi-Reference-Slots werden hier **nicht** angefasst (separates Feature).
+
+## Verifikation nach Implementierung
+
+1. Szene mit `Charakter: — keiner —` aber Prompt enthält "Matthew Dusatko" → Live-Preview zeigt "i2v ref · Matthew", Generate sendet `referenceImageUrl` → Hailuo nutzt `first_frame_image` (Log: `uses reference image`).
+2. Pure B-Roll Szene ohne Namen → kein Anker, kein Identity-Card → Modell rendert frei.
+3. Szene mit explizitem `characterShot` → Anker wie bisher, kein Regress.
