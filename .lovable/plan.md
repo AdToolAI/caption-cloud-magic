@@ -1,54 +1,54 @@
 ## Problem
-Wenn im Composer im **Cast-Picker** Charaktere wie *Matthew Dusatko* und *Sarah Dusatko* ausgewählt werden, taucht ihr Name **nicht** im AI-Prompt auf. Damit ignoriert sowohl der Resolver (Namensmatch im Prompt schlägt fehl) als auch das Modell die Cast-Auswahl — die Szene wird ohne die Charaktere generiert.
 
-Die Cast-Auswahl muss den Prompt **automatisch ergänzen**, sobald sich die Auswahl ändert — und sich beim Entfernen wieder sauber zurückziehen, ohne den Rest des Prompts zu zerstören.
+Der `CharacterCastPicker` schreibt zwar `characterShots: [a, b]` in den lokalen State, aber das Composer-Persistence- und Reload-System kennt **nur die Spalte `character_shot` (Singular)** in `composer_scenes`. Das Feld `characterShots` (Plural) ist also rein in-memory.
 
-## Lösung — Auto-Inject Cast-Namen in Prompt
+Sobald der `VideoComposerDashboard` die Szenen frisch aus der DB nachzieht (passiert beim Mount, nach Realtime-Updates, nach Render-Webhook etc.), wird das Scene-Objekt komplett neu aus den DB-Spalten gebaut — **`characterShots` ist dann `undefined`**, und der Picker fällt zurück auf `legacyValue = characterShot` (= nur 1 Slot).
 
-### 1. Neuer Helper `applyCastToPrompt()`
-Datei: `src/lib/motion-studio/applyCastToPrompt.ts` (neu).
+Im Screenshot sichtbar: Cast-Field zeigt „Kein Charakter im Cast", obwohl der Prompt bereits `[Besetzung: Matthew Dusatko (Voll)]` enthält — und das Add-Popover bietet Matthew **erneut** an, weil `inCast` leer ist. Klick auf einen zweiten Charakter ersetzt deshalb effektiv den ersten.
 
-Verhalten:
-- Input: `prompt: string`, `cast: CharacterShot[]`, `previousCast: CharacterShot[]`.
-- Erkennt eine **Cast-Markierung** am Anfang des Prompts in der Form:
-  ```
-  [Cast: Sarah Dusatko (full), Matthew Dusatko (profile)] <rest of prompt>
-  ```
-- Ersetzt die bestehende Markierung durch die neue Liste, oder fügt sie vorne ein, oder entfernt sie komplett bei leerem Cast.
-- Lokalisiert: DE → `[Besetzung: …]`, EN → `[Cast: …]`, ES → `[Reparto: …]`.
-- Shot-Type-Suffix ist optional (default an), z.B. `Sarah Dusatko (Voll)`.
-- Wenn der User die Markierung manuell gelöscht hat (Markierung weg, aber Cast vorhanden) → re-injecten.
-- Wenn der Name **bereits frei im Prompt** vorkommt (Volltext oder Vorname ≥3 Zeichen) → **keine** Doppel-Erwähnung in der Markierung für diesen Namen.
+## Lösung
 
-### 2. SceneCard `onChange` des CharacterCastPickers
-Statt nur `characterShots` + `characterShot` zu speichern, zusätzlich:
-```ts
-const newPrompt = applyCastToPrompt(scene.aiPrompt || '', next, scene.characterShots ?? []);
-onUpdate({ characterShots: next, characterShot: next[0], aiPrompt: newPrompt });
+Eine echte zweite Quelle für die Multi-Cast-Daten in der DB persistieren — getrennt vom Legacy-Singular.
+
+### 1. DB-Migration (`composer_scenes`)
+Neue Spalte:
+```sql
+alter table public.composer_scenes
+  add column if not exists character_shots jsonb not null default '[]'::jsonb;
 ```
-Wenn `promptMode === 'guided'` (Slot-Modus): Cast-Markierung wird in den **ersten Slot** (`subject` o. ä.) injiziert statt in `aiPrompt`, damit der Stitcher sie nicht überschreibt. Im Free-Modus direkt in `aiPrompt`.
+- Kein Constraint, kein Default-Cast — leeres Array = legacy/keine Multi-Auswahl.
+- Bestehende Zeilen bleiben unangetastet (Default `[]`), Legacy-Pfad über `character_shot` läuft weiter.
 
-### 3. Resolver bleibt unverändert
-`resolveSceneCharacterAnchorsAll()` liest weiterhin `scene.characterShots` als primäre Quelle — durch die zusätzliche Erwähnung im Prompt funktioniert jetzt **auch** der Namensmatch-Pfad (z. B. wenn der User einen Charakter manuell tippt statt zu picken).
+### 2. Persistence (3 Schreibstellen)
+In **`src/components/video-composer/VideoComposerDashboard.tsx`** (`persistScenesToDb`, ~Zeile 702) und **`src/hooks/useComposerPersistence.ts`** (Insert ~232 + Update ~188):
+```ts
+character_shot: (scene.characterShot ?? null) as any,
+character_shots: (scene.characterShots ?? []) as any,
+```
 
-### 4. UI-Feedback
-Kleiner Hinweis unter dem Cast-Picker (lokalisiert):
-> „Charaktere werden automatisch im Prompt erwähnt."
+### 3. Loader (DB → ComposerScene)
+In **`src/components/video-composer/VideoComposerDashboard.tsx`** (`loadProject` Mapping ~Zeile 285 und `refetchScenesFromDb` analog):
+```ts
+characterShot: row.character_shot ?? local?.characterShot,
+characterShots: (row.character_shots as CharacterShot[] | null)?.length
+  ? (row.character_shots as CharacterShot[])
+  : (row.character_shot ? [row.character_shot] : (local?.characterShots ?? [])),
+```
+- Fallback `[character_shot]` deckt alte Projekte ohne `character_shots`-Eintrag ab → der zweite Charakter geht beim ersten Speichern in die neue Spalte.
 
-Mit Toggle „Auto-Inject" (default on, in `localStorage` gemerkt), falls Power-User volle Prompt-Kontrolle wollen.
+### 4. Type-Stelle
+**`src/types/video-composer.ts`** — `characterShots?: CharacterShot[]` ist bereits im Type, kein Schema-Change nötig.
 
-### 5. Edge-Cases
-- **Ältere Szenen** ohne Markierung, aber mit `characterShots`: beim ersten Mount einmal `applyCastToPrompt` durchlaufen lassen (idempotent).
-- **Slot-Modus**: Cast-Markierung darf nicht doppelt in mehrere Slots wandern → Stitcher prüft.
-- **Guided→Free Mode-Switch**: Markierung wird mit umgezogen.
-
-## Geänderte Dateien
-- **Neu**: `src/lib/motion-studio/applyCastToPrompt.ts`
-- `src/components/video-composer/SceneCard.tsx` — onChange im Cast-Picker, einmaliger Backfill auf Mount, optionaler Auto-Inject-Toggle.
-- `mem://features/video-composer/multi-character-composition.md` — um „Cast-Auto-Inject" ergänzen.
+### 5. Optional: Singular-Sync robuster
+In **`SceneCard.tsx`** (Zeile 686–688) bleibt der Sync `characterShot: next[0]` für Lip-Sync/ContinuityGuardian/CastConsistencyMap erhalten — nur jetzt nicht mehr die einzige Wahrheit.
 
 ## Out of Scope
-- Volltext-NLP (z. B. Pronomen-Resolution).
-- Auto-Generieren ganzer Sätze um die Charaktere — wir ergänzen nur die Cast-Markierung; das Modell + Shot Director lesen sie deterministisch.
+- Migration der bestehenden anderen Komponenten (`ContinuityGuardian`, `CastConsistencyMap`, `ClipsTab.targetScene.characterShot`) auf den Plural — die nutzen weiter den Singular `characterShot` (= primärer Slot), das passt für die aktuelle UX.
+- Edge-Function `compose-scene-anchor` — bekommt Multi-Portraits bereits korrekt aus dem Resolver, unabhängig von der DB-Spalte.
+
+## Geänderte Dateien
+- **Migration**: neue Spalte `composer_scenes.character_shots jsonb`
+- `src/components/video-composer/VideoComposerDashboard.tsx` (Loader + Persist)
+- `src/hooks/useComposerPersistence.ts` (Insert + Update)
 
 Soll ich loslegen?

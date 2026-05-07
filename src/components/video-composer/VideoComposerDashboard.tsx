@@ -315,6 +315,10 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
+            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+              ? ((row as any).character_shots as any)
+              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
@@ -416,6 +420,10 @@ export default function VideoComposerDashboard() {
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
+            characterShot: ((row as any).character_shot as any) ?? local?.characterShot,
+            characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
+              ? ((row as any).character_shots as any)
+              : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
@@ -700,6 +708,7 @@ export default function VideoComposerDashboard() {
           transition_type: s.transitionType,
           transition_duration: s.transitionDuration,
           character_shot: (s.characterShot ?? null) as any,
+          character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])) as any,
           director_modifiers: (s.directorModifiers ?? {}) as any,
           shot_director: (s.shotDirector ?? {}) as any,
           prompt_slots: (s.promptSlots ?? null) as any,
