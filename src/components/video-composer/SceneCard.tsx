@@ -170,29 +170,7 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
-  // Backfill: ensure existing scenes with a cast also have the cast marker in the prompt.
-  // Idempotent — applyCastToPrompt detects an existing/missing marker and only updates when needed.
   const didBackfillCast = useRef(false);
-  useEffect(() => {
-    if (didBackfillCast.current) return;
-    if (!scene.clipSource.startsWith('ai-')) return;
-    if (!characters || characters.length === 0) return;
-    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
-    if (cast.length === 0) return;
-    didBackfillCast.current = true;
-    if (promptMode === 'structured') {
-      const currentSubject = (promptSlots.subject as string) || '';
-      const newSubject = applyCastToPrompt(currentSubject, cast, characters, lang);
-      if (newSubject !== currentSubject) {
-        const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
-        onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
-      }
-    } else {
-      const newPrompt = applyCastToPrompt(scene.aiPrompt || '', cast, characters, lang);
-      if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id, characters?.length]);
 
   const { systemPresets } = useStylePresets();
 
