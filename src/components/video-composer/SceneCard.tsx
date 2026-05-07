@@ -59,7 +59,7 @@ import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
 import { ModelSelector } from '@/components/ai-video/ModelSelector';
 import { COMPOSER_AVAILABLE_MODELS, modelIdToSource, sourceToModelId } from '@/lib/video-composer/modelMapping';
 import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useStylePresets } from '@/hooks/useStylePresets';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
