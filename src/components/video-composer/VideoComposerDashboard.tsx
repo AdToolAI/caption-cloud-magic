@@ -713,6 +713,8 @@ export default function VideoComposerDashboard() {
           transition_duration: s.transitionDuration,
           character_shot: (s.characterShot ?? null) as any,
           character_shots: (s.characterShots ?? (s.characterShot ? [s.characterShot] : [])) as any,
+          dialog_script: s.dialogScript ?? null,
+          dialog_voices: (s.dialogVoices ?? {}) as any,
           director_modifiers: (s.directorModifiers ?? {}) as any,
           shot_director: (s.shotDirector ?? {}) as any,
           prompt_slots: (s.promptSlots ?? null) as any,
