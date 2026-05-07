@@ -22,7 +22,12 @@ const corsHeaders = {
 
 interface Body {
   sceneId: string;
-  portraitUrl: string;
+  /** Single-portrait legacy field — used as fallback when portraitUrls absent. */
+  portraitUrl?: string;
+  /** Multi-portrait array — preferred. Up to 4 characters in one composed frame. */
+  portraitUrls?: string[];
+  /** Optional character names matched 1:1 with portraitUrls (used in prompt). */
+  characterNames?: string[];
   scenePrompt: string;
   aspectRatio?: "16:9" | "9:16" | "1:1";
   shotType?: string;
@@ -62,7 +67,12 @@ serve(async (req) => {
     }
 
     const body = (await req.json()) as Body;
-    if (!body.sceneId || !body.portraitUrl || !body.scenePrompt) {
+    const portraits = (body.portraitUrls && body.portraitUrls.length > 0)
+      ? body.portraitUrls.slice(0, 4) // hard cap — 4 chars max in one frame
+      : (body.portraitUrl ? [body.portraitUrl] : []);
+    const names = (body.characterNames ?? []).slice(0, portraits.length);
+
+    if (!body.sceneId || portraits.length === 0 || !body.scenePrompt) {
       return new Response(JSON.stringify({ error: "missing fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -72,8 +82,8 @@ serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // --- Cache lookup ---
-    const portraitHash = await sha1(body.portraitUrl);
-    const promptHash = await sha1(`${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}`);
+    const portraitHash = await sha1(portraits.join("|"));
+    const promptHash = await sha1(`${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
@@ -92,13 +102,26 @@ serve(async (req) => {
 
     // --- Build edit prompt ---
     const aspect = body.aspectRatio ?? "16:9";
+    const isMulti = portraits.length > 1;
+    const peopleNoun = isMulti ? `these ${portraits.length} people` : "this person";
+    const nameClause = names.length > 0
+      ? ` The reference portraits correspond, in order, to: ${names.join(", ")}.`
+      : "";
+    const multiClause = isMulti
+      ? ` All ${portraits.length} characters MUST be visible in the same frame, positioned naturally according to the scene description (e.g. side by side, facing each other, in conversation). Preserve each person's individual identity exactly — do not blend faces.`
+      : "";
     const editInstruction =
-      `Place this exact same person into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features. ` +
-      `Match the requested framing and composition precisely — the person does NOT have to be centered or facing the camera. ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause} ` +
+      `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description, no text, no captions, no watermark.\n\n` +
       `Scene: ${body.scenePrompt}`;
 
-    // --- Call Nano Banana 2 ---
+    // --- Call Nano Banana 2 with all portraits as separate image_url parts ---
+    const userContent: any[] = [{ type: "text", text: editInstruction }];
+    for (const url of portraits) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+
     const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -107,15 +130,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: editInstruction },
-              { type: "image_url", image_url: { url: body.portraitUrl } },
-            ],
-          },
-        ],
+        messages: [{ role: "user", content: userContent }],
         modalities: ["image", "text"],
       }),
     });
