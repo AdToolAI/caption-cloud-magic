@@ -130,12 +130,19 @@ export default function SceneCard({
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
+  const _brandApplies = activeBrandChar
+    ? sceneFeaturesCharacter(scene, { name: activeBrandChar.name })
+    : false;
   const brandCharacterInput = activeBrandChar
     ? {
         name: activeBrandChar.name,
         identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
         referenceImageUrl: activeBrandChar.reference_image_url,
-        appliesToScene: sceneFeaturesCharacter(scene, { name: activeBrandChar.name }),
+        appliesToScene: _brandApplies,
+        // When the scene features the character, surface the portrait as the
+        // i2v anchor so the live preview's "i2v ref" badge reflects what the
+        // engine will actually receive (Hailuo first_frame_image, etc.).
+        usePortraitAsFirstFrame: _brandApplies,
       }
     : undefined;
   // Phase 6 — Live Prompt Preview expanded state.
