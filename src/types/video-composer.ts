@@ -168,6 +168,12 @@ export interface ComposerScene {
   referenceImageUrl?: string;
   /** Optional shot-strategy hint for character continuity. */
   characterShot?: CharacterShot;
+  /**
+   * Override: when true, send the character portrait directly as i2v first-frame
+   * instead of composing a scene-aware anchor. Use only when the user explicitly
+   * wants a face-locked opening (e.g. tight close-up).
+   */
+  forcePortraitAsFirstFrame?: boolean;
   clipUrl?: string;
   clipStatus: ClipStatus;
   /**
