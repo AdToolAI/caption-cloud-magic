@@ -1,5 +1,24 @@
 
-# Artlist-Parität für Video Composer & AI Video Toolkit
+# Artlist-Parität – Fortschritt
+
+## ✅ Stage 5 – Camera & Lens Picker (DONE)
+- `shotDirector.ts`: 6 Kameras + 7 Linsen, neue Achsen `camera` + `lens`.
+- `ShotDirectorPanel` + `SceneShotDirectorPanel`: 6 Slots statt 4 (Toolkit + per-Scene).
+- `buildShotPromptSuffix`: englische Auto-Injection in alle 11 Provider.
+
+## ✅ Stage 1 – Location Library (DONE)
+- DB: `brand_locations` (RLS) + `scene_still_frames` (Cache für Stage 2).
+- Storage-Bucket `brand-locations` (User-ID-First-RLS).
+- Hook `useBrandLocations` / Alias `useAccessibleLocations` + `buildLocationPromptInjection`.
+- Edge Function `extract-location-identity` (Gemini 2.5 Flash Vision → Identity Card).
+- Page `/locations` mit Bento-Grid, Create/Favorite/Archive.
+
+## ⏳ Stages 2-4 (vorbereitet, noch nicht implementiert)
+- **Stage 3 – @mention Prompt Editor**: Komponente `<MentionablePromptInput>` mit Cast/Location-Autosuggest.
+- **Stage 2 – Frame-First Pipeline**: Edge `generate-scene-still` (Tabelle ist schon da), SceneCard-Tab "Still Frame".
+- **Stage 4 – Asset Capture**: Edge `extract-asset-from-frame`, "Save as Character/Location"-Menü auf jedem Bild.
+
+
 
 Ziel: Die 5 identifizierten Lücken zu Artlist Studio schließen, ohne unsere Stärken (11 Provider, Lambda-Stitching, Director's Cut) anzufassen.
 
