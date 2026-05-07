@@ -4,10 +4,19 @@
 //
 // Returns the URL to use as `referenceImageUrl` for the provider call,
 // or undefined when the strategy is `text-only` / `subject-reference`.
+//
+// Multi-character: when more than one character is detected in the scene
+// (explicit shot + name matches, or multiple cast names in the prompt),
+// ALL portraits are sent to compose-scene-anchor in a single Nano Banana 2
+// edit call so the resulting first-frame contains all of them positioned
+// according to the scene description.
 
 import { supabase } from '@/integrations/supabase/client';
 import type { ComposerScene } from '@/types/video-composer';
-import { resolveSceneCharacterAnchor, type SceneAnchor } from './resolveSceneCharacterAnchor';
+import {
+  resolveSceneCharacterAnchorsAll,
+  type SceneAnchor,
+} from './resolveSceneCharacterAnchor';
 import type { ComposerCharacter } from '@/types/video-composer';
 
 interface BrandCharLike {
@@ -19,10 +28,17 @@ interface BrandCharLike {
 export interface PreparedAnchor {
   /** URL to send as i2v first-frame; undefined when strategy ≠ first-frame-* */
   firstFrameUrl?: string;
-  /** Subject-reference URL (Vidu/Kling Reference2V); undefined otherwise. */
+  /** Subject-reference URL (Vidu/Kling Reference2V) — single. */
   subjectReferenceUrl?: string;
+  /** Multiple subject references (Vidu Q2 reference2v: up to 7). */
+  subjectReferenceUrls?: string[];
+  /** Primary anchor (first one) — kept for backwards-compat logging. */
   anchor?: SceneAnchor;
+  /** All anchors detected in the scene (>= 1 when any). */
+  anchors?: SceneAnchor[];
   composed: boolean;
+  /** When true, caller should consider routing to a multi-ref provider (Vidu). */
+  isMulti?: boolean;
 }
 
 export async function prepareSceneAnchor(
@@ -37,38 +53,63 @@ export async function prepareSceneAnchor(
     return { firstFrameUrl: scene.referenceImageUrl, composed: false };
   }
 
-  const anchor = resolveSceneCharacterAnchor(scene, characters, brandChar);
-  if (!anchor) return { composed: false };
+  const anchors = resolveSceneCharacterAnchorsAll(scene, characters, brandChar);
+  if (anchors.length === 0) return { composed: false };
 
-  switch (anchor.strategy) {
-    case 'first-frame-direct':
-      return { firstFrameUrl: anchor.referenceImageUrl, anchor, composed: false };
-    case 'subject-reference':
-      return { subjectReferenceUrl: anchor.referenceImageUrl, anchor, composed: false };
-    case 'text-only':
-      return { anchor, composed: false };
-    case 'first-frame-composed': {
-      try {
-        const { data, error } = await supabase.functions.invoke('compose-scene-anchor', {
-          body: {
-            sceneId: scene.id,
-            portraitUrl: anchor.referenceImageUrl,
-            scenePrompt: scenePromptForCompose,
-            aspectRatio,
-            shotType: scene.characterShot?.shotType,
-          },
-        });
-        if (error) throw error;
-        if (data?.composedUrl) {
-          return { firstFrameUrl: data.composedUrl, anchor, composed: true };
-        }
-        // Fallback strategy from the function: text-only
-        console.warn(`[prepareSceneAnchor] compose returned no url for ${scene.id}, falling back to text-only`);
-        return { anchor, composed: false };
-      } catch (e) {
-        console.error(`[prepareSceneAnchor] compose failed for ${scene.id}, text-only fallback`, e);
-        return { anchor, composed: false };
-      }
+  const primary = anchors[0];
+  const isMulti = anchors.length > 1;
+
+  // Subject-reference provider (Vidu) → pass ALL portraits as separate refs.
+  if (primary.strategy === 'subject-reference') {
+    return {
+      subjectReferenceUrl: primary.referenceImageUrl,
+      subjectReferenceUrls: anchors.map((a) => a.referenceImageUrl),
+      anchor: primary,
+      anchors,
+      composed: false,
+      isMulti,
+    };
+  }
+
+  if (primary.strategy === 'first-frame-direct' && !isMulti) {
+    return { firstFrameUrl: primary.referenceImageUrl, anchor: primary, anchors, composed: false };
+  }
+
+  if (primary.strategy === 'text-only' && !isMulti) {
+    return { anchor: primary, anchors, composed: false };
+  }
+
+  // first-frame-composed (single OR multi). Multi always lands here because
+  // the resolver upgrades the strategy when >1 anchor is present.
+  try {
+    const portraitUrls = anchors.map((a) => a.referenceImageUrl);
+    const { data, error } = await supabase.functions.invoke('compose-scene-anchor', {
+      body: {
+        sceneId: scene.id,
+        // Legacy single-portrait field kept for backwards compatibility.
+        portraitUrl: portraitUrls[0],
+        // New multi-portrait field — server prefers this when present.
+        portraitUrls,
+        characterNames: anchors.map((a) => a.name),
+        scenePrompt: scenePromptForCompose,
+        aspectRatio,
+        shotType: scene.characterShot?.shotType,
+      },
+    });
+    if (error) throw error;
+    if (data?.composedUrl) {
+      return {
+        firstFrameUrl: data.composedUrl,
+        anchor: primary,
+        anchors,
+        composed: true,
+        isMulti,
+      };
     }
+    console.warn(`[prepareSceneAnchor] compose returned no url for ${scene.id}, falling back to text-only`);
+    return { anchor: primary, anchors, composed: false, isMulti };
+  } catch (e) {
+    console.error(`[prepareSceneAnchor] compose failed for ${scene.id}, text-only fallback`, e);
+    return { anchor: primary, anchors, composed: false, isMulti };
   }
 }
