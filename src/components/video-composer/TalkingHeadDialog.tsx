@@ -601,8 +601,372 @@ export default function TalkingHeadDialog({
               )}
             </Button>
           </TabsContent>
+
+          <TabsContent value="dialog" className="space-y-4">
+            <DialogModeTab
+              cast={cast}
+              voices={[
+                ...PRESET_VOICES.map((v) => ({ id: v.id, name: v.name, isCustom: false })),
+                ...customVoices.filter((v) => v.is_active).map((v) => ({
+                  id: v.id,
+                  name: `⭐ ${v.name}`,
+                  isCustom: true,
+                  elevenlabsVoiceId: v.elevenlabs_voice_id,
+                })),
+              ]}
+              aspectRatio={aspectRatio}
+              setAspectRatio={setAspectRatio}
+              resolution={resolution}
+              setResolution={setResolution}
+              projectId={projectId}
+              availableScenes={availableScenes}
+              targetSceneId={targetSceneId}
+              setTargetSceneId={setTargetSceneId}
+              onSuccess={(results) => {
+                // Fire onSuccess for each generated block so parent can attach
+                // them to scenes / refresh history.
+                results.forEach((r) => onSuccess?.(r));
+                onOpenChange(false);
+              }}
+              estimateCost={estimateCost}
+              generate={generate}
+            />
+          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// =====================================================================
+// Dialog Mode Tab — shot-reverse-shot multi-speaker generation.
+// =====================================================================
+//
+// User writes a screenplay-style script:
+//   SARAH: Hi! Welcome to our store.
+//   MATTHEW: Thanks Sarah, what do you recommend?
+//   SARAH: This new product is amazing.
+//
+// Each line is matched to a cast member (by speaker label = cast.name) and
+// rendered as its own HeyGen Talking-Head clip. The clips can be attached
+// to consecutive composer scenes (auto-spawn) or just dropped into history.
+
+interface VoiceOption {
+  id: string;
+  name: string;
+  isCustom: boolean;
+  elevenlabsVoiceId?: string;
+}
+
+interface DialogBlock {
+  speakerId: string;       // ComposerCharacter.id
+  speakerName: string;
+  text: string;
+  voiceId: string;         // chosen voice for this speaker
+}
+
+interface DialogModeTabProps {
+  cast: ComposerCharacter[];
+  voices: VoiceOption[];
+  aspectRatio: '16:9' | '9:16' | '1:1';
+  setAspectRatio: (v: '16:9' | '9:16' | '1:1') => void;
+  resolution: '480p' | '720p';
+  setResolution: (v: '480p' | '720p') => void;
+  projectId?: string;
+  availableScenes?: Array<{ id: string; label: string }>;
+  targetSceneId: string;
+  setTargetSceneId: (v: string) => void;
+  onSuccess: (
+    results: Array<{
+      videoUrl: string | null;
+      audioUrl: string;
+      predictionId: string;
+      sceneId?: string;
+    }>,
+  ) => void;
+  estimateCost: (durationSec: number, includesTTS: boolean) => number;
+  generate: ReturnType<typeof useTalkingHead>['generate'];
+}
+
+function parseDialogScript(script: string, cast: ComposerCharacter[]): DialogBlock[] {
+  const blocks: DialogBlock[] = [];
+  const lines = script.split(/\r?\n/);
+  // Match "NAME: text" or "NAME — text" at the start of a line.
+  const re = /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*[:—-]\s*(.+)$/;
+  let current: DialogBlock | null = null;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      current = null;
+      continue;
+    }
+    const m = re.exec(line);
+    if (m) {
+      const speakerName = m[1].trim();
+      const text = m[2].trim();
+      const c = cast.find(
+        (x) => x.name.toLowerCase() === speakerName.toLowerCase() ||
+               x.name.toLowerCase().split(/\s+/)[0] === speakerName.toLowerCase(),
+      );
+      if (c && c.referenceImageUrl) {
+        current = {
+          speakerId: c.id,
+          speakerName: c.name,
+          text,
+          voiceId: '',
+        };
+        blocks.push(current);
+        continue;
+      }
+    }
+    // Continuation line → append to last block.
+    if (current) current.text += ' ' + line;
+  }
+  return blocks;
+}
+
+function DialogModeTab({
+  cast,
+  voices,
+  aspectRatio,
+  setAspectRatio,
+  resolution,
+  setResolution,
+  projectId,
+  availableScenes,
+  targetSceneId,
+  setTargetSceneId,
+  onSuccess,
+  estimateCost,
+  generate,
+}: DialogModeTabProps) {
+  const [script, setScript] = useState(
+    cast.length >= 2
+      ? `${cast[0].name}: Hi! Schön dich zu sehen.\n${cast[1].name}: Hi ${cast[0].name.split(' ')[0]}, was empfiehlst du?\n${cast[0].name}: Definitiv unser neues Produkt — du wirst es lieben.`
+      : '',
+  );
+  const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, string>>({});
+  const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null);
+
+  const blocks = useMemo(() => parseDialogScript(script, cast), [script, cast]);
+  const speakers = useMemo(
+    () => Array.from(new Set(blocks.map((b) => b.speakerId)))
+      .map((id) => cast.find((c) => c.id === id)!)
+      .filter(Boolean),
+    [blocks, cast],
+  );
+
+  const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
+  const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
+  const totalCost = blocks.length * estimateCost(Math.max(3, Math.ceil(totalChars / blocks.length / 18)), true);
+
+  const handleGenerateDialog = async () => {
+    if (blocks.length === 0) {
+      toast({
+        title: 'Kein gültiges Dialog-Skript',
+        description: 'Format: "Sarah: Hallo!" — der Name muss exakt einem Cast-Charakter entsprechen.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    // Ensure each speaker has a voice picked.
+    for (const sp of speakers) {
+      if (!voicePerSpeaker[sp.id]) {
+        toast({
+          title: 'Stimme fehlt',
+          description: `Wähle eine Stimme für "${sp.name}".`,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+    setGenerating(true);
+    setProgress({ current: 0, total: blocks.length });
+    const results: Array<{
+      videoUrl: string | null;
+      audioUrl: string;
+      predictionId: string;
+      sceneId?: string;
+    }> = [];
+    try {
+      for (let i = 0; i < blocks.length; i++) {
+        const b = blocks[i];
+        const c = cast.find((x) => x.id === b.speakerId)!;
+        const voiceMeta = voices.find((v) => v.id === voicePerSpeaker[b.speakerId])!;
+        const r = await generate({
+          projectId,
+          imageUrl: c.referenceImageUrl!,
+          text: b.text,
+          voiceId: voiceMeta.isCustom ? undefined : voiceMeta.id,
+          customVoiceId: voiceMeta.isCustom ? voiceMeta.elevenlabsVoiceId : undefined,
+          aspectRatio,
+          resolution,
+          composerCharacterId: c.id,
+          // Each block goes to a separate scene if the user picked one as anchor;
+          // otherwise media-library only.
+          sceneId: targetSceneId === '__none__' ? undefined : targetSceneId,
+        });
+        if (r?.success) {
+          results.push({
+            videoUrl: r.videoUrl,
+            audioUrl: r.audioUrl,
+            predictionId: r.predictionId,
+            sceneId: targetSceneId === '__none__' ? undefined : targetSceneId,
+          });
+        }
+        setProgress({ current: i + 1, total: blocks.length });
+      }
+      toast({
+        title: 'Dialog gestartet',
+        description: `${results.length}/${blocks.length} Talking-Heads werden generiert (1–3 Min pro Clip).`,
+      });
+      onSuccess(results);
+    } catch (e) {
+      console.error('[DialogMode] error', e);
+      toast({
+        title: 'Fehler',
+        description: e instanceof Error ? e.message : 'Generierung fehlgeschlagen',
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+      setProgress(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-3 bg-primary/5 border-primary/30">
+        <div className="text-sm font-medium mb-1">Drehbuch-Modus für Multi-Speaker-Szenen</div>
+        <p className="text-xs text-muted-foreground">
+          Schreibe einen Dialog wie ein Drehbuch — pro Sprecher entsteht ein
+          eigener Talking-Head-Clip. Im Director's Cut werden sie als
+          Shot-Reverse-Shot zusammengeschnitten.
+        </p>
+      </Card>
+
+      <div>
+        <Label htmlFor="dialog-script">Skript</Label>
+        <Textarea
+          id="dialog-script"
+          value={script}
+          onChange={(e) => setScript(e.target.value)}
+          placeholder={`${cast[0]?.name ?? 'Sarah'}: Hi!\n${cast[1]?.name ?? 'Matthew'}: Hi ${cast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`}
+          rows={7}
+          className="mt-1 font-mono text-sm"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          {blocks.length} Block{blocks.length === 1 ? '' : 'e'} erkannt · {speakers.length} Sprecher · ~{estimatedDurationSec}s gesamt
+        </p>
+      </div>
+
+      {speakers.length > 0 && (
+        <div className="space-y-2">
+          <Label>Stimme pro Sprecher</Label>
+          <div className="space-y-2">
+            {speakers.map((sp) => (
+              <div key={sp.id} className="flex items-center gap-3 p-2 rounded-md border border-border/40 bg-muted/20">
+                <img src={sp.referenceImageUrl} alt={sp.name} className="h-10 w-10 rounded object-cover" />
+                <div className="flex-1 text-sm font-medium">{sp.name}</div>
+                <Select
+                  value={voicePerSpeaker[sp.id] || ''}
+                  onValueChange={(v) => setVoicePerSpeaker((prev) => ({ ...prev, [sp.id]: v }))}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Stimme wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {voices.map((v) => (
+                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Format</Label>
+          <Select value={aspectRatio} onValueChange={(v: '16:9' | '9:16' | '1:1') => setAspectRatio(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="9:16">9:16 (TikTok / Reels)</SelectItem>
+              <SelectItem value="16:9">16:9 (YouTube)</SelectItem>
+              <SelectItem value="1:1">1:1 (Instagram)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Qualität</Label>
+          <Select value={resolution} onValueChange={(v: '480p' | '720p') => setResolution(v)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="720p">720p HD</SelectItem>
+              <SelectItem value="480p">480p (günstiger)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {availableScenes && availableScenes.length > 0 && (
+        <div>
+          <Label>Anker-Szene <span className="text-muted-foreground font-normal">(optional)</span></Label>
+          <Select value={targetSceneId} onValueChange={setTargetSceneId}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Nur in Media Library</SelectItem>
+              {availableScenes.map((s) => (
+                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            Alle Dialog-Clips werden in der Reihenfolge an diese Szene angehängt.
+            Wechsle danach in den Director's Cut für Shot-Reverse-Shot-Schnitt.
+          </p>
+        </div>
+      )}
+
+      <Card className="p-3 bg-muted/30 border-border/40">
+        <div className="flex items-start gap-2 text-xs text-muted-foreground">
+          <AlertCircle className="h-4 w-4 mt-0.5 text-primary shrink-0" />
+          <div>
+            Geschätzte Gesamt-Kosten: <span className="text-primary font-semibold">€{totalCost.toFixed(2)}</span>{' '}
+            ({blocks.length} × HeyGen Talking-Head) · Generierung läuft sequentiell
+          </div>
+        </div>
+      </Card>
+
+      {progress && (
+        <Card className="p-3 bg-primary/5 border-primary/30">
+          <div className="text-xs">
+            Generiere Block {progress.current} / {progress.total} …
+          </div>
+          <div className="mt-2 h-1.5 bg-muted rounded overflow-hidden">
+            <div
+              className="h-full bg-primary transition-all"
+              style={{ width: `${(progress.current / progress.total) * 100}%` }}
+            />
+          </div>
+        </Card>
+      )}
+
+      <Button
+        onClick={handleGenerateDialog}
+        disabled={generating || blocks.length === 0 || speakers.some((s) => !voicePerSpeaker[s.id])}
+        className="w-full"
+        size="lg"
+      >
+        {generating ? (
+          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Generiere Dialog ({progress?.current ?? 0}/{progress?.total ?? blocks.length}) …</>
+        ) : (
+          <><Mic className="h-4 w-4 mr-2" /> Dialog generieren ({blocks.length} Clips · €{totalCost.toFixed(2)})</>
+        )}
+      </Button>
+    </div>
   );
 }
