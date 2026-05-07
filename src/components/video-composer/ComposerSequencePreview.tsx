@@ -483,7 +483,34 @@ export default function ComposerSequencePreview({
     advanceScene();
   };
 
-  const togglePlay = () => setPlaying(p => !p);
+  const primeSfxAudios = useCallback(() => {
+    if (sfxPrimedRef.current) return;
+    sfxPrimedRef.current = true;
+    sfxAudiosRef.current.forEach((a, id) => {
+      try {
+        const wasMuted = a.muted;
+        a.muted = true;
+        const p = a.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            try { a.pause(); a.currentTime = 0; a.muted = wasMuted; } catch { /* noop */ }
+          }).catch((err) => {
+            console.warn(`[Preview] SFX prime failed clip=${id}`, err?.name || err);
+            try { a.muted = wasMuted; } catch { /* noop */ }
+          });
+        } else {
+          try { a.pause(); a.currentTime = 0; a.muted = wasMuted; } catch { /* noop */ }
+        }
+      } catch (err) {
+        console.warn(`[Preview] SFX prime threw clip=${id}`, err);
+      }
+    });
+  }, []);
+
+  const togglePlay = () => {
+    primeSfxAudios();
+    setPlaying(p => !p);
+  };
 
   const handleScrub = (val: number) => {
     if (totalDuration <= 0) return;
