@@ -187,8 +187,3 @@ export default function SceneStillFrameStudio({
     </div>
   );
 }
-        </div>
-      )}
-    </div>
-  );
-}
