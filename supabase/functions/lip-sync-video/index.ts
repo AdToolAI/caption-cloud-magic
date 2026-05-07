@@ -55,17 +55,17 @@ serve(async (req) => {
     await supabase.from('wallets').update({
       balance: wallet.balance - COST,
       updated_at: new Date().toISOString(),
-    }).eq('user_id', user.id);
+    }).eq('user_id', userId);
 
     const refund = async (reason: string) => {
       console.warn(`[lip-sync-video] Refund ${COST}: ${reason}`);
       const { data: w2 } = await supabase
-        .from('wallets').select('balance').eq('user_id', user.id).single();
+        .from('wallets').select('balance').eq('user_id', userId).single();
       if (w2) {
         await supabase.from('wallets').update({
           balance: w2.balance + COST,
           updated_at: new Date().toISOString(),
-        }).eq('user_id', user.id);
+        }).eq('user_id', userId);
       }
     };
 
