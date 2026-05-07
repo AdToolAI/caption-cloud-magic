@@ -68,6 +68,7 @@ import SceneCommentBadge from './SceneCommentBadge';
 import SceneCommentSheet from './SceneCommentSheet';
 import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
+import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 
 interface SceneCardProps {
