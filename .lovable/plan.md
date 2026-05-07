@@ -1,48 +1,51 @@
-## Problem
+## Root cause (verified live against the HeyGen API)
 
-Talking-Head schlägt mit `HEYGEN_AVATAR_LIMIT` (HTTP 400, code `401028`: "exceeded your limit of 3 photo avatars") fehl.
+Das „3 Photo Avatars"-Kontingent wird bei HeyGen **nicht** auf `talking_photo`, `photo_avatar/photo/list` oder `/v2/avatars` getrackt — sondern auf **Photo Avatar Groups** unter `GET /v2/avatar_group.list` (Filter `group_type === "PHOTO"`).
 
-Logs zeigen:
+Live-Probe gegen den echten Account:
 
 ```
-prune: photo_avatar list 404, trying avatar.list
-prune (avatars): 0 total, 0 deletable, deleting 0
-HeyGen talking_photo upload status=400 … 401028 … exceeded your limit of 3 photo avatars
+GET /v2/avatar_group.list   → total_count: 3, alle group_type:"PHOTO", num_looks:0
+DELETE /v2/avatar_group/{id}                 → 200 {"code":100}   ← funktioniert
+DELETE /v2/photo_avatar_group/{id}           → 200 {"code":100}   ← Alias, funktioniert auch
+DELETE /v2/photo_avatar/{id}                 → 404 "photo avatar not found"
 ```
 
-Ursache: Das Quota „3 Photo Avatars" lebt auf dem **`talking_photo`**-Endpoint, nicht auf `photo_avatar/photo/list` (404 für unseren Plan) und auch nicht auf `/v2/avatars` (filtert die 3 hochgeladenen Talking-Photos heraus → 0 Treffer). Der Prune findet daher nichts zu Löschendem, obwohl das Konto voll ist.
+Nach einer einzigen Test-Löschung sank `total_count` von 3 → 2. Damit ist eindeutig: das Kontingent sind die **Avatar-Groups vom Typ `PHOTO`**, und der bisher implementierte Prune (talking_photo v1 + photo_avatar/photo/list + /v2/avatars) räumt eine völlig andere Liste auf — deshalb `tried=30, deleted=0` in den Logs und HTTP 400 `401028` beim Upload.
 
-Beim letzten Fix wurde `pruneLegacyTalkingPhotos` (über `/v1/talking_photo.list`) entfernt, weil sie minutenlang über HeyGen-Presets lief. Genau dort liegen aber auch die echten User-Uploads, die jetzt das Quota blockieren.
+Die letzten beiden verbleibenden Gruppen sind reine Reste vom 1.4.2026 mit `num_looks: 0` (offensichtlich Auto-Cleanup-Müll), die das Konto blockieren.
 
 ## Fix (eine Datei)
 
-`supabase/functions/generate-talking-head/index.ts` — `pruneHeyGenTalkingPhotos` erweitern um einen dritten, **smart begrenzten** Fallback auf `/v1/talking_photo.list`:
+`supabase/functions/generate-talking-head/index.ts` → `pruneHeyGenTalkingPhotos` um einen **vorgelagerten Avatar-Group-Prune** ergänzen:
 
-1. Bestehende Reihenfolge bleibt: `/v2/photo_avatar/photo/list` → `/v2/avatars` (photo-only).
-2. **Neuer Fallback** wenn beide oben 0 deletable lieferten: `GET /v1/talking_photo.list`.
-   - Ergebnisliste **rückwärts** durchgehen (User-Uploads sind typischerweise am Ende neuer als die Preset-Bibliothek).
-   - Pro Eintrag `DELETE /v2/talking_photo/{id}` versuchen.
-   - **Hard-Cap auf 30 Versuche pro Aufruf** (≈ < 5 s, da HeyGen-DELETE schnell antwortet).
-   - **Early-Exit nach 3 erfolgreichen Deletes** (200/204) — das räumt das volle 3er-Kontingent komplett frei und stoppt sofort.
-   - 404 = Preset → still ignorieren, weiterzählen.
-   - `preserveId` (gecachter QA-Talking-Photo-Id aus `system_config.qa.heygen_talking_photo_id`) niemals löschen.
-3. Logging: `prune (talking_photo v1 fallback): tried=N, deleted=K, skipped404=M`.
-4. Sonst nichts ändern — Upload-Pfad, TTS, Video-Erzeugung, Background-Polling, Refund- und QA-Mock-Logik bleiben unverändert.
+1. **Vor allen anderen Versuchen** (vor `photo_avatar/photo/list` und Co.):
+   - `GET /v2/avatar_group.list`
+   - Filter `group_type === 'PHOTO'`
+   - Pro Gruppe `DELETE /v2/avatar_group/{id}` (Erfolg = HTTP 200 mit `code === 100`).
+   - Hard-Cap: max. 5 Deletes pro Aufruf.
+   - **Niemals** löschen, wenn `preserveId === group.id` ODER wenn `group.num_looks > 0` mit einem `look.id === preserveId` (Defensive: gecachter QA-Avatar wird nie weggeworfen).
+   - Logging: `prune (avatar_groups): total=N, deleted=K, kept=M`.
+
+2. Die bestehenden Fallback-Pfade (`/v2/photo_avatar/photo/list`, `/v2/avatars` photo-only, `/v1/talking_photo.list`) bleiben **unverändert** als Belt-and-Suspenders, falls HeyGen das Schema mal wieder ändert.
+
+3. Sonst nichts ändern — Upload-Pfad, TTS, Video-Erzeugung, Background-Polling, Refund- und QA-Mock-Logik bleiben unangetastet.
 
 ## Verifikation
 
 1. `generate-talking-head` deployen.
-2. Im Motion Studio "Talking-Head erstellen" mit Bild + Skript "Welcome to DroneOcular!" auslösen.
+2. „Talking-Head erstellen" mit Skript „Welcome to DroneOcular!" auslösen.
 3. Edge-Logs erwartet:
-   - `prune (avatars): 0 total, 0 deletable, deleting 0`
-   - `prune (talking_photo v1 fallback): tried=…, deleted=3, skipped404=…`
-   - `HeyGen talking_photo upload status=200`
-   - `HeyGen video_id=…`
-4. UI: grüner „Talking-Head wird generiert"-Toast statt rotem Fehler. Function antwortet < 30 s.
-5. Sollte HeyGen das Konto später erneut mit „nur Presets" antworten (z. B. weil der User schon manuell aufgeräumt hat), ist der Fallback ein No-Op und der Upload geht direkt durch.
+   ```
+   prune (avatar_groups): total=2, deleted=2, kept=0
+   HeyGen talking_photo upload status=200
+   HeyGen video_id=…
+   ```
+4. UI: grüner „Talking-Head wird generiert"-Toast statt rotem Fehler. Antwort < 30 s.
+5. Bei nachfolgenden Renders ist `total=1, deleted=1` (nur die frische Gruppe vom letzten Render wird wieder freigeräumt).
 
 ## Out of Scope
 
 - Keine Frontend-, DB-, Storage-, Refund- oder Polling-Änderungen.
-- Kein Eingriff in Lip-Sync, QA-Preset oder andere Edge Functions.
-- Kein neuer Endpoint, keine Schema-Änderungen.
+- Kein Eingriff in QA-Preset, Lip-Sync oder andere Edge Functions.
+- Kein Schema-Wechsel auf HeyGen v3 (laut HeyGen v1/v2 bis 31.10.2026 stabil).
