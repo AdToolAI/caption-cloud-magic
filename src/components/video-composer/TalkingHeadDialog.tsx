@@ -689,11 +689,7 @@ interface DialogModeTabProps {
 }
 
 function parseDialogScript(script: string, cast: ComposerCharacter[]): DialogBlock[] {
-  // Delegate to shared parser; map to local DialogBlock (which adds voiceId).
-  // We import lazily to avoid touching the module-level imports of this large file.
-  const { parseDialogScript: shared } =
-    require('@/lib/talking-head/parseDialogScript') as typeof import('@/lib/talking-head/parseDialogScript');
-  return shared(script, cast).map((b) => ({
+  return sharedParseDialogScript(script, cast).map((b) => ({
     speakerId: b.speakerId,
     speakerName: b.speakerName,
     text: b.text,
