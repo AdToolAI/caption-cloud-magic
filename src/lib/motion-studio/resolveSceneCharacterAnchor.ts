@@ -168,10 +168,16 @@ export function resolveSceneCharacterAnchorsAll(
     });
   }
 
-  // Recompute strategies with multi-flag.
+  // Recompute strategies with multi-flag. Each anchor uses ITS OWN shotType
+  // (from the matching cast slot) when available; falls back to primary.
   const multi = out.length > 1;
-  return out.map((a) => ({
-    ...a,
-    strategy: pickStrategy(shot?.shotType, scene.clipSource, a.source, forceDirect, multi),
-  }));
+  const primaryShot = slots[0]?.shotType;
+  return out.map((a) => {
+    const ownSlot = slots.find((s) => s.characterId === a.characterId);
+    const shotType = ownSlot?.shotType ?? primaryShot;
+    return {
+      ...a,
+      strategy: pickStrategy(shotType, scene.clipSource, a.source, forceDirect, multi),
+    };
+  });
 }
