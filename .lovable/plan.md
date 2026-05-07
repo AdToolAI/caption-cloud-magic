@@ -1,38 +1,58 @@
-# Problem
-Im Export-Step ist trotz unmute kein AI-Mix-Sound (Ambient/SFX/Foley) hörbar. Voiceover/Music spielen, die KI-Clips nicht. Im Screenshot fehlt zusätzlich die "AI Mix · N"-Badge — Indiz, dass `useSceneAudioClips(project?.id)` für die aktive Projekt-ID **0 Clips** liefert, obwohl die DB für das Projekt `f458e595…` 9+ Clips enthält (alle mit korrekter `user_id`, `kind in ambient/sfx/foley`, public bucket `scene-sfx`).
+## Zwei Themen
 
-# Drei wahrscheinliche Ursachen (in Reihenfolge)
+### 1. Sound-Übergänge zwischen Szenen sind zu abrupt
 
-1. **Projekt-ID-Drift**: `AssemblyTab` ruft `useSceneAudioClips(project?.id ?? null)`. Wenn beim Tab-Wechsel auf Export `project.id` kurz `undefined` ist (Draft aus sessionStorage hat noch keine `id`, oder DB-Hydrate noch nicht durch), löst der Hook nur `setClips([])` aus und lädt nicht nach. Es gibt zwar einen Reload-Event, der wird aber nur von `SoundDesignPanel` gefeuert — ein simpler Tab-Wechsel feuert ihn nie.
-2. **Audio-Autoplay-Lockout pro Element**: `new Audio(url)` wird **nach** dem ersten Play-Klick erzeugt (Effect läuft erst wenn `sceneAudioClips` non-empty wird). Manche Browser (Safari/iOS, teils Chromium mit strenger Policy) verlangen pro neuem `HTMLAudioElement` eine Gesten-Aktivierung — `play()` rejected silent. Voiceover/Music funktionieren, weil deren `<audio>`-Tags **im JSX** existieren und beim allerersten User-Klick mitaktiviert werden.
-3. **Stale-Closure beim Sync-Effect**: Der SFX-Sync-`useEffect` rebindet bei jedem `globalTime`-Tick. Wenn `sfxClipsTimeline` durch `playable`/`startOffsets` neu erzeugt wird (geschieht oft, da Memo-Deps), wird der vorherige Effect-Cleanup ausgeführt und nichts pausiert — passt, aber `play()`-Promises laufen ins Leere ohne Logging.
+**Aktuelles Verhalten** (`ComposerSequencePreview.tsx`, Zeilen 686-711):
+Beim SFX-Sync wird ein Clip exakt am Szenenrand mit `a.play()` gestartet und am Ende hart mit `a.pause()` gestoppt — dadurch hört man einen hörbaren Schnitt, besonders wenn ambiente Layer (Wind, Stadtgeräusch, Field-Tone) zwischen Szene 1 und Szene 2 wechseln.
 
-# Plan (3 Schritte, Frontend-only)
+**Plan — Fade-In/Out + Cross-Bleed**
 
-### 1. Diagnostic Logging (sofort sichtbar in Console)
-- `useSceneAudioClips`: Logge `projectId`, `data.length`, evtl. `error.message` bei jedem Load.
-- `ComposerSequencePreview` SFX-Init-Effect: Logge `sceneAudioClips.length`, jede `clip.id` + `url`, `audio.error` falls Load-Fehler.
-- SFX-Sync-Effect: Bei jedem `play()`-reject `console.warn` mit `clip.id` + Reason.
+a) **Per-Clip-Fades** in der Sync-Schleife (`ComposerSequencePreview.tsx`):
+   - Neue Konstante `SFX_FADE_SEC = 0.4` (300–500 ms fühlen sich am natürlichsten an).
+   - Statt `a.volume = safeVol` eine kleine Hilfsfunktion:
+     - Wenn `globalTime < start + FADE` → Volume linear von 0 → safeVol rampen.
+     - Wenn `globalTime > end - FADE` → Volume linear von safeVol → 0 rampen.
+     - Sonst: volle Lautstärke.
+   - Beim Verlassen des Bereichs (`!inRange`) **nicht sofort `pause()`**, sondern erst wenn Volume auf 0 ist; das verhindert Click-Artefakte.
 
-### 2. Projekt-ID-Drift fixen (Hauptverdacht für leere Liste)
-- `AssemblyTab`: useSceneAudioClips an `project?.id` koppeln — bereits so. **Zusätzlich**: Wenn `project?.id` von `null/undefined` → konkrete UUID wechselt, refetch erzwingen (der Hook tut das schon via `useCallback([projectId])` + `useEffect([load])`, aber wir verifizieren mit Log).
-- Außerdem: in `useSceneAudioClips` einen *Realtime-Channel* auf `scene_audio_clips` (filter `project_id`) anhängen, damit auch externe Inserts (Sound-Mix-Lauf in anderem Tab) sofort propagieren.
+b) **Optional: Pre-Roll am Szenenrand** — Damit Ambiente bereits *vor* dem Szenenwechsel leise einsetzt, das Tracking-Fenster pro Clip um `FADE` nach vorne ziehen:
+   - `startWindow = start - SFX_FADE_SEC` (geclamped auf 0)
+   - Rampe beginnt dann bei `startWindow`, erreicht volle Lautstärke bei `start`.
+   - Genauso am Ende: `endWindow = end + SFX_FADE_SEC`.
+   - Effekt: ambient track der nächsten Szene blendet sich über den 400-ms-Crossfade des Videos (Konstante `CROSSFADE_MS = 400` existiert bereits) sauber ein.
 
-### 3. Autoplay-Lockout härten
-- SFX-Audio-Elements **nicht mehr per `new Audio()`** erzeugen, sondern als versteckte `<audio>`-Tags im JSX rendern (gleicher Mechanismus wie VO/Music). Map per `key={clip.id}` und `ref` via Callback in `sfxAudiosRef`.
-- Beim ersten `togglePlay()`-Klick einmal alle SFX-Audios `audio.muted = true; audio.play().then(()=>audio.pause())` "primen" — hebt Autoplay-Lockout zuverlässig auf.
-- `crossOrigin="anonymous"` setzen (Bucket ist public), damit der Browser CORS-sauber decodiert.
+c) **Render-Parität** — Damit Vorschau und finaler Mux übereinstimmen, in `supabase/functions/mux-audio-to-video/index.ts` (bzw. `compose-video-assemble`) die `afade=in:0:d=0.4` / `afade=out:start_time=…:d=0.4` Filter pro Clip ergänzen, falls dort noch nicht vorhanden. (Wenn schon vorhanden, nur Wert auf 0.4 vereinheitlichen.) → Wird in der Plan-Umsetzung geprüft und nur bei Bedarf geändert.
 
-# Out of Scope
-- Keine Backend/Edge-Function-Änderungen.
-- Kein Eingriff in `compose-video-assemble`/`mux-audio-to-video` — das finale Render ist davon nicht betroffen.
+**Touched files (Phase 1 — UI):**
+- `src/components/video-composer/ComposerSequencePreview.tsx` — Fade-Funktion + Pre-Roll-Fenster
 
-# Verifikation
-1. DevTools-Console nach Tab-Wechsel auf Export: `[useSceneAudioClips] projectId=… loaded N=9` muss erscheinen.
-2. Badge "AI Mix · 9" erscheint im Preview-Header.
-3. Play drücken → in Console keine `play() rejected`-Warnungen → Sound hörbar.
-4. Falls weiter still: Console zeigt entweder `audio.error code=4` (CORS/404) oder `NotAllowedError` → richtet die nächste Iteration zielgerichtet aus.
+**Touched files (Phase 2 — nur falls Render abrupt klingt):**
+- `supabase/functions/mux-audio-to-video/index.ts` — afade-Filter pro Clip
 
-# Geänderte Dateien
-- `src/hooks/useSceneAudioClips.ts` (Logging + Realtime-Subscribe)
-- `src/components/video-composer/ComposerSequencePreview.tsx` (JSX-Audio-Tags + Priming + Logging)
+---
+
+### 2. Lip-Sync im Sound-Mix?
+
+**Kurze Antwort: Nein.** Sound-Mix (ambient/sfx/foley) ist reines **Audio-Mixing** — er bewegt keine Lippen.
+
+**Lip-Sync entsteht ausschließlich im Talking-Head-Flow:**
+- Dialog "Talking-Head erstellen" (zweiter Screenshot) → lädt Foto + Skript + Stimme → ruft `generate-talking-head` (HeyGen Photo-Avatar) auf → liefert ein **fertig lip-synctes Video** zurück, das als Szenen-Clip eingesetzt wird.
+- Alternativ kann `lip-sync-video` (sync-labs/lipsync-2) ein bestehendes Video nachträglich auf eine Audio-Spur synchronisieren — das wird aber **nicht** automatisch vom Sound-Designer aufgerufen, sondern müsste explizit pro Szene getriggert werden.
+
+**Empfehlung in der UI:**
+Im Sound-Design-Panel einen kleinen Hinweis ergänzen: *"Lip-Sync für sprechende Charaktere bitte im Talking-Head-Dialog erstellen — der Sound-Mix mischt nur Atmo/SFX/Musik."* (1 Zeile, kein Logikwechsel).
+
+**Touched file (Phase 3 — Hinweis):**
+- `src/components/video-composer/SoundDesignPanel.tsx` — kurzer Helper-Text
+
+---
+
+### Out of scope
+- Keine Änderungen an `lip-sync-video`-Edge-Function.
+- Keine neuen Provider, keine DB-Migration.
+- Talking-Head-Dialog selbst wird nicht angefasst.
+
+### Verifikation
+- Vorschau abspielen → bei Szenenübergang darf kein hörbarer Schnitt mehr auftreten; Ambient-Layer schmelzen ineinander.
+- Console: `[Preview] sceneAudioClips loaded: N` weiterhin vorhanden, keine neuen Warnings.
+- Hinweis-Text sichtbar im Sound-Design-Panel.
