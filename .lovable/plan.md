@@ -24,9 +24,10 @@
 - UI `<SceneStillFrameStudio>`: Card im SceneCard direkt vor dem Reference-Upload, sichtbar nur für `ai-*` clipSources. 2× / 4× Varianten-Wahl, Klick = setzt `scene.referenceImageUrl` → wird automatisch i2v first frame beim Render.
 - Brand-Charakter-Bild wird als Compose-Hint mitgeschickt (Identity Lock).
 
-## ⏳ Stage 4 (vorbereitet, noch nicht implementiert)
-- **Stage 4 – Asset Capture**: Edge `extract-asset-from-frame`, "Save as Character/Location"-Menü auf jedem Bild.
-
+## ✅ Stage 4 – Asset Capture (DONE)
+- Edge Function `extract-asset-from-frame`: nimmt jede Bild-URL + Mode (`character|location`), re-hostet ins richtige Bucket (`brand-characters` / `brand-locations`) unter `{user_id}/...`, ruft Gemini 2.5 Flash Vision mit Mode-spezifischem Schema, inseriert in `brand_characters` / `brand_locations`.
+- Komponente `<SaveAsAssetMenu imageUrl … />`: Bookmark-Icon-Trigger → Dropdown ("Save as Character" / "Save as Location") → Dialog mit Name+Description → invalidiert beide Library-Queries.
+- Eingebaut in `<SceneStillFrameStudio>`: jede Frame-Variante hat unten-rechts einen Bookmark-Button → ein Klick = wiederverwendbares Asset, sofort im @-Mention Picker verfügbar.
 
 
 Ziel: Die 5 identifizierten Lücken zu Artlist Studio schließen, ohne unsere Stärken (11 Provider, Lambda-Stitching, Director's Cut) anzufassen.
