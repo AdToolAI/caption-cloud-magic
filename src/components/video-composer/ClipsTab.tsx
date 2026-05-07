@@ -76,14 +76,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const buildBrandInputForScene = useCallback(
     (scene: ComposerScene) => {
       if (!activeBrandChar) return undefined;
+      const applies = sceneFeaturesCharacter(scene, { name: activeBrandChar.name });
       return {
         name: activeBrandChar.name,
         identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
         referenceImageUrl: activeBrandChar.reference_image_url,
-        // Gate: only inject identity card when the scene actually features
-        // the character (explicit characterShot or name in the prompt).
-        appliesToScene: sceneFeaturesCharacter(scene, { name: activeBrandChar.name }),
-        usePortraitAsFirstFrame: (activeBrandChar as any).use_portrait_as_first_frame === true,
+        // Gate: only inject identity card AND portrait anchor when the scene
+        // actually features the character (explicit characterShot or name in
+        // the prompt). When it does, the portrait is auto-used as i2v anchor
+        // for face/identity consistency — without it, the model invents a
+        // different person.
+        appliesToScene: applies,
+        usePortraitAsFirstFrame: applies,
       };
     },
     [activeBrandChar],
