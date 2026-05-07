@@ -173,9 +173,20 @@ export default function SceneStillFrameStudio({
                     <Check className="h-2.5 w-2.5" />
                   </div>
                 )}
+                <div
+                  className="absolute bottom-1 right-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <SaveAsAssetMenu imageUrl={v.url} language={language} iconOnly />
+                </div>
               </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
         </div>
       )}
     </div>
