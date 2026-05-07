@@ -1109,6 +1109,7 @@ export default function VideoComposerDashboard() {
               assemblyConfig={project.assemblyConfig}
               onUpdateAssembly={updateAssembly}
               scenes={project.scenes}
+              projectId={project.id}
               onGoToExport={() => setActiveTab('export')}
             />
           </TabsContent>
