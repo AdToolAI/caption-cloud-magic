@@ -305,6 +305,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // resolveMentions + applyDirectorModifiers + buildShotPromptSuffix
           // chain. Resolves axis conflicts, injects brand character, and
           // splits negative phrases out of the positive prompt.
+          const brandCharacterInput = buildBrandInputForScene(s);
           const composed = composePromptLayers({
             rawPrompt: s.aiPrompt || '',
             directorModifiers: s.directorModifiers,
@@ -325,10 +326,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           // the user explicitly opted in via `usePortraitAsFirstFrame`. Otherwise
           // the portrait stays a look reference (description anchor) only.
           const castAnchor = castMember?.usePortraitAsFirstFrame ? castMember.referenceImageUrl : undefined;
-          // Brand character portrait is now opt-in (default OFF). Otherwise every
-          // scene would start with the exact portrait frame ("photo-to-video" look).
-          const brandAnchor = (brandCharacterInput as any)?.usePortraitAsFirstFrame === true
-            ? brandCharacterInput?.referenceImageUrl
+          // Brand character portrait is now opt-in (default OFF) AND only when
+          // the scene features the character.
+          const brandAnchor = brandCharacterInput?.appliesToScene && brandCharacterInput?.usePortraitAsFirstFrame
+            ? brandCharacterInput.referenceImageUrl
             : undefined;
           return {
             id: s.id,
@@ -338,9 +339,6 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composed.negativePrompt || undefined,
             stockKeywords: s.stockKeywords,
             uploadUrl: s.uploadUrl,
-            // Only manual `s.referenceImageUrl` (Frame-Chain / Continuity button)
-            // or explicit opt-in anchors. `composed.referenceImageUrl` from
-            // @-mentions is intentionally NOT auto-piped — it stays a look reference.
             referenceImageUrl:
               s.referenceImageUrl ||
               castAnchor ||
@@ -438,13 +436,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(optimistic);
       }
 
-      // Centralized prompt composer (Phase 1)
+      const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
       const composedSingle = composePromptLayers({
         rawPrompt: targetScene.aiPrompt || '',
         directorModifiers: targetScene.directorModifiers,
         shotDirector: targetScene.shotDirector,
         cinematicStylePresetId: (targetScene as any).cinematicStylePresetId,
-        brandCharacter: brandCharacterInput,
+        brandCharacter: brandCharacterInputSingle,
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
       });
@@ -467,8 +465,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                 ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
                 : undefined;
               const cmAnchor = cm?.usePortraitAsFirstFrame ? cm.referenceImageUrl : undefined;
-              const brandAnchor = (brandCharacterInput as any)?.usePortraitAsFirstFrame === true
-                ? brandCharacterInput?.referenceImageUrl
+              const brandAnchor = brandCharacterInputSingle?.appliesToScene && brandCharacterInputSingle?.usePortraitAsFirstFrame
+                ? brandCharacterInputSingle.referenceImageUrl
                 : undefined;
               return targetScene.referenceImageUrl || cmAnchor || brandAnchor;
             })(),
