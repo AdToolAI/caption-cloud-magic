@@ -24,6 +24,7 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
+import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
@@ -72,13 +73,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const { characters: brandChars } = useBrandCharacters();
   // Phase 2 — auto-inject the user's favorite Brand Character (if any).
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
-  const brandCharacterInput = activeBrandChar
-    ? {
+  const buildBrandInputForScene = useCallback(
+    (scene: ComposerScene) => {
+      if (!activeBrandChar) return undefined;
+      return {
         name: activeBrandChar.name,
         identityCardPrompt: buildCharacterPromptInjection(activeBrandChar),
         referenceImageUrl: activeBrandChar.reference_image_url,
-      }
-    : undefined;
+        // Gate: only inject identity card when the scene actually features
+        // the character (explicit characterShot or name in the prompt).
+        appliesToScene: sceneFeaturesCharacter(scene, { name: activeBrandChar.name }),
+        usePortraitAsFirstFrame: (activeBrandChar as any).use_portrait_as_first_frame === true,
+      };
+    },
+    [activeBrandChar],
+  );
 
   /**
    * Frame-to-Shot Continuity:
