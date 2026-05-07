@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import SaveAsAssetMenu from '@/components/assets/SaveAsAssetMenu';
 
 interface Variant {
   url: string;
@@ -172,6 +173,12 @@ export default function SceneStillFrameStudio({
                     <Check className="h-2.5 w-2.5" />
                   </div>
                 )}
+                <div
+                  className="absolute bottom-1 right-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <SaveAsAssetMenu imageUrl={v.url} language={language} iconOnly />
+                </div>
               </button>
             );
           })}
