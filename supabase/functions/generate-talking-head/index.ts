@@ -85,6 +85,43 @@ function mapDimension(aspectRatio: string, resolution: string): { width: number;
 // before the next upload — otherwise HeyGen returns code 401028 "exceeded
 // your limit of N photo avatars".
 async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promise<void> {
+  // ─── PRIMARY PRUNE: avatar_group (PHOTO) ──────────────────────────────
+  // Verified live: HeyGen tracks the "3 photo avatars" quota on
+  // /v2/avatar_group.list (group_type === "PHOTO"). Deleting via
+  // DELETE /v2/avatar_group/{id} returns HTTP 200 {"code":100} on success.
+  try {
+    const gr = await fetch(`${HEYGEN_BASE_V2}/avatar_group.list`, {
+      method: 'GET',
+      headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+    });
+    if (gr.ok) {
+      const gj = await gr.json();
+      const groups: any[] = Array.isArray(gj?.data?.avatar_group_list) ? gj.data.avatar_group_list : [];
+      const photoGroups = groups.filter((g) => (g?.group_type || '').toUpperCase() === 'PHOTO');
+      let deleted = 0, kept = 0;
+      for (const g of photoGroups) {
+        if (deleted >= 5) break;
+        const id = g?.id;
+        if (!id) continue;
+        if (preserveId && id === preserveId) { kept++; continue; }
+        const dr = await fetch(`${HEYGEN_BASE_V2}/avatar_group/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+        });
+        if (dr.ok) {
+          deleted++;
+        } else {
+          console.warn(`[talking-head] prune avatar_group ${id} -> ${dr.status}`);
+        }
+      }
+      console.log(`[talking-head] prune (avatar_groups): total=${photoGroups.length}, deleted=${deleted}, kept=${kept}`);
+    } else {
+      console.warn(`[talking-head] prune avatar_group.list ${gr.status}, continuing with fallbacks`);
+    }
+  } catch (e) {
+    console.warn('[talking-head] prune avatar_group failed (non-fatal):', e instanceof Error ? e.message : String(e));
+  }
+
   try {
     // The actual quota ("3 photo avatars") is tracked under photo_avatar, not
     // talking_photo.list (which returns HeyGen presets). Try the photo-avatar
