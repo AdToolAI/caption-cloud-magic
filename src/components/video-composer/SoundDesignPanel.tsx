@@ -94,6 +94,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
         description: `${data?.generated_count ?? 0} Clips generiert${data?.failed_count ? `, ${data.failed_count} fehlgeschlagen` : ''}.`,
       });
       await load();
+      emitSceneAudioClipsChanged(projectId);
     } catch (e) {
       toast({ title: 'Fehler', description: (e as Error).message, variant: 'destructive' });
     } finally {
