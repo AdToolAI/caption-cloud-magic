@@ -189,13 +189,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
+      // Resolve @mentions against the unified library (brand + motion-studio)
+      const mentionResolved = resolveMentions(prompt.trim(), mentionChars, mentionLocs);
       // Build the prompt — inject Library cast/location, Brand Character (if locked) AND Shot Director cinematography
       const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
       const brandSuffix = brandCharacter
         ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
         : '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
-      const finalPrompt = [prompt.trim(), shotSuffix, brandSuffix, castSuffix]
+      const finalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix]
         .filter(Boolean)
         .join('\n\n');
 
@@ -206,11 +208,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         aspectRatio,
       };
 
-      // i2v: Brand Character image > manual upload > library character
+      // i2v: Brand Character image > manual upload > library character > resolved mention
       const referenceImage =
         brandCharacter?.reference_image_url ??
         startImageUrl ??
         castCharacter?.reference_image_url ??
+        mentionResolved.referenceImageUrl ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
       // v2v: pass reference clip + reference type (Kling-3 omni)
