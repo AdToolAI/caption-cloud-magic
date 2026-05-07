@@ -13,8 +13,13 @@
 - Edge Function `extract-location-identity` (Gemini 2.5 Flash Vision → Identity Card).
 - Page `/locations` mit Bento-Grid, Create/Favorite/Archive.
 
-## ⏳ Stages 2-4 (vorbereitet, noch nicht implementiert)
-- **Stage 3 – @mention Prompt Editor**: Komponente `<MentionablePromptInput>` mit Cast/Location-Autosuggest.
+## ✅ Stage 3 – @mention Prompt Editor (DONE)
+- Neuer Hook `useUnifiedMentionLibrary`: aggregiert `brand_characters` (Avatare/Stage 1 + Marketplace) + `brand_locations` (Stage 1) + Legacy Motion-Studio Library, dedupliziert per Name.
+- `PromptMentionEditor` zieht jetzt aus der unified library → tippe `@` und siehst Avatars + Locations + Motion-Studio-Cast nebeneinander.
+- Toolkit Generator: Textarea ersetzt durch `PromptMentionEditor`, `resolveMentions` erweitert finalen Prompt mit Cast/Setting-Block und nutzt aufgelöstes Reference-Image als i2v-Fallback.
+- Composer (SceneCard, ClipsTab) nutzt unified library für `composePromptLayers` → identische Auflösung in Toolkit + Composer.
+
+## ⏳ Stages 2 & 4 (vorbereitet, noch nicht implementiert)
 - **Stage 2 – Frame-First Pipeline**: Edge `generate-scene-still` (Tabelle ist schon da), SceneCard-Tab "Still Frame".
 - **Stage 4 – Asset Capture**: Edge `extract-asset-from-frame`, "Save as Character/Location"-Menü auf jedem Bild.
 
