@@ -66,6 +66,7 @@ import { toast } from '@/hooks/use-toast';
 import SceneCommentBadge from './SceneCommentBadge';
 import SceneCommentSheet from './SceneCommentSheet';
 import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
+import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 
 interface SceneCardProps {
