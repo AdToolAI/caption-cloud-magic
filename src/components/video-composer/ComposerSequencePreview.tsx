@@ -10,6 +10,7 @@ import type {
 } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
+import type { SceneAudioClip } from './SoundDesignPanel';
 
 interface Props {
   scenes: ComposerScene[];
@@ -22,6 +23,9 @@ interface Props {
   backgroundMusicUrl?: string | null;
   /** Background music volume (0..1). Defaults to 0.3. */
   backgroundMusicVolume?: number;
+  /** AI-generated ambient/sfx/foley clips — synced to scene offsets so the
+   *  preview matches what mux-audio-to-video will mix into the final render. */
+  sceneAudioClips?: SceneAudioClip[];
   /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
   onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
