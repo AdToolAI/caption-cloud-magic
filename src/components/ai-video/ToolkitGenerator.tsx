@@ -302,17 +302,25 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {language === 'de' ? 'Optimieren' : 'Optimize'}
           </Button>
         </div>
-        <Textarea
+        <PromptMentionEditor
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={setPrompt}
           placeholder={
             language === 'de'
-              ? 'Beschreibe dein Video … z. B. „Eine Drohnenaufnahme über einer alpinen Berglandschaft bei Sonnenaufgang“'
-              : 'Describe your video… e.g. "A drone shot over an alpine mountain landscape at sunrise"'
+              ? 'Beschreibe dein Video … nutze @charakter und @location aus deiner Library'
+              : language === 'es'
+              ? 'Describe tu vídeo … usa @personaje y @ubicación de tu biblioteca'
+              : 'Describe your video … use @character and @location from your library'
           }
           rows={4}
-          className="resize-none bg-background/40 border-border/40 focus:border-primary/40"
         />
+        <p className="mt-1.5 text-[10px] text-muted-foreground/80 italic">
+          {language === 'de'
+            ? 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.'
+            : language === 'es'
+            ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu biblioteca.'
+            : 'ℹ️ Type @ to tag characters & locations from your library.'}
+        </p>
       </Card>
 
       {/* ── Cinematic Style Presets (one-click director looks) ── */}
