@@ -651,6 +651,7 @@ export default function ComposerSequencePreview({
   // Maps each clip to a global timeline offset based on its scene's position
   // in the playable sequence (mirrors what compose-video-assemble does for
   // the final mux). Clips without a matching scene play at start_offset from 0.
+  const SFX_FADE_SEC = 0.4;
   const sfxClipsTimeline = useMemo(() => {
     if (!sceneAudioClips?.length) return [] as Array<{ clip: SceneAudioClip; start: number; end: number }>;
     const sceneStart = new Map<string, number>();
