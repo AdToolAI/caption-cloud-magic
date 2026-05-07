@@ -1,48 +1,54 @@
 ## Problem
-Stage 2 (Resolver/Anchor) und Stage 3 (Talking-Head Dialog) sind fertig — aber **Stage 1 (UI) wurde nie umgesetzt**. Im Composer gibt es nach wie vor nur den `CharacterShotPicker` mit einem einzigen `<Select>` für **einen** Charakter pro Szene. Der Resolver kann zwar mehrere Charaktere via `@-Mention`/Namensmatch im Prompt einsammeln, aber es gibt keinen sichtbaren Cast-Slot für mehrere expliziten Charaktere.
+Wenn im Composer im **Cast-Picker** Charaktere wie *Matthew Dusatko* und *Sarah Dusatko* ausgewählt werden, taucht ihr Name **nicht** im AI-Prompt auf. Damit ignoriert sowohl der Resolver (Namensmatch im Prompt schlägt fehl) als auch das Modell die Cast-Auswahl — die Szene wird ohne die Charaktere generiert.
 
-## Lösung — Multi-Character Cast Picker (UI-only)
+Die Cast-Auswahl muss den Prompt **automatisch ergänzen**, sobald sich die Auswahl ändert — und sich beim Entfernen wieder sauber zurückziehen, ohne den Rest des Prompts zu zerstören.
 
-### 1. Neue Komponente `CharacterCastPicker`
-Ersetzt den `CharacterShotPicker` in `SceneCard.tsx`. Verhalten:
+## Lösung — Auto-Inject Cast-Namen in Prompt
 
-- **Cast-Slots** (max 4) horizontal als Avatar-Chips: `[Sarah · Voll] [Matthew · Profil] [+]`.
-- Jeder Chip:
-  - Avatar-Thumbnail + Name
-  - Inline-Dropdown für `shotType` (Voll/Profil/Rücken/Detail/POV/Silhouette)
-  - `×` zum Entfernen
-- `[+]`-Button → Popover-Dropdown mit allen verfügbaren Charakteren (gefiltert: schon im Cast = ausgegraut).
-- Bei 0 Charakteren im Cast → unverändertes „— keiner —" Verhalten.
-- Erster Slot bleibt der „primary" für Backwards-Compat (wird in `scene.characterShot` gespeichert wie heute).
+### 1. Neuer Helper `applyCastToPrompt()`
+Datei: `src/lib/motion-studio/applyCastToPrompt.ts` (neu).
 
-### 2. Datenmodell-Erweiterung (kein DB-Change)
-- Neues optionales Feld in `ComposerScene`: `characterShots?: CharacterShot[]` (Array, max 4).
-- `characterShot` (singular) bleibt als **derived** Feld = `characterShots?.[0]` für Backwards-Compat in Resolver, Badge, Lip-Sync-Toggle, Render-Pipeline.
-- Migration in-memory beim Laden alter Szenen: wenn `characterShot` gesetzt aber `characterShots` leer → `characterShots = [characterShot]`.
+Verhalten:
+- Input: `prompt: string`, `cast: CharacterShot[]`, `previousCast: CharacterShot[]`.
+- Erkennt eine **Cast-Markierung** am Anfang des Prompts in der Form:
+  ```
+  [Cast: Sarah Dusatko (full), Matthew Dusatko (profile)] <rest of prompt>
+  ```
+- Ersetzt die bestehende Markierung durch die neue Liste, oder fügt sie vorne ein, oder entfernt sie komplett bei leerem Cast.
+- Lokalisiert: DE → `[Besetzung: …]`, EN → `[Cast: …]`, ES → `[Reparto: …]`.
+- Shot-Type-Suffix ist optional (default an), z.B. `Sarah Dusatko (Voll)`.
+- Wenn der User die Markierung manuell gelöscht hat (Markierung weg, aber Cast vorhanden) → re-injecten.
+- Wenn der Name **bereits frei im Prompt** vorkommt (Volltext oder Vorname ≥3 Zeichen) → **keine** Doppel-Erwähnung in der Markierung für diesen Namen.
 
-### 3. Resolver-Anpassung
-`resolveSceneCharacterAnchorsAll()` erweitern um Quelle `'cast-slot'`:
-- Iteriert ZUERST über `scene.characterShots[]` (alle expliziten Slots → `first-frame-composed` bei multi).
-- Danach unverändert: `cast-name-match` und `brand-name-match`.
-- Strategie: bei ≥2 Anchors → `first-frame-composed` (multi-flag bleibt wie implementiert).
+### 2. SceneCard `onChange` des CharacterCastPickers
+Statt nur `characterShots` + `characterShot` zu speichern, zusätzlich:
+```ts
+const newPrompt = applyCastToPrompt(scene.aiPrompt || '', next, scene.characterShots ?? []);
+onUpdate({ characterShots: next, characterShot: next[0], aiPrompt: newPrompt });
+```
+Wenn `promptMode === 'guided'` (Slot-Modus): Cast-Markierung wird in den **ersten Slot** (`subject` o. ä.) injiziert statt in `aiPrompt`, damit der Stitcher sie nicht überschreibt. Im Free-Modus direkt in `aiPrompt`.
 
-### 4. Badge-Reihe in `SceneCard`
-Statt einem `CharacterShotBadge` jetzt eine `flex gap-1`-Reihe aller Cast-Mitglieder mit ihren Shot-Badges.
+### 3. Resolver bleibt unverändert
+`resolveSceneCharacterAnchorsAll()` liest weiterhin `scene.characterShots` als primäre Quelle — durch die zusätzliche Erwähnung im Prompt funktioniert jetzt **auch** der Namensmatch-Pfad (z. B. wenn der User einen Charakter manuell tippt statt zu picken).
 
-### 5. UI-Hinweis
-Kleiner Helper-Text unter dem Cast-Picker:
-> „Bis zu 4 Charaktere pro Szene. Nano Banana 2 komponiert sie automatisch ins erste Frame. Bei ≥2 Charakteren wird Vidu Q2 (Multi-Reference) als Provider empfohlen."
+### 4. UI-Feedback
+Kleiner Hinweis unter dem Cast-Picker (lokalisiert):
+> „Charaktere werden automatisch im Prompt erwähnt."
+
+Mit Toggle „Auto-Inject" (default on, in `localStorage` gemerkt), falls Power-User volle Prompt-Kontrolle wollen.
+
+### 5. Edge-Cases
+- **Ältere Szenen** ohne Markierung, aber mit `characterShots`: beim ersten Mount einmal `applyCastToPrompt` durchlaufen lassen (idempotent).
+- **Slot-Modus**: Cast-Markierung darf nicht doppelt in mehrere Slots wandern → Stitcher prüft.
+- **Guided→Free Mode-Switch**: Markierung wird mit umgezogen.
 
 ## Geänderte Dateien
-- `src/components/video-composer/CharacterShotBadge.tsx` — neu: `CharacterCastPicker` Komponente (oder eigene Datei `CharacterCastPicker.tsx`).
-- `src/components/video-composer/SceneCard.tsx` — Picker tauschen, Badge-Reihe rendern, `characterShots` State handhaben.
-- `src/types/video-composer.ts` — Feld `characterShots?: CharacterShot[]` ergänzen.
-- `src/lib/motion-studio/resolveSceneCharacterAnchor.ts` — Cast-Slots als erste Quelle einlesen.
-- `mem://features/video-composer/multi-character-composition.md` — Update mit Cast-UI Beschreibung.
+- **Neu**: `src/lib/motion-studio/applyCastToPrompt.ts`
+- `src/components/video-composer/SceneCard.tsx` — onChange im Cast-Picker, einmaliger Backfill auf Mount, optionaler Auto-Inject-Toggle.
+- `mem://features/video-composer/multi-character-composition.md` — um „Cast-Auto-Inject" ergänzen.
 
 ## Out of Scope
-- DB-Migration (nicht nötig — Array wird in `composer_scenes.character_shot` als JSON-Array serialisiert ODER neu in `character_shots` JSONB; entscheide ich beim Implementieren — ohne neue Spalte).
-- Talking-Head Dialog-Mode (bereits fertig).
-- Toolkit-Generator Multi-Cast (kommt in einer Folge-Iteration).
+- Volltext-NLP (z. B. Pronomen-Resolution).
+- Auto-Generieren ganzer Sätze um die Charaktere — wir ergänzen nur die Cast-Markierung; das Modell + Shot Director lesen sie deterministisch.
 
 Soll ich loslegen?

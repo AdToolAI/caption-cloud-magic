@@ -68,6 +68,7 @@ import SceneCommentBadge from './SceneCommentBadge';
 import SceneCommentSheet from './SceneCommentSheet';
 import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
+import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 
 interface SceneCardProps {
@@ -169,7 +170,8 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
-  // Block K-5: pull system presets to seed inspire variation
+  const didBackfillCast = useRef(false);
+
   const { systemPresets } = useStylePresets();
 
   const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
@@ -211,6 +213,30 @@ export default function SceneCard({
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
+
+  // Backfill: ensure existing scenes with a cast also have the cast marker in the prompt.
+  // Idempotent — applyCastToPrompt is a no-op when the marker is already present.
+  useEffect(() => {
+    if (didBackfillCast.current) return;
+    if (!scene.clipSource.startsWith('ai-')) return;
+    if (!characters || characters.length === 0) return;
+    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    if (cast.length === 0) return;
+    didBackfillCast.current = true;
+    if (promptMode === 'structured') {
+      const currentSubject = (promptSlots.subject as string) || '';
+      const newSubject = applyCastToPrompt(currentSubject, cast, characters, lang);
+      if (newSubject !== currentSubject) {
+        const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
+        onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
+      }
+    } else {
+      const newPrompt = applyCastToPrompt(scene.aiPrompt || '', cast, characters, lang);
+      if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id, characters?.length]);
+
 
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
@@ -650,20 +676,41 @@ export default function SceneCard({
 
             {/* Character Cast picker (multi, max 4) — only when characters are defined in the briefing AND it's an AI scene */}
             {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
-              <CharacterCastPicker
-                characters={characters}
-                value={scene.characterShots}
-                legacyValue={scene.characterShot}
-                onChange={(next) =>
-                  onUpdate({
-                    characterShots: next,
-                    // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
-                    characterShot: next[0],
-                  })
-                }
-                language={lang as 'en' | 'de' | 'es'}
-              />
+              <>
+                <CharacterCastPicker
+                  characters={characters}
+                  value={scene.characterShots}
+                  legacyValue={scene.characterShot}
+                  onChange={(next) => {
+                    const updates: Partial<ComposerScene> = {
+                      characterShots: next,
+                      // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
+                      characterShot: next[0],
+                    };
+                    if (promptMode === 'structured') {
+                      const subjectKey: keyof PromptSlots = 'subject';
+                      const currentSubject = (promptSlots[subjectKey] as string) || '';
+                      const newSubject = applyCastToPrompt(currentSubject, next, characters, lang);
+                      const nextSlots: PromptSlots = { ...promptSlots, [subjectKey]: newSubject };
+                      updates.promptSlots = nextSlots;
+                      updates.aiPrompt = stitchSlots(nextSlots, promptSlotOrder);
+                    } else {
+                      updates.aiPrompt = applyCastToPrompt(scene.aiPrompt || '', next, characters, lang);
+                    }
+                    onUpdate(updates);
+                  }}
+                  language={lang as 'en' | 'de' | 'es'}
+                />
+                <p className="text-[10px] text-muted-foreground -mt-1 px-1">
+                  {lang === 'de'
+                    ? 'Charaktere werden automatisch im Prompt erwähnt.'
+                    : lang === 'es'
+                    ? 'Los personajes se mencionan automáticamente en el prompt.'
+                    : 'Characters are mentioned automatically in the prompt.'}
+                </p>
+              </>
             )}
+
 
             {/* Scene-Aware Character Anchor — strategy badge + override */}
             {scene.clipSource.startsWith('ai-') && (() => {
