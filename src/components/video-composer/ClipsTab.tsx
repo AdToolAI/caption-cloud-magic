@@ -465,6 +465,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         libraryLocations: libLocations,
       });
 
+      const preparedSingle = targetScene.clipSource.startsWith('ai-')
+        ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt)
+        : undefined;
+      if (preparedSingle?.anchor) {
+        console.log(
+          `[ClipsTab] single scene ${targetScene.id} → ${preparedSingle.anchor.strategy} (${preparedSingle.anchor.name}, source=${preparedSingle.anchor.source}, composed=${preparedSingle.composed})`,
+        );
+      }
+
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
@@ -478,13 +487,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composedSingle.negativePrompt || undefined,
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
-            referenceImageUrl: (() => {
-              const sceneAnchor = resolveSceneCharacterAnchor(targetScene, characters, activeBrandChar);
-              if (sceneAnchor && !targetScene.referenceImageUrl) {
-                console.log(`[ClipsTab] single scene ${targetScene.id} → anchor ${sceneAnchor.source} (${sceneAnchor.name})`);
-              }
-              return targetScene.referenceImageUrl || sceneAnchor?.referenceImageUrl;
-            })(),
+            referenceImageUrl: preparedSingle?.firstFrameUrl,
+            subjectReferenceUrl: preparedSingle?.subjectReferenceUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
             withAudio: targetScene.withAudio !== false,
