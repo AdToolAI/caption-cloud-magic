@@ -82,7 +82,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
             id: s.id,
             startTime: i * 5,
             endTime: (i + 1) * 5,
-            description: s.aiPrompt || s.description || '',
+            description: s.aiPrompt || '',
             mood: detectedMood,
           })),
         },
