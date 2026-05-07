@@ -135,6 +135,8 @@ export default function ComposerSequencePreview({
   const audioRef = useRef<HTMLAudioElement>(null);
   /** Background music audio element — independent linear track, looped under VO. */
   const musicRef = useRef<HTMLAudioElement>(null);
+  /** AI SFX/Ambient/Foley audio elements — keyed by clip id. */
+  const sfxAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   const playableRef = useRef(playable);
   const startOffsetsRef = useRef(startOffsets);
