@@ -170,9 +170,9 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   } catch (_e) { /* non-fatal */ }
 
   await pruneHeyGenTalkingPhotos(0, preserveId);
-  // Also prune via the legacy talking_photo.list endpoint as a fallback
-  // (different plans expose different listing endpoints).
-  await pruneLegacyTalkingPhotos(preserveId);
+  // Note: legacy /v1/talking_photo.list returns HeyGen's preset library (hundreds
+  // of items, all 404 on DELETE) and used to block this function for minutes.
+  // The /v2/photo_avatar/photo/list path above is the correct quota source.
 
   const srcRes = await fetch(sourceUrl);
   if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
