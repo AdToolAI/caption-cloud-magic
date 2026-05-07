@@ -15,6 +15,7 @@ import ExportPresetPanel from './ExportPresetPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
+import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 
 interface AssemblyTabProps {
   project: any;
