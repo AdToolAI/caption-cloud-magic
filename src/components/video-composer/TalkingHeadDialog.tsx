@@ -293,12 +293,15 @@ export default function TalkingHeadDialog({
         </DialogHeader>
 
         <Tabs defaultValue="character" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="character">
               <ImageIcon className="h-4 w-4 mr-2" /> Charakter
             </TabsTrigger>
             <TabsTrigger value="script" disabled={!imageUrl || !selectedCharId}>
               <Sparkles className="h-4 w-4 mr-2" /> Skript & Stimme
+            </TabsTrigger>
+            <TabsTrigger value="dialog" disabled={cast.length < 2}>
+              <User className="h-4 w-4 mr-2" /> Dialog ({cast.length})
             </TabsTrigger>
           </TabsList>
 
