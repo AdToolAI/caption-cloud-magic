@@ -1,97 +1,55 @@
-## Ziel
+## Problem
 
-Videos sollen wie bei Artlist / Veed / Captions klingen: **Voiceover + lippensynchroner Sprecher + Ambient/Atmo + punktgenaue SFX + Musik (geduckt)** – automatisch generiert, in einem Mix.
+Im Export-Step zeigt "Gesamtes Video — Vorschau" zwar das fertige Video, spielt aber **keinen Sound aus dem AI Sound Mix** ab, den du im Audio-Tab über "Mix erstellen" generiert hast.
 
-Aktueller Stand im Projekt:
-- `director-cut-voice-over` (ElevenLabs TTS) ✅
-- `director-cut-sound-design` empfiehlt nur Sounds, **generiert aber nichts** ❌
-- `animate-scene-hailuo` akzeptiert bereits `audio` für Lip-Sync, wird aber im Composer nicht genutzt
-- `TalkingHeadDialog` mit HeyGen ist da, aber nur als Standalone-Avatar
-- `mux-audio-to-video`, `director-cut-audio-mixing`, Music Studio (Stable Audio / MiniMax) ✅
+Zwei Ursachen:
 
-Wir bauen die fehlenden 3 Bausteine und die End-Mix-Pipeline.
+1. **Die Vorschau ist standardmäßig stumm** (`muted = true`) — du müsstest erst auf das Lautsprecher-Icon klicken. Das ist nicht offensichtlich.
+2. **Die generierten Szenen-SFX/Ambient/Foley-Clips (`scene_audio_clips`) werden vom Preview-Player gar nicht geladen** — er spielt nur Voiceover + Background-Music. Die "Mix erstellen"-Clips landen zwar in der DB und im finalen Render, sind in der Preview aber unsichtbar/unhörbar.
 
----
+Der finale Render (Lambda → `mux-audio-to-video`) bezieht die Clips bereits korrekt aus `scene_audio_clips` (Phase 2 Pipeline) — das Problem ist **rein in der Export-Step-Preview**.
 
 ## Plan
 
-### 1) AI Sound-Designer wird "echt" (Ambient + SFX generieren)
+Reines Frontend / Preview-Fix, keine Backend-Änderungen.
 
-Neue Edge Function **`generate-scene-sfx`** (ElevenLabs Sound Effects API, `text-to-sound-effects`, bis 22s, ~5 Credits/Clip):
+### 1. `ComposerSequencePreview.tsx` erweitern
 
-- Input: `scene_id`, `prompt` ("rainy city street, distant traffic, light wind"), `duration`, `kind: 'ambient' | 'sfx' | 'foley'`
-- Output: MP3 in neuem Bucket `scene-sfx/{user_id}/...`, Eintrag in neuer Tabelle `scene_audio_clips` (scene_id, kind, url, start_offset, duration, volume, ducking)
+- Neue Prop `projectId?: string | null` und `sceneAudioClips?: SceneAudioClip[]` (oder direkt aus DB laden, siehe 2).
+- Default `muted = false` setzen (mit erstem User-Gesten-Fallback für Browser-Autoplay-Policy: bei `play()`-Reject einmalig auf `muted=true` umschalten und Hinweis-Toast).
+- Pro Szene Offset berechnen (akkumulierte `durationSeconds`) und für jeden Clip eine eigene `HTMLAudioElement`-Instanz im `useEffect` aufbauen. Schon vorhandenes Muster aus `TimelineVideoPreview.tsx` (Map<id, Audio>) wiederverwenden.
+- In der bestehenden `tick`-/`onVideoTimeUpdate`-Schleife jeden Clip prüfen:
+  - `clipStart = sceneOffset + clip.start_offset`
+  - `clipEnd = clipStart + clip.duration`
+  - innerhalb Range + `playing` → `audio.play()`, `audio.currentTime = globalTime - clipStart`
+  - außerhalb / pause / mute → `audio.pause()`
+- Volume = `clip.volume * (muted ? 0 : 1)`, geklippt auf `[0, 1]` (gem. Memory `audio-playback-volume-clamping`).
+- Cleanup beim Unmount + bei Wechsel der Clip-Liste.
 
-`director-cut-sound-design` wird umgebaut: liefert weiterhin die KI-Empfehlungen, ruft aber für jede Empfehlung **automatisch `generate-scene-sfx`** auf (Ambient pro Szene + 1–3 Foley/SFX-Akzente). Fallback: Suche in `search-stock-sfx` (Pixabay/Freesound), wenn ElevenLabs fehlschlägt → automatischer Credit-Refund (Project-Memory-Regel).
+### 2. Datenladen
 
-### 2) Lip-Sync direkt im Composer
+In `AssemblyTab.tsx` einen leichten Loader (oder neuer Hook `useSceneAudioClips(projectId)`) hinzufügen, der `scene_audio_clips` für `project.id` mit `kind in ('ambient','sfx','foley')` lädt und an `ComposerSequencePreview` als Prop weiterreicht. Realtime-Subscription optional, mindestens Reload nach `Mix erstellen` (über `eventBus`/`window` Event aus `SoundDesignPanel`).
 
-Neuer Schalter pro Szene in `ClipsTab` / `SceneCard`: **"Lip-Sync mit Voiceover"** (nur sichtbar, wenn die Szene einen Charakter + Voiceover-Segment hat).
+### 3. UX-Politur
 
-- Wenn aktiv und Provider = Hailuo: Voiceover-Slice der Szene wird als `audio`-Parameter an `animate-scene-hailuo` durchgereicht (existiert schon, nur Verdrahtung fehlt).
-- Für andere Provider (Kling / Veo / Seedance / Sora): post-hoc Lip-Sync via neuer Edge Function **`lip-sync-video`** mit Replicate `sync-labs/lipsync-2` oder `bytedance/latentsync` (3–8 Credits, idempotenter Refund).
-- Für reine Talking-Head-Szenen (ein Charakter spricht in die Kamera): bestehender `TalkingHeadDialog` (HeyGen) wird als Scene-Option im Storyboard-Tab angeboten ("Talking-Head-Szene einfügen").
+- Kleines Badge **"AI Mix aktiv · X Clips"** über dem Preview, wenn Clips geladen sind, damit klar ist, dass die Preview den vollen Sound abspielt.
+- Mute-Button-Tooltip: "Klick für Sound (VO + Musik + AI SFX)".
 
-### 3) Neuer "Audio Designer"-Tab im Composer
+### 4. Verifikation
 
-Ersetzt den dünnen Music-only `AudioTab` durch eine **Multi-Track-Timeline**:
+- DB-Sanity-Check via `read_query`: `select count(*), kind from scene_audio_clips where project_id = … group by kind` nach Mix-Erstellung.
+- Manuell im Browser: Export-Step öffnen, Play drücken — Voiceover + Musik + Ambient/SFX hörbar pro Szene.
+- Console-Log: `[Preview] loaded N scene audio clips` zur schnellen Diagnose.
 
-```text
- ┌──── Track 1: Voiceover (TTS / Upload)            [vol] [ducking ON]
- ├──── Track 2: Music (Stock / AI-generiert)        [vol] [auto-duck -12dB]
- ├──── Track 3: Ambient pro Szene (AI generiert)    [vol] [crossfade]
- ├──── Track 4: SFX / Foley Akzente (Marker)        [vol] [per-marker]
- └──── Track 5: Original-Audio aus Clips            [vol] [mute toggle]
-```
+## Out of Scope
 
-- "AI-Mix erstellen" Button: ruft `director-cut-sound-design` (jetzt generierend) + `analyze-music-beats` (Music-Sync) + setzt Auto-Ducking auf Voiceover-Segmente.
-- Pre-Listen pro Track via WaveSurfer-Mini-Player.
+- Keine Änderung an `compose-video-assemble`, `mux-audio-to-video`, `remotion-webhook` (laufen bereits korrekt).
+- Kein Waveform/Multi-Track-Editor in der Export-Preview (das gehört in den Audio-Tab).
+- Keine Lip-Sync-Vorschau (Lip-Sync passiert post-stitch, nicht in der Live-Preview).
 
-### 4) Final-Mix in der Render-Pipeline
+## Files Touched
 
-`mux-audio-to-video` wird zu **`mux-multi-track-audio`** erweitert:
-
-- Eingabe: gerendertes Video + Voiceover + Music (mit Duck-Envelope aus `lib/duckingEnvelope.ts`) + alle `scene_audio_clips` (Ambient/SFX) mit Start-Offset.
-- FFmpeg-Filter-Graph:
-  - Music: sidechain-compress gegen Voiceover (-12dB Auto-Duck)
-  - Ambient: 0.25 Lautstärke, fade in/out an Szenengrenzen
-  - SFX: punktuell, 0.6 Lautstärke
-  - Loudness-Normalisierung auf -14 LUFS (Broadcast/Social Standard)
-- Wird sowohl von Director's Cut als auch vom Composer-Final-Render aufgerufen.
-
-### 5) Wie macht das Artlist?
-Kurz für Kontext (im UI auch als Hinweistext):
-- Artlist = **Stock-Library** (lizenzfreie Musik + SFX + Foley) + **Auto-Match** (Beats → Schnitt)
-- Captions/Veed/Submagic = **AI Voice Clone + Lip-Sync** (sync.so / D-ID) + **AI SFX** (ElevenLabs Sound Effects)
-- Wir kombinieren beides: Stock (Pixabay/Freesound vorhanden) **+** AI-Generation **+** Auto-Mix **+** Lip-Sync.
-
----
-
-## Technische Details
-
-**Neue Tabellen** (eine Migration):
-- `scene_audio_clips` (id, project_id, scene_id, user_id, kind, url, start_offset, duration, volume, ducking_enabled, source: 'ai'|'stock'|'upload', cost_credits, refunded)
-
-**Neuer Bucket**: `scene-sfx` (RLS: `user_id` als erstes Pfadsegment, gemäß Project-Memory).
-
-**Neue/aktualisierte Edge Functions**:
-- `generate-scene-sfx` (neu, ElevenLabs `v1/sound-generation`, qa-mock-Header-Pattern)
-- `lip-sync-video` (neu, Replicate sync-labs/latentsync, idempotenter Refund über deterministische UUID)
-- `director-cut-sound-design` (umbauen → generiert wirklich)
-- `mux-audio-to-video` → `mux-multi-track-audio` (FFmpeg sidechaincompress + loudnorm)
-
-**Frontend**:
-- `src/components/video-composer/AudioDesignerTab.tsx` (ersetzt `AudioTab.tsx`, Multi-Track-Timeline mit WaveSurfer)
-- `src/components/video-composer/SceneCard.tsx`: neuer Toggle "Lip-Sync"
-- `src/hooks/useSceneAudioClips.ts` (neu, CRUD + Realtime auf `scene_audio_clips`)
-- `src/lib/audio/mixGraph.ts` (Helper, baut FFmpeg-Filter-Graph clientseitig als Vorschau-Spec)
-
-**Credits** (transparent in UI):
-- AI Ambient/SFX: 5 Credits / Clip
-- Lip-Sync (post-hoc): 8 Credits / Szene (Hailuo-inline = 0 Extra)
-- Final Mix: 0 (im Render enthalten)
-
-**Out of Scope** (separate Phase):
-- Voice-Cloning auf Charakter-Avatare (würde `clone-voice` + `brand_characters.default_voice_id` koppeln)
-- Stem-Separation für Original-Clips (`separate-audio-stems` existiert schon, aber UI fehlt)
-- Surround/Spatial Audio
+- `src/components/video-composer/ComposerSequencePreview.tsx` (Prop + Audio-Sync + Default-Unmute)
+- `src/components/video-composer/AssemblyTab.tsx` (Clips laden + Prop reichen)
+- *(optional)* `src/hooks/useSceneAudioClips.ts` (neuer kleiner Hook)
+- *(optional)* `src/components/video-composer/SoundDesignPanel.tsx` (Event nach erfolgreichem Mix für Reload)
