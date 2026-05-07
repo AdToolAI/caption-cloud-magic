@@ -690,12 +690,27 @@ export default function ComposerSequencePreview({
     sfxClipsTimeline.forEach(({ clip, start, end }) => {
       const a = map.get(clip.id);
       if (!a) return;
-      const inRange = globalTime >= start && globalTime < end;
-      const safeVol = Math.max(0, Math.min(1, (clip.volume ?? 0.5)));
-      a.volume = safeVol;
+      const baseVol = Math.max(0, Math.min(1, (clip.volume ?? 0.5)));
+      // Pre-roll/post-roll window so the clip fades in *before* its scene start
+      // and fades out *after* its scene end → smooth crossfade between scenes.
+      const fade = Math.min(SFX_FADE_SEC, Math.max(0.05, (end - start) / 2));
+      const windowStart = Math.max(0, start - fade);
+      const windowEnd = end + fade;
+      const inWindow = globalTime >= windowStart && globalTime < windowEnd;
+
+      // Compute envelope gain (linear fade-in / fade-out).
+      let gain = baseVol;
+      if (globalTime < start) {
+        gain = baseVol * Math.max(0, (globalTime - windowStart) / fade);
+      } else if (globalTime > end - fade && globalTime < end) {
+        gain = baseVol * Math.max(0, (end - globalTime) / fade);
+      } else if (globalTime >= end) {
+        gain = baseVol * Math.max(0, (windowEnd - globalTime) / fade);
+      }
+      a.volume = Math.max(0, Math.min(1, gain));
       a.muted = muted;
 
-      if (inRange && playing) {
+      if (inWindow && playing) {
         const target = Math.max(0, globalTime - start);
         if (Math.abs(a.currentTime - target) > 0.25) {
           try { a.currentTime = target; } catch { /* noop */ }
@@ -706,7 +721,8 @@ export default function ComposerSequencePreview({
           });
         }
       } else {
-        if (!a.paused) a.pause();
+        // Only pause once fully faded out — avoids click artifacts.
+        if (!a.paused && a.volume <= 0.001) a.pause();
       }
     });
   }, [playing, muted, globalTime, sfxClipsTimeline]);
