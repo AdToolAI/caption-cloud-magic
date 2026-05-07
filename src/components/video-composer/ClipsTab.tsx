@@ -456,14 +456,11 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             stockKeywords: targetScene.stockKeywords,
             uploadUrl: targetScene.uploadUrl,
             referenceImageUrl: (() => {
-              const cm = targetScene.characterShot && targetScene.characterShot.shotType !== 'absent'
-                ? characters?.find((c) => c.id === targetScene.characterShot!.characterId)
-                : undefined;
-              const cmAnchor = cm?.usePortraitAsFirstFrame ? cm.referenceImageUrl : undefined;
-              const brandAnchor = brandCharacterInputSingle?.appliesToScene && brandCharacterInputSingle?.usePortraitAsFirstFrame
-                ? brandCharacterInputSingle.referenceImageUrl
-                : undefined;
-              return targetScene.referenceImageUrl || cmAnchor || brandAnchor;
+              const sceneAnchor = resolveSceneCharacterAnchor(targetScene, characters, activeBrandChar);
+              if (sceneAnchor && !targetScene.referenceImageUrl) {
+                console.log(`[ClipsTab] single scene ${targetScene.id} → anchor ${sceneAnchor.source} (${sceneAnchor.name})`);
+              }
+              return targetScene.referenceImageUrl || sceneAnchor?.referenceImageUrl;
             })(),
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
