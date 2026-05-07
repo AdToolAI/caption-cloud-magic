@@ -59,6 +59,7 @@ export default function StoryboardTab({
   language,
   projectId,
   characters,
+  onAddCharacter,
   preferredAspect,
   onRefetchScenes,
 }: StoryboardTabProps) {
