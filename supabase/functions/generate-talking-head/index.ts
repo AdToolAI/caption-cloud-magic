@@ -84,30 +84,61 @@ function mapDimension(aspectRatio: string, resolution: string): { width: number;
 // counts. We pre-clean custom (non-preset) photos so we always have headroom
 // before the next upload — otherwise HeyGen returns code 401028 "exceeded
 // your limit of N photo avatars".
-async function pruneHeyGenTalkingPhotos(maxKeep = 0): Promise<void> {
+async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promise<void> {
   try {
-    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+    // The actual quota ("3 photo avatars") is tracked under photo_avatar, not
+    // talking_photo.list (which returns HeyGen presets). Try the photo-avatar
+    // endpoint first; fall back to v2 avatar.list filtered to type=photo.
+    let items: any[] = [];
+    let source = 'photo_avatar';
+
+    const paRes = await fetch(`${HEYGEN_BASE_V2}/photo_avatar/photo/list`, {
       method: 'GET',
       headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
     });
-    if (!listRes.ok) {
-      console.warn(`[talking-head] prune: list failed ${listRes.status}, skipping`);
-      return;
+    if (paRes.ok) {
+      const j = await paRes.json();
+      items = Array.isArray(j?.data?.photos) ? j.data.photos
+            : Array.isArray(j?.data) ? j.data
+            : [];
+    } else {
+      console.warn(`[talking-head] prune: photo_avatar list ${paRes.status}, trying avatar.list`);
+      const avRes = await fetch(`${HEYGEN_BASE_V2}/avatars`, {
+        method: 'GET',
+        headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+      });
+      if (avRes.ok) {
+        const j = await avRes.json();
+        const all = Array.isArray(j?.data?.avatars) ? j.data.avatars : [];
+        items = all.filter((a: any) => a?.avatar_type === 'photo' || a?.type === 'photo_avatar');
+        source = 'avatars';
+      } else {
+        console.warn(`[talking-head] prune: avatar.list ${avRes.status}, skipping`);
+        return;
+      }
     }
-    const json = await listRes.json();
-    const items: any[] = Array.isArray(json?.data) ? json.data : [];
-    // Only delete user-uploaded (non-preset) photos. Presets are owned by
-    // HeyGen and shared across the account — they don't count to the quota.
-    const custom = items.filter((x) => !x?.is_preset);
-    const toDelete = custom.slice(0, Math.max(0, custom.length - maxKeep));
-    console.log(`[talking-head] prune: ${custom.length} custom, deleting ${toDelete.length}`);
+
+    // Never delete the preserved (cached QA) avatar.
+    const candidates = items.filter((x) => {
+      const id = x?.id || x?.photo_avatar_id || x?.avatar_id;
+      return id && (!preserveId || id !== preserveId);
+    });
+    const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep));
+    console.log(`[talking-head] prune (${source}): ${items.length} total, ${candidates.length} deletable, deleting ${toDelete.length}`);
     for (const item of toDelete) {
-      const id = item?.id;
+      const id = item?.id || item?.photo_avatar_id || item?.avatar_id;
       if (!id) continue;
-      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
+      // Try photo_avatar delete first, fall back to talking_photo
+      let dr = await fetch(`${HEYGEN_BASE_V2}/photo_avatar/${id}`, {
         method: 'DELETE',
         headers: { 'X-Api-Key': HEYGEN_API_KEY },
       });
+      if (dr.status === 404) {
+        dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
+          method: 'DELETE',
+          headers: { 'X-Api-Key': HEYGEN_API_KEY },
+        });
+      }
       console.log(`[talking-head] prune: delete ${id} -> ${dr.status}`);
     }
   } catch (e) {
