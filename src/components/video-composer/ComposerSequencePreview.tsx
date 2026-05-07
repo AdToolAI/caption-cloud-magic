@@ -841,6 +841,23 @@ export default function ComposerSequencePreview({
             className="hidden"
           />
         )}
+
+        {/* Hidden AI SFX/Ambient/Foley audio elements — registered via JSX
+            refs so the browser counts them as part of the same gesture chain
+            as the play button (avoids per-element autoplay lockouts). */}
+        {sfxClipsTimeline.map(({ clip }) => (
+          <audio
+            key={clip.id}
+            ref={(el) => {
+              if (el) sfxAudiosRef.current.set(clip.id, el);
+              else sfxAudiosRef.current.delete(clip.id);
+            }}
+            src={clip.url}
+            preload="auto"
+            crossOrigin="anonymous"
+            className="hidden"
+          />
+        ))}
       </div>
 
       {/* Controls */}
