@@ -2329,6 +2329,54 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_locations: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_favorite: boolean
+          name: string
+          reference_image_url: string
+          storage_path: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          visual_identity_json: Json | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name: string
+          reference_image_url: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          visual_identity_json?: Json | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name?: string
+          reference_image_url?: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          visual_identity_json?: Json | null
+        }
+        Relationships: []
+      }
       brand_templates: {
         Row: {
           brand_kit_id: string
@@ -11247,6 +11295,39 @@ export type Database = {
           url?: string
           user_id?: string
           volume?: number
+        }
+        Relationships: []
+      }
+      scene_still_frames: {
+        Row: {
+          created_at: string
+          id: string
+          prompt_hash: string
+          scene_id: string
+          selected_variant_url: string | null
+          updated_at: string
+          user_id: string
+          variants: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt_hash: string
+          scene_id: string
+          selected_variant_url?: string | null
+          updated_at?: string
+          user_id: string
+          variants?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt_hash?: string
+          scene_id?: string
+          selected_variant_url?: string | null
+          updated_at?: string
+          user_id?: string
+          variants?: Json
         }
         Relationships: []
       }
