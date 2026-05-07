@@ -651,20 +651,41 @@ export default function SceneCard({
 
             {/* Character Cast picker (multi, max 4) — only when characters are defined in the briefing AND it's an AI scene */}
             {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
-              <CharacterCastPicker
-                characters={characters}
-                value={scene.characterShots}
-                legacyValue={scene.characterShot}
-                onChange={(next) =>
-                  onUpdate({
-                    characterShots: next,
-                    // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
-                    characterShot: next[0],
-                  })
-                }
-                language={lang as 'en' | 'de' | 'es'}
-              />
+              <>
+                <CharacterCastPicker
+                  characters={characters}
+                  value={scene.characterShots}
+                  legacyValue={scene.characterShot}
+                  onChange={(next) => {
+                    const updates: Partial<ComposerScene> = {
+                      characterShots: next,
+                      // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
+                      characterShot: next[0],
+                    };
+                    if (promptMode === 'structured') {
+                      const subjectKey: keyof PromptSlots = 'subject';
+                      const currentSubject = (promptSlots[subjectKey] as string) || '';
+                      const newSubject = applyCastToPrompt(currentSubject, next, characters, lang);
+                      const nextSlots: PromptSlots = { ...promptSlots, [subjectKey]: newSubject };
+                      updates.promptSlots = nextSlots;
+                      updates.aiPrompt = stitchSlots(nextSlots, promptSlotOrder);
+                    } else {
+                      updates.aiPrompt = applyCastToPrompt(scene.aiPrompt || '', next, characters, lang);
+                    }
+                    onUpdate(updates);
+                  }}
+                  language={lang as 'en' | 'de' | 'es'}
+                />
+                <p className="text-[10px] text-muted-foreground -mt-1 px-1">
+                  {lang === 'de'
+                    ? 'Charaktere werden automatisch im Prompt erwähnt.'
+                    : lang === 'es'
+                    ? 'Los personajes se mencionan automáticamente en el prompt.'
+                    : 'Characters are mentioned automatically in the prompt.'}
+                </p>
+              </>
             )}
+
 
             {/* Scene-Aware Character Anchor — strategy badge + override */}
             {scene.clipSource.startsWith('ai-') && (() => {
