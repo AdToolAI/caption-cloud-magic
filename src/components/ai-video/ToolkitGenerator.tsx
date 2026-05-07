@@ -80,6 +80,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
   const [castCharacterId, setCastCharacterId] = useState<string | null>(null);
   const [castLocationId, setCastLocationId] = useState<string | null>(null);
   const castCharacter = useMemo(
