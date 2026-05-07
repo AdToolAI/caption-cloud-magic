@@ -485,6 +485,8 @@ export default function StoryboardTab({
         open={talkingHeadOpen}
         onOpenChange={setTalkingHeadOpen}
         projectId={projectId}
+        briefingCharacters={characters}
+        onAddBriefingCharacter={onAddCharacter}
         availableScenes={scenes.map((s, i) => ({
           id: s.id,
           label: `S${i + 1} — ${s.sceneType}`,
