@@ -1,4 +1,4 @@
-import { Camera, Sun, Move, Crop, RotateCcw, Check } from 'lucide-react';
+import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -18,6 +18,8 @@ const CATEGORY_META: Record<ShotCategory, { icon: typeof Camera; title: { en: st
   angle: { icon: Camera, title: { en: 'Angle', de: 'Winkel', es: 'Ángulo' } },
   movement: { icon: Move, title: { en: 'Movement', de: 'Bewegung', es: 'Movimiento' } },
   lighting: { icon: Sun, title: { en: 'Lighting', de: 'Licht', es: 'Luz' } },
+  camera: { icon: Film, title: { en: 'Camera', de: 'Kamera', es: 'Cámara' } },
+  lens: { icon: Aperture, title: { en: 'Lens', de: 'Objektiv', es: 'Objetivo' } },
 };
 
 interface Props {
@@ -50,7 +52,7 @@ export default function SceneShotDirectorPanel({ value, onChange, language }: Pr
           <Camera className="h-3 w-3" />
           {lang === 'de' ? 'Shot Director' : lang === 'es' ? 'Director de Plano' : 'Shot Director'}
           {count > 0 && (
-            <Badge variant="secondary" className="h-4 px-1 text-[9px]">{count}/4</Badge>
+            <Badge variant="secondary" className="h-4 px-1 text-[9px]">{count}/6</Badge>
           )}
         </div>
         {count > 0 && (
@@ -61,7 +63,7 @@ export default function SceneShotDirectorPanel({ value, onChange, language }: Pr
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
         {(Object.keys(SHOT_CATEGORIES) as ShotCategory[]).map((cat) => {
           const meta = CATEGORY_META[cat];
           const Icon = meta.icon;
