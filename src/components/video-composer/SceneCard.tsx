@@ -715,6 +715,19 @@ export default function SceneCard({
               </>
             )}
 
+            {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
+            {scene.clipSource.startsWith('ai-') && characters && (
+              <SceneDialogStudio
+                scene={scene}
+                cast={scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])}
+                characters={characters}
+                projectId={projectId}
+                language={lang}
+                onUpdate={onUpdate}
+                onAddScene={onAddScene}
+              />
+            )}
+
 
             {/* Scene-Aware Character Anchor — strategy badge + override */}
             {scene.clipSource.startsWith('ai-') && (() => {
