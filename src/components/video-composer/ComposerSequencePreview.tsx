@@ -135,8 +135,10 @@ export default function ComposerSequencePreview({
   const audioRef = useRef<HTMLAudioElement>(null);
   /** Background music audio element — independent linear track, looped under VO. */
   const musicRef = useRef<HTMLAudioElement>(null);
-  /** AI SFX/Ambient/Foley audio elements — keyed by clip id. */
+  /** AI SFX/Ambient/Foley audio elements — keyed by clip id (set via JSX refs). */
   const sfxAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  /** Tracks whether SFX elements have been "primed" by a user gesture (autoplay policy). */
+  const sfxPrimedRef = useRef(false);
 
   const playableRef = useRef(playable);
   const startOffsetsRef = useRef(startOffsets);
@@ -481,7 +483,34 @@ export default function ComposerSequencePreview({
     advanceScene();
   };
 
-  const togglePlay = () => setPlaying(p => !p);
+  const primeSfxAudios = useCallback(() => {
+    if (sfxPrimedRef.current) return;
+    sfxPrimedRef.current = true;
+    sfxAudiosRef.current.forEach((a, id) => {
+      try {
+        const wasMuted = a.muted;
+        a.muted = true;
+        const p = a.play();
+        if (p && typeof p.then === 'function') {
+          p.then(() => {
+            try { a.pause(); a.currentTime = 0; a.muted = wasMuted; } catch { /* noop */ }
+          }).catch((err) => {
+            console.warn(`[Preview] SFX prime failed clip=${id}`, err?.name || err);
+            try { a.muted = wasMuted; } catch { /* noop */ }
+          });
+        } else {
+          try { a.pause(); a.currentTime = 0; a.muted = wasMuted; } catch { /* noop */ }
+        }
+      } catch (err) {
+        console.warn(`[Preview] SFX prime threw clip=${id}`, err);
+      }
+    });
+  }, []);
+
+  const togglePlay = () => {
+    primeSfxAudios();
+    setPlaying(p => !p);
+  };
 
   const handleScrub = (val: number) => {
     if (totalDuration <= 0) return;
@@ -636,27 +665,15 @@ export default function ComposerSequencePreview({
       });
   }, [sceneAudioClips, playable, startOffsets]);
 
-  // Initialize / cleanup audio elements when clip list changes.
+  // Log clip list changes (audio elements themselves are created via JSX refs
+  // below — that ensures the browser counts them as part of the same user
+  // gesture chain as the play button, sidestepping per-element autoplay locks).
   useEffect(() => {
-    const map = sfxAudiosRef.current;
-    const ids = new Set(sfxClipsTimeline.map(x => x.clip.id));
-    // Remove gone clips
-    map.forEach((audio, id) => {
-      if (!ids.has(id)) {
-        try { audio.pause(); audio.src = ''; } catch { /* noop */ }
-        map.delete(id);
-      }
-    });
-    // Add new clips
-    sfxClipsTimeline.forEach(({ clip }) => {
-      if (!map.has(clip.id)) {
-        const a = new Audio(clip.url);
-        a.preload = 'auto';
-        map.set(clip.id, a);
-      }
-    });
     if (sfxClipsTimeline.length > 0) {
-      console.info(`[Preview] loaded ${sfxClipsTimeline.length} scene audio clips`);
+      console.info(
+        `[Preview] sceneAudioClips loaded: ${sfxClipsTimeline.length}`,
+        sfxClipsTimeline.map(x => ({ id: x.clip.id, kind: x.clip.kind, start: x.start, end: x.end, url: x.clip.url })),
+      );
     }
   }, [sfxClipsTimeline]);
 
@@ -682,7 +699,11 @@ export default function ComposerSequencePreview({
         if (Math.abs(a.currentTime - target) > 0.25) {
           try { a.currentTime = target; } catch { /* noop */ }
         }
-        if (a.paused) a.play().catch(() => {});
+        if (a.paused) {
+          a.play().catch((err) => {
+            console.warn(`[Preview] SFX play() rejected clip=${clip.id}`, err?.name || err);
+          });
+        }
       } else {
         if (!a.paused) a.pause();
       }
@@ -820,6 +841,23 @@ export default function ComposerSequencePreview({
             className="hidden"
           />
         )}
+
+        {/* Hidden AI SFX/Ambient/Foley audio elements — registered via JSX
+            refs so the browser counts them as part of the same gesture chain
+            as the play button (avoids per-element autoplay lockouts). */}
+        {sfxClipsTimeline.map(({ clip }) => (
+          <audio
+            key={clip.id}
+            ref={(el) => {
+              if (el) sfxAudiosRef.current.set(clip.id, el);
+              else sfxAudiosRef.current.delete(clip.id);
+            }}
+            src={clip.url}
+            preload="auto"
+            crossOrigin="anonymous"
+            className="hidden"
+          />
+        ))}
       </div>
 
       {/* Controls */}
@@ -850,7 +888,7 @@ export default function ComposerSequencePreview({
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setMuted(m => !m)}
+          onClick={() => { primeSfxAudios(); setMuted(m => !m); }}
           className="h-9 w-9 shrink-0"
         >
           {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
