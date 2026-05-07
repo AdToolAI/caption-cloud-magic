@@ -84,10 +84,10 @@ export default function TalkingHeadDialog({
       if (!user) throw new Error('Not authenticated');
       const path = `${user.id}/talking-head/${Date.now()}_${file.name}`;
       const { error } = await supabase.storage
-        .from('library')
+        .from('composer-uploads')
         .upload(path, file, { contentType: file.type, upsert: false });
       if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from('library').getPublicUrl(path);
+      const { data: { publicUrl } } = supabase.storage.from('composer-uploads').getPublicUrl(path);
       setImageUrl(publicUrl);
       toast({ title: 'Foto hochgeladen', description: 'Charakter-Foto bereit.' });
     } catch (err) {
