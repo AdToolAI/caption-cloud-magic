@@ -127,6 +127,7 @@ async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promi
     // function for minutes if HeyGen returns a large/unexpected list.
     const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep)).slice(0, 10);
     console.log(`[talking-head] prune (${source}): ${items.length} total, ${candidates.length} deletable, deleting ${toDelete.length}`);
+    let deletedCount = 0;
     for (const item of toDelete) {
       const id = item?.id || item?.photo_avatar_id || item?.avatar_id;
       if (!id) continue;
@@ -141,7 +142,49 @@ async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promi
           headers: { 'X-Api-Key': HEYGEN_API_KEY },
         });
       }
+      if (dr.ok) deletedCount++;
       console.log(`[talking-head] prune: delete ${id} -> ${dr.status}`);
+    }
+
+    // Fallback: when neither v2 endpoint surfaced the actual user-uploaded
+    // talking_photos (quota lives on /v1/talking_photo.list), iterate that
+    // list in reverse (newest user uploads tend to be at the end), DELETE
+    // each via /v2/talking_photo/{id}, hard-cap 30 tries, early-exit after
+    // 3 successful deletes (frees the entire 3-photo quota).
+    if (deletedCount === 0) {
+      try {
+        const lr = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
+          method: 'GET',
+          headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
+        });
+        if (lr.ok) {
+          const lj = await lr.json();
+          const list: any[] = Array.isArray(lj?.data) ? lj.data
+                            : Array.isArray(lj?.data?.list) ? lj.data.list
+                            : Array.isArray(lj?.data?.talking_photos) ? lj.data.talking_photos
+                            : [];
+          const reversed = [...list].reverse();
+          let tried = 0, deleted = 0, skipped404 = 0;
+          for (const item of reversed) {
+            if (tried >= 30 || deleted >= 3) break;
+            const id = item?.talking_photo_id || item?.id;
+            if (!id) continue;
+            if (preserveId && id === preserveId) continue;
+            tried++;
+            const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
+              method: 'DELETE',
+              headers: { 'X-Api-Key': HEYGEN_API_KEY },
+            });
+            if (dr.ok) deleted++;
+            else if (dr.status === 404) skipped404++;
+          }
+          console.log(`[talking-head] prune (talking_photo v1 fallback): tried=${tried}, deleted=${deleted}, skipped404=${skipped404}`);
+        } else {
+          console.warn(`[talking-head] prune v1 fallback: list ${lr.status}, skipping`);
+        }
+      } catch (e2) {
+        console.warn('[talking-head] prune v1 fallback failed (non-fatal):', e2 instanceof Error ? e2.message : String(e2));
+      }
     }
   } catch (e) {
     console.warn('[talking-head] prune failed (non-fatal):', e instanceof Error ? e.message : String(e));
