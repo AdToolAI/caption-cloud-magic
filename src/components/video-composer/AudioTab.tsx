@@ -19,12 +19,14 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
+import SoundDesignPanel from './SoundDesignPanel';
 
 interface AudioTabProps {
   assemblyConfig: AssemblyConfig;
   onUpdateAssembly: (config: Partial<AssemblyConfig>) => void;
   scenes: ComposerScene[];
   onGoToExport: () => void;
+  projectId?: string | null;
 }
 
 interface MusicTrack {
@@ -37,7 +39,7 @@ interface MusicTrack {
   mood: string;
 }
 
-export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onGoToExport }: AudioTabProps) {
+export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onGoToExport, projectId }: AudioTabProps) {
   const { t } = useTranslation();
   const music = assemblyConfig.music;
 
@@ -256,6 +258,7 @@ export default function AudioTab({ assemblyConfig, onUpdateAssembly, scenes, onG
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
+      <SoundDesignPanel projectId={projectId ?? null} scenes={scenes} />
       <MusicLibraryBrowser
         open={libraryOpen}
         onOpenChange={setLibraryOpen}

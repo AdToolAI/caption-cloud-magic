@@ -1,66 +1,97 @@
-## Problem
+## Ziel
 
-Bei der Szene "Matthew Dusatko, a middle-aged farmer..." wird kein Referenzbild an den AI-Provider geschickt. Sichtbare Symptome im Screenshot:
-- `Charakter: — keiner —` (kein `characterShot` gesetzt)
-- Kein Referenzbild-Thumbnail im rechten Slot
-- Modell erfindet ein Gesicht statt das Avatar-Foto zu nutzen
+Videos sollen wie bei Artlist / Veed / Captions klingen: **Voiceover + lippensynchroner Sprecher + Ambient/Atmo + punktgenaue SFX + Musik (geduckt)** – automatisch generiert, in einem Mix.
 
-## Root Cause (verifiziert in Code)
+Aktueller Stand im Projekt:
+- `director-cut-voice-over` (ElevenLabs TTS) ✅
+- `director-cut-sound-design` empfiehlt nur Sounds, **generiert aber nichts** ❌
+- `animate-scene-hailuo` akzeptiert bereits `audio` für Lip-Sync, wird aber im Composer nicht genutzt
+- `TalkingHeadDialog` mit HeyGen ist da, aber nur als Standalone-Avatar
+- `mux-audio-to-video`, `director-cut-audio-mixing`, Music Studio (Stable Audio / MiniMax) ✅
 
-In `ClipsTab.tsx` gibt es zwei getrennte Pfade, die ein `referenceImageUrl` an den Edge-Function-Payload anhängen — und beide sind in dieser Konstellation tot:
+Wir bauen die fehlenden 3 Bausteine und die End-Mix-Pipeline.
 
-1. **Cast-Pfad** (`castMember.usePortraitAsFirstFrame`)
-   - Greift nur, wenn `scene.characterShot.shotType !== 'absent'`. Im Screenshot ist `Charakter: — keiner —` → `castMember = undefined` → kein Anker.
-   - Selbst wenn ein Cast gesetzt wäre, ist `usePortraitAsFirstFrame` per Default `false` (siehe `CharacterManager.tsx:201`) → Anker bleibt aus.
+---
 
-2. **Brand-Char-Pfad** (`activeBrandChar` = Favorite aus `/brand-characters`)
-   - Funktioniert nur für **eine einzige** Brand-Character-Karte (`brandChars.find(c => c.is_favorite) ?? brandChars[0]`).
-   - Wenn der Nutzer Matthew über die Composer-Cast-Library hinzugefügt hat (er aber kein favorisierter Brand-Character ist), zieht dieser Pfad nicht — oder zieht für eine andere Person.
-   - Außerdem hängt der Pfad zusätzlich an `usePortraitAsFirstFrame` — das wir in `SceneCard`/`ClipsTab` zwar auf `_brandApplies` mappen, aber nur für Brand-Chars, nicht für Cast-Mitglieder mit `brandCharacterId`.
+## Plan
 
-Ergebnis: `referenceImageUrl` bleibt `undefined` → `compose-video-clips` baut T2V (`hailuoInput.first_frame_image` wird nie gesetzt) → Hailuo erfindet einen Mann.
+### 1) AI Sound-Designer wird "echt" (Ambient + SFX generieren)
 
-## Lösung
+Neue Edge Function **`generate-scene-sfx`** (ElevenLabs Sound Effects API, `text-to-sound-effects`, bis 22s, ~5 Credits/Clip):
 
-Wir machen die Anker-Resolution **per-Szene cast-zentriert** und entkoppeln sie vom (verwirrenden) `usePortraitAsFirstFrame`-Toggle. Das matcht das Mental-Modell des Users: "Wenn ich einen Charakter in der Cast-Liste habe und er kommt in der Szene vor, nimm sein Bild als Referenz."
+- Input: `scene_id`, `prompt` ("rainy city street, distant traffic, light wind"), `duration`, `kind: 'ambient' | 'sfx' | 'foley'`
+- Output: MP3 in neuem Bucket `scene-sfx/{user_id}/...`, Eintrag in neuer Tabelle `scene_audio_clips` (scene_id, kind, url, start_offset, duration, volume, ducking)
 
-### 1. Neuer Helper `src/lib/motion-studio/resolveSceneCharacterAnchor.ts`
+`director-cut-sound-design` wird umgebaut: liefert weiterhin die KI-Empfehlungen, ruft aber für jede Empfehlung **automatisch `generate-scene-sfx`** auf (Ambient pro Szene + 1–3 Foley/SFX-Akzente). Fallback: Suche in `search-stock-sfx` (Pixabay/Freesound), wenn ElevenLabs fehlschlägt → automatischer Credit-Refund (Project-Memory-Regel).
 
-Reine Funktion. Gibt für eine Szene den besten Anker (`{ characterId, name, referenceImageUrl, source }`) zurück.
+### 2) Lip-Sync direkt im Composer
 
-Reihenfolge:
-1. Explizit gewählter Cast (`scene.characterShot.shotType !== 'absent'` und Cast hat `referenceImageUrl`).
-2. Cast-Member, dessen Name (oder First-Name-Token, ≥3 Zeichen) im `aiPrompt` vorkommt — über alle `characters` der Szene, nicht nur die favorisierte Brand-Karte.
-3. Favorisierte Brand-Character-Karte, falls Name dort matcht (Backup, wie bisher).
-4. Sonst `undefined`.
+Neuer Schalter pro Szene in `ClipsTab` / `SceneCard`: **"Lip-Sync mit Voiceover"** (nur sichtbar, wenn die Szene einen Charakter + Voiceover-Segment hat).
 
-Lebt in `lib/motion-studio/`, neben `sceneFeaturesCharacter.ts`. Keine DB-/Backend-Änderungen.
+- Wenn aktiv und Provider = Hailuo: Voiceover-Slice der Szene wird als `audio`-Parameter an `animate-scene-hailuo` durchgereicht (existiert schon, nur Verdrahtung fehlt).
+- Für andere Provider (Kling / Veo / Seedance / Sora): post-hoc Lip-Sync via neuer Edge Function **`lip-sync-video`** mit Replicate `sync-labs/lipsync-2` oder `bytedance/latentsync` (3–8 Credits, idempotenter Refund).
+- Für reine Talking-Head-Szenen (ein Charakter spricht in die Kamera): bestehender `TalkingHeadDialog` (HeyGen) wird als Scene-Option im Storyboard-Tab angeboten ("Talking-Head-Szene einfügen").
 
-### 2. `src/components/video-composer/ClipsTab.tsx`
+### 3) Neuer "Audio Designer"-Tab im Composer
 
-- `buildBrandInputForScene`: bleibt für Identity-Card-Text-Injection (das funktioniert ja).
-- Neue Helper-Aufrufe in `handleGenerateAll` (Zeile ~338) **und** im Single-Clip-Pfad (Zeile ~467):
-  - `const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);`
-  - `referenceImageUrl: scene.referenceImageUrl || anchor?.referenceImageUrl`
-- Die alten `castAnchor` / `brandAnchor`-Blöcke (mit `usePortraitAsFirstFrame`-Gate) werden ersetzt — der Toggle bleibt im UI als "Force always" Option erhalten (legacy), ist aber für den Default-Flow nicht mehr nötig.
+Ersetzt den dünnen Music-only `AudioTab` durch eine **Multi-Track-Timeline**:
 
-### 3. `src/components/video-composer/SceneCard.tsx`
+```text
+ ┌──── Track 1: Voiceover (TTS / Upload)            [vol] [ducking ON]
+ ├──── Track 2: Music (Stock / AI-generiert)        [vol] [auto-duck -12dB]
+ ├──── Track 3: Ambient pro Szene (AI generiert)    [vol] [crossfade]
+ ├──── Track 4: SFX / Foley Akzente (Marker)        [vol] [per-marker]
+ └──── Track 5: Original-Audio aus Clips            [vol] [mute toggle]
+```
 
-- "i2v ref"-Badge in der Live-Preview liest jetzt aus dem gleichen Helper, damit das, was angezeigt wird, exakt dem entspricht, was das Edge-Function-Payload bekommt.
-- Kleiner sichtbarer Anker-Hint unter dem Charakter-Dropdown: wenn ein Anker via Name-Match gefunden wurde, kleines Avatar-Thumb + Tooltip "Referenzbild: {Name}".
+- "AI-Mix erstellen" Button: ruft `director-cut-sound-design` (jetzt generierend) + `analyze-music-beats` (Music-Sync) + setzt Auto-Ducking auf Voiceover-Segmente.
+- Pre-Listen pro Track via WaveSurfer-Mini-Player.
 
-### 4. `src/components/video-composer/CastConsistencyMap.tsx`
+### 4) Final-Mix in der Render-Pipeline
 
-- `getAnchor` greift den neuen Resolver, sodass die Map-Punkte (🟢 Reference) konsistent mit dem tatsächlichen Edge-Payload sind. Kein optisches Re-Design.
+`mux-audio-to-video` wird zu **`mux-multi-track-audio`** erweitert:
 
-## Out-of-Scope
+- Eingabe: gerendertes Video + Voiceover + Music (mit Duck-Envelope aus `lib/duckingEnvelope.ts`) + alle `scene_audio_clips` (Ambient/SFX) mit Start-Offset.
+- FFmpeg-Filter-Graph:
+  - Music: sidechain-compress gegen Voiceover (-12dB Auto-Duck)
+  - Ambient: 0.25 Lautstärke, fade in/out an Szenengrenzen
+  - SFX: punktuell, 0.6 Lautstärke
+  - Loudness-Normalisierung auf -14 LUFS (Broadcast/Social Standard)
+- Wird sowohl von Director's Cut als auch vom Composer-Final-Render aufgerufen.
 
-- Keine DB-Migration, kein neues Schema.
-- Kein Eingriff in `compose-video-clips/index.ts` (das Backend wertet `scene.referenceImageUrl` bereits korrekt aus — siehe Hailuo Z. 408/428, Kling 471, Wan 564, Seedance 606, Luma 647, Veo 697, HappyHorse 872).
-- Vidu/Runway-spezifische Multi-Reference-Slots werden hier **nicht** angefasst (separates Feature).
+### 5) Wie macht das Artlist?
+Kurz für Kontext (im UI auch als Hinweistext):
+- Artlist = **Stock-Library** (lizenzfreie Musik + SFX + Foley) + **Auto-Match** (Beats → Schnitt)
+- Captions/Veed/Submagic = **AI Voice Clone + Lip-Sync** (sync.so / D-ID) + **AI SFX** (ElevenLabs Sound Effects)
+- Wir kombinieren beides: Stock (Pixabay/Freesound vorhanden) **+** AI-Generation **+** Auto-Mix **+** Lip-Sync.
 
-## Verifikation nach Implementierung
+---
 
-1. Szene mit `Charakter: — keiner —` aber Prompt enthält "Matthew Dusatko" → Live-Preview zeigt "i2v ref · Matthew", Generate sendet `referenceImageUrl` → Hailuo nutzt `first_frame_image` (Log: `uses reference image`).
-2. Pure B-Roll Szene ohne Namen → kein Anker, kein Identity-Card → Modell rendert frei.
-3. Szene mit explizitem `characterShot` → Anker wie bisher, kein Regress.
+## Technische Details
+
+**Neue Tabellen** (eine Migration):
+- `scene_audio_clips` (id, project_id, scene_id, user_id, kind, url, start_offset, duration, volume, ducking_enabled, source: 'ai'|'stock'|'upload', cost_credits, refunded)
+
+**Neuer Bucket**: `scene-sfx` (RLS: `user_id` als erstes Pfadsegment, gemäß Project-Memory).
+
+**Neue/aktualisierte Edge Functions**:
+- `generate-scene-sfx` (neu, ElevenLabs `v1/sound-generation`, qa-mock-Header-Pattern)
+- `lip-sync-video` (neu, Replicate sync-labs/latentsync, idempotenter Refund über deterministische UUID)
+- `director-cut-sound-design` (umbauen → generiert wirklich)
+- `mux-audio-to-video` → `mux-multi-track-audio` (FFmpeg sidechaincompress + loudnorm)
+
+**Frontend**:
+- `src/components/video-composer/AudioDesignerTab.tsx` (ersetzt `AudioTab.tsx`, Multi-Track-Timeline mit WaveSurfer)
+- `src/components/video-composer/SceneCard.tsx`: neuer Toggle "Lip-Sync"
+- `src/hooks/useSceneAudioClips.ts` (neu, CRUD + Realtime auf `scene_audio_clips`)
+- `src/lib/audio/mixGraph.ts` (Helper, baut FFmpeg-Filter-Graph clientseitig als Vorschau-Spec)
+
+**Credits** (transparent in UI):
+- AI Ambient/SFX: 5 Credits / Clip
+- Lip-Sync (post-hoc): 8 Credits / Szene (Hailuo-inline = 0 Extra)
+- Final Mix: 0 (im Render enthalten)
+
+**Out of Scope** (separate Phase):
+- Voice-Cloning auf Charakter-Avatare (würde `clone-voice` + `brand_characters.default_voice_id` koppeln)
+- Stem-Separation für Original-Clips (`separate-audio-stems` existiert schon, aber UI fehlt)
+- Surround/Spatial Audio

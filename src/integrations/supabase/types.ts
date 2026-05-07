@@ -11154,6 +11154,69 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_audio_clips: {
+        Row: {
+          cost_credits: number
+          created_at: string
+          ducking_enabled: boolean
+          duration: number
+          id: string
+          kind: string
+          metadata: Json
+          project_id: string | null
+          prompt: string | null
+          refunded: boolean
+          scene_id: string | null
+          source: string
+          start_offset: number
+          storage_path: string | null
+          updated_at: string
+          url: string
+          user_id: string
+          volume: number
+        }
+        Insert: {
+          cost_credits?: number
+          created_at?: string
+          ducking_enabled?: boolean
+          duration?: number
+          id?: string
+          kind: string
+          metadata?: Json
+          project_id?: string | null
+          prompt?: string | null
+          refunded?: boolean
+          scene_id?: string | null
+          source?: string
+          start_offset?: number
+          storage_path?: string | null
+          updated_at?: string
+          url: string
+          user_id: string
+          volume?: number
+        }
+        Update: {
+          cost_credits?: number
+          created_at?: string
+          ducking_enabled?: boolean
+          duration?: number
+          id?: string
+          kind?: string
+          metadata?: Json
+          project_id?: string | null
+          prompt?: string | null
+          refunded?: boolean
+          scene_id?: string | null
+          source?: string
+          start_offset?: number
+          storage_path?: string | null
+          updated_at?: string
+          url?: string
+          user_id?: string
+          volume?: number
+        }
+        Relationships: []
+      }
       schedule_blocks: {
         Row: {
           caption_override: string | null

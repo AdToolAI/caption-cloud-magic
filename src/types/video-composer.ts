@@ -291,6 +291,12 @@ export interface ComposerScene {
    * Defaults to `true` for backwards-compat with existing scenes.
    */
   withAudio?: boolean;
+  /**
+   * Lip-sync the scene's character video to the voiceover slice.
+   * - Hailuo: voiceover is passed inline as `audio` (no extra cost).
+   * - Other providers: post-hoc via `lip-sync-video` (sync-labs, ~8 credits).
+   */
+  lipSyncWithVoiceover?: boolean;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
