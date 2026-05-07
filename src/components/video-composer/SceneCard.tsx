@@ -634,12 +634,19 @@ export default function SceneCard({
               </div>
             )}
 
-            {/* Character Shot picker — only when characters are defined in the briefing AND it's an AI scene */}
+            {/* Character Cast picker (multi, max 4) — only when characters are defined in the briefing AND it's an AI scene */}
             {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
-              <CharacterShotPicker
+              <CharacterCastPicker
                 characters={characters}
-                value={scene.characterShot}
-                onChange={(next) => onUpdate({ characterShot: next })}
+                value={scene.characterShots}
+                legacyValue={scene.characterShot}
+                onChange={(next) =>
+                  onUpdate({
+                    characterShots: next,
+                    // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
+                    characterShot: next[0],
+                  })
+                }
                 language={lang as 'en' | 'de' | 'es'}
               />
             )}
