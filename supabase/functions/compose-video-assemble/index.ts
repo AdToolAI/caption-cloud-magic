@@ -538,6 +538,35 @@ serve(async (req) => {
 
     // 9. Build webhook with customData so remotion-webhook can match it
     const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+
+    // Load per-scene audio clips (ambient/sfx/foley) so the webhook can mux them
+    // into the final stitched video alongside the voiceover and music.
+    const { data: audioClipRows } = await supabase
+      .from('scene_audio_clips')
+      .select('url, start_offset, duration, volume, kind, scene_id')
+      .eq('project_id', projectId);
+    const sceneIdToOrder = new Map<string, number>();
+    (scenes || []).forEach((s: any) => sceneIdToOrder.set(s.id, s.order_index ?? 0));
+    // Compute timeline offset per scene by summing previous scene durations
+    const sortedScenes = [...(scenes || [])].sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const sceneStartOffset = new Map<string, number>();
+    let acc = 0;
+    for (const s of sortedScenes) {
+      sceneStartOffset.set(s.id, acc);
+      acc += Number(s.duration_seconds) || 0;
+    }
+    const sceneAudioClipsForMux = (audioClipRows || []).map((r: any) => ({
+      url: r.url,
+      startOffset: (sceneStartOffset.get(r.scene_id) || 0) + (Number(r.start_offset) || 0),
+      volume: r.volume ?? 0.4,
+      kind: r.kind || 'sfx',
+    }));
+
+    // Lip-sync intent: which scenes asked for VO-driven lip-sync?
+    const lipSyncSceneIds = (scenes || [])
+      .filter((s: any) => s.lip_sync_with_voiceover === true)
+      .map((s: any) => s.id);
+
     const webhookData = {
       url: webhookUrl,
       secret: null,
@@ -549,6 +578,15 @@ serve(async (req) => {
         composer_project_id: projectId,
         source: 'composer',
         export_id: exportId || null,
+        // Pass advanced audio + lip-sync intent to remotion-webhook so it can
+        // (a) post-mux SFX/ambient clips and (b) optionally run a lip-sync pass.
+        audioTracks: {
+          voiceoverUrl,
+          backgroundMusicUrl: musicUrl,
+          backgroundMusicVolume: (assemblyConfig.music?.volume || 30) / 100,
+          sceneAudioClips: sceneAudioClipsForMux,
+        },
+        lipSyncEnabled: lipSyncSceneIds.length > 0 && !!voiceoverUrl,
       },
     };
 
