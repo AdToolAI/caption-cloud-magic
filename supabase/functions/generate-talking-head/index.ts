@@ -32,6 +32,8 @@ interface TalkingHeadRequest {
    * 3-photo limit). Used by the QA Live Sweep to reuse a cached portrait.
    */
   talkingPhotoId?: string;
+  /** Briefing-Cast character id, written to scene's mentioned_character_ids. */
+  composerCharacterId?: string;
 }
 
 // ---------- ElevenLabs TTS (unchanged from previous version) ----------
