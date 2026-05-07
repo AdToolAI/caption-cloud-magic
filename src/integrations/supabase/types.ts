@@ -5206,6 +5206,8 @@ export type Database = {
           continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
+          dialog_script: string | null
+          dialog_voices: Json
           director_modifiers: Json | null
           duration_seconds: number
           effects: Json | null
@@ -5268,6 +5270,8 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_script?: string | null
+          dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
@@ -5330,6 +5334,8 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_script?: string | null
+          dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
           effects?: Json | null
