@@ -150,6 +150,9 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
           Generiert pro Szene Hintergrund-Atmo (Wind, Stadt, Café…) und punktgenaue SFX/Foley via ElevenLabs.
           Diese werden im finalen Render automatisch unter die Voiceover-Spur gemischt (Auto-Ducking, -14 LUFS).
         </p>
+        <p className="text-[11px] text-muted-foreground/80 italic">
+          Hinweis: Lip-Sync für sprechende Charaktere wird im <strong>Talking-Head-Dialog</strong> erstellt — der Sound-Mix mischt nur Atmo, SFX und Musik.
+        </p>
 
         {loading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
 
