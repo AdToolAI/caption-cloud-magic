@@ -638,27 +638,15 @@ export default function ComposerSequencePreview({
       });
   }, [sceneAudioClips, playable, startOffsets]);
 
-  // Initialize / cleanup audio elements when clip list changes.
+  // Log clip list changes (audio elements themselves are created via JSX refs
+  // below — that ensures the browser counts them as part of the same user
+  // gesture chain as the play button, sidestepping per-element autoplay locks).
   useEffect(() => {
-    const map = sfxAudiosRef.current;
-    const ids = new Set(sfxClipsTimeline.map(x => x.clip.id));
-    // Remove gone clips
-    map.forEach((audio, id) => {
-      if (!ids.has(id)) {
-        try { audio.pause(); audio.src = ''; } catch { /* noop */ }
-        map.delete(id);
-      }
-    });
-    // Add new clips
-    sfxClipsTimeline.forEach(({ clip }) => {
-      if (!map.has(clip.id)) {
-        const a = new Audio(clip.url);
-        a.preload = 'auto';
-        map.set(clip.id, a);
-      }
-    });
     if (sfxClipsTimeline.length > 0) {
-      console.info(`[Preview] loaded ${sfxClipsTimeline.length} scene audio clips`);
+      console.info(
+        `[Preview] sceneAudioClips loaded: ${sfxClipsTimeline.length}`,
+        sfxClipsTimeline.map(x => ({ id: x.clip.id, kind: x.clip.kind, start: x.start, end: x.end, url: x.clip.url })),
+      );
     }
   }, [sfxClipsTimeline]);
 
@@ -684,7 +672,11 @@ export default function ComposerSequencePreview({
         if (Math.abs(a.currentTime - target) > 0.25) {
           try { a.currentTime = target; } catch { /* noop */ }
         }
-        if (a.paused) a.play().catch(() => {});
+        if (a.paused) {
+          a.play().catch((err) => {
+            console.warn(`[Preview] SFX play() rejected clip=${clip.id}`, err?.name || err);
+          });
+        }
       } else {
         if (!a.paused) a.pause();
       }
