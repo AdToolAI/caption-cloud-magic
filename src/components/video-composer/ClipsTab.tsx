@@ -320,22 +320,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             libraryCharacters: libCharacters,
             libraryLocations: libLocations,
           });
-          // Sherlock-Holmes Anchor: when this scene targets a cast member that
-          // is linked to a Brand Character (avatar portrait), fall back to
-          // their portrait as the i2v anchor frame for vastly better face
-          // consistency. We only override when the scene has no own anchor.
-          const castMember = s.characterShot && s.characterShot.shotType !== 'absent'
-            ? characters?.find((c) => c.id === s.characterShot!.characterId)
-            : undefined;
-          // Only use the cast member's portrait as i2v first-frame anchor when
-          // the user explicitly opted in via `usePortraitAsFirstFrame`. Otherwise
-          // the portrait stays a look reference (description anchor) only.
-          const castAnchor = castMember?.usePortraitAsFirstFrame ? castMember.referenceImageUrl : undefined;
-          // Brand character portrait is now opt-in (default OFF) AND only when
-          // the scene features the character.
-          const brandAnchor = brandCharacterInput?.appliesToScene && brandCharacterInput?.usePortraitAsFirstFrame
-            ? brandCharacterInput.referenceImageUrl
-            : undefined;
+          // Per-scene cast-aware anchor: send the portrait of the character
+          // who actually appears in this scene (explicit shot OR name match)
+          // so i2v providers (Hailuo first_frame_image, Kling start_image,
+          // Wan image, Seedance image, Luma start_image, Veo image,
+          // HappyHorse image) lock onto the right face.
+          const sceneAnchor = resolveSceneCharacterAnchor(s, characters, activeBrandChar);
+          if (sceneAnchor && !s.referenceImageUrl) {
+            console.log(`[ClipsTab] scene ${s.id} → anchor ${sceneAnchor.source} (${sceneAnchor.name})`);
+          }
           return {
             id: s.id,
             clipSource: s.clipSource,
@@ -344,10 +337,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             negativePrompt: composed.negativePrompt || undefined,
             stockKeywords: s.stockKeywords,
             uploadUrl: s.uploadUrl,
-            referenceImageUrl:
-              s.referenceImageUrl ||
-              castAnchor ||
-              brandAnchor,
+            referenceImageUrl: s.referenceImageUrl || sceneAnchor?.referenceImageUrl,
             durationSeconds: s.durationSeconds,
             characterShot: s.characterShot,
             withAudio: s.withAudio !== false,
