@@ -319,6 +319,8 @@ export default function VideoComposerDashboard() {
             characterShots: (Array.isArray((row as any).character_shots) && (row as any).character_shots.length > 0)
               ? ((row as any).character_shots as any)
               : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
+            dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
+            dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
