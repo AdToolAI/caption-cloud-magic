@@ -15,6 +15,7 @@ import ExportPresetPanel from './ExportPresetPanel';
 import type { AssemblyConfig, ComposerScene, WatermarkConfig } from '@/types/video-composer';
 import { DEFAULT_WATERMARK_CONFIG, getClipCost } from '@/types/video-composer';
 import { persistAssemblyConfig } from '@/hooks/useComposerPersistence';
+import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 
 interface AssemblyTabProps {
   project: any;
@@ -83,6 +84,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
     return fb;
   };
 
+  const { clips: sceneAudioClips } = useSceneAudioClips(project?.id ?? null);
   const [isRendering, setIsRendering] = useState(false);
   const [renderId, setRenderId] = useState<string | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderStatus>('idle');
@@ -472,6 +474,11 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           <CardTitle className="text-base flex items-center gap-2">
             <Film className="h-4 w-4 text-primary" />
             {t('videoComposer.previewFullVideo')}
+            {sceneAudioClips.length > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-primary border border-primary/30">
+                <Sparkles className="h-3 w-3" /> AI Mix · {sceneAudioClips.length}
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -485,6 +492,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
                 : null
             }
             backgroundMusicVolume={(assemblyConfig.music?.volume ?? 30) / 100}
+            sceneAudioClips={sceneAudioClips}
             globalTextOverlays={
               assemblyConfig.textOverlaysEnabled === false
                 ? []

@@ -10,6 +10,7 @@ import type {
 } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { PreviewTextOverlayLayer } from './PreviewTextOverlayLayer';
+import type { SceneAudioClip } from './SoundDesignPanel';
 
 interface Props {
   scenes: ComposerScene[];
@@ -22,6 +23,9 @@ interface Props {
   backgroundMusicUrl?: string | null;
   /** Background music volume (0..1). Defaults to 0.3. */
   backgroundMusicVolume?: number;
+  /** AI-generated ambient/sfx/foley clips — synced to scene offsets so the
+   *  preview matches what mux-audio-to-video will mix into the final render. */
+  sceneAudioClips?: SceneAudioClip[];
   /** Notifies parent of playhead changes so the editor timeline can stay in sync. */
   onTimeUpdate?: (currentTime: number, totalDuration: number) => void;
 }
@@ -56,6 +60,7 @@ export default function ComposerSequencePreview({
   voiceoverUrl,
   backgroundMusicUrl,
   backgroundMusicVolume = 0.3,
+  sceneAudioClips,
   onTimeUpdate,
 }: Props) {
   const { t } = useTranslation();
@@ -130,6 +135,8 @@ export default function ComposerSequencePreview({
   const audioRef = useRef<HTMLAudioElement>(null);
   /** Background music audio element — independent linear track, looped under VO. */
   const musicRef = useRef<HTMLAudioElement>(null);
+  /** AI SFX/Ambient/Foley audio elements — keyed by clip id. */
+  const sfxAudiosRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   const playableRef = useRef(playable);
   const startOffsetsRef = useRef(startOffsets);
@@ -557,8 +564,8 @@ export default function ComposerSequencePreview({
   // Auto-unmute when a voiceover becomes available — VO is the primary
   // audio track and should be hearable by default (video stays muted via slot refs).
   useEffect(() => {
-    if (voiceoverUrl || backgroundMusicUrl) setMuted(false);
-  }, [voiceoverUrl, backgroundMusicUrl]);
+    if (voiceoverUrl || backgroundMusicUrl || (sceneAudioClips && sceneAudioClips.length > 0)) setMuted(false);
+  }, [voiceoverUrl, backgroundMusicUrl, sceneAudioClips]);
 
   // Unified audio sync — re-evaluates on globalTime so audio.play() fires
   // automatically once the lead-in threshold is crossed (no scrub needed).
@@ -610,6 +617,77 @@ export default function ComposerSequencePreview({
       m.pause();
     }
   }, [playing, backgroundMusicUrl, backgroundMusicVolume, muted, globalTime, totalDuration]);
+
+  // ── AI SFX / Ambient / Foley sync ────────────────────────────
+  // Maps each clip to a global timeline offset based on its scene's position
+  // in the playable sequence (mirrors what compose-video-assemble does for
+  // the final mux). Clips without a matching scene play at start_offset from 0.
+  const sfxClipsTimeline = useMemo(() => {
+    if (!sceneAudioClips?.length) return [] as Array<{ clip: SceneAudioClip; start: number; end: number }>;
+    const sceneStart = new Map<string, number>();
+    playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
+    return sceneAudioClips
+      .filter(c => !!c.url)
+      .map(c => {
+        const base = c.scene_id && sceneStart.has(c.scene_id) ? sceneStart.get(c.scene_id)! : 0;
+        const start = base + (Number(c.start_offset) || 0);
+        const dur = Math.max(0.1, Number(c.duration) || 0);
+        return { clip: c, start, end: start + dur };
+      });
+  }, [sceneAudioClips, playable, startOffsets]);
+
+  // Initialize / cleanup audio elements when clip list changes.
+  useEffect(() => {
+    const map = sfxAudiosRef.current;
+    const ids = new Set(sfxClipsTimeline.map(x => x.clip.id));
+    // Remove gone clips
+    map.forEach((audio, id) => {
+      if (!ids.has(id)) {
+        try { audio.pause(); audio.src = ''; } catch { /* noop */ }
+        map.delete(id);
+      }
+    });
+    // Add new clips
+    sfxClipsTimeline.forEach(({ clip }) => {
+      if (!map.has(clip.id)) {
+        const a = new Audio(clip.url);
+        a.preload = 'auto';
+        map.set(clip.id, a);
+      }
+    });
+    if (sfxClipsTimeline.length > 0) {
+      console.info(`[Preview] loaded ${sfxClipsTimeline.length} scene audio clips`);
+    }
+  }, [sfxClipsTimeline]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    sfxAudiosRef.current.forEach(a => { try { a.pause(); a.src = ''; } catch { /* noop */ } });
+    sfxAudiosRef.current.clear();
+  }, []);
+
+  // Sync SFX clips against the global playhead.
+  useEffect(() => {
+    const map = sfxAudiosRef.current;
+    sfxClipsTimeline.forEach(({ clip, start, end }) => {
+      const a = map.get(clip.id);
+      if (!a) return;
+      const inRange = globalTime >= start && globalTime < end;
+      const safeVol = Math.max(0, Math.min(1, (clip.volume ?? 0.5)));
+      a.volume = safeVol;
+      a.muted = muted;
+
+      if (inRange && playing) {
+        const target = Math.max(0, globalTime - start);
+        if (Math.abs(a.currentTime - target) > 0.25) {
+          try { a.currentTime = target; } catch { /* noop */ }
+        }
+        if (a.paused) a.play().catch(() => {});
+      } else {
+        if (!a.paused) a.pause();
+      }
+    });
+  }, [playing, muted, globalTime, sfxClipsTimeline]);
 
   const activeSubtitle = useMemo(() => {
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;

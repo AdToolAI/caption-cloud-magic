@@ -7,6 +7,7 @@ import { Loader2, Sparkles, Trash2, Volume2, Wand2, Wind, Zap, Music } from 'luc
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import type { ComposerScene } from '@/types/video-composer';
+import { emitSceneAudioClipsChanged } from '@/hooks/useSceneAudioClips';
 
 export interface SceneAudioClip {
   id: string;
@@ -93,6 +94,7 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
         description: `${data?.generated_count ?? 0} Clips generiert${data?.failed_count ? `, ${data.failed_count} fehlgeschlagen` : ''}.`,
       });
       await load();
+      emitSceneAudioClipsChanged(projectId);
     } catch (e) {
       toast({ title: 'Fehler', description: (e as Error).message, variant: 'destructive' });
     } finally {
@@ -116,11 +118,13 @@ export default function SoundDesignPanel({ projectId, scenes, detectedMood }: Pr
   const updateVolume = async (id: string, vol: number) => {
     setClips((cs) => cs.map((c) => c.id === id ? { ...c, volume: vol } : c));
     await supabase.from('scene_audio_clips').update({ volume: vol }).eq('id', id);
+    emitSceneAudioClipsChanged(projectId);
   };
 
   const removeClip = async (id: string) => {
     await supabase.from('scene_audio_clips').delete().eq('id', id);
     setClips((cs) => cs.filter((c) => c.id !== id));
+    emitSceneAudioClipsChanged(projectId);
   };
 
   const grouped = useMemo(() => ({
