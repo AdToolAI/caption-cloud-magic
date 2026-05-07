@@ -118,7 +118,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
             {lang === 'de' ? 'Shot Director' : lang === 'es' ? 'Director de Plano' : 'Shot Director'}
             {count > 0 && (
               <Badge variant="outline" className="border-primary/40 text-primary text-[10px] ml-1">
-                {count}/4
+                {count}/6
               </Badge>
             )}
           </Label>
@@ -138,7 +138,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {(Object.keys(SHOT_CATEGORIES) as ShotCategory[]).map((cat) => {
           const meta = CATEGORY_META[cat];
           const Icon = meta.icon;
