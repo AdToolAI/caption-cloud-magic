@@ -888,7 +888,7 @@ export default function ComposerSequencePreview({
         <Button
           size="icon"
           variant="ghost"
-          onClick={() => setMuted(m => !m)}
+          onClick={() => { primeSfxAudios(); setMuted(m => !m); }}
           className="h-9 w-9 shrink-0"
         >
           {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
