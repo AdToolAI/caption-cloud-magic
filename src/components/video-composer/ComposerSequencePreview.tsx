@@ -618,7 +618,78 @@ export default function ComposerSequencePreview({
     }
   }, [playing, backgroundMusicUrl, backgroundMusicVolume, muted, globalTime, totalDuration]);
 
-  const activeSubtitle = useMemo(() => {
+  // ── AI SFX / Ambient / Foley sync ────────────────────────────
+  // Maps each clip to a global timeline offset based on its scene's position
+  // in the playable sequence (mirrors what compose-video-assemble does for
+  // the final mux). Clips without a matching scene play at start_offset from 0.
+  const sfxClipsTimeline = useMemo(() => {
+    if (!sceneAudioClips?.length) return [] as Array<{ clip: SceneAudioClip; start: number; end: number }>;
+    const sceneStart = new Map<string, number>();
+    playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
+    return sceneAudioClips
+      .filter(c => !!c.url)
+      .map(c => {
+        const base = c.scene_id && sceneStart.has(c.scene_id) ? sceneStart.get(c.scene_id)! : 0;
+        const start = base + (Number(c.start_offset) || 0);
+        const dur = Math.max(0.1, Number(c.duration) || 0);
+        return { clip: c, start, end: start + dur };
+      });
+  }, [sceneAudioClips, playable, startOffsets]);
+
+  // Initialize / cleanup audio elements when clip list changes.
+  useEffect(() => {
+    const map = sfxAudiosRef.current;
+    const ids = new Set(sfxClipsTimeline.map(x => x.clip.id));
+    // Remove gone clips
+    map.forEach((audio, id) => {
+      if (!ids.has(id)) {
+        try { audio.pause(); audio.src = ''; } catch { /* noop */ }
+        map.delete(id);
+      }
+    });
+    // Add new clips
+    sfxClipsTimeline.forEach(({ clip }) => {
+      if (!map.has(clip.id)) {
+        const a = new Audio(clip.url);
+        a.preload = 'auto';
+        map.set(clip.id, a);
+      }
+    });
+    if (sfxClipsTimeline.length > 0) {
+      console.info(`[Preview] loaded ${sfxClipsTimeline.length} scene audio clips`);
+    }
+  }, [sfxClipsTimeline]);
+
+  // Cleanup on unmount
+  useEffect(() => () => {
+    sfxAudiosRef.current.forEach(a => { try { a.pause(); a.src = ''; } catch { /* noop */ } });
+    sfxAudiosRef.current.clear();
+  }, []);
+
+  // Sync SFX clips against the global playhead.
+  useEffect(() => {
+    const map = sfxAudiosRef.current;
+    sfxClipsTimeline.forEach(({ clip, start, end }) => {
+      const a = map.get(clip.id);
+      if (!a) return;
+      const inRange = globalTime >= start && globalTime < end;
+      const safeVol = Math.max(0, Math.min(1, (clip.volume ?? 0.5)));
+      a.volume = safeVol;
+      a.muted = muted;
+
+      if (inRange && playing) {
+        const target = Math.max(0, globalTime - start);
+        if (Math.abs(a.currentTime - target) > 0.25) {
+          try { a.currentTime = target; } catch { /* noop */ }
+        }
+        if (a.paused) a.play().catch(() => {});
+      } else {
+        if (!a.paused) a.pause();
+      }
+    });
+  }, [playing, muted, globalTime, sfxClipsTimeline]);
+
+
     if (!subtitles?.enabled || !subtitles.segments?.length) return null;
     return (
       subtitles.segments.find(
