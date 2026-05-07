@@ -41,6 +41,8 @@ interface StoryboardTabProps {
   language: string;
   projectId?: string;
   characters?: ComposerCharacter[];
+  /** Called when the Talking-Head dialog adds a new character to the briefing. */
+  onAddCharacter?: (character: ComposerCharacter) => void;
   preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
   /**
    * Block M — Hybrid Extend uses the server-side orchestrator which inserts
