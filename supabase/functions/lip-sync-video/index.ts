@@ -24,14 +24,27 @@ serve(async (req) => {
 
     const auth = req.headers.get('Authorization');
     if (!auth) return json({ error: 'Unauthorized' }, 401);
-    const { data: { user } } = await supabase.auth.getUser(auth.replace('Bearer ', ''));
-    if (!user) return json({ error: 'Unauthorized' }, 401);
+    const token = auth.replace('Bearer ', '');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const { video_url, audio_url, scene_id = null, project_id = null } = await req.json();
+    const body = await req.json();
+    const { video_url, audio_url, scene_id = null, project_id = null, user_id: bodyUserId } = body || {};
+
+    // Allow service-role calls (e.g. from remotion-webhook) to pass user_id
+    // explicitly instead of a user JWT.
+    let userId: string | null = null;
+    if (token === serviceKey && bodyUserId) {
+      userId = String(bodyUserId);
+    } else {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      userId = user?.id ?? null;
+    }
+    if (!userId) return json({ error: 'Unauthorized' }, 401);
+
     if (!video_url || !audio_url) return json({ error: 'video_url and audio_url required' }, 400);
 
     const { data: wallet } = await supabase
-      .from('wallets').select('balance').eq('user_id', user.id).single();
+      .from('wallets').select('balance').eq('user_id', userId).single();
     if (!wallet || wallet.balance < COST) {
       return json({ error: 'INSUFFICIENT_CREDITS', required: COST }, 402);
     }
