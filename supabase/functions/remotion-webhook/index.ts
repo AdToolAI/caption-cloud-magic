@@ -105,6 +105,70 @@ serve(async (req) => {
         }
       }
 
+      // Composer Phase 2: post-render mux for SFX/ambient scene clips
+      // (only for composer renders that ship sceneAudioClips). The video
+      // already contains voiceover + music from Lambda; we layer the SFX on top.
+      const sceneAudioClips = Array.isArray(audioTracks?.sceneAudioClips)
+        ? audioTracks.sceneAudioClips
+        : [];
+      if (isComposer && sceneAudioClips.length > 0) {
+        console.log(`🔊 [composer] Post-mux ${sceneAudioClips.length} scene SFX/ambient clips...`);
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          const muxResp = await fetch(`${supabaseUrl}/functions/v1/mux-audio-to-video`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              videoUrl: finalOutputUrl,
+              audioTracks: { sceneAudioClips, loudnorm: true },
+              userId,
+              renderId: pendingRenderId || renderId,
+            }),
+          });
+          if (muxResp.ok) {
+            const muxResult = await muxResp.json();
+            if (muxResult.ok && muxResult.outputUrl) {
+              finalOutputUrl = muxResult.outputUrl;
+              console.log(`🔊 [composer] SFX mux ok → ${finalOutputUrl}`);
+            }
+          } else {
+            console.warn(`🔊 [composer] SFX mux failed ${muxResp.status}`);
+          }
+        } catch (e) {
+          console.error('🔊 [composer] SFX mux error:', e);
+        }
+      }
+
+      // Composer Phase 2: optional global lip-sync pass against project voiceover.
+      if (isComposer && customData?.lipSyncEnabled === true && audioTracks?.voiceoverUrl) {
+        console.log('💋 [composer] Running lip-sync pass against project voiceover...');
+        try {
+          const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+          const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+          const lsResp = await fetch(`${supabaseUrl}/functions/v1/lip-sync-video`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              video_url: finalOutputUrl,
+              audio_url: audioTracks.voiceoverUrl,
+              project_id: composerProjectId,
+            }),
+          });
+          if (lsResp.ok) {
+            const ls = await lsResp.json();
+            if (ls.success && ls.video_url) {
+              finalOutputUrl = ls.video_url;
+              console.log(`💋 [composer] Lip-sync ok → ${finalOutputUrl}`);
+            }
+          } else {
+            console.warn(`💋 [composer] Lip-sync skipped (${lsResp.status})`);
+          }
+        } catch (e) {
+          console.error('💋 [composer] Lip-sync error:', e);
+        }
+      }
+
       if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
