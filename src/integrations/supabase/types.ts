@@ -11157,6 +11157,36 @@ export type Database = {
         }
         Relationships: []
       }
+      scene_anchor_cache: {
+        Row: {
+          composed_url: string
+          created_at: string
+          id: string
+          portrait_hash: string
+          prompt_hash: string
+          scene_id: string
+          user_id: string
+        }
+        Insert: {
+          composed_url: string
+          created_at?: string
+          id?: string
+          portrait_hash: string
+          prompt_hash: string
+          scene_id: string
+          user_id: string
+        }
+        Update: {
+          composed_url?: string
+          created_at?: string
+          id?: string
+          portrait_hash?: string
+          prompt_hash?: string
+          scene_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       scene_audio_clips: {
         Row: {
           cost_credits: number
