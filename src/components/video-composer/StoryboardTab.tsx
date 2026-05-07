@@ -443,6 +443,7 @@ export default function StoryboardTab({
                           : undefined
                       }
                       hasOtherReadyScenes={hasOtherReadyScenes}
+                      onAddScene={onAddScene}
                       language={language}
                     />
                   </SortableSceneItem>
