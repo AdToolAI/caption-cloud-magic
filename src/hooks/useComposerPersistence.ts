@@ -234,6 +234,8 @@ export function useComposerPersistence() {
               retry_count: scene.retryCount || 0,
               character_shot: (scene.characterShot ?? null) as any,
               character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
+              dialog_script: scene.dialogScript ?? null,
+              dialog_voices: (scene.dialogVoices ?? {}) as any,
               director_modifiers: (scene.directorModifiers ?? {}) as any,
               shot_director: (scene.shotDirector ?? {}) as any,
               prompt_slots: (scene.promptSlots ?? null) as any,
