@@ -10,14 +10,19 @@ export function emitSceneAudioClipsChanged(projectId?: string | null) {
   } catch { /* noop */ }
 }
 
-/** Loads ambient/sfx/foley clips for a composer project and re-loads on
- *  the `composer:scene-audio-clips-changed` event (fired by SoundDesignPanel). */
+/** Loads ambient/sfx/foley clips for a composer project. Re-loads on
+ *  the `composer:scene-audio-clips-changed` event AND via a Realtime
+ *  subscription on `scene_audio_clips` filtered by project_id. */
 export function useSceneAudioClips(projectId?: string | null) {
   const [clips, setClips] = useState<SceneAudioClip[]>([]);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!projectId) { setClips([]); return; }
+    if (!projectId) {
+      console.info('[useSceneAudioClips] no projectId — skip load');
+      setClips([]);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from('scene_audio_clips')
@@ -25,8 +30,10 @@ export function useSceneAudioClips(projectId?: string | null) {
       .eq('project_id', projectId)
       .in('kind', ['ambient', 'sfx', 'foley'])
       .order('created_at', { ascending: true });
-    if (error) console.error('[useSceneAudioClips] load', error);
-    setClips((data as SceneAudioClip[]) || []);
+    if (error) console.error('[useSceneAudioClips] load error', error);
+    const rows = (data as SceneAudioClip[]) || [];
+    console.info(`[useSceneAudioClips] projectId=${projectId} loaded N=${rows.length}`);
+    setClips(rows);
     setLoading(false);
   }, [projectId]);
 
@@ -39,6 +46,21 @@ export function useSceneAudioClips(projectId?: string | null) {
     };
     window.addEventListener(RELOAD_EVENT, handler);
     return () => window.removeEventListener(RELOAD_EVENT, handler);
+  }, [projectId, load]);
+
+  // Realtime subscription so external inserts (e.g. another tab running the
+  // sound-design pipeline) propagate into the preview without manual refresh.
+  useEffect(() => {
+    if (!projectId) return;
+    const channel = supabase
+      .channel(`scene_audio_clips:${projectId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'scene_audio_clips', filter: `project_id=eq.${projectId}` },
+        () => { load(); },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [projectId, load]);
 
   return { clips, loading, reload: load };
