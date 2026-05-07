@@ -1,51 +1,81 @@
-## Root cause (verified live against the HeyGen API)
+## Problem
 
-Das „3 Photo Avatars"-Kontingent wird bei HeyGen **nicht** auf `talking_photo`, `photo_avatar/photo/list` oder `/v2/avatars` getrackt — sondern auf **Photo Avatar Groups** unter `GET /v2/avatar_group.list` (Filter `group_type === "PHOTO"`).
+Im Talking-Head-Dialog (Motion Studio → Button „Talking-Head"):
+1. **Keine Avatar-Auswahl** — du musst jedes Mal manuell ein Foto hochladen, obwohl du in `/avatars` bereits Avatare wie „Matthew Dusatko" mit Portrait + Default-Voice gespeichert hast. „Sarah" ist im Dialog nur die **Stimme**, kein Charakter.
+2. **Ergebnis verschwindet** — beim Aufruf aus dem Storyboard wird keine Szene mitgegeben, das fertige Video landet nur in der Media Library, nicht im Storyboard. Deshalb siehst du außer Matthew (Cast Consistency Map = AI-Reference, anderes Feature) keinen neuen Charakter im Projekt.
 
-Live-Probe gegen den echten Account:
+## Lösung
 
+### 1. Avatar-Picker im Dialog (Tab „Charakter")
+
+Tab „Charakter" um ein **Grid mit deinen Avataren** erweitern, gleichwertig neben dem manuellen Upload:
+
+```text
+┌─ Tab: Charakter ──────────────────────────────────┐
+│ Deine Avatare                                     │
+│ ┌────┐ ┌────┐ ┌────┐ ┌─────────┐                  │
+│ │ MD │ │ AB │ │ CD │ │ + Foto  │                  │
+│ │Matt│ │Anna│ │Carl│ │ hoch-   │                  │
+│ │hew │ │    │ │    │ │ laden   │                  │
+│ └────┘ └────┘ └────┘ └─────────┘                  │
+│ Ausgewählt: Matthew Dusatko ✓ (Voice: George)     │
+└───────────────────────────────────────────────────┘
 ```
-GET /v2/avatar_group.list   → total_count: 3, alle group_type:"PHOTO", num_looks:0
-DELETE /v2/avatar_group/{id}                 → 200 {"code":100}   ← funktioniert
-DELETE /v2/photo_avatar_group/{id}           → 200 {"code":100}   ← Alias, funktioniert auch
-DELETE /v2/photo_avatar/{id}                 → 404 "photo avatar not found"
+
+- Lädt via `useAccessibleCharacters()` (Single-Source-of-Truth, owned + purchased).
+- Karte = Portrait (`portrait_url` falls vorhanden, sonst `reference_image_url`) + Name.
+- Klick → setzt `imageUrl`, `voiceId` (aus `default_voice_id` falls gesetzt), und zeigt unten welcher Avatar aktiv ist + „Wechseln"-Button.
+- Manuelle Upload-Card bleibt als gleichwertige letzte Kachel im Grid.
+- Wenn der Avatar `portrait_url` hat (Hedra-optimiert), bevorzugen wir das gegenüber `reference_image_url`.
+
+### 2. Optionale Szenen-Zuweisung (Tab „Skript & Stimme")
+
+Neuer Block unter „Qualität":
+
+```text
+Ziel (optional)
+┌────────────────────────────────────────────┐
+│ ▾  Nur in Media Library                    │
+│    Szene 1 — Hook                          │
+│    Szene 2 — Body                          │
+│    …                                       │
+└────────────────────────────────────────────┘
 ```
 
-Nach einer einzigen Test-Löschung sank `total_count` von 3 → 2. Damit ist eindeutig: das Kontingent sind die **Avatar-Groups vom Typ `PHOTO`**, und der bisher implementierte Prune (talking_photo v1 + photo_avatar/photo/list + /v2/avatars) räumt eine völlig andere Liste auf — deshalb `tried=30, deleted=0` in den Logs und HTTP 400 `401028` beim Upload.
+- Default: „Nur in Media Library" (heutiges Verhalten).
+- Wenn Szene gewählt → `sceneId` an `generate(...)` übergeben → Edge-Function hängt das fertige Video automatisch als Clip an die Szene (passiert bereits via `videoUrl`-Field auf der scene row, sobald `sceneId` mitkommt).
 
-Die letzten beiden verbleibenden Gruppen sind reine Reste vom 1.4.2026 mit `num_looks: 0` (offensichtlich Auto-Cleanup-Müll), die das Konto blockieren.
+### 3. Storyboard-Integration
 
-## Fix (eine Datei)
+`StoryboardTab.tsx` reicht die Szenen-Liste in den Dialog:
+- Neue Prop `availableScenes: { id; index; sceneType }[]` für das Dropdown.
+- `onSuccess` zeigt zusätzlich Toast „Talking-Head zu Szene {index} hinzugefügt — Anschauen" mit Auto-Scroll zur Szene, wenn eine ID gewählt wurde.
 
-`supabase/functions/generate-talking-head/index.ts` → `pruneHeyGenTalkingPhotos` um einen **vorgelagerten Avatar-Group-Prune** ergänzen:
+## Technical Details
 
-1. **Vor allen anderen Versuchen** (vor `photo_avatar/photo/list` und Co.):
-   - `GET /v2/avatar_group.list`
-   - Filter `group_type === 'PHOTO'`
-   - Pro Gruppe `DELETE /v2/avatar_group/{id}` (Erfolg = HTTP 200 mit `code === 100`).
-   - Hard-Cap: max. 5 Deletes pro Aufruf.
-   - **Niemals** löschen, wenn `preserveId === group.id` ODER wenn `group.num_looks > 0` mit einem `look.id === preserveId` (Defensive: gecachter QA-Avatar wird nie weggeworfen).
-   - Logging: `prune (avatar_groups): total=N, deleted=K, kept=M`.
+**Geänderte Dateien (Frontend only, keine DB-/Edge-Änderungen):**
+- `src/components/video-composer/TalkingHeadDialog.tsx`
+  - Import `useAccessibleCharacters`
+  - Neuer State `selectedAvatarId`, `targetSceneId`
+  - Avatar-Grid in Tab „Charakter" (Cards mit `aspect-square`, gold-Ring bei selected, James-Bond-Design-Tokens)
+  - Beim Avatar-Klick: `setImageUrl(c.portrait_url ?? c.reference_image_url)`, `setVoiceId(c.default_voice_id ?? voiceId)`
+  - Neue Prop `availableScenes?: Array<{ id: string; label: string }>`
+  - Szenen-Select in Tab „Skript & Stimme"
+  - `handleGenerate` übergibt `sceneId: targetSceneId || undefined`
+- `src/components/video-composer/StoryboardTab.tsx`
+  - `<TalkingHeadDialog availableScenes={scenes.map((s,i)=>({ id: s.id, label: \`S${i+1} — ${s.sceneType}\` }))} />`
+  - `onSuccess({sceneId})`: bei vorhandenem `sceneId` smooth-scroll zum Card-Element + Erfolgs-Toast.
 
-2. Die bestehenden Fallback-Pfade (`/v2/photo_avatar/photo/list`, `/v2/avatars` photo-only, `/v1/talking_photo.list`) bleiben **unverändert** als Belt-and-Suspenders, falls HeyGen das Schema mal wieder ändert.
-
-3. Sonst nichts ändern — Upload-Pfad, TTS, Video-Erzeugung, Background-Polling, Refund- und QA-Mock-Logik bleiben unangetastet.
+**Out of Scope:**
+- Keine Änderungen an `generate-talking-head` Edge Function (akzeptiert bereits `imageUrl`, `voiceId`, `sceneId`).
+- Keine DB-Migration.
+- Kein neuer Hook; `useAccessibleCharacters` existiert bereits.
+- Kein Eingriff in Cast Consistency Map (das ist Reference-Image für AI-Video-Modelle, nicht für Talking-Head).
 
 ## Verifikation
 
-1. `generate-talking-head` deployen.
-2. „Talking-Head erstellen" mit Skript „Welcome to DroneOcular!" auslösen.
-3. Edge-Logs erwartet:
-   ```
-   prune (avatar_groups): total=2, deleted=2, kept=0
-   HeyGen talking_photo upload status=200
-   HeyGen video_id=…
-   ```
-4. UI: grüner „Talking-Head wird generiert"-Toast statt rotem Fehler. Antwort < 30 s.
-5. Bei nachfolgenden Renders ist `total=1, deleted=1` (nur die frische Gruppe vom letzten Render wird wieder freigeräumt).
-
-## Out of Scope
-
-- Keine Frontend-, DB-, Storage-, Refund- oder Polling-Änderungen.
-- Kein Eingriff in QA-Preset, Lip-Sync oder andere Edge Functions.
-- Kein Schema-Wechsel auf HeyGen v3 (laut HeyGen v1/v2 bis 31.10.2026 stabil).
+1. Talking-Head-Dialog öffnen → Tab „Charakter" zeigt Grid mit „Matthew Dusatko" + Upload-Card.
+2. Matthew anklicken → Foto + Voice (George) automatisch gesetzt, Tab „Skript & Stimme" wird klickbar.
+3. Szene 2 im neuen Dropdown wählen, Skript schreiben, „Generieren".
+4. Erwartung: Toast „Talking-Head zu S2 hinzugefügt", nach 1–3 Min taucht das Video als Clip in Szene 2 auf, Storyboard scrollt dorthin.
+5. Zweiter Test ohne Szene-Auswahl → Video erscheint nur in der Video-History (Dashboard).
