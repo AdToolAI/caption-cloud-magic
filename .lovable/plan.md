@@ -1,97 +1,98 @@
-## Problem
 
-Wenn eine Szene einen Charakter hat (Matthew, Sarah …), startet das generierte Video direkt mit einem **Close-up des Avatar-Gesichts** und der eigentliche Prompt ("wide shot, golden wheat field, drone hovering, farmer with back to camera …") wird ignoriert.
+# Artlist-Parität – Fortschritt
 
-**Ursache:** `ClipsTab.generateAll` schickt das Porträt des Charakters als `referenceImageUrl` an Hailuo / Kling / Wan / Seedance / Luma / Veo / HappyHorse. Diese Modelle interpretieren das Bild als **first-frame** (i2v) — die Komposition des Videos ist also durch das Porträt festgelegt: zentriertes Gesicht, neutraler Hintergrund. Der Text-Prompt kann das nicht mehr "übersteuern".
+## ✅ Stage 5 – Camera & Lens Picker (DONE)
+- `shotDirector.ts`: 6 Kameras + 7 Linsen, neue Achsen `camera` + `lens`.
+- `ShotDirectorPanel` + `SceneShotDirectorPanel`: 6 Slots statt 4 (Toolkit + per-Scene).
+- `buildShotPromptSuffix`: englische Auto-Injection in alle 11 Provider.
 
-Das Porträt als Anker ist nur sinnvoll, wenn die Szene tatsächlich ein Close-up des Charakters zeigen soll. Bei `full` / `wide` / `back` / `silhouette` / unspezifizierten Shots zerstört es die Komposition.
+## ✅ Stage 1 – Location Library (DONE)
+- DB: `brand_locations` (RLS) + `scene_still_frames` (Cache für Stage 2).
+- Storage-Bucket `brand-locations` (User-ID-First-RLS).
+- Hook `useBrandLocations` / Alias `useAccessibleLocations` + `buildLocationPromptInjection`.
+- Edge Function `extract-location-identity` (Gemini 2.5 Flash Vision → Identity Card).
+- Page `/locations` mit Bento-Grid, Create/Favorite/Archive.
 
-## Lösung — "Scene-Aware Character Anchor"
+## ⏳ Stages 2-4 (vorbereitet, noch nicht implementiert)
+- **Stage 3 – @mention Prompt Editor**: Komponente `<MentionablePromptInput>` mit Cast/Location-Autosuggest.
+- **Stage 2 – Frame-First Pipeline**: Edge `generate-scene-still` (Tabelle ist schon da), SceneCard-Tab "Still Frame".
+- **Stage 4 – Asset Capture**: Edge `extract-asset-from-frame`, "Save as Character/Location"-Menü auf jedem Bild.
 
-Statt das rohe Porträt als first-frame zu schicken, **rendern wir pro Szene einen passenden first-frame**, der Charakter-Identität + Szenen-Komposition kombiniert. Wenn das nicht nötig/möglich ist, fallen wir intelligent auf reine Identity-Injection im Text-Prompt zurück.
 
-### Entscheidungs-Matrix (neu in `resolveSceneCharacterAnchor`)
 
-```text
-characterShot.shotType   →   Anchor-Strategie
-─────────────────────────────────────────────
-detail / pov             →   Porträt direkt als first-frame  (Status quo, OK)
-full / profile / back /  →   Composed first-frame via Nano-Banana 2
-silhouette                   (Porträt + Szenen-Prompt → neues Bild)
-absent / kein Shot       →   Kein Bild-Anker, nur Identity-Card im Text
-                             (Modell macht reines T2V mit Beschreibung)
-```
+Ziel: Die 5 identifizierten Lücken zu Artlist Studio schließen, ohne unsere Stärken (11 Provider, Lambda-Stitching, Director's Cut) anzufassen.
 
-Zusätzlich für Modelle mit echter Subject-Reference (Vidu Q2, Kling Reference2V): Porträt geht in den dedizierten `reference_images`-Slot statt als first-frame — dort dominiert es die Komposition nicht.
+---
 
-### Komponenten
+## Stage 1 – Location Library (Charakter-Pendant für Orte)
 
-1. **Neue Edge Function `compose-scene-anchor`**
-   - Input: `portraitUrl`, `scenePrompt`, `aspectRatio`, `shotType`
-   - Ruft Lovable AI Gateway mit `google/gemini-3.1-flash-image-preview` (Nano Banana 2) im Edit-Modus auf: Porträt + Anweisung "Place this person into the following scene as described, matching framing and composition: …"
-   - Speichert Ergebnis in `composer-frames` Bucket (existiert bereits), gibt URL zurück
-   - Cached pro `(sceneId, portraitHash, promptHash)` in einer kleinen Tabelle `scene_anchor_cache`, damit "Generate All" nicht jedes Mal neu zahlt
+**Was**: Wiederverwendbare Locations mit Konsistenz-Garantie, analog zu Brand Characters.
 
-2. **`resolveSceneCharacterAnchor.ts` erweitern**
-   - Gibt zusätzlich `strategy: 'first-frame-direct' | 'first-frame-composed' | 'subject-reference' | 'text-only'` zurück
-   - Strategie wird aus `characterShot.shotType` + `clipSource` (Modell) abgeleitet
+- Neue Tabelle `brand_locations` (user_id, name, description, reference_image_url, identity_card JSONB, tags, created_at). RLS analog zu `brand_characters`.
+- Storage-Bucket `brand-locations` mit User-ID-First-Path-RLS.
+- Neue Page `/locations` (Bento-Grid, James-Bond-Look) mit Create/Edit/Delete + Gemini Vision Identity-Card-Extraktion (Environment, Lighting, Color Palette, Time of Day, Atmosphere).
+- Hook `useAccessibleLocations` (eigene + ggf. später marketplace).
+- Auto-Injection: Wenn eine Location in Composer-Szene aktiv ist, wird `reference_image_url` als zweiter Subject-Reference-Slot bei Vidu Q2 / Kling Reference2V mitgeschickt; bei anderen Providern über englischen Prompt-Layer (`location modifier`).
 
-3. **`ClipsTab.generateAll` umbauen**
-   - Vor dem Payload-Build: für alle Szenen mit Strategie `first-frame-composed` parallel `compose-scene-anchor` aufrufen, Ergebnis als `referenceImageUrl` setzen
-   - Strategie `text-only` → `referenceImageUrl: undefined`, Identity-Card bleibt im Text (passiert bereits in `composePromptLayers`)
-   - Strategie `subject-reference` → neues Feld `subjectReferenceUrl` im Payload (wird in den 1–2 Provider-Functions ausgelesen, die das unterstützen)
+## Stage 2 – Frame-First Pipeline (Still → Animate)
 
-4. **UI-Hinweis im SceneCard / Charakter-Dropdown**
-   - Kleines Badge unter dem Charakter-Selector: "Anker: Komponiert · 0,02€" / "Anker: Porträt direkt" / "Nur Text-Identität" — damit der User versteht, was passieren wird
-   - Toggle "Porträt direkt verwenden" als Override
+**Was**: Pro Szene optional zuerst ein Still-Frame generieren, kuratieren, *dann* animieren. Verhindert verbrannte Video-Credits durch falsche Komposition.
 
-5. **Default für neue Charakter-Szenen**
-   - Wenn ein Charakter über die Cast-Selection einer Szene zugewiesen wird, **ohne** dass ein expliziter `characterShot` gesetzt wurde, default `shotType = 'absent'` → das Modell entscheidet rein über den Prompt, kein face-lock. (Heute fällt das in den name-match-Pfad und schickt das Porträt als first-frame — das ist genau die jetzige Beschwerde.)
+- Erweiterung `SceneCard`: neuer Tab "Still Frame" vor "Video".
+- Edge Function `generate-scene-still` (Nano Banana 2 / Gemini 3.1 Flash Image), nimmt finalen Prompt + Charakter + Location und gibt 1–4 Varianten zurück. Cache in neuer Tabelle `scene_still_frames` (scene_id, prompt_hash, variants JSONB).
+- UI: Variantengrid, "Use as first frame for video" → setzt `referenceImageUrl` und überschreibt Scene-Anchor-Strategy auf `first-frame-direct`.
+- Toggle pro Szene: `requireStillFirst` (default off, on im Wizard für Storytelling-Formate).
+- Wiederverwendung: Still-Frames können per Klick als Brand Character oder Location extrahiert werden (siehe Stage 4).
 
-### Edge-Function-Details
+## Stage 3 – @mention Prompt Editor
 
-- `compose-scene-anchor` läuft synchron, ~3–6 s, ein Bild pro Szene
-- Kosten: Nano Banana 2 ~0,02 €/Bild, einmalig pro Szene (Cache)
-- Fehler-Fallback: Wenn die Composition fehlschlägt, fällt die Strategie automatisch auf `text-only` zurück (sicherer als ein face-lock)
+**Was**: Inline `@`-Trigger zum Einfügen von Cast/Locations in jeden Prompt-Editor.
 
-### Geänderte Dateien
+- Neue Komponente `<MentionablePromptInput>` (autosuggest popover, keyboard nav).
+- Datenquellen: `useAccessibleCharacters` + `useAccessibleLocations` + Szenen-spezifische Cast/Location.
+- Mentions werden als Token `@[Name](char:uuid)` / `@[Name](loc:uuid)` gespeichert.
+- Render-Zeit: Token wird zu beschreibendem englischen Text expandiert (z.B. "Sarah, a 32-year-old woman with auburn hair…") und passende Reference-Bilder werden automatisch dem `composePromptLayers`-Output beigefügt.
+- Eingebaut in: Composer Scene-Prompt, AI Video Toolkit Prompt-Box, Picture Studio.
 
-```text
-src/lib/motion-studio/resolveSceneCharacterAnchor.ts   (Strategie-Logik)
-src/components/video-composer/ClipsTab.tsx             (Pre-Compose vor generateAll)
-src/components/video-composer/SceneCard.tsx            (Badge + Override-Toggle)
-src/components/video-composer/StoryboardTab.tsx        (Default shotType=absent bei Cast-Zuweisung)
-supabase/functions/compose-scene-anchor/index.ts       (NEU)
-supabase/functions/_shared/qaMock.ts                   (mock-pfad für QA)
-```
+## Stage 4 – Asset Capture aus generierten Frames
 
-### Migration
+**Was**: Aus jedem Bild (Still-Frame, Video-Thumbnail, Picture Studio Output) Charaktere und Locations als wiederverwendbare Assets extrahieren.
 
-```sql
-create table public.scene_anchor_cache (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null,
-  scene_id uuid not null,
-  portrait_hash text not null,
-  prompt_hash text not null,
-  composed_url text not null,
-  created_at timestamptz default now(),
-  unique (scene_id, portrait_hash, prompt_hash)
-);
-alter table public.scene_anchor_cache enable row level security;
-create policy "own anchor cache" on public.scene_anchor_cache
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-```
+- "Save as…" Menü auf jedem Bild → `Save as Character` / `Save as Location`.
+- Edge Function `extract-asset-from-frame` (Gemini 2.5 Pro Vision):
+  - Modus `character`: Detect main person, crop tight portrait, extrahiere Identity Card.
+  - Modus `location`: Mask out people, generate clean location plate via Nano Banana 2 (inpaint), extrahiere Location Identity Card.
+- Direkt-Insert in `brand_characters` / `brand_locations`, sofort in der Library verfügbar.
 
-### Verifikation
+## Stage 5 – Camera & Lens Picker (Hardware-Presets)
 
-1. Szene 1: "wide cinematic shot of a wheat field, farmer Matthew with his back to the camera" + Charakter Matthew → Strategie `first-frame-composed` → erstes Frame zeigt **Matthew von hinten in einem Weizenfeld**, nicht sein Gesicht-Close-up.
-2. Szene 2: "extreme close-up of Matthew's eyes, golden hour" + `shotType=detail` → Strategie `first-frame-direct` → Porträt direkt (Status quo, weiter erwünscht).
-3. Szene 3: B-roll "drone hovering over crops" ohne Charakter → kein Anker, kein Porträt-Lock.
-4. Override: User klickt "Porträt direkt" → Strategie auf `first-frame-direct` gezwungen.
+**Was**: Konkrete Kamera- und Objektiv-Presets im Shot Director, nicht nur generische Begriffe.
 
-### Out of Scope
+- Erweiterung Shot Director um zwei neue Slots: `camera` (6 Optionen: ARRI Alexa 35, RED V-Raptor, Sony Venice 2, Apple iPhone 17 Pro Max, Panavision Millennium XL2, VHS Camcorder) und `lens` (7 Optionen: ARRI Signature Prime, Leica Summilux-C, Cooke S4/i, Helios 44-2 Swirl Bokeh, Lomo Anamorphic, Angénieux Optimo, Sigma Cine Art).
+- Jeder Eintrag mit englischem Prompt-Snippet (`shot on ARRI Alexa 35, ARRI Signature Prime lens, soft cinematic highlights, anamorphic falloff…`) → wird vom `composePromptLayers` mit höchster Priorität (axis: optics) injiziert.
+- Verfügbar im Toolkit + per-Scene im Composer + als Teil der Cinematic Style Presets (Noir bekommt z.B. Cooke S4/i + Alexa 35 vor-konfiguriert).
 
-- Keine Änderung an Talking-Head-Pipeline (HeyGen ist eigenes Lip-Sync-Modell, dort ist face-lock korrekt).
-- Keine Änderung an den 11 Provider-Edge-Functions außer denen mit echter Subject-Reference (1–2 Files).
-- Keine Marketplace-/Brand-Character-DB-Änderungen.
+---
+
+## Out of Scope (bewusst)
+
+- Eigener Stock-Katalog (Artlists USP, wir bleiben bei Pexels/Pixabay)
+- Auto-Model-Routing (User-Wahl bleibt Feature, kein Bug)
+- Echtes Server-Side Live-Rendering (Artlist hat das auch nicht)
+
+## Reihenfolge & Risiko
+
+1. **Stage 5** (Camera/Lens) – kleinste Änderung, sofort sichtbarer "Pro"-Faktor.
+2. **Stage 1** (Location Library) – DB + Page + Hook, mittlerer Aufwand.
+3. **Stage 3** (@mention) – Brückenkomponente, braucht 1+2 als Datenquelle.
+4. **Stage 2** (Frame-First) – größter UX-Shift, profitiert von 1–3.
+5. **Stage 4** (Asset Capture) – Closing-Loop, baut auf 1+2 auf.
+
+## Technische Notizen
+
+- Alle Visual-Prompts englisch (Core-Memory).
+- Jede neue Edge Function: idempotenter Credit-Refund bei Fail (Core-Memory).
+- Storage-Pfade: `{user_id}/...` (Core-Memory).
+- `composePromptLayers` bleibt Single Source of Truth – neue Achsen `optics` (camera+lens) und `location` werden mit klarer Priorität ergänzt.
+- DB-Migrationen: 2 neue Tabellen (`brand_locations`, `scene_still_frames`) + 1 neuer Storage-Bucket.
+- Keine Änderung an Render-Pipeline, Lambda, Director's Cut.

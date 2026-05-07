@@ -6,7 +6,7 @@
  * and localized labels/descriptions for the UI.
  */
 
-export type ShotCategory = 'angle' | 'lighting' | 'movement' | 'framing';
+export type ShotCategory = 'angle' | 'lighting' | 'movement' | 'framing' | 'camera' | 'lens';
 
 export interface ShotOption {
   id: string;
@@ -244,11 +244,97 @@ export const SHOT_FRAMINGS: ShotOption[] = [
   },
 ];
 
+export const CAMERA_BODIES: ShotOption[] = [
+  {
+    id: 'arri-alexa-35',
+    promptFragment: 'shot on ARRI Alexa 35 with rich cinematic color and soft film-like highlights',
+    label: { en: 'ARRI Alexa 35', de: 'ARRI Alexa 35', es: 'ARRI Alexa 35' },
+    description: { en: 'High-end cinematic, soft highlights.', de: 'Highend-Kino, weiche Lichter.', es: 'Cine de alta gama.' },
+  },
+  {
+    id: 'red-v-raptor',
+    promptFragment: 'shot on RED V-Raptor with ultra-high resolution sharp detail and bold dynamic range',
+    label: { en: 'RED V-Raptor', de: 'RED V-Raptor', es: 'RED V-Raptor' },
+    description: { en: 'Ultra-sharp, bold dynamic range.', de: 'Ultra-scharf, hoher Kontrast.', es: 'Ultra nítido.' },
+  },
+  {
+    id: 'sony-venice-2',
+    promptFragment: 'shot on Sony Venice 2 with large-format cinematic visuals deep dynamic range and natural skin tones',
+    label: { en: 'Sony Venice 2', de: 'Sony Venice 2', es: 'Sony Venice 2' },
+    description: { en: 'Large format, natural skin tones.', de: 'Großformat, natürliche Hauttöne.', es: 'Tonos de piel naturales.' },
+  },
+  {
+    id: 'panavision-xl2',
+    promptFragment: 'shot on Panavision Millennium XL2 35mm film with classic Hollywood anamorphic character',
+    label: { en: 'Panavision XL2', de: 'Panavision XL2', es: 'Panavision XL2' },
+    description: { en: 'Classic Hollywood film look.', de: 'Klassischer Hollywood-Look.', es: 'Look clásico de Hollywood.' },
+  },
+  {
+    id: 'iphone-17-pro-max',
+    promptFragment: 'shot on Apple iPhone 17 Pro Max with clean modern smartphone footage natural color and a handheld everyday feel',
+    label: { en: 'iPhone 17 Pro Max', de: 'iPhone 17 Pro Max', es: 'iPhone 17 Pro Max' },
+    description: { en: 'Modern, handheld, natural.', de: 'Modern, Handheld, natürlich.', es: 'Moderno, en mano.' },
+  },
+  {
+    id: 'vhs-camcorder',
+    promptFragment: 'shot on a VHS camcorder with lo-fi analog texture soft focus tape noise and nostalgic home-video vibes',
+    label: { en: 'VHS Camcorder', de: 'VHS Camcorder', es: 'Cámara VHS' },
+    description: { en: 'Lo-fi nostalgic tape look.', de: 'Lo-Fi Retro-Look.', es: 'Estilo retro.' },
+  },
+];
+
+export const LENSES: ShotOption[] = [
+  {
+    id: 'arri-signature-prime',
+    promptFragment: 'with ARRI Signature Prime lens, clean modern cinema glass, sharp detail, smooth falloff',
+    label: { en: 'ARRI Signature Prime', de: 'ARRI Signature Prime', es: 'ARRI Signature Prime' },
+    description: { en: 'Clean modern cinema glass.', de: 'Sauber, modern.', es: 'Cine moderno limpio.' },
+  },
+  {
+    id: 'leica-summilux-c',
+    promptFragment: 'with Leica Summilux-C lens, crisp high-contrast image, premium clarity and depth',
+    label: { en: 'Leica Summilux-C', de: 'Leica Summilux-C', es: 'Leica Summilux-C' },
+    description: { en: 'Crisp, premium clarity.', de: 'Knackig, premium.', es: 'Nítido y premium.' },
+  },
+  {
+    id: 'cooke-s4i',
+    promptFragment: 'with Cooke S4/i lens, warm organic Cooke look, gentle contrast, flattering skin tones',
+    label: { en: 'Cooke S4/i', de: 'Cooke S4/i', es: 'Cooke S4/i' },
+    description: { en: 'Warm, organic, flattering.', de: 'Warm, organisch.', es: 'Cálido y orgánico.' },
+  },
+  {
+    id: 'helios-44-2',
+    promptFragment: 'with Helios 44-2 vintage Soviet lens, distinctive swirling bokeh, soft vintage rendering',
+    label: { en: 'Helios 44-2 Swirl', de: 'Helios 44-2', es: 'Helios 44-2' },
+    description: { en: 'Vintage swirling bokeh.', de: 'Vintage Swirl-Bokeh.', es: 'Bokeh vintage.' },
+  },
+  {
+    id: 'lomo-anamorphic',
+    promptFragment: 'with Lomo anamorphic lens, classic widescreen look, oval bokeh, cinematic horizontal lens flares',
+    label: { en: 'Lomo Anamorphic', de: 'Lomo Anamorph', es: 'Lomo Anamórfica' },
+    description: { en: 'Oval bokeh, lens flares.', de: 'Oval-Bokeh, Lens Flares.', es: 'Bokeh oval, destellos.' },
+  },
+  {
+    id: 'angenieux-optimo',
+    promptFragment: 'with Angénieux Optimo cinema zoom, smooth focus and balanced contrast',
+    label: { en: 'Angénieux Optimo', de: 'Angénieux Optimo', es: 'Angénieux Optimo' },
+    description: { en: 'Smooth versatile cinema zoom.', de: 'Vielseitiger Kino-Zoom.', es: 'Zoom versátil.' },
+  },
+  {
+    id: 'sigma-cine-art',
+    promptFragment: 'with Sigma Cine Art lens, sharp neutral optics, modern clarity and controlled color',
+    label: { en: 'Sigma Cine Art', de: 'Sigma Cine Art', es: 'Sigma Cine Art' },
+    description: { en: 'Sharp neutral, modern clarity.', de: 'Scharf, neutral, modern.', es: 'Nítido y neutro.' },
+  },
+];
+
 export const SHOT_CATEGORIES: Record<ShotCategory, ShotOption[]> = {
   angle: CAMERA_ANGLES,
   lighting: LIGHTING_MOODS,
   movement: CAMERA_MOVEMENTS,
   framing: SHOT_FRAMINGS,
+  camera: CAMERA_BODIES,
+  lens: LENSES,
 };
 
 export type ShotSelection = Partial<Record<ShotCategory, string>>;

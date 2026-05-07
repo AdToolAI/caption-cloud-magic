@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, Sun, Move, Crop, RotateCcw, Check } from 'lucide-react';
+import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { Card } from '@/components/ui/card';
@@ -38,6 +38,14 @@ const CATEGORY_META: Record<
   lighting: {
     icon: Sun,
     title: { en: 'Lighting', de: 'Licht', es: 'Iluminación' },
+  },
+  camera: {
+    icon: Film,
+    title: { en: 'Camera Body', de: 'Kamera', es: 'Cámara' },
+  },
+  lens: {
+    icon: Aperture,
+    title: { en: 'Lens', de: 'Objektiv', es: 'Objetivo' },
   },
 };
 
@@ -110,7 +118,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
             {lang === 'de' ? 'Shot Director' : lang === 'es' ? 'Director de Plano' : 'Shot Director'}
             {count > 0 && (
               <Badge variant="outline" className="border-primary/40 text-primary text-[10px] ml-1">
-                {count}/4
+                {count}/6
               </Badge>
             )}
           </Label>
@@ -130,7 +138,7 @@ export function ShotDirectorPanel({ value, onChange, basePrompt = '' }: Props) {
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
         {(Object.keys(SHOT_CATEGORIES) as ShotCategory[]).map((cat) => {
           const meta = CATEGORY_META[cat];
           const Icon = meta.icon;
