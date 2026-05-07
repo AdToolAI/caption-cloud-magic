@@ -572,7 +572,7 @@ Deno.serve(async (req) => {
     // Step 4: Update scene with processing status
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     if (sceneId) {
-      await admin.from('composer_scenes').update({
+      const sceneUpdate: Record<string, unknown> = {
         clip_source: 'talking-head',
         character_image_url: imageUrl,
         character_audio_url: audioUrl,
@@ -584,7 +584,11 @@ Deno.serve(async (req) => {
         clip_status: 'processing',
         clip_url: null,
         updated_at: new Date().toISOString(),
-      }).eq('id', sceneId);
+      };
+      if (composerCharacterId) {
+        sceneUpdate.mentioned_character_ids = [composerCharacterId];
+      }
+      await admin.from('composer_scenes').update(sceneUpdate).eq('id', sceneId);
     }
 
     // Step 5: Schedule background polling
