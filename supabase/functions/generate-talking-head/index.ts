@@ -212,32 +212,7 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   return talkingPhotoId;
 }
 
-// Legacy fallback prune via /v1/talking_photo.list (some plans only expose this).
-async function pruneLegacyTalkingPhotos(preserveId?: string): Promise<void> {
-  try {
-    const listRes = await fetch(`${HEYGEN_BASE_V1}/talking_photo.list`, {
-      method: 'GET',
-      headers: { 'X-Api-Key': HEYGEN_API_KEY, 'accept': 'application/json' },
-    });
-    if (!listRes.ok) return;
-    const json = await listRes.json();
-    const items: any[] = Array.isArray(json?.data) ? json.data : [];
-    // Try deleting ALL ids (HeyGen sometimes mislabels uploads as preset).
-    // True presets just return 4xx and we move on.
-    const targets = items.filter((x) => x?.id && (!preserveId || x.id !== preserveId));
-    console.log(`[talking-head] prune (legacy talking_photo.list): ${items.length} total, attempting ${targets.length}`);
-    for (const item of targets) {
-      const id = item.id;
-      const dr = await fetch(`${HEYGEN_BASE_V2}/talking_photo/${id}`, {
-        method: 'DELETE',
-        headers: { 'X-Api-Key': HEYGEN_API_KEY },
-      });
-      console.log(`[talking-head] prune (legacy): delete ${id} -> ${dr.status}`);
-    }
-  } catch (e) {
-    console.warn('[talking-head] legacy prune failed (non-fatal):', e instanceof Error ? e.message : String(e));
-  }
-}
+// (legacy preset prune removed — see comment in uploadHeyGenTalkingPhoto)
 
 // Create a video generation request → returns video_id
 // Uses talking_photo character + audio voice with direct URL (no audio asset upload needed)
