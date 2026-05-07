@@ -123,7 +123,9 @@ async function pruneHeyGenTalkingPhotos(maxKeep = 0, preserveId?: string): Promi
       const id = x?.id || x?.photo_avatar_id || x?.avatar_id;
       return id && (!preserveId || id !== preserveId);
     });
-    const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep));
+    // Hard-cap: never delete more than 10 per invocation to avoid blocking the
+    // function for minutes if HeyGen returns a large/unexpected list.
+    const toDelete = candidates.slice(0, Math.max(0, candidates.length - maxKeep)).slice(0, 10);
     console.log(`[talking-head] prune (${source}): ${items.length} total, ${candidates.length} deletable, deleting ${toDelete.length}`);
     for (const item of toDelete) {
       const id = item?.id || item?.photo_avatar_id || item?.avatar_id;

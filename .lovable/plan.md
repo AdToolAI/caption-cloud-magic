@@ -1,38 +1,36 @@
 ## Problem
 
-Talking-Head generation fails with:
+Talking-Head generation hängt minutenlang und endet in einem `Edge Function returned a non-2xx status code`-Fehler.
+
+Edge-Logs zeigen: `pruneLegacyTalkingPhotos` iteriert über **hunderte** HeyGen-Preset-IDs aus `/v1/talking_photo.list` (HeyGen liefert dort seine komplette Sample-Bibliothek) und ruft für jede einzelne `DELETE /v2/talking_photo/{id}` auf — alle antworten mit `404`. Das blockiert den eigentlichen Upload so lange, bis die Function in den Shutdown läuft, bevor das User-Bild überhaupt hochgeladen wird.
+
 ```
-HEYGEN_AVATAR_LIMIT: {"code":401028,"message":"You have exceeded your limit of 3 photo avatars. Please upgrade for more."}
+prune (legacy): delete 8b470bdce44948d897390a5612119db9 -> 404
+prune (legacy): delete 30854db4d8104fe0b0608f3f4452bdd5 -> 404
+... (100+ Zeilen, ~17 Sekunden, weiter wachsend)
+LOG shutdown
 ```
 
-The function already tries to auto-prune old uploaded photos before each upload, but the log shows:
-```
-prune: 0 custom, deleting 0
-```
+`pruneHeyGenTalkingPhotos` über `/v2/photo_avatar/photo/list` ist bereits die korrekte Quelle für das tatsächliche User-Quota (3 Photo-Avatars). Der Legacy-Pfad ist reiner Schaden.
 
-…and the upload still fails. So our prune call lists the wrong resource: `/v1/talking_photo.list` returns HeyGen's sample/preset library (filtered out by `is_preset`), **not** the user's uploaded photo avatars that actually count against the 3-avatar quota.
+## Fix (eine Datei)
 
-## Fix (single edge function, no DB changes)
+`supabase/functions/generate-talking-head/index.ts`:
 
-Edit `supabase/functions/generate-talking-head/index.ts` → `pruneHeyGenTalkingPhotos`:
+1. **`pruneLegacyTalkingPhotos`-Aufruf entfernen** (Zeile 173) und die Funktion löschen — sie löscht nur HeyGen-Presets (immer 404) und blockiert die Function-Ausführung minutenlang.
+2. **`pruneHeyGenTalkingPhotos` als alleinige Quota-Bereinigung** beibehalten — das ist der richtige Endpoint (`/v2/photo_avatar/photo/list`).
+3. **Defensive Hard-Cap** in der verbleibenden Prune-Schleife: maximal 10 DELETEs pro Aufruf, damit selbst bei einer kaputten API-Antwort nie mehr als wenige Sekunden verbraucht werden.
+4. Sonst nichts ändern — Upload, Video-Erzeugung, Background-Polling und Refund-Logik bleiben unangetastet.
 
-1. Replace the listing source with HeyGen's photo-avatar endpoint that actually represents the quota:
-   - `GET https://api.heygen.com/v2/photo_avatar/photo/list` (user-owned uploads)
-   - Fallback: `GET https://api.heygen.com/v2/avatar.list` filtered to `avatar_type === 'photo'` if the first returns 404.
-2. Delete via `DELETE https://api.heygen.com/v2/photo_avatar/{id}` (and fallback to `/v2/talking_photo/{id}` if 404).
-3. Skip any item whose `id` matches `system_config.qa.heygen_talking_photo_id` (the cached QA preset) so we never delete it.
-4. Keep `maxKeep = 0` behavior for normal calls; log how many were found + deleted so we can verify in logs.
-5. If the upload still returns `401028` after a successful prune, surface a clearer user-facing error: *"HeyGen-Avatar-Kontingent voll — bitte kurz warten und erneut versuchen."* instead of the raw API string.
+## Verifikation
 
-## Verification
+1. `generate-talking-head` deployen.
+2. Im Motion Studio "Talking-Head erstellen" mit Bild + Skript "We are DroneOcular!" auslösen.
+3. Edge-Logs erwartet: 1× `prune (photo_avatar): N total, M deletable, deleting M` (M ≤ 3), dann `talking_photo upload status=200`, dann `HeyGen video_id=...`.
+4. UI: grüner "Talking-Head wird generiert"-Toast statt rotem Fehler-Toast; Function antwortet < 30 s.
 
-1. Deploy `generate-talking-head`.
-2. Retry "Talking-Head generieren" from the Motion Studio dialog with the same image + script.
-3. Check edge logs: expect `prune: N custom, deleting N` with N ≥ 1, followed by a successful `talking_photo upload status=200`.
-4. Confirm the dialog shows "Talking-Head wird generiert" toast instead of the red error.
+## Out of Scope
 
-## Out of scope
-
-- No frontend, DB, or other edge-function changes.
-- No change to credit refund logic (already handled).
-- No change to the QA preset cached in `system_config.qa.heygen_talking_photo_id`.
+- Keine Frontend-, DB- oder Storage-Änderungen.
+- Kein Eingriff in Refund-Logik, Polling oder QA-Preset.
+- Keine Änderung am Hintergrundsound-Übergang oder am Lip-Sync (separater Workstream).
