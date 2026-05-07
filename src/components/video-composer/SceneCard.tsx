@@ -335,9 +335,23 @@ export default function SceneCard({
 
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
                 <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
-                {scene.characterShot && scene.characterShot.shotType !== 'absent' && (
-                  <CharacterShotBadge shot={scene.characterShot} characterName={activeChar?.name} />
-                )}
+                {(() => {
+                  const slots = scene.characterShots && scene.characterShots.length > 0
+                    ? scene.characterShots
+                    : (scene.characterShot ? [scene.characterShot] : []);
+                  return slots
+                    .filter((s) => s.shotType !== 'absent')
+                    .map((s) => {
+                      const ch = characters?.find((c) => c.id === s.characterId);
+                      return (
+                        <CharacterShotBadge
+                          key={s.characterId}
+                          shot={s}
+                          characterName={ch?.name}
+                        />
+                      );
+                    });
+                })()}
                 {scene.hybridMode && (
                   <Badge
                     variant="outline"
