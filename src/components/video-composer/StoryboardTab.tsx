@@ -482,8 +482,18 @@ export default function StoryboardTab({
         open={talkingHeadOpen}
         onOpenChange={setTalkingHeadOpen}
         projectId={projectId}
-        onSuccess={() => {
+        availableScenes={scenes.map((s, i) => ({
+          id: s.id,
+          label: `S${i + 1} — ${s.sceneType}`,
+        }))}
+        onSuccess={(res) => {
           void onRefetchScenes?.();
+          if (res.sceneId) {
+            setTimeout(() => {
+              const el = document.querySelector(`[data-scene-id="${res.sceneId}"]`);
+              el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 250);
+          }
         }}
       />
 

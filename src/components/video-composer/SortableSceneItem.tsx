@@ -38,8 +38,9 @@ export function SortableSceneItem({ id, children, badge, className }: SortableSc
     <div
       ref={setNodeRef}
       style={style}
+      data-scene-id={id}
       className={cn(
-        'flex items-stretch gap-2',
+        'flex items-stretch gap-2 scroll-mt-24',
         isDragging && 'shadow-glow scale-[1.02]',
         className
       )}
