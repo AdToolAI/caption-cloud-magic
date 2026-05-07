@@ -794,6 +794,7 @@ export default function VideoComposerDashboard() {
           clip_quality: baseScene.clipQuality || 'standard',
           clip_status: 'pending',
           with_audio: baseScene.withAudio !== false,
+          lip_sync_with_voiceover: baseScene.lipSyncWithVoiceover === true,
           ai_prompt: baseScene.aiPrompt ?? null,
           stock_keywords: baseScene.stockKeywords ?? null,
           upload_url: baseScene.uploadUrl ?? null,
