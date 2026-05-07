@@ -23,6 +23,9 @@ import { ShotDirectorPanel } from './ShotDirectorPanel';
 import CinematicStylePresets from './CinematicStylePresets';
 import { MultiReferenceUploader, type ViduReferenceSlot } from './MultiReferenceUploader';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
+import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { BrandCharacterSelector } from '@/components/brand-characters/BrandCharacterSelector';
 import { useBrandCharacters, buildCharacterPromptInjection, type BrandCharacter } from '@/hooks/useBrandCharacters';
 import type { ShotSelection } from '@/config/shotDirector';
@@ -77,6 +80,7 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
   /* ── Library Cast & Locations (Scene Continuity) ── */
   const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const { characters: mentionChars, locations: mentionLocs } = useUnifiedMentionLibrary();
   const [castCharacterId, setCastCharacterId] = useState<string | null>(null);
   const [castLocationId, setCastLocationId] = useState<string | null>(null);
   const castCharacter = useMemo(
@@ -185,13 +189,15 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
 
     setGenerating(true);
     try {
+      // Resolve @mentions against the unified library (brand + motion-studio)
+      const mentionResolved = resolveMentions(prompt.trim(), mentionChars, mentionLocs);
       // Build the prompt — inject Library cast/location, Brand Character (if locked) AND Shot Director cinematography
       const castSuffix = buildCastPromptSuffix(castCharacter, castLocation);
       const brandSuffix = brandCharacter
         ? `Featuring ${brandCharacter.name}: ${buildCharacterPromptInjection(brandCharacter)}.`
         : '';
       const shotSuffix = buildShotPromptSuffix(shotSelection);
-      const finalPrompt = [prompt.trim(), shotSuffix, brandSuffix, castSuffix]
+      const finalPrompt = [mentionResolved.prompt, shotSuffix, brandSuffix, castSuffix]
         .filter(Boolean)
         .join('\n\n');
 
@@ -202,11 +208,12 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
         aspectRatio,
       };
 
-      // i2v: Brand Character image > manual upload > library character
+      // i2v: Brand Character image > manual upload > library character > resolved mention
       const referenceImage =
         brandCharacter?.reference_image_url ??
         startImageUrl ??
         castCharacter?.reference_image_url ??
+        mentionResolved.referenceImageUrl ??
         null;
       if (model.capabilities.i2v && referenceImage) body.startImageUrl = referenceImage;
       // v2v: pass reference clip + reference type (Kling-3 omni)
@@ -302,17 +309,25 @@ export function ToolkitGenerator({ onAfterGenerate }: Props) {
             {language === 'de' ? 'Optimieren' : 'Optimize'}
           </Button>
         </div>
-        <Textarea
+        <PromptMentionEditor
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={setPrompt}
           placeholder={
             language === 'de'
-              ? 'Beschreibe dein Video … z. B. „Eine Drohnenaufnahme über einer alpinen Berglandschaft bei Sonnenaufgang“'
-              : 'Describe your video… e.g. "A drone shot over an alpine mountain landscape at sunrise"'
+              ? 'Beschreibe dein Video … nutze @charakter und @location aus deiner Library'
+              : language === 'es'
+              ? 'Describe tu vídeo … usa @personaje y @ubicación de tu biblioteca'
+              : 'Describe your video … use @character and @location from your library'
           }
           rows={4}
-          className="resize-none bg-background/40 border-border/40 focus:border-primary/40"
         />
+        <p className="mt-1.5 text-[10px] text-muted-foreground/80 italic">
+          {language === 'de'
+            ? 'ℹ️ Tippe @ um Charaktere & Locations aus deiner Library zu taggen.'
+            : language === 'es'
+            ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones de tu biblioteca.'
+            : 'ℹ️ Type @ to tag characters & locations from your library.'}
+        </p>
       </Card>
 
       {/* ── Cinematic Style Presets (one-click director looks) ── */}

@@ -27,7 +27,7 @@ import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
-import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
 import {
   DndContext,
@@ -71,7 +71,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
   const { save: saveSceneToLibrary, savingSceneId, savedSceneIds } = useSaveSceneToLibrary();
   // Library for @-mention resolution at generation time
-  const { characters: libCharacters, locations: libLocations } = useMotionStudioLibrary();
+  const { characters: libCharacters, locations: libLocations } = useUnifiedMentionLibrary();
   const { characters: brandChars } = useBrandCharacters();
   // Phase 2 — auto-inject the user's favorite Brand Character (if any).
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
