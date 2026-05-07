@@ -6,252 +6,154 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-const SOUND_DESIGN_CREDITS = 5;
-
-// Predefined sound categories with sample URLs
-const AMBIENT_SOUNDS = {
-  nature: [
-    { name: 'Forest Birds', category: 'nature', mood: 'peaceful' },
-    { name: 'Ocean Waves', category: 'nature', mood: 'calm' },
-    { name: 'Rain on Window', category: 'nature', mood: 'melancholic' },
-    { name: 'Wind Through Trees', category: 'nature', mood: 'mysterious' },
-  ],
-  urban: [
-    { name: 'City Traffic', category: 'urban', mood: 'busy' },
-    { name: 'Cafe Ambience', category: 'urban', mood: 'cozy' },
-    { name: 'Office Background', category: 'urban', mood: 'professional' },
-    { name: 'Street Market', category: 'urban', mood: 'vibrant' },
-  ],
-  tech: [
-    { name: 'Server Room', category: 'tech', mood: 'futuristic' },
-    { name: 'Digital Hum', category: 'tech', mood: 'modern' },
-    { name: 'Keyboard Typing', category: 'tech', mood: 'productive' },
-  ],
-  emotional: [
-    { name: 'Tension Drone', category: 'emotional', mood: 'tense' },
-    { name: 'Hopeful Pad', category: 'emotional', mood: 'inspiring' },
-    { name: 'Sad Piano Ambience', category: 'emotional', mood: 'sad' },
-    { name: 'Epic Build', category: 'emotional', mood: 'epic' },
-  ],
-};
-
-const SFX_LIBRARY = {
-  transitions: ['Whoosh', 'Swipe', 'Glitch', 'Impact', 'Rise'],
-  ui: ['Click', 'Pop', 'Notification', 'Success', 'Error'],
-  motion: ['Footsteps', 'Door', 'Car Pass', 'Wind Gust'],
-  accents: ['Cymbal Swell', 'Bass Drop', 'Stinger', 'Hit'],
-};
-
+/**
+ * AI Sound Designer (real generation).
+ * - Asks Gemini for a list of ambient/sfx prompts per scene.
+ * - Calls generate-scene-sfx for each suggestion (parallel, capped).
+ * - Returns the inserted scene_audio_clips rows so the UI can render the timeline.
+ *
+ * Body: {
+ *   project_id?, scenes: [{ id, startTime, endTime, description?, mood? }],
+ *   detected_mood?: string,
+ *   max_clips?: number      // safety cap, default 8
+ * }
+ */
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    const auth = req.headers.get('Authorization');
+    if (!auth) return json({ error: 'Unauthorized' }, 401);
+    const { data: { user } } = await supabase.auth.getUser(auth.replace('Bearer ', ''));
+    if (!user) return json({ error: 'Unauthorized' }, 401);
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const body = await req.json();
+    const scenes = Array.isArray(body?.scenes) ? body.scenes : [];
+    const project_id = body?.project_id ?? null;
+    const detected_mood = body?.detected_mood ?? 'neutral';
+    const max_clips = Math.max(1, Math.min(16, Number(body?.max_clips) || 8));
 
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
+    if (scenes.length === 0) return json({ error: 'scenes required' }, 400);
 
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { 
-      video_url,
-      scenes = [],
-      detected_mood,
-      generate_ambient = true,
-      generate_sfx = true,
-      generate_foley = true,
-    } = await req.json();
-
-    console.log(`[Sound Design] Analyzing for user: ${user.id}, scenes: ${scenes.length}`);
-
-    // Check user credits
-    const { data: wallet, error: walletError } = await supabaseAdmin
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', user.id)
-      .single();
-
-    if (walletError || !wallet) {
-      return new Response(
-        JSON.stringify({ error: 'Could not retrieve wallet' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (wallet.balance < SOUND_DESIGN_CREDITS) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'INSUFFICIENT_CREDITS',
-          message: `Du benötigst ${SOUND_DESIGN_CREDITS} Credits für AI Sound Design. Aktuell: ${wallet.balance} Credits.`,
-          required: SOUND_DESIGN_CREDITS,
-          available: wallet.balance,
-        }),
-        { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Use Lovable AI to analyze scenes and suggest sounds
+    // 1) Ask Gemini for AI sound recommendations
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    let aiRecommendations = null;
+    let suggestions: Array<{
+      scene_id: string;
+      kind: 'ambient' | 'sfx' | 'foley';
+      prompt: string;
+      duration: number;
+      start_offset: number;
+      volume: number;
+    }> = [];
 
     if (LOVABLE_API_KEY) {
+      const sceneDesc = scenes.map((s: any, i: number) =>
+        `Scene ${i + 1} [id=${s.id}] (${s.startTime ?? 0}-${s.endTime ?? 0}s): ${s.description || '—'} | mood: ${s.mood || detected_mood}`
+      ).join('\n');
+
       try {
-        const systemPrompt = `Du bist ein professioneller Sound Designer für Videos. Analysiere Szenen und empfehle passende Audio-Elemente.
-
-Kategorien:
-- Ambient: Hintergrundatmosphäre (Natur, Stadt, Technik, Emotional)
-- SFX: Soundeffekte für Übergänge und Akzente
-- Foley: Realistische Geräusche für Aktionen
-
-Berücksichtige:
-- Stimmung jeder Szene
-- Übergänge zwischen Szenen
-- Gesamtatmosphäre des Videos`;
-
-        const scenesDescription = scenes.map((s: any, i: number) => 
-          `Szene ${i + 1} (${s.startTime}s-${s.endTime}s): ${s.description || 'Keine Beschreibung'}, Stimmung: ${s.mood || 'unbekannt'}`
-        ).join('\n');
-
-        const userPrompt = `Analysiere diese Szenen und empfehle Sound Design:
-
-${scenesDescription || 'Keine Szenen-Details verfügbar'}
-
-Erkannte Gesamtstimmung: ${detected_mood || 'unbekannt'}
-
-Generiere Empfehlungen im Format:
-{
-  "ambient": {
-    "primary": {"name": "...", "category": "...", "mood": "..."},
-    "secondary": {"name": "...", "category": "...", "mood": "..."}
-  },
-  "sfx_placements": [
-    {"timestamp": 0.0, "type": "transition", "name": "Whoosh", "reason": "Szenenstart"}
-  ],
-  "foley_suggestions": [
-    {"timestamp": 2.5, "type": "footsteps", "reason": "Person geht"}
-  ],
-  "volume_recommendations": {
-    "ambient_level": 0.3,
-    "sfx_level": 0.7,
-    "foley_level": 0.5
-  },
-  "mixing_notes": "..."
-}`;
-
-        const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        const aiRes = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Authorization': `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             model: 'google/gemini-2.5-flash',
             messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
+              { role: 'system', content: 'You are a professional sound designer. Output STRICT JSON only.' },
+              { role: 'user', content:
+`Design ambient + sfx for these scenes. Return JSON:
+{"clips":[{"scene_id":"...","kind":"ambient|sfx|foley","prompt":"english sound description (e.g. rainy city street with distant traffic)","duration":6,"start_offset":0,"volume":0.3}]}
+
+Rules:
+- Max ${max_clips} clips total.
+- 1 ambient per scene (kind=ambient, duration = scene length, volume 0.2-0.35).
+- 0-2 sfx accents per scene at meaningful moments (kind=sfx or foley, short duration 1-3s, volume 0.5-0.7).
+- start_offset is RELATIVE to scene start.
+- Prompts in ENGLISH for best generation quality.
+
+Scenes:
+${sceneDesc}` },
             ],
           }),
         });
-
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content;
-          
-          if (content) {
-            try {
-              const jsonMatch = content.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                aiRecommendations = JSON.parse(jsonMatch[0]);
-              }
-            } catch (parseError) {
-              console.error('[Sound Design] Failed to parse AI response:', parseError);
-            }
+        if (aiRes.ok) {
+          const data = await aiRes.json();
+          const content = data?.choices?.[0]?.message?.content || '';
+          const m = content.match(/\{[\s\S]*\}/);
+          if (m) {
+            const parsed = JSON.parse(m[0]);
+            if (Array.isArray(parsed?.clips)) suggestions = parsed.clips.slice(0, max_clips);
           }
         }
-      } catch (aiError) {
-        console.error('[Sound Design] AI analysis error:', aiError);
+      } catch (e) {
+        console.warn('[sound-design] AI suggestion failed:', (e as Error).message);
       }
     }
 
-    // Generate fallback recommendations if AI failed
-    if (!aiRecommendations) {
-      const moodCategory = detected_mood === 'energetic' ? 'urban' : 
-                          detected_mood === 'calm' ? 'nature' : 
-                          detected_mood === 'professional' ? 'tech' : 'emotional';
-      
-      aiRecommendations = {
-        ambient: {
-          primary: AMBIENT_SOUNDS[moodCategory as keyof typeof AMBIENT_SOUNDS]?.[0] || AMBIENT_SOUNDS.nature[0],
-          secondary: AMBIENT_SOUNDS.emotional[1],
-        },
-        sfx_placements: scenes.map((s: any, i: number) => ({
-          timestamp: s.startTime || i * 5,
-          type: 'transition',
-          name: SFX_LIBRARY.transitions[i % SFX_LIBRARY.transitions.length],
-          reason: 'Szenenübergang',
-        })),
-        foley_suggestions: [],
-        volume_recommendations: {
-          ambient_level: 0.25,
-          sfx_level: 0.6,
-          foley_level: 0.5,
-        },
-        mixing_notes: 'Standard-Mix empfohlen. Ambient leise im Hintergrund, SFX für Akzente.',
-        mode: 'fallback',
-      };
+    // 2) Fallback if AI failed: 1 ambient per scene
+    if (suggestions.length === 0) {
+      suggestions = scenes.slice(0, max_clips).map((s: any) => ({
+        scene_id: s.id,
+        kind: 'ambient' as const,
+        prompt: `subtle ${detected_mood} ambient atmosphere`,
+        duration: Math.max(3, Math.min(20, (s.endTime ?? 5) - (s.startTime ?? 0))),
+        start_offset: 0,
+        volume: 0.25,
+      }));
     }
 
-    // Deduct credits
-    await supabaseAdmin
-      .from('wallets')
-      .update({ 
-        balance: wallet.balance - SOUND_DESIGN_CREDITS,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', user.id);
+    // 3) Generate clips in parallel (cap concurrency)
+    const supaUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const concurrency = 3;
+    const generated: any[] = [];
+    const failed: any[] = [];
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        credits_used: SOUND_DESIGN_CREDITS,
-        recommendations: aiRecommendations,
-        available_sounds: {
-          ambient: AMBIENT_SOUNDS,
-          sfx: SFX_LIBRARY,
-        },
-        settings: {
-          generate_ambient,
-          generate_sfx,
-          generate_foley,
-        },
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    async function generateOne(s: typeof suggestions[number]) {
+      try {
+        const res = await fetch(`${supaUrl}/functions/v1/generate-scene-sfx`, {
+          method: 'POST',
+          headers: { 'Authorization': auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: s.prompt,
+            duration: s.duration,
+            kind: s.kind,
+            project_id,
+            scene_id: s.scene_id,
+            start_offset: s.start_offset,
+            volume: s.volume,
+            ducking_enabled: s.kind === 'ambient',
+          }),
+        });
+        const out = await res.json();
+        if (res.ok && out?.success) generated.push(out.clip);
+        else failed.push({ ...s, error: out?.error || res.status });
+      } catch (e) {
+        failed.push({ ...s, error: (e as Error).message });
+      }
+    }
 
-  } catch (error) {
-    console.error('[Sound Design] Error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    for (let i = 0; i < suggestions.length; i += concurrency) {
+      await Promise.all(suggestions.slice(i, i + concurrency).map(generateOne));
+    }
+
+    return json({
+      success: true,
+      generated_count: generated.length,
+      failed_count: failed.length,
+      clips: generated,
+      failures: failed,
+    });
+  } catch (e) {
+    console.error('[sound-design] fatal', e);
+    return json({ error: (e as Error).message }, 500);
   }
 });
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
