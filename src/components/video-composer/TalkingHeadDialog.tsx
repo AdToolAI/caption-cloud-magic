@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { ComposerCharacter } from '@/types/video-composer';
+import { parseDialogScript as sharedParseDialogScript } from '@/lib/talking-head/parseDialogScript';
 
 interface TalkingHeadDialogProps {
   open: boolean;
@@ -689,40 +690,12 @@ interface DialogModeTabProps {
 }
 
 function parseDialogScript(script: string, cast: ComposerCharacter[]): DialogBlock[] {
-  const blocks: DialogBlock[] = [];
-  const lines = script.split(/\r?\n/);
-  // Match "NAME: text" or "NAME — text" at the start of a line.
-  const re = /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*[:—-]\s*(.+)$/;
-  let current: DialogBlock | null = null;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (!line) {
-      current = null;
-      continue;
-    }
-    const m = re.exec(line);
-    if (m) {
-      const speakerName = m[1].trim();
-      const text = m[2].trim();
-      const c = cast.find(
-        (x) => x.name.toLowerCase() === speakerName.toLowerCase() ||
-               x.name.toLowerCase().split(/\s+/)[0] === speakerName.toLowerCase(),
-      );
-      if (c && c.referenceImageUrl) {
-        current = {
-          speakerId: c.id,
-          speakerName: c.name,
-          text,
-          voiceId: '',
-        };
-        blocks.push(current);
-        continue;
-      }
-    }
-    // Continuation line → append to last block.
-    if (current) current.text += ' ' + line;
-  }
-  return blocks;
+  return sharedParseDialogScript(script, cast).map((b) => ({
+    speakerId: b.speakerId,
+    speakerName: b.speakerName,
+    text: b.text,
+    voiceId: '',
+  }));
 }
 
 function DialogModeTab({

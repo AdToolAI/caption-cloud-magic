@@ -176,6 +176,14 @@ export interface ComposerScene {
    */
   characterShots?: CharacterShot[];
   /**
+   * Per-scene dialog screenplay (one block per line, "NAME: text").
+   * When set, the SceneDialogStudio generates HeyGen lip-sync clips per
+   * speaker and auto-spawns sub-scenes for shot-reverse-shot.
+   */
+  dialogScript?: string;
+  /** Map of characterId → voiceId (Eleven Labs preset or custom voice id). */
+  dialogVoices?: Record<string, string>;
+  /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
    * wants a face-locked opening (e.g. tight close-up).

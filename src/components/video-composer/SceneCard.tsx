@@ -70,6 +70,7 @@ import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
+import SceneDialogStudio from './SceneDialogStudio';
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -90,6 +91,8 @@ interface SceneCardProps {
   onHybridExtend?: (mode: 'forward' | 'backward' | 'bridge' | 'style-ref') => void;
   /** True if at least one OTHER scene in the project has a clip_url (enables Bridge button). */
   hasOtherReadyScenes?: boolean;
+  /** Allows the per-scene Dialog Studio to spawn shot-reverse-shot sub-scenes. */
+  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
   language: string;
 }
 
@@ -120,6 +123,7 @@ export default function SceneCard({
   onMoveDown,
   onHybridExtend,
   hasOtherReadyScenes,
+  onAddScene,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
@@ -709,6 +713,19 @@ export default function SceneCard({
                     : 'Characters are mentioned automatically in the prompt.'}
                 </p>
               </>
+            )}
+
+            {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
+            {scene.clipSource.startsWith('ai-') && characters && (
+              <SceneDialogStudio
+                scene={scene}
+                cast={scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])}
+                characters={characters}
+                projectId={projectId}
+                language={lang}
+                onUpdate={onUpdate}
+                onAddScene={onAddScene}
+              />
             )}
 
 
