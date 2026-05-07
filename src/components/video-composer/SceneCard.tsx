@@ -1071,6 +1071,19 @@ export default function SceneCard({
                       ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
                       : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
               </div>
+              {scene.clipSource.startsWith('ai-') && projectId && (
+                <SceneStillFrameStudio
+                  projectId={projectId}
+                  sceneId={scene.id}
+                  prompt={scene.aiPrompt || ''}
+                  composeHintImageUrl={
+                    activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                  }
+                  selectedReferenceUrl={scene.referenceImageUrl}
+                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                  language={lang as 'en' | 'de' | 'es'}
+                />
+              )}
               <SceneReferenceImageUpload
                 projectId={projectId}
                 sceneId={scene.id}
