@@ -100,7 +100,7 @@ export function resolveSceneCharacterAnchor(
  * composer can place ALL of them in one frame.
  */
 export function resolveSceneCharacterAnchorsAll(
-  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'clipSource'> & {
+  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'characterShots' | 'clipSource'> & {
     forcePortraitAsFirstFrame?: boolean;
   },
   characters: ComposerCharacter[] | undefined,
@@ -110,16 +110,22 @@ export function resolveSceneCharacterAnchorsAll(
   const seen = new Set<string>();
   const out: SceneAnchor[] = [];
 
-  // 1) Explicit characterShot
-  const shot = scene.characterShot;
-  if (shot && shot.shotType && shot.shotType !== 'absent' && characters) {
-    const cm = characters.find((c) => c.id === shot.characterId);
-    if (cm?.referenceImageUrl) {
+  // 1) Explicit cast slots (multi-character UI). Falls back to legacy
+  //    `characterShot` (singular) when `characterShots` is not yet populated.
+  const slots = (scene.characterShots && scene.characterShots.length > 0)
+    ? scene.characterShots
+    : (scene.characterShot ? [scene.characterShot] : []);
+  if (characters && slots.length > 0) {
+    for (const slot of slots) {
+      if (!slot || !slot.shotType || slot.shotType === 'absent') continue;
+      if (seen.has(slot.characterId)) continue;
+      const cm = characters.find((c) => c.id === slot.characterId);
+      if (!cm?.referenceImageUrl) continue;
       out.push({
         characterId: cm.id,
         name: cm.name,
         referenceImageUrl: cm.referenceImageUrl,
-        source: 'explicit-shot',
+        source: out.length === 0 ? 'explicit-shot' : 'cast-slot',
         strategy: 'first-frame-direct', // recomputed below
       });
       seen.add(cm.id);
