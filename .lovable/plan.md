@@ -19,8 +19,12 @@
 - Toolkit Generator: Textarea ersetzt durch `PromptMentionEditor`, `resolveMentions` erweitert finalen Prompt mit Cast/Setting-Block und nutzt aufgelöstes Reference-Image als i2v-Fallback.
 - Composer (SceneCard, ClipsTab) nutzt unified library für `composePromptLayers` → identische Auflösung in Toolkit + Composer.
 
-## ⏳ Stages 2 & 4 (vorbereitet, noch nicht implementiert)
-- **Stage 2 – Frame-First Pipeline**: Edge `generate-scene-still` (Tabelle ist schon da), SceneCard-Tab "Still Frame".
+## ✅ Stage 2 – Frame-First Pipeline (DONE)
+- Edge Function `generate-scene-still`: 1–4 Nano-Banana-2-Varianten parallel, optional referenceImageUrl als Compose-Hint, Cache via `scene_still_frames` (prompt_hash) → keine Doppel-Kosten beim Re-Render.
+- UI `<SceneStillFrameStudio>`: Card im SceneCard direkt vor dem Reference-Upload, sichtbar nur für `ai-*` clipSources. 2× / 4× Varianten-Wahl, Klick = setzt `scene.referenceImageUrl` → wird automatisch i2v first frame beim Render.
+- Brand-Charakter-Bild wird als Compose-Hint mitgeschickt (Identity Lock).
+
+## ⏳ Stage 4 (vorbereitet, noch nicht implementiert)
 - **Stage 4 – Asset Capture**: Edge `extract-asset-from-frame`, "Save as Character/Location"-Menü auf jedem Bild.
 
 
