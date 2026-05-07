@@ -12,6 +12,8 @@ export interface TalkingHeadParams {
   customVoiceId?: string;
   aspectRatio?: '16:9' | '9:16' | '1:1';
   resolution?: '480p' | '720p';
+  /** Briefing-Cast character id — written to composer_scenes.mentioned_character_ids */
+  composerCharacterId?: string;
 }
 
 export interface TalkingHeadResult {
