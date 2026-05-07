@@ -8,10 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, MapPin, Loader2, Star, Trash2 } from 'lucide-react';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
-import { useTrackPageFeature } from '@/hooks/useTrackPageFeature';
 
 const Locations = () => {
-  useTrackPageFeature('brand_locations');
   const { locations, isLoading, createLocation, toggleFavorite, archiveLocation } = useBrandLocations();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
