@@ -474,6 +474,11 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           <CardTitle className="text-base flex items-center gap-2">
             <Film className="h-4 w-4 text-primary" />
             {t('videoComposer.previewFullVideo')}
+            {sceneAudioClips.length > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide bg-primary/15 text-primary border border-primary/30">
+                <Sparkles className="h-3 w-3" /> AI Mix · {sceneAudioClips.length}
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
