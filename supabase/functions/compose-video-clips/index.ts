@@ -54,6 +54,36 @@ interface ComposerCharacter {
   brandCharacterId?: string;
 }
 
+type DialogVoiceCfg = { engine?: string; voiceId?: string; voiceName?: string; provider?: string };
+
+/** ── HeyGen routing helpers (mirrors src/lib/video-composer/sceneEngineRouter.ts) ── */
+function sceneHasDialogText(script?: string | null): boolean {
+  return !!(script && script.trim().length > 0);
+}
+function countDialogSpeakers(script?: string | null): number {
+  const s = (script ?? '').trim();
+  if (!s) return 0;
+  const speakers = new Set<string>();
+  for (const line of s.split('\n')) {
+    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+    if (m) speakers.add(m[1].trim().toLowerCase());
+  }
+  return speakers.size;
+}
+/** Strip "NAME:" / "[NAME]:" speaker prefixes — leaves clean spoken text. */
+function stripSpeakerPrefixes(script: string): string {
+  return script
+    .split('\n')
+    .map((line) => line.replace(/^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]\s*/, '').trim())
+    .filter((l) => l.length > 0)
+    .join(' ');
+}
+function resolveDialogVoiceId(cfg?: string | DialogVoiceCfg): string | undefined {
+  if (!cfg) return undefined;
+  if (typeof cfg === 'string') return cfg;
+  return cfg.voiceId;
+}
+
 type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
 
 interface ClipScene {
