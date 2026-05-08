@@ -275,6 +275,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     return () => clearInterval(interval);
   }, [generatingCount, pollScenes]);
 
+  // One-shot poll on mount → recovers stuck 'generating' UI from a previous
+  // session by reloading the actual DB truth (e.g. scene was already 'ready'
+  // but the client hung on a Nano-Banana compose call).
+  useEffect(() => {
+    pollScenes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const ensureProject = async (): Promise<{ projectId: string; scenes: ComposerScene[] } | null> => {
     // Always call onEnsurePersisted (when available) so the LATEST Storyboard
     // edits (prompt, slots, director settings, …) are flushed to DB before
