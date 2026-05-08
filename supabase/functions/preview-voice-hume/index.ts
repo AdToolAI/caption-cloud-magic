@@ -52,6 +52,9 @@ serve(async (req) => {
     if (!res.ok) {
       const err = await res.text();
       console.error('[preview-voice-hume] Hume error', res.status, err);
+      if (res.status === 404) {
+        throw new Error(`Hume voice "${voiceName}" not found in your library.`);
+      }
       throw new Error(`Hume ${res.status}: ${err.slice(0, 300)}`);
     }
 
