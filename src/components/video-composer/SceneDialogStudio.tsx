@@ -14,10 +14,11 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
@@ -59,12 +60,13 @@ const PRESET_VOICES = [
 const T = {
   de: {
     title: 'Szenen-Dialog',
-    subtitle: 'Schreibe ein Drehbuch — jede Zeile wird zu einem eigenen Lip-Sync-Clip.',
+    subtitle: 'Schreibe ein Drehbuch — der Dialog läuft als Voiceover in DIESER Szene.',
     script: 'Drehbuch',
     voices: 'Stimme pro Sprecher',
     pickVoice: 'Stimme wählen',
     aiBtn: 'Skript via AI',
-    genBtn: 'Dialog generieren',
+    genBtn: 'Voiceover generieren',
+    genBtnSrs: 'Lip-Sync-Clips generieren',
     generating: 'Generiere…',
     blocks: (n: number) => `${n} Block${n === 1 ? '' : 'e'}`,
     speakers: (n: number) => `${n} Sprecher`,
@@ -73,17 +75,21 @@ const T = {
     voiceMissing: (name: string) => `Wähle eine Stimme für „${name}".`,
     parseEmpty: 'Kein gültiges Skript. Format: "Sarah: Hallo!"',
     success: (n: number) => `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`,
+    successInline: (n: number) => `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`,
     failed: 'Generierung fehlgeschlagen',
     aiFailed: 'KI-Skript konnte nicht erstellt werden',
+    srsLabel: 'Erweitert: Als separate Shot-Reverse-Shot-Szenen rendern',
+    srsHint: 'Standard: Dialog läuft als Voiceover in dieser Szene — keine extra Szenen.',
   },
   en: {
     title: 'Scene Dialog',
-    subtitle: 'Write a screenplay — each line becomes its own lip-sync clip.',
+    subtitle: 'Write a screenplay — the dialog plays as voiceover IN this scene.',
     script: 'Screenplay',
     voices: 'Voice per speaker',
     pickVoice: 'Pick voice',
     aiBtn: 'AI Script',
-    genBtn: 'Generate dialog',
+    genBtn: 'Generate voiceover',
+    genBtnSrs: 'Generate lip-sync clips',
     generating: 'Generating…',
     blocks: (n: number) => `${n} block${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} speaker${n === 1 ? '' : 's'}`,
@@ -92,17 +98,21 @@ const T = {
     voiceMissing: (name: string) => `Pick a voice for "${name}".`,
     parseEmpty: 'No valid script. Format: "Sarah: Hi!"',
     success: (n: number) => `${n} lip-sync clip${n === 1 ? '' : 's'} are being generated (1–3 min).`,
+    successInline: (n: number) => `${n} voiceover block${n === 1 ? '' : 's'} attached to this scene.`,
     failed: 'Generation failed',
     aiFailed: 'AI script could not be generated',
+    srsLabel: 'Advanced: render as separate shot-reverse-shot scenes',
+    srsHint: 'Default: dialog plays as voiceover in this scene — no extra scenes.',
   },
   es: {
     title: 'Diálogo de escena',
-    subtitle: 'Escribe un guion — cada línea se convierte en un clip lip-sync.',
+    subtitle: 'Escribe un guion — el diálogo suena como voz en off EN esta escena.',
     script: 'Guion',
     voices: 'Voz por hablante',
     pickVoice: 'Elegir voz',
     aiBtn: 'Guion con IA',
-    genBtn: 'Generar diálogo',
+    genBtn: 'Generar voz en off',
+    genBtnSrs: 'Generar clips lip-sync',
     generating: 'Generando…',
     blocks: (n: number) => `${n} bloque${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} hablante${n === 1 ? '' : 's'}`,
@@ -111,8 +121,11 @@ const T = {
     voiceMissing: (name: string) => `Elige una voz para "${name}".`,
     parseEmpty: 'Guion no válido. Formato: "Sarah: ¡Hola!"',
     success: (n: number) => `${n} clip${n === 1 ? '' : 's'} lip-sync se están generando (1–3 min).`,
+    successInline: (n: number) => `${n} bloque${n === 1 ? '' : 's'} de voz añadidos a esta escena.`,
     failed: 'Generación fallida',
     aiFailed: 'No se pudo generar el guion con IA',
+    srsLabel: 'Avanzado: renderizar como escenas plano-contraplano separadas',
+    srsHint: 'Por defecto: el diálogo suena como voz en off en esta escena — sin escenas extra.',
   },
 };
 
@@ -158,6 +171,7 @@ export default function SceneDialogStudio({
   );
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
 
   // Sync only when switching to a different scene — otherwise the parent's
   // re-render after our own debounced save would clobber the user's in-flight
@@ -236,6 +250,86 @@ export default function SceneDialogStudio({
     }
   };
 
+  const handleGenerateInline = async () => {
+    setGenerating(true);
+    let okCount = 0;
+    let cumulativeOffset = 0;
+    try {
+      for (const block of blocks) {
+        const c = sceneCast.find((x) => x.id === block.speakerId);
+        if (!c) continue;
+        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
+        if (!voiceMeta) continue;
+
+        // ElevenLabs voice id: presets use the preset id directly; cloned
+        // voices store the real ElevenLabs id in `elevenlabsVoiceId`.
+        const elevenVoiceId = voiceMeta.isCustom
+          ? voiceMeta.elevenlabsVoiceId
+          : voiceMeta.id;
+
+        const { data, error } = await supabase.functions.invoke('generate-voiceover', {
+          body: {
+            text: block.text,
+            voiceId: elevenVoiceId,
+            projectId: projectId ?? scene.projectId,
+          },
+        });
+        if (error) throw error;
+        const audioUrl = (data as any)?.audioUrl as string | undefined;
+        const duration = Number((data as any)?.duration ?? 0) || Math.max(1.5, block.text.length / 18);
+        if (!audioUrl) throw new Error('No audioUrl returned');
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Unauthorized');
+
+        const { error: insErr } = await supabase
+          .from('scene_audio_clips')
+          .insert({
+            user_id: user.id,
+            project_id: projectId ?? scene.projectId,
+            scene_id: scene.id,
+            kind: 'voiceover',
+            source: 'ai',
+            prompt: `${c.name}: ${block.text}`,
+            url: audioUrl,
+            start_offset: Math.round(cumulativeOffset * 100) / 100,
+            duration: Math.round(duration * 100) / 100,
+            volume: 1.0,
+            ducking_enabled: true,
+            cost_credits: 0,
+          });
+        if (insErr) throw insErr;
+
+        cumulativeOffset += duration + 0.15; // small breath between speakers
+        okCount += 1;
+      }
+
+      // Bump scene duration so all VO blocks fit (cap at 60s sanity)
+      const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
+      if (totalNeeded > (scene.durationSeconds ?? 0)) {
+        onUpdate({ durationSeconds: totalNeeded });
+      }
+      // Notify other panels (SoundDesign / preview) to refresh.
+      try {
+        const evt = new CustomEvent('scene-audio-clips-changed', {
+          detail: { projectId: projectId ?? scene.projectId },
+        });
+        window.dispatchEvent(evt);
+      } catch (_) { /* noop */ }
+
+      toast({ title: t.title, description: t.successInline(okCount) });
+    } catch (e) {
+      console.error('[SceneDialogStudio] inline generate error', e);
+      toast({
+        title: t.failed,
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (blocks.length === 0) {
       toast({ title: t.parseEmpty, variant: 'destructive' });
@@ -246,6 +340,10 @@ export default function SceneDialogStudio({
         toast({ title: t.voiceMissing(sp.name), variant: 'destructive' });
         return;
       }
+    }
+    if (!renderAsSeparateScenes) {
+      await handleGenerateInline();
+      return;
     }
     setGenerating(true);
     let okCount = 0;
@@ -442,6 +540,21 @@ export default function SceneDialogStudio({
         </div>
       )}
 
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border/40 bg-background/40 p-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Volume2 className="h-3 w-3 text-primary" />
+            <span className="text-[11px] font-medium">{t.srsLabel}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{t.srsHint}</p>
+        </div>
+        <Switch
+          checked={renderAsSeparateScenes}
+          onCheckedChange={setRenderAsSeparateScenes}
+          disabled={generating}
+        />
+      </div>
+
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -469,9 +582,13 @@ export default function SceneDialogStudio({
             <>
               <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
             </>
+          ) : renderAsSeparateScenes ? (
+            <>
+              <User className="h-3 w-3" /> {t.genBtnSrs}
+            </>
           ) : (
             <>
-              <User className="h-3 w-3" /> {t.genBtn}
+              <Volume2 className="h-3 w-3" /> {t.genBtn}
             </>
           )}
         </Button>
