@@ -381,10 +381,16 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         return;
       }
 
-      // Optimistically mark AI scenes as generating
+      // Optimistically mark AI scenes as generating, AND freeze the
+      // composed first-frame as the scene's referenceImageUrl so future
+      // re-rolls reuse it deterministically (no Nano-Banana drift).
       const optimistic = pScenes.map(s => {
         if (scenesPayload.some(p => p.id === s.id) && s.clipSource.startsWith('ai-')) {
-          return { ...s, clipStatus: 'generating' as const };
+          const prep = anchorByScene.get(s.id);
+          const frozenRef = prep?.composed && prep.firstFrameUrl
+            ? prep.firstFrameUrl
+            : s.referenceImageUrl;
+          return { ...s, clipStatus: 'generating' as const, referenceImageUrl: frozenRef };
         }
         return s;
       });
