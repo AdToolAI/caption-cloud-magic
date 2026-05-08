@@ -919,8 +919,64 @@ export default function SceneCard({
                 onUpdate={onUpdate}
                 onAddScene={onAddScene}
                 onEnsurePersisted={onEnsurePersisted}
+                autoSplitOnMount={autoSplitArmed}
+                onAutoSplitConsumed={() => setAutoSplitArmed(false)}
               />
             )}
+
+            {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
+            <AlertDialog open={splitConfirmOpen} onOpenChange={setSplitConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {(() => {
+                      const speakerLines = (scene.dialogScript ?? '')
+                        .split('\n')
+                        .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
+                        .filter(Boolean) as string[];
+                      const n = Math.max(2, new Set(speakerLines).size);
+                      return lang === 'de'
+                        ? `Szene in ${n} Einzel-Szenen aufteilen?`
+                        : lang === 'es'
+                        ? `¿Dividir la escena en ${n} subescenas?`
+                        : `Split scene into ${n} sub-scenes?`;
+                    })()}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {(() => {
+                      const speakerLines = (scene.dialogScript ?? '')
+                        .split('\n')
+                        .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
+                        .filter(Boolean) as string[];
+                      const n = Math.max(2, new Set(speakerLines).size);
+                      const eur = estimateHeygenCostEur(n).toFixed(2);
+                      return lang === 'de'
+                        ? `Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Die aktuelle Szene bleibt als Wrapper bestehen. Geschätzte Kosten: €${eur}.`
+                        : lang === 'es'
+                        ? `Cada hablante recibirá su propio clip HeyGen lip-sync en el storyboard. Coste estimado: €${eur}.`
+                        : `Each speaker becomes its own HeyGen lip-sync clip in the storyboard. Estimated cost: €${eur}.`;
+                    })()}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>
+                    {lang === 'de' ? 'Abbrechen' : lang === 'es' ? 'Cancelar' : 'Cancel'}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setDialogStudioOpen(true);
+                      setAutoSplitArmed(true);
+                      setTimeout(
+                        () => dialogStudioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+                        80,
+                      );
+                    }}
+                  >
+                    {lang === 'de' ? 'Splitten & generieren' : lang === 'es' ? 'Dividir y generar' : 'Split & generate'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
 
 
             {/* Scene-Aware Character Anchor — strategy badge + override */}
