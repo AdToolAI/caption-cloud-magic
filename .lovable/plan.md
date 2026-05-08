@@ -1,50 +1,49 @@
-## Was wir beheben
+## Root Cause
 
-### Problem 1 — Sarah verschwindet als Sprecher
-**Ursache** in `src/lib/talking-head/parseDialogScript.ts`:
-```ts
-x.name.toLowerCase() === speakerName.toLowerCase() ||
-x.name.toLowerCase().split(/\s+/)[0] === speakerName.toLowerCase()
+Im Screenshot ist der Szenen-Prompt im **strukturierten Modus** (`promptMode === 'structured'`, Badge „Strukturiert" oben rechts). In diesem Modus wird `scene.aiPrompt` bei jedem Re-Render aus `promptSlots` via `stitchSlots(...)` neu zusammengebaut.
+
+`SceneDialogStudio` schreibt den `[Dialog: …]`-Marker aber **ausschließlich** in `scene.aiPrompt` — niemals in `promptSlots.subject`. Folge: Sobald irgendein Slot-Re-Stitch passiert (z. B. nach `onUpdate`), überschreibt der Stitcher den frisch eingefügten Dialog-Marker → der Prompt sieht aus wie vorher, das Skript wirkt sich weder visuell auf den AI-Clip noch akustisch aus.
+
+`applyCastToPrompt` macht es bereits korrekt vor: bei structured → in `promptSlots.subject` schreiben **und** `aiPrompt` neu stitchen; bei free → nur `aiPrompt`.
+
+Zweiter Aspekt: Selbst mit korrektem Marker ist `[Dialog: …]` nur eine Notiz im Prompt. Damit der Clip tatsächlich „den Dialog spricht/zeigt", muss im Free-Mode-Prompt explizit eine Sprech-Anweisung im englischen, kameralesbaren Stil stehen (z. B. `Matthew says: "…". Sarah replies: "…".`) — so wie HeyGen / i2v-Modelle es als Mund-/Mimik-Hinweis interpretieren können. Der reine Marker reicht nicht.
+
+## Plan
+
+**1. `applyDialogToPrompt.ts` — zwei Ausgaben statt einer**
+- Bestehende Marker-Funktion bleibt für Anzeige im Free-Prompt.
+- Neue Hilfsfunktion `buildSpokenLinesBlock(blocks, lang)` rendert einen englischen Sprech-Block:
+  ```
+  Spoken dialog (visible lip-sync): Matthew says: "Welcome to DroneOcular." Sarah replies: "Tired of wasting hours…".
+  ```
+- Idempotenter Wrapper-Marker `[Dialog: …][/Dialog]` der diesen Block umschließt — so kann ein Re-Run ihn sauber ersetzen, ohne fremden Prompt-Text zu zerstören.
+
+**2. `SceneDialogStudio.tsx` — Sync in `promptSlots.subject` UND `aiPrompt` (analog `applyCastToPrompt`)**
+- Neue Props vom Parent (`SceneCard`) erhalten/durchschleifen: `promptMode`, `promptSlots`, `promptSlotOrder`, oder einfacher: in `SceneCard` die Sync-Logik zentral durchführen, nicht im Studio.
+- Bevorzugte Variante (geringere Prop-Drilling-Kosten): **Sync-Effekt von `SceneDialogStudio` nach `SceneCard` ziehen.**
+  - `SceneDialogStudio` ruft nur noch `onUpdate({ dialogScript })` auf.
+  - `SceneCard` bekommt einen neuen `useEffect`, der bei Änderung von `scene.dialogScript` (+ `characters`):
+    - `parseDialogScript(...)` ausführt
+    - bei `promptMode === 'structured'`: `promptSlots.subject` mit `applyDialogToPrompt(currentSubject, blocks, lang)` updaten und `aiPrompt = stitchSlots(nextSlots, order)` neu setzen
+    - bei `promptMode === 'free'`: `aiPrompt = applyDialogToPrompt(scene.aiPrompt, blocks, lang)` setzen
+- Checkbox „Dialog in Szenen-Prompt übernehmen" wandert zu `scene.syncDialogToPrompt` (oder bleibt lokal mit Default true) — Effekt respektiert das Flag.
+
+**3. Sichtbares Feedback**
+- Toast nach AI-Skript bestätigt jetzt zusätzlich: „Prompt aktualisiert ✓" (sonst denkt der User wieder, nichts sei passiert).
+- Im `DialogPreviewList` ein kleines „⟳ in Prompt synchronisiert"-Badge wenn `syncToPrompt === true` und `blocks.length > 0`.
+
+**4. Out of scope**
+- Keine Edge-Function-Änderung, keine DB-Migration, kein neues HeyGen-Verhalten.
+- `parseDialogScript` und Cast-Filter (Sarah-Fix) bleiben wie zuletzt korrigiert.
+
+## Files
+- `src/lib/motion-studio/applyDialogToPrompt.ts` — `buildSpokenLinesBlock`, neuer Wrapper-Marker.
+- `src/components/video-composer/SceneCard.tsx` — neuer Sync-Effekt für `dialogScript` (analog Cast-Backfill).
+- `src/components/video-composer/SceneDialogStudio.tsx` — Effekt entfernen, nur noch `dialogScript` persistieren; Toast-Text ergänzen; „synchronisiert"-Badge.
+
+## Resultat
+Nach „Skript via AI" erscheint im KI-Prompt sofort:
 ```
-Cast-Name = „Sarah" (kurz), Skript schreibt „**Sarah Dusatko**:" (lang). Die zweite Bedingung prüft nur „Cast-Vorname == Skript-komplett" — nicht den umgekehrten Fall „Skript-Vorname == Cast-komplett". Folge: Sarahs Zeile wird als Continuation an Matthews Block angehängt → 1 Sprecher, Matthew „spricht" beide Texte.
-
-**Fix** — symmetrisches Vornamen-Matching:
-```ts
-const castFirst = x.name.toLowerCase().split(/\s+/)[0];
-const scriptFirst = speakerName.toLowerCase().split(/\s+/)[0];
-return (
-  x.name.toLowerCase() === speakerName.toLowerCase() ||
-  castFirst === scriptFirst                    // „Sarah" ↔ „Sarah Dusatko"
-);
+[Besetzung: Matthew Dusatko (Voll), Sarah (Voll)] [Dialog] Spoken dialog: Matthew says: "Welcome to DroneOcular." Sarah replies: "Tired of wasting hours fighting weeds…". [/Dialog] Low angle, wide shot of a vast Texan farmland …
 ```
-
-Nebenfix: `referenceImageUrl`-Pflicht im Parser entfernen — Speaker-Erkennung darf nicht vom Bild abhängen (Bild ist erst beim HeyGen-Render relevant).
-
-### Problem 2 — Skript wirkt sich nicht sichtbar auf Prompt/Szenen aus
-Aktuell speichert „Skript via AI" nur `dialogScript`. Der KI-Prompt der Szene und die Sub-Szenen werden nicht angefasst → User denkt „nichts passiert".
-
-**Fix** — drei sichtbare Effekte:
-1. **Inline-Block-Vorschau** unter dem Textarea (Avatar + Name + erste 60 Zeichen pro Zeile). So sieht der User sofort, wie das Skript geparsed wurde.
-2. **Auto-Sync in Szenen-Prompt** (Checkbox „In Prompt übernehmen", default an):
-   Idempotenter, lokalisierter `[Dialog: Matthew → "…", Sarah → "…"]`-Marker wird an `aiPrompt` (oder `promptSlots.subject` im Structured-Mode) angehängt. Re-Run mit gleichen Blöcken = no-op; leeres Skript entfernt Marker. Dadurch verändert sich die Szenen-Komposition messbar (sprechende Pose) und der User sieht es im Prompt-Feld.
-3. **Toast „Skript bereit – jetzt Dialog generieren"** als CTA, damit der zweite Schritt nicht übersehen wird.
-
-In `handleGenerate`: Sprecher ohne Portrait sauber überspringen (statt schon im Parser auszufiltern) mit Toast „Kein Portrait für {Name} — Lip-Sync übersprungen".
-
-## Technische Details
-
-### Dateien
-- `src/lib/talking-head/parseDialogScript.ts`
-  - Speaker-Match: bidirektionales Vornamen-Matching.
-  - `referenceImageUrl`-Guard entfernen.
-- `src/components/video-composer/SceneDialogStudio.tsx`
-  - `sceneCast`-Filter: `referenceImageUrl`-Bedingung entfernen.
-  - `handleGenerate`: Skip + Toast für Speaker ohne Portrait.
-  - Inline `<DialogPreviewList />` (Avatar/Name/Snippet) direkt unter dem Textarea.
-  - Checkbox „Dialog in Szenen-Prompt übernehmen" + bei Skript-Update / „Skript via AI" → `applyDialogToPrompt(...)` aufrufen + Toast „Skript bereit".
-- `src/lib/motion-studio/applyDialogToPrompt.ts` (neu, parallel zu `applyCastToPrompt`)
-  - Idempotenter, lokalisierter `[Dialog: …]`-Marker (de/en/es).
-
-### Out of scope
-- Keine DB-Migration, keine Edge-Function-Änderung, keine Pipeline-Änderung.
-- Cast-Picker und HeyGen-Sub-Szenen-Spawn bleiben unverändert.
+…und bleibt auch nach Re-Stitches erhalten, weil der Marker jetzt in `promptSlots.subject` lebt.

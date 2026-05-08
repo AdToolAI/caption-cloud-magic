@@ -15,8 +15,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -160,7 +158,6 @@ export default function SceneDialogStudio({
   );
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [syncToPrompt, setSyncToPrompt] = useState(true);
 
   // Sync only when switching to a different scene — otherwise the parent's
   // re-render after our own debounced save would clobber the user's in-flight
@@ -171,20 +168,17 @@ export default function SceneDialogStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce + (optional) sync into the scene's AI prompt
+  // Persist script with debounce. The actual prompt-sync happens in
+  // SceneCard (so that structured-mode promptSlots.subject is updated and
+  // stitchSlots can't wipe the marker on the next render).
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     const handle = setTimeout(() => {
-      const updates: Partial<ComposerScene> = { dialogScript: script };
-      if (syncToPrompt) {
-        const parsed = parseDialogScript(script, sceneCast);
-        updates.aiPrompt = applyDialogToPrompt(scene.aiPrompt ?? '', parsed, language);
-      }
-      onUpdate(updates);
+      onUpdate({ dialogScript: script });
     }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script, syncToPrompt]);
+  }, [script]);
 
   // Persist voice map immediately on change
   const setVoiceFor = (speakerId: string, voiceId: string) => {
@@ -224,10 +218,10 @@ export default function SceneDialogStudio({
           title: language === 'de' ? 'Skript bereit' : language === 'es' ? 'Guion listo' : 'Script ready',
           description:
             language === 'de'
-              ? 'Jetzt „Dialog generieren" klicken.'
+              ? 'Prompt aktualisiert ✓ — jetzt „Dialog generieren" klicken.'
               : language === 'es'
-              ? 'Ahora haz clic en "Generar diálogo".'
-              : 'Now click "Generate dialog".',
+              ? 'Prompt actualizado ✓ — ahora haz clic en "Generar diálogo".'
+              : 'Prompt updated ✓ — now click "Generate dialog".',
         });
       }
     } catch (e) {
@@ -391,18 +385,16 @@ export default function SceneDialogStudio({
           </div>
         )}
 
-        <label className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
-          <Checkbox
-            checked={syncToPrompt}
-            onCheckedChange={(v) => setSyncToPrompt(!!v)}
-            className="h-3.5 w-3.5"
-          />
-          {language === 'de'
-            ? 'Dialog in Szenen-Prompt übernehmen'
-            : language === 'es'
-            ? 'Incluir diálogo en el prompt de la escena'
-            : 'Sync dialog into scene prompt'}
-        </label>
+        {blocks.length > 0 && (
+          <div className="mt-2 text-[10px] text-emerald-500 flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            {language === 'de'
+              ? 'Dialog ist live im Szenen-Prompt synchronisiert'
+              : language === 'es'
+              ? 'Diálogo sincronizado en vivo con el prompt de la escena'
+              : 'Dialog is live-synced into the scene prompt'}
+          </div>
+        )}
       </div>
 
       {speakers.length > 0 && (
