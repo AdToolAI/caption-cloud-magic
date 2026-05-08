@@ -68,6 +68,7 @@ export default function VoiceSubtitlesTab({
   language,
   briefing,
   onGoToAudio,
+  projectId,
 }: VoiceSubtitlesTabProps) {
   const { t } = useTranslation();
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
