@@ -61,6 +61,31 @@ const PRESET_VOICES = [
   { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel (narrator)' },
 ];
 
+// Extract a human-readable error message from any thrown value
+// (Error, Supabase FunctionsHttpError, PostgrestError, plain object, string).
+function formatError(e: unknown): string {
+  if (!e) return 'Unknown error';
+  if (typeof e === 'string') return e;
+  if (e instanceof Error && e.message) return e.message;
+  const anyE = e as any;
+  return (
+    anyE?.message ||
+    anyE?.error?.message ||
+    anyE?.context?.message ||
+    anyE?.details ||
+    anyE?.error_description ||
+    (() => {
+      try { return JSON.stringify(anyE); } catch { return String(anyE); }
+    })()
+  );
+}
+
+const PROJECT_REQUIRED = {
+  de: 'Bitte zuerst das Projekt speichern, bevor Voiceover generiert wird.',
+  en: 'Please save the project first before generating voiceover.',
+  es: 'Guarda el proyecto antes de generar la voz en off.',
+} as const;
+
 const T = {
   de: {
     title: 'Szenen-Skript',
@@ -254,7 +279,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] AI script error', e);
       toast({
         title: t.aiFailed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
@@ -263,6 +288,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   const handleGenerateInline = async () => {
+    const pid = (projectId || scene.projectId || '').trim();
+    if (!pid) {
+      toast({
+        title: t.failed,
+        description: PROJECT_REQUIRED[language],
+        variant: 'destructive',
+      });
+      return;
+    }
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
@@ -283,7 +317,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           body: {
             text: block.text,
             voiceId: elevenVoiceId,
-            projectId: projectId ?? scene.projectId,
+            projectId: pid,
           },
         });
         if (error) throw error;
@@ -298,7 +332,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           .from('scene_audio_clips')
           .insert({
             user_id: user.id,
-            project_id: projectId ?? scene.projectId,
+            project_id: pid,
             scene_id: scene.id,
             kind: 'voiceover',
             source: 'ai',
@@ -324,7 +358,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       // Notify other panels (SoundDesign / preview) to refresh.
       try {
         const evt = new CustomEvent('scene-audio-clips-changed', {
-          detail: { projectId: projectId ?? scene.projectId },
+          detail: { projectId: pid },
         });
         window.dispatchEvent(evt);
       } catch (_) { /* noop */ }
@@ -334,7 +368,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] inline generate error', e);
       toast({
         title: t.failed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
@@ -436,7 +470,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] generate error', e);
       toast({
         title: t.failed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
