@@ -267,6 +267,55 @@ export default function VoiceSubtitlesTab({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht eingeloggt');
 
+      // ── Multi-Speaker branch (Voice Studio 2.0) ─────────────────
+      if (isMultiSpeakerScript(voiceover.script) && voiceover.speakerMap) {
+        const parsedSegments = parseSpeakerScript(voiceover.script);
+        const missing = parsedSegments
+          .map((s) => s.speakerId)
+          .filter((id) => !voiceover.speakerMap![id]);
+        if (missing.length) {
+          throw new Error(`Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`);
+        }
+
+        const { data: msData, error: msErr } = await supabase.functions.invoke('generate-multi-speaker-vo', {
+          body: {
+            segments: parsedSegments.map((s) => ({ speakerId: s.speakerId, text: s.text, tags: s.tags })),
+            speakerMap: voiceover.speakerMap,
+            defaultEngine: 'elevenlabs',
+          },
+        });
+        if (msErr) throw msErr;
+        if (!msData?.success) throw new Error(msData?.error || 'Multi-speaker VO failed');
+
+        // Stitch on client → WAV
+        const stitched = await stitchSpeakerSegments(
+          (msData.segments as Array<{ speakerId: string; audioBase64: string; mime: string }>),
+          { gapMs: voiceover.segmentGapMs ?? 180 },
+        );
+
+        const wavPath = `${user.id}/${Date.now()}-multi-vo.wav`;
+        const { data: upload, error: upErr } = await supabase.storage
+          .from('voiceover-audio')
+          .upload(wavPath, stitched.wavBlob, { contentType: 'audio/wav', cacheControl: '3600', upsert: false });
+        if (upErr) throw upErr;
+        const { data: { publicUrl } } = supabase.storage.from('voiceover-audio').getPublicUrl(upload.path);
+
+        onUpdateAssembly({
+          voiceover: {
+            ...voiceover,
+            multiSpeaker: true,
+            audioUrl: publicUrl,
+            durationSeconds: stitched.durationSeconds,
+            segmentTimings: stitched.segmentTimings,
+          },
+        });
+        toast({
+          title: 'Multi-Speaker VO erzeugt',
+          description: `${parsedSegments.length} Segmente · ${stitched.durationSeconds.toFixed(1)}s`,
+        });
+        return;
+      }
+
       const selected = voices.find(v => v.id === voiceover.voiceId);
 
       const { data, error } = await supabase.functions.invoke('generate-voiceover', {
