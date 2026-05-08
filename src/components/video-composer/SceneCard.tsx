@@ -101,6 +101,8 @@ interface SceneCardProps {
    *  so prompt injection / anchor resolution finds it. */
   onAddCharacter?: (character: ComposerCharacter) => void;
   language: string;
+  /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
+  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
 const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
@@ -133,6 +135,7 @@ export default function SceneCard({
   onAddScene,
   onAddCharacter,
   language,
+  onEnsurePersisted,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
