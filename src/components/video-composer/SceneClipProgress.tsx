@@ -35,14 +35,17 @@ export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
       <video
         src={scene.clipUrl}
         className="w-full h-full object-cover"
-        muted
         controls
+        playsInline
+        preload="metadata"
         onLoadedMetadata={(e) => {
+          const el = e.currentTarget;
+          // Default to a comfortable dialog-friendly volume.
+          try { el.volume = 0.9; } catch { /* noop */ }
           // Skip the frozen reference-image opening frames produced by i2v
           // providers (Hailuo, Kling, Wan, Seedance, Luma, Veo, Sora).
           if (trim > 0) {
             try {
-              const el = e.currentTarget;
               if (isFinite(el.duration) && trim < el.duration - 0.1) {
                 el.currentTime = trim;
               }
