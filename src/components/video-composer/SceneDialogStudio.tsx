@@ -444,21 +444,40 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
-  if (sceneCast.length < 2) return null;
+  if (sceneCast.length < 1) return null;
+  if (open === false) return null;
+
+  const isMonologue = sceneCast.length === 1;
 
   return (
-    <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
+    <Card ref={ref} className="p-3 space-y-3 border-primary/30 bg-primary/5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Mic className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold">{t.title}</span>
         </div>
-        <span className="text-[10px] text-muted-foreground">
-          {t.blocks(blocks.length)} · {t.speakers(speakers.length)} · {t.sec(estimatedDurationSec)}
-          {blocks.length > 0 && ` · €${totalCost.toFixed(2)}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            {t.blocks(blocks.length)} · {t.speakers(speakers.length)} · {t.sec(estimatedDurationSec)}
+            {blocks.length > 0 && ` · €${totalCost.toFixed(2)}`}
+          </span>
+          {onClose && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onClose}
+              aria-label={t.close}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
-      <p className="text-[10px] text-muted-foreground -mt-1">{t.subtitle}</p>
+      <p className="text-[10px] text-muted-foreground -mt-1">
+        {isMonologue ? t.subtitleMono : t.subtitle}
+      </p>
 
       <div>
         <Label className="text-[10px] text-muted-foreground">{t.script}</Label>
