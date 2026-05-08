@@ -50,6 +50,10 @@ interface SceneDialogStudioProps {
   open?: boolean;
   /** Close-handler used by the in-card X button. */
   onClose?: () => void;
+  /** Auto-persist hook — saves the project before generating voiceover so
+   *  unsaved projects don't block the user. Returns the fresh projectId and
+   *  scene rows so we can map the current scene to its DB id. */
+  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
 const PRESET_VOICES = [
