@@ -3,7 +3,8 @@
 // Backwards-compatible: writes both `characterShots[]` AND `characterShot`
 // (= the first/primary slot) so older pipeline code keeps working.
 
-import { Plus, X, Users } from 'lucide-react';
+import { useEffect, useMemo, useRef } from 'react';
+import { Plus, X, Users, UserPlus, AlertCircle } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -40,10 +41,20 @@ const LABELS = {
     de: 'Bis zu 4 Charaktere pro Szene. Bei ≥2 komponiert Nano Banana 2 sie ins erste Frame; Vidu Q2 (Multi-Reference) wird empfohlen.',
     es: 'Hasta 4 personajes por escena. Con ≥2, Nano Banana 2 los compone en el primer frame; se recomienda Vidu Q2.',
   },
+  briefingSection: { en: 'In this project', de: 'In diesem Projekt', es: 'En este proyecto' },
+  librarySection:  { en: 'From your avatar library', de: 'Aus deiner Avatar-Bibliothek', es: 'De tu biblioteca de avatares' },
+  createNew:       { en: 'Create new avatar…', de: 'Neuen Avatar erstellen…', es: 'Crear nuevo avatar…' },
+  unknown:         { en: 'Unknown — remove?', de: 'Unbekannt – entfernen?', es: 'Desconocido – ¿quitar?' },
 } as const;
 
 interface Props {
   characters: ComposerCharacter[];
+  /** Optional: full avatar library (brand_characters + purchased). Shown as a
+   *  second section in the add-popover. Picking one auto-adds it to briefing. */
+  libraryCharacters?: ComposerCharacter[];
+  /** Called when the user picks a character that wasn't in `characters` yet,
+   *  so the parent can persist it to the project briefing cast. */
+  onAddToBriefing?: (character: ComposerCharacter) => void;
   value?: CharacterShot[];
   /** Backwards-compat: legacy single-slot value. */
   legacyValue?: CharacterShot;
@@ -57,18 +68,87 @@ function normalizeValue(value?: CharacterShot[], legacy?: CharacterShot): Charac
   return [];
 }
 
+/**
+ * Tolerant character lookup — mirrors `applyCastToPrompt.findCharacter`
+ * and `CastConsistencyMap.getAnchor` so the picker stays in sync even when
+ * the storyboard LLM drifts the `characterId` away from the brand UUID.
+ */
+function findCharacter(
+  slotId: string | undefined,
+  pool: ComposerCharacter[],
+): ComposerCharacter | undefined {
+  if (!slotId || !pool.length) return undefined;
+  const exact = pool.find((c) => c.id === slotId);
+  if (exact) return exact;
+  const lower = slotId.toLowerCase();
+  const byNameInId = pool.find((c) => {
+    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    return !!first && first.length >= 3 && lower.includes(first);
+  });
+  if (byNameInId) return byNameInId;
+  return pool.find((c) => c.name?.trim().toLowerCase() === lower);
+}
+
 export function CharacterCastPicker({
   characters,
+  libraryCharacters,
+  onAddToBriefing,
   value,
   legacyValue,
   onChange,
   language = 'en',
 }: Props) {
-  if (!characters || characters.length === 0) return null;
   const lang: Lang = language;
   const cast = normalizeValue(value, legacyValue);
+
+  // Combined pool used for resolving slot ids (briefing first, then library
+  // — briefing wins on dupe id).
+  const resolutionPool = useMemo<ComposerCharacter[]>(() => {
+    const seen = new Set((characters ?? []).map((c) => c.id));
+    const extras = (libraryCharacters ?? []).filter((c) => !seen.has(c.id));
+    return [...(characters ?? []), ...extras];
+  }, [characters, libraryCharacters]);
+
+  // Self-heal: when a slot's id is drifted (e.g. "lib:matthew-…") but matches
+  // a real character via tolerant lookup, rewrite it to the canonical UUID
+  // exactly once. Subsequent renders see the corrected id and stop.
+  const healedRef = useRef(false);
+  useEffect(() => {
+    if (healedRef.current) return;
+    if (cast.length === 0) return;
+    let changed = false;
+    const next = cast.map((s) => {
+      if (resolutionPool.some((c) => c.id === s.characterId)) return s;
+      const match = findCharacter(s.characterId, resolutionPool);
+      if (match && match.id !== s.characterId) {
+        changed = true;
+        return { ...s, characterId: match.id };
+      }
+      return s;
+    });
+    if (changed) {
+      healedRef.current = true;
+      onChange(next);
+    }
+    // Dependencies kept lean — only re-run when ids actually change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cast.map((s) => s.characterId).join('|'), resolutionPool.map((c) => c.id).join('|')]);
+
   const inCast = new Set(cast.map((s) => s.characterId));
-  const available = characters.filter((c) => !inCast.has(c.id));
+
+  const briefingAvailable = (characters ?? []).filter((c) => !inCast.has(c.id));
+  const libraryAvailable = (libraryCharacters ?? []).filter(
+    (c) => !inCast.has(c.id) && !(characters ?? []).some((b) => b.id === c.id),
+  );
+
+  // Render nothing if there is genuinely nothing to show or do.
+  if (
+    (characters?.length ?? 0) === 0 &&
+    (libraryCharacters?.length ?? 0) === 0 &&
+    cast.length === 0
+  ) {
+    return null;
+  }
 
   const updateSlot = (id: string, patch: Partial<CharacterShot>) => {
     onChange(cast.map((s) => (s.characterId === id ? { ...s, ...patch } : s)));
@@ -80,6 +160,17 @@ export function CharacterCastPicker({
     if (cast.length >= MAX_CAST) return;
     onChange([...cast, { characterId: id, shotType: 'full' }]);
   };
+  const addFromLibrary = (c: ComposerCharacter) => {
+    if (cast.length >= MAX_CAST) return;
+    if (onAddToBriefing && !(characters ?? []).some((b) => b.id === c.id)) {
+      onAddToBriefing(c);
+    }
+    addSlot(c.id);
+  };
+
+  const canAddMore =
+    cast.length < MAX_CAST &&
+    (briefingAvailable.length > 0 || libraryAvailable.length > 0 || !!onAddToBriefing);
 
   return (
     <div className="space-y-1.5">
@@ -94,12 +185,18 @@ export function CharacterCastPicker({
         )}
 
         {cast.map((slot) => {
-          const ch = characters.find((c) => c.id === slot.characterId);
+          const ch = findCharacter(slot.characterId, resolutionPool);
           const meta = SHOT_TYPE_META[slot.shotType] ?? SHOT_TYPE_META.full;
+          const isGhost = !ch;
           return (
             <div
               key={slot.characterId}
-              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-0.5 pr-1 py-0.5"
+              className={
+                isGhost
+                  ? 'inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 pl-0.5 pr-1 py-0.5'
+                  : 'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 pl-0.5 pr-1 py-0.5'
+              }
+              title={isGhost ? LABELS.unknown[lang] : ch?.name}
             >
               {ch?.referenceImageUrl ? (
                 <img
@@ -107,37 +204,45 @@ export function CharacterCastPicker({
                   alt={ch.name}
                   className="h-5 w-5 rounded-full object-cover"
                 />
+              ) : isGhost ? (
+                <div className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-300">
+                  <AlertCircle className="h-3 w-3" />
+                </div>
               ) : (
                 <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[8px] font-bold">
                   {ch?.name?.[0] ?? '?'}
                 </div>
               )}
-              <span className="text-[10px] font-medium px-1">{ch?.name ?? '—'}</span>
+              <span className={`text-[10px] font-medium px-1 ${isGhost ? 'text-amber-300' : ''}`}>
+                {ch?.name ?? LABELS.unknown[lang]}
+              </span>
 
-              <Select
-                value={slot.shotType}
-                onValueChange={(v) =>
-                  updateSlot(slot.characterId, { shotType: v as CharacterShotType })
-                }
-              >
-                <SelectTrigger className="h-5 w-auto gap-1 text-[10px] border-border/40 bg-background/50 px-1.5">
-                  <SelectValue>{meta.label}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {SHOT_ORDER.map((t) => {
-                    const m = SHOT_TYPE_META[t];
-                    const Icon = m.icon;
-                    return (
-                      <SelectItem key={t} value={t} className="text-xs">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Icon className="h-3 w-3" />
-                          {m.label}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              {!isGhost && (
+                <Select
+                  value={slot.shotType}
+                  onValueChange={(v) =>
+                    updateSlot(slot.characterId, { shotType: v as CharacterShotType })
+                  }
+                >
+                  <SelectTrigger className="h-5 w-auto gap-1 text-[10px] border-border/40 bg-background/50 px-1.5">
+                    <SelectValue>{meta.label}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHOT_ORDER.map((t) => {
+                      const m = SHOT_TYPE_META[t];
+                      const Icon = m.icon;
+                      return (
+                        <SelectItem key={t} value={t} className="text-xs">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Icon className="h-3 w-3" />
+                            {m.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
 
               <button
                 type="button"
@@ -152,7 +257,7 @@ export function CharacterCastPicker({
           );
         })}
 
-        {cast.length < MAX_CAST && available.length > 0 && (
+        {canAddMore && (
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -165,29 +270,72 @@ export function CharacterCastPicker({
                 {LABELS.add[lang]}
               </Button>
             </PopoverTrigger>
-            <PopoverContent align="start" className="w-56 p-1">
-              <div className="space-y-0.5">
-                {available.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => addSlot(c.id)}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
-                  >
-                    {c.referenceImageUrl ? (
-                      <img
-                        src={c.referenceImageUrl}
-                        alt={c.name}
-                        className="h-6 w-6 rounded-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
-                        {c.name[0]}
-                      </div>
-                    )}
-                    <span className="text-xs">{c.name}</span>
-                  </button>
-                ))}
+            <PopoverContent align="start" className="w-64 p-1">
+              <div className="space-y-1">
+                {briefingAvailable.length > 0 && (
+                  <div>
+                    <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                      {LABELS.briefingSection[lang]}
+                    </div>
+                    <div className="space-y-0.5">
+                      {briefingAvailable.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => addSlot(c.id)}
+                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
+                        >
+                          {c.referenceImageUrl ? (
+                            <img src={c.referenceImageUrl} alt={c.name} className="h-6 w-6 rounded-full object-cover" />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+                              {c.name[0]}
+                            </div>
+                          )}
+                          <span className="text-xs">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {libraryAvailable.length > 0 && (
+                  <div>
+                    <div className="px-2 pt-1 pb-0.5 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                      {LABELS.librarySection[lang]}
+                    </div>
+                    <div className="space-y-0.5">
+                      {libraryAvailable.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => addFromLibrary(c)}
+                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left"
+                        >
+                          {c.referenceImageUrl ? (
+                            <img src={c.referenceImageUrl} alt={c.name} className="h-6 w-6 rounded-full object-cover" />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold">
+                              {c.name[0]}
+                            </div>
+                          )}
+                          <span className="text-xs">{c.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-border/40 my-1" />
+                <a
+                  href="/brand-characters"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 w-full px-2 py-1.5 rounded hover:bg-muted text-left text-xs text-primary"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                  {LABELS.createNew[lang]}
+                </a>
               </div>
             </PopoverContent>
           </Popover>
