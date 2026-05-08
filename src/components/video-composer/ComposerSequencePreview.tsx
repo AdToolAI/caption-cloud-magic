@@ -793,7 +793,6 @@ export default function ComposerSequencePreview({
           ref={videoBRef}
           playsInline
           preload="auto"
-          muted
           onTimeUpdate={onVideoTimeUpdate}
           onEnded={onVideoEnded}
           className="absolute inset-0 w-full h-full object-contain"
