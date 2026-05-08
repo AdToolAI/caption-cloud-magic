@@ -470,7 +470,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] generate error', e);
       toast({
         title: t.failed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
