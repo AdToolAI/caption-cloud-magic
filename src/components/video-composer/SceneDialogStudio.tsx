@@ -171,13 +171,20 @@ export default function SceneDialogStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce
+  // Persist script with debounce + (optional) sync into the scene's AI prompt
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
-    const handle = setTimeout(() => onUpdate({ dialogScript: script }), 500);
+    const handle = setTimeout(() => {
+      const updates: Partial<ComposerScene> = { dialogScript: script };
+      if (syncToPrompt) {
+        const parsed = parseDialogScript(script, sceneCast);
+        updates.aiPrompt = applyDialogToPrompt(scene.aiPrompt ?? '', parsed, language);
+      }
+      onUpdate(updates);
+    }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script]);
+  }, [script, syncToPrompt]);
 
   // Persist voice map immediately on change
   const setVoiceFor = (speakerId: string, voiceId: string) => {
