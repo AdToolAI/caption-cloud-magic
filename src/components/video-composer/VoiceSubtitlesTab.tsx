@@ -260,10 +260,25 @@ export default function VoiceSubtitlesTab({
   }, [voiceover?.enabled, scenes.length]);
 
 
+  // Detect per-scene voiceover clips — these conflict with a global VO
+  // (the audio engine would play both at once → "two voices" bug).
+  const perSceneVoCount = useMemo(
+    () => (sceneAudioClips ?? []).filter((c) => c.kind === 'voiceover' && !!c.url).length,
+    [sceneAudioClips],
+  );
+
   const handleGenerateVoiceover = async () => {
     if (!voiceover?.script?.trim()) {
       toast({ title: t('videoComposer.scriptMissing'), variant: 'destructive' });
       return;
+    }
+    if (perSceneVoCount > 0) {
+      const ok = window.confirm(
+        `Es existieren bereits ${perSceneVoCount} Per-Szene-Voiceover-Clips (aus dem Storyboard-Dialog). ` +
+        `Wenn du jetzt einen globalen Voiceover generierst, wird der globale VO in jenen Szenen automatisch stummgeschaltet, ` +
+        `damit nicht zwei Stimmen gleichzeitig spielen.\n\nFortfahren?`
+      );
+      if (!ok) return;
     }
     setGeneratingVo(true);
     try {
