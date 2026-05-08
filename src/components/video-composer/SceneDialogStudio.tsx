@@ -59,6 +59,11 @@ interface SceneDialogStudioProps {
    *  unsaved projects don't block the user. Returns the fresh projectId and
    *  scene rows so we can map the current scene to its DB id. */
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  /** When true, the studio will auto-flip "render as separate scenes" and
+   *  trigger handleGenerate() once on mount/update. Used by the multi-speaker
+   *  "Splitten" badge in SceneCard for one-click sub-scene generation. */
+  autoSplitOnMount?: boolean;
+  onAutoSplitConsumed?: () => void;
 }
 
 const PRESET_VOICES = [
