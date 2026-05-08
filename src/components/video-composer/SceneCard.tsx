@@ -490,6 +490,7 @@ export default function SceneCard({
                         <SelectItem value="sync-polish" className="text-xs">✨ Sync.so Polish</SelectItem>
                       </SelectContent>
                     </Select>
+                    </>
                   );
                 })()}
                 {(() => {
