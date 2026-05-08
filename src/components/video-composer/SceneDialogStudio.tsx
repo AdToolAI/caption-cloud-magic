@@ -59,6 +59,11 @@ interface SceneDialogStudioProps {
    *  unsaved projects don't block the user. Returns the fresh projectId and
    *  scene rows so we can map the current scene to its DB id. */
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  /** When true, the studio will auto-flip "render as separate scenes" and
+   *  trigger handleGenerate() once on mount/update. Used by the multi-speaker
+   *  "Splitten" badge in SceneCard for one-click sub-scene generation. */
+  autoSplitOnMount?: boolean;
+  onAutoSplitConsumed?: () => void;
 }
 
 const PRESET_VOICES = [
@@ -184,6 +189,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   open,
   onClose,
   onEnsurePersisted,
+  autoSplitOnMount,
+  onAutoSplitConsumed,
 }, ref) {
   const t = T[language];
   const { toast } = useToast();
@@ -644,6 +651,39 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       setGenerating(false);
     }
   };
+
+  // ── Auto-Split trigger ─────────────────────────────────────────────
+  // Fires once when the parent's amber "Splitten" badge sets autoSplitOnMount.
+  // Requires: ≥2 dialog blocks AND a voice configured for every speaker.
+  useEffect(() => {
+    if (!autoSplitOnMount) return;
+    if (generating) return;
+    if (blocks.length < 2) return;
+    const allVoicesSet = speakers.every((sp) => Boolean(voicePerSpeaker[sp.id]?.voiceId));
+    if (!allVoicesSet) {
+      toast({
+        title:
+          language === 'de'
+            ? 'Stimme pro Sprecher fehlt'
+            : language === 'es'
+            ? 'Falta voz por hablante'
+            : 'Voice per speaker missing',
+        description:
+          language === 'de'
+            ? 'Bitte unten eine Stimme für jeden Sprecher wählen, dann erneut auf „Splitten" klicken.'
+            : language === 'es'
+            ? 'Selecciona una voz para cada hablante y vuelve a hacer clic en "Dividir".'
+            : 'Pick a voice for every speaker, then click "Split" again.',
+        variant: 'destructive',
+      });
+      onAutoSplitConsumed?.();
+      return;
+    }
+    setRenderAsSeparateScenes(true);
+    onAutoSplitConsumed?.();
+    setTimeout(() => { void handleGenerate(); }, 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSplitOnMount, blocks.length, generating]);
 
   if (sceneCast.length < 1) return null;
   if (open === false) return null;
