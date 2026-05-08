@@ -449,6 +449,7 @@ export default function StoryboardTab({
                       onAddScene={onAddScene}
                       onAddCharacter={onAddCharacter}
                       language={language}
+                      onEnsurePersisted={onEnsurePersisted}
                     />
                   </SortableSceneItem>
                 );
