@@ -560,15 +560,32 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           });
           continue;
         }
-        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
-        if (!voiceMeta) continue;
+        const cfg = voicePerSpeaker[block.speakerId];
+        if (!cfg?.voiceId) continue;
 
         if (!onAddScene) continue;
 
-        // 1) Create the sub-scene FIRST so it has a real DB UUID. We store
-        //    `clipStatus: 'generating'` so the placeholder shows the spinner
-        //    immediately, and pollScenes (ClipsTab) will flip it to 'ready'
-        //    once HeyGen finishes (the edge function writes back into the row).
+        // For Hume voices: pre-render audio to a public URL (HeyGen can't call
+        // Hume directly). For ElevenLabs: let HeyGen do TTS internally.
+        let preGeneratedAudioUrl: string | undefined;
+        if (cfg.engine === 'hume') {
+          const { data: humeData, error: humeErr } = await supabase.functions.invoke(
+            'generate-voiceover-hume',
+            {
+              body: {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pidForSrs,
+              },
+            },
+          );
+          if (humeErr) throw humeErr;
+          preGeneratedAudioUrl = (humeData as any)?.audioUrl;
+          if (!preGeneratedAudioUrl) throw new Error('Hume returned no audioUrl');
+        }
+
+        // 1) Create the sub-scene FIRST so it has a real DB UUID.
         const charShot: CharacterShot = {
           characterId: c.id,
           shotType: 'profile',
@@ -589,14 +606,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         });
         const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
 
-        // 2) Kick off the HeyGen render and tell it which scene to update.
+        // 2) Kick off the HeyGen render. For Hume → pass the audioUrl directly.
+        //    For ElevenLabs → pass text + voiceId so HeyGen can synth itself.
         const r = await generate({
           sceneId: newSceneId,
           projectId: pidForSrs,
           imageUrl: c.referenceImageUrl,
-          text: block.text,
-          voiceId: voiceMeta.isCustom ? undefined : voiceMeta.id,
-          customVoiceId: voiceMeta.isCustom ? voiceMeta.elevenlabsVoiceId : undefined,
+          ...(preGeneratedAudioUrl
+            ? { audioUrl: preGeneratedAudioUrl }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? undefined : cfg.voiceId,
+                customVoiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : undefined,
+              }),
           aspectRatio: '9:16',
           resolution: '720p',
           composerCharacterId: c.id,
