@@ -243,6 +243,30 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id, characters?.length]);
 
+  // Sync scene.dialogScript → scene.aiPrompt (and promptSlots.subject in
+  // structured mode). Without this the [Dialog] marker written into aiPrompt
+  // alone would be wiped on the next stitchSlots() call.
+  useEffect(() => {
+    if (!scene.clipSource.startsWith('ai-')) return;
+    if (!characters || characters.length === 0) return;
+    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    const sceneCastChars = cast
+      .map((cs) => characters.find((c) => c.id === cs.characterId))
+      .filter((c): c is ComposerCharacter => !!c);
+    const blocks = parseDialogScript(scene.dialogScript ?? '', sceneCastChars);
+    if (promptMode === 'structured') {
+      const currentSubject = (promptSlots.subject as string) || '';
+      const newSubject = applyDialogToPrompt(currentSubject, blocks, lang);
+      if (newSubject !== currentSubject) {
+        const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
+        onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
+      }
+    } else {
+      const newPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, lang);
+      if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.dialogScript, characters?.length, promptMode]);
 
   const handleSlotsChange = (next: PromptSlots) => {
     const stitched = stitchSlots(next, promptSlotOrder);
