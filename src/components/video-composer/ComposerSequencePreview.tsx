@@ -596,6 +596,33 @@ export default function ComposerSequencePreview({
   // template so the editor preview is WYSIWYG with the final render.
   const VO_LEAD_IN_SECONDS = 0.4;
 
+  // SINGLE-SOURCE-OF-TRUTH RULE:
+  // If a scene has its own per-scene voiceover clip (kind='voiceover' in
+  // scene_audio_clips, generated via SceneDialogStudio), the *global* VO
+  // (assemblyConfig.voiceover.audioUrl) MUST be muted during that scene's
+  // window — otherwise both tracks play simultaneously and the user hears
+  // two voices at once ("Welcome to droneOcular" bug).
+  // This also handles scenes with embedded HeyGen / lip-synced audio.
+  const perSceneVoSceneIds = useMemo(() => {
+    const ids = new Set<string>();
+    (sceneAudioClips ?? []).forEach((c) => {
+      if (c.kind === 'voiceover' && c.scene_id && c.url) ids.add(c.scene_id);
+    });
+    playable.forEach((s) => {
+      if (
+        s.lipSyncAppliedAt ||
+        (s.clipSource as string) === 'ai-heygen'
+      ) {
+        ids.add(s.id);
+      }
+    });
+    return ids;
+  }, [sceneAudioClips, playable]);
+
+  /** True when the currently-active scene already has its own spoken audio
+   *  (per-scene VO clip OR embedded lip-sync). Global VO is muted while true. */
+  const currentSceneHasOwnVoice = !!currentScene && perSceneVoSceneIds.has(currentScene.id);
+
   // Auto-unmute when an audible track becomes available — VO, BGM, SFX, OR
   // a lip-sync / HeyGen scene whose audio is embedded directly in the video.
   useEffect(() => {
