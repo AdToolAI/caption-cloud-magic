@@ -219,7 +219,9 @@ export default function ComposerSequencePreview({
     slotMapRef.current[slot] = idx;
     const el = getVideoForSlot(slot);
     if (el) {
-      el.muted = true;
+      // Active slot honours the user's mute toggle; standby is always muted
+      // until it becomes active to avoid double-audio during preload.
+      el.muted = slot === activeSlotRef.current ? mutedRef.current : true;
       try { el.currentTime = 0; } catch { /* noop */ }
     }
   }, [setSrcForSlot]);
