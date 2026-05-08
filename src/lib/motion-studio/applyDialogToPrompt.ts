@@ -28,14 +28,23 @@ function snippet(text: string, max = 240): string {
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…';
 }
 
-/** English spoken-lines body. Always English regardless of UI language. */
+/** English spoken-lines body. Always English regardless of UI language.
+ *  IMPORTANT: We deliberately do NOT pass the literal spoken text into the
+ *  prompt. Modern i2v / t2v models (Hailuo, Kling, Wan, Sora…) tend to
+ *  render quoted strings as on-screen captions, which then appears as
+ *  burned-in subtitles in the final video. The actual words are spoken via
+ *  the ElevenLabs voiceover track — the prompt only needs to describe the
+ *  speaking behaviour and forbid on-screen text. */
 export function buildSpokenLinesBlock(blocks: DialogBlock[]): string {
   if (!blocks?.length) return '';
-  const lines = blocks.map((b, i) => {
-    const verb = i === 0 ? 'says' : 'replies';
-    return `${b.speakerName} ${verb}: "${snippet(b.text)}"`;
-  });
-  return `Spoken dialog (visible lip-sync mouth movement): ${lines.join(' ')}`;
+  const speakers = Array.from(new Set(blocks.map((b) => b.speakerName).filter(Boolean)));
+  const who =
+    speakers.length === 0
+      ? 'the character'
+      : speakers.length === 1
+      ? speakers[0]
+      : `${speakers.slice(0, -1).join(', ')} and ${speakers[speakers.length - 1]}`;
+  return `${who} ${speakers.length > 1 ? 'are' : 'is'} speaking to camera with natural, subtle lip-sync mouth movement and matching facial expression. Do NOT render any on-screen text, captions, subtitles, signs, watermarks, logos or written words anywhere in the frame.`;
 }
 
 export function applyDialogToPrompt(
