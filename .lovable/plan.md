@@ -1,29 +1,32 @@
-## Problem
+## Ziel
+Das per Szenen-Skript erzeugte Voiceover soll im Vorschau-Player hörbar sein — nicht nur im finalen Render oder als gespeicherter Datenbankeintrag.
 
-Beim Klick auf "Voiceover generieren" im Storyboard-Tab erscheint die Toast "Bitte zuerst das Projekt speichern…". Ursache: Solange das Projekt noch nicht in der DB liegt, ist `project.id === ''`, und der eben eingebaute Guard in `SceneDialogStudio.handleGenerateInline` bricht ab. Der User soll aber nicht erst irgendwo "Speichern" klicken müssen – andere Aktionen (z. B. Clips generieren in `ClipsTab`) lösen automatisch `ensureProjectPersisted` aus.
+## Ursache
+Die Voiceover-Blöcke werden als `scene_audio_clips.kind = 'voiceover'` gespeichert, aber der Preview-Loader lädt aktuell nur `ambient`, `sfx` und `foley`. Zusätzlich sendet `SceneDialogStudio` nach der Generierung ein anderes Event (`scene-audio-clips-changed`) als der Loader erwartet (`composer:scene-audio-clips-changed`). Dadurch werden die neuen Voiceover-Clips im Player nie geladen.
 
-## Lösung
+## Plan
+1. **Audio-Clip-Loader erweitern**
+   - `useSceneAudioClips` so ändern, dass auch `kind = 'voiceover'` geladen wird.
+   - Event-Namen vereinheitlichen, damit neue Clips direkt nach der Generierung im Preview auftauchen.
 
-Denselben Auto-Persist-Pfad wie in `ClipsTab` auf den Voiceover-Flow anwenden: Vor dem ElevenLabs-Aufruf einmalig persistieren, dann mit der frischen `projectId` (und ggf. neuer `scene.id`) weitermachen.
+2. **Voiceover-Clips in der Preview synchron abspielen**
+   - `ComposerSequencePreview` nutzt bereits `sceneAudioClips`; diese Logik soll auch Voiceover-Clips akzeptieren.
+   - Die vorhandene Timeline-Logik bleibt erhalten: `scene_id + start_offset + duration` bestimmt den Zeitpunkt.
+   - Beim Play-Button werden die versteckten Audio-Elemente geprimed, damit Browser-Autoplay-Regeln nicht blockieren.
 
-### Änderungen
+3. **Voiceover-Tab ebenfalls an die Szenen-Audio-Clips anschließen**
+   - `VoiceSubtitlesTab` bekommt `projectId` und lädt `scene_audio_clips` wie der Export-Tab.
+   - Diese Clips werden an `ComposerSequencePreview` übergeben, damit der Player auf dem aktuell sichtbaren Tab das Szenen-Voiceover abspielt.
 
-**1. `VideoComposerDashboard.tsx`** – `onEnsurePersisted`-Prop an `StoryboardTab` durchreichen (analog zu ClipsTab, Zeilen 1110–1114).
+4. **Nach Generierung korrekt refreshen**
+   - `SceneDialogStudio` ruft nach erfolgreichem Insert den bestehenden `emitSceneAudioClipsChanged(projectId)` Helper auf statt eines abweichenden CustomEvent-Namens.
 
-**2. `StoryboardTab.tsx`** – `onEnsurePersisted?: () => Promise<{ projectId; scenes }>` als Prop entgegennehmen und an `SceneCard` weiterreichen.
+## Dateien
+- `src/hooks/useSceneAudioClips.ts`
+- `src/components/video-composer/SceneDialogStudio.tsx`
+- `src/components/video-composer/VoiceSubtitlesTab.tsx`
+- `src/components/video-composer/VideoComposerDashboard.tsx`
+- ggf. kleine Anpassung in `src/components/video-composer/ComposerSequencePreview.tsx`, falls Voiceover-Clips für Lautstärke/Priming noch explizit behandelt werden müssen
 
-**3. `SceneCard.tsx`** – Prop entgegennehmen und an `<SceneDialogStudio onEnsurePersisted={...} />` weiterreichen.
-
-**4. `SceneDialogStudio.tsx`** – Neue optionale Prop `onEnsurePersisted`. In `handleGenerateInline` UND `handleGenerate`:
-   - Zuerst `pid = (projectId || scene.projectId || '').trim()` berechnen.
-   - Wenn leer und `onEnsurePersisted` vorhanden: `await onEnsurePersisted()` aufrufen, dann
-     - `pid = result.projectId`
-     - `sceneId = result.scenes.find(s => orderIndex/tempId match)?.id ?? scene.id` ermitteln (analog zu `ClipsTab` map-by-orderIndex)
-   - Erst danach den `PROJECT_REQUIRED`-Guard greifen lassen.
-   - `project_id: pid` und `scene_id: sceneId` im Insert verwenden.
-
-**Out of scope:** Keine Edge-Function-Änderungen, keine DB-Migration, kein UI-Redesign. Nur Prop-Threading + zwei zusätzliche Persist-Calls in den beiden Voiceover-Pfaden.
-
-### Erwartetes Verhalten danach
-
-Klick auf "Voiceover generieren" in einem ungespeicherten Projekt → das Projekt wird im Hintergrund einmalig in der DB angelegt, die Szene erhält ihre echte `id`, dann läuft der ElevenLabs-Call sauber durch. Die Fehler-Toast erscheint nur noch, wenn `ensureProjectPersisted` selbst fehlschlägt (mit dem vorhandenen `formatError`-Helper als lesbare Meldung).
+## Nicht enthalten
+Keine Datenbank-Migration, keine Änderung an ElevenLabs, kein UI-Redesign.

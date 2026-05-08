@@ -38,6 +38,7 @@ import type {
 import { DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
+import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
 
 interface VoiceSubtitlesTabProps {
@@ -48,6 +49,7 @@ interface VoiceSubtitlesTabProps {
   language: string;
   briefing?: ComposerBriefing;
   onGoToAudio: () => void;
+  projectId?: string | null;
 }
 
 const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', 'Bebas Neue', 'Playfair Display'];
@@ -67,8 +69,10 @@ export default function VoiceSubtitlesTab({
   language,
   briefing,
   onGoToAudio,
+  projectId,
 }: VoiceSubtitlesTabProps) {
   const { t } = useTranslation();
+  const { clips: sceneAudioClips } = useSceneAudioClips(projectId ?? null);
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
   const voiceover = assemblyConfig.voiceover;
   // Keep latest voiceover in a ref so async callbacks (e.g. browser-decoded
@@ -518,6 +522,7 @@ export default function VoiceSubtitlesTab({
             scenes={scenes}
             subtitles={subtitles}
             voiceoverUrl={voiceover?.audioUrl ?? null}
+            sceneAudioClips={sceneAudioClips}
             globalTextOverlays={
               assemblyConfig.textOverlaysEnabled === false ? [] : globalOverlays
             }
