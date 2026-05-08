@@ -122,28 +122,51 @@ serve(async (req) => {
       userContent.push({ type: "image_url", image_url: { url } });
     }
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        messages: [{ role: "user", content: userContent }],
-        modalities: ["image", "text"],
-      }),
-    });
+    // Hard 45s timeout — Nano Banana 2 multi-portrait calls can hang on the
+    // gateway and would otherwise stall the client invoke() forever.
+    const ac = new AbortController();
+    const t0 = Date.now();
+    const timeoutId = setTimeout(() => ac.abort(), 45_000);
+    let aiResp: Response;
+    try {
+      aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3.1-flash-image-preview",
+          messages: [{ role: "user", content: userContent }],
+          modalities: ["image", "text"],
+        }),
+        signal: ac.signal,
+      });
+    } catch (e) {
+      clearTimeout(timeoutId);
+      const elapsedMs = Date.now() - t0;
+      const reason = (e as any)?.name === "AbortError" ? "ai_timeout" : "ai_network";
+      console.warn(
+        `[compose-scene-anchor] ${reason} sceneId=${body.sceneId} portraits=${portraits.length} elapsedMs=${elapsedMs}`,
+      );
+      return new Response(
+        JSON.stringify({ strategy: "text-only", error: reason }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    clearTimeout(timeoutId);
 
     if (!aiResp.ok) {
       const txt = await aiResp.text();
       console.error("[compose-scene-anchor] AI gateway error", aiResp.status, txt);
-      // Fallback: tell caller to go text-only
       return new Response(
         JSON.stringify({ strategy: "text-only", error: "ai_failed" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    console.log(
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} elapsedMs=${Date.now() - t0}`,
+    );
 
     const aiJson = await aiResp.json();
     const dataUrl: string | undefined =
