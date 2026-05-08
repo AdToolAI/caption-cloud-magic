@@ -484,15 +484,25 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         <Textarea
           value={script}
           onChange={(e) => setScript(e.target.value)}
-          placeholder={`${sceneCast[0]?.name ?? 'Sarah'}: ${
-            language === 'de' ? 'Hi!' : language === 'es' ? '¡Hola!' : 'Hi!'
-          }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
-            language === 'de'
-              ? `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-              : language === 'es'
-              ? `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-              : `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-          }`}
+          placeholder={
+            isMonologue
+              ? `${sceneCast[0]?.name ?? 'Sarah'}: ${
+                  language === 'de'
+                    ? 'Hi, willkommen!'
+                    : language === 'es'
+                    ? '¡Hola, bienvenido!'
+                    : 'Hi, welcome!'
+                }`
+              : `${sceneCast[0]?.name ?? 'Sarah'}: ${
+                  language === 'de' ? 'Hi!' : language === 'es' ? '¡Hola!' : 'Hi!'
+                }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
+                  language === 'de'
+                    ? `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                    : language === 'es'
+                    ? `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                    : `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                }`
+          }
           rows={4}
           className="mt-1 font-mono text-xs"
         />
