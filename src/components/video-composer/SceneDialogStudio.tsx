@@ -387,18 +387,16 @@ export default function SceneDialogStudio({
           </div>
         )}
 
-        <label className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
-          <Checkbox
-            checked={syncToPrompt}
-            onCheckedChange={(v) => setSyncToPrompt(!!v)}
-            className="h-3.5 w-3.5"
-          />
-          {language === 'de'
-            ? 'Dialog in Szenen-Prompt übernehmen'
-            : language === 'es'
-            ? 'Incluir diálogo en el prompt de la escena'
-            : 'Sync dialog into scene prompt'}
-        </label>
+        {blocks.length > 0 && (
+          <div className="mt-2 text-[10px] text-emerald-500 flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            {language === 'de'
+              ? 'Dialog ist live im Szenen-Prompt synchronisiert'
+              : language === 'es'
+              ? 'Diálogo sincronizado en vivo con el prompt de la escena'
+              : 'Dialog is live-synced into the scene prompt'}
+          </div>
+        )}
       </div>
 
       {speakers.length > 0 && (
