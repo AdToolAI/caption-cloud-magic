@@ -904,24 +904,69 @@ export default function SceneCard({
 
             {/* Lip-Sync toggle — for character scenes */}
             {scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
-              <div className="flex items-center justify-between gap-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-semibold text-primary">Lip-Sync zum Voiceover</span>
-                  <span className="text-[9px] text-muted-foreground">
-                    {scene.clipSource === 'ai-hailuo' ? 'Inline (kostenlos)' : 'Post-hoc via sync-labs (~8 Credits)'}
-                  </span>
+              <div className="flex flex-col gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
+                      🎙️ Lip-Sync zum Voiceover
+                      {scene.lipSyncAppliedAt && (
+                        <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-bold">
+                          SYNCED
+                        </span>
+                      )}
+                      {scene.lipSyncStatus === 'running' && (
+                        <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold animate-pulse">
+                          SYNCING…
+                        </span>
+                      )}
+                      {scene.lipSyncStatus === 'failed' && (
+                        <span className="px-1 py-0.5 rounded bg-red-500/20 text-red-300 text-[8px] font-bold">
+                          FAILED
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-[9px] text-muted-foreground">
+                      {scene.lipSyncAppliedAt
+                        ? 'Charakter spricht wortgenau in der Szene · ~8 Credits'
+                        : scene.clipSource === 'ai-hailuo'
+                        ? 'Auto: Sync.so Post-Step nach Generate (~8 Credits)'
+                        : 'Auto: Sync.so Post-Step nach Generate (~8 Credits)'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ lipSyncWithVoiceover: !scene.lipSyncWithVoiceover })}
+                    disabled={scene.lipSyncStatus === 'running'}
+                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
+                      scene.lipSyncWithVoiceover
+                        ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
+                        : 'text-muted-foreground hover:text-foreground border border-border'
+                    }`}
+                  >
+                    {scene.lipSyncWithVoiceover ? 'AN' : 'AUS'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onUpdate({ lipSyncWithVoiceover: !scene.lipSyncWithVoiceover })}
-                  className={`px-2 py-1 rounded text-[10px] font-medium transition-all ${
-                    scene.lipSyncWithVoiceover
-                      ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
-                      : 'text-muted-foreground hover:text-foreground border border-border'
-                  }`}
-                >
-                  {scene.lipSyncWithVoiceover ? 'AN' : 'AUS'}
-                </button>
+                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed') && scene.clipUrl && (
+                  <button
+                    type="button"
+                    disabled={scene.lipSyncStatus === 'running'}
+                    onClick={async () => {
+                      try {
+                        const { error } = await supabase.functions.invoke(
+                          'compose-lipsync-scene',
+                          { body: { scene_id: scene.id } },
+                        );
+                        if (error) throw error;
+                        onUpdate({ lipSyncStatus: 'running' });
+                      } catch (e) {
+                        console.warn('[SceneCard] re-sync failed', e);
+                      }
+                    }}
+                    className="text-[9px] text-primary hover:underline self-end disabled:opacity-50"
+                  >
+                    🔁 Lip-Sync neu rendern
+                  </button>
+                )}
               </div>
             )}
             {scene.clipSource.startsWith('ai-') && (
