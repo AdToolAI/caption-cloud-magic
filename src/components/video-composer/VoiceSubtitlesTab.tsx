@@ -522,6 +522,7 @@ export default function VoiceSubtitlesTab({
             scenes={scenes}
             subtitles={subtitles}
             voiceoverUrl={voiceover?.audioUrl ?? null}
+            sceneAudioClips={sceneAudioClips}
             globalTextOverlays={
               assemblyConfig.textOverlaysEnabled === false ? [] : globalOverlays
             }
