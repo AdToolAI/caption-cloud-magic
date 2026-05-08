@@ -159,11 +159,14 @@ export default function SceneDialogStudio({
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
 
-  // Sync from scene if it changes (e.g. project reload)
+  // Sync only when switching to a different scene — otherwise the parent's
+  // re-render after our own debounced save would clobber the user's in-flight
+  // typing (cursor jump / dropped characters).
   useEffect(() => {
     setScript(scene.dialogScript ?? '');
     setVoicePerSpeaker(scene.dialogVoices ?? {});
-  }, [scene.id, scene.dialogScript, scene.dialogVoices]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.id]);
 
   // Persist script with debounce
   useEffect(() => {
