@@ -48,6 +48,7 @@ interface VoiceSubtitlesTabProps {
   language: string;
   briefing?: ComposerBriefing;
   onGoToAudio: () => void;
+  projectId?: string | null;
 }
 
 const FONT_FAMILIES = ['Inter', 'Roboto', 'Montserrat', 'Poppins', 'Bebas Neue', 'Playfair Display'];
