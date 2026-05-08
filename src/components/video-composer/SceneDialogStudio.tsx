@@ -189,6 +189,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   open,
   onClose,
   onEnsurePersisted,
+  autoSplitOnMount,
+  onAutoSplitConsumed,
 }, ref) {
   const t = T[language];
   const { toast } = useToast();
