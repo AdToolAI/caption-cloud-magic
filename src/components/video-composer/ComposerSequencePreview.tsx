@@ -592,11 +592,24 @@ export default function ComposerSequencePreview({
   // template so the editor preview is WYSIWYG with the final render.
   const VO_LEAD_IN_SECONDS = 0.4;
 
-  // Auto-unmute when a voiceover becomes available — VO is the primary
-  // audio track and should be hearable by default (video stays muted via slot refs).
+  // Auto-unmute when an audible track becomes available — VO, BGM, SFX, OR
+  // a lip-sync / HeyGen scene whose audio is embedded directly in the video.
   useEffect(() => {
-    if (voiceoverUrl || backgroundMusicUrl || (sceneAudioClips && sceneAudioClips.length > 0)) setMuted(false);
-  }, [voiceoverUrl, backgroundMusicUrl, sceneAudioClips]);
+    const hasEmbeddedAudio = playable.some(
+      (s) =>
+        s.lipSyncWithVoiceover === true ||
+        s.clipSource === 'ai-heygen' ||
+        s.clipSource === 'upload',
+    );
+    if (
+      voiceoverUrl ||
+      backgroundMusicUrl ||
+      (sceneAudioClips && sceneAudioClips.length > 0) ||
+      hasEmbeddedAudio
+    ) {
+      setMuted(false);
+    }
+  }, [voiceoverUrl, backgroundMusicUrl, sceneAudioClips, playable]);
 
   // Unified audio sync — re-evaluates on globalTime so audio.play() fires
   // automatically once the lead-in threshold is crossed (no scrub needed).
