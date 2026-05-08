@@ -433,22 +433,24 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
-        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
-        if (!voiceMeta) continue;
+        const cfg = voicePerSpeaker[block.speakerId];
+        if (!cfg?.voiceId) continue;
 
-        // ElevenLabs voice id: presets use the preset id directly; cloned
-        // voices store the real ElevenLabs id in `elevenlabsVoiceId`.
-        const elevenVoiceId = voiceMeta.isCustom
-          ? voiceMeta.elevenlabsVoiceId
-          : voiceMeta.id;
-
-        const { data, error } = await supabase.functions.invoke('generate-voiceover', {
-          body: {
-            text: block.text,
-            voiceId: elevenVoiceId,
-            projectId: pid,
-          },
-        });
+        // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
+        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+        const body = cfg.engine === 'hume'
+          ? {
+              text: block.text,
+              voiceName: cfg.voiceId,
+              provider: cfg.provider || 'HUME_AI',
+              projectId: pid,
+            }
+          : {
+              text: block.text,
+              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+              projectId: pid,
+            };
+        const { data, error } = await supabase.functions.invoke(fnName, { body });
         if (error) throw error;
         const audioUrl = (data as any)?.audioUrl as string | undefined;
         const duration = Number((data as any)?.duration ?? 0) || Math.max(1.5, block.text.length / 18);
