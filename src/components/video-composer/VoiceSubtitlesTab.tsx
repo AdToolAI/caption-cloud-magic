@@ -41,6 +41,8 @@ import { toast } from '@/hooks/use-toast';
 import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
 import { SpeakerMappingBar } from '@/components/video-composer/voice-studio/SpeakerMappingBar';
+import { ScriptTagToolbar } from '@/components/video-composer/voice-studio/ScriptTagToolbar';
+import { SegmentCardList } from '@/components/video-composer/voice-studio/SegmentCardList';
 import { isMultiSpeakerScript, parseSpeakerScript } from '@/lib/voice-studio/parseSpeakerScript';
 import { stitchSpeakerSegments } from '@/lib/voice-studio/stitchSpeakerSegments';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
@@ -84,6 +86,7 @@ export default function VoiceSubtitlesTab({
   // of a stale closure value captured at the moment of generation.
   const voiceoverRef = useRef(voiceover);
   useEffect(() => { voiceoverRef.current = voiceover; }, [voiceover]);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const globalOverlays: GlobalTextOverlay[] = assemblyConfig.globalTextOverlays ?? [];
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
 
@@ -277,9 +280,15 @@ export default function VoiceSubtitlesTab({
           throw new Error(`Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`);
         }
 
+        const overridesMap = voiceover.segmentOverrides || {};
         const { data: msData, error: msErr } = await supabase.functions.invoke('generate-multi-speaker-vo', {
           body: {
-            segments: parsedSegments.map((s) => ({ speakerId: s.speakerId, text: s.text, tags: s.tags })),
+            segments: parsedSegments.map((s, idx) => ({
+              speakerId: s.speakerId,
+              text: s.text,
+              tags: s.tags,
+              overrides: overridesMap[idx],
+            })),
             speakerMap: voiceover.speakerMap,
             defaultEngine: 'elevenlabs',
           },
@@ -703,13 +712,19 @@ export default function VoiceSubtitlesTab({
                   </Button>
                 </div>
               </div>
+              <ScriptTagToolbar
+                textareaRef={scriptTextareaRef}
+                value={voiceover.script}
+                onChange={(next) => onUpdateAssembly({ voiceover: { ...voiceover, script: next, autoScriptGenerated: false } })}
+              />
               <Textarea
+                ref={scriptTextareaRef}
                 value={voiceover.script}
                 onChange={(e) => onUpdateAssembly({ voiceover: { ...voiceover, script: e.target.value, autoScriptGenerated: false } })}
                 placeholder={autoGenerating ? t('videoComposer.autoScriptLoading') : t('videoComposer.voScriptPlaceholder')}
                 rows={4}
                 disabled={autoGenerating}
-                className="bg-background/50 resize-none text-sm"
+                className="bg-background/50 resize-none text-sm font-mono"
               />
               {autoError && !voiceover.script.trim() && !autoGenerating && (
                 <p className="text-[10px] text-amber-500/90">
@@ -723,20 +738,30 @@ export default function VoiceSubtitlesTab({
 
             {/* ── Multi-Speaker mapping (auto-shown for `Speaker: text` scripts) ── */}
             {isMultiSpeakerScript(voiceover.script) && (
-              <SpeakerMappingBar
-                script={voiceover.script}
-                elevenLabsVoices={voices}
-                speakerMap={voiceover.speakerMap || {}}
-                onChange={(speakerMap) =>
-                  onUpdateAssembly({
-                    voiceover: {
-                      ...voiceover,
-                      multiSpeaker: true,
-                      speakerMap,
-                    },
-                  })
-                }
-              />
+              <>
+                <SpeakerMappingBar
+                  script={voiceover.script}
+                  elevenLabsVoices={voices}
+                  speakerMap={voiceover.speakerMap || {}}
+                  onChange={(speakerMap) =>
+                    onUpdateAssembly({
+                      voiceover: {
+                        ...voiceover,
+                        multiSpeaker: true,
+                        speakerMap,
+                      },
+                    })
+                  }
+                />
+                <SegmentCardList
+                  script={voiceover.script}
+                  speakerMap={voiceover.speakerMap || {}}
+                  overrides={voiceover.segmentOverrides || {}}
+                  onOverridesChange={(segmentOverrides) =>
+                    onUpdateAssembly({ voiceover: { ...voiceover, segmentOverrides } })
+                  }
+                />
+              </>
             )}
 
             <div className="flex gap-2">
