@@ -31,9 +31,9 @@ serve(async (req) => {
   try {
     const { language = 'en', sceneContext = '', durationSeconds = 6, cast = [] } =
       await req.json();
-    if (!Array.isArray(cast) || cast.length < 2) {
+    if (!Array.isArray(cast) || cast.length < 1) {
       return new Response(
-        JSON.stringify({ error: 'Need at least 2 cast members' }),
+        JSON.stringify({ error: 'Need at least 1 cast member' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -48,6 +48,7 @@ serve(async (req) => {
     // Word budget — natural speech ≈ 2.5 words per second across all speakers.
     const wordBudget = Math.max(8, Math.round(durationSeconds * 2.5));
     const langName = LANG_LABEL[language] ?? 'English';
+    const isMonologue = cast.length === 1;
 
     const castSummary = cast
       .map(
@@ -56,7 +57,17 @@ serve(async (req) => {
       )
       .join('\n');
 
-    const sys = `You are a screenwriter for short-form video. Write a natural-sounding dialog between the listed characters in ${langName}. Strict format — one block per line:
+    const sys = isMonologue
+      ? `You are a screenwriter for short-form video. Write a natural-sounding monologue spoken DIRECTLY to camera by the single character below, in ${langName}. Strict format — every line begins with the character name:
+NAME: text
+
+Rules:
+- Use ONLY the exact character name provided (case-insensitive).
+- 1 to 2 blocks total, all using the SAME name.
+- Total ~${wordBudget} words across all blocks.
+- Concise, conversational, on-topic, addressed to the viewer. No stage directions, no parentheticals, no quotes.
+- Output ONLY the script lines, nothing else.`
+      : `You are a screenwriter for short-form video. Write a natural-sounding dialog between the listed characters in ${langName}. Strict format — one block per line:
 NAME: text
 
 Rules:
@@ -66,7 +77,7 @@ Rules:
 - Concise, conversational, on-topic. No stage directions, no parentheticals, no quotes.
 - Output ONLY the script lines, nothing else.`;
 
-    const user = `Scene context: ${sceneContext || '(open-ended)'}\n\nCast:\n${castSummary}\n\nWrite the dialog now.`;
+    const user = `Scene context: ${sceneContext || '(open-ended)'}\n\nCast:\n${castSummary}\n\nWrite the ${isMonologue ? 'monologue' : 'dialog'} now.`;
 
     const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

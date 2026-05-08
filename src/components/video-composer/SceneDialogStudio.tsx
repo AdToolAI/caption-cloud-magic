@@ -13,8 +13,8 @@
  * composer_scenes (added in migration 20260507-…).
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2 } from 'lucide-react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -46,6 +46,10 @@ interface SceneDialogStudioProps {
   language: 'de' | 'en' | 'es';
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Controlled open/close — when explicitly false, renders nothing. */
+  open?: boolean;
+  /** Close-handler used by the in-card X button. */
+  onClose?: () => void;
 }
 
 const PRESET_VOICES = [
@@ -59,8 +63,9 @@ const PRESET_VOICES = [
 
 const T = {
   de: {
-    title: 'Szenen-Dialog',
+    title: 'Szenen-Skript',
     subtitle: 'Schreibe ein Drehbuch — der Dialog läuft als Voiceover in DIESER Szene.',
+    subtitleMono: 'Monolog — der Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene.',
     script: 'Drehbuch',
     voices: 'Stimme pro Sprecher',
     pickVoice: 'Stimme wählen',
@@ -71,7 +76,7 @@ const T = {
     blocks: (n: number) => `${n} Block${n === 1 ? '' : 'e'}`,
     speakers: (n: number) => `${n} Sprecher`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Mindestens 2 Charaktere im Cast nötig.',
+    needCast: 'Mindestens 1 Charakter im Cast nötig.',
     voiceMissing: (name: string) => `Wähle eine Stimme für „${name}".`,
     parseEmpty: 'Kein gültiges Skript. Format: "Sarah: Hallo!"',
     success: (n: number) => `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`,
@@ -80,10 +85,12 @@ const T = {
     aiFailed: 'KI-Skript konnte nicht erstellt werden',
     srsLabel: 'Erweitert: Als separate Shot-Reverse-Shot-Szenen rendern',
     srsHint: 'Standard: Dialog läuft als Voiceover in dieser Szene — keine extra Szenen.',
+    close: 'Schließen',
   },
   en: {
-    title: 'Scene Dialog',
+    title: 'Scene Script',
     subtitle: 'Write a screenplay — the dialog plays as voiceover IN this scene.',
+    subtitleMono: 'Monologue — the character speaks to camera. Plays as voiceover in this scene.',
     script: 'Screenplay',
     voices: 'Voice per speaker',
     pickVoice: 'Pick voice',
@@ -94,7 +101,7 @@ const T = {
     blocks: (n: number) => `${n} block${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} speaker${n === 1 ? '' : 's'}`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Need at least 2 cast characters.',
+    needCast: 'Need at least 1 cast character.',
     voiceMissing: (name: string) => `Pick a voice for "${name}".`,
     parseEmpty: 'No valid script. Format: "Sarah: Hi!"',
     success: (n: number) => `${n} lip-sync clip${n === 1 ? '' : 's'} are being generated (1–3 min).`,
@@ -103,10 +110,12 @@ const T = {
     aiFailed: 'AI script could not be generated',
     srsLabel: 'Advanced: render as separate shot-reverse-shot scenes',
     srsHint: 'Default: dialog plays as voiceover in this scene — no extra scenes.',
+    close: 'Close',
   },
   es: {
-    title: 'Diálogo de escena',
+    title: 'Guion de escena',
     subtitle: 'Escribe un guion — el diálogo suena como voz en off EN esta escena.',
+    subtitleMono: 'Monólogo — el personaje habla a cámara. Suena como voz en off en esta escena.',
     script: 'Guion',
     voices: 'Voz por hablante',
     pickVoice: 'Elegir voz',
@@ -117,7 +126,7 @@ const T = {
     blocks: (n: number) => `${n} bloque${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} hablante${n === 1 ? '' : 's'}`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Se necesitan al menos 2 personajes.',
+    needCast: 'Se necesita al menos 1 personaje.',
     voiceMissing: (name: string) => `Elige una voz para "${name}".`,
     parseEmpty: 'Guion no válido. Formato: "Sarah: ¡Hola!"',
     success: (n: number) => `${n} clip${n === 1 ? '' : 's'} lip-sync se están generando (1–3 min).`,
@@ -126,10 +135,11 @@ const T = {
     aiFailed: 'No se pudo generar el guion con IA',
     srsLabel: 'Avanzado: renderizar como escenas plano-contraplano separadas',
     srsHint: 'Por defecto: el diálogo suena como voz en off en esta escena — sin escenas extra.',
+    close: 'Cerrar',
   },
 };
 
-export default function SceneDialogStudio({
+const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(function SceneDialogStudio({
   scene,
   cast,
   characters,
@@ -137,7 +147,9 @@ export default function SceneDialogStudio({
   language,
   onUpdate,
   onAddScene,
-}: SceneDialogStudioProps) {
+  open,
+  onClose,
+}, ref) {
   const t = T[language];
   const { toast } = useToast();
   const { generate, estimateCost } = useTalkingHead();
@@ -432,36 +444,65 @@ export default function SceneDialogStudio({
     }
   };
 
-  if (sceneCast.length < 2) return null;
+  if (sceneCast.length < 1) return null;
+  if (open === false) return null;
+
+  const isMonologue = sceneCast.length === 1;
 
   return (
-    <Card className="p-3 space-y-3 border-primary/30 bg-primary/5">
+    <Card ref={ref} className="p-3 space-y-3 border-primary/30 bg-primary/5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <Mic className="h-3.5 w-3.5 text-primary" />
           <span className="text-xs font-semibold">{t.title}</span>
         </div>
-        <span className="text-[10px] text-muted-foreground">
-          {t.blocks(blocks.length)} · {t.speakers(speakers.length)} · {t.sec(estimatedDurationSec)}
-          {blocks.length > 0 && ` · €${totalCost.toFixed(2)}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground">
+            {t.blocks(blocks.length)} · {t.speakers(speakers.length)} · {t.sec(estimatedDurationSec)}
+            {blocks.length > 0 && ` · €${totalCost.toFixed(2)}`}
+          </span>
+          {onClose && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={onClose}
+              aria-label={t.close}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       </div>
-      <p className="text-[10px] text-muted-foreground -mt-1">{t.subtitle}</p>
+      <p className="text-[10px] text-muted-foreground -mt-1">
+        {isMonologue ? t.subtitleMono : t.subtitle}
+      </p>
 
       <div>
         <Label className="text-[10px] text-muted-foreground">{t.script}</Label>
         <Textarea
           value={script}
           onChange={(e) => setScript(e.target.value)}
-          placeholder={`${sceneCast[0]?.name ?? 'Sarah'}: ${
-            language === 'de' ? 'Hi!' : language === 'es' ? '¡Hola!' : 'Hi!'
-          }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
-            language === 'de'
-              ? `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-              : language === 'es'
-              ? `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-              : `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
-          }`}
+          placeholder={
+            isMonologue
+              ? `${sceneCast[0]?.name ?? 'Sarah'}: ${
+                  language === 'de'
+                    ? 'Hi, willkommen!'
+                    : language === 'es'
+                    ? '¡Hola, bienvenido!'
+                    : 'Hi, welcome!'
+                }`
+              : `${sceneCast[0]?.name ?? 'Sarah'}: ${
+                  language === 'de' ? 'Hi!' : language === 'es' ? '¡Hola!' : 'Hi!'
+                }\n${sceneCast[1]?.name ?? 'Matthew'}: ${
+                  language === 'de'
+                    ? `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                    : language === 'es'
+                    ? `¡Hola ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                    : `Hi ${sceneCast[0]?.name?.split(' ')[0] ?? 'Sarah'}!`
+                }`
+          }
           rows={4}
           className="mt-1 font-mono text-xs"
         />
@@ -540,21 +581,22 @@ export default function SceneDialogStudio({
         </div>
       )}
 
-      <div className="flex items-start justify-between gap-3 rounded-md border border-border/40 bg-background/40 p-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Volume2 className="h-3 w-3 text-primary" />
-            <span className="text-[11px] font-medium">{t.srsLabel}</span>
+      {!isMonologue && (
+        <div className="flex items-start justify-between gap-3 rounded-md border border-border/40 bg-background/40 p-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <Volume2 className="h-3 w-3 text-primary" />
+              <span className="text-[11px] font-medium">{t.srsLabel}</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{t.srsHint}</p>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-0.5">{t.srsHint}</p>
+          <Switch
+            checked={renderAsSeparateScenes}
+            onCheckedChange={setRenderAsSeparateScenes}
+            disabled={generating}
+          />
         </div>
-        <Switch
-          checked={renderAsSeparateScenes}
-          onCheckedChange={setRenderAsSeparateScenes}
-          disabled={generating}
-        />
-      </div>
-
+      )}
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -595,4 +637,7 @@ export default function SceneDialogStudio({
       </div>
     </Card>
   );
-}
+});
+
+export default SceneDialogStudio;
+
