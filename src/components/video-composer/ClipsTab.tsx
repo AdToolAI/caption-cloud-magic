@@ -412,6 +412,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           subjectReferenceUrl: prepared?.subjectReferenceUrl,
           durationSeconds: s.durationSeconds,
           characterShot: s.characterShot,
+          characterShots: s.characterShots,
+          dialogScript: s.dialogScript,
+          dialogVoices: s.dialogVoices,
+          engineOverride: s.engineOverride ?? 'auto',
           withAudio: s.withAudio !== false,
         };
       });
