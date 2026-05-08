@@ -405,7 +405,7 @@ async function processHeyGenJob(opts: {
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
               clip_url: finalUrl,
-              clip_status: 'completed',
+              clip_status: 'ready',
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
           }
