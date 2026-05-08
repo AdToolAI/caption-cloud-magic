@@ -288,6 +288,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   };
 
   const handleGenerateInline = async () => {
+    const pid = (projectId || scene.projectId || '').trim();
+    if (!pid) {
+      toast({
+        title: t.failed,
+        description: PROJECT_REQUIRED[language],
+        variant: 'destructive',
+      });
+      return;
+    }
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
@@ -308,7 +317,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           body: {
             text: block.text,
             voiceId: elevenVoiceId,
-            projectId: projectId ?? scene.projectId,
+            projectId: pid,
           },
         });
         if (error) throw error;
@@ -323,7 +332,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           .from('scene_audio_clips')
           .insert({
             user_id: user.id,
-            project_id: projectId ?? scene.projectId,
+            project_id: pid,
             scene_id: scene.id,
             kind: 'voiceover',
             source: 'ai',
@@ -349,7 +358,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       // Notify other panels (SoundDesign / preview) to refresh.
       try {
         const evt = new CustomEvent('scene-audio-clips-changed', {
-          detail: { projectId: projectId ?? scene.projectId },
+          detail: { projectId: pid },
         });
         window.dispatchEvent(evt);
       } catch (_) { /* noop */ }
@@ -359,7 +368,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] inline generate error', e);
       toast({
         title: t.failed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
