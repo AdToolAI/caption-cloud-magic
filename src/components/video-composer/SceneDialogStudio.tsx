@@ -747,36 +747,106 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         <div className="space-y-1.5">
           <Label className="text-[10px] text-muted-foreground">{t.voices}</Label>
           <div className="space-y-1.5">
-            {speakers.map((sp) => (
-              <div
-                key={sp.id}
-                className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/20 p-1.5"
-              >
-                {sp.referenceImageUrl && (
-                  <img
-                    src={sp.referenceImageUrl}
-                    alt={sp.name}
-                    className="h-7 w-7 rounded object-cover"
-                  />
-                )}
-                <div className="flex-1 text-xs font-medium truncate">{sp.name}</div>
-                <Select
-                  value={voicePerSpeaker[sp.id] || ''}
-                  onValueChange={(v) => setVoiceFor(sp.id, v)}
+            {speakers.map((sp) => {
+              const cfg = voicePerSpeaker[sp.id];
+              const isHume = cfg?.engine === 'hume';
+              return (
+                <div
+                  key={sp.id}
+                  className="grid grid-cols-[auto_1fr_120px_180px_auto] items-center gap-2 rounded-md border border-border/40 bg-muted/20 p-1.5"
                 >
-                  <SelectTrigger className="h-7 w-[180px] text-xs">
-                    <SelectValue placeholder={t.pickVoice} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allVoices.map((v) => (
-                      <SelectItem key={v.id} value={v.id} className="text-xs">
-                        {v.name}
+                  {sp.referenceImageUrl ? (
+                    <img
+                      src={sp.referenceImageUrl}
+                      alt={sp.name}
+                      className="h-7 w-7 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded bg-muted" />
+                  )}
+                  <div className="text-xs font-medium truncate">{sp.name}</div>
+
+                  {/* Engine selector */}
+                  <Select
+                    value={cfg?.engine ?? 'elevenlabs'}
+                    onValueChange={(v) => handleEngineChange(sp.id, v as 'elevenlabs' | 'hume')}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-[60]">
+                      <SelectItem value="elevenlabs" className="text-xs">ElevenLabs</SelectItem>
+                      <SelectItem value="hume" className="text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <SparklesIcon className="h-3 w-3" />
+                          Hume Octave
+                        </span>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Voice selector — list depends on engine */}
+                  <Select
+                    value={cfg?.voiceId ?? ''}
+                    onValueChange={(voiceId) => {
+                      if (isHume) {
+                        const v = HUME_VOICES.find((x) => x.name === voiceId);
+                        updateSpeakerVoice(sp.id, {
+                          voiceId,
+                          voiceName: v?.label ?? voiceId,
+                          provider: v?.provider ?? 'HUME_AI',
+                        });
+                      } else {
+                        const v = elPickerEntries.find((x) => x.id === voiceId);
+                        updateSpeakerVoice(sp.id, {
+                          voiceId,
+                          voiceName: v?.name ?? voiceId,
+                          isCustom: v?.isCustom ?? false,
+                          elevenlabsVoiceId: v?.elevenlabsVoiceId,
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder={t.pickVoice} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[60] max-h-[320px]">
+                      {isHume
+                        ? HUME_VOICES.map((v) => (
+                            <SelectItem key={v.id} value={v.name} className="text-xs">
+                              <div className="flex flex-col">
+                                <span>{v.label}</span>
+                                <span className="text-[10px] text-muted-foreground">{v.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        : elPickerEntries.map((v) => (
+                            <SelectItem key={v.id} value={v.id} className="text-xs">
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Preview */}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7"
+                    disabled={!cfg?.voiceId || previewing === sp.id}
+                    onClick={() => handlePreview(sp.id)}
+                    aria-label="Preview"
+                  >
+                    {previewing === sp.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
