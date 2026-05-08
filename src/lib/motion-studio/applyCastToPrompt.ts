@@ -42,6 +42,31 @@ function nameAlreadyInProse(prose: string, fullName: string): boolean {
   return !!(first && first.length >= 3 && p.includes(first));
 }
 
+/**
+ * Tolerant character lookup — mirrors `CastConsistencyMap.getAnchor` so the
+ * prompt-marker stays in sync with the UI even when the storyboard LLM drifts
+ * the `characterId` away from the brand UUID (e.g. "lib:matthew-…",
+ * "matthew_dusatko", or the plain name).
+ */
+function findCharacter(
+  slot: CharacterShot,
+  chars: ComposerCharacter[] | undefined,
+): ComposerCharacter | undefined {
+  if (!chars?.length || !slot?.characterId) return undefined;
+  // 1) exact id
+  const exact = chars.find((c) => c.id === slot.characterId);
+  if (exact) return exact;
+  const slotIdLower = slot.characterId.toLowerCase();
+  // 2) slot id contains first name (≥3 chars)
+  const byNameInId = chars.find((c) => {
+    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    return !!first && first.length >= 3 && slotIdLower.includes(first);
+  });
+  if (byNameInId) return byNameInId;
+  // 3) slot id equals full name lowercased
+  return chars.find((c) => c.name?.trim().toLowerCase() === slotIdLower);
+}
+
 export function applyCastToPrompt(
   prompt: string,
   cast: CharacterShot[] | undefined,
@@ -55,7 +80,7 @@ export function applyCastToPrompt(
   // Build name + shot tokens, skipping any character already mentioned in the prose.
   const tokens: string[] = [];
   for (const slot of list) {
-    const char = characters?.find((c) => c.id === slot.characterId);
+    const char = findCharacter(slot, characters);
     if (!char?.name) continue;
     if (nameAlreadyInProse(prose, char.name)) continue;
     const shotLbl = SHOT_LABEL[lang][slot.shotType] ?? slot.shotType;
