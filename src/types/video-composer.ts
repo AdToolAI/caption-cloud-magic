@@ -454,6 +454,22 @@ export interface MultiSpeakerVoiceCfg {
   provider?: 'HUME_AI' | 'CUSTOM_VOICE';
 }
 
+/**
+ * Per-speaker voice config used by SceneDialogStudio (per-scene dialog editor).
+ * Lighter than MultiSpeakerVoiceCfg — only what we need for HeyGen lip-sync.
+ */
+export interface DialogVoiceCfg {
+  engine: 'elevenlabs' | 'hume';
+  /** ElevenLabs voiceId, OR Hume voice NAME, OR custom-voice row id. */
+  voiceId: string;
+  voiceName?: string;
+  /** ElevenLabs only — set when voiceId references a `custom_voices` row. */
+  isCustom?: boolean;
+  /** ElevenLabs only — real ElevenLabs id when isCustom=true. */
+  elevenlabsVoiceId?: string;
+  /** Hume only — defaults to HUME_AI. */
+  provider?: 'HUME_AI' | 'CUSTOM_VOICE';
+
 export interface MusicConfig {
   enabled: boolean;
   trackUrl: string;
