@@ -1129,6 +1129,7 @@ export default function VideoComposerDashboard() {
               language={project.language}
               briefing={project.briefing}
               onGoToAudio={() => setActiveTab('audio')}
+              projectId={project.id}
             />
           </TabsContent>
 
