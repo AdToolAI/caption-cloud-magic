@@ -171,20 +171,17 @@ export default function SceneDialogStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce + (optional) sync into the scene's AI prompt
+  // Persist script with debounce. The actual prompt-sync happens in
+  // SceneCard (so that structured-mode promptSlots.subject is updated and
+  // stitchSlots can't wipe the marker on the next render).
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     const handle = setTimeout(() => {
-      const updates: Partial<ComposerScene> = { dialogScript: script };
-      if (syncToPrompt) {
-        const parsed = parseDialogScript(script, sceneCast);
-        updates.aiPrompt = applyDialogToPrompt(scene.aiPrompt ?? '', parsed, language);
-      }
-      onUpdate(updates);
+      onUpdate({ dialogScript: script });
     }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script, syncToPrompt]);
+  }, [script]);
 
   // Persist voice map immediately on change
   const setVoiceFor = (speakerId: string, voiceId: string) => {
