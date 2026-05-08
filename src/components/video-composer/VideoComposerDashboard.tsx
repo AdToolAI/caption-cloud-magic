@@ -762,7 +762,7 @@ export default function VideoComposerDashboard() {
    * Falls back to a local-only scene (non-UUID id) when the project itself
    * hasn't been persisted yet — those will be flushed by `ensureProjectPersisted`.
    */
-  const addSceneToProject = useCallback(async (partial: Partial<ComposerScene>): Promise<void> => {
+  const addSceneToProject = useCallback(async (partial: Partial<ComposerScene>): Promise<string | undefined> => {
     const tempId = `scene_${Date.now()}`;
     const baseScene: ComposerScene = {
       id: tempId,
@@ -788,7 +788,7 @@ export default function VideoComposerDashboard() {
         ...prev,
         scenes: [...prev.scenes, { ...baseScene, orderIndex: prev.scenes.length }],
       }));
-      return;
+      return undefined;
     }
 
     // Optimistic insert (so the user sees it instantly)
@@ -807,7 +807,8 @@ export default function VideoComposerDashboard() {
           duration_seconds: baseScene.durationSeconds,
           clip_source: baseScene.clipSource,
           clip_quality: baseScene.clipQuality || 'standard',
-          clip_status: 'pending',
+          clip_status: baseScene.clipStatus ?? 'pending',
+          clip_url: baseScene.clipUrl ?? null,
           with_audio: baseScene.withAudio !== false,
           lip_sync_with_voiceover: baseScene.lipSyncWithVoiceover === true,
           ai_prompt: baseScene.aiPrompt ?? null,
@@ -830,16 +831,18 @@ export default function VideoComposerDashboard() {
         .single();
       if (error) throw error;
       const newId = (data as any)?.id as string | undefined;
-      if (!newId) return;
+      if (!newId) return undefined;
       // Swap temp id for real UUID
       setProject(prev => ({
         ...prev,
         scenes: prev.scenes.map(s => s.id === tempId ? { ...s, id: newId, projectId } : s),
       }));
+      return newId;
     } catch (err) {
       console.warn('[VideoComposerDashboard] addSceneToProject failed:', err);
       // Roll back optimistic insert
       setProject(prev => ({ ...prev, scenes: prev.scenes.filter(s => s.id !== tempId) }));
+      return undefined;
     }
   }, [project.id]);
 

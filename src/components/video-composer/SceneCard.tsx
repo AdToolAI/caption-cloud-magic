@@ -94,7 +94,7 @@ interface SceneCardProps {
   /** True if at least one OTHER scene in the project has a clip_url (enables Bridge button). */
   hasOtherReadyScenes?: boolean;
   /** Allows the per-scene Dialog Studio to spawn shot-reverse-shot sub-scenes. */
-  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
+  onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
   language: string;
 }
 

@@ -405,7 +405,7 @@ async function processHeyGenJob(opts: {
           if (opts.sceneId) {
             await admin.from('composer_scenes').update({
               clip_url: finalUrl,
-              clip_status: 'completed',
+              clip_status: 'ready',
               updated_at: new Date().toISOString(),
             }).eq('id', opts.sceneId);
           }
@@ -573,7 +573,6 @@ Deno.serve(async (req) => {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     if (sceneId) {
       const sceneUpdate: Record<string, unknown> = {
-        clip_source: 'talking-head',
         character_image_url: imageUrl,
         character_audio_url: audioUrl,
         character_voice_id: voiceId || customVoiceId,
@@ -581,7 +580,7 @@ Deno.serve(async (req) => {
         talking_head_aspect: aspectRatio,
         talking_head_resolution: resolution,
         replicate_prediction_id: videoId, // reusing column to store HeyGen video_id
-        clip_status: 'processing',
+        clip_status: 'generating',
         clip_url: null,
         updated_at: new Date().toISOString(),
       };

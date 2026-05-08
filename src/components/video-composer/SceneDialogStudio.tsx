@@ -44,7 +44,7 @@ interface SceneDialogStudioProps {
   projectId?: string;
   language: 'de' | 'en' | 'es';
   onUpdate: (updates: Partial<ComposerScene>) => void;
-  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
+  onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
 }
 
 const PRESET_VOICES = [
@@ -275,7 +275,35 @@ export default function SceneDialogStudio({
         const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
         if (!voiceMeta) continue;
 
+        if (!onAddScene) continue;
+
+        // 1) Create the sub-scene FIRST so it has a real DB UUID. We store
+        //    `clipStatus: 'generating'` so the placeholder shows the spinner
+        //    immediately, and pollScenes (ClipsTab) will flip it to 'ready'
+        //    once HeyGen finishes (the edge function writes back into the row).
+        const charShot: CharacterShot = {
+          characterId: c.id,
+          shotType: 'profile',
+        } as CharacterShot;
+        const newSceneIdRaw = await onAddScene({
+          sceneType: scene.sceneType,
+          durationSeconds: Math.max(3, Math.ceil(block.text.length / 18)),
+          clipSource: 'ai-hailuo',
+          clipQuality: scene.clipQuality,
+          clipStatus: 'generating',
+          referenceImageUrl: c.referenceImageUrl,
+          aiPrompt: `${c.name}: ${block.text}`,
+          characterShot: charShot,
+          characterShots: [charShot],
+          lipSyncWithVoiceover: true,
+          transitionType: 'fade',
+          transitionDuration: 0.3,
+        });
+        const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
+
+        // 2) Kick off the HeyGen render and tell it which scene to update.
         const r = await generate({
+          sceneId: newSceneId,
           projectId,
           imageUrl: c.referenceImageUrl,
           text: block.text,
@@ -286,28 +314,7 @@ export default function SceneDialogStudio({
           composerCharacterId: c.id,
         });
 
-        if (r?.success && onAddScene) {
-          // Spawn a new sub-scene right after — Director's Cut stitching picks it up.
-          const charShot: CharacterShot = {
-            characterId: c.id,
-            shotType: 'profile',
-          } as CharacterShot;
-          await onAddScene({
-            sceneType: scene.sceneType,
-            durationSeconds: Math.max(3, Math.ceil(block.text.length / 18)),
-            clipSource: 'ai-hailuo',
-            clipQuality: scene.clipQuality,
-            clipUrl: r.videoUrl ?? undefined,
-            clipStatus: r.videoUrl ? 'ready' : 'pending',
-            replicatePredictionId: r.predictionId,
-            referenceImageUrl: c.referenceImageUrl,
-            aiPrompt: `${c.name}: ${block.text}`,
-            characterShot: charShot,
-            characterShots: [charShot],
-            lipSyncWithVoiceover: true,
-            transitionType: 'fade',
-            transitionDuration: 0.3,
-          });
+        if (r?.success) {
           okCount += 1;
         }
       }

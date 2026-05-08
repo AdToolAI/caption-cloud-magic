@@ -219,7 +219,9 @@ export default function ComposerSequencePreview({
     slotMapRef.current[slot] = idx;
     const el = getVideoForSlot(slot);
     if (el) {
-      el.muted = true;
+      // Active slot honours the user's mute toggle; standby is always muted
+      // until it becomes active to avoid double-audio during preload.
+      el.muted = slot === activeSlotRef.current ? mutedRef.current : true;
       try { el.currentTime = 0; } catch { /* noop */ }
     }
   }, [setSrcForSlot]);
@@ -265,10 +267,14 @@ export default function ComposerSequencePreview({
     }
   }, [playing, isImage, sceneIdx]);
 
-  // Apply mute changes to the active slot
+  // Apply mute changes to the active slot (standby remains muted to avoid
+  // double-audio during preload).
   useEffect(() => {
-    const v = getVideoForSlot(activeSlotRef.current);
-    if (v && !isImage) v.muted = muted;
+    const active = activeSlotRef.current;
+    const va = getVideoForSlot(active);
+    const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
+    if (va && !isImage) va.muted = muted;
+    if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
   // ── The core: stateless ref-based transition ──────────────────
@@ -590,11 +596,24 @@ export default function ComposerSequencePreview({
   // template so the editor preview is WYSIWYG with the final render.
   const VO_LEAD_IN_SECONDS = 0.4;
 
-  // Auto-unmute when a voiceover becomes available — VO is the primary
-  // audio track and should be hearable by default (video stays muted via slot refs).
+  // Auto-unmute when an audible track becomes available — VO, BGM, SFX, OR
+  // a lip-sync / HeyGen scene whose audio is embedded directly in the video.
   useEffect(() => {
-    if (voiceoverUrl || backgroundMusicUrl || (sceneAudioClips && sceneAudioClips.length > 0)) setMuted(false);
-  }, [voiceoverUrl, backgroundMusicUrl, sceneAudioClips]);
+    const hasEmbeddedAudio = playable.some(
+      (s) =>
+        s.lipSyncWithVoiceover === true ||
+        (s.clipSource as string) === 'ai-heygen' ||
+        s.clipSource === 'upload',
+    );
+    if (
+      voiceoverUrl ||
+      backgroundMusicUrl ||
+      (sceneAudioClips && sceneAudioClips.length > 0) ||
+      hasEmbeddedAudio
+    ) {
+      setMuted(false);
+    }
+  }, [voiceoverUrl, backgroundMusicUrl, sceneAudioClips, playable]);
 
   // Unified audio sync — re-evaluates on globalTime so audio.play() fires
   // automatically once the lead-in threshold is crossed (no scrub needed).
@@ -778,7 +797,6 @@ export default function ComposerSequencePreview({
           ref={videoBRef}
           playsInline
           preload="auto"
-          muted
           onTimeUpdate={onVideoTimeUpdate}
           onEnded={onVideoEnded}
           className="absolute inset-0 w-full h-full object-contain"
