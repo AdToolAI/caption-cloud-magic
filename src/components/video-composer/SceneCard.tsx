@@ -436,7 +436,37 @@ export default function SceneCard({
                 {(() => {
                   const rec = recommendEngineForScene(scene);
                   const override = scene.engineOverride ?? 'auto';
+                  // Multi-speaker hint: HeyGen MVP renders only first speaker per scene.
+                  // Surface a clickable warning that opens the Dialog Studio with
+                  // "Als getrennte Szenen rendern" pre-armed.
+                  const speakerLines = (scene.dialogScript ?? '')
+                    .split('\n')
+                    .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
+                    .filter(Boolean) as string[];
+                  const speakerCount = new Set(speakerLines).size;
+                  const showSplitHint =
+                    rec.engine === 'heygen-talking-head' && speakerCount >= 2;
                   return (
+                    <>
+                    {showSplitHint && (
+                      <Badge
+                        variant="outline"
+                        className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-amber-500/60 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                        title={
+                          lang === 'de'
+                            ? `${speakerCount} Sprecher erkannt. Beim Composer-Render wird nur der erste Sprecher als HeyGen-Clip generiert. Klicke hier, um die Szene über das Dialog-Studio in ${speakerCount} Einzelszenen zu splitten — jeder Sprecher bekommt seinen eigenen lippensynchronen Clip.`
+                            : lang === 'es'
+                            ? `${speakerCount} hablantes detectados. El renderizador del Composer solo genera al primero como clip HeyGen. Haz clic para dividir la escena en ${speakerCount} subescenas vía el Dialog Studio.`
+                            : `${speakerCount} speakers detected. Composer render uses only the first speaker. Click to split this scene into ${speakerCount} sub-scenes via Dialog Studio — one HeyGen lip-sync clip per speaker.`
+                        }
+                        onClick={() => {
+                          setDialogStudioOpen(true);
+                          setTimeout(() => dialogStudioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+                        }}
+                      >
+                        ⚠️ {speakerCount} {lang === 'de' ? 'Sprecher · splitten' : lang === 'es' ? 'hablantes · dividir' : 'speakers · split'}
+                      </Badge>
+                    )}
                     <Select
                       value={override}
                       onValueChange={(v) => onUpdate({ engineOverride: v as any })}
