@@ -14,10 +14,11 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
