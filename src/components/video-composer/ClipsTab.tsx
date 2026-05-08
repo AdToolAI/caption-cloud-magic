@@ -435,6 +435,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
   const handleGenerateSingle = async (scene: ComposerScene) => {
     setSingleGenerating(prev => ({ ...prev, [scene.id]: true }));
+    // Snapshot for rollback if invocation fails.
+    const previousStatus = scene.clipStatus;
     try {
       const persisted = await ensureProject();
       if (!persisted) {
@@ -516,7 +518,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       toast({ title: 'Generierung gestartet', description: `Szene ${(targetScene.orderIndex ?? 0) + 1}` });
       setTimeout(pollScenes, 500);
     } catch (err: any) {
-      toast({ title: 'Fehler', description: err.message, variant: 'destructive' });
+      // Roll back the optimistic 'generating' status so the spinner clears
+      // and the Re-Roll button reappears.
+      const rolledBack = scenes.map(s =>
+        s.id === scene.id ? { ...s, clipStatus: previousStatus } : s
+      );
+      onUpdateScenes(rolledBack);
+      console.error('[ClipsTab] handleGenerateSingle failed', err);
+      toast({
+        title: 'Fehler',
+        description: err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
+        variant: 'destructive',
+      });
     } finally {
       setSingleGenerating(prev => ({ ...prev, [scene.id]: false }));
     }
