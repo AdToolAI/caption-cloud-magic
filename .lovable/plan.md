@@ -1,32 +1,28 @@
 ## Ziel
-Das per Szenen-Skript erzeugte Voiceover soll im Vorschau-Player hörbar sein — nicht nur im finalen Render oder als gespeicherter Datenbankeintrag.
-
-## Ursache
-Die Voiceover-Blöcke werden als `scene_audio_clips.kind = 'voiceover'` gespeichert, aber der Preview-Loader lädt aktuell nur `ambient`, `sfx` und `foley`. Zusätzlich sendet `SceneDialogStudio` nach der Generierung ein anderes Event (`scene-audio-clips-changed`) als der Loader erwartet (`composer:scene-audio-clips-changed`). Dadurch werden die neuen Voiceover-Clips im Player nie geladen.
+Das im Szenen-Skript erzeugte Voiceover soll im Preview-Player hörbar sein, und der Skripttext soll nicht als sichtbares Textoverlay/Untertitel erscheinen, außer der Nutzer erzeugt explizit Untertitel.
 
 ## Plan
-1. **Audio-Clip-Loader erweitern**
-   - `useSceneAudioClips` so ändern, dass auch `kind = 'voiceover'` geladen wird.
-   - Event-Namen vereinheitlichen, damit neue Clips direkt nach der Generierung im Preview auftauchen.
+1. **Szenen-Voiceover als eigenständige Audiotracks behandeln**
+   - `scene_audio_clips.kind = 'voiceover'` bleibt die Quelle für per-scene Dialog/Monolog-Audio.
+   - Im Preview werden diese Clips nicht mehr wie SFX mit Fade-/Fensterlogik behandelt, sondern als Voiceover-Spoken-Tracks ohne Fade und mit voller Lautstärke synchron zur Szene abgespielt.
 
-2. **Voiceover-Clips in der Preview synchron abspielen**
-   - `ComposerSequencePreview` nutzt bereits `sceneAudioClips`; diese Logik soll auch Voiceover-Clips akzeptieren.
-   - Die vorhandene Timeline-Logik bleibt erhalten: `scene_id + start_offset + duration` bestimmt den Zeitpunkt.
-   - Beim Play-Button werden die versteckten Audio-Elemente geprimed, damit Browser-Autoplay-Regeln nicht blockieren.
+2. **Autoplay-/Gesture-Problem im Preview beheben**
+   - Beim Klick auf Play werden sowohl SFX-Clips als auch der globale Voiceover-Audiotrack und die per-scene Voiceover-Clips “geprimed”.
+   - Dadurch blockiert der Browser die späteren `audio.play()`-Aufrufe nicht mehr, wenn ein Voiceover erst nach Szenenstart oder nach einem Scrub beginnt.
 
-3. **Voiceover-Tab ebenfalls an die Szenen-Audio-Clips anschließen**
-   - `VoiceSubtitlesTab` bekommt `projectId` und lädt `scene_audio_clips` wie der Export-Tab.
-   - Diese Clips werden an `ComposerSequencePreview` übergeben, damit der Player auf dem aktuell sichtbaren Tab das Szenen-Voiceover abspielt.
+3. **Dialog-/Skripttext nicht als sichtbares Overlay rendern**
+   - Die bestehende Logik, die Szenen-Skripte in den AI-Prompt schreibt, bleibt für die Videogenerierung erhalten.
+   - Es wird aber sichergestellt, dass `dialogScript` nicht in `textOverlay`, `globalTextOverlays` oder automatische Untertitel wandert.
+   - Legacy-/Migrationslogik wird so abgesichert, dass nur echte Textoverlay-Felder migriert werden, nicht das Voiceover-Skript.
 
-4. **Nach Generierung korrekt refreshen**
-   - `SceneDialogStudio` ruft nach erfolgreichem Insert den bestehenden `emitSceneAudioClipsChanged(projectId)` Helper auf statt eines abweichenden CustomEvent-Namens.
+4. **Preview-Synchronisation nach Voiceover-Generierung stabilisieren**
+   - Nach dem Insert von per-scene Voiceover-Clips wird der Preview-Loader zuverlässig aktualisiert.
+   - Falls die Szene durch `ensureProjectPersisted()` eine neue DB-ID bekommt, wird der Audioclip weiter sauber der sichtbaren Szene zugeordnet.
 
-## Dateien
-- `src/hooks/useSceneAudioClips.ts`
-- `src/components/video-composer/SceneDialogStudio.tsx`
-- `src/components/video-composer/VoiceSubtitlesTab.tsx`
-- `src/components/video-composer/VideoComposerDashboard.tsx`
-- ggf. kleine Anpassung in `src/components/video-composer/ComposerSequencePreview.tsx`, falls Voiceover-Clips für Lautstärke/Priming noch explizit behandelt werden müssen
-
-## Nicht enthalten
-Keine Datenbank-Migration, keine Änderung an ElevenLabs, kein UI-Redesign.
+## Technische Details
+- Betroffene Dateien voraussichtlich:
+  - `src/components/video-composer/ComposerSequencePreview.tsx`
+  - `src/components/video-composer/SceneDialogStudio.tsx`
+  - ggf. `src/components/video-composer/VoiceSubtitlesTab.tsx`
+- Keine Datenbankmigration nötig.
+- Keine Änderung an ElevenLabs selbst; Fokus liegt auf Playback, Clip-Timing und Overlay-Trennung.
