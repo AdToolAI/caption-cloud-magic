@@ -1,44 +1,39 @@
 ## Problem
 
-Im Composer-Storyboard zeigt der Cast-Picker einer Szene zwei Slots: einen mit "?" (kein Name, kein Avatar) und Matthew. Es lässt sich kein weiterer Charakter auswählen oder neu anlegen.
+Beim Generieren der Clips für Szene 1 (mit Dialog zwischen Matthew & Sarah) entstehen automatisch **zwei zusätzliche Sub-Szenen** (#6 "Matthew: Welcome…" und #7 "Sarah: Tired of wasting…") als separate HeyGen-Lip-Sync-Clips (Shot-Reverse-Shot).
 
-Zwei kooperierende Ursachen:
+**Ursache:** `SceneDialogStudio.tsx` (Zeile 278–315) ruft pro Dialog-Block ein `onAddScene(...)` auf und legt für jede Sprecher-Zeile eine eigene Szene mit `clipSource: 'ai-hailuo'` + Lip-Sync an. Das war für klassisches Shot-Reverse-Shot gedacht — der User möchte das aber **nicht**: Dialog soll IN der Original-Szene mitlaufen, ohne Zerlegung in mehrere Szenen.
 
-1. **Ghost-Slot**: `CharacterCastPicker` matcht `slot.characterId` strikt gegen `characters` (aus `briefing.characters`). Wenn die Storyboard-LLM eine ID wie `lib:matthew-…`, `matthew_dusatko` oder einen zweiten, in der Briefing-Liste nicht vorhandenen Charakter ausgibt, fällt das Matching durch → Tag rendert `?` und einen leeren Namen. Die Tolerant-Match-Logik aus `applyCastToPrompt.ts` (`findCharacter`) und `CastConsistencyMap.getAnchor` ist hier nicht angewendet.
+## Lösung (Inline-Modus als neuer Default)
 
-2. **Keine Add-Quelle**: Der Picker zieht ausschließlich aus `briefing.characters`. Wenn der Nutzer nur Matthew im Briefing hat (oder den anderen Slot nicht zuordnen kann), ist `available` leer → der "Charakter hinzufügen"-Button verschwindet komplett. Es gibt auch keinen Weg, von hier aus einen neuen Brand-Charakter anzulegen.
+Den `SceneDialogStudio` so umbauen, dass er per Default **keine neuen Szenen mehr spawnt**. Die Szene zeigt weiterhin beide Charaktere (über den bestehenden Cast/Prompt-Pfad mit dem Frame-First / Anchor-Compose-Mechanismus), und der Dialog wird nur als **Audio (Voiceover)** an die Original-Szene gehängt.
 
-## Fix
+### Konkret
 
-### 1. `src/components/video-composer/CharacterCastPicker.tsx` — tolerantes Matching + Ghost-Repair
+1. **Neuer Toggle** „Als separate Shot-Reverse-Shot-Szenen rendern" — Default **aus**.
+   - Aus (neu): kein `onAddScene`, keine Sub-Szenen, kein HeyGen-Lip-Sync.
+   - Ein (Power-User): bisheriges Verhalten (eine Sub-Szene pro Sprecher).
 
-- Tolerant-Lookup-Helfer (gleiche Logik wie `applyCastToPrompt.findCharacter`): exact id → first-name in id → full-name lower.
-- Slot-Render nutzt diesen Lookup. Wenn ein Match gefunden wird, der aber eine andere `id` hat als `slot.characterId`, ruft der Picker einmalig `onChange` mit der **kanonischen** id auf (Self-Heal des Drifts), damit nachgelagerte Schritte (Anchor, Prompt, Render) wieder konsistent sind.
-- Slots, für die wirklich kein Match existiert, werden visuell als "Unbekannt – entfernen?" mit deutlichem Reassign/X markiert (statt nur `?`), so dass der Nutzer sie aufräumen kann.
+2. **Inline-Pfad (Toggle aus):**
+   - Pro Dialog-Block sequentiell ElevenLabs-TTS via bestehender `synthesize-voiceover` / `text-to-speech` Edge-Function (die wird bereits im Composer für Szenen-VO verwendet).
+   - Audio-Clips der Reihe nach zu **einer** kombinierten Audio-Datei mergen (`ffmpeg` server-seitig in `synthesize-voiceover` ist schon da; alternativ Web Audio Concat client-seitig — wir bevorzugen den vorhandenen Edge-Function-Pfad mit mehreren Sprechern, falls vorhanden, sonst sequentielle Aufrufe + Concat in einer kleinen neuen Edge-Function `synthesize-dialog-voiceover`).
+   - Resultierende `voiceover_url` + `voiceover_duration_seconds` per `onUpdate` an die **aktuelle** Szene hängen.
+   - `scene.duration` ggf. auf die Dialog-Länge anheben (max(clipDuration, dialogDuration)).
+   - Dialog-Skript bleibt im Prompt (bereits durch `applyDialogToPrompt` erledigt) → der i2v-Provider sieht beide Charaktere im Prompt + Cast-Anchor.
 
-### 2. Picker-Quelle erweitern: gesamte Avatar-Library zeigen
+3. **UI-Hinweis:** Im Studio sichtbar machen, dass der Dialog als VO in **dieser** Szene läuft („Dialog wird als Voiceover an Szene X gehängt — keine extra Szenen") + kleiner Switch für „Erweitert: Shot-Reverse-Shot".
 
-- Neue optionale Prop `libraryCharacters?: ComposerCharacter[]`.
-- Im Add-Popover werden Briefing-Cast und Library-Charaktere zusammengeführt (dedupe per id + Tolerant-Name-Match), Briefing-Einträge zuerst, Library mit Sektions-Label "Aus deiner Avatar-Bibliothek".
-- Klick auf Library-Eintrag fügt den Slot hinzu **und** propagiert den Char nach `briefing.characters` (Composer-State), damit Anchor/Prompt-Pipeline ihn kennt.
+4. **Aufräumen der bereits gespawnten Szenen:** Einmaliger „Diese 2 Szenen entfernen"-Button im Studio, sichtbar wenn `composer_scenes` Sub-Szenen mit `metadata.spawned_from_dialog === scene.id` hat (Markierung auch beim Spawn setzen).
 
-### 3. "Neuen Charakter erstellen"-Link
+### Out of Scope
+- Keine Änderungen an HeyGen, Render-Pipeline, Anchor-Compose, Cast-Picker.
+- Keine DB-Migrationen nötig — `voiceover_url` Felder existieren auf `composer_scenes`.
 
-- Am Ende des Add-Popovers ein dezenter Link **"+ Neuen Avatar erstellen"**, der `/brand-characters` in einem neuen Tab öffnet (i18n: de/en/es).
-- Kein In-Place-Wizard — bewusst Out-of-Scope, um Scope minimal zu halten.
+### Betroffene Dateien
+- `src/components/video-composer/SceneDialogStudio.tsx` — Toggle, Inline-Pfad, UI-Texte (de/en/es).
+- evtl. neue Edge-Function `supabase/functions/synthesize-dialog-voiceover/index.ts` — sequentielle TTS pro Block + Concat (nur falls bestehende `synthesize-voiceover` nicht multi-speaker kann; das prüfe ich beim Implementieren).
+- `supabase/config.toml` — Eintrag für die neue Function (`verify_jwt = true`).
 
-### 4. Wiring
-
-- `src/components/video-composer/SceneCard.tsx` (Z. 716, 755): `libraryCharacters={brandCharsFromHook}` durchreichen, dazu Callback, der neue Library-Picks in `project.briefing.characters` mergt.
-- `src/components/video-composer/StoryboardTab.tsx` (Z. 434) und `VideoComposerDashboard.tsx` (Z. 1095/1107): `useAccessibleCharacters()` einbinden und nach `ComposerCharacter`-Shape adaptieren (gleicher Adapter wie in `useUnifiedMentionLibrary.ts`), an SceneCard durchreichen.
-
-## Out of Scope
-- Kein Inline-Avatar-Wizard.
-- Keine Änderungen an Anchor-Composition, Prompt-Marker oder Render-Pipeline.
-- Keine Änderungen an HeyGen / Lip-Sync.
-
-## Verifikation
-1. Bestehende Szene mit Ghost-Slot: `?` wird durch korrekten Avatar ersetzt (Tolerant-Match) bzw. als "Unbekannt" klar markiert.
-2. Add-Button erscheint, sobald entweder Briefing- oder Library-Chars verfügbar sind; Library-Sektion listet alle Avatare des Nutzers.
-3. Auswahl eines Library-Charakters fügt ihn zur Szene UND zum Briefing-Cast hinzu; Anchor + Prompt enthalten den Namen.
-4. "Neuen Avatar erstellen" öffnet `/brand-characters`.
+### Verifikation
+- Szene mit 2 Cast-Mitgliedern + Dialog → „Alle generieren" erzeugt **nur** den i2v-Clip für diese Szene + ein VO mit beiden Stimmen, **keine** zusätzlichen Sub-Szenen in der Liste.
+- Toggle „Shot-Reverse-Shot" reaktivierbar → altes Verhalten bleibt erhalten.
