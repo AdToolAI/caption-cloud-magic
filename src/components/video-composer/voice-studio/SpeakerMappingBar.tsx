@@ -30,6 +30,7 @@ export function SpeakerMappingBar({
 }: SpeakerMappingBarProps) {
   const speakers = useMemo(() => uniqueSpeakers(parseSpeakerScript(script)), [script]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const { voices: humeVoices, isLoading: humeLoading } = useHumeVoices();
 
   // Auto-seed missing speakers with sensible defaults (ElevenLabs Aria + alternates).
   useEffect(() => {
