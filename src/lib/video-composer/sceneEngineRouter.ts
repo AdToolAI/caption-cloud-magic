@@ -48,17 +48,63 @@ export function sceneHasCast(scene: ComposerScene): boolean {
   return false;
 }
 
+/** Approximate HeyGen cost: €0.30 per speaker (capped 1-4). */
+export function estimateHeygenCostEur(speakerCount: number): number {
+  return Math.max(1, Math.min(4, speakerCount)) * 0.30;
+}
+
+/** Count speakers from a dialog script — matches `[NAME]:` or `NAME:` blocks. */
+export function countSpeakers(scene: ComposerScene): number {
+  const script = (scene.dialogScript ?? '').trim();
+  if (!script) return 0;
+  const speakers = new Set<string>();
+  for (const line of script.split('\n')) {
+    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+    if (m) speakers.add(m[1].trim().toLowerCase());
+  }
+  return speakers.size;
+}
+
 export function recommendEngineForScene(scene: ComposerScene): EngineRecommendation {
+  const override = scene.engineOverride ?? 'auto';
   const hasDialog = sceneHasDialog(scene);
   const hasCast = sceneHasCast(scene);
+  const speakers = Math.max(1, countSpeakers(scene));
 
+  // ── User override wins ─────────────────────────────────────────────
+  if (override === 'heygen') {
+    return {
+      engine: 'heygen-talking-head',
+      label: '🎙️ HeyGen Lip-Sync (manuell)',
+      reason: 'Vom Nutzer erzwungen — HeyGen Photo-Avatar rendert frame-genauen Lip-Sync.',
+      extraCostEur: estimateHeygenCostEur(speakers),
+    };
+  }
+  if (override === 'broll') {
+    return {
+      engine: 'broll',
+      label: '🎬 B-Roll (manuell)',
+      reason: 'Vom Nutzer erzwungen — kein Lip-Sync, klassischer B-Roll-Render.',
+      extraCostEur: 0,
+    };
+  }
+  if (override === 'sync-polish') {
+    return {
+      engine: 'sync-polish',
+      label: '✨ Sync.so Polish (manuell)',
+      reason: 'Vom Nutzer erzwungen — Hailuo + Sync.so Polish-Pass.',
+      extraCostEur: 0.05,
+    };
+  }
+
+  // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
     return {
       engine: 'heygen-talking-head',
-      label: '🎙️ HeyGen Lip-Sync',
+      label: speakers >= 2 ? `🎙️ HeyGen Lip-Sync (${speakers} Sprecher)` : '🎙️ HeyGen Lip-Sync',
       reason:
         'Charakter spricht im Bild — HeyGen Photo Avatar liefert frame-genauen Lip-Sync (Werbe-Niveau).',
-      extraCostEur: 0.3,
+      extraCostEur: estimateHeygenCostEur(speakers),
     };
   }
 
