@@ -250,6 +250,86 @@ export default function SceneDialogStudio({
     }
   };
 
+  const handleGenerateInline = async () => {
+    setGenerating(true);
+    let okCount = 0;
+    let cumulativeOffset = 0;
+    try {
+      for (const block of blocks) {
+        const c = sceneCast.find((x) => x.id === block.speakerId);
+        if (!c) continue;
+        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
+        if (!voiceMeta) continue;
+
+        // ElevenLabs voice id: presets use the preset id directly; cloned
+        // voices store the real ElevenLabs id in `elevenlabsVoiceId`.
+        const elevenVoiceId = voiceMeta.isCustom
+          ? voiceMeta.elevenlabsVoiceId
+          : voiceMeta.id;
+
+        const { data, error } = await supabase.functions.invoke('generate-voiceover', {
+          body: {
+            text: block.text,
+            voiceId: elevenVoiceId,
+            projectId: projectId ?? scene.projectId,
+          },
+        });
+        if (error) throw error;
+        const audioUrl = (data as any)?.audioUrl as string | undefined;
+        const duration = Number((data as any)?.duration ?? 0) || Math.max(1.5, block.text.length / 18);
+        if (!audioUrl) throw new Error('No audioUrl returned');
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Unauthorized');
+
+        const { error: insErr } = await supabase
+          .from('scene_audio_clips')
+          .insert({
+            user_id: user.id,
+            project_id: projectId ?? scene.projectId,
+            scene_id: scene.id,
+            kind: 'voiceover',
+            source: 'ai',
+            prompt: `${c.name}: ${block.text}`,
+            url: audioUrl,
+            start_offset: Math.round(cumulativeOffset * 100) / 100,
+            duration: Math.round(duration * 100) / 100,
+            volume: 1.0,
+            ducking_enabled: true,
+            cost_credits: 0,
+          });
+        if (insErr) throw insErr;
+
+        cumulativeOffset += duration + 0.15; // small breath between speakers
+        okCount += 1;
+      }
+
+      // Bump scene duration so all VO blocks fit (cap at 60s sanity)
+      const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
+      if (totalNeeded > (scene.durationSeconds ?? 0)) {
+        onUpdate({ durationSeconds: totalNeeded });
+      }
+      // Notify other panels (SoundDesign / preview) to refresh.
+      try {
+        const evt = new CustomEvent('scene-audio-clips-changed', {
+          detail: { projectId: projectId ?? scene.projectId },
+        });
+        window.dispatchEvent(evt);
+      } catch (_) { /* noop */ }
+
+      toast({ title: t.title, description: t.successInline(okCount) });
+    } catch (e) {
+      console.error('[SceneDialogStudio] inline generate error', e);
+      toast({
+        title: t.failed,
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'destructive',
+      });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleGenerate = async () => {
     if (blocks.length === 0) {
       toast({ title: t.parseEmpty, variant: 'destructive' });
@@ -260,6 +340,10 @@ export default function SceneDialogStudio({
         toast({ title: t.voiceMissing(sp.name), variant: 'destructive' });
         return;
       }
+    }
+    if (!renderAsSeparateScenes) {
+      await handleGenerateInline();
+      return;
     }
     setGenerating(true);
     let okCount = 0;
