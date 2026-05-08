@@ -465,10 +465,7 @@ export default function SceneCard({
                             ? `${speakerCount} hablantes detectados. El renderizador del Composer solo genera al primero como clip HeyGen. Haz clic para dividir la escena en ${speakerCount} subescenas vía el Dialog Studio.`
                             : `${speakerCount} speakers detected. Composer render uses only the first speaker. Click to split this scene into ${speakerCount} sub-scenes via Dialog Studio — one HeyGen lip-sync clip per speaker.`
                         }
-                        onClick={() => {
-                          setDialogStudioOpen(true);
-                          setTimeout(() => dialogStudioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
-                        }}
+                        onClick={() => setSplitConfirmOpen(true)}
                       >
                         ⚠️ {speakerCount} {lang === 'de' ? 'Sprecher · splitten' : lang === 'es' ? 'hablantes · dividir' : 'speakers · split'}
                       </Badge>
