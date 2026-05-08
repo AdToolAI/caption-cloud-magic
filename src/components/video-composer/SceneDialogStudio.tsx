@@ -139,7 +139,7 @@ const T = {
   },
 };
 
-export default function SceneDialogStudio({
+const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(function SceneDialogStudio({
   scene,
   cast,
   characters,
@@ -147,7 +147,9 @@ export default function SceneDialogStudio({
   language,
   onUpdate,
   onAddScene,
-}: SceneDialogStudioProps) {
+  open,
+  onClose,
+}, ref) {
   const t = T[language];
   const { toast } = useToast();
   const { generate, estimateCost } = useTalkingHead();
