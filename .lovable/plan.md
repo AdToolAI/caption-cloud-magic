@@ -1,55 +1,50 @@
-# Fix: Drehbuch-Textfeld löscht/verschluckt Buchstaben
+## Was wir beheben
 
-## Problem
-
-Im `SceneDialogStudio` schreibt der User in das Drehbuch-Textfeld. Während des Tippens werden zufällig Buchstaben überschrieben oder gelöscht, der Cursor springt.
-
-## Ursache
-
-In `src/components/video-composer/SceneDialogStudio.tsx`:
-
+### Problem 1 — Sarah verschwindet als Sprecher
+**Ursache** in `src/lib/talking-head/parseDialogScript.ts`:
 ```ts
-// Zeile 169–174: debounced auto-save (500ms)
-useEffect(() => {
-  if (script === (scene.dialogScript ?? '')) return;
-  const handle = setTimeout(() => onUpdate({ dialogScript: script }), 500);
-  return () => clearTimeout(handle);
-}, [script]);
+x.name.toLowerCase() === speakerName.toLowerCase() ||
+x.name.toLowerCase().split(/\s+/)[0] === speakerName.toLowerCase()
+```
+Cast-Name = „Sarah" (kurz), Skript schreibt „**Sarah Dusatko**:" (lang). Die zweite Bedingung prüft nur „Cast-Vorname == Skript-komplett" — nicht den umgekehrten Fall „Skript-Vorname == Cast-komplett". Folge: Sarahs Zeile wird als Continuation an Matthews Block angehängt → 1 Sprecher, Matthew „spricht" beide Texte.
 
-// Zeile 163–166: sync from props
-useEffect(() => {
-  setScript(scene.dialogScript ?? '');
-  setVoicePerSpeaker(scene.dialogVoices ?? {});
-}, [scene.id, scene.dialogScript, scene.dialogVoices]);
+**Fix** — symmetrisches Vornamen-Matching:
+```ts
+const castFirst = x.name.toLowerCase().split(/\s+/)[0];
+const scriptFirst = speakerName.toLowerCase().split(/\s+/)[0];
+return (
+  x.name.toLowerCase() === speakerName.toLowerCase() ||
+  castFirst === scriptFirst                    // „Sarah" ↔ „Sarah Dusatko"
+);
 ```
 
-Race-Condition:
-1. User tippt „Wimmm" → `script` = "Wimmm"
-2. Nach 500 ms feuert `onUpdate({ dialogScript: "Wimmm" })` → Parent re-rendert mit neuem `scene.dialogScript`
-3. User tippt parallel weiter → lokal "Wimmme"
-4. Sync-Effect läuft (Dependency `scene.dialogScript` hat sich geändert) → `setScript("Wimmm")` überschreibt das aktuell getippte „Wimmme"
-5. Resultat: Buchstaben verschwinden, Cursor springt zurück.
+Nebenfix: `referenceImageUrl`-Pflicht im Parser entfernen — Speaker-Erkennung darf nicht vom Bild abhängen (Bild ist erst beim HeyGen-Render relevant).
 
-Gleiches Problem mit `dialogVoices`.
+### Problem 2 — Skript wirkt sich nicht sichtbar auf Prompt/Szenen aus
+Aktuell speichert „Skript via AI" nur `dialogScript`. Der KI-Prompt der Szene und die Sub-Szenen werden nicht angefasst → User denkt „nichts passiert".
 
-## Fix
+**Fix** — drei sichtbare Effekte:
+1. **Inline-Block-Vorschau** unter dem Textarea (Avatar + Name + erste 60 Zeichen pro Zeile). So sieht der User sofort, wie das Skript geparsed wurde.
+2. **Auto-Sync in Szenen-Prompt** (Checkbox „In Prompt übernehmen", default an):
+   Idempotenter, lokalisierter `[Dialog: Matthew → "…", Sarah → "…"]`-Marker wird an `aiPrompt` (oder `promptSlots.subject` im Structured-Mode) angehängt. Re-Run mit gleichen Blöcken = no-op; leeres Skript entfernt Marker. Dadurch verändert sich die Szenen-Komposition messbar (sprechende Pose) und der User sieht es im Prompt-Feld.
+3. **Toast „Skript bereit – jetzt Dialog generieren"** als CTA, damit der zweite Schritt nicht übersehen wird.
 
-Sync nur bei **echtem Szenen-Wechsel** (scene.id), nicht bei jeder Prop-Änderung des eigenen Felds.
+In `handleGenerate`: Sprecher ohne Portrait sauber überspringen (statt schon im Parser auszufiltern) mit Toast „Kein Portrait für {Name} — Lip-Sync übersprungen".
 
-```ts
-useEffect(() => {
-  setScript(scene.dialogScript ?? '');
-  setVoicePerSpeaker(scene.dialogVoices ?? {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [scene.id]);
-```
+## Technische Details
 
-Damit gewinnt der lokale State während des Tippens; der debounced Save schickt seinen Wert an den Parent, ohne dass der Parent den User wieder „überschreibt".
+### Dateien
+- `src/lib/talking-head/parseDialogScript.ts`
+  - Speaker-Match: bidirektionales Vornamen-Matching.
+  - `referenceImageUrl`-Guard entfernen.
+- `src/components/video-composer/SceneDialogStudio.tsx`
+  - `sceneCast`-Filter: `referenceImageUrl`-Bedingung entfernen.
+  - `handleGenerate`: Skip + Toast für Speaker ohne Portrait.
+  - Inline `<DialogPreviewList />` (Avatar/Name/Snippet) direkt unter dem Textarea.
+  - Checkbox „Dialog in Szenen-Prompt übernehmen" + bei Skript-Update / „Skript via AI" → `applyDialogToPrompt(...)` aufrufen + Toast „Skript bereit".
+- `src/lib/motion-studio/applyDialogToPrompt.ts` (neu, parallel zu `applyCastToPrompt`)
+  - Idempotenter, lokalisierter `[Dialog: …]`-Marker (de/en/es).
 
-## Geänderte Dateien
-
-- `src/components/video-composer/SceneDialogStudio.tsx` — Dependencies des Sync-Effects auf `[scene.id]` reduzieren.
-
-## Out of Scope
-
-Keine DB-Migration, keine UI-Änderung, keine Logik-Änderung an Generierung oder Persistenz.
+### Out of scope
+- Keine DB-Migration, keine Edge-Function-Änderung, keine Pipeline-Änderung.
+- Cast-Picker und HeyGen-Sub-Szenen-Spawn bleiben unverändert.

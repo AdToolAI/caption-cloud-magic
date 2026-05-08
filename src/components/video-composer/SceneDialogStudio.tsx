@@ -14,7 +14,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2 } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -135,7 +137,7 @@ export default function SceneDialogStudio({
     () =>
       cast
         .map((cs) => characters.find((c) => c.id === cs.characterId))
-        .filter((c): c is ComposerCharacter => !!c && !!c.referenceImageUrl),
+        .filter((c): c is ComposerCharacter => !!c),
     [cast, characters],
   );
 
@@ -158,6 +160,7 @@ export default function SceneDialogStudio({
   );
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [syncToPrompt, setSyncToPrompt] = useState(true);
 
   // Sync only when switching to a different scene — otherwise the parent's
   // re-render after our own debounced save would clobber the user's in-flight
@@ -168,13 +171,20 @@ export default function SceneDialogStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce
+  // Persist script with debounce + (optional) sync into the scene's AI prompt
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
-    const handle = setTimeout(() => onUpdate({ dialogScript: script }), 500);
+    const handle = setTimeout(() => {
+      const updates: Partial<ComposerScene> = { dialogScript: script };
+      if (syncToPrompt) {
+        const parsed = parseDialogScript(script, sceneCast);
+        updates.aiPrompt = applyDialogToPrompt(scene.aiPrompt ?? '', parsed, language);
+      }
+      onUpdate(updates);
+    }, 500);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [script]);
+  }, [script, syncToPrompt]);
 
   // Persist voice map immediately on change
   const setVoiceFor = (speakerId: string, voiceId: string) => {
@@ -208,7 +218,18 @@ export default function SceneDialogStudio({
       });
       if (error) throw error;
       const generated = (data as any)?.script as string | undefined;
-      if (generated) setScript(generated);
+      if (generated) {
+        setScript(generated);
+        toast({
+          title: language === 'de' ? 'Skript bereit' : language === 'es' ? 'Guion listo' : 'Script ready',
+          description:
+            language === 'de'
+              ? 'Jetzt „Dialog generieren" klicken.'
+              : language === 'es'
+              ? 'Ahora haz clic en "Generar diálogo".'
+              : 'Now click "Generate dialog".',
+        });
+      }
     } catch (e) {
       console.error('[SceneDialogStudio] AI script error', e);
       toast({
@@ -238,7 +259,25 @@ export default function SceneDialogStudio({
       // Run sequentially to avoid HeyGen rate spikes
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
-        if (!c?.referenceImageUrl) continue;
+        if (!c) continue;
+        if (!c.referenceImageUrl) {
+          toast({
+            title:
+              language === 'de'
+                ? `Kein Portrait für ${c.name}`
+                : language === 'es'
+                ? `Sin retrato para ${c.name}`
+                : `No portrait for ${c.name}`,
+            description:
+              language === 'de'
+                ? 'Lip-Sync übersprungen.'
+                : language === 'es'
+                ? 'Lip-sync omitido.'
+                : 'Lip-sync skipped.',
+            variant: 'destructive',
+          });
+          continue;
+        }
         const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
         if (!voiceMeta) continue;
 
@@ -327,6 +366,43 @@ export default function SceneDialogStudio({
           rows={4}
           className="mt-1 font-mono text-xs"
         />
+
+        {blocks.length > 0 && (
+          <div className="mt-2 space-y-1 rounded-md border border-border/40 bg-background/40 p-2">
+            {blocks.map((b, i) => {
+              const sp = sceneCast.find((c) => c.id === b.speakerId);
+              const missing = !sp?.referenceImageUrl;
+              return (
+                <div key={i} className="flex items-start gap-2 text-[11px]">
+                  {sp?.referenceImageUrl ? (
+                    <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
+                  ) : (
+                    <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
+                      <ImageOff className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                  <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
+                    {b.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
+          <Checkbox
+            checked={syncToPrompt}
+            onCheckedChange={(v) => setSyncToPrompt(!!v)}
+            className="h-3.5 w-3.5"
+          />
+          {language === 'de'
+            ? 'Dialog in Szenen-Prompt übernehmen'
+            : language === 'es'
+            ? 'Incluir diálogo en el prompt de la escena'
+            : 'Sync dialog into scene prompt'}
+        </label>
       </div>
 
       {speakers.length > 0 && (

@@ -46,12 +46,19 @@ export function parseDialogScript(
     if (m) {
       const speakerName = m[1].trim();
       const text = m[2].trim();
-      const c = cast.find(
-        (x) =>
-          x.name.toLowerCase() === speakerName.toLowerCase() ||
-          x.name.toLowerCase().split(/\s+/)[0] === speakerName.toLowerCase(),
-      );
-      if (c && c.referenceImageUrl) {
+      const spk = speakerName.toLowerCase();
+      const spkFirst = spk.split(/\s+/)[0];
+      const c = cast.find((x) => {
+        const xn = x.name.toLowerCase();
+        const xnFirst = xn.split(/\s+/)[0];
+        return (
+          xn === spk ||
+          xnFirst === spk ||           // cast "Sarah Dusatko" ↔ script "Sarah"
+          xn === spkFirst ||           // cast "Sarah" ↔ script "Sarah Dusatko"
+          xnFirst === spkFirst         // both share a first name
+        );
+      });
+      if (c) {
         current = { speakerId: c.id, speakerName: c.name, text };
         blocks.push(current);
         continue;
