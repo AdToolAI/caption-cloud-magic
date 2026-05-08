@@ -283,6 +283,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         onUpdateScenes(merged);
       });
     }
+
+    // Auto-trigger Sync.so post-step lip-sync. We fire-and-forget; the next
+    // poll tick will surface lip_sync_applied_at and swap clip_url. The edge
+    // function self-checks for a voiceover clip — if none exists yet, it 400s
+    // silently and we'll retry on the next ready scene.
+    if (lipSyncTargets.length > 0) {
+      lipSyncTargets.forEach((sceneId) => {
+        console.info(`[ClipsTab] Auto-triggering lip-sync for scene ${sceneId}`);
+        supabase.functions
+          .invoke('compose-lipsync-scene', { body: { scene_id: sceneId } })
+          .then(({ error }) => {
+            if (error) {
+              console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, error);
+            } else {
+              toast({
+                title: 'Lip-Sync gestartet',
+                description: 'Charakter spricht gleich wortgenau in der Szene.',
+              });
+            }
+          });
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, scenes, onUpdateScenes]);
 
