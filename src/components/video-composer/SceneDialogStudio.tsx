@@ -14,7 +14,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2 } from 'lucide-react';
+import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -135,7 +137,7 @@ export default function SceneDialogStudio({
     () =>
       cast
         .map((cs) => characters.find((c) => c.id === cs.characterId))
-        .filter((c): c is ComposerCharacter => !!c && !!c.referenceImageUrl),
+        .filter((c): c is ComposerCharacter => !!c),
     [cast, characters],
   );
 
