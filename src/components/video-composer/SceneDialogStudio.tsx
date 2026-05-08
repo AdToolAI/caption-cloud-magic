@@ -540,6 +540,21 @@ export default function SceneDialogStudio({
         </div>
       )}
 
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border/40 bg-background/40 p-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Volume2 className="h-3 w-3 text-primary" />
+            <span className="text-[11px] font-medium">{t.srsLabel}</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">{t.srsHint}</p>
+        </div>
+        <Switch
+          checked={renderAsSeparateScenes}
+          onCheckedChange={setRenderAsSeparateScenes}
+          disabled={generating}
+        />
+      </div>
+
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -567,9 +582,13 @@ export default function SceneDialogStudio({
             <>
               <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
             </>
+          ) : renderAsSeparateScenes ? (
+            <>
+              <User className="h-3 w-3" /> {t.genBtnSrs}
+            </>
           ) : (
             <>
-              <User className="h-3 w-3" /> {t.genBtn}
+              <Volume2 className="h-3 w-3" /> {t.genBtn}
             </>
           )}
         </Button>
