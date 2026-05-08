@@ -366,6 +366,43 @@ export default function SceneDialogStudio({
           rows={4}
           className="mt-1 font-mono text-xs"
         />
+
+        {blocks.length > 0 && (
+          <div className="mt-2 space-y-1 rounded-md border border-border/40 bg-background/40 p-2">
+            {blocks.map((b, i) => {
+              const sp = sceneCast.find((c) => c.id === b.speakerId);
+              const missing = !sp?.referenceImageUrl;
+              return (
+                <div key={i} className="flex items-start gap-2 text-[11px]">
+                  {sp?.referenceImageUrl ? (
+                    <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
+                  ) : (
+                    <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
+                      <ImageOff className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                  <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
+                    {b.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <label className="mt-2 flex items-center gap-2 text-[10px] text-muted-foreground cursor-pointer">
+          <Checkbox
+            checked={syncToPrompt}
+            onCheckedChange={(v) => setSyncToPrompt(!!v)}
+            className="h-3.5 w-3.5"
+          />
+          {language === 'de'
+            ? 'Dialog in Szenen-Prompt übernehmen'
+            : language === 'es'
+            ? 'Incluir diálogo en el prompt de la escena'
+            : 'Sync dialog into scene prompt'}
+        </label>
       </div>
 
       {speakers.length > 0 && (
