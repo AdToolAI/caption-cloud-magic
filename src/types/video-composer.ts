@@ -181,8 +181,13 @@ export interface ComposerScene {
    * speaker and auto-spawns sub-scenes for shot-reverse-shot.
    */
   dialogScript?: string;
-  /** Map of characterId → voiceId (Eleven Labs preset or custom voice id). */
-  dialogVoices?: Record<string, string>;
+  /**
+   * Map of characterId → voice config.
+   *  - Legacy: plain string = ElevenLabs voiceId
+   *  - New:    { engine, voiceId, voiceName?, provider? }
+   * Both formats are accepted at runtime via `resolveDialogVoice()`.
+   */
+  dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
