@@ -95,6 +95,9 @@ interface SceneCardProps {
   hasOtherReadyScenes?: boolean;
   /** Allows the per-scene Dialog Studio to spawn shot-reverse-shot sub-scenes. */
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Propagates a newly-picked library character into the project briefing cast
+   *  so prompt injection / anchor resolution finds it. */
+  onAddCharacter?: (character: ComposerCharacter) => void;
   language: string;
 }
 
@@ -126,6 +129,7 @@ export default function SceneCard({
   onHybridExtend,
   hasOtherReadyScenes,
   onAddScene,
+  onAddCharacter,
   language,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
@@ -710,11 +714,19 @@ export default function SceneCard({
               </div>
             )}
 
-            {/* Character Cast picker (multi, max 4) — only when characters are defined in the briefing AND it's an AI scene */}
-            {scene.clipSource.startsWith('ai-') && characters && characters.length > 0 && (
+            {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
+            {scene.clipSource.startsWith('ai-') && ((characters && characters.length > 0) || libCharacters.length > 0) && (
               <>
                 <CharacterCastPicker
                   characters={characters}
+                  libraryCharacters={libCharacters.map((c): ComposerCharacter => ({
+                    id: c.id,
+                    name: c.name,
+                    appearance: c.description ?? '',
+                    signatureItems: c.signature_items ?? '',
+                    referenceImageUrl: c.reference_image_url ?? undefined,
+                  }))}
+                  onAddToBriefing={onAddCharacter}
                   value={scene.characterShots}
                   legacyValue={scene.characterShot}
                   onChange={(next) => {
