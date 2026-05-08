@@ -83,12 +83,13 @@ export async function prepareSceneAnchor(
   // the resolver upgrades the strategy when >1 anchor is present.
   try {
     const portraitUrls = anchors.map((a) => a.referenceImageUrl);
-    const { data, error } = await supabase.functions.invoke('compose-scene-anchor', {
+    // 60s race timeout — protects the UI if the edge worker dies before
+    // returning. The edge function itself has a 45s internal timeout, so this
+    // is just an extra safety net.
+    const invokePromise = supabase.functions.invoke('compose-scene-anchor', {
       body: {
         sceneId: scene.id,
-        // Legacy single-portrait field kept for backwards compatibility.
         portraitUrl: portraitUrls[0],
-        // New multi-portrait field — server prefers this when present.
         portraitUrls,
         characterNames: anchors.map((a) => a.name),
         scenePrompt: scenePromptForCompose,
@@ -96,6 +97,13 @@ export async function prepareSceneAnchor(
         shotType: scene.characterShot?.shotType,
       },
     });
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(
+        () => resolve({ data: null, error: new Error('compose-scene-anchor client timeout (60s)') }),
+        60_000,
+      ),
+    );
+    const { data, error } = (await Promise.race([invokePromise, timeoutPromise])) as any;
     if (error) throw error;
     if (data?.composedUrl) {
       return {
