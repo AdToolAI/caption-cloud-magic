@@ -17,6 +17,7 @@ import {
   ChevronUp, ChevronDown, Trash2, GripVertical,
   Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
   ArrowRight, ArrowLeft, Link2, Palette, Volume2, VolumeX,
+  MessageSquareQuote,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
