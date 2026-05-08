@@ -217,10 +217,16 @@ CRITICAL RULES:
 - Never put the character in two consecutive scenes with the same shotType. When the character does appear, vary the framing.
 - ALWAYS write signatureItems verbatim when ANY part of the character is visible. This is the visual anchor.
 - DO NOT use continuity pronouns ("the same person", "she from before") — consistency comes from repeated signatureItems, not claimed identity.
-- For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value.
-- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent"). A signature item may incidentally appear in the environment (e.g. a crown on a table) but does not require characterShot.
+- For each scene that features a character, set characterShot.characterId to the exact id from the list and characterShot.shotType to the chosen value (this is the PRIMARY slot, kept for backward compatibility).
+- ALSO populate characterShots[] with one entry per character actually visible in the scene (1–4 entries). The first entry MUST mirror characterShot. For solo scenes, characterShots has exactly one entry.
+- For scenes WITHOUT any character, omit characterShot entirely (or set characterId="" + shotType="absent") and leave characterShots empty.
 
-If multiple characters are defined and a scene features more than one, pick the primary one for characterShot and include both sets of signatureItems in the prompt.`;
+🎭 MULTI-CHARACTER CO-PRESENCE (when ${chars.length} ≥ 2 characters are defined):
+- Aim to feature TWO characters together in roughly 30–60% of the character-bearing scenes (occasionally three). The remaining character scenes can be solo for variety.
+- Pick co-presence scenes naturally based on the story: shared moments, conversations, parallel actions in the same environment, family/team scenes, etc.
+- When two characters share a scene: give each their OWN shotType (e.g. Sarah "full" + Matthew "profile", or both "full" if it is a clear two-shot establishing moment). Avoid two "absent" or two identical exotic types ("pov"+"pov").
+- The aiPrompt MUST name BOTH characters verbatim and include the signatureItems of every visible character. Do NOT use "the two of them" or pronouns — restate names.
+- Never put the same identical pair in two consecutive scenes with the same shotTypes — vary framing.`;
 })()}
 
 Write text overlays separately (in ${langLabel}) — they're rendered as a distinct layer on top of the video.${styleDirective}`;
