@@ -674,9 +674,15 @@ export default function ComposerSequencePreview({
   const sfxClipsTimeline = useMemo(() => {
     if (!sceneAudioClips?.length) return [] as Array<{ clip: SceneAudioClip; start: number; end: number }>;
     const sceneStart = new Map<string, number>();
+    // Scenes that already have a Sync.so lip-synced clip embed the VO inside
+    // the video — playing the separate VO track too would double the audio.
+    const lipSyncedSceneIds = new Set(
+      playable.filter(s => !!s.lipSyncAppliedAt).map(s => s.id),
+    );
     playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
     return sceneAudioClips
       .filter(c => !!c.url)
+      .filter(c => !(c.kind === 'voiceover' && c.scene_id && lipSyncedSceneIds.has(c.scene_id)))
       .map(c => {
         const base = c.scene_id && sceneStart.has(c.scene_id) ? sceneStart.get(c.scene_id)! : 0;
         const start = base + (Number(c.start_offset) || 0);
