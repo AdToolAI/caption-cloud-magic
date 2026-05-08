@@ -189,6 +189,13 @@ export interface ComposerScene {
    */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /**
+   * Render-Engine override. `auto` (default) lets `recommendEngineForScene()`
+   * decide. `heygen` forces HeyGen Photo-Avatar lip-sync. `broll` forces the
+   * classic Hailuo/etc. clip without lip-sync. `sync-polish` runs Hailuo +
+   * Sync.so polish pass after generation. Persisted as `engine_override`.
+   */
+  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish';
+  /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
    * wants a face-locked opening (e.g. tight close-up).
