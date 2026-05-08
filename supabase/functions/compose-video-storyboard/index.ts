@@ -458,12 +458,35 @@ Generate the storyboard using the create_storyboard function.`;
       return 'ai-hailuo';
     };
 
+    // Valid character ids for filtering LLM output
+    const validCharIds = new Set((briefing.characters || []).map((c) => c.id));
+    const normalizeShots = (rawShots: any, primaryShot: any): Array<{ characterId: string; shotType: string }> => {
+      const out: Array<{ characterId: string; shotType: string }> = [];
+      const seen = new Set<string>();
+      const push = (slot: any) => {
+        if (!slot || !slot.shotType || slot.shotType === 'absent') return;
+        const id = String(slot.characterId || '').trim();
+        if (!id || seen.has(id)) return;
+        // tolerate id-drift only when exactly 1 character defined
+        if (!validCharIds.has(id) && !(briefing.characters?.length === 1)) return;
+        const finalId = validCharIds.has(id) ? id : briefing.characters![0].id;
+        if (seen.has(finalId)) return;
+        seen.add(finalId);
+        out.push({ characterId: finalId, shotType: slot.shotType });
+      };
+      if (Array.isArray(rawShots)) for (const s of rawShots) push(s);
+      push(primaryShot);
+      return out.slice(0, 4);
+    };
+
     const scenes = parsed.scenes.map((s: any, index: number, arr: any[]) => {
       const aiEffects = sanitizeEffects(s.effects);
       const finalEffects = aiEffects.length > 0
         ? aiEffects.map(e => ({ ...e, color: e.color || brandColor }))
         : getDefaultEffects(s.sceneType || 'custom', visualStyleId, brandColor);
-      const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length, s.characterShot);
+      const shots = normalizeShots(s.characterShots, s.characterShot);
+      const primary = shots[0];
+      const clipSource = pickClipSource(s.sceneType || 'custom', index, arr.length, primary);
       return {
         id: `scene_${Date.now()}_${index}`,
         projectId: "",
@@ -486,9 +509,8 @@ Generate the storyboard using the create_storyboard function.`;
         retryCount: 0,
         costEuros: clipSource === 'ai-image' ? 0.05 : 1.2,
         effects: finalEffects,
-        ...(s.characterShot && s.characterShot.shotType
-          ? { characterShot: { characterId: s.characterShot.characterId || "", shotType: s.characterShot.shotType } }
-          : {}),
+        ...(primary ? { characterShot: primary } : {}),
+        ...(shots.length > 0 ? { characterShots: shots } : {}),
       };
     });
 
