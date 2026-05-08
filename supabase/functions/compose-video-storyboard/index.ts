@@ -538,6 +538,41 @@ Generate the storyboard using the create_storyboard function.`;
       }
     }
 
+    // 🎬 SERVER-SIDE CAST HARD-ANCHOR — guarantee that any scene with a
+    // characterShot also names the character in its aiPrompt. The client
+    // backfill (`applyCastToPrompt`) adds a localised marker; we inject a
+    // deterministic English prefix here so the provider always receives the
+    // name even on race conditions / id-drift.
+    if (hasCharacters && scenes.length > 0) {
+      const charById = new Map<string, any>();
+      for (const c of briefing.characters!) charById.set(c.id, c);
+      const findChar = (slot: any) => {
+        if (!slot?.characterId) return undefined;
+        const exact = charById.get(slot.characterId);
+        if (exact) return exact;
+        const lower = String(slot.characterId).toLowerCase();
+        for (const c of briefing.characters!) {
+          const first = String(c.name || '').trim().toLowerCase().split(/\s+/)[0];
+          if (first && first.length >= 3 && lower.includes(first)) return c;
+          if (String(c.name || '').trim().toLowerCase() === lower) return c;
+        }
+        return briefing.characters!.length === 1 ? briefing.characters![0] : undefined;
+      };
+      for (const s of scenes as any[]) {
+        const shot = s.characterShot;
+        if (!shot || !shot.shotType || shot.shotType === 'absent') continue;
+        const char = findChar(shot);
+        if (!char?.name) continue;
+        const promptLower = String(s.aiPrompt || '').toLowerCase();
+        const first = String(char.name).trim().toLowerCase().split(/\s+/)[0];
+        const alreadyNamed =
+          promptLower.includes(String(char.name).toLowerCase()) ||
+          (first.length >= 3 && promptLower.includes(first));
+        if (alreadyNamed) continue;
+        s.aiPrompt = `Featuring ${char.name} (${shot.shotType}): ${s.aiPrompt || ''}`.trim();
+      }
+    }
+
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
