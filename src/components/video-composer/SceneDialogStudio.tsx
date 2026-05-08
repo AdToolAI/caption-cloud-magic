@@ -593,7 +593,43 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
-    if (!renderAsSeparateScenes) {
+
+    // ── Auto-SRS for multi-speaker dialog ─────────────────────────────
+    // It is physically impossible to lip-sync 2+ different speakers into a
+    // single AI B-roll clip — there is only one `clip_url` per scene and
+    // the underlying i2v model has no idea who speaks when. Artlist /
+    // Synthesia / HeyGen Studio all solve this by rendering one talking-
+    // head clip per speaker and cutting them together (Shot-Reverse-Shot).
+    // We force that path automatically as soon as we have ≥2 blocks AND a
+    // portrait for every speaker. No silent fallback to fake "audio overlay
+    // pretending to be lip-sync".
+    if (blocks.length >= 2) {
+      const missingPortrait = speakers.find(
+        (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+      );
+      if (missingPortrait) {
+        toast({
+          title:
+            language === 'de'
+              ? `Kein Portrait für ${missingPortrait.name}`
+              : language === 'es'
+              ? `Sin retrato para ${missingPortrait.name}`
+              : `No portrait for ${missingPortrait.name}`,
+          description:
+            language === 'de'
+              ? `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`
+              : language === 'es'
+              ? `Asigna a ${missingPortrait.name} un Brand-Character con retrato; sin él no hay lip-sync real.`
+              : `Assign ${missingPortrait.name} a Brand-Character with a portrait — without it, real lip-sync is impossible.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!renderAsSeparateScenes) {
+        setRenderAsSeparateScenes(true);
+        // fall through into SRS path below
+      }
+    } else if (!renderAsSeparateScenes) {
       await handleGenerateInline();
       return;
     }
@@ -976,33 +1012,52 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           />
         </div>
       )}
-      {/* Lip-sync mode hint — single-speaker scenes with portrait auto-render
-          via HeyGen so the mouth matches the audio (Artlist-style). */}
-      {!renderAsSeparateScenes && blocks.length > 0 && (() => {
-        const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
-        const willLipSync = portraitsAvailable && blocks.length === 1;
-        const label = willLipSync
-          ? language === 'de'
-            ? '🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~0,30 €)'
-            : language === 'es'
-            ? '🎙️ Lip-Sync via HeyGen — la boca coincide con el audio (~0,30 €)'
-            : '🎙️ Lip-sync via HeyGen — mouth matches the audio (~€0.30)'
-          : !portraitsAvailable
-          ? language === 'de'
-            ? '🔊 Nur Audio-Overlay — kein Portrait, daher kein Lip-Sync. Lade ein Portrait im Cast hoch oder aktiviere oben „Als separate Szenen rendern"'
-            : language === 'es'
-            ? '🔊 Solo audio — sin retrato, sin lip-sync. Sube un retrato o activa "Renderizar como escenas separadas"'
-            : '🔊 Audio overlay only — no portrait, no lip-sync. Upload a portrait or enable "Render as separate scenes" above'
-          : language === 'de'
-            ? '🔊 Mehrere Sprecher in einer Szene — Audio-Overlay. Für echten Lip-Sync „Als separate Szenen rendern" aktivieren'
-            : language === 'es'
-            ? '🔊 Varios hablantes en una escena — solo audio. Activa "Escenas separadas" para lip-sync real'
-            : '🔊 Multiple speakers in one scene — audio overlay. Enable "Render as separate scenes" for real lip-sync';
-        return (
-          <p className={`text-[10px] ${willLipSync ? 'text-primary' : 'text-muted-foreground'} -mb-1`}>
-            {label}
-          </p>
+      {/* Lip-sync mode hint — honest about what each path actually delivers. */}
+      {blocks.length > 0 && (() => {
+        const portraitsAll = speakers.every(
+          (sp) => Boolean(sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl),
         );
+        const missing = speakers.find(
+          (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+        );
+        const isMulti = blocks.length >= 2;
+        let label: string;
+        let tone: 'primary' | 'amber' | 'muted' = 'muted';
+        if (isMulti && portraitsAll) {
+          tone = 'primary';
+          const cost = (speakers.length * 0.30).toFixed(2);
+          label = language === 'de'
+            ? `🎙️ Wird als ${speakers.length} Szenen gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~€${cost}`
+            : language === 'es'
+            ? `🎙️ Se renderizará como ${speakers.length} escenas (Shot-Reverse-Shot, 1 clip HeyGen por hablante) — ~€${cost}`
+            : `🎙️ Will render as ${speakers.length} scenes (Shot-Reverse-Shot, 1 HeyGen clip per speaker) — ~€${cost}`;
+        } else if (isMulti && missing) {
+          tone = 'amber';
+          label = language === 'de'
+            ? `⚠️ ${missing.name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst kein echter Lip-Sync möglich.`
+            : language === 'es'
+            ? `⚠️ ${missing.name} no tiene retrato — asigna un Brand-Character, si no, no hay lip-sync real.`
+            : `⚠️ ${missing.name} has no portrait — assign a cast character or real lip-sync is impossible.`;
+        } else if (!isMulti && portraitsAll) {
+          tone = 'primary';
+          label = language === 'de'
+            ? '🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~€0,30)'
+            : language === 'es'
+            ? '🎙️ Lip-sync via HeyGen — la boca coincide con el audio (~€0,30)'
+            : '🎙️ Lip-sync via HeyGen — mouth matches the audio (~€0.30)';
+        } else {
+          label = language === 'de'
+            ? '🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)'
+            : language === 'es'
+            ? '🔊 Solo audio (sin retrato, no hay lip-sync posible)'
+            : '🔊 Audio overlay (no lip-sync possible without a cast portrait)';
+        }
+        const cls = tone === 'primary'
+          ? 'text-primary'
+          : tone === 'amber'
+          ? 'text-amber-500'
+          : 'text-muted-foreground';
+        return <p className={`text-[10px] ${cls} -mb-1`}>{label}</p>;
       })()}
       <div className="flex items-center gap-2">
         <Button
@@ -1030,6 +1085,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           {generating ? (
             <>
               <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
+            </>
+          ) : blocks.length >= 2 ? (
+            <>
+              <User className="h-3 w-3" />{' '}
+              {language === 'de'
+                ? `Lip-Sync generieren (${speakers.length} Szenen)`
+                : language === 'es'
+                ? `Generar lip-sync (${speakers.length} escenas)`
+                : `Generate lip-sync (${speakers.length} scenes)`}
             </>
           ) : renderAsSeparateScenes ? (
             <>
