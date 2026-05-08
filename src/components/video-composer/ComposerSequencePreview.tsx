@@ -267,10 +267,14 @@ export default function ComposerSequencePreview({
     }
   }, [playing, isImage, sceneIdx]);
 
-  // Apply mute changes to the active slot
+  // Apply mute changes to the active slot (standby remains muted to avoid
+  // double-audio during preload).
   useEffect(() => {
-    const v = getVideoForSlot(activeSlotRef.current);
-    if (v && !isImage) v.muted = muted;
+    const active = activeSlotRef.current;
+    const va = getVideoForSlot(active);
+    const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
+    if (va && !isImage) va.muted = muted;
+    if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
   // ── The core: stateless ref-based transition ──────────────────
