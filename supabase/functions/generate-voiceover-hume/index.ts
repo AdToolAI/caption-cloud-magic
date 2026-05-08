@@ -76,6 +76,9 @@ serve(async (req) => {
     if (!res.ok) {
       const err = await res.text();
       console.error('[generate-voiceover-hume] Hume error', res.status, err);
+      if (res.status === 404) {
+        throw new Error(`Hume voice "${body.voiceName}" not found in your library. Please pick another voice.`);
+      }
       throw new Error(`Hume ${res.status}: ${err.slice(0, 300)}`);
     }
 
