@@ -38,6 +38,7 @@ import type {
 import { DEFAULT_SUBTITLES_CONFIG } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
+import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
 
 interface VoiceSubtitlesTabProps {
