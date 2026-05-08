@@ -279,9 +279,15 @@ export default function VoiceSubtitlesTab({
           throw new Error(`Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`);
         }
 
+        const overridesMap = voiceover.segmentOverrides || {};
         const { data: msData, error: msErr } = await supabase.functions.invoke('generate-multi-speaker-vo', {
           body: {
-            segments: parsedSegments.map((s) => ({ speakerId: s.speakerId, text: s.text, tags: s.tags })),
+            segments: parsedSegments.map((s, idx) => ({
+              speakerId: s.speakerId,
+              text: s.text,
+              tags: s.tags,
+              overrides: overridesMap[idx],
+            })),
             speakerMap: voiceover.speakerMap,
             defaultEngine: 'elevenlabs',
           },
