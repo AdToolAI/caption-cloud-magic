@@ -86,6 +86,7 @@ export default function VoiceSubtitlesTab({
   // of a stale closure value captured at the moment of generation.
   const voiceoverRef = useRef(voiceover);
   useEffect(() => { voiceoverRef.current = voiceover; }, [voiceover]);
+  const scriptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const globalOverlays: GlobalTextOverlay[] = assemblyConfig.globalTextOverlays ?? [];
   const [previewCurrentTime, setPreviewCurrentTime] = useState(0);
 
