@@ -1,27 +1,29 @@
 ## Problem
 
-Beim Klick auf **„Voiceover generieren"** im *Szenen-Skript*-Panel erscheint der Toast `Generierung fehlgeschlagen — [object Object]`.
+Beim Klick auf "Voiceover generieren" im Storyboard-Tab erscheint die Toast "Bitte zuerst das Projekt speichern…". Ursache: Solange das Projekt noch nicht in der DB liegt, ist `project.id === ''`, und der eben eingebaute Guard in `SceneDialogStudio.handleGenerateInline` bricht ab. Der User soll aber nicht erst irgendwo "Speichern" klicken müssen – andere Aktionen (z. B. Clips generieren in `ClipsTab`) lösen automatisch `ensureProjectPersisted` aus.
 
-## Ursache
+## Lösung
 
-In `SceneDialogStudio.tsx` (`handleGenerateInline`) wird beim ersten Block erfolgreich Audio von ElevenLabs erzeugt (Edge-Log bestätigt: `bytes: 31391`, projectId: `""`). Direkt danach scheitert der `INSERT` in `scene_audio_clips`:
+Denselben Auto-Persist-Pfad wie in `ClipsTab` auf den Voiceover-Flow anwenden: Vor dem ElevenLabs-Aufruf einmalig persistieren, dann mit der frischen `projectId` (und ggf. neuer `scene.id`) weitermachen.
 
-- Die Spalte `project_id` ist `uuid`, aber das Frontend übergibt `projectId ?? scene.projectId` — das ist hier ein **leerer String** (`''`), weil `VideoComposerDashboard` das Projekt initial mit `projectId: ''` rendert (Zeile 498/769) und Nullish-Coalescing `""` nicht ersetzt.
-- Postgres liefert daraufhin einen `PostgrestError`-Objekt-Fehler. Der Toast macht `String(e)` → `"[object Object]"`.
+### Änderungen
 
-Der gleiche Bug existiert auch im SRS-Pfad (`handleGenerate`, ~Zeile 436) und beim AI-Skript-Aufruf.
+**1. `VideoComposerDashboard.tsx`** – `onEnsurePersisted`-Prop an `StoryboardTab` durchreichen (analog zu ClipsTab, Zeilen 1110–1114).
 
-## Fix (klein, frontend-only)
+**2. `StoryboardTab.tsx`** – `onEnsurePersisted?: () => Promise<{ projectId; scenes }>` als Prop entgegennehmen und an `SceneCard` weiterreichen.
 
-**Datei:** `src/components/video-composer/SceneDialogStudio.tsx`
+**3. `SceneCard.tsx`** – Prop entgegennehmen und an `<SceneDialogStudio onEnsurePersisted={...} />` weiterreichen.
 
-1. **Projekt-Guard** vor `handleGenerateInline` und `handleGenerate`:
-   - Effektive Projekt-ID berechnen: `const pid = (projectId || scene.projectId || '').trim();`
-   - Wenn leer → Toast „Bitte zuerst das Projekt speichern" (DE/EN/ES) und Abbruch, **bevor** ElevenLabs aufgerufen wird (spart Credits).
-2. **Fehler-Toast härten**: kleine Hilfsfunktion `formatError(e)`, die in dieser Reihenfolge probiert: `e.message` → `e.error?.message` / `e.context?.message` → `e.details` → `JSON.stringify(e)` → `String(e)`. An allen drei `catch`-Blöcken (AI-Skript, Inline-Generate, SRS-Generate) verwenden.
-3. **Insert nur mit gültiger pid**: `project_id: pid` statt `projectId ?? scene.projectId`.
+**4. `SceneDialogStudio.tsx`** – Neue optionale Prop `onEnsurePersisted`. In `handleGenerateInline` UND `handleGenerate`:
+   - Zuerst `pid = (projectId || scene.projectId || '').trim()` berechnen.
+   - Wenn leer und `onEnsurePersisted` vorhanden: `await onEnsurePersisted()` aufrufen, dann
+     - `pid = result.projectId`
+     - `sceneId = result.scenes.find(s => orderIndex/tempId match)?.id ?? scene.id` ermitteln (analog zu `ClipsTab` map-by-orderIndex)
+   - Erst danach den `PROJECT_REQUIRED`-Guard greifen lassen.
+   - `project_id: pid` und `scene_id: sceneId` im Insert verwenden.
 
-## Out of scope
+**Out of scope:** Keine Edge-Function-Änderungen, keine DB-Migration, kein UI-Redesign. Nur Prop-Threading + zwei zusätzliche Persist-Calls in den beiden Voiceover-Pfaden.
 
-- Keine DB-Migrationen, keine Edge-Function-Änderungen, keine UI-Redesigns.
-- Auto-Save des Projekts wird hier **nicht** ergänzt — nur klarer Hinweis an den User.
+### Erwartetes Verhalten danach
+
+Klick auf "Voiceover generieren" in einem ungespeicherten Projekt → das Projekt wird im Hintergrund einmalig in der DB angelegt, die Szene erhält ihre echte `id`, dann läuft der ElevenLabs-Call sauber durch. Die Fehler-Toast erscheint nur noch, wenn `ensureProjectPersisted` selbst fehlschlägt (mit dem vorhandenen `formatError`-Helper als lesbare Meldung).
