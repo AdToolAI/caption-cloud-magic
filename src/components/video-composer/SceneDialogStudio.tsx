@@ -422,6 +422,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       await handleGenerateInline();
       return;
     }
+    // Ensure the project is persisted before spawning sub-scenes (otherwise
+    // onAddScene would write to a non-existent project_id).
+    let pidForSrs = (projectId || scene.projectId || '').trim();
+    try {
+      const ids = await resolvePersistedIds();
+      if (!ids) {
+        toast({ title: t.failed, description: PROJECT_REQUIRED[language], variant: 'destructive' });
+        return;
+      }
+      pidForSrs = ids.pid;
+    } catch (e) {
+      toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
+      return;
+    }
     setGenerating(true);
     let okCount = 0;
     try {
