@@ -181,8 +181,13 @@ export interface ComposerScene {
    * speaker and auto-spawns sub-scenes for shot-reverse-shot.
    */
   dialogScript?: string;
-  /** Map of characterId → voiceId (Eleven Labs preset or custom voice id). */
-  dialogVoices?: Record<string, string>;
+  /**
+   * Map of characterId → voice config.
+   *  - Legacy: plain string = ElevenLabs voiceId
+   *  - New:    { engine, voiceId, voiceName?, provider? }
+   * Both formats are accepted at runtime via `resolveDialogVoice()`.
+   */
+  dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
@@ -446,6 +451,23 @@ export interface MultiSpeakerVoiceCfg {
   speed?: number;
   // Hume tuning
   description?: string;
+  provider?: 'HUME_AI' | 'CUSTOM_VOICE';
+}
+
+/**
+ * Per-speaker voice config used by SceneDialogStudio (per-scene dialog editor).
+ * Lighter than MultiSpeakerVoiceCfg — only what we need for HeyGen lip-sync.
+ */
+export interface DialogVoiceCfg {
+  engine: 'elevenlabs' | 'hume';
+  /** ElevenLabs voiceId, OR Hume voice NAME, OR custom-voice row id. */
+  voiceId: string;
+  voiceName?: string;
+  /** ElevenLabs only — set when voiceId references a `custom_voices` row. */
+  isCustom?: boolean;
+  /** ElevenLabs only — real ElevenLabs id when isCustom=true. */
+  elevenlabsVoiceId?: string;
+  /** Hume only — defaults to HUME_AI. */
   provider?: 'HUME_AI' | 'CUSTOM_VOICE';
 }
 

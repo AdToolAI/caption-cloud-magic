@@ -32,10 +32,15 @@ import { useTalkingHead } from '@/hooks/useTalkingHead';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
+import { HUME_VOICES } from '@/lib/voice-studio/humeVoices';
+import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
+import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
   ComposerScene,
   CharacterShot,
+  DialogVoiceCfg,
 } from '@/types/video-composer';
 
 interface SceneDialogStudioProps {
@@ -194,23 +199,62 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     [cast, characters],
   );
 
-  const allVoices = useMemo(
-    () => [
-      ...PRESET_VOICES.map((v) => ({ id: v.id, name: v.name, isCustom: false, elevenlabsVoiceId: undefined as string | undefined })),
-      ...customVoices.filter((v) => v.is_active).map((v) => ({
+  // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
+  const [elVoices, setElVoices] = useState<VoiceMeta[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', {
+          body: { language: 'all' },
+        });
+        if (error) throw error;
+        setElVoices(sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []));
+      } catch (err) {
+        console.warn('[SceneDialogStudio] list-voices failed, using PRESET_VOICES fallback', err);
+        setElVoices(PRESET_VOICES.map((p) => ({ id: p.id, name: p.name, language: 'en' as any })));
+      }
+    })();
+  }, []);
+
+  /** ElevenLabs picker entries (library + active custom voices) */
+  const elPickerEntries = useMemo(() => {
+    const lib = elVoices.map((v) => ({
+      id: v.id,
+      name: v.name,
+      isCustom: false as const,
+      elevenlabsVoiceId: undefined as string | undefined,
+      gender: v.gender,
+    }));
+    const custom = customVoices
+      .filter((v) => v.is_active && v.elevenlabs_voice_id)
+      .map((v) => ({
         id: v.id,
         name: `⭐ ${v.name}`,
-        isCustom: true,
+        isCustom: true as const,
         elevenlabsVoiceId: v.elevenlabs_voice_id,
-      })),
-    ],
-    [customVoices],
-  );
+        gender: undefined as string | undefined,
+      }));
+    return [...lib, ...custom];
+  }, [elVoices, customVoices]);
+
+  // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
+  const normalizeVoiceMap = (
+    raw: Record<string, string | DialogVoiceCfg> | undefined,
+  ): Record<string, DialogVoiceCfg> => {
+    const out: Record<string, DialogVoiceCfg> = {};
+    if (!raw) return out;
+    for (const [k, v] of Object.entries(raw)) {
+      const r = resolveDialogVoice(v);
+      if (r) out[k] = r;
+    }
+    return out;
+  };
 
   const [script, setScript] = useState(scene.dialogScript ?? '');
-  const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, string>>(
-    scene.dialogVoices ?? {},
+  const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
+    normalizeVoiceMap(scene.dialogVoices),
   );
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
@@ -220,13 +264,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // typing (cursor jump / dropped characters).
   useEffect(() => {
     setScript(scene.dialogScript ?? '');
-    setVoicePerSpeaker(scene.dialogVoices ?? {});
+    setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce. The actual prompt-sync happens in
-  // SceneCard (so that structured-mode promptSlots.subject is updated and
-  // stitchSlots can't wipe the marker on the next render).
+  // Persist script with debounce.
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     const handle = setTimeout(() => {
@@ -236,11 +278,67 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [script]);
 
-  // Persist voice map immediately on change
-  const setVoiceFor = (speakerId: string, voiceId: string) => {
-    const next = { ...voicePerSpeaker, [speakerId]: voiceId };
+  /** Persist voice map immediately on change */
+  const updateSpeakerVoice = (speakerId: string, patch: Partial<DialogVoiceCfg>) => {
+    const cur = voicePerSpeaker[speakerId];
+    const next: Record<string, DialogVoiceCfg> = {
+      ...voicePerSpeaker,
+      [speakerId]: { ...(cur ?? { engine: 'elevenlabs', voiceId: '' }), ...patch },
+    };
     setVoicePerSpeaker(next);
     onUpdate({ dialogVoices: next });
+  };
+
+  const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
+    if (engine === 'hume') {
+      const fallback = HUME_VOICES[0];
+      updateSpeakerVoice(speakerId, {
+        engine: 'hume',
+        voiceId: fallback.name,
+        voiceName: fallback.label,
+        provider: fallback.provider,
+        isCustom: undefined,
+        elevenlabsVoiceId: undefined,
+      });
+    } else {
+      const fb = elPickerEntries[0];
+      updateSpeakerVoice(speakerId, {
+        engine: 'elevenlabs',
+        voiceId: fb?.id ?? 'EXAVITQu4vr4xnSDxMaL',
+        voiceName: fb?.name ?? 'Sarah',
+        isCustom: fb?.isCustom ?? false,
+        elevenlabsVoiceId: fb?.elevenlabsVoiceId,
+        provider: undefined,
+      });
+    }
+  };
+
+  const handlePreview = async (speakerId: string) => {
+    const cfg = voicePerSpeaker[speakerId];
+    if (!cfg?.voiceId) return;
+    setPreviewing(speakerId);
+    try {
+      const fnName = cfg.engine === 'hume' ? 'preview-voice-hume' : 'preview-voice';
+      const sp = sceneCast.find((c) => c.id === speakerId);
+      const previewText =
+        language === 'de'
+          ? `Hi, ich bin ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`
+          : language === 'es'
+          ? `Hola, soy ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`
+          : `Hi, I'm ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`;
+      const body = cfg.engine === 'hume'
+        ? { text: previewText, voiceName: cfg.voiceId, provider: cfg.provider || 'HUME_AI' }
+        : { text: previewText, voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId };
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
+      if (error) throw error;
+      if (!data?.audioContent) throw new Error('No audio returned');
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+      await audio.play();
+    } catch (e) {
+      toast({ title: 'Preview failed', description: formatError(e), variant: 'destructive' });
+    } finally {
+      setPreviewing(null);
+    }
   };
 
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
@@ -335,22 +433,24 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
-        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
-        if (!voiceMeta) continue;
+        const cfg = voicePerSpeaker[block.speakerId];
+        if (!cfg?.voiceId) continue;
 
-        // ElevenLabs voice id: presets use the preset id directly; cloned
-        // voices store the real ElevenLabs id in `elevenlabsVoiceId`.
-        const elevenVoiceId = voiceMeta.isCustom
-          ? voiceMeta.elevenlabsVoiceId
-          : voiceMeta.id;
-
-        const { data, error } = await supabase.functions.invoke('generate-voiceover', {
-          body: {
-            text: block.text,
-            voiceId: elevenVoiceId,
-            projectId: pid,
-          },
-        });
+        // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
+        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+        const body = cfg.engine === 'hume'
+          ? {
+              text: block.text,
+              voiceName: cfg.voiceId,
+              provider: cfg.provider || 'HUME_AI',
+              projectId: pid,
+            }
+          : {
+              text: block.text,
+              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+              projectId: pid,
+            };
+        const { data, error } = await supabase.functions.invoke(fnName, { body });
         if (error) throw error;
         const audioUrl = (data as any)?.audioUrl as string | undefined;
         const duration = Number((data as any)?.duration ?? 0) || Math.max(1.5, block.text.length / 18);
@@ -412,7 +512,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return;
     }
     for (const sp of speakers) {
-      if (!voicePerSpeaker[sp.id]) {
+      if (!voicePerSpeaker[sp.id]?.voiceId) {
         toast({ title: t.voiceMissing(sp.name), variant: 'destructive' });
         return;
       }
@@ -460,15 +560,32 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           });
           continue;
         }
-        const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
-        if (!voiceMeta) continue;
+        const cfg = voicePerSpeaker[block.speakerId];
+        if (!cfg?.voiceId) continue;
 
         if (!onAddScene) continue;
 
-        // 1) Create the sub-scene FIRST so it has a real DB UUID. We store
-        //    `clipStatus: 'generating'` so the placeholder shows the spinner
-        //    immediately, and pollScenes (ClipsTab) will flip it to 'ready'
-        //    once HeyGen finishes (the edge function writes back into the row).
+        // For Hume voices: pre-render audio to a public URL (HeyGen can't call
+        // Hume directly). For ElevenLabs: let HeyGen do TTS internally.
+        let preGeneratedAudioUrl: string | undefined;
+        if (cfg.engine === 'hume') {
+          const { data: humeData, error: humeErr } = await supabase.functions.invoke(
+            'generate-voiceover-hume',
+            {
+              body: {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pidForSrs,
+              },
+            },
+          );
+          if (humeErr) throw humeErr;
+          preGeneratedAudioUrl = (humeData as any)?.audioUrl;
+          if (!preGeneratedAudioUrl) throw new Error('Hume returned no audioUrl');
+        }
+
+        // 1) Create the sub-scene FIRST so it has a real DB UUID.
         const charShot: CharacterShot = {
           characterId: c.id,
           shotType: 'profile',
@@ -489,14 +606,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         });
         const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
 
-        // 2) Kick off the HeyGen render and tell it which scene to update.
+        // 2) Kick off the HeyGen render. For Hume → pass the audioUrl directly.
+        //    For ElevenLabs → pass text + voiceId so HeyGen can synth itself.
         const r = await generate({
           sceneId: newSceneId,
           projectId: pidForSrs,
           imageUrl: c.referenceImageUrl,
-          text: block.text,
-          voiceId: voiceMeta.isCustom ? undefined : voiceMeta.id,
-          customVoiceId: voiceMeta.isCustom ? voiceMeta.elevenlabsVoiceId : undefined,
+          ...(preGeneratedAudioUrl
+            ? { audioUrl: preGeneratedAudioUrl }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? undefined : cfg.voiceId,
+                customVoiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : undefined,
+              }),
           aspectRatio: '9:16',
           resolution: '720p',
           composerCharacterId: c.id,
@@ -625,36 +747,106 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         <div className="space-y-1.5">
           <Label className="text-[10px] text-muted-foreground">{t.voices}</Label>
           <div className="space-y-1.5">
-            {speakers.map((sp) => (
-              <div
-                key={sp.id}
-                className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/20 p-1.5"
-              >
-                {sp.referenceImageUrl && (
-                  <img
-                    src={sp.referenceImageUrl}
-                    alt={sp.name}
-                    className="h-7 w-7 rounded object-cover"
-                  />
-                )}
-                <div className="flex-1 text-xs font-medium truncate">{sp.name}</div>
-                <Select
-                  value={voicePerSpeaker[sp.id] || ''}
-                  onValueChange={(v) => setVoiceFor(sp.id, v)}
+            {speakers.map((sp) => {
+              const cfg = voicePerSpeaker[sp.id];
+              const isHume = cfg?.engine === 'hume';
+              return (
+                <div
+                  key={sp.id}
+                  className="grid grid-cols-[auto_1fr_120px_180px_auto] items-center gap-2 rounded-md border border-border/40 bg-muted/20 p-1.5"
                 >
-                  <SelectTrigger className="h-7 w-[180px] text-xs">
-                    <SelectValue placeholder={t.pickVoice} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allVoices.map((v) => (
-                      <SelectItem key={v.id} value={v.id} className="text-xs">
-                        {v.name}
+                  {sp.referenceImageUrl ? (
+                    <img
+                      src={sp.referenceImageUrl}
+                      alt={sp.name}
+                      className="h-7 w-7 rounded object-cover"
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded bg-muted" />
+                  )}
+                  <div className="text-xs font-medium truncate">{sp.name}</div>
+
+                  {/* Engine selector */}
+                  <Select
+                    value={cfg?.engine ?? 'elevenlabs'}
+                    onValueChange={(v) => handleEngineChange(sp.id, v as 'elevenlabs' | 'hume')}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="z-[60]">
+                      <SelectItem value="elevenlabs" className="text-xs">ElevenLabs</SelectItem>
+                      <SelectItem value="hume" className="text-xs">
+                        <span className="inline-flex items-center gap-1">
+                          <SparklesIcon className="h-3 w-3" />
+                          Hume Octave
+                        </span>
                       </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Voice selector — list depends on engine */}
+                  <Select
+                    value={cfg?.voiceId ?? ''}
+                    onValueChange={(voiceId) => {
+                      if (isHume) {
+                        const v = HUME_VOICES.find((x) => x.name === voiceId);
+                        updateSpeakerVoice(sp.id, {
+                          voiceId,
+                          voiceName: v?.label ?? voiceId,
+                          provider: v?.provider ?? 'HUME_AI',
+                        });
+                      } else {
+                        const v = elPickerEntries.find((x) => x.id === voiceId);
+                        updateSpeakerVoice(sp.id, {
+                          voiceId,
+                          voiceName: v?.name ?? voiceId,
+                          isCustom: v?.isCustom ?? false,
+                          elevenlabsVoiceId: v?.elevenlabsVoiceId,
+                        });
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="h-7 text-xs">
+                      <SelectValue placeholder={t.pickVoice} />
+                    </SelectTrigger>
+                    <SelectContent className="z-[60] max-h-[320px]">
+                      {isHume
+                        ? HUME_VOICES.map((v) => (
+                            <SelectItem key={v.id} value={v.name} className="text-xs">
+                              <div className="flex flex-col">
+                                <span>{v.label}</span>
+                                <span className="text-[10px] text-muted-foreground">{v.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        : elPickerEntries.map((v) => (
+                            <SelectItem key={v.id} value={v.id} className="text-xs">
+                              {v.name}
+                            </SelectItem>
+                          ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Preview */}
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="h-7 w-7"
+                    disabled={!cfg?.voiceId || previewing === sp.id}
+                    onClick={() => handlePreview(sp.id)}
+                    aria-label="Preview"
+                  >
+                    {previewing === sp.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Play className="h-3 w-3" />
+                    )}
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
