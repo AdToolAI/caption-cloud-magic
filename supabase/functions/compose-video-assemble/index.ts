@@ -555,12 +555,22 @@ serve(async (req) => {
       sceneStartOffset.set(s.id, acc);
       acc += Number(s.duration_seconds) || 0;
     }
-    const sceneAudioClipsForMux = (audioClipRows || []).map((r: any) => ({
-      url: r.url,
-      startOffset: (sceneStartOffset.get(r.scene_id) || 0) + (Number(r.start_offset) || 0),
-      volume: r.volume ?? 0.4,
-      kind: r.kind || 'sfx',
-    }));
+    // Skip voiceover clips for scenes that already have an embedded lip-sync
+    // (Sync.so post-step muxed the VO into the video itself — adding it as a
+    // separate track would double the audio).
+    const lipSyncedSceneIds = new Set(
+      (scenes || [])
+        .filter((s: any) => !!s.lip_sync_applied_at)
+        .map((s: any) => s.id),
+    );
+    const sceneAudioClipsForMux = (audioClipRows || [])
+      .filter((r: any) => !(r.kind === 'voiceover' && lipSyncedSceneIds.has(r.scene_id)))
+      .map((r: any) => ({
+        url: r.url,
+        startOffset: (sceneStartOffset.get(r.scene_id) || 0) + (Number(r.start_offset) || 0),
+        volume: r.volume ?? 0.4,
+        kind: r.kind || 'sfx',
+      }));
 
     // Lip-sync intent: which scenes asked for VO-driven lip-sync?
     const lipSyncSceneIds = (scenes || [])

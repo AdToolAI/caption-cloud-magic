@@ -177,7 +177,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url, duration_seconds, upload_type')
+      .select('id, clip_status, clip_url, duration_seconds, upload_type, lip_sync_applied_at, lip_sync_status, lip_sync_source_clip_url, lip_sync_with_voiceover')
       .eq('project_id', projectId);
 
     if (!data) return;
@@ -189,14 +189,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
     // and then update DB + UI in a single follow-up pass. This is the
     // single source of truth for downstream WAV padding + composition math.
     const justReady: Array<{ sceneId: string; clipUrl: string }> = [];
+    // Scenes that opted into Sync.so post-step lip-sync and are ready to run it.
+    const lipSyncTargets: string[] = [];
 
     const updatedScenes = scenes.map((scene, idx) => {
       const dbScene = data.find((d: any) => d.id === scene.id);
+      const lipChanged =
+        !!dbScene &&
+        ((dbScene as any).lip_sync_applied_at !== (scene.lipSyncAppliedAt ?? null) ||
+          (dbScene as any).lip_sync_status !== (scene.lipSyncStatus ?? null));
       if (
         dbScene &&
         (dbScene.clip_status !== scene.clipStatus ||
           dbScene.clip_url !== scene.clipUrl ||
-          (dbScene.upload_type && dbScene.upload_type !== scene.uploadType))
+          (dbScene.upload_type && dbScene.upload_type !== scene.uploadType) ||
+          lipChanged)
       ) {
         changed = true;
         // Toast on transition generating → ready
@@ -204,6 +211,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           toast({ title: `Szene ${idx + 1} fertig ✓`, description: SCENE_TYPE_LABELS[scene.sceneType]?.de });
           if (dbScene.clip_url) {
             justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
+          }
+          // Auto-trigger Sync.so post-step when the scene opted in and a VO exists.
+          if (
+            (dbScene as any).lip_sync_with_voiceover === true &&
+            !(dbScene as any).lip_sync_applied_at &&
+            (dbScene as any).lip_sync_status !== 'running'
+          ) {
+            lipSyncTargets.push(scene.id);
           }
         }
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'failed') {
@@ -215,6 +230,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
           clipUrl: dbScene.clip_url || scene.clipUrl,
           uploadType: (dbScene.upload_type as ComposerScene['uploadType']) || scene.uploadType,
+          lipSyncAppliedAt: (dbScene as any).lip_sync_applied_at ?? null,
+          lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
+          lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
         };
       }
       return scene;
@@ -263,6 +281,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           return u ? { ...s, durationSeconds: u.realDur } : s;
         });
         onUpdateScenes(merged);
+      });
+    }
+
+    // Auto-trigger Sync.so post-step lip-sync. We fire-and-forget; the next
+    // poll tick will surface lip_sync_applied_at and swap clip_url. The edge
+    // function self-checks for a voiceover clip — if none exists yet, it 400s
+    // silently and we'll retry on the next ready scene.
+    if (lipSyncTargets.length > 0) {
+      lipSyncTargets.forEach((sceneId) => {
+        console.info(`[ClipsTab] Auto-triggering lip-sync for scene ${sceneId}`);
+        supabase.functions
+          .invoke('compose-lipsync-scene', { body: { scene_id: sceneId } })
+          .then(({ error }) => {
+            if (error) {
+              console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, error);
+            } else {
+              toast({
+                title: 'Lip-Sync gestartet',
+                description: 'Charakter spricht gleich wortgenau in der Szene.',
+              });
+            }
+          });
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
