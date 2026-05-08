@@ -493,7 +493,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // 2) Kick off the HeyGen render and tell it which scene to update.
         const r = await generate({
           sceneId: newSceneId,
-          projectId,
+          projectId: pidForSrs,
           imageUrl: c.referenceImageUrl,
           text: block.text,
           voiceId: voiceMeta.isCustom ? undefined : voiceMeta.id,
