@@ -279,7 +279,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       console.error('[SceneDialogStudio] AI script error', e);
       toast({
         title: t.aiFailed,
-        description: e instanceof Error ? e.message : String(e),
+        description: formatError(e),
         variant: 'destructive',
       });
     } finally {
