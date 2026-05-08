@@ -69,6 +69,8 @@ import SceneCommentSheet from './SceneCommentSheet';
 import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
+import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
+import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
 
