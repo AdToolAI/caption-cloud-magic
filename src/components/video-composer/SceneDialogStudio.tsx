@@ -285,7 +285,7 @@ export default function SceneDialogStudio({
           characterId: c.id,
           shotType: 'profile',
         } as CharacterShot;
-        const newSceneId = await onAddScene({
+        const newSceneIdRaw = await onAddScene({
           sceneType: scene.sceneType,
           durationSeconds: Math.max(3, Math.ceil(block.text.length / 18)),
           clipSource: 'ai-hailuo',
@@ -299,10 +299,11 @@ export default function SceneDialogStudio({
           transitionType: 'fade',
           transitionDuration: 0.3,
         });
+        const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
 
         // 2) Kick off the HeyGen render and tell it which scene to update.
         const r = await generate({
-          sceneId: newSceneId ?? undefined,
+          sceneId: newSceneId,
           projectId,
           imageUrl: c.referenceImageUrl,
           text: block.text,
