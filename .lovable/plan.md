@@ -1,83 +1,185 @@
+## Voice Studio 2.0 — Multi-Speaker, Hume Octave & Artlist-Niveau Kontrolle
 
-# In-Scene Lip-Sync via Sync.so (Industriestandard)
+Wir bauen den Voiceover-Step im Video Composer (Tab 4) zu einem vollwertigen "Voice Studio" um — drei Probleme werden parallel gelöst:
 
-Wir nutzen die **Strategie 2** der großen Player: stummen AI-Clip generieren → Voiceover separat → Sync.so re-rendered nur den Mundbereich passend zum Audio. Ergebnis = **eine** Video-Datei pro Szene, Charakter steht in der Szene, Lippen wortgenau.
+1. **Multi-Voice mit Speaker-Tags** — Skripte wie `Matthew: ...` / `Sarah: ...` werden segmentweise mit unterschiedlichen Stimmen synthetisiert und nahtlos zu einer einzigen VO-Spur zusammengefügt.
+2. **Hume Octave als zweite TTS-Engine** — emotional natürlichste KI-Stimme am Markt, frei wählbar pro Segment neben ElevenLabs.
+3. **Artlist-Niveau Kontrolle** — Inline-Tags (Pause/Emotion/Betonung), Pro-Satz-Tuning-Panel und Drag-to-Scene Timeline.
 
-Gute Nachricht: 80 % ist schon da. `supabase/functions/lip-sync-video/index.ts` läuft bereits mit `sync/lipsync-2` auf Replicate, das Scene-Feld `lip_sync_with_voiceover` existiert in der DB. Es ist nur nirgends im Composer-Workflow verdrahtet.
+---
 
-## Was gebaut wird
+### Stage 1 — Multi-Speaker Skript-Engine
 
-### 1. Auto-Trigger nach Clip-Generierung
-Wenn eine Szene fertiggerendert wird **und** `lipSyncWithVoiceover === true` **und** ein VO-Clip in `scene_audio_clips` (kind=`voiceover`) existiert:
-- Edge-Function `compose-lipsync-scene` (neu, dünner Wrapper um `lip-sync-video`) wird aufgerufen
-- nimmt `clip_url` (stummes Video) + VO-Audio-URL
-- ruft Sync.so via Replicate, lädt Ergebnis in den `composer-clips` Bucket hoch
-- ersetzt `composer_scenes.clip_url` mit dem lip-synced Video, setzt Flag `lip_sync_applied_at`
-- idempotenter Credit-Refund bei Failure (Pflicht laut Memory)
+**Skript-Parser**
+- Neuer Parser `lib/voice-studio/parseSpeakerScript.ts` erkennt Zeilen wie `Matthew: Hallo` / `**Sarah:** Hi` / `[Matthew] Hallo`
+- Output: `[{ speaker: 'Matthew', text: '...', lineIndex: 0 }, ...]`
+- Ohne Speaker-Tags → eine Zeile mit `speaker: 'Narrator'` (Backwards-compat)
 
-### 2. UI: Lip-Sync Toggle pro Szene
-In `SceneDialogStudio.tsx` neuer Switch direkt unter dem Dialog-Feld:
-> 🎙️ **Lip-Sync** — Charakter spricht in der Szene wortgenau (+0.05 €/sec)
+**Voice-Mapping UI** (neuer Block oben im Voiceover-Tab)
+- Erkannte Sprecher werden automatisch als Chips angezeigt
+- Pro Sprecher Dropdown: Engine (ElevenLabs / Hume) + konkrete Stimme + Geschlecht-Filter
+- Auto-Suggestion: erkennt Männer-/Frauen-Namen und schlägt passende Stimmen vor
+- Persistenz: `assemblyConfig.voiceover.speakerMap = { Matthew: { engine, voiceId, settings }, Sarah: {...} }`
 
-- Default: aus (günstiger, Voiceover läuft als Tonspur)
-- An: Sync.so Post-Step wird automatisch nach Generate ausgelöst
-- Badge auf SceneCard: "🎙️ Lip-Synced" wenn `lip_sync_applied_at` gesetzt
-
-### 3. Manueller "Re-sync"-Button
-Wenn VO oder Dialog nachträglich geändert wurde: Button "Lip-Sync neu rendern" auf der SceneCard, ruft dieselbe Edge-Function.
-
-### 4. Preview & Export richtig handhaben
-- `ComposerSequencePreview.tsx`: bei `lip_sync_applied_at != null` → den synced Clip abspielen, **VO-Audio-Track für diese Szene MUTEN** (sonst doppelt)
-- `compose-video-assemble`: bei lip-synced Szenen → VO nicht zusätzlich muxen
-- Bei Szenen **ohne** Lip-Sync: aktueller Voiceover-Tonspur-Fix bleibt (parallel abspielen)
-
-### 5. Sicherheit & Credits
-- Voraussetzung-Check: Clip muss existieren, VO-Audio muss existieren, beide URLs öffentlich erreichbar
-- Cost-Estimate vorher anzeigen (basierend auf Clip-Dauer × 0.05€)
-- Wallet-Balance-Check vor Sync.so Call
-- Auto-Refund bei Replicate Fail/Timeout (deterministische UUID aus scene_id)
-- Polling via `EdgeRuntime.waitUntil` (Sync.so braucht 30-90s)
-
-## Architektur
+**Multi-Segment Generation**
+- Neue Edge Function `generate-multi-speaker-vo`:
+  - Iteriert über Segmente, ruft pro Segment richtige Engine auf
+  - Stitcht alle MP3s sample-genau via WAV-Padding zu einer Spur
+  - Optional: kleine Pause zwischen Sprecherwechseln (default 0.3s, einstellbar)
+- Returnt eine WAV-URL + Wort-Timing-Array für Untertitel
+- Idempotenter Credit-Refund bei Failures (gemäss Core-Memory)
 
 ```text
-[Generate Scene Clip] → ai-hailuo/kling/etc → composer-clips bucket → composer_scenes.clip_url
-        ↓
-   lipSyncWithVoiceover && hasVoiceover?
-        ↓ JA
-[compose-lipsync-scene]
-    ├─ fetch clip_url + vo_url
-    ├─ replicate.run("sync/lipsync-2", { video, audio })
-    ├─ upload → composer-clips/{userId}/{sceneId}-synced.mp4
-    └─ UPDATE composer_scenes
-         SET clip_url = synced_url,
-             lip_sync_applied_at = now(),
-             lip_sync_source_clip_url = original (für Re-sync)
-        ↓
-[Preview spielt synced Video, mutet VO-Track für diese Szene]
-[Export muxt synced Video direkt, ohne VO drüber]
+Skript: "Matthew: Schau die Drohne. Sarah: Wow!"
+        │
+        ├─ Segment 1 (Matthew) → ElevenLabs Liam → mp3
+        ├─ 0.3s Pause
+        └─ Segment 2 (Sarah)  → Hume Octave   → mp3
+        │
+        └─ Stitch → WAV mit Wort-Timestamps → upload
 ```
 
-## Out of Scope
-- Sora 2 / Veo 3 Native-Audio (separater Plan)
-- Mehrere Sprecher pro Szene (Sync.so kann nur 1 Gesicht/Audio-Spur)
-- Echtzeit-Preview vor Lip-Sync (zu langsam)
+---
 
-## Files
+### Stage 2 — Hume Octave Integration
 
-**Neu:**
-- `supabase/functions/compose-lipsync-scene/index.ts`
+**Connector-Setup**
+- Hume nutzt direkten API-Key (kein Connector-Gateway-Eintrag vorhanden) → `HUME_API_KEY` als Lovable Secret
+- Wird bei Implementation via `add_secret` angefragt — User holt Key auf hume.ai → Settings → API Keys
 
-**Edit:**
-- `supabase/functions/lip-sync-video/index.ts` — leichte Generalisierung (URL statt video_id Mode)
-- `src/components/video-composer/SceneDialogStudio.tsx` — Toggle + Cost-Hint
-- `src/components/video-composer/SceneCard.tsx` — Badge + Re-sync Button
-- `src/components/video-composer/VideoComposerDashboard.tsx` — Auto-Trigger nach Clip-Done
-- `src/components/video-composer/ComposerSequencePreview.tsx` — VO-Track muten bei synced Szenen
-- `supabase/functions/compose-video-assemble/index.ts` — VO bei synced Szenen nicht mehr muxen
+**Edge Function `tts-hume`**
+- Wrapper um Hume Octave TTS (Endpoint `/v0/tts/file`)
+- Parameter: `text`, `voiceName`, `description` (Tonality-Prompt!), `speed`
+- Response: MP3-Bytes → WAV-Konvertierung wie bei ElevenLabs
 
-**DB Migration:**
-- `composer_scenes`: `lip_sync_applied_at TIMESTAMPTZ`, `lip_sync_source_clip_url TEXT` (für Re-sync auf Original)
+**Hume-Voice-Library**
+- `lib/voice-studio/humeVoices.ts` mit ~12 kuratierten Hume-Voices (3 pro Sprache + Hume Voice Library Picks)
+- Voice-Picker zeigt Tabs `ElevenLabs (XX)` / `Hume Octave (12)`
+- Hume-Voices haben Badge "🎭 Octave" mit Tooltip "Emotional natürlichste Engine"
 
-## Memory-Update nach Implementierung
-Neuer Eintrag: `[Composer Lip-Sync Pipeline](mem://features/video-composer/lipsync-pipeline)` — Sync.so Post-Step, Auto-Trigger, Re-sync-Flow, VO-Mute bei synced Szenen.
+**Engine-Toggle pro Sprecher**
+- Im Speaker-Mapping Dropdown: oben "Engine wählen" → ElevenLabs | Hume
+- Voice-Liste filtert sich entsprechend
+
+---
+
+### Stage 3 — Artlist-Niveau Kontrolle
+
+**3a. Inline-Tags im Skript-Editor**
+- Toolbar über dem Textarea: Buttons für Pause / Whisper / Excited / Calm / Emphasize
+- Klick fügt Tag an Cursor-Position ein: `[pause 0.5s]`, `[whisper]...[/whisper]`, `[excited]...[/excited]`
+- Syntax-Highlighting im Textarea (eigene Mini-Implementation mit overlaid div)
+- Beim Render werden Tags engine-spezifisch übersetzt:
+  - **ElevenLabs v3** (wir upgraden default model auf `eleven_v3` für Tags-Support): native audio tags
+  - **Hume Octave**: `description`-Feld wird mit der Emotion gefüllt (z.B. "whisper softly")
+  - **ElevenLabs v2** (Fallback): `[pause]` → SSML-Komma-Tricks, Emotion → `style`-Slider hochregeln
+
+**3b. Pro-Satz Voice-Tuning Panel**
+- Skript-Editor zeigt rechts daneben eine Liste aller geparsten Sätze als Cards
+- Jede Card: Sprecher-Badge, Text-Preview, "Re-roll"-Button (regeneriert nur diesen Satz)
+- Expand → Slider: Stability, Style, Speed, Pitch (engine-abhängig sichtbar)
+- Settings werden auf `segment.overrides` persistiert → bei Generation gemerged mit Speaker-Default
+- Audio-Player pro Card mit ▶/⏸ und Wellenform
+
+**3c. Timeline-VO mit Drag-to-Scene**
+- Unterhalb des Skript-Editors: horizontaler Stripe mit Szenen (oben) und VO-Segmenten (unten)
+- Jedes generierte Segment = farbiger Block (Farbe = Sprecher)
+- Drag-to-Scene: Block über Szene ziehen → snapped an Scene-Start
+- Manuelles Verschieben innerhalb der Timeline (Snap auf 0.1s)
+- Visueller Sync-Marker zeigt: ✓ wenn VO-Segment-Mitte in Szene liegt, ⚠ wenn überlappt
+- Gesamt-VO-Länge vs. Gesamt-Szenen-Länge oben rechts mit Status-Badge
+
+---
+
+### Stage 4 — Datenmodell & Persistenz
+
+**Erweiterung `assemblyConfig.voiceover`** (TypeScript-Interface in `types/video-composer.ts`):
+```text
+voiceover: {
+  enabled, script, audioUrl, durationSeconds,        // bestehend
+  speakerMap: Record<string, SpeakerConfig>,         // NEU
+  segments: VoiceSegment[],                          // NEU (geparste & gerenderte Sätze)
+  defaultEngine: 'elevenlabs' | 'hume',              // NEU
+  segmentGapMs: number,                              // NEU (default 300)
+}
+```
+
+`VoiceSegment`:
+```text
+{
+  id, speaker, text, lineIndex,
+  audioUrl?, durationSeconds?,
+  sceneAssignment?: string,    // sceneId für Drag-to-Scene
+  startOffsetMs?: number,      // manuelle Verschiebung in Timeline
+  overrides?: { stability, style, speed, pitch },
+  status: 'pending' | 'generating' | 'ready' | 'failed'
+}
+```
+
+Migration: `composer_projects.assembly_config` ist `jsonb` → keine Schema-Änderung nötig, nur TS-Types & Default-Initializer.
+
+---
+
+### Stage 5 — UI-Restrukturierung
+
+Der bisherige `VoiceSubtitlesTab` wird in zwei Sub-Tabs geteilt:
+- **Voice Studio** (neu, default) — Skript + Speaker-Map + Pro-Satz-Cards + Timeline
+- **Untertitel** — bestehende Subtitle-Logik
+
+Neue Komponenten unter `src/components/video-composer/voice-studio/`:
+- `VoiceStudioPanel.tsx` (Container)
+- `SpeakerMappingBar.tsx`
+- `ScriptEditorWithTags.tsx`
+- `SegmentCardList.tsx`
+- `VoiceTimelineStripe.tsx`
+- `EngineVoicePicker.tsx` (kombiniert ElevenLabs + Hume)
+
+---
+
+### Technische Details
+
+**Edge Functions (neu)**
+- `supabase/functions/generate-multi-speaker-vo/index.ts` — Orchestrator
+- `supabase/functions/tts-hume/index.ts` — Hume Octave Wrapper
+- Bestehende `generate-voiceover` bekommt optional `model_id: 'eleven_v3'`
+
+**Secrets benötigt**
+- `HUME_API_KEY` (wird via add_secret nach User-Zustimmung angefragt)
+
+**Audio-Stitching**
+- Erweitert `lib/audioToWav.ts` um `concatWavSegments(segments, gapMs)`
+- Sample-genau via Web Audio API decode → AudioBuffer concat → WAV-encode
+- Wort-Timestamps werden pro Segment offset-korrigiert
+
+**Backwards-Compat**
+- Alte Projekte ohne `speakerMap` → automatisch ein "Narrator" mit aktueller `voiceId` gemappt
+- Skripte ohne Speaker-Tags → wie bisher single-voice
+- `audioUrl` bleibt das finale Master-Asset (für Renderer transparent)
+
+**Error-Handling**
+- Pro-Segment Refund bei Engine-Failure
+- Wenn Hume failt → Auto-Fallback Toast "Hume nicht erreichbar, Sarah-ElevenLabs verwendet" mit Retry-Button
+- Validation: warnt wenn Speaker im Skript ohne Mapping (z.B. `Tom: Hi` aber kein Tom in Map)
+
+---
+
+### Out of Scope (bewusst weggelassen)
+- Voice-Cloning für Hume (später)
+- Automatisches Lip-Sync mit den neuen Multi-Voice Tracks (Composer-Lip-Sync-Toggle bleibt unverändert; nutzt finale Master-WAV)
+- Music/SFX im selben Tab (bleibt im Audio-Tab)
+- Realtime-Collaboration auf Voice-Editor (bestehende Composer-Collab greift global)
+
+---
+
+### Reihenfolge der Implementation
+
+```text
+1. Datenmodell + Skript-Parser (kein UI)         ~ kleine Iteration
+2. Multi-Speaker ElevenLabs (ohne Hume)          ~ erste sichtbare Verbesserung
+3. Hume-Integration (Secret + Edge + Picker)     ~ Roboter-Sound gelöst
+4. Inline-Tags + ElevenLabs v3 Upgrade           ~ Tags funktional
+5. Pro-Satz-Cards (Re-roll, Sliders)             ~ Detailkontrolle
+6. Timeline + Drag-to-Scene                      ~ Sync-Kontrolle
+```
+
+Jede Stufe ist deploybar und testbar — du kannst nach Stage 2 schon zwei Sprecher hören, Stage 3 löst die Roboterstimme, Stage 4–6 bringen die Artlist-Tiefe.
