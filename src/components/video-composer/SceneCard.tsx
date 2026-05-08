@@ -70,6 +70,7 @@ import SceneCommentSheet from './SceneCommentSheet';
 import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
+import { syncCastFromPrompt } from '@/lib/motion-studio/syncCastFromPrompt';
 import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
@@ -232,6 +233,24 @@ export default function SceneCard({
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
+
+  // Auto-sync: when the scene prompt mentions a known character (e.g. the
+  // storyboard LLM wrote "Sarah Dusatko wipes sweat…" but only added Matthew
+  // to characterShots), append the missing character with shotType 'full'.
+  // Idempotent — `syncCastFromPrompt` returns the same reference when nothing
+  // changes, so no render loop. Must run BEFORE the cast-marker backfill below
+  // so the marker picks up the auto-added slots in the same pass.
+  useEffect(() => {
+    if (!characters || characters.length === 0) return;
+    const current = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    const next = syncCastFromPrompt(scene.aiPrompt || '', current, characters);
+    if (next === current) return;
+    onUpdate({
+      characterShots: next,
+      characterShot: next[0] ?? scene.characterShot,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.aiPrompt, characters?.length]);
 
   // Backfill: ensure scenes with a cast also carry the cast marker in the
   // prompt. `applyCastToPrompt` is idempotent (strips the existing marker

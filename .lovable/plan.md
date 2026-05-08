@@ -1,73 +1,75 @@
 ## Problem
 
-Das `SceneDialogStudio` ist aktuell **gar nicht sichtbar**, weil:
-- Es nur ab `sceneCast.length >= 2` rendert (Hard-Gate `if (sceneCast.length < 2) return null;`).
-- Selbst wenn 2 Cast da sind, sitzt es tief unter Cast-Hinweis, Anker-Badge und Prompt → der User findet es nicht.
+In Szene 2 zeigt die **Cast Consistency Map** oben sowohl Matthew als auch Sarah (S2 grün), während die **Cast-Zeile in der SceneCard** nur „Matthew Dusatko · Silhouette" anzeigt. Der KI-Prompt erwähnt Sarah aber explizit ("Sarah Dusatko, wipes sweat from her brow…").
 
-Der User will:
-1. **Schon ab 1 Charakter** verfügbar (Monolog → Charakter spricht zur Kamera).
-2. Einen klar sichtbaren **Button „Skript schreiben"** in der Cast-Zeile, der das Studio öffnet.
+**Ursache:**
+- `CastConsistencyMap.getAnchor()` ist tolerant: matcht per `characterShot.characterId` **oder** per Namens-Treffer im Prompt-Text → erkennt Sarah.
+- `scene.characterShots` enthält dagegen nur, was die Storyboard-LLM bzw. der `CharacterCastPicker` explizit gesetzt hat → Sarah fehlt dort, weil der Storyboard-Generator (`compose-video-storyboard`) `character_shots` gar nicht erzeugt.
+- Folge: Cast-Badge-Zeile, Anker-Compose (Multi-Portrait → Nano Banana 2), Vidu-Multi-Reference und Skript-Studio bekommen Sarah nicht mit, obwohl sie in der Szene vorkommt.
 
-## Lösung
+Das ist ein echter Bug, weil der Anchor-Compose laut `[Multi-Character Scene Composition]`-Memory `portraitUrls[]` aus `characterShots` zieht — Sarah würde also nie ins komponierte Anker-Frame gerendert.
 
-### 1. Trigger-Button in der Cast-Zeile (`SceneCard.tsx`)
+## Lösung — clientseitige Auto-Sync (keine LLM-/DB-Änderungen)
 
-Direkt neben „Charakter hinzufügen" platzieren, sichtbar wenn `sceneCast.length >= 1`:
+### Neuer Helper `src/lib/motion-studio/syncCastFromPrompt.ts`
 
-- `<Button variant="secondary" size="sm">` mit Icon `MessageSquareQuote` + Label:
-  - DE: „Skript schreiben" / EN: „Write script" / ES: „Escribir guion"
-- Mini-Badge wenn `scene.dialogScript?.trim()` schon Inhalt hat (z. B. „· 2 Zeilen").
-- Klick → toggelt lokalen State `dialogStudioOpen` und scrollt per `ref.scrollIntoView({ behavior: 'smooth', block: 'center' })` zum Studio-Bereich.
+Pure Funktion:
 
-State:
 ```ts
-const [dialogStudioOpen, setDialogStudioOpen] = useState(
-  Boolean(scene.dialogScript?.trim()) // bestehende Skripte: initial offen
-);
+syncCastFromPrompt(
+  prompt: string,
+  currentShots: CharacterShot[],
+  characters: ComposerCharacter[],
+): CharacterShot[]
 ```
 
-### 2. Studio öffnet/schließt sich (`SceneDialogStudio.tsx`)
+Logik:
+- Tokenisiert `prompt` (lowercase) und sucht für jeden bekannten Charakter aus `characters` einen Treffer per **vollem Namen** oder **Vorname** (≥3 Zeichen) — gleiche Heuristik wie `CastConsistencyMap` und `sceneFeaturesCharacter`, damit alle drei Stellen konsistent bleiben.
+- Behält bestehende Slots **unverändert** (inkl. `shotType`, Reihenfolge).
+- Hängt fehlende Charaktere mit Default `shotType: 'full'` an (kein `'absent'`, kein Überschreiben einer manuellen Auswahl).
+- Idempotent: ohne neue Treffer wird die Original-Referenz zurückgegeben → kein Re-Render-Loop.
+- Begrenzung: max. 4 Slots (deckt sich mit Multi-Portrait-Limit für Nano Banana 2 / Vidu Q2).
 
-- Neue optionale Props: `open?: boolean`, `onClose?: () => void`, plus `forwardRef` auf den Card-Container.
-- Bisheriges Hard-Gate ersetzen:
-  - Vorher: `if (sceneCast.length < 2) return null;`
-  - Nachher: `if (sceneCast.length < 1) return null;` **und** `if (open === false) return null;`
-- Im Card-Header neuer X-Button → ruft `onClose` auf.
+### Integration in `SceneCard.tsx`
 
-### 3. Monolog-Modus (1 Sprecher)
+Direkt vor dem bestehenden Cast-Marker-Backfill-Effect (~Zeile 240) ein neuer `useEffect`:
 
-Texte/Verhalten anpassen, wenn `sceneCast.length === 1`:
+```ts
+useEffect(() => {
+  const current = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+  const next = syncCastFromPrompt(scene.aiPrompt || '', current, characters ?? []);
+  if (next === current) return;
+  onUpdate({
+    characterShots: next,
+    characterShot: next[0] ?? scene.characterShot,
+  });
+}, [scene.aiPrompt, characters, scene.characterShots?.length]);
+```
 
-- Untertitel-Text:
-  - DE: „Monolog — Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene."
-  - EN: „Monologue — character speaks to camera. Plays as voiceover in this scene."
-  - ES: „Monólogo — el personaje habla a cámara. Suena como voz en off en esta escena."
-- Skript-Placeholder verkürzen auf eine Zeile: `"Sarah: Hi, willkommen!"`.
-- Shot-Reverse-Shot-Toggle bei 1 Cast **ausblenden** (kein Reverse-Shot ohne 2. Sprecher).
-- Generate-Button-Label bleibt „Voiceover generieren".
+Reihenfolge wichtig: Auto-Sync läuft **vor** dem Cast-Marker-Backfill, damit der `[Cast: …]`-Marker direkt die neu erkannten Charaktere mit aufnimmt.
 
-### 4. Edge Function `generate-scene-dialog`
+### Visueller Hinweis (optional, dezent)
 
-Aktuelles Gate `cast.length < 2 → 400` lockern auf `< 1`. Prompt anpassen:
-
-- Wenn nur 1 Cast: System-Prompt erzeugt **1–2 Blöcke** mit demselben Sprechernamen (Monolog), keine Dialogwechsel.
-- Wort-Budget bleibt `~ durationSeconds * 2.5`.
+Wenn `syncCastFromPrompt` Slots hinzugefügt hat (Vergleich `next.length > current.length`), einmalig ein kleines `Badge` in der Cast-Zeile zeigen:
+- DE: „Auto-erkannt: Sarah" / EN: „Auto-detected: Sarah" / ES: „Auto-detectado: Sarah"
+- Ohne Toast, ohne Persistenz-Flag — nur Tooltip am `Charakter hinzufügen`-Button.
 
 ## Out of Scope
 
-- Keine Änderungen an `handleGenerateInline` / `handleGenerate` (TTS-Pfad funktioniert für 1 Sprecher genauso).
-- Keine Änderung an Anchor-Compose, Frame-First, Render-Pipeline.
-- Keine DB-Migration.
+- Keine Änderung an `compose-video-storyboard` (Storyboard-LLM bleibt wie er ist).
+- Keine DB-Migration, kein `character_shots`-Schemawechsel.
+- Kein Auto-Remove von Charakteren, deren Name *nicht mehr* im Prompt steht (zu aggressiv — könnte manuell gepickte Cast-Mitglieder löschen).
+- Render-Pipeline, Anchor-Compose, Skript-Studio bleiben unverändert — sie profitieren automatisch, weil `scene.characterShots` jetzt korrekt ist.
 
 ## Dateien
 
-- `src/components/video-composer/SceneCard.tsx` — neuer Button + State + Scroll-Ref + Übergabe `open`/`onClose` an Studio.
-- `src/components/video-composer/SceneDialogStudio.tsx` — `open`/`onClose` Props, ForwardRef, Cast≥1, Monolog-Texte, Toggle bedingt ausblenden, Header-Close-X.
-- `supabase/functions/generate-scene-dialog/index.ts` — Gate auf `< 1`, Monolog-Prompt-Variante.
+- **neu**: `src/lib/motion-studio/syncCastFromPrompt.ts`
+- **edit**: `src/components/video-composer/SceneCard.tsx` — neuer Sync-Effect + optionaler „Auto-erkannt"-Badge.
 
 ## Verifikation
 
-- Szene mit **1 Charakter**: Button „Skript schreiben" sichtbar in Cast-Zeile → Klick öffnet Studio mit Monolog-Hinweis, scrollt sanft hin. „KI-Skript" generiert 1–2 Sätze derselben Person, „Voiceover generieren" hängt VO an die Szene.
-- Szene mit **2+ Charakteren**: Wie oben, plus Shot-Reverse-Shot-Toggle sichtbar.
-- Szene mit **0 Charakteren**: Kein Button, kein Studio.
-- Szene mit bereits gespeichertem `dialogScript` → Studio initial offen.
+1. Storyboard mit „Sarah und Matthew arbeiten am Feld" generieren → Szene 2 Cast-Zeile zeigt **Matthew + Sarah**, nicht mehr nur Matthew.
+2. `[Cast: Matthew Dusatko (full), Sarah Dusatko (full)] …` taucht im Prompt-Marker auf.
+3. „Anker komponieren" → Nano Banana 2 bekommt **beide** `portraitUrls` und rendert Sarah + Matthew ins Frame.
+4. Cast Consistency Map zeigt weiterhin S2 grün für beide — jetzt aber konsistent zur Cast-Zeile.
+5. Manuelles Entfernen von Sarah über `CharacterCastPicker` bleibt persistent (Sync fügt sie nicht sofort wieder hinzu, solange der Prompt nicht erneut geändert wird → Dependency `scene.aiPrompt`; Edge-Case dokumentiert).
