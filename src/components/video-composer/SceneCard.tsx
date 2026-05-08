@@ -719,6 +719,14 @@ export default function SceneCard({
               <>
                 <CharacterCastPicker
                   characters={characters}
+                  libraryCharacters={libCharacters.map((c): ComposerCharacter => ({
+                    id: c.id,
+                    name: c.name,
+                    appearance: c.description ?? '',
+                    signatureItems: c.signature_items ?? '',
+                    referenceImageUrl: c.reference_image_url ?? undefined,
+                  }))}
+                  onAddToBriefing={onAddCharacter}
                   value={scene.characterShots}
                   legacyValue={scene.characterShot}
                   onChange={(next) => {
