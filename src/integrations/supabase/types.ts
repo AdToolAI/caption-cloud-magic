@@ -5212,6 +5212,7 @@ export type Database = {
           duration_seconds: number
           effects: Json | null
           end_reference_image_url: string | null
+          engine_override: string
           first_frame_url: string | null
           hybrid_mode: string | null
           hybrid_target_scene_id: string | null
@@ -5279,6 +5280,7 @@ export type Database = {
           duration_seconds?: number
           effects?: Json | null
           end_reference_image_url?: string | null
+          engine_override?: string
           first_frame_url?: string | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
@@ -5346,6 +5348,7 @@ export type Database = {
           duration_seconds?: number
           effects?: Json | null
           end_reference_image_url?: string | null
+          engine_override?: string
           first_frame_url?: string | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
