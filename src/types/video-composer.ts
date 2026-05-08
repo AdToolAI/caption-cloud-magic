@@ -469,6 +469,7 @@ export interface DialogVoiceCfg {
   elevenlabsVoiceId?: string;
   /** Hume only — defaults to HUME_AI. */
   provider?: 'HUME_AI' | 'CUSTOM_VOICE';
+}
 
 export interface MusicConfig {
   enabled: boolean;
