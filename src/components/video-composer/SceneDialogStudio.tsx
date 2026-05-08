@@ -15,8 +15,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Mic, Sparkles, User, Loader2, ImageOff } from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
-import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
