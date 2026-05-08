@@ -637,4 +637,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       </div>
     </Card>
   );
-}
+});
+
+export default SceneDialogStudio;
+
