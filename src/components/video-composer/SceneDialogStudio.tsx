@@ -364,7 +364,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           .insert({
             user_id: user.id,
             project_id: pid,
-            scene_id: scene.id,
+            scene_id: sceneId,
             kind: 'voiceover',
             source: 'ai',
             prompt: `${c.name}: ${block.text}`,
