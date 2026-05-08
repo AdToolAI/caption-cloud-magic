@@ -652,7 +652,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
     // `cinematic_preset_slug` text column — no schema change needed.
-    const srsMarker = `dialog-srs:${sceneId}`;
+    const srsMarker = `dialog-srs:${scene.id}`;
     try {
       // ── Pre-flight: validate every speaker has a voice + portrait BEFORE
       //    any spend, so we can't end up with a half-rendered dialog where
