@@ -44,7 +44,7 @@ interface SceneDialogStudioProps {
   projectId?: string;
   language: 'de' | 'en' | 'es';
   onUpdate: (updates: Partial<ComposerScene>) => void;
-  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
+  onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
 }
 
 const PRESET_VOICES = [
