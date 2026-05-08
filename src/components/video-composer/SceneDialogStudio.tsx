@@ -199,23 +199,62 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     [cast, characters],
   );
 
-  const allVoices = useMemo(
-    () => [
-      ...PRESET_VOICES.map((v) => ({ id: v.id, name: v.name, isCustom: false, elevenlabsVoiceId: undefined as string | undefined })),
-      ...customVoices.filter((v) => v.is_active).map((v) => ({
+  // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
+  const [elVoices, setElVoices] = useState<VoiceMeta[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('list-voices', {
+          body: { language: 'all' },
+        });
+        if (error) throw error;
+        setElVoices(sortVoicesPremiumFirst<VoiceMeta>(data?.voices || []));
+      } catch (err) {
+        console.warn('[SceneDialogStudio] list-voices failed, using PRESET_VOICES fallback', err);
+        setElVoices(PRESET_VOICES.map((p) => ({ id: p.id, name: p.name, language: 'en' as any })));
+      }
+    })();
+  }, []);
+
+  /** ElevenLabs picker entries (library + active custom voices) */
+  const elPickerEntries = useMemo(() => {
+    const lib = elVoices.map((v) => ({
+      id: v.id,
+      name: v.name,
+      isCustom: false as const,
+      elevenlabsVoiceId: undefined as string | undefined,
+      gender: v.gender,
+    }));
+    const custom = customVoices
+      .filter((v) => v.is_active && v.elevenlabs_voice_id)
+      .map((v) => ({
         id: v.id,
         name: `⭐ ${v.name}`,
-        isCustom: true,
+        isCustom: true as const,
         elevenlabsVoiceId: v.elevenlabs_voice_id,
-      })),
-    ],
-    [customVoices],
-  );
+        gender: undefined as string | undefined,
+      }));
+    return [...lib, ...custom];
+  }, [elVoices, customVoices]);
+
+  // ── Voice map state — backwards-compatible (string → DialogVoiceCfg) ──
+  const normalizeVoiceMap = (
+    raw: Record<string, string | DialogVoiceCfg> | undefined,
+  ): Record<string, DialogVoiceCfg> => {
+    const out: Record<string, DialogVoiceCfg> = {};
+    if (!raw) return out;
+    for (const [k, v] of Object.entries(raw)) {
+      const r = resolveDialogVoice(v);
+      if (r) out[k] = r;
+    }
+    return out;
+  };
 
   const [script, setScript] = useState(scene.dialogScript ?? '');
-  const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, string>>(
-    scene.dialogVoices ?? {},
+  const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
+    normalizeVoiceMap(scene.dialogVoices),
   );
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
@@ -225,13 +264,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   // typing (cursor jump / dropped characters).
   useEffect(() => {
     setScript(scene.dialogScript ?? '');
-    setVoicePerSpeaker(scene.dialogVoices ?? {});
+    setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  // Persist script with debounce. The actual prompt-sync happens in
-  // SceneCard (so that structured-mode promptSlots.subject is updated and
-  // stitchSlots can't wipe the marker on the next render).
+  // Persist script with debounce.
   useEffect(() => {
     if (script === (scene.dialogScript ?? '')) return;
     const handle = setTimeout(() => {
@@ -241,11 +278,67 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [script]);
 
-  // Persist voice map immediately on change
-  const setVoiceFor = (speakerId: string, voiceId: string) => {
-    const next = { ...voicePerSpeaker, [speakerId]: voiceId };
+  /** Persist voice map immediately on change */
+  const updateSpeakerVoice = (speakerId: string, patch: Partial<DialogVoiceCfg>) => {
+    const cur = voicePerSpeaker[speakerId];
+    const next: Record<string, DialogVoiceCfg> = {
+      ...voicePerSpeaker,
+      [speakerId]: { ...(cur ?? { engine: 'elevenlabs', voiceId: '' }), ...patch },
+    };
     setVoicePerSpeaker(next);
     onUpdate({ dialogVoices: next });
+  };
+
+  const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
+    if (engine === 'hume') {
+      const fallback = HUME_VOICES[0];
+      updateSpeakerVoice(speakerId, {
+        engine: 'hume',
+        voiceId: fallback.name,
+        voiceName: fallback.label,
+        provider: fallback.provider,
+        isCustom: undefined,
+        elevenlabsVoiceId: undefined,
+      });
+    } else {
+      const fb = elPickerEntries[0];
+      updateSpeakerVoice(speakerId, {
+        engine: 'elevenlabs',
+        voiceId: fb?.id ?? 'EXAVITQu4vr4xnSDxMaL',
+        voiceName: fb?.name ?? 'Sarah',
+        isCustom: fb?.isCustom ?? false,
+        elevenlabsVoiceId: fb?.elevenlabsVoiceId,
+        provider: undefined,
+      });
+    }
+  };
+
+  const handlePreview = async (speakerId: string) => {
+    const cfg = voicePerSpeaker[speakerId];
+    if (!cfg?.voiceId) return;
+    setPreviewing(speakerId);
+    try {
+      const fnName = cfg.engine === 'hume' ? 'preview-voice-hume' : 'preview-voice';
+      const sp = sceneCast.find((c) => c.id === speakerId);
+      const previewText =
+        language === 'de'
+          ? `Hi, ich bin ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`
+          : language === 'es'
+          ? `Hola, soy ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`
+          : `Hi, I'm ${sp?.name?.split(' ')[0] ?? 'Sarah'}.`;
+      const body = cfg.engine === 'hume'
+        ? { text: previewText, voiceName: cfg.voiceId, provider: cfg.provider || 'HUME_AI' }
+        : { text: previewText, voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId };
+      const { data, error } = await supabase.functions.invoke(fnName, { body });
+      if (error) throw error;
+      if (!data?.audioContent) throw new Error('No audio returned');
+      const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+      await audio.play();
+    } catch (e) {
+      toast({ title: 'Preview failed', description: formatError(e), variant: 'destructive' });
+    } finally {
+      setPreviewing(null);
+    }
   };
 
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
