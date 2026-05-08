@@ -75,6 +75,7 @@ import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
+import { recommendEngineForScene } from '@/lib/video-composer/sceneEngineRouter';
 
 interface SceneCardProps {
   scene: ComposerScene;
