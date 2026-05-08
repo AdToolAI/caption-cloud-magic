@@ -593,7 +593,43 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
-    if (!renderAsSeparateScenes) {
+
+    // ── Auto-SRS for multi-speaker dialog ─────────────────────────────
+    // It is physically impossible to lip-sync 2+ different speakers into a
+    // single AI B-roll clip — there is only one `clip_url` per scene and
+    // the underlying i2v model has no idea who speaks when. Artlist /
+    // Synthesia / HeyGen Studio all solve this by rendering one talking-
+    // head clip per speaker and cutting them together (Shot-Reverse-Shot).
+    // We force that path automatically as soon as we have ≥2 blocks AND a
+    // portrait for every speaker. No silent fallback to fake "audio overlay
+    // pretending to be lip-sync".
+    if (blocks.length >= 2) {
+      const missingPortrait = speakers.find(
+        (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+      );
+      if (missingPortrait) {
+        toast({
+          title:
+            language === 'de'
+              ? `Kein Portrait für ${missingPortrait.name}`
+              : language === 'es'
+              ? `Sin retrato para ${missingPortrait.name}`
+              : `No portrait for ${missingPortrait.name}`,
+          description:
+            language === 'de'
+              ? `Weise ${missingPortrait.name} im Cast einen Brand-Character mit Portrait zu — sonst kein echtes Lip-Sync möglich.`
+              : language === 'es'
+              ? `Asigna a ${missingPortrait.name} un Brand-Character con retrato; sin él no hay lip-sync real.`
+              : `Assign ${missingPortrait.name} a Brand-Character with a portrait — without it, real lip-sync is impossible.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (!renderAsSeparateScenes) {
+        setRenderAsSeparateScenes(true);
+        // fall through into SRS path below
+      }
+    } else if (!renderAsSeparateScenes) {
       await handleGenerateInline();
       return;
     }
