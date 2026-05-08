@@ -656,6 +656,13 @@ export default function ComposerSequencePreview({
       } catch {}
     }
 
+    // Suppress the global VO during scenes that own their voice (per-scene
+    // dialog clip or embedded HeyGen/lip-sync). Prevents the double-voice bug.
+    if (currentSceneHasOwnVoice) {
+      try { audio.pause(); } catch {}
+      return;
+    }
+
     if (playing) {
       if (globalTime < VO_LEAD_IN_SECONDS) {
         // Hold audio at 0 during the 0.4s breath; browser pre-decodes.
@@ -667,7 +674,7 @@ export default function ComposerSequencePreview({
     } else {
       audio.pause();
     }
-  }, [playing, voiceoverUrl, muted, globalTime]);
+  }, [playing, voiceoverUrl, muted, globalTime, currentSceneHasOwnVoice]);
 
   // ── Background music sync ─────────────────────────────────────
   // BGM is a linear track that loops underneath the video. It mirrors
