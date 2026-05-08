@@ -176,7 +176,7 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
-  const didBackfillCast = useRef(false);
+  
 
   const { systemPresets } = useStylePresets();
 
