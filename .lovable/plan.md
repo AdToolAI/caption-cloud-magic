@@ -1,75 +1,42 @@
 ## Problem
 
-In Szene 2 zeigt die **Cast Consistency Map** oben sowohl Matthew als auch Sarah (S2 grün), während die **Cast-Zeile in der SceneCard** nur „Matthew Dusatko · Silhouette" anzeigt. Der KI-Prompt erwähnt Sarah aber explizit ("Sarah Dusatko, wipes sweat from her brow…").
+Der Storyboard-Generator (`compose-video-storyboard`) erlaubt im Tool-Schema nur **ein** `characterShot` pro Szene (`characterShot: { characterId, shotType }`). Sobald zwei oder mehr Charaktere definiert sind (z.B. Sarah + Matthew), wählt die LLM für jede Szene exakt einen Charakter — dadurch tauchen die beiden in der Cast Consistency Map nie zusammen in derselben Spalte (S1, S2 …) auf, obwohl sie thematisch zusammengehören.
 
-**Ursache:**
-- `CastConsistencyMap.getAnchor()` ist tolerant: matcht per `characterShot.characterId` **oder** per Namens-Treffer im Prompt-Text → erkennt Sarah.
-- `scene.characterShots` enthält dagegen nur, was die Storyboard-LLM bzw. der `CharacterCastPicker` explizit gesetzt hat → Sarah fehlt dort, weil der Storyboard-Generator (`compose-video-storyboard`) `character_shots` gar nicht erzeugt.
-- Folge: Cast-Badge-Zeile, Anker-Compose (Multi-Portrait → Nano Banana 2), Vidu-Multi-Reference und Skript-Studio bekommen Sarah nicht mit, obwohl sie in der Szene vorkommt.
+Der bestehende Client-Sync (`syncCastFromPrompt`) hilft nur, wenn die LLM den zweiten Namen im `aiPrompt` erwähnt — was sie aber nach aktueller System-Instruktion gerade nicht tut, weil die Anweisung lautet *"pick the primary one for characterShot"*.
 
-Das ist ein echter Bug, weil der Anchor-Compose laut `[Multi-Character Scene Composition]`-Memory `portraitUrls[]` aus `characterShots` zieht — Sarah würde also nie ins komponierte Anker-Frame gerendert.
+## Lösung — Multi-Cast direkt im Storyboard
 
-## Lösung — clientseitige Auto-Sync (keine LLM-/DB-Änderungen)
+### 1. Schema-Erweiterung (`compose-video-storyboard/index.ts`)
+- Tool-Schema: zusätzlich zum bestehenden `characterShot` ein optionales **`characterShots`**-Array (max. 4 Einträge, gleiche Item-Form wie `characterShot`). `characterShot` bleibt zur Abwärtskompatibilität als „primärer Slot" enthalten.
+- System-Prompt im SMART-CHARACTER-USAGE-Block ergänzen:
+  - Bei ≥ 2 definierten Charakteren **soll** die LLM in 30–60 % der character-tragenden Szenen **zwei (selten drei) Charaktere gleichzeitig** zeigen — mit individuellem `shotType` pro Charakter (z.B. Sarah `full`, Matthew `profile`).
+  - Diese Mehrfach-Slots gehören in das neue `characterShots`-Array; der primäre/erstgenannte zusätzlich in `characterShot` (Backcompat).
+  - Im `aiPrompt` müssen alle gelisteten Namen + Signature-Items wörtlich vorkommen.
+  - Solo-Szenen bleiben erlaubt (Variation), aber kein „nur 1 Charakter pro Szene"-Zwang mehr.
 
-### Neuer Helper `src/lib/motion-studio/syncCastFromPrompt.ts`
+### 2. Server-Side Mapping
+- In `parsed.scenes.map(...)`: aus `s.characterShots` (falls vorhanden) ein bereinigtes Array bauen (Duplikate raus, max. 4, nur gültige `characterId`s aus `briefing.characters`), in das fertige Scene-Objekt als `characterShots` übernehmen. Wenn nur `s.characterShot` kommt → wie bisher in `characterShots: [s.characterShot]` spiegeln.
+- `pickClipSource` / `isStockCandidate`: „featured a character" zählt jetzt als „mindestens ein Eintrag in `characterShots` mit `shotType !== 'absent'`".
+- Hard-Anchor-Block (Zeilen ~541-590, der den Namen ins Prompt zwingt): über alle Einträge in `characterShots` iterieren statt nur `characterShot`.
 
-Pure Funktion:
+### 3. Floor/Cap (Frequency-Repair)
+- Aktuell läuft Floor/Cap nur über `primaryChar` (`briefing.characters![0]`). Erweitern: für **jeden** definierten Charakter eine eigene Floor/Cap-Schleife laufen lassen, die in/aus `characterShots` einfügt bzw. entfernt. Reihenfolge: erst alle Floors, dann alle Caps.
+- Wenn ein Charakter via Floor in eine Szene neu eingefügt wird, in der bereits ein anderer steht → einfach an `characterShots` anhängen (max. 4).
 
-```ts
-syncCastFromPrompt(
-  prompt: string,
-  currentShots: CharacterShot[],
-  characters: ComposerCharacter[],
-): CharacterShot[]
-```
-
-Logik:
-- Tokenisiert `prompt` (lowercase) und sucht für jeden bekannten Charakter aus `characters` einen Treffer per **vollem Namen** oder **Vorname** (≥3 Zeichen) — gleiche Heuristik wie `CastConsistencyMap` und `sceneFeaturesCharacter`, damit alle drei Stellen konsistent bleiben.
-- Behält bestehende Slots **unverändert** (inkl. `shotType`, Reihenfolge).
-- Hängt fehlende Charaktere mit Default `shotType: 'full'` an (kein `'absent'`, kein Überschreiben einer manuellen Auswahl).
-- Idempotent: ohne neue Treffer wird die Original-Referenz zurückgegeben → kein Re-Render-Loop.
-- Begrenzung: max. 4 Slots (deckt sich mit Multi-Portrait-Limit für Nano Banana 2 / Vidu Q2).
-
-### Integration in `SceneCard.tsx`
-
-Direkt vor dem bestehenden Cast-Marker-Backfill-Effect (~Zeile 240) ein neuer `useEffect`:
-
-```ts
-useEffect(() => {
-  const current = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
-  const next = syncCastFromPrompt(scene.aiPrompt || '', current, characters ?? []);
-  if (next === current) return;
-  onUpdate({
-    characterShots: next,
-    characterShot: next[0] ?? scene.characterShot,
-  });
-}, [scene.aiPrompt, characters, scene.characterShots?.length]);
-```
-
-Reihenfolge wichtig: Auto-Sync läuft **vor** dem Cast-Marker-Backfill, damit der `[Cast: …]`-Marker direkt die neu erkannten Charaktere mit aufnimmt.
-
-### Visueller Hinweis (optional, dezent)
-
-Wenn `syncCastFromPrompt` Slots hinzugefügt hat (Vergleich `next.length > current.length`), einmalig ein kleines `Badge` in der Cast-Zeile zeigen:
-- DE: „Auto-erkannt: Sarah" / EN: „Auto-detected: Sarah" / ES: „Auto-detectado: Sarah"
-- Ohne Toast, ohne Persistenz-Flag — nur Tooltip am `Charakter hinzufügen`-Button.
+### 4. Client-Konsistenz
+- `syncCastFromPrompt` bleibt unverändert (idempotent, Append-only) und greift weiterhin als Sicherheitsnetz, falls die LLM Namen erwähnt aber `characterShots` vergisst.
+- `SceneCard` und Cast Consistency Map konsumieren `scene.characterShots` bereits korrekt — keine Änderung nötig (laut bestehendem Code-Pfad in der Memory `[Multi-Character Scene Composition]`).
 
 ## Out of Scope
-
-- Keine Änderung an `compose-video-storyboard` (Storyboard-LLM bleibt wie er ist).
-- Keine DB-Migration, kein `character_shots`-Schemawechsel.
-- Kein Auto-Remove von Charakteren, deren Name *nicht mehr* im Prompt steht (zu aggressiv — könnte manuell gepickte Cast-Mitglieder löschen).
-- Render-Pipeline, Anchor-Compose, Skript-Studio bleiben unverändert — sie profitieren automatisch, weil `scene.characterShots` jetzt korrekt ist.
+- Keine UI-Änderungen am Wizard/SceneCard, keine DB-Migrationen.
+- Keine Änderung am Anchor-Compose oder Render-Pfad — die nutzen bereits `portraitUrls[]` aus `characterShots` (siehe Memory `[Multi-Character Scene Composition]`).
+- Frequency-Tags pro Charakter bleiben semantisch unverändert; nur die Repair-Schleife wird multi-fähig.
 
 ## Dateien
-
-- **neu**: `src/lib/motion-studio/syncCastFromPrompt.ts`
-- **edit**: `src/components/video-composer/SceneCard.tsx` — neuer Sync-Effect + optionaler „Auto-erkannt"-Badge.
+- **edit**: `supabase/functions/compose-video-storyboard/index.ts` (Schema, System-Prompt, Mapping, Floor/Cap, Hard-Anchor)
 
 ## Verifikation
-
-1. Storyboard mit „Sarah und Matthew arbeiten am Feld" generieren → Szene 2 Cast-Zeile zeigt **Matthew + Sarah**, nicht mehr nur Matthew.
-2. `[Cast: Matthew Dusatko (full), Sarah Dusatko (full)] …` taucht im Prompt-Marker auf.
-3. „Anker komponieren" → Nano Banana 2 bekommt **beide** `portraitUrls` und rendert Sarah + Matthew ins Frame.
-4. Cast Consistency Map zeigt weiterhin S2 grün für beide — jetzt aber konsistent zur Cast-Zeile.
-5. Manuelles Entfernen von Sarah über `CharacterCastPicker` bleibt persistent (Sync fügt sie nicht sofort wieder hinzu, solange der Prompt nicht erneut geändert wird → Dependency `scene.aiPrompt`; Edge-Case dokumentiert).
+1. Briefing mit zwei Charakteren (Sarah + Matthew, beide `balanced`) → in der Cast Consistency Map taucht in mindestens 1–2 Szenen die grüne Markierung **bei beiden Zeilen in derselben Spalte** auf.
+2. Cast-Zeile dieser Szenen zeigt beide Chips ohne dass der „Auto-erkannt"-Sync feuern muss.
+3. `aiPrompt` dieser Szenen nennt beide Namen; Anker-Compose schickt zwei `portraitUrls[]` an Nano Banana 2.
+4. Solo-Szenen funktionieren weiter wie bisher (nicht jede Szene wird zwangsweise multi-cast).
