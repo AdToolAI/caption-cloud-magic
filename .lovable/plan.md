@@ -1,62 +1,62 @@
 ## Problem
 
-Im Composer-Master-Preview gibt es zwei Bugs nach dem Hinzufügen von Dialog/Lip-Sync:
+In der "Cast Consistency Map" wird Matthew korrekt für S1, S2 und S5 als Anker angezeigt — aber sein Name taucht in **keinem** der zugehörigen Szenen-Prompts auf. Damit hat das KI-Video-Modell keinen sprachlichen Anker für die Person, was visuelle Konsistenz untergräbt (selbst wenn ein Reference-Image existiert, hilft es enorm, den Namen + die Erscheinung im Prompt zu nennen).
 
-1. **Kein Ton** trotz aktiviertem Lautsprecher.
-2. **Charaktere in Szene 1 sehen anders aus** als die Avatare — aber **nur seit Lip-Sync**. Davor matchten die Renders die Avatare 1:1.
+## Ursache
 
-## Ursachen
+Es gibt zwei kooperierende, aber inkonsistente Matcher:
 
-### Audio (Bugs in `ComposerSequencePreview.tsx`)
+1. **`CastConsistencyMap.getAnchor`** (UI) ist **tolerant**: matched per exakter ID **oder** wenn `shot.characterId` den Vornamen enthält (`lib:matthew-…`) **oder** wenn der Name im Prompt steht. Deshalb leuchtet das Icon.
+2. **`applyCastToPrompt`** (Prompt-Injection) ist **strikt**: `characters.find(c => c.id === slot.characterId)`. Wenn der Storyboard-Generator (`compose-video-storyboard`) eine `characterId` zurückgibt, die nicht 1:1 die UUID des Brand-Characters ist (z. B. `"matthew"`, `"lib:matthew-…"`, ein altes Slug-Format), schlägt der `find` fehl, kein Token wird erzeugt, kein `[Cast: …]` Marker landet im Prompt.
 
-- **Auto-Unmute zu eng** (Z. 596): `muted` startet `true` und wird nur entstummt, wenn `voiceoverUrl`/`backgroundMusicUrl`/`sceneAudioClips` gesetzt sind. Lip-Sync-HeyGen-Videos haben den Ton **im Video selbst** — keiner dieser Trigger feuert.
-- **Slot B JSX hartcodiert `muted`** (Z. 781): wird zwar imperativ überschrieben, aber jeder Re-Render setzt zurück.
-- **`preloadSlot` mutet immer** (Z. 222): jede Vorbereitung des Standby-Slots stellt `el.muted = true` ein.
-
-Zusätzlich: `SceneDialogStudio.handleGenerate` spawnt Sub-Szenen mit `clipUrl: r.videoUrl ?? undefined`. HeyGen liefert synchron `videoUrl: null` (Polling läuft 1–3 min im Hintergrund). Es gibt **keinen Composer-Poller, der die Sub-Szene später updated** → die Lip-Sync-Szenen erscheinen nie im `playable`-Array, der Player zeigt nur Szene 1 ("Szene 1 von 1").
-
-### Avatar-Drift in Szene 1 (Auslöser: das Re-Roll nach Dialog-Add)
-
-Vor Lip-Sync hatte Szene 1 nur **einen Cast-Member** und der Anchor-Resolver lieferte deterministisch `first-frame-direct` (Portrait direkt) oder die bereits einmalig komponierte und auf der Szene gespeicherte `referenceImageUrl` → Renders sahen 1:1 wie die Avatare aus.
-
-Nach dem Dialog-Setup wurde der Cast auf **2 Charaktere** erweitert. Beim manuellen "Neu generieren €0.75"-Klick lief `prepareSceneAnchor` neu — diesmal mit `multi=true`, also `first-frame-composed` über Nano Banana 2 mit 2 Portraits gleichzeitig. Diese Multi-Portrait-Edit-Pfade (Nano Banana 2) verändern bekanntermaßen Gesichtszüge stärker als Single-Portrait. **Ergebnis: anderer Look als die Avatare.**
-
-Eine einmal erfolgreich genutzte `referenceImageUrl` wird **nicht persistent auf der Szene gespeichert**, also rechnet jeder Re-Roll die Komposition neu — mit potenziell anderem Output.
+Zusätzlich: der Backfill-Effect in `SceneCard.tsx` (Z. 225–244) ist nützlich, läuft aber nur einmal pro `scene.id` und nutzt dieselbe strikte Lookup-Logik — also korrigiert er den ID-Drift ebenfalls nicht.
 
 ## Fix
 
-Kein Face-Lock, kein Provider-Switch. Stattdessen: **Determinismus + Audio-Ergonomie**.
+### 1. `src/lib/motion-studio/applyCastToPrompt.ts` — tolerantes Character-Lookup
+Hilfsfunktion, die genauso matched wie `CastConsistencyMap.getAnchor`:
 
-### 1. Audio im Master-Preview hörbar machen
-**`src/components/video-composer/ComposerSequencePreview.tsx`**
-- Auto-Unmute-Effekt erweitern: zusätzlich entmuten, sobald **mind. eine Szene** `lipSyncWithVoiceover === true` hat oder `clipSource === 'ai-heygen'` ist.
-- `muted`-Attribut aus Slot-B-JSX entfernen (Z. 781).
-- `preloadSlot`: nur dann zwangs-muten, wenn der Slot **nicht aktiv** ist; sonst `mutedRef.current` respektieren.
-- Volume-Toggle-Klick auf **alle** Video-Slots anwenden (Schutz gegen Race beim ersten Tap).
+```ts
+function findCharacter(slot: CharacterShot, chars: ComposerCharacter[] | undefined) {
+  if (!chars?.length || !slot.characterId) return undefined;
+  // 1) exact id
+  const exact = chars.find(c => c.id === slot.characterId);
+  if (exact) return exact;
+  // 2) characterId contains first name (handles "lib:matthew-…", "matthew_dusatko")
+  const slotIdLower = slot.characterId.toLowerCase();
+  const byNameInId = chars.find(c => {
+    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    return !!first && first.length >= 3 && slotIdLower.includes(first);
+  });
+  if (byNameInId) return byNameInId;
+  // 3) characterId equals the full name lowercased (LLM drift)
+  return chars.find(c => c.name?.trim().toLowerCase() === slotIdLower);
+}
+```
 
-### 2. Lip-Sync-Sub-Szenen sichtbar machen (HeyGen-Polling)
-**`src/components/video-composer/SceneDialogStudio.tsx`** und **`src/components/video-composer/ClipsTab.tsx`**
-- Beim `onAddScene` `replicatePredictionId = data.predictionId` (HeyGen video_id) speichern und `clipStatus: 'generating'` setzen, wenn `videoUrl` initial `null` ist.
-- Bestehender `pollScenes` (ClipsTab) prüft die `composer_scenes`-Tabelle alle 5s — `generate-talking-head` muss bei Fertigstellung den passenden Composer-Scene-Datensatz updaten (`clip_url` + `clip_status='ready'`). Wir verifizieren das vor dem Edit; wenn der Hook fehlt, im Edge-Function-Webhook ergänzen.
+Im Loop ersetzen: `const char = findCharacter(slot, characters);`. Verhalten ist sonst identisch (`nameAlreadyInProse`, Marker, Lang-Labels bleiben).
 
-### 3. Avatar-Look beim Re-Roll deterministisch machen
-**`src/lib/motion-studio/prepareSceneAnchor.ts`** + Caller-Pfad in **`ClipsTab.tsx`**
-- Nach erfolgreichem Render der Szene den verwendeten First-Frame als `referenceImageUrl` **auf der Szene persistieren** (`onUpdateScenes` + DB-Update). Beim nächsten Re-Roll greift dann der bereits existierende Short-Circuit `if (scene.referenceImageUrl) return { firstFrameUrl: scene.referenceImageUrl }` → **identische Charaktere wie zuvor**, kein erneutes Nano-Banana-Roulette.
-- Manuelles "Re-Compose Anchor" bleibt als bewusste User-Aktion möglich (kleiner Button auf der Scene-Card, optional in Phase 2).
+### 2. `src/components/video-composer/SceneCard.tsx` — Backfill robuster machen
+- Den Backfill-Effect (Z. 225–244) nicht nur an `[scene.id, characters?.length]` koppeln, sondern auch an `scene.characterShots?.length` / `scene.characterShot?.characterId`. So läuft er erneut, wenn der Auto-Director nachträglich Cast hinzufügt oder der Storyboard-Refresh die Shots neu schreibt.
+- `didBackfillCast` Ref entfernen — die Funktion `applyCastToPrompt` ist bereits idempotent (sie strippt zuerst den existierenden Marker), zusätzliche Re-Runs sind unschädlich.
 
-Damit:
-- Single-Cast-Szenen vor Lip-Sync: bleiben unverändert (nutzten `first-frame-direct`).
-- Multi-Cast-Szenen nach Dialog-Add: erste Komposition wird "eingefroren", Re-Rolls reproduzieren denselben Look.
-- Kein erzwungener Face-Lock, kein Provider-Switch — der Clip dreht sich nicht plötzlich um den Charakter.
+Damit greift bei jedem neuen Storyboard die Auto-Injection — auch wenn die LLM `characterId`s drifteten.
 
-## Bewusst nicht angefasst
+### 3. (Defensive Server-Side) `supabase/functions/compose-video-storyboard/index.ts`
+Nach Erhalt der Storyboard-Scenes vom Modell und nach dem bestehenden Cast-Repair-Block (Z. 482–530) einen kleinen Post-Processing-Schritt einfügen: wenn `briefing.characters` vorhanden ist und eine Scene einen `characterShot` mit gültigem `shotType` hat, vorne im `aiPrompt` einen englischen Hard-Anchor einfügen, falls der Name noch fehlt — z. B.:
 
-- HeyGen-Engine, Provider-Wahl, Vidu-Switch — nichts davon.
-- Render-Pipeline (Lambda, Director's Cut).
-- SceneClipProgress-Mini-Player (im letzten Edit bereits korrekt entstummt).
+```
+"Featuring <Name> (<shotType>): " + aiPrompt
+```
+
+Das ist die Backend-Variante des Markers (englisch, weil Prompts englisch an die Provider gehen) und stellt sicher, dass der Name auch dann im Prompt steht, wenn der Client-Backfill (z. B. wegen Race-Conditions) noch nicht gelaufen ist. Idempotent: vorher prüfen, ob der Name (oder Vorname) bereits im Prompt vorkommt.
+
+## Out of Scope
+- Keine Änderungen an HeyGen / Lip-Sync / Audio-Logik (separate, bereits gefixte Themen).
+- Keine Änderungen am Cast-Picker UI oder der Map.
+- Keine Änderungen am Render-/Provider-Engine-Mapping.
 
 ## Verifikation
-
-1. Composer öffnen → Szene 1 mit 2 Avataren → "Neu generieren": Charaktere sehen **identisch** zur ersten Generation aus (kein Morph).
-2. Dialog hinzufügen → "Dialog generieren": nach 1–3 min erscheinen Sub-Szenen 2/3/… im Player ("Szene 2 von 4").
-3. Master-Preview Play: Lautsprecher ist automatisch aktiv, Stimmen + Lippen synchron hörbar.
+1. Bestehendes Projekt mit Matthew laden → Backfill läuft, `[Besetzung: Matthew Dusatko (Voll)]` (bzw. localisiert) erscheint im Prompt von S1, S2, S5.
+2. Neues Storyboard via Auto-Director generieren → Prompts enthalten "Featuring Matthew Dusatko (full): …" direkt aus dem Server-Response.
+3. Cast-Map zeigt unverändert dieselben Anker-Icons; keine Regression bei Szenen ohne Cast.

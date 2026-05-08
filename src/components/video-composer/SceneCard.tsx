@@ -176,7 +176,7 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
-  const didBackfillCast = useRef(false);
+  
 
   const { systemPresets } = useStylePresets();
 
@@ -220,15 +220,15 @@ export default function SceneCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
 
-  // Backfill: ensure existing scenes with a cast also have the cast marker in the prompt.
-  // Idempotent — applyCastToPrompt is a no-op when the marker is already present.
+  // Backfill: ensure scenes with a cast also carry the cast marker in the
+  // prompt. `applyCastToPrompt` is idempotent (strips the existing marker
+  // first), so we can safely re-run on every cast / character-list change to
+  // catch storyboard refreshes and late-arriving brand characters.
   useEffect(() => {
-    if (didBackfillCast.current) return;
     if (!scene.clipSource.startsWith('ai-')) return;
     if (!characters || characters.length === 0) return;
     const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
     if (cast.length === 0) return;
-    didBackfillCast.current = true;
     if (promptMode === 'structured') {
       const currentSubject = (promptSlots.subject as string) || '';
       const newSubject = applyCastToPrompt(currentSubject, cast, characters, lang);
@@ -241,7 +241,13 @@ export default function SceneCard({
       if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id, characters?.length]);
+  }, [
+    scene.id,
+    characters?.length,
+    scene.characterShots?.length,
+    scene.characterShot?.characterId,
+    scene.characterShots?.map((s) => `${s.characterId}:${s.shotType}`).join('|'),
+  ]);
 
   // Sync scene.dialogScript → scene.aiPrompt (and promptSlots.subject in
   // structured mode). Without this the [Dialog] marker written into aiPrompt
