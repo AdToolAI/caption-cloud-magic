@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } from '@/types/video-composer';
+import { recommendEngineForScene } from '@/lib/video-composer/sceneEngineRouter';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
@@ -757,12 +758,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
             {scenes.map((scene, i) => {
               const status = statusConfig[scene.clipStatus] || statusConfig.pending;
           const sceneQuality = scene.clipQuality || 'standard';
-          const costPerClip = scene.clipSource.startsWith('ai-')
+          const baseCost = scene.clipSource.startsWith('ai-')
             ? getClipCost(scene.clipSource, sceneQuality, scene.durationSeconds)
             : 0;
+          const engineRec = recommendEngineForScene(scene);
+          const isHeygen = engineRec.engine === 'heygen-talking-head';
+          // For HeyGen, the actual render cost = HeyGen extra cost (no Hailuo).
+          // For sync-polish, base + extra. For broll, just base.
+          const costPerClip = isHeygen
+            ? engineRec.extraCostEur
+            : baseCost + (engineRec.engine === 'sync-polish' ? engineRec.extraCostEur : 0);
           const isUpload = scene.clipSource === 'upload';
           const hasUpload = !!scene.uploadUrl;
-          const isAi = scene.clipSource.startsWith('ai-');
+          const isAi = scene.clipSource.startsWith('ai-') || isHeygen;
           const isStock = scene.clipSource === 'stock';
           const isThisGenerating = singleGenerating[scene.id] || scene.clipStatus === 'generating';
 
@@ -819,8 +827,21 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
                           WebkitBoxOrient: 'vertical',
                         }}
                       >
-                        <span>{CLIP_SOURCE_LABELS[scene.clipSource]?.de}</span>
-                        {isAi && (
+                        <span>{isHeygen ? 'HeyGen Photo Avatar' : CLIP_SOURCE_LABELS[scene.clipSource]?.de}</span>
+                        {/* Engine pill — sichtbar pro Szene, klar wer rendert */}
+                        <span
+                          className={`px-1.5 py-0 rounded text-[9px] border ${
+                            isHeygen
+                              ? 'border-primary/60 bg-primary/15 text-primary'
+                              : engineRec.engine === 'sync-polish'
+                              ? 'border-amber-500/40 bg-amber-500/10 text-amber-300'
+                              : 'border-border/40 bg-muted/40 text-muted-foreground'
+                          }`}
+                          title={engineRec.reason}
+                        >
+                          {engineRec.label}
+                        </span>
+                        {isAi && !isHeygen && (
                           <span className={`px-1.5 py-0 rounded text-[9px] border ${
                             sceneQuality === 'pro'
                               ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
