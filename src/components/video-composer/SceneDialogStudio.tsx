@@ -218,10 +218,10 @@ export default function SceneDialogStudio({
           title: language === 'de' ? 'Skript bereit' : language === 'es' ? 'Guion listo' : 'Script ready',
           description:
             language === 'de'
-              ? 'Jetzt „Dialog generieren" klicken.'
+              ? 'Prompt aktualisiert ✓ — jetzt „Dialog generieren" klicken.'
               : language === 'es'
-              ? 'Ahora haz clic en "Generar diálogo".'
-              : 'Now click "Generate dialog".',
+              ? 'Prompt actualizado ✓ — ahora haz clic en "Generar diálogo".'
+              : 'Prompt updated ✓ — now click "Generate dialog".',
         });
       }
     } catch (e) {
