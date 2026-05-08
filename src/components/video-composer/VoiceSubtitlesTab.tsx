@@ -672,10 +672,28 @@ export default function VoiceSubtitlesTab({
               </p>
             </div>
 
+            {/* ── Multi-Speaker mapping (auto-shown for `Speaker: text` scripts) ── */}
+            {isMultiSpeakerScript(voiceover.script) && (
+              <SpeakerMappingBar
+                script={voiceover.script}
+                elevenLabsVoices={voices}
+                speakerMap={voiceover.speakerMap || {}}
+                onChange={(speakerMap) =>
+                  onUpdateAssembly({
+                    voiceover: {
+                      ...voiceover,
+                      multiSpeaker: true,
+                      speakerMap,
+                    },
+                  })
+                }
+              />
+            )}
+
             <div className="flex gap-2">
               <Button onClick={handleGenerateVoiceover} disabled={generatingVo || !voiceover.script.trim()} className="gap-2 flex-1">
                 {generatingVo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                {generatingVo ? t('videoComposer.generating') : t('videoComposer.generateVo')}
+                {generatingVo ? t('videoComposer.generating') : (isMultiSpeakerScript(voiceover.script) ? `${t('videoComposer.generateVo')} · Multi-Speaker` : t('videoComposer.generateVo'))}
               </Button>
             </div>
             {voiceover.audioUrl && (
