@@ -197,6 +197,8 @@ export default function SceneCard({
     Boolean((scene.dialogScript ?? '').trim()),
   );
   const dialogStudioRef = useRef<HTMLDivElement | null>(null);
+  const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
+  const [autoSplitArmed, setAutoSplitArmed] = useState(false);
 
   
 
