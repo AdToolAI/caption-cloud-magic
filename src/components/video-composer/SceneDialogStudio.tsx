@@ -50,6 +50,10 @@ interface SceneDialogStudioProps {
   open?: boolean;
   /** Close-handler used by the in-card X button. */
   onClose?: () => void;
+  /** Auto-persist hook — saves the project before generating voiceover so
+   *  unsaved projects don't block the user. Returns the fresh projectId and
+   *  scene rows so we can map the current scene to its DB id. */
+  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
 const PRESET_VOICES = [
@@ -174,6 +178,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   onAddScene,
   open,
   onClose,
+  onEnsurePersisted,
 }, ref) {
   const t = T[language];
   const { toast } = useToast();
@@ -287,14 +292,40 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
+  /** Resolve a usable {pid, sceneId}. If the project hasn't been persisted yet,
+   *  call onEnsurePersisted() to flush it and remap the current scene's id by
+   *  orderIndex (preferred) or by tempId equality. */
+  const resolvePersistedIds = async (): Promise<{ pid: string; sceneId: string } | null> => {
+    let pid = (projectId || scene.projectId || '').trim();
+    let sceneId = scene.id;
+    if (pid && sceneId && !sceneId.startsWith('temp-')) return { pid, sceneId };
+    if (!onEnsurePersisted) return pid && sceneId ? { pid, sceneId } : null;
+    const result = await onEnsurePersisted();
+    pid = result.projectId;
+    const matched =
+      result.scenes.find((s) => s.id === scene.id) ||
+      result.scenes.find((s) => s.orderIndex === scene.orderIndex);
+    if (matched?.id) sceneId = matched.id;
+    return pid && sceneId ? { pid, sceneId } : null;
+  };
+
   const handleGenerateInline = async () => {
-    const pid = (projectId || scene.projectId || '').trim();
-    if (!pid) {
-      toast({
-        title: t.failed,
-        description: PROJECT_REQUIRED[language],
-        variant: 'destructive',
-      });
+    let pid = '';
+    let sceneId = scene.id;
+    try {
+      const ids = await resolvePersistedIds();
+      if (!ids) {
+        toast({
+          title: t.failed,
+          description: PROJECT_REQUIRED[language],
+          variant: 'destructive',
+        });
+        return;
+      }
+      pid = ids.pid;
+      sceneId = ids.sceneId;
+    } catch (e) {
+      toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
     }
     setGenerating(true);
@@ -333,7 +364,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           .insert({
             user_id: user.id,
             project_id: pid,
-            scene_id: scene.id,
+            scene_id: sceneId,
             kind: 'voiceover',
             source: 'ai',
             prompt: `${c.name}: ${block.text}`,
@@ -389,6 +420,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
     if (!renderAsSeparateScenes) {
       await handleGenerateInline();
+      return;
+    }
+    // Ensure the project is persisted before spawning sub-scenes (otherwise
+    // onAddScene would write to a non-existent project_id).
+    let pidForSrs = (projectId || scene.projectId || '').trim();
+    try {
+      const ids = await resolvePersistedIds();
+      if (!ids) {
+        toast({ title: t.failed, description: PROJECT_REQUIRED[language], variant: 'destructive' });
+        return;
+      }
+      pidForSrs = ids.pid;
+    } catch (e) {
+      toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
     }
     setGenerating(true);
@@ -448,7 +493,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // 2) Kick off the HeyGen render and tell it which scene to update.
         const r = await generate({
           sceneId: newSceneId,
-          projectId,
+          projectId: pidForSrs,
           imageUrl: c.referenceImageUrl,
           text: block.text,
           voiceId: voiceMeta.isCustom ? undefined : voiceMeta.id,

@@ -1096,6 +1096,11 @@ export default function VideoComposerDashboard() {
               onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
               preferredAspect={project.briefing?.aspectRatio}
               onRefetchScenes={refetchScenesFromDb}
+              onEnsurePersisted={async () => {
+                const result = await ensureProjectPersisted(project);
+                setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+                return result;
+              }}
             />
           </TabsContent>
 
