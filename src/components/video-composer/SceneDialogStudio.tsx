@@ -512,7 +512,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return;
     }
     for (const sp of speakers) {
-      if (!voicePerSpeaker[sp.id]) {
+      if (!voicePerSpeaker[sp.id]?.voiceId) {
         toast({ title: t.voiceMissing(sp.name), variant: 'destructive' });
         return;
       }
