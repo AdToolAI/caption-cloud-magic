@@ -36,7 +36,7 @@ interface StoryboardTabProps {
    * refetches. Falls back to local-only when the project hasn't been
    * persisted yet.
    */
-  onAddScene?: (partial: Partial<ComposerScene>) => void | Promise<void>;
+  onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
   onGoToClips: () => void;
   language: string;
   projectId?: string;
