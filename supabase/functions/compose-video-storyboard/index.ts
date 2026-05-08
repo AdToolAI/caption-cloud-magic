@@ -324,7 +324,7 @@ Generate the storyboard using the create_storyboard function.`;
                         },
                         characterShot: {
                           type: "object",
-                          description: "Optional — when a recurring character is featured, set characterId to the character's id from the briefing and shotType to the chosen framing strategy. Omit (or shotType=\"absent\") for scenes without any character.",
+                          description: "PRIMARY slot — when a recurring character is featured, set characterId to the character's id from the briefing and shotType to the chosen framing strategy. Omit (or shotType=\"absent\") for scenes without any character. When the scene features multiple characters, this MUST mirror characterShots[0].",
                           properties: {
                             characterId: { type: "string" },
                             shotType: {
@@ -334,6 +334,23 @@ Generate the storyboard using the create_storyboard function.`;
                           },
                           required: ["characterId", "shotType"],
                           additionalProperties: false,
+                        },
+                        characterShots: {
+                          type: "array",
+                          description: "Multi-character cast for this scene. 1 entry for solo, 2–4 entries when several recurring characters share the frame. The first entry MUST equal characterShot. Leave empty for scenes without any character.",
+                          maxItems: 4,
+                          items: {
+                            type: "object",
+                            properties: {
+                              characterId: { type: "string" },
+                              shotType: {
+                                type: "string",
+                                enum: ["full", "profile", "back", "detail", "pov", "silhouette", "absent"],
+                              },
+                            },
+                            required: ["characterId", "shotType"],
+                            additionalProperties: false,
+                          },
                         },
                         effects: {
                           type: "array",
