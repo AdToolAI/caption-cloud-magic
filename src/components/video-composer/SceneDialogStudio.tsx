@@ -292,14 +292,40 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
   };
 
+  /** Resolve a usable {pid, sceneId}. If the project hasn't been persisted yet,
+   *  call onEnsurePersisted() to flush it and remap the current scene's id by
+   *  orderIndex (preferred) or by tempId equality. */
+  const resolvePersistedIds = async (): Promise<{ pid: string; sceneId: string } | null> => {
+    let pid = (projectId || scene.projectId || '').trim();
+    let sceneId = scene.id;
+    if (pid && sceneId && !sceneId.startsWith('temp-')) return { pid, sceneId };
+    if (!onEnsurePersisted) return pid && sceneId ? { pid, sceneId } : null;
+    const result = await onEnsurePersisted();
+    pid = result.projectId;
+    const matched =
+      result.scenes.find((s) => s.id === scene.id) ||
+      result.scenes.find((s) => s.orderIndex === scene.orderIndex);
+    if (matched?.id) sceneId = matched.id;
+    return pid && sceneId ? { pid, sceneId } : null;
+  };
+
   const handleGenerateInline = async () => {
-    const pid = (projectId || scene.projectId || '').trim();
-    if (!pid) {
-      toast({
-        title: t.failed,
-        description: PROJECT_REQUIRED[language],
-        variant: 'destructive',
-      });
+    let pid = '';
+    let sceneId = scene.id;
+    try {
+      const ids = await resolvePersistedIds();
+      if (!ids) {
+        toast({
+          title: t.failed,
+          description: PROJECT_REQUIRED[language],
+          variant: 'destructive',
+        });
+        return;
+      }
+      pid = ids.pid;
+      sceneId = ids.sceneId;
+    } catch (e) {
+      toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
     }
     setGenerating(true);
