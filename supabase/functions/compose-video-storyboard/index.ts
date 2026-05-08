@@ -515,79 +515,103 @@ Generate the storyboard using the create_storyboard function.`;
     });
 
     // 🛡️ SERVER-SIDE CHARACTER FLOOR + CAP — auto-repair if LLM ignored the
-    // per-character frequency target. Adds anchors when below the floor and
-    // strips anchors (→ shotType: "absent") when above the cap (cameo).
-    if (hasCharacters && scenes.length > 0) {
-      const primaryChar = briefing.characters![0];
-      const primaryCharId = primaryChar.id;
-      const r = freqRange(primaryChar.appearanceFrequency);
-      const minRequired = Math.max(1, Math.ceil(scenes.length * r.min));
-      const maxAllowed = Math.max(minRequired, Math.floor(scenes.length * r.max));
-      const matchesPrimary = (s: any) =>
-        s.characterShot?.characterId === primaryCharId ||
-        // Tolerate id-drift: any non-empty shot counts as primary when only one character is defined
-        (briefing.characters!.length === 1 && s.characterShot?.shotType && s.characterShot.shotType !== 'absent');
-      const hasShot = (s: any) => s.characterShot && s.characterShot.shotType && s.characterShot.shotType !== 'absent' && matchesPrimary(s);
-      let currentCount = scenes.filter(hasShot).length;
+    // per-character frequency target. Now multi-character aware: runs one
+    // floor/cap pass for EACH defined character independently. Floor adds the
+    // character to scenes that don't yet feature them (appended to characterShots
+    // up to 4 slots); cap removes the character from excess scenes.
+    const syncPrimaryFromShots = (sc: any) => {
+      const shots: Array<{ characterId: string; shotType: string }> = sc.characterShots || [];
+      const first = shots.find((x) => x && x.shotType && x.shotType !== 'absent');
+      if (first) sc.characterShot = { characterId: first.characterId, shotType: first.shotType };
+      else { sc.characterShot = { characterId: '', shotType: 'absent' }; }
+    };
+    const updateClipSource = (sc: any, idx: number) => {
+      const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
+      if (newSource !== sc.clipSource) {
+        sc.clipSource = newSource;
+        sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
+      }
+    };
 
-      // FLOOR: insert if too few
-      if (currentCount < minRequired) {
+    if (hasCharacters && scenes.length > 0) {
+      // FLOOR pass — per character
+      for (const ch of briefing.characters!) {
+        const r = freqRange(ch.appearanceFrequency);
+        const minRequired = Math.max(1, Math.ceil(scenes.length * r.min));
+        const isTolerantSingle = briefing.characters!.length === 1;
+        const featuresChar = (sc: any) => {
+          const list: any[] = sc.characterShots || [];
+          if (list.some((x) => x && x.shotType && x.shotType !== 'absent' && x.characterId === ch.id)) return true;
+          if (isTolerantSingle && list.some((x) => x && x.shotType && x.shotType !== 'absent')) return true;
+          return false;
+        };
+        const currentCount = scenes.filter(featuresChar).length;
+        if (currentCount >= minRequired) continue;
+
         const needed = minRequired - currentCount;
+        // Spread additions across the timeline; prefer hook + cta + middle.
         const candidateOrder: number[] = [0];
         if (scenes.length > 1) candidateOrder.push(scenes.length - 1);
         for (let i = 1; i < scenes.length - 1; i++) candidateOrder.push(i);
-
         const rotation: Array<'profile' | 'detail' | 'silhouette' | 'back' | 'full'> =
           ['profile', 'detail', 'silhouette', 'back', 'full'];
         let inserted = 0;
         let rotIdx = 0;
         for (const idx of candidateOrder) {
           if (inserted >= needed) break;
-          const sc = scenes[idx];
-          if (hasShot(sc)) continue;
+          const sc: any = scenes[idx];
+          if (featuresChar(sc)) continue;
+          const shots: any[] = sc.characterShots || [];
+          if (shots.length >= 4) continue; // slot cap
           const shotType = rotation[rotIdx % rotation.length];
           rotIdx++;
-          sc.characterShot = { characterId: primaryCharId, shotType };
-          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
-          if (newSource !== sc.clipSource) {
-            sc.clipSource = newSource;
-            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
-          }
+          shots.push({ characterId: ch.id, shotType });
+          sc.characterShots = shots;
+          syncPrimaryFromShots(sc);
+          updateClipSource(sc, idx);
           inserted++;
         }
-        currentCount += inserted;
-        console.log(`[storyboard] character-floor auto-repair: inserted ${inserted} anchor(s) (had ${currentCount - inserted}, need ${minRequired}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
+        if (inserted > 0) {
+          console.log(`[storyboard] character-floor auto-repair (${ch.name}): inserted ${inserted} anchor(s), need ${minRequired}, freq=${ch.appearanceFrequency || 'balanced'}`);
+        }
       }
 
-      // CAP: strip excess anchors when over the upper bound (e.g. cameo cap)
-      if (currentCount > maxAllowed) {
-        const excess = currentCount - maxAllowed;
-        // Prefer to keep hook (idx 0) and CTA (last) — strip from the middle.
-        const stripOrder: number[] = [];
-        for (let i = 1; i < scenes.length - 1; i++) stripOrder.push(i);
-        stripOrder.push(scenes.length - 1, 0);
+      // CAP pass — per character
+      for (const ch of briefing.characters!) {
+        const r = freqRange(ch.appearanceFrequency);
+        const minRequired = Math.max(1, Math.ceil(scenes.length * r.min));
+        const maxAllowed = Math.max(minRequired, Math.floor(scenes.length * r.max));
+        const featuredIndices = scenes
+          .map((sc: any, i: number) => ({ sc, i }))
+          .filter(({ sc }) => (sc.characterShots || []).some((x: any) => x?.characterId === ch.id && x.shotType !== 'absent'))
+          .map(({ i }) => i);
+        if (featuredIndices.length <= maxAllowed) continue;
+
+        const excess = featuredIndices.length - maxAllowed;
+        // Strip from middle first (keep hook + cta as anchors)
+        const middle = featuredIndices.filter((i) => i !== 0 && i !== scenes.length - 1);
+        const tail = featuredIndices.filter((i) => i === 0 || i === scenes.length - 1);
+        const stripOrder = [...middle, ...tail];
         let removed = 0;
         for (const idx of stripOrder) {
           if (removed >= excess) break;
-          const sc = scenes[idx];
-          if (!hasShot(sc)) continue;
-          sc.characterShot = { characterId: '', shotType: 'absent' };
-          const newSource = pickClipSource(sc.sceneType || 'custom', idx, scenes.length, sc.characterShot);
-          if (newSource !== sc.clipSource) {
-            sc.clipSource = newSource;
-            sc.costEuros = newSource === 'ai-image' ? 0.05 : 1.2;
-          }
+          const sc: any = scenes[idx];
+          sc.characterShots = (sc.characterShots || []).filter((x: any) => x.characterId !== ch.id);
+          syncPrimaryFromShots(sc);
+          updateClipSource(sc, idx);
           removed++;
         }
-        console.log(`[storyboard] character-cap auto-repair: removed ${removed} anchor(s) (had ${currentCount}, max ${maxAllowed}, freq=${primaryChar.appearanceFrequency || 'balanced'})`);
+        if (removed > 0) {
+          console.log(`[storyboard] character-cap auto-repair (${ch.name}): removed ${removed} anchor(s), max ${maxAllowed}, freq=${ch.appearanceFrequency || 'balanced'}`);
+        }
       }
     }
 
-    // 🎬 SERVER-SIDE CAST HARD-ANCHOR — guarantee that any scene with a
-    // characterShot also names the character in its aiPrompt. The client
-    // backfill (`applyCastToPrompt`) adds a localised marker; we inject a
-    // deterministic English prefix here so the provider always receives the
-    // name even on race conditions / id-drift.
+    // 🎬 SERVER-SIDE CAST HARD-ANCHOR — guarantee that EVERY character listed
+    // in characterShots is named in the scene's aiPrompt. The client backfill
+    // (`applyCastToPrompt`) adds a localised marker; we inject a deterministic
+    // English prefix here so providers always receive the names even on race
+    // conditions / id-drift.
     if (hasCharacters && scenes.length > 0) {
       const charById = new Map<string, any>();
       for (const c of briefing.characters!) charById.set(c.id, c);
@@ -595,28 +619,30 @@ Generate the storyboard using the create_storyboard function.`;
         if (!slot?.characterId) return undefined;
         const exact = charById.get(slot.characterId);
         if (exact) return exact;
-        const lower = String(slot.characterId).toLowerCase();
-        for (const c of briefing.characters!) {
-          const first = String(c.name || '').trim().toLowerCase().split(/\s+/)[0];
-          if (first && first.length >= 3 && lower.includes(first)) return c;
-          if (String(c.name || '').trim().toLowerCase() === lower) return c;
-        }
         return briefing.characters!.length === 1 ? briefing.characters![0] : undefined;
       };
       for (const s of scenes as any[]) {
-        const shot = s.characterShot;
-        if (!shot || !shot.shotType || shot.shotType === 'absent') continue;
-        const char = findChar(shot);
-        if (!char?.name) continue;
-        const promptLower = String(s.aiPrompt || '').toLowerCase();
-        const first = String(char.name).trim().toLowerCase().split(/\s+/)[0];
-        const alreadyNamed =
-          promptLower.includes(String(char.name).toLowerCase()) ||
-          (first.length >= 3 && promptLower.includes(first));
-        if (alreadyNamed) continue;
-        s.aiPrompt = `Featuring ${char.name} (${shot.shotType}): ${s.aiPrompt || ''}`.trim();
+        const shots: any[] = s.characterShots && s.characterShots.length > 0
+          ? s.characterShots
+          : (s.characterShot ? [s.characterShot] : []);
+        const missing: string[] = [];
+        for (const shot of shots) {
+          if (!shot || !shot.shotType || shot.shotType === 'absent') continue;
+          const char = findChar(shot);
+          if (!char?.name) continue;
+          const promptLower = String(s.aiPrompt || '').toLowerCase();
+          const first = String(char.name).trim().toLowerCase().split(/\s+/)[0];
+          const alreadyNamed =
+            promptLower.includes(String(char.name).toLowerCase()) ||
+            (first.length >= 3 && promptLower.includes(first));
+          if (!alreadyNamed) missing.push(`${char.name} (${shot.shotType})`);
+        }
+        if (missing.length > 0) {
+          s.aiPrompt = `Featuring ${missing.join(' and ')}: ${s.aiPrompt || ''}`.trim();
+        }
       }
     }
+
 
     return new Response(JSON.stringify({ scenes, sceneCount: scenes.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
