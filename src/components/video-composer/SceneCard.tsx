@@ -854,6 +854,7 @@ export default function SceneCard({
                 language={lang}
                 onUpdate={onUpdate}
                 onAddScene={onAddScene}
+                onEnsurePersisted={onEnsurePersisted}
               />
             )}
 
