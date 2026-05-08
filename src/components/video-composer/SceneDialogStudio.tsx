@@ -415,6 +415,26 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return pid && sceneId ? { pid, sceneId } : null;
   };
 
+  /** Probe real audio duration in browser when TTS service didn't return one. */
+  const probeAudioDuration = (audioUrl: string, fallbackSec: number): Promise<number> =>
+    new Promise((resolve) => {
+      try {
+        const a = new Audio();
+        a.preload = 'metadata';
+        let done = false;
+        const finish = (d: number) => { if (!done) { done = true; resolve(d); } };
+        a.addEventListener('loadedmetadata', () => {
+          const d = Number.isFinite(a.duration) && a.duration > 0 ? a.duration : fallbackSec;
+          finish(d);
+        });
+        a.addEventListener('error', () => finish(fallbackSec));
+        setTimeout(() => finish(fallbackSec), 5000);
+        a.src = audioUrl;
+      } catch {
+        resolve(fallbackSec);
+      }
+    });
+
   const handleGenerateInline = async () => {
     let pid = '';
     let sceneId = scene.id;
@@ -437,7 +457,29 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
+
+    // Determine if we should auto-upgrade to HeyGen lip-sync.
+    // Trigger: at least one speaker in this dialog has a portrait. If not, we
+    // fall back to plain audio overlay (no face animation).
+    const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
+    const useHeygenLipSync =
+      portraitsAvailable && blocks.length === 1; // single-speaker scene → replace clip with HeyGen
+    // (Multi-speaker single-scene HeyGen would require stitching multiple
+    // talking-head clips into one; that path lives in SRS mode.)
+
     try {
+      // ── Idempotency: wipe previous voiceover clips for this scene so a
+      //    re-generation never stacks Sarah-old + Sarah-new on top of each
+      //    other (which produced the "two voices at once" bug).
+      const { error: delErr } = await supabase
+        .from('scene_audio_clips')
+        .delete()
+        .eq('scene_id', sceneId)
+        .eq('kind', 'voiceover');
+      if (delErr) {
+        console.warn('[SceneDialogStudio] failed to clear old voiceover clips', delErr);
+      }
+
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
@@ -461,8 +503,15 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const { data, error } = await supabase.functions.invoke(fnName, { body });
         if (error) throw error;
         const audioUrl = (data as any)?.audioUrl as string | undefined;
-        const duration = Number((data as any)?.duration ?? 0) || Math.max(1.5, block.text.length / 18);
         if (!audioUrl) throw new Error('No audioUrl returned');
+
+        // Real audio duration — TTS service value first, browser-probe fallback.
+        // Fixes the "Matthew talks longer than Sarah even though his script
+        // is shorter" bug caused by the static `text.length / 18` heuristic.
+        const reportedDuration = Number((data as any)?.duration ?? 0);
+        const duration = reportedDuration > 0
+          ? reportedDuration
+          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Unauthorized');
@@ -484,6 +533,25 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             cost_credits: 0,
           });
         if (insErr) throw insErr;
+
+        // Auto-upgrade single-speaker scenes to HeyGen lip-sync when we have
+        // a portrait. The HeyGen render REPLACES `clip_url` so the on-screen
+        // mouth actually matches the audio (Artlist/Synthesia-style flow).
+        if (useHeygenLipSync && c.referenceImageUrl) {
+          try {
+            await generate({
+              sceneId,
+              projectId: pid,
+              imageUrl: c.referenceImageUrl,
+              audioUrl,
+              aspectRatio: '9:16',
+              resolution: '720p',
+              composerCharacterId: c.id,
+            });
+          } catch (heygenErr) {
+            console.warn('[SceneDialogStudio] HeyGen auto-upgrade failed, audio-only fallback in place', heygenErr);
+          }
+        }
 
         cumulativeOffset += duration + 0.15; // small breath between speakers
         okCount += 1;
@@ -908,6 +976,34 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           />
         </div>
       )}
+      {/* Lip-sync mode hint — single-speaker scenes with portrait auto-render
+          via HeyGen so the mouth matches the audio (Artlist-style). */}
+      {!renderAsSeparateScenes && blocks.length > 0 && (() => {
+        const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
+        const willLipSync = portraitsAvailable && blocks.length === 1;
+        const label = willLipSync
+          ? language === 'de'
+            ? '🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~0,30 €)'
+            : language === 'es'
+            ? '🎙️ Lip-Sync via HeyGen — la boca coincide con el audio (~0,30 €)'
+            : '🎙️ Lip-sync via HeyGen — mouth matches the audio (~€0.30)'
+          : !portraitsAvailable
+          ? language === 'de'
+            ? '🔊 Nur Audio-Overlay — kein Portrait, daher kein Lip-Sync. Lade ein Portrait im Cast hoch oder aktiviere oben „Als separate Szenen rendern"'
+            : language === 'es'
+            ? '🔊 Solo audio — sin retrato, sin lip-sync. Sube un retrato o activa "Renderizar como escenas separadas"'
+            : '🔊 Audio overlay only — no portrait, no lip-sync. Upload a portrait or enable "Render as separate scenes" above'
+          : language === 'de'
+            ? '🔊 Mehrere Sprecher in einer Szene — Audio-Overlay. Für echten Lip-Sync „Als separate Szenen rendern" aktivieren'
+            : language === 'es'
+            ? '🔊 Varios hablantes en una escena — solo audio. Activa "Escenas separadas" para lip-sync real'
+            : '🔊 Multiple speakers in one scene — audio overlay. Enable "Render as separate scenes" for real lip-sync';
+        return (
+          <p className={`text-[10px] ${willLipSync ? 'text-primary' : 'text-muted-foreground'} -mb-1`}>
+            {label}
+          </p>
+        );
+      })()}
       <div className="flex items-center gap-2">
         <Button
           type="button"
