@@ -54,6 +54,36 @@ interface ComposerCharacter {
   brandCharacterId?: string;
 }
 
+type DialogVoiceCfg = { engine?: string; voiceId?: string; voiceName?: string; provider?: string };
+
+/** ── HeyGen routing helpers (mirrors src/lib/video-composer/sceneEngineRouter.ts) ── */
+function sceneHasDialogText(script?: string | null): boolean {
+  return !!(script && script.trim().length > 0);
+}
+function countDialogSpeakers(script?: string | null): number {
+  const s = (script ?? '').trim();
+  if (!s) return 0;
+  const speakers = new Set<string>();
+  for (const line of s.split('\n')) {
+    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+    if (m) speakers.add(m[1].trim().toLowerCase());
+  }
+  return speakers.size;
+}
+/** Strip "NAME:" / "[NAME]:" speaker prefixes — leaves clean spoken text. */
+function stripSpeakerPrefixes(script: string): string {
+  return script
+    .split('\n')
+    .map((line) => line.replace(/^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]\s*/, '').trim())
+    .filter((l) => l.length > 0)
+    .join(' ');
+}
+function resolveDialogVoiceId(cfg?: string | DialogVoiceCfg): string | undefined {
+  if (!cfg) return undefined;
+  if (typeof cfg === 'string') return cfg;
+  return cfg.voiceId;
+}
+
 type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' | 'silhouette' | 'absent';
 
 interface ClipScene {
@@ -72,6 +102,13 @@ interface ClipScene {
   endReferenceImageUrl?: string;
   durationSeconds: number;
   characterShot?: { characterId: string; shotType: CharacterShotType };
+  characterShots?: Array<{ characterId: string; shotType: CharacterShotType }>;
+  /** Per-scene dialog screenplay ("NAME: text" per line). Triggers HeyGen routing. */
+  dialogScript?: string;
+  /** Map of characterId → voice (string voiceId or { voiceId }). */
+  dialogVoices?: Record<string, string | DialogVoiceCfg>;
+  /** Render-engine override: 'auto' | 'heygen' | 'broll' | 'sync-polish'. */
+  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish';
   /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
   withAudio?: boolean;
 }
@@ -364,7 +401,100 @@ serve(async (req) => {
 
       const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
 
+      // ── HeyGen routing branch ─────────────────────────────────────────────
+      // Triggered when:
+      //   • engineOverride === 'heygen'  OR
+      //   • engineOverride === 'auto' AND scene has dialog text AND a cast character
+      // Multi-speaker MVP: renders the FIRST speaker's portion (full text in
+      // their voice). Per-speaker stitching is future work.
       try {
+        const override = scene.engineOverride ?? 'auto';
+        const hasDialog = sceneHasDialogText(scene.dialogScript);
+        const primaryShot = scene.characterShots?.find((s) => s && s.shotType !== 'absent')
+          ?? (scene.characterShot && scene.characterShot.shotType !== 'absent' ? scene.characterShot : undefined);
+        const wantsHeygen = override === 'heygen' || (override === 'auto' && hasDialog && !!primaryShot);
+
+        if (wantsHeygen) {
+          if (!hasDialog) {
+            console.warn(`[compose-video-clips] Scene ${scene.id} forced HeyGen but has no dialogScript — falling back to ${scene.clipSource}.`);
+          } else if (!primaryShot) {
+            console.warn(`[compose-video-clips] Scene ${scene.id} wants HeyGen but no cast character — falling back to ${scene.clipSource}.`);
+          } else {
+            const character = charById.get(primaryShot.characterId);
+            const portraitUrl = character?.referenceImageUrl;
+            const voiceCfg = scene.dialogVoices?.[primaryShot.characterId];
+            const voiceId = resolveDialogVoiceId(voiceCfg);
+            const cleanText = stripSpeakerPrefixes(scene.dialogScript!);
+            const speakerCount = Math.max(1, countDialogSpeakers(scene.dialogScript));
+
+            if (!portraitUrl) {
+              console.warn(`[compose-video-clips] Scene ${scene.id} HeyGen route — character ${primaryShot.characterId} has no portrait, falling back to ${scene.clipSource}.`);
+            } else if (!cleanText) {
+              console.warn(`[compose-video-clips] Scene ${scene.id} HeyGen route — empty cleaned dialog, falling back to ${scene.clipSource}.`);
+            } else {
+              if (speakerCount > 1) {
+                console.warn(`[compose-video-clips] Scene ${scene.id} HeyGen route: ${speakerCount} speakers detected — MVP uses first speaker only.`);
+              }
+
+              await supabaseAdmin
+                .from('composer_scenes')
+                .update({
+                  clip_status: 'generating',
+                  clip_quality: quality,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', scene.id);
+
+              const heygenResp = await fetch(`${supabaseUrl}/functions/v1/generate-talking-head`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': authHeader,
+                },
+                body: JSON.stringify({
+                  sceneId: scene.id,
+                  projectId,
+                  imageUrl: portraitUrl,
+                  text: cleanText,
+                  voiceId: voiceId || undefined,
+                  aspectRatio: '16:9',
+                  resolution: '720p',
+                  composerCharacterId: character?.id,
+                }),
+              });
+
+              if (!heygenResp.ok) {
+                const errBody = await heygenResp.text();
+                console.error(`[compose-video-clips] HeyGen scene ${scene.id} failed:`, heygenResp.status, errBody);
+                await supabaseAdmin
+                  .from('composer_scenes')
+                  .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+                  .eq('id', scene.id);
+                results.push({ sceneId: scene.id, status: 'failed', error: `HeyGen ${heygenResp.status}` });
+              } else {
+                const heygenData = await heygenResp.json();
+                console.log(`[compose-video-clips] HeyGen scene ${scene.id} → video_id=${heygenData.predictionId}`);
+
+                // Deduct HeyGen credits (~€0.30 per speaker; MVP single speaker = €0.30).
+                try {
+                  const heygenCost = 0.30 * Math.max(1, Math.min(4, speakerCount));
+                  await supabaseAdmin.rpc('deduct_ai_video_credits', {
+                    p_user_id: user.id,
+                    p_amount: heygenCost,
+                    p_generation_id: projectId,
+                  });
+                  console.log(`[compose-video-clips] Deducted €${heygenCost.toFixed(2)} for HeyGen scene ${scene.id}`);
+                } catch (credErr) {
+                  console.error('[compose-video-clips] HeyGen credit deduction failed:', credErr);
+                }
+
+                results.push({ sceneId: scene.id, status: 'generating', predictionId: heygenData.predictionId });
+              }
+              continue; // skip the regular per-source dispatch for this scene
+            }
+          }
+        }
+
         if (scene.clipSource === 'upload' && scene.uploadUrl) {
           // Upload: just mark as ready
           await supabaseAdmin
