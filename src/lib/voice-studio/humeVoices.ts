@@ -1,14 +1,13 @@
 /**
- * Curated Hume Octave voice catalog.
+ * Hume Octave voice catalog (types + helpers).
  *
- * Hume's Octave TTS exposes voices by NAME (provider="HUME_AI" or
- * "CUSTOM_VOICE"). These names correspond to Hume's public voice library
- * (https://platform.hume.ai/tts/voices). We expose a curated subset
- * matching ElevenLabs' typical persona slots so the SpeakerMappingBar
- * can show feature-parity options across both engines.
+ * The actual list of voices is fetched dynamically from Hume's
+ * `/v0/tts/voices` endpoint via `useHumeVoices()`. We do NOT hardcode names
+ * here because Hume's library evolves and any stale name causes a hard 404
+ * in `generate-voiceover-hume`.
  *
- * To add custom voices later: extend with `provider: 'CUSTOM_VOICE'`
- * entries (the name must match the user's Hume workspace).
+ * A tiny SAFE_FALLBACK list is kept only for use when the live fetch fails,
+ * so the UI never shows an empty dropdown.
  */
 
 export type HumeVoiceGender = 'male' | 'female' | 'neutral';
@@ -29,83 +28,45 @@ export interface HumeVoiceMeta {
   languages: string[];
 }
 
-export const HUME_VOICES: HumeVoiceMeta[] = [
+/** Tiny known-good fallback (verified to exist in Hume's HUME_AI library). */
+export const HUME_VOICES_FALLBACK: HumeVoiceMeta[] = [
   {
-    id: 'hume:ito',
+    id: 'hume:Ito',
     name: 'Ito',
     provider: 'HUME_AI',
     gender: 'male',
-    label: 'Ito — warm narrator',
-    description: 'Warm, grounded male narrator. Great for storytelling & explainers.',
+    label: 'Ito',
+    description: 'Hume Octave voice',
     languages: ['en', 'de', 'es'],
   },
   {
-    id: 'hume:kora',
+    id: 'hume:Kora',
     name: 'Kora',
     provider: 'HUME_AI',
     gender: 'female',
-    label: 'Kora — bright host',
-    description: 'Bright, energetic female host. Marketing & social ads.',
+    label: 'Kora',
+    description: 'Hume Octave voice',
     languages: ['en', 'de', 'es'],
   },
   {
-    id: 'hume:dacher',
+    id: 'hume:Dacher',
     name: 'Dacher',
     provider: 'HUME_AI',
     gender: 'male',
-    label: 'Dacher — calm scholar',
-    description: 'Calm, thoughtful male voice. Documentary, educational.',
-    languages: ['en', 'de', 'es'],
-  },
-  {
-    id: 'hume:aura',
-    name: 'Aura',
-    provider: 'HUME_AI',
-    gender: 'female',
-    label: 'Aura — soft cinematic',
-    description: 'Soft, cinematic female voice. Trailers, premium brand spots.',
-    languages: ['en', 'de', 'es'],
-  },
-  {
-    id: 'hume:zara',
-    name: 'Zara',
-    provider: 'HUME_AI',
-    gender: 'female',
-    label: 'Zara — confident pro',
-    description: 'Confident, professional female. Corporate & B2B.',
-    languages: ['en', 'de', 'es'],
-  },
-  {
-    id: 'hume:nova',
-    name: 'Nova',
-    provider: 'HUME_AI',
-    gender: 'neutral',
-    label: 'Nova — neutral assistant',
-    description: 'Clear, neutral voice. AI-assistant style.',
-    languages: ['en', 'de', 'es'],
-  },
-  {
-    id: 'hume:rhys',
-    name: 'Rhys',
-    provider: 'HUME_AI',
-    gender: 'male',
-    label: 'Rhys — gritty hero',
-    description: 'Deep, gritty male voice. Action ads, sports, automotive.',
-    languages: ['en'],
-  },
-  {
-    id: 'hume:lucas',
-    name: 'Lucas',
-    provider: 'HUME_AI',
-    gender: 'male',
-    label: 'Lucas — friendly youth',
-    description: 'Friendly, youthful male. Lifestyle & DTC brands.',
+    label: 'Dacher',
+    description: 'Hume Octave voice',
     languages: ['en', 'de', 'es'],
   },
 ];
 
-export function getHumeVoiceById(id: string): HumeVoiceMeta | undefined {
-  return HUME_VOICES.find((v) => v.id === id);
+/** @deprecated kept for compatibility with older imports — prefer useHumeVoices(). */
+export const HUME_VOICES = HUME_VOICES_FALLBACK;
+
+export function getHumeVoiceById(
+  id: string,
+  list: HumeVoiceMeta[] = HUME_VOICES_FALLBACK,
+): HumeVoiceMeta | undefined {
+  return list.find((v) => v.id === id);
 }
 
 /** True when a voiceId belongs to the Hume engine (vs ElevenLabs). */

@@ -32,7 +32,7 @@ import { useTalkingHead } from '@/hooks/useTalkingHead';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
-import { HUME_VOICES } from '@/lib/voice-studio/humeVoices';
+import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
@@ -189,6 +189,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { toast } = useToast();
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
+  const { voices: humeVoices } = useHumeVoices();
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
@@ -291,7 +292,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
     if (engine === 'hume') {
-      const fallback = HUME_VOICES[0];
+      const fallback = humeVoices[0];
       updateSpeakerVoice(speakerId, {
         engine: 'hume',
         voiceId: fallback.name,
@@ -790,7 +791,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     value={cfg?.voiceId ?? ''}
                     onValueChange={(voiceId) => {
                       if (isHume) {
-                        const v = HUME_VOICES.find((x) => x.name === voiceId);
+                        const v = humeVoices.find((x) => x.name === voiceId);
                         updateSpeakerVoice(sp.id, {
                           voiceId,
                           voiceName: v?.label ?? voiceId,
@@ -812,7 +813,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     </SelectTrigger>
                     <SelectContent className="z-[60] max-h-[320px]">
                       {isHume
-                        ? HUME_VOICES.map((v) => (
+                        ? humeVoices.map((v) => (
                             <SelectItem key={v.id} value={v.name} className="text-xs">
                               <div className="flex flex-col">
                                 <span>{v.label}</span>

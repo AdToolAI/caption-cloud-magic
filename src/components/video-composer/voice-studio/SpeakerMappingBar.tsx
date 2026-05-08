@@ -8,7 +8,8 @@ import { Loader2, Mic, Play, Sparkles, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { parseSpeakerScript, uniqueSpeakers } from '@/lib/voice-studio/parseSpeakerScript';
-import { HUME_VOICES, isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
+import { isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
+import { useHumeVoices } from '@/hooks/useHumeVoices';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
 
@@ -29,6 +30,7 @@ export function SpeakerMappingBar({
 }: SpeakerMappingBarProps) {
   const speakers = useMemo(() => uniqueSpeakers(parseSpeakerScript(script)), [script]);
   const [previewing, setPreviewing] = useState<string | null>(null);
+  const { voices: humeVoices, isLoading: humeLoading } = useHumeVoices();
 
   // Auto-seed missing speakers with sensible defaults (ElevenLabs Aria + alternates).
   useEffect(() => {
@@ -62,7 +64,7 @@ export function SpeakerMappingBar({
 
   const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
     if (engine === 'hume') {
-      const fallback = HUME_VOICES[0];
+      const fallback = humeVoices[0];
       setSpeakerCfg(speakerId, {
         engine: 'hume',
         voiceId: fallback.name,
@@ -164,7 +166,7 @@ export function SpeakerMappingBar({
                 value={cfg?.voiceId ?? ''}
                 onValueChange={(voiceId) => {
                   if (isHume) {
-                    const v = HUME_VOICES.find((x) => x.name === voiceId);
+                    const v = humeVoices.find((x) => x.name === voiceId);
                     setSpeakerCfg(s.speakerId, {
                       voiceId,
                       voiceName: v?.label ?? voiceId,
@@ -181,7 +183,7 @@ export function SpeakerMappingBar({
                 </SelectTrigger>
                 <SelectContent className="max-h-[320px]">
                   {isHume
-                    ? HUME_VOICES.map((v) => (
+                    ? humeVoices.map((v) => (
                         <SelectItem key={v.id} value={v.name}>
                           <div className="flex flex-col">
                             <span className="font-medium">{v.label}</span>
