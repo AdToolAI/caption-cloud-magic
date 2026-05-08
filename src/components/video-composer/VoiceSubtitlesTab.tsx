@@ -40,6 +40,10 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
+import { SpeakerMappingBar } from '@/components/video-composer/voice-studio/SpeakerMappingBar';
+import { isMultiSpeakerScript, parseSpeakerScript } from '@/lib/voice-studio/parseSpeakerScript';
+import { stitchSpeakerSegments } from '@/lib/voice-studio/stitchSpeakerSegments';
+import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
 
 interface VoiceSubtitlesTabProps {
   scenes: ComposerScene[];
@@ -262,6 +266,55 @@ export default function VoiceSubtitlesTab({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht eingeloggt');
+
+      // ── Multi-Speaker branch (Voice Studio 2.0) ─────────────────
+      if (isMultiSpeakerScript(voiceover.script) && voiceover.speakerMap) {
+        const parsedSegments = parseSpeakerScript(voiceover.script);
+        const missing = parsedSegments
+          .map((s) => s.speakerId)
+          .filter((id) => !voiceover.speakerMap![id]);
+        if (missing.length) {
+          throw new Error(`Stimme fehlt für: ${Array.from(new Set(missing)).join(', ')}`);
+        }
+
+        const { data: msData, error: msErr } = await supabase.functions.invoke('generate-multi-speaker-vo', {
+          body: {
+            segments: parsedSegments.map((s) => ({ speakerId: s.speakerId, text: s.text, tags: s.tags })),
+            speakerMap: voiceover.speakerMap,
+            defaultEngine: 'elevenlabs',
+          },
+        });
+        if (msErr) throw msErr;
+        if (!msData?.success) throw new Error(msData?.error || 'Multi-speaker VO failed');
+
+        // Stitch on client → WAV
+        const stitched = await stitchSpeakerSegments(
+          (msData.segments as Array<{ speakerId: string; audioBase64: string; mime: string }>),
+          { gapMs: voiceover.segmentGapMs ?? 180 },
+        );
+
+        const wavPath = `${user.id}/${Date.now()}-multi-vo.wav`;
+        const { data: upload, error: upErr } = await supabase.storage
+          .from('voiceover-audio')
+          .upload(wavPath, stitched.wavBlob, { contentType: 'audio/wav', cacheControl: '3600', upsert: false });
+        if (upErr) throw upErr;
+        const { data: { publicUrl } } = supabase.storage.from('voiceover-audio').getPublicUrl(upload.path);
+
+        onUpdateAssembly({
+          voiceover: {
+            ...voiceover,
+            multiSpeaker: true,
+            audioUrl: publicUrl,
+            durationSeconds: stitched.durationSeconds,
+            segmentTimings: stitched.segmentTimings,
+          },
+        });
+        toast({
+          title: 'Multi-Speaker VO erzeugt',
+          description: `${parsedSegments.length} Segmente · ${stitched.durationSeconds.toFixed(1)}s`,
+        });
+        return;
+      }
 
       const selected = voices.find(v => v.id === voiceover.voiceId);
 
@@ -668,10 +721,28 @@ export default function VoiceSubtitlesTab({
               </p>
             </div>
 
+            {/* ── Multi-Speaker mapping (auto-shown for `Speaker: text` scripts) ── */}
+            {isMultiSpeakerScript(voiceover.script) && (
+              <SpeakerMappingBar
+                script={voiceover.script}
+                elevenLabsVoices={voices}
+                speakerMap={voiceover.speakerMap || {}}
+                onChange={(speakerMap) =>
+                  onUpdateAssembly({
+                    voiceover: {
+                      ...voiceover,
+                      multiSpeaker: true,
+                      speakerMap,
+                    },
+                  })
+                }
+              />
+            )}
+
             <div className="flex gap-2">
               <Button onClick={handleGenerateVoiceover} disabled={generatingVo || !voiceover.script.trim()} className="gap-2 flex-1">
                 {generatingVo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                {generatingVo ? t('videoComposer.generating') : t('videoComposer.generateVo')}
+                {generatingVo ? t('videoComposer.generating') : (isMultiSpeakerScript(voiceover.script) ? `${t('videoComposer.generateVo')} · Multi-Speaker` : t('videoComposer.generateVo'))}
               </Button>
             </div>
             {voiceover.audioUrl && (

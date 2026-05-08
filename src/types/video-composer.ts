@@ -416,6 +416,35 @@ export interface VoiceoverConfig {
   /** True when the script was auto-generated from briefing+scenes on first
    *  Voiceover-tab visit (used to avoid re-running and to allow safe re-fills). */
   autoScriptGenerated?: boolean;
+
+  // ── Voice Studio 2.0: Multi-Speaker mode ─────────────────────────
+  /** When true, the script is parsed as multi-speaker (Speaker: text) and
+   *  rendered via `generate-multi-speaker-vo` instead of `generate-voiceover`. */
+  multiSpeaker?: boolean;
+  /** Per-speaker voice mapping: speakerId → engine + voice + tuning. */
+  speakerMap?: Record<string, MultiSpeakerVoiceCfg>;
+  /** Inter-speaker gap in milliseconds (default 180ms). */
+  segmentGapMs?: number;
+  /** Per-segment timings produced by the stitcher — used for timeline UI. */
+  segmentTimings?: Array<{ speakerId: string; startSec: number; endSec: number }>;
+}
+
+export interface MultiSpeakerVoiceCfg {
+  engine: 'elevenlabs' | 'hume';
+  /** ElevenLabs voice id, OR Hume voice NAME (e.g. "Ito"). */
+  voiceId: string;
+  /** Display label used in the SpeakerMappingBar. */
+  voiceName?: string;
+  // ElevenLabs tuning
+  modelId?: string;
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  useSpeakerBoost?: boolean;
+  speed?: number;
+  // Hume tuning
+  description?: string;
+  provider?: 'HUME_AI' | 'CUSTOM_VOICE';
 }
 
 export interface MusicConfig {
