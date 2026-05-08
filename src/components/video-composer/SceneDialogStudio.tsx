@@ -189,6 +189,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { toast } = useToast();
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
+  const { voices: humeVoices } = useHumeVoices();
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
