@@ -703,44 +703,54 @@ export default function ComposerSequencePreview({
     sfxAudiosRef.current.clear();
   }, []);
 
-  // Sync SFX clips against the global playhead.
+  // Sync SFX / Voiceover clips against the global playhead.
+  // Voiceover clips (kind === 'voiceover') are treated as spoken tracks:
+  // no fade window, full volume, hard play/pause at scene boundaries —
+  // anything else clips the speech and feels like the VO "isn't playing".
   useEffect(() => {
     const map = sfxAudiosRef.current;
     sfxClipsTimeline.forEach(({ clip, start, end }) => {
       const a = map.get(clip.id);
       if (!a) return;
-      const baseVol = Math.max(0, Math.min(1, (clip.volume ?? 0.5)));
-      // Pre-roll/post-roll window so the clip fades in *before* its scene start
-      // and fades out *after* its scene end → smooth crossfade between scenes.
-      const fade = Math.min(SFX_FADE_SEC, Math.max(0.05, (end - start) / 2));
-      const windowStart = Math.max(0, start - fade);
-      const windowEnd = end + fade;
-      const inWindow = globalTime >= windowStart && globalTime < windowEnd;
+      const isVoice = clip.kind === 'voiceover';
+      const baseVol = Math.max(0, Math.min(1, (clip.volume ?? (isVoice ? 1.0 : 0.5))));
 
-      // Compute envelope gain (linear fade-in / fade-out).
+      let inWindow: boolean;
       let gain = baseVol;
-      if (globalTime < start) {
-        gain = baseVol * Math.max(0, (globalTime - windowStart) / fade);
-      } else if (globalTime > end - fade && globalTime < end) {
-        gain = baseVol * Math.max(0, (end - globalTime) / fade);
-      } else if (globalTime >= end) {
-        gain = baseVol * Math.max(0, (windowEnd - globalTime) / fade);
+      if (isVoice) {
+        inWindow = globalTime >= start && globalTime < end + 0.15;
+      } else {
+        const fade = Math.min(SFX_FADE_SEC, Math.max(0.05, (end - start) / 2));
+        const windowStart = Math.max(0, start - fade);
+        const windowEnd = end + fade;
+        inWindow = globalTime >= windowStart && globalTime < windowEnd;
+        if (globalTime < start) {
+          gain = baseVol * Math.max(0, (globalTime - windowStart) / fade);
+        } else if (globalTime > end - fade && globalTime < end) {
+          gain = baseVol * Math.max(0, (end - globalTime) / fade);
+        } else if (globalTime >= end) {
+          gain = baseVol * Math.max(0, (windowEnd - globalTime) / fade);
+        }
       }
       a.volume = Math.max(0, Math.min(1, gain));
       a.muted = muted;
 
       if (inWindow && playing) {
         const target = Math.max(0, globalTime - start);
-        if (Math.abs(a.currentTime - target) > 0.25) {
+        if (Math.abs(a.currentTime - target) > 0.35) {
           try { a.currentTime = target; } catch { /* noop */ }
         }
         if (a.paused) {
           a.play().catch((err) => {
-            console.warn(`[Preview] SFX play() rejected clip=${clip.id}`, err?.name || err);
+            console.warn(`[Preview] ${isVoice ? 'VO' : 'SFX'} play() rejected clip=${clip.id}`, err?.name || err);
           });
         }
+      } else if (isVoice) {
+        if (!a.paused) {
+          try { a.pause(); } catch { /* noop */ }
+        }
       } else {
-        // Only pause once fully faded out — avoids click artifacts.
+        // SFX: only pause once fully faded out — avoids click artifacts.
         if (!a.paused && a.volume <= 0.001) a.pause();
       }
     });
