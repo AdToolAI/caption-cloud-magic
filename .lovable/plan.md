@@ -1,93 +1,61 @@
+## Diagnose
 
-## Problem-Analyse
+Bei 2 Sprechern in einer Szene gibt es heute keinen echten Lip-Sync, weil:
 
-### Bug 1: Doppelte Voiceovers übereinander
-`handleGenerateInline()` in `SceneDialogStudio.tsx` (Zeile 470-486) fuegt bei jedem Klick neue `scene_audio_clips`-Zeilen ein, loescht aber NIEMALS die alten. Drueckt der User zweimal "Voiceover generieren", liegen 2x Sarah + 2x Matthew uebereinander.
+- Inline-Modus rendert HeyGen nur wenn `blocks.length === 1` (SceneDialogStudio.tsx Z. 466). Bei Sarah+Matthew wird HeyGen komplett übersprungen.
+- Selbst wenn wir HeyGen für beide aufrufen würden: es gibt nur **ein** `clip_url` pro Szene. Der zweite Render würde den ersten überschreiben.
+- Das B-Roll-Video kennt das Skript nicht. Es kann nicht "wissen" wann wer redet — diese Information existiert im Video-Prompt gar nicht.
 
-### Bug 2: Matthew redet laenger als Sarah trotz kuerzerem Skript
-Die Dauer wird mit `block.text.length / 18` geschaetzt (Zeile 464), aber die **echte** Audio-Dauer kommt vom TTS-Service. Wenn ElevenLabs oder Hume fuer Sarahs Stimme schneller spricht als fuer Matthews, ist das Ergebnis falsch. Zusaetzlich: wenn alte Clips nicht geloescht wurden, laeuft Matthews alter langer Clip parallel zum neuen kurzen.
+Artlist/Synthesia/HeyGen lösen das ausschließlich über **Shot-Reverse-Shot**: pro Sprecher-Block ein eigener Talking-Head-Clip, hintereinander geschnitten. Genau das ist unser bereits existierender SRS-Modus (`renderAsSeparateScenes`).
 
-### Bug 3: Lip-Sync passt nicht
-Im **Inline-Modus** (Standard, ohne "Als separate Szenen rendern") wird kein HeyGen-Lip-Sync ausgefuehrt — es werden nur Voiceover-Audio-Clips ueber das Video gelegt. Das Video laeuft unveraendert weiter, die Muender bewegen sich zufaellig. Lip-Sync passiert NUR im SRS-Modus (Shot-Reverse-Shot mit HeyGen).
+## Lösung
 
-### Wie Artlist / Synthesia es machen
-Diese Tools generieren per Sprecher-Block:
-1. TTS-Audio zuerst
-2. Audio + Portraet an einen Avatar-Renderer (HeyGen/D-ID/Synthesia)
-3. Der Renderer animiert das Gesicht Frame-fuer-Frame passend zur Audio-Wellenform
-4. Das resultierende Video ERSETZT die Originalszene
+**Multi-Speaker-Dialog mit Cast erzwingt automatisch SRS.** Inline-Mode bleibt nur für Single-Speaker oder wenn kein Portrait existiert (dann ehrlich als "Audio-Overlay" gelabelt, kein Fake-Lip-Sync-Versprechen).
 
-Unser Inline-Modus ueberspringt Schritt 2-4 komplett.
-
----
-
-## Fix-Plan
-
-### 1. Alte Voiceover-Clips loeschen vor Neugenerierung
+### Schritt 1 — Auto-SRS bei Multi-Speaker + Portraits
 **Datei:** `src/components/video-composer/SceneDialogStudio.tsx`
 
-Vor der `for (const block of blocks)`-Schleife in `handleGenerateInline()`:
-- DELETE alle bestehenden `scene_audio_clips` mit `scene_id = sceneId` AND `kind = 'voiceover'`
-- Damit werden alte Clips sauber entfernt, bevor neue eingefuegt werden
+In `handleGenerateInline()` direkt nach dem Parsen der `blocks`:
+- Wenn `blocks.length >= 2` UND **alle** beteiligten Sprecher ein `referenceImageUrl` haben → automatisch in den SRS-Pfad umleiten (gleiche Logik wie der "Als separate Szenen rendern"-Toggle).
+- SRS erzeugt pro Block eine eigene Composer-Szene mit eigenem HeyGen-Render und eigenem `clip_url`. Die Reihenfolge im Storyboard entspricht 1:1 der Skript-Reihenfolge.
+- Toggle `renderAsSeparateScenes` wird automatisch gesetzt + `handleGenerate()` (SRS-Pfad) aufgerufen — der Code dafür existiert bereits.
 
-### 2. Echte Audio-Dauer statt Schaetzung verwenden
-**Datei:** `src/components/video-composer/SceneDialogStudio.tsx`
+### Schritt 2 — Ehrliche Labels statt Fake-Lip-Sync
+Im Hint-Badge unter dem Generate-Button (heutige Zeilen 983-1025):
+- **Multi-Speaker + alle Portraits vorhanden** → "🎙️ Wird als 2 Szenen gerendert (Shot-Reverse-Shot, je 1 HeyGen-Clip pro Sprecher) — ~0,30 €/Sprecher"
+- **Multi-Speaker + Portrait fehlt** → "⚠️ {Name} hat kein Portrait — bitte Cast-Charakter zuweisen, sonst nur Audio-Overlay ohne Lip-Sync"
+- **Single-Speaker + Portrait** → "🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~0,30 €)"
+- **Kein Portrait** → "🔊 Audio-Overlay (kein Lip-Sync möglich ohne Cast-Portrait)"
 
-Die Variable `duration` (Zeile 464) nutzt bereits `data.duration` als primaere Quelle, faellt aber auf `block.text.length / 18` zurueck. Das Fallback ist zu ungenau. Stattdessen:
-- Wenn `data.duration` vorhanden, verwenden
-- Wenn nicht: Audio-Datei per `Audio()` Element laden und `loadedmetadata`-Event abwarten fuer echte Dauer
-- Erst danach den `scene_audio_clips`-Insert ausfuehren
+Der "Generieren"-Button-Text ändert sich entsprechend: "Lip-Sync generieren (2 Szenen)" statt nur "Voiceover generieren".
 
-### 3. Inline-Modus automatisch auf HeyGen upgraden wenn Cast vorhanden
-**Datei:** `src/components/video-composer/SceneDialogStudio.tsx`
+### Schritt 3 — Pre-Flight-Validation
+Bevor SRS startet:
+- Wenn ein Sprecher kein `referenceImageUrl` hat → Toast mit klarer Anweisung "Weise {Name} im Cast einen Brand-Character mit Portrait zu, dann erneut generieren". Kein automatischer Fallback auf Audio-Overlay (das war der Fake-Lip-Sync).
 
-Wenn die Szene Cast-Charaktere mit `referenceImageUrl` hat:
-- Standard-Flow aendern: statt nur Voiceover-Audio ueber die Szene zu legen, fuer jeden Block mit Portraet automatisch `generate-talking-head` aufrufen
-- Das HeyGen-Video als `clip_url` der Szene setzen (wie im SRS-Modus, aber ohne separate Szenen zu erstellen)
-- Fallback auf Audio-only wenn kein Portraet vorhanden
+### Schritt 4 — Doppel-Voiceover-Bug abschließen
+Der Insert-Loop in Inline läuft heute auch noch wenn HeyGen greift. Im SRS-Pfad hat jede Sub-Szene **ihren eigenen** `scene_audio_clips`-Eintrag, daher:
+- Inline-Insert nur noch ausführen wenn **wir tatsächlich im Inline-Pfad bleiben** (Single-Speaker oder Audio-Only).
+- Wenn wir auf SRS umleiten → früh returnen, SRS macht alles selbst.
 
-### 4. UI-Hinweis: Lip-Sync-Status klar kommunizieren
-**Datei:** `src/components/video-composer/SceneDialogStudio.tsx`
+## Was der User danach sieht
 
-- Badge neben dem Generate-Button: "Audio only" vs "Lip-Sync (HeyGen)" je nachdem ob Portraets vorhanden sind
-- Warnung wenn kein Portraet: "Ohne Portraet nur Audio-Overlay, kein Lip-Sync"
+Bei „Sarah: Hi! / Matthew: Thanks":
+1. Klick auf "Lip-Sync generieren"
+2. Storyboard zeigt **2 neue Szenen**: "Sarah spricht (HeyGen)" + "Matthew spricht (HeyGen)"
+3. Jede Szene hat ihren eigenen Talking-Head-Clip mit echtem Mund-zu-Audio-Sync
+4. Die Original-B-Roll-Szene bleibt als Intro/Establishing-Shot davor erhalten oder wird ersetzt (User-Wahl im SRS-Dialog, existiert schon)
 
----
+Das ist genau der Artlist-Workflow — kein magischer Multi-Mund-Render im selben Bild, sondern saubere Schnitt-Folge.
 
 ## Technische Details
 
-### Schritt 1 — DELETE alte Clips (SceneDialogStudio.tsx, handleGenerateInline)
-```ts
-// Vor der for-Schleife:
-await supabase
-  .from('scene_audio_clips')
-  .delete()
-  .eq('scene_id', sceneId)
-  .eq('kind', 'voiceover');
-```
+- **Keine neuen Edge Functions.** SRS-Pfad und `generate-talking-head` existieren bereits.
+- **Keine DB-Änderungen.** SRS legt Composer-Szenen über bestehende Tabellen an.
+- **Keine neuen Kosten-Pfade.** HeyGen ~0,30 € pro Sprecher-Block bleibt unverändert.
+- **Auto-Split-Confirm-Dialog** (aus dem letzten Loop) wird der Standard-Pfad — der Inline-Modus ist für Multi-Speaker nicht mehr erreichbar.
 
-### Schritt 2 — Audio-Dauer Fallback (SceneDialogStudio.tsx)
-```ts
-// Browser-seitiger Dauer-Probe wenn data.duration fehlt:
-let duration = Number(data?.duration ?? 0);
-if (!duration && audioUrl) {
-  duration = await new Promise<number>((resolve) => {
-    const a = new Audio(audioUrl);
-    a.addEventListener('loadedmetadata', () => resolve(a.duration || block.text.length / 18));
-    a.addEventListener('error', () => resolve(block.text.length / 18));
-    setTimeout(() => resolve(block.text.length / 18), 5000);
-  });
-}
-```
+## Nicht im Scope
 
-### Schritt 3 — HeyGen-Auto-Upgrade (SceneDialogStudio.tsx)
-Fuer Bloecke deren Sprecher ein `referenceImageUrl` hat:
-- TTS Audio generieren (wie jetzt)
-- Dann `generate-talking-head` mit `audioUrl` + `imageUrl` aufrufen
-- `clip_url` der Szene mit dem HeyGen-Result aktualisieren
-- `scene_audio_clips` Insert TROTZDEM machen (fuer Timing/Preview)
-
-Keine neuen Edge Functions noetig — `generate-talking-head` akzeptiert bereits `audioUrl` direkt.
-
-### Kein DB-Schema-Aenderung noetig
-Alle Fixes sind rein im Frontend (`SceneDialogStudio.tsx`).
+- Echtes „2 Münder im selben Frame"-Rendering. Das ist mit aktuellen i2v-Modellen nicht zuverlässig lösbar und macht auch Artlist nicht. Wer beide Köpfe gleichzeitig im Bild will, muss das via Compositing in Director's Cut machen (Picture-in-Picture).
+- Phonem-Animation für AI-B-Roll-Gesichter (also lipSync-2 Polish). Bleibt opt-in über `engineOverride: 'sync-polish'`, ist aber unzuverlässig — daher nicht der Default.
