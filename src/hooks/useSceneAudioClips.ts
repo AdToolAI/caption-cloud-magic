@@ -28,7 +28,7 @@ export function useSceneAudioClips(projectId?: string | null) {
       .from('scene_audio_clips')
       .select('*')
       .eq('project_id', projectId)
-      .in('kind', ['ambient', 'sfx', 'foley'])
+      .in('kind', ['ambient', 'sfx', 'foley', 'voiceover'])
       .order('created_at', { ascending: true });
     if (error) console.error('[useSceneAudioClips] load error', error);
     const rows = (data as SceneAudioClip[]) || [];
