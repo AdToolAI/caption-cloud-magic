@@ -61,6 +61,31 @@ const PRESET_VOICES = [
   { id: 'onwK4e9ZLuTAKqWW03F9', name: 'Daniel (narrator)' },
 ];
 
+// Extract a human-readable error message from any thrown value
+// (Error, Supabase FunctionsHttpError, PostgrestError, plain object, string).
+function formatError(e: unknown): string {
+  if (!e) return 'Unknown error';
+  if (typeof e === 'string') return e;
+  if (e instanceof Error && e.message) return e.message;
+  const anyE = e as any;
+  return (
+    anyE?.message ||
+    anyE?.error?.message ||
+    anyE?.context?.message ||
+    anyE?.details ||
+    anyE?.error_description ||
+    (() => {
+      try { return JSON.stringify(anyE); } catch { return String(anyE); }
+    })()
+  );
+}
+
+const PROJECT_REQUIRED = {
+  de: 'Bitte zuerst das Projekt speichern, bevor Voiceover generiert wird.',
+  en: 'Please save the project first before generating voiceover.',
+  es: 'Guarda el proyecto antes de generar la voz en off.',
+} as const;
+
 const T = {
   de: {
     title: 'Szenen-Skript',
