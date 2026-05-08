@@ -8,7 +8,8 @@ import { Loader2, Mic, Play, Sparkles, Users } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { parseSpeakerScript, uniqueSpeakers } from '@/lib/voice-studio/parseSpeakerScript';
-import { HUME_VOICES, isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
+import { isHumeVoiceId } from '@/lib/voice-studio/humeVoices';
+import { useHumeVoices } from '@/hooks/useHumeVoices';
 import type { VoiceMeta } from '@/lib/elevenlabs-voices';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
 
