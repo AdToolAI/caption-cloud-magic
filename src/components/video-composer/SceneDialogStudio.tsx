@@ -13,8 +13,8 @@
  * composer_scenes (added in migration 20260507-…).
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2 } from 'lucide-react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
