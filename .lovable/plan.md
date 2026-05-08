@@ -1,81 +1,55 @@
-# HeyGen Lip-Sync echt in den Render-Flow integrieren
-
 ## Problem
 
-Der **„🎙️ HeyGen Lip-Sync"-Badge** im Storyboard ist aktuell nur ein **Hinweis**. Wenn du in der Clips-Tab auf „Generieren" klickst, wird **trotzdem Hailuo** verwendet — denn `compose-video-clips` liest nur `scene.clipSource` (z.B. `ai-hailuo`) und kennt HeyGen gar nicht. Das Voiceover wird zwar erzeugt, aber als reine Audio-Spur drüber gelegt — kein echter Lip-Sync.
+Der amber Badge **„⚠️ 2 Sprecher · splitten"** im Storyboard tut aktuell beim Klick fast nichts:
 
-## Ziel
+1. Er setzt `dialogStudioOpen = true` und scrollt zum Dialog Studio.
+2. Das Studio ist bei vorhandenem Script aber **schon offen** (Default in `SceneCard.tsx` Zeile 192–194), und liegt direkt unter der Karte → es ist meist schon im Viewport. Ergebnis: visuell „passiert nichts".
+3. Den eigentlichen Split-Schritt — den Toggle **„Als getrennte Szenen rendern"** im Dialog-Studio aktivieren und auf **Generieren** klicken — muss der Nutzer immer noch selbst finden.
 
-Wenn `recommendEngineForScene(scene) === 'heygen-talking-head'`, soll die Clips-Pipeline für genau diese Szene **HeyGen Photo-Avatar** rendern statt Hailuo. Bei Multi-Speaker-Dialog werden mehrere HeyGen-Cuts sequentiell generiert und in der Szene aneinandergehängt.
+Der Nutzer erwartet: *Klick auf „splitten" → Szene wird in N Einzel-Szenen aufgeteilt.*
 
----
+## Lösung (UI/Frontend only)
 
-## Schritt 1 — Sichtbarkeit & UX in der Clips-Tab
+Den Badge zu einem **echten One-Click-Split-Trigger** machen, mit klarer Bestätigung statt stillem Scroll.
 
-In `ClipsTab.tsx` neben jeder Szene ein klares Engine-Indikator-Pill anzeigen:
+### 1. Badge umbenennen + neuer Klick-Flow (`SceneCard.tsx`, ~Zeile 451–469)
 
-- **„🎙️ HeyGen Lip-Sync"** (gold) — wenn Cast + Dialog vorhanden
-- **„🎬 Hailuo B-Roll"** (grau) — Standard
-- Im „Generieren"-Button: Cost ist die Summe aus Hailuo-Cost UND/ODER HeyGen-Cost (je nach Engine).
+- Label bleibt `⚠️ N Sprecher · splitten`, aber Klick öffnet **AlertDialog**:
+  > „Diese Szene in **N Einzel-Szenen** aufteilen? Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Kosten: ca. **€{N × 0.30}**."
+  > Buttons: *Abbrechen* / *Splitten & generieren*
+- Bei Bestätigung:
+  - `setDialogStudioOpen(true)`
+  - Neuer Prop an `SceneDialogStudio`: `autoSplitOnMount?: boolean` → Studio aktiviert intern `renderAsSeparateScenes = true` und ruft direkt `handleGenerate()` auf
+  - Karte expandiert visuell + Scroll zum Studio
+- Reines Hover-Tooltip bleibt für „warum".
 
-So sieht der User direkt: „diese Szene wird HeyGen, nicht Hailuo".
+### 2. `SceneDialogStudio.tsx` — Auto-Split-Eintrittspunkt
 
-## Schritt 2 — Render-Routing serverseitig
+- Neue Props:
+  ```ts
+  autoSplitOnMount?: boolean;       // wenn true → renderAsSeparateScenes=true + handleGenerate()
+  onAutoSplitConsumed?: () => void; // Reset des Triggers nach Verbrauch
+  ```
+- `useEffect` im Studio: wenn `autoSplitOnMount && blocks.length >= 2 && allVoicesSet`, einmalig `setRenderAsSeparateScenes(true)` + `handleGenerate()` ausführen, dann `onAutoSplitConsumed()`.
+- Wenn Voices fehlen: kein Auto-Run, stattdessen Toast „Bitte erst Stimmen pro Sprecher wählen" + Highlight der Voice-Mapping-Bar (klassisches Verhalten).
 
-In `compose-video-clips/index.ts` pro Szene **vor dem Hailuo-Call** prüfen:
+### 3. Visuelles Feedback
 
+- Während Split läuft: Badge zeigt Spinner + Label „Splitte… 1/N".
+- Nach Erfolg: Badge verschwindet (weil `dialogScript` nun in N Sub-Szenen liegt) und Toast „N Lip-Sync-Szenen erstellt".
+- Bei Fehler einer Teil-Szene: bestehende `toast`-Logik aus `SceneDialogStudio` greift weiter; Badge fällt zurück auf den Hint-Zustand.
+
+## Betroffene Dateien
+
+```text
+src/components/video-composer/SceneCard.tsx          ← AlertDialog + autoSplit-Prop weiterreichen
+src/components/video-composer/SceneDialogStudio.tsx  ← autoSplitOnMount Effekt + Reset-Callback
 ```
-if (scene.dialogScript && scene.castCharacterPortraits.length >= 1) {
-  → invoke('generate-talking-head') pro Sprecher
-  → bei mehreren Sprechern: sequentiell rendern,
-    danach mit ffmpeg/Remotion-Stitch zu einem Clip zusammenfügen
-  → in scene.clipUrl speichern, status = 'ready'
-} else {
-  → bestehender Hailuo-Pfad
-}
-```
 
-`generate-talking-head` existiert bereits (HeyGen Photo-Avatar API, `~0.30€/Video`, idempotenter Refund). Wir reused diese Funktion.
+Keine Edge-Function-, DB- oder Pricing-Änderungen — die komplette Split-/HeyGen-Pipeline existiert schon (`onAddScene` + `generate-talking-head`). Wir verdrahten nur den existierenden Workflow hinter einem Klick.
 
-## Schritt 3 — Multi-Speaker im Composer
+## Out of scope
 
-Für Szenen mit `[Matthew] ... [Sarah] ...` Dialog:
-
-1. **Voiceover-Generierung** (bereits vorhanden) erzeugt 1 Audio pro Sprecher.
-2. **Clip-Generierung** ruft `generate-talking-head` einmal pro Sprecher auf (Portrait + Voiceover-URL des Sprechers).
-3. Server-side stitchen wir die N HeyGen-MP4s mit ffmpeg zu einem Clip in Szenen-Dauer.
-4. Resultat = `scene.clipUrl`, `scene.clipStatus = 'ready'`.
-
-## Schritt 4 — Sicherheits-Netz (Override)
-
-In der SceneCard ein kleines Dropdown unter dem Engine-Badge:
-
-- **Auto** (default — Engine-Router entscheidet)
-- **Erzwinge HeyGen** — auch wenn nur 1 Sprecher / kein Dialog
-- **Erzwinge Hailuo** — überspringt HeyGen, klassischer B-Roll
-- **B-Roll + Sync.so Polish** — Hailuo + Lip-Sync-Pass danach
-
-Override wird in `scene.engineOverride: 'auto' | 'heygen' | 'broll' | 'sync-polish'` gespeichert.
-
-## Schritt 5 — Cost-Anzeige aktualisieren
-
-`getClipCost()` erweitern: wenn Szene auf HeyGen geroutet wird, Cost = `0.30€ × Anzahl_Sprecher` statt Hailuo-Cost. Die Gesamt-Schätzung oben (€5.40) wird entsprechend angepasst.
-
----
-
-## Nicht-Ziele
-
-- **Kein neuer Edge-Function-Code** für HeyGen — `generate-talking-head` bleibt unverändert.
-- **Kein Refactor der Voiceover-Pipeline** — Hume/ElevenLabs-VO läuft weiter, dient nur als Audio-Quelle für HeyGen.
-- **Kein Wav2Lip / MuseTalk** auf KI-Gesichtern — Qualität zu unzuverlässig.
-
-## Technische Details
-
-- **Geänderte Files**: `ClipsTab.tsx`, `SceneCard.tsx`, `compose-video-clips/index.ts`, `types/video-composer.ts` (`engineOverride` Feld), `lib/cost/pricing.ts`
-- **DB-Migration**: 1 neue Spalte `composer_scenes.engine_override TEXT`
-- **Edge-Functions reused**: `generate-talking-head` (HeyGen), `compose-video-clips` (erweitert um Routing)
-- **Stitching**: ffmpeg via `ffmpeg-stitch` Edge-Function (existiert bereits für Multi-Scene-Render)
-
-## Erfolgskriterium
-
-Du klickst in der Clips-Tab auf „Alle generieren" → Szene 1 (Welcome to DroneOcular mit Matthew + Sarah) wird via HeyGen gerendert. Im fertigen Clip **bewegen sich die Münder von Matthew und Sarah synchron zum Voiceover** — frame-genau, werbe-tauglich.
+- Multi-Speaker innerhalb *einer* HeyGen-Szene (bleibt MVP-Limit: erster Sprecher).
+- Server-seitiges Rendering / neue Edge Functions.
+- Änderungen am Engine-Override-Dropdown daneben.
