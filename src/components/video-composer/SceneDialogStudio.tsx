@@ -292,7 +292,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
     if (engine === 'hume') {
-      const fallback = HUME_VOICES[0];
+      const fallback = humeVoices[0];
       updateSpeakerVoice(speakerId, {
         engine: 'hume',
         voiceId: fallback.name,
@@ -791,7 +791,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     value={cfg?.voiceId ?? ''}
                     onValueChange={(voiceId) => {
                       if (isHume) {
-                        const v = HUME_VOICES.find((x) => x.name === voiceId);
+                        const v = humeVoices.find((x) => x.name === voiceId);
                         updateSpeakerVoice(sp.id, {
                           voiceId,
                           voiceName: v?.label ?? voiceId,
@@ -813,7 +813,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                     </SelectTrigger>
                     <SelectContent className="z-[60] max-h-[320px]">
                       {isHume
-                        ? HUME_VOICES.map((v) => (
+                        ? humeVoices.map((v) => (
                             <SelectItem key={v.id} value={v.name} className="text-xs">
                               <div className="flex flex-col">
                                 <span>{v.label}</span>
