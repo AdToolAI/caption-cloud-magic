@@ -49,6 +49,8 @@ interface StoryboardTabProps {
    * a new scene row directly. The dashboard must refetch from DB to surface it.
    */
   onRefetchScenes?: () => void | Promise<void>;
+  /** Auto-persist hook — saves the project to DB and returns the fresh projectId + scene rows. */
+  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
 export default function StoryboardTab({
@@ -62,6 +64,7 @@ export default function StoryboardTab({
   onAddCharacter,
   preferredAspect,
   onRefetchScenes,
+  onEnsurePersisted,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
