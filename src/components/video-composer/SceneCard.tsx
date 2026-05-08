@@ -434,6 +434,24 @@ export default function SceneCard({
                 <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
                 <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
                 {(() => {
+                  const rec = recommendEngineForScene(scene);
+                  return (
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] h-4 px-1.5 gap-1 ${
+                        rec.engine === 'heygen-talking-head'
+                          ? 'border-primary/60 text-primary bg-primary/10'
+                          : rec.engine === 'sync-polish'
+                          ? 'border-amber-500/40 text-amber-300'
+                          : 'border-border/50 text-muted-foreground'
+                      }`}
+                      title={rec.reason}
+                    >
+                      {rec.label}
+                    </Badge>
+                  );
+                })()}
+                {(() => {
                   const slots = scene.characterShots && scene.characterShots.length > 0
                     ? scene.characterShots
                     : (scene.characterShot ? [scene.characterShot] : []);
