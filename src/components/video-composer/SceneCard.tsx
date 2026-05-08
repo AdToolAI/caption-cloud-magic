@@ -765,12 +765,66 @@ export default function SceneCard({
                     ? 'Los personajes se mencionan automáticamente en el prompt.'
                     : 'Characters are mentioned automatically in the prompt.'}
                 </p>
+
+                {/* Trigger: open the per-scene Script/Dialog Studio. Available from 1 cast member upwards. */}
+                {(() => {
+                  const sceneCastCount =
+                    (scene.characterShots?.length ?? 0) ||
+                    (scene.characterShot ? 1 : 0);
+                  if (sceneCastCount < 1) return null;
+                  const hasScript = Boolean((scene.dialogScript ?? '').trim());
+                  const lineCount = hasScript
+                    ? (scene.dialogScript ?? '')
+                        .split(/\r?\n/)
+                        .filter((l) => /^\s*[A-Za-zÀ-ÿ][^\n]{0,40}\s*[:—-]\s*\S/.test(l)).length
+                    : 0;
+                  const label =
+                    lang === 'de' ? 'Skript schreiben'
+                    : lang === 'es' ? 'Escribir guion'
+                    : 'Write script';
+                  const lineLbl = (n: number) =>
+                    lang === 'de' ? `${n} Zeile${n === 1 ? '' : 'n'}`
+                    : lang === 'es' ? `${n} línea${n === 1 ? '' : 's'}`
+                    : `${n} line${n === 1 ? '' : 's'}`;
+                  return (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 text-xs gap-1.5 self-start"
+                      onClick={() => {
+                        setDialogStudioOpen((v) => {
+                          const next = !v;
+                          if (next) {
+                            // Defer scroll until the studio mounts.
+                            setTimeout(() => {
+                              dialogStudioRef.current?.scrollIntoView({
+                                behavior: 'smooth',
+                                block: 'center',
+                              });
+                            }, 50);
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      <MessageSquareQuote className="h-3.5 w-3.5" />
+                      {label}
+                      {hasScript && lineCount > 0 && (
+                        <span className="text-[10px] text-muted-foreground">· {lineLbl(lineCount)}</span>
+                      )}
+                    </Button>
+                  );
+                })()}
               </>
             )}
 
             {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
             {scene.clipSource.startsWith('ai-') && characters && (
               <SceneDialogStudio
+                ref={dialogStudioRef}
+                open={dialogStudioOpen}
+                onClose={() => setDialogStudioOpen(false)}
                 scene={scene}
                 cast={scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])}
                 characters={characters}
