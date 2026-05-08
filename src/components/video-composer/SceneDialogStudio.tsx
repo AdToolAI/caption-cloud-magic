@@ -649,96 +649,140 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
     setGenerating(true);
     let okCount = 0;
+    // Marker so we can clean up previously auto-spawned SRS sub-scenes for
+    // *this* parent scene before regenerating. Stored in the free-form
+    // `cinematic_preset_slug` text column — no schema change needed.
+    const srsMarker = `dialog-srs:${scene.id}`;
     try {
-      // Run sequentially to avoid HeyGen rate spikes
+      // ── Pre-flight: validate every speaker has a voice + portrait BEFORE
+      //    any spend, so we can't end up with a half-rendered dialog where
+      //    only one speaker got real lip-sync.
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
-        if (!c) continue;
+        if (!c) throw new Error(`Speaker "${block.speakerName}" is not in this scene's cast`);
         if (!c.referenceImageUrl) {
-          toast({
-            title:
-              language === 'de'
-                ? `Kein Portrait für ${c.name}`
-                : language === 'es'
-                ? `Sin retrato para ${c.name}`
-                : `No portrait for ${c.name}`,
-            description:
-              language === 'de'
-                ? 'Lip-Sync übersprungen.'
-                : language === 'es'
-                ? 'Lip-sync omitido.'
-                : 'Lip-sync skipped.',
-            variant: 'destructive',
-          });
-          continue;
+          throw new Error(
+            language === 'de'
+              ? `${c.name} hat kein Portrait — bitte im Cast einen Brand-Character mit Portrait zuweisen.`
+              : language === 'es'
+              ? `${c.name} no tiene retrato — asigna un Brand-Character con retrato.`
+              : `${c.name} has no portrait — assign a cast Brand-Character with a portrait.`,
+          );
         }
         const cfg = voicePerSpeaker[block.speakerId];
-        if (!cfg?.voiceId) continue;
-
-        if (!onAddScene) continue;
-
-        // For Hume voices: pre-render audio to a public URL (HeyGen can't call
-        // Hume directly). For ElevenLabs: let HeyGen do TTS internally.
-        let preGeneratedAudioUrl: string | undefined;
-        if (cfg.engine === 'hume') {
-          const { data: humeData, error: humeErr } = await supabase.functions.invoke(
-            'generate-voiceover-hume',
-            {
-              body: {
-                text: block.text,
-                voiceName: cfg.voiceId,
-                provider: cfg.provider || 'HUME_AI',
-                projectId: pidForSrs,
-              },
-            },
-          );
-          if (humeErr) throw humeErr;
-          preGeneratedAudioUrl = (humeData as any)?.audioUrl;
-          if (!preGeneratedAudioUrl) throw new Error('Hume returned no audioUrl');
+        if (!cfg?.voiceId) {
+          throw new Error(t.voiceMissing(c.name));
         }
+      }
 
-        // 1) Create the sub-scene FIRST so it has a real DB UUID.
+      // ── Idempotency: remove previously auto-spawned dialog sub-scenes for
+      //    this parent so a re-generation does NOT stack old Sarah/Matthew
+      //    clips on top of the fresh ones (root cause of "random extra
+      //    speakers" / "double voiceovers" in the user's report).
+      try {
+        const { data: stale } = await supabase
+          .from('composer_scenes')
+          .select('id')
+          .eq('project_id', pidForSrs)
+          .eq('cinematic_preset_slug', srsMarker);
+        const staleIds = (stale ?? []).map((r: any) => r.id).filter(Boolean);
+        if (staleIds.length > 0) {
+          await supabase.from('scene_audio_clips').delete().in('scene_id', staleIds);
+          await supabase.from('composer_scenes').delete().in('id', staleIds);
+          console.log('[SceneDialogStudio] removed', staleIds.length, 'stale dialog sub-scenes');
+        }
+      } catch (cleanupErr) {
+        console.warn('[SceneDialogStudio] stale sub-scene cleanup failed (continuing)', cleanupErr);
+      }
+
+      // ── Phase 1: pre-generate TTS for EVERY block first.
+      //    This guarantees:
+      //      • Sub-scenes are created with the REAL audio duration (no more
+      //        "Matthew talks 4× too long" because of the text-length heuristic).
+      //      • HeyGen always receives a fixed `audioUrl` — never an internal
+      //        re-TTS that could pick a different voice.
+      type Synth = {
+        block: typeof blocks[number];
+        character: ComposerCharacter;
+        audioUrl: string;
+        durationSec: number;
+        engine: 'elevenlabs' | 'hume';
+      };
+      const synthed: Synth[] = [];
+      for (const block of blocks) {
+        const c = sceneCast.find((x) => x.id === block.speakerId)!;
+        const cfg = voicePerSpeaker[block.speakerId]!;
+        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+        const body = cfg.engine === 'hume'
+          ? {
+              text: block.text,
+              voiceName: cfg.voiceId,
+              provider: cfg.provider || 'HUME_AI',
+              projectId: pidForSrs,
+            }
+          : {
+              text: block.text,
+              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+              projectId: pidForSrs,
+            };
+        const { data, error } = await supabase.functions.invoke(fnName, { body });
+        if (error) throw error;
+        const audioUrl = (data as any)?.audioUrl as string | undefined;
+        if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
+        const reportedDuration = Number((data as any)?.duration ?? 0);
+        const durationSec = reportedDuration > 0
+          ? reportedDuration
+          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        synthed.push({
+          block,
+          character: c,
+          audioUrl,
+          durationSec,
+          engine: cfg.engine,
+        });
+      }
+
+      // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
+      //    order, each with its OWN real duration and OWN audioUrl.
+      if (!onAddScene) throw new Error('Cannot spawn sub-scenes: onAddScene missing');
+      for (const s of synthed) {
         const charShot: CharacterShot = {
-          characterId: c.id,
+          characterId: s.character.id,
           shotType: 'profile',
         } as CharacterShot;
+        const subDuration = Math.max(2, Math.min(60, Math.round(s.durationSec * 100) / 100));
         const newSceneIdRaw = await onAddScene({
           sceneType: scene.sceneType,
-          durationSeconds: Math.max(3, Math.ceil(block.text.length / 18)),
+          durationSeconds: subDuration,
           clipSource: 'ai-hailuo',
           clipQuality: scene.clipQuality,
           clipStatus: 'generating',
-          referenceImageUrl: c.referenceImageUrl,
-          aiPrompt: `${c.name}: ${block.text}`,
+          referenceImageUrl: s.character.referenceImageUrl,
+          aiPrompt: `${s.character.name}: ${s.block.text}`,
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
           transitionType: 'fade',
           transitionDuration: 0.3,
+          // Marker for idempotent cleanup on the next regeneration.
+          cinematicPresetSlug: srsMarker,
         });
         const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
 
-        // 2) Kick off the HeyGen render. For Hume → pass the audioUrl directly.
-        //    For ElevenLabs → pass text + voiceId so HeyGen can synth itself.
+        // Always pass the pre-generated audioUrl — no HeyGen-internal TTS,
+        // no risk of voice swaps. Pinning audioUrl also guarantees the
+        // rendered mouth-open length === audio length === sub-scene length.
         const r = await generate({
           sceneId: newSceneId,
           projectId: pidForSrs,
-          imageUrl: c.referenceImageUrl,
-          ...(preGeneratedAudioUrl
-            ? { audioUrl: preGeneratedAudioUrl }
-            : {
-                text: block.text,
-                voiceId: cfg.isCustom ? undefined : cfg.voiceId,
-                customVoiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : undefined,
-              }),
+          imageUrl: s.character.referenceImageUrl,
+          audioUrl: s.audioUrl,
           aspectRatio: '9:16',
           resolution: '720p',
-          composerCharacterId: c.id,
+          composerCharacterId: s.character.id,
         });
 
-        if (r?.success) {
-          okCount += 1;
-        }
+        if (r?.success) okCount += 1;
       }
       toast({
         title: t.title,
