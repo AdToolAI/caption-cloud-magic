@@ -976,6 +976,34 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           />
         </div>
       )}
+      {/* Lip-sync mode hint — single-speaker scenes with portrait auto-render
+          via HeyGen so the mouth matches the audio (Artlist-style). */}
+      {!renderAsSeparateScenes && blocks.length > 0 && (() => {
+        const portraitsAvailable = sceneCast.some((c) => Boolean(c.referenceImageUrl));
+        const willLipSync = portraitsAvailable && blocks.length === 1;
+        const label = willLipSync
+          ? language === 'de'
+            ? '🎙️ Lip-Sync via HeyGen — Mund passt zum Audio (~0,30 €)'
+            : language === 'es'
+            ? '🎙️ Lip-Sync via HeyGen — la boca coincide con el audio (~0,30 €)'
+            : '🎙️ Lip-sync via HeyGen — mouth matches the audio (~€0.30)'
+          : !portraitsAvailable
+          ? language === 'de'
+            ? '🔊 Nur Audio-Overlay — kein Portrait, daher kein Lip-Sync. Lade ein Portrait im Cast hoch oder aktiviere oben „Als separate Szenen rendern"'
+            : language === 'es'
+            ? '🔊 Solo audio — sin retrato, sin lip-sync. Sube un retrato o activa "Renderizar como escenas separadas"'
+            : '🔊 Audio overlay only — no portrait, no lip-sync. Upload a portrait or enable "Render as separate scenes" above'
+          : language === 'de'
+            ? '🔊 Mehrere Sprecher in einer Szene — Audio-Overlay. Für echten Lip-Sync „Als separate Szenen rendern" aktivieren'
+            : language === 'es'
+            ? '🔊 Varios hablantes en una escena — solo audio. Activa "Escenas separadas" para lip-sync real'
+            : '🔊 Multiple speakers in one scene — audio overlay. Enable "Render as separate scenes" for real lip-sync';
+        return (
+          <p className={`text-[10px] ${willLipSync ? 'text-primary' : 'text-muted-foreground'} -mb-1`}>
+            {label}
+          </p>
+        );
+      })()}
       <div className="flex items-center gap-2">
         <Button
           type="button"
