@@ -218,7 +218,18 @@ export default function SceneDialogStudio({
       });
       if (error) throw error;
       const generated = (data as any)?.script as string | undefined;
-      if (generated) setScript(generated);
+      if (generated) {
+        setScript(generated);
+        toast({
+          title: language === 'de' ? 'Skript bereit' : language === 'es' ? 'Guion listo' : 'Script ready',
+          description:
+            language === 'de'
+              ? 'Jetzt „Dialog generieren" klicken.'
+              : language === 'es'
+              ? 'Ahora haz clic en "Generar diálogo".'
+              : 'Now click "Generate dialog".',
+        });
+      }
     } catch (e) {
       console.error('[SceneDialogStudio] AI script error', e);
       toast({
@@ -248,7 +259,25 @@ export default function SceneDialogStudio({
       // Run sequentially to avoid HeyGen rate spikes
       for (const block of blocks) {
         const c = sceneCast.find((x) => x.id === block.speakerId);
-        if (!c?.referenceImageUrl) continue;
+        if (!c) continue;
+        if (!c.referenceImageUrl) {
+          toast({
+            title:
+              language === 'de'
+                ? `Kein Portrait für ${c.name}`
+                : language === 'es'
+                ? `Sin retrato para ${c.name}`
+                : `No portrait for ${c.name}`,
+            description:
+              language === 'de'
+                ? 'Lip-Sync übersprungen.'
+                : language === 'es'
+                ? 'Lip-sync omitido.'
+                : 'Lip-sync skipped.',
+            variant: 'destructive',
+          });
+          continue;
+        }
         const voiceMeta = allVoices.find((v) => v.id === voicePerSpeaker[block.speakerId]);
         if (!voiceMeta) continue;
 
