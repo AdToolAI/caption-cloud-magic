@@ -46,6 +46,10 @@ interface SceneDialogStudioProps {
   language: 'de' | 'en' | 'es';
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Controlled open/close — when explicitly false, renders nothing. */
+  open?: boolean;
+  /** Close-handler used by the in-card X button. */
+  onClose?: () => void;
 }
 
 const PRESET_VOICES = [
