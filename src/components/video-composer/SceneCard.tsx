@@ -435,20 +435,31 @@ export default function SceneCard({
                 <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
                 {(() => {
                   const rec = recommendEngineForScene(scene);
+                  const override = scene.engineOverride ?? 'auto';
                   return (
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] h-4 px-1.5 gap-1 ${
-                        rec.engine === 'heygen-talking-head'
-                          ? 'border-primary/60 text-primary bg-primary/10'
-                          : rec.engine === 'sync-polish'
-                          ? 'border-amber-500/40 text-amber-300'
-                          : 'border-border/50 text-muted-foreground'
-                      }`}
-                      title={rec.reason}
+                    <Select
+                      value={override}
+                      onValueChange={(v) => onUpdate({ engineOverride: v as any })}
                     >
-                      {rec.label}
-                    </Badge>
+                      <SelectTrigger
+                        className={`h-5 w-auto gap-1 px-1.5 border-none p-0 text-[9px] [&_svg]:h-2.5 [&_svg]:w-2.5 ${
+                          rec.engine === 'heygen-talking-head'
+                            ? 'text-primary bg-primary/10 border border-primary/60'
+                            : rec.engine === 'sync-polish'
+                            ? 'text-amber-300 bg-amber-500/10 border border-amber-500/40'
+                            : 'text-muted-foreground bg-transparent border border-border/50'
+                        } rounded-md`}
+                        title={rec.reason}
+                      >
+                        <SelectValue>{rec.label}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto" className="text-xs">⚙️ Auto (empfohlen)</SelectItem>
+                        <SelectItem value="heygen" className="text-xs">🎙️ HeyGen erzwingen</SelectItem>
+                        <SelectItem value="broll" className="text-xs">🎬 B-Roll erzwingen</SelectItem>
+                        <SelectItem value="sync-polish" className="text-xs">✨ Sync.so Polish</SelectItem>
+                      </SelectContent>
+                    </Select>
                   );
                 })()}
                 {(() => {
