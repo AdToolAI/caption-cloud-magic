@@ -427,6 +427,8 @@ export interface VoiceoverConfig {
   segmentGapMs?: number;
   /** Per-segment timings produced by the stitcher — used for timeline UI. */
   segmentTimings?: Array<{ speakerId: string; startSec: number; endSec: number }>;
+  /** Per-segment overrides keyed by parsed segment index (Voice Studio 2.0 → Pro-Satz Cards). */
+  segmentOverrides?: Record<number, { stability?: number; style?: number; speed?: number }>;
 }
 
 export interface MultiSpeakerVoiceCfg {
