@@ -63,8 +63,9 @@ const PRESET_VOICES = [
 
 const T = {
   de: {
-    title: 'Szenen-Dialog',
+    title: 'Szenen-Skript',
     subtitle: 'Schreibe ein Drehbuch — der Dialog läuft als Voiceover in DIESER Szene.',
+    subtitleMono: 'Monolog — der Charakter spricht zur Kamera. Läuft als Voiceover in dieser Szene.',
     script: 'Drehbuch',
     voices: 'Stimme pro Sprecher',
     pickVoice: 'Stimme wählen',
@@ -75,7 +76,7 @@ const T = {
     blocks: (n: number) => `${n} Block${n === 1 ? '' : 'e'}`,
     speakers: (n: number) => `${n} Sprecher`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Mindestens 2 Charaktere im Cast nötig.',
+    needCast: 'Mindestens 1 Charakter im Cast nötig.',
     voiceMissing: (name: string) => `Wähle eine Stimme für „${name}".`,
     parseEmpty: 'Kein gültiges Skript. Format: "Sarah: Hallo!"',
     success: (n: number) => `${n} Lip-Sync-Clip${n === 1 ? '' : 's'} werden generiert (1–3 Min).`,
@@ -84,10 +85,12 @@ const T = {
     aiFailed: 'KI-Skript konnte nicht erstellt werden',
     srsLabel: 'Erweitert: Als separate Shot-Reverse-Shot-Szenen rendern',
     srsHint: 'Standard: Dialog läuft als Voiceover in dieser Szene — keine extra Szenen.',
+    close: 'Schließen',
   },
   en: {
-    title: 'Scene Dialog',
+    title: 'Scene Script',
     subtitle: 'Write a screenplay — the dialog plays as voiceover IN this scene.',
+    subtitleMono: 'Monologue — the character speaks to camera. Plays as voiceover in this scene.',
     script: 'Screenplay',
     voices: 'Voice per speaker',
     pickVoice: 'Pick voice',
@@ -98,7 +101,7 @@ const T = {
     blocks: (n: number) => `${n} block${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} speaker${n === 1 ? '' : 's'}`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Need at least 2 cast characters.',
+    needCast: 'Need at least 1 cast character.',
     voiceMissing: (name: string) => `Pick a voice for "${name}".`,
     parseEmpty: 'No valid script. Format: "Sarah: Hi!"',
     success: (n: number) => `${n} lip-sync clip${n === 1 ? '' : 's'} are being generated (1–3 min).`,
@@ -107,10 +110,12 @@ const T = {
     aiFailed: 'AI script could not be generated',
     srsLabel: 'Advanced: render as separate shot-reverse-shot scenes',
     srsHint: 'Default: dialog plays as voiceover in this scene — no extra scenes.',
+    close: 'Close',
   },
   es: {
-    title: 'Diálogo de escena',
+    title: 'Guion de escena',
     subtitle: 'Escribe un guion — el diálogo suena como voz en off EN esta escena.',
+    subtitleMono: 'Monólogo — el personaje habla a cámara. Suena como voz en off en esta escena.',
     script: 'Guion',
     voices: 'Voz por hablante',
     pickVoice: 'Elegir voz',
@@ -121,7 +126,7 @@ const T = {
     blocks: (n: number) => `${n} bloque${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} hablante${n === 1 ? '' : 's'}`,
     sec: (n: number) => `~${n}s`,
-    needCast: 'Se necesitan al menos 2 personajes.',
+    needCast: 'Se necesita al menos 1 personaje.',
     voiceMissing: (name: string) => `Elige una voz para "${name}".`,
     parseEmpty: 'Guion no válido. Formato: "Sarah: ¡Hola!"',
     success: (n: number) => `${n} clip${n === 1 ? '' : 's'} lip-sync se están generando (1–3 min).`,
@@ -130,6 +135,7 @@ const T = {
     aiFailed: 'No se pudo generar el guion con IA',
     srsLabel: 'Avanzado: renderizar como escenas plano-contraplano separadas',
     srsHint: 'Por defecto: el diálogo suena como voz en off en esta escena — sin escenas extra.',
+    close: 'Cerrar',
   },
 };
 
