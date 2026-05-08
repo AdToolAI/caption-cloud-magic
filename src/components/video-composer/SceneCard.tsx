@@ -180,6 +180,14 @@ export default function SceneCard({
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
 
+  // Scene Dialog Studio — toggleable per-scene script editor (monolog from 1 cast,
+  // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
+  // in the cast row. Initial open if a script already exists.
+  const [dialogStudioOpen, setDialogStudioOpen] = useState<boolean>(
+    Boolean((scene.dialogScript ?? '').trim()),
+  );
+  const dialogStudioRef = useRef<HTMLDivElement | null>(null);
+
   
 
   const { systemPresets } = useStylePresets();
