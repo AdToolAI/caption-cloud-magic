@@ -489,6 +489,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           `[ClipsTab] single scene ${targetScene.id} → ${preparedSingle.anchor.strategy} (${preparedSingle.anchor.name}, source=${preparedSingle.anchor.source}, composed=${preparedSingle.composed})`,
         );
       }
+      // Freeze the composed first-frame on the scene so future re-rolls reuse
+      // it deterministically (no Nano-Banana drift between rolls).
+      if (preparedSingle?.composed && preparedSingle.firstFrameUrl) {
+        const frozen = pScenes.map(s =>
+          s.id === targetScene.id ? { ...s, referenceImageUrl: preparedSingle.firstFrameUrl } : s
+        );
+        onUpdateScenes(frozen);
+      }
 
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
