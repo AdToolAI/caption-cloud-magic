@@ -1,8 +1,11 @@
 // supabase/functions/generate-multi-speaker-vo/index.ts
 // Generates per-segment TTS audio for a multi-speaker script.
-// - Accepts: { segments:[{speakerId,text}], speakerMap:{[speakerId]:{engine,voiceId,...}} }
-// - Returns: { segments:[{speakerId,text,audioBase64,mime,engine,voiceId,durationMs?}] }
-// Stitching is done client-side (WebAudio → WAV) so we keep this fast and stateless.
+// Voice Studio 2.0:
+//   - Inline tags ([whisper], [excited], [soft], [emphasize], [laugh], [pause 0.5s])
+//     are translated to engine-specific cues (ElevenLabs voice settings + SSML
+//     <break/>; Hume "description" parameter + punctuation pauses).
+//   - Optional `overrides` per segment merge on top of the speaker default.
+// Returns: { segments:[{speakerId,text,audioBase64,mime,engine,voiceId}] }
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
@@ -14,21 +17,27 @@ const corsHeaders = {
 
 interface SpeakerVoiceCfg {
   engine: 'elevenlabs' | 'hume';
-  voiceId: string;            // ElevenLabs voice id, OR a Hume voice NAME (no `hume:` prefix)
-  // ElevenLabs tuning
+  voiceId: string;
   modelId?: string;
   stability?: number;
   similarityBoost?: number;
   style?: number;
   useSpeakerBoost?: boolean;
   speed?: number;
-  // Hume tuning
-  description?: string;       // e.g. "warm, slightly hushed"
+  description?: string;
   provider?: 'HUME_AI' | 'CUSTOM_VOICE';
 }
 
+interface RequestSegment {
+  speakerId: string;
+  text: string;
+  tags?: string[];
+  /** Per-segment override that wins over the speaker default. */
+  overrides?: { stability?: number; style?: number; speed?: number };
+}
+
 interface RequestBody {
-  segments: Array<{ speakerId: string; text: string; tags?: string[] }>;
+  segments: RequestSegment[];
   speakerMap: Record<string, SpeakerVoiceCfg>;
   defaultEngine?: 'elevenlabs' | 'hume';
 }
@@ -43,6 +52,60 @@ function bufToBase64(buf: ArrayBuffer): string {
   return btoa(s);
 }
 
+// ─── Tag translation helpers ──────────────────────────────────────
+const TAG_TO_DESCRIPTION: Record<string, string> = {
+  whisper: 'in a soft, hushed whisper',
+  soft: 'in a calm, soft tone',
+  excited: 'with energetic, excited delivery',
+  emphasize: 'with strong, emphatic stress',
+  laugh: 'with a warm, audible laugh',
+  sad: 'in a sad, somber tone',
+  angry: 'in an angry, intense tone',
+  shout: 'shouting loudly',
+};
+
+function buildHumeDescription(tags: string[] | undefined, base: string | undefined): string | undefined {
+  const cues = (tags || []).map((t) => TAG_TO_DESCRIPTION[t.toLowerCase()]).filter(Boolean);
+  if (!cues.length && !base) return undefined;
+  return [base, ...cues].filter(Boolean).join('. ');
+}
+
+function applyTagsToElevenLabsSettings(tags: string[] | undefined, cfg: SpeakerVoiceCfg): SpeakerVoiceCfg {
+  if (!tags?.length) return cfg;
+  const out = { ...cfg };
+  for (const raw of tags) {
+    const t = raw.toLowerCase();
+    if (t === 'whisper' || t === 'soft') {
+      out.stability = Math.max(out.stability ?? 0.5, 0.8);
+      out.style = Math.min(out.style ?? 0, 0.15);
+    } else if (t === 'excited' || t === 'shout') {
+      out.stability = Math.min(out.stability ?? 0.5, 0.35);
+      out.style = Math.max(out.style ?? 0, 0.75);
+    } else if (t === 'emphasize') {
+      out.style = Math.max(out.style ?? 0, 0.55);
+    } else if (t === 'sad' || t === 'angry') {
+      out.stability = Math.min(out.stability ?? 0.5, 0.4);
+      out.style = Math.max(out.style ?? 0, 0.6);
+    }
+  }
+  return out;
+}
+
+/** Replace `[pause N s]` cues with engine-specific breaks. Stripped from text otherwise. */
+function expandPauseCues(text: string, engine: 'elevenlabs' | 'hume'): string {
+  const PAUSE_RE = /\[pause(?:\s+([0-9]*\.?[0-9]+)\s*s)?\]/gi;
+  return text.replace(PAUSE_RE, (_, secs) => {
+    const s = Math.max(0.1, Math.min(3, Number(secs) || 0.5));
+    if (engine === 'elevenlabs') {
+      return `<break time="${s.toFixed(2)}s"/>`;
+    }
+    // Hume Octave honors punctuation pauses; longer pause = more dots.
+    const dots = Math.max(2, Math.round(s * 3));
+    return ' ' + '.'.repeat(dots) + ' ';
+  }).replace(/\s+/g, ' ').trim();
+}
+
+// ─── TTS engines ──────────────────────────────────────────────────
 async function ttsElevenLabs(text: string, cfg: SpeakerVoiceCfg, apiKey: string) {
   const voiceId = cfg.voiceId || '9BWtsMINqrJLrRacOk9x';
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
@@ -70,8 +133,6 @@ async function ttsElevenLabs(text: string, cfg: SpeakerVoiceCfg, apiKey: string)
 }
 
 async function ttsHume(text: string, cfg: SpeakerVoiceCfg, apiKey: string) {
-  // Hume Octave TTS — /v0/tts/file returns audio bytes directly.
-  // Docs: https://dev.hume.ai/reference/text-to-speech-tts/synthesize-file
   const body: any = {
     utterances: [
       {
@@ -124,11 +185,8 @@ serve(async (req) => {
 
     console.log('[multi-speaker-vo] segments:', body.segments.length, 'speakers:', Object.keys(body.speakerMap));
 
-    // Resolve config per segment & generate sequentially to keep memory low
-    // (segments are usually small — 3–20 lines).
     const out: Array<{
       speakerId: string;
-      speakerName?: string;
       text: string;
       audioBase64: string;
       mime: string;
@@ -137,19 +195,30 @@ serve(async (req) => {
     }> = [];
 
     for (const seg of body.segments) {
-      const cfg = body.speakerMap[seg.speakerId];
-      if (!cfg) {
-        throw new Error(`No voice mapping for speaker "${seg.speakerId}"`);
-      }
-      const engine = cfg.engine || body.defaultEngine || 'elevenlabs';
+      const baseCfg = body.speakerMap[seg.speakerId];
+      if (!baseCfg) throw new Error(`No voice mapping for speaker "${seg.speakerId}"`);
+      const engine = baseCfg.engine || body.defaultEngine || 'elevenlabs';
+
+      // Merge per-segment overrides on top of speaker defaults.
+      const mergedCfg: SpeakerVoiceCfg = {
+        ...baseCfg,
+        ...(seg.overrides?.stability !== undefined ? { stability: seg.overrides.stability } : {}),
+        ...(seg.overrides?.style !== undefined ? { style: seg.overrides.style } : {}),
+        ...(seg.overrides?.speed !== undefined ? { speed: seg.overrides.speed } : {}),
+      };
+
+      // Tag-aware text expansion + tone tuning.
+      const expandedText = expandPauseCues(seg.text || '', engine);
 
       let result;
       if (engine === 'hume') {
         if (!HUME_API_KEY) throw new Error('HUME_API_KEY not configured');
-        result = await ttsHume(seg.text, cfg, HUME_API_KEY);
+        const description = buildHumeDescription(seg.tags, mergedCfg.description);
+        result = await ttsHume(expandedText, { ...mergedCfg, description }, HUME_API_KEY);
       } else {
         if (!ELEVENLABS_API_KEY) throw new Error('ELEVENLABS_API_KEY not configured');
-        result = await ttsElevenLabs(seg.text, cfg, ELEVENLABS_API_KEY);
+        const tuned = applyTagsToElevenLabsSettings(seg.tags, mergedCfg);
+        result = await ttsElevenLabs(expandedText, tuned, ELEVENLABS_API_KEY);
       }
 
       out.push({
@@ -158,7 +227,7 @@ serve(async (req) => {
         audioBase64: result.audioBase64,
         mime: result.mime,
         engine,
-        voiceId: cfg.voiceId,
+        voiceId: mergedCfg.voiceId,
       });
     }
 
