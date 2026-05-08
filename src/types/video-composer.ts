@@ -318,6 +318,13 @@ export interface ComposerScene {
    * - Other providers: post-hoc via `lip-sync-video` (sync-labs, ~8 credits).
    */
   lipSyncWithVoiceover?: boolean;
+
+  /** Sync.so post-step status: when set, clipUrl is the lip-synced version. */
+  lipSyncAppliedAt?: string | null;
+  /** Original silent clip URL — kept so we can re-sync against a new VO. */
+  lipSyncSourceClipUrl?: string | null;
+  /** running | done | failed | null. */
+  lipSyncStatus?: string | null;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
