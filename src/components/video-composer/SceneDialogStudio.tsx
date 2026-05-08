@@ -386,12 +386,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       if (totalNeeded > (scene.durationSeconds ?? 0)) {
         onUpdate({ durationSeconds: totalNeeded });
       }
-      // Notify other panels (SoundDesign / preview) to refresh.
+      // Notify other panels (SoundDesign / preview) to refresh — use the
+      // shared helper so the event name matches `useSceneAudioClips`.
       try {
-        const evt = new CustomEvent('scene-audio-clips-changed', {
-          detail: { projectId: pid },
-        });
-        window.dispatchEvent(evt);
+        const { emitSceneAudioClipsChanged } = await import('@/hooks/useSceneAudioClips');
+        emitSceneAudioClipsChanged(pid);
       } catch (_) { /* noop */ }
 
       toast({ title: t.title, description: t.successInline(okCount) });
