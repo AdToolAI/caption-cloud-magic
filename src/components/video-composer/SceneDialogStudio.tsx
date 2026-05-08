@@ -160,7 +160,6 @@ export default function SceneDialogStudio({
   );
   const [generating, setGenerating] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [syncToPrompt, setSyncToPrompt] = useState(true);
 
   // Sync only when switching to a different scene — otherwise the parent's
   // re-render after our own debounced save would clobber the user's in-flight
