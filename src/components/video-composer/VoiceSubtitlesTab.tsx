@@ -40,6 +40,10 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { toast } from '@/hooks/use-toast';
 import { useSceneAudioClips } from '@/hooks/useSceneAudioClips';
 import { TextOverlayEditor2028 } from '@/components/directors-cut/features/TextOverlayEditor2028';
+import { SpeakerMappingBar } from '@/components/video-composer/voice-studio/SpeakerMappingBar';
+import { isMultiSpeakerScript, parseSpeakerScript } from '@/lib/voice-studio/parseSpeakerScript';
+import { stitchSpeakerSegments } from '@/lib/voice-studio/stitchSpeakerSegments';
+import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
 
 interface VoiceSubtitlesTabProps {
   scenes: ComposerScene[];
