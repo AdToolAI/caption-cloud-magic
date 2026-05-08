@@ -1,49 +1,67 @@
-## Root Cause
+# Fix: Re-Roll von Szene 1 hängt nach Dialog-Hinzufügen
 
-Im Screenshot ist der Szenen-Prompt im **strukturierten Modus** (`promptMode === 'structured'`, Badge „Strukturiert" oben rechts). In diesem Modus wird `scene.aiPrompt` bei jedem Re-Render aus `promptSlots` via `stitchSlots(...)` neu zusammengebaut.
+## Was wirklich passiert
 
-`SceneDialogStudio` schreibt den `[Dialog: …]`-Marker aber **ausschließlich** in `scene.aiPrompt` — niemals in `promptSlots.subject`. Folge: Sobald irgendein Slot-Re-Stitch passiert (z. B. nach `onUpdate`), überschreibt der Stitcher den frisch eingefügten Dialog-Marker → der Prompt sieht aus wie vorher, das Skript wirkt sich weder visuell auf den AI-Clip noch akustisch aus.
+Beim Klick auf **„Neu generieren €0,75"** läuft client-seitig:
 
-`applyCastToPrompt` macht es bereits korrekt vor: bei structured → in `promptSlots.subject` schreiben **und** `aiPrompt` neu stitchen; bei free → nur `aiPrompt`.
-
-Zweiter Aspekt: Selbst mit korrektem Marker ist `[Dialog: …]` nur eine Notiz im Prompt. Damit der Clip tatsächlich „den Dialog spricht/zeigt", muss im Free-Mode-Prompt explizit eine Sprech-Anweisung im englischen, kameralesbaren Stil stehen (z. B. `Matthew says: "…". Sarah replies: "…".`) — so wie HeyGen / i2v-Modelle es als Mund-/Mimik-Hinweis interpretieren können. Der reine Marker reicht nicht.
-
-## Plan
-
-**1. `applyDialogToPrompt.ts` — zwei Ausgaben statt einer**
-- Bestehende Marker-Funktion bleibt für Anzeige im Free-Prompt.
-- Neue Hilfsfunktion `buildSpokenLinesBlock(blocks, lang)` rendert einen englischen Sprech-Block:
-  ```
-  Spoken dialog (visible lip-sync): Matthew says: "Welcome to DroneOcular." Sarah replies: "Tired of wasting hours…".
-  ```
-- Idempotenter Wrapper-Marker `[Dialog: …][/Dialog]` der diesen Block umschließt — so kann ein Re-Run ihn sauber ersetzen, ohne fremden Prompt-Text zu zerstören.
-
-**2. `SceneDialogStudio.tsx` — Sync in `promptSlots.subject` UND `aiPrompt` (analog `applyCastToPrompt`)**
-- Neue Props vom Parent (`SceneCard`) erhalten/durchschleifen: `promptMode`, `promptSlots`, `promptSlotOrder`, oder einfacher: in `SceneCard` die Sync-Logik zentral durchführen, nicht im Studio.
-- Bevorzugte Variante (geringere Prop-Drilling-Kosten): **Sync-Effekt von `SceneDialogStudio` nach `SceneCard` ziehen.**
-  - `SceneDialogStudio` ruft nur noch `onUpdate({ dialogScript })` auf.
-  - `SceneCard` bekommt einen neuen `useEffect`, der bei Änderung von `scene.dialogScript` (+ `characters`):
-    - `parseDialogScript(...)` ausführt
-    - bei `promptMode === 'structured'`: `promptSlots.subject` mit `applyDialogToPrompt(currentSubject, blocks, lang)` updaten und `aiPrompt = stitchSlots(nextSlots, order)` neu setzen
-    - bei `promptMode === 'free'`: `aiPrompt = applyDialogToPrompt(scene.aiPrompt, blocks, lang)` setzen
-- Checkbox „Dialog in Szenen-Prompt übernehmen" wandert zu `scene.syncDialogToPrompt` (oder bleibt lokal mit Default true) — Effekt respektiert das Flag.
-
-**3. Sichtbares Feedback**
-- Toast nach AI-Skript bestätigt jetzt zusätzlich: „Prompt aktualisiert ✓" (sonst denkt der User wieder, nichts sei passiert).
-- Im `DialogPreviewList` ein kleines „⟳ in Prompt synchronisiert"-Badge wenn `syncToPrompt === true` und `blocks.length > 0`.
-
-**4. Out of scope**
-- Keine Edge-Function-Änderung, keine DB-Migration, kein neues HeyGen-Verhalten.
-- `parseDialogScript` und Cast-Filter (Sarah-Fix) bleiben wie zuletzt korrigiert.
-
-## Files
-- `src/lib/motion-studio/applyDialogToPrompt.ts` — `buildSpokenLinesBlock`, neuer Wrapper-Marker.
-- `src/components/video-composer/SceneCard.tsx` — neuer Sync-Effekt für `dialogScript` (analog Cast-Backfill).
-- `src/components/video-composer/SceneDialogStudio.tsx` — Effekt entfernen, nur noch `dialogScript` persistieren; Toast-Text ergänzen; „synchronisiert"-Badge.
-
-## Resultat
-Nach „Skript via AI" erscheint im KI-Prompt sofort:
 ```
-[Besetzung: Matthew Dusatko (Voll), Sarah (Voll)] [Dialog] Spoken dialog: Matthew says: "Welcome to DroneOcular." Sarah replies: "Tired of wasting hours fighting weeds…". [/Dialog] Low angle, wide shot of a vast Texan farmland …
+handleGenerateSingle
+  └─ prepareSceneAnchor (NEU: 2 Portraits → Multi-Char-Pfad)
+        └─ supabase.functions.invoke('compose-scene-anchor')
+              └─ fetch(ai.gateway.lovable.dev, Gemini-3.1-Flash-Image, 2 Bilder)   ← hängt
+  └─ supabase.functions.invoke('compose-video-clips')   ← wird NIE erreicht
 ```
-…und bleibt auch nach Re-Stitches erhalten, weil der Marker jetzt in `promptSlots.subject` lebt.
+
+Belege aus der Live-DB & Logs:
+- `composer_scenes` von Szene 1: `clip_status='ready'`, `replicate_prediction_id` **unverändert** seit 00:53 (also 20 min alt).
+- `compose-video-clips`-Edge-Logs: letzter Eintrag 00:51:31 (Initial-Run). Kein Re-Roll-Aufruf.
+- `compose-scene-anchor`: keine neuen Logs.
+- Im Code: `fetch("…ai.gateway.lovable.dev/v1/chat/completions", …)` in `compose-scene-anchor/index.ts` Zeile 125 hat **keinen `signal` / AbortController / Timeout**. Wenn der Gateway hängt oder >150 s braucht, terminiert die Edge Function mit Worker-Timeout, der Client-Promise resolved aber nie sauber.
+- Der Client-`handleGenerateSingle` hat ebenfalls keinen Timeout um den `invoke`-Aufruf, daher bleibt `setSingleGenerating[scene.id] = true` ewig stehen.
+
+## Was gebaut wird (rein Frontend + ein Edge-Function-Hardening, KEIN neues Schema)
+
+### 1. Edge-Function `compose-scene-anchor` (Zeile 125): harten Timeout setzen
+
+- `AbortController` mit **45 s** Timeout um den Gemini-Image-fetch.
+- Bei `AbortError` / non-2xx → wie bisher die existierende Fallback-Antwort `{ strategy: "text-only", error: "ai_timeout" }` (HTTP 200).
+- Zusätzlich `console.warn` mit `sceneId` + `portraitsCount` + `elapsedMs` für Telemetrie.
+
+Damit kommt der Client garantiert spätestens nach 45 s eine Antwort und fällt auf text-only zurück (nutzt also einfach das vorhandene `referenceImageUrl` ohne Multi-Portrait-Composition).
+
+### 2. Client `prepareSceneAnchor.ts`: zusätzlicher Schutz
+
+- 60 s Race-Timeout um den `supabase.functions.invoke('compose-scene-anchor')`. Bei Timeout → wie bei `error`: text-only Fallback (`return { anchor: primary, anchors, composed: false, isMulti }`), `console.warn` mit `sceneId`.
+- Verhindert Spinner-Hänger, falls der Worker selbst stirbt bevor er antwortet.
+
+### 3. Client `ClipsTab.tsx › handleGenerateSingle`: Reset bei Fehler
+
+- Im `catch`-Block die optimistische Änderung zurückrollen: `clipStatus` der Ziel-Szene wieder auf den vorigen Wert (i. d. R. `'ready'`) setzen, damit der Spinner verschwindet und der Re-Roll-Button wieder erscheint.
+- Aktuell läuft dort nur `toast({ title: 'Fehler' })` — der UI-State bleibt hängen.
+- `finally` setzt `singleGenerating` korrekt zurück; das alleine reicht aber nicht, weil `SceneClipProgress` zusätzlich am `clipStatus='generating'` festhängt.
+
+### 4. Client `ClipsTab.tsx`: Ein einzelnes „Festgehängt? Zurücksetzen"-Mini-Action
+
+- In der Karte einer Szene mit `clipStatus='generating'` UND ohne `replicate_prediction_id`-Update seit > 90 s blendet sich ein dezenter Link „Status zurücksetzen" ein, der lokal `clipStatus = 'ready' | 'pending'` (je nach `clipUrl`-Vorhandensein) setzt. Rein Client-Reset, kein DB-Write nötig — Polling holt sich beim nächsten Tick eh den DB-Wahrheit-Wert.
+
+### 5. Acute Recovery für die aktuell hängende Karte
+
+- Beim Mount von `ClipsTab` einmal `pollScenes()` triggern, damit die UI sofort wieder den DB-Stand lädt (Szene 1 ist in der DB ja ready). Dadurch verschwindet der Spinner direkt nach Reload — ohne dass der Nutzer die App neu laden muss.
+
+## Was bewusst NICHT gemacht wird
+
+- Kein neuer Job-Queue / Worker. Die existierende Architektur (compose-video-clips → Replicate-Webhook) ist async-fähig; das Problem liegt ausschließlich im **synchronen Pre-Step** (Nano Banana Compose) ohne Timeout.
+- Keine Schema-Änderung an `composer_scenes`.
+- Keine Veränderung am Dialog-Studio / Lip-Sync-Pfad.
+
+## Akzeptanz-Kriterien
+
+1. „Neu generieren" auf einer Szene mit 2 Charakteren bleibt nie länger als 60 s ohne Antwort hängen.
+2. Wenn die Multi-Portrait-Composition fehlschlägt/timeout, wird transparent mit Single-Portrait/text-only weitergegeben und der Re-Roll geht trotzdem zu compose-video-clips durch.
+3. Die aktuell sichtbare Karte mit hängendem Spinner ist nach Reload sofort wieder als „Fertig" zu sehen.
+
+## Geänderte Dateien
+
+- `supabase/functions/compose-scene-anchor/index.ts` (Timeout + Logging)
+- `src/lib/motion-studio/prepareSceneAnchor.ts` (Race-Timeout)
+- `src/components/video-composer/ClipsTab.tsx` (Catch-Reset, Mount-Poll, Stuck-Reset-Action)
