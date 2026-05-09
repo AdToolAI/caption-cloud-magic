@@ -567,18 +567,42 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         }
 
         timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
+        planSpeakers.push({
+          characterId: c.id,
+          name: c.name,
+          startSec: Math.round(cumulativeOffset * 100) / 100,
+          endSec: Math.round((cumulativeOffset + duration) * 100) / 100,
+          text: block.text,
+          engine: cfg.engine,
+          voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+          audioUrl,
+        });
         cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
       }
 
       // Refresh the visible prompt with concrete per-speaker timestamps
       // (Audio Plan), now that real TTS durations are known.
+      // Also persist the AudioPlan as a first-class field so downstream
+      // consumers (lip-sync, prompt composer, audio playback) stop racing
+      // against the textual fallback.
       try {
         const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedBlocks, language);
-        if (timedPrompt !== (scene.aiPrompt || '')) {
-          onUpdate({ aiPrompt: timedPrompt });
-        }
-      } catch (_) { /* noop */ }
+        const audioPlan: import('@/types/video-composer').AudioPlan = {
+          version: 1,
+          speakers: planSpeakers,
+          totalSec: Math.round((cumulativeOffset - INTER_SPEAKER_GAP_SEC) * 100) / 100,
+          interSpeakerGapSec: INTER_SPEAKER_GAP_SEC,
+          language,
+          generatedAt: new Date().toISOString(),
+        };
+        const updates: Partial<ComposerScene> = {
+          audioPlan,
+          dialogLockedAt: audioPlan.generatedAt,
+        };
+        if (timedPrompt !== (scene.aiPrompt || '')) updates.aiPrompt = timedPrompt;
+        onUpdate(updates);
+      } catch (e) { console.warn('[SceneDialogStudio] audioPlan emit failed', e); }
 
       // Bump scene duration so all VO blocks fit (cap at 60s sanity)
       const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
