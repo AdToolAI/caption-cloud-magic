@@ -1388,51 +1388,84 @@ export default function SceneCard({
               );
             })()}
 
-            {/* Universal Reference Image — available in every clip-source mode */}
-            <div className="space-y-1.5 pt-1 border-t border-border/30">
-              <div className="text-[10px] text-muted-foreground/80 leading-snug">
-                {scene.clipSource.startsWith('ai-')
-                  ? (lang === 'de'
-                      ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
-                      : lang === 'es'
-                      ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
-                      : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
-                  : (lang === 'de'
-                      ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
-                      : lang === 'es'
-                      ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
-                      : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
-              </div>
-              {advancedOpen && scene.clipSource.startsWith('ai-') && projectId && (
-                <SceneStillFrameStudio
+            {/* Universal Reference Image — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && (
+              <div className="space-y-1.5 pt-1 border-t border-border/30">
+                <div className="text-[10px] text-muted-foreground/80 leading-snug">
+                  {scene.clipSource.startsWith('ai-')
+                    ? (lang === 'de'
+                        ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
+                        : lang === 'es'
+                        ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
+                        : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
+                    : (lang === 'de'
+                        ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
+                        : lang === 'es'
+                        ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
+                        : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
+                </div>
+                {scene.clipSource.startsWith('ai-') && projectId && (
+                  <SceneStillFrameStudio
+                    projectId={projectId}
+                    sceneId={scene.id}
+                    prompt={scene.aiPrompt || ''}
+                    composeHintImageUrl={
+                      activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                    }
+                    selectedReferenceUrl={scene.referenceImageUrl}
+                    onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                    language={lang as 'en' | 'de' | 'es'}
+                  />
+                )}
+                <SceneReferenceImageUpload
                   projectId={projectId}
                   sceneId={scene.id}
-                  prompt={scene.aiPrompt || ''}
-                  composeHintImageUrl={
-                    activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
-                  }
-                  selectedReferenceUrl={scene.referenceImageUrl}
-                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                  language={lang as 'en' | 'de' | 'es'}
+                  referenceImageUrl={scene.referenceImageUrl}
+                  onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
                 />
-              )}
-              <SceneReferenceImageUpload
-                projectId={projectId}
-                sceneId={scene.id}
-                referenceImageUrl={scene.referenceImageUrl}
-                onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
-              />
-            </div>
+              </div>
+            )}
 
-            {/* Transitions disabled in Composer — handled in Director's Cut */}
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
-              title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
-            >
-              <span className="text-[10px] text-muted-foreground">
-                Harter Schnitt → Übergänge im Director's Cut
-              </span>
-            </div>
+            {/* Hard-cut hint — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && (
+              <div
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
+                title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
+              >
+                <span className="text-[10px] text-muted-foreground">
+                  Harter Schnitt → Übergänge im Director's Cut
+                </span>
+              </div>
+            )}
+
+            {/* Phase 3 (Studio Set v2) — single drawer toggle for all secondary
+                settings. Active sub-features bubble up as small pills when the
+                drawer is closed so the user keeps situational awareness. */}
+            {(() => {
+              const anchor = scene.clipSource.startsWith('ai-')
+                ? resolveSceneCharacterAnchor(scene, characters, activeBrandChar)
+                : null;
+              const anchorShort: Record<string, string> = {
+                'first-frame-direct': lang === 'de' ? 'Anker: Porträt' : 'Anchor: portrait',
+                'first-frame-composed': lang === 'de' ? 'Anker: komponiert' : 'Anchor: composed',
+                'subject-reference': lang === 'de' ? 'Anker: Subject-Ref' : 'Anchor: subject-ref',
+                'text-only': lang === 'de' ? 'Anker: Text' : 'Anchor: text',
+              };
+              return (
+                <SceneSecondaryToggle
+                  language={lang}
+                  open={secondaryOpen}
+                  onToggle={() => setSecondaryOpen((v) => !v)}
+                  summary={{
+                    effectsCount: scene.effects?.length ?? 0,
+                    anchorLabel: anchor ? (anchorShort[anchor.strategy] ?? null) : null,
+                    faceLock: Boolean(scene.forcePortraitAsFirstFrame),
+                    lipSyncOn: Boolean(scene.lipSyncWithVoiceover),
+                    hasReferenceImage: Boolean(scene.referenceImageUrl),
+                  }}
+                />
+              );
+            })()}
           </div>
 
           {/* Thumbnail preview */}
