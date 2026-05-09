@@ -913,14 +913,13 @@ export default function SceneCard({
                   return (
                     <Button
                       type="button"
-                      variant="secondary"
+                      variant="ghost"
                       size="sm"
-                      className="h-8 text-xs gap-1.5 self-start"
+                      className="h-7 text-[11px] gap-1.5 self-start text-muted-foreground hover:text-foreground"
                       onClick={() => {
                         setDialogStudioOpen((v) => {
                           const next = !v;
                           if (next) {
-                            // Defer scroll until the studio mounts.
                             setTimeout(() => {
                               dialogStudioRef.current?.scrollIntoView({
                                 behavior: 'smooth',
@@ -932,10 +931,10 @@ export default function SceneCard({
                         });
                       }}
                     >
-                      <MessageSquareQuote className="h-3.5 w-3.5" />
+                      <MessageSquareQuote className="h-3 w-3" />
                       {label}
                       {hasScript && lineCount > 0 && (
-                        <span className="text-[10px] text-muted-foreground">· {lineLbl(lineCount)}</span>
+                        <span className="text-[10px] opacity-70">· {lineLbl(lineCount)}</span>
                       )}
                     </Button>
                   );
