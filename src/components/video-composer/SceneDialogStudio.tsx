@@ -877,7 +877,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
       // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
       //    order, each with its OWN real duration and OWN audioUrl.
+      //    A failed render for one speaker MUST NOT abort the others — we
+      //    collect failures and show a single summary toast at the end.
       if (!onAddScene) throw new Error('Cannot spawn sub-scenes: onAddScene missing');
+      const failures: Array<{ speaker: string; reason: string }> = [];
       for (const s of synthed) {
         const charShot: CharacterShot = {
           characterId: s.character.id,
@@ -888,51 +891,85 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // downstream re-route that reads dialogVoices can never accidentally
         // pick another speaker's voice.
         const speakerVoiceCfg = voicePerSpeaker[s.block.speakerId];
-        const newSceneIdRaw = await onAddScene({
-          sceneType: scene.sceneType,
-          durationSeconds: subDuration,
-          // Mark as a finished HeyGen lip-sync scene so compose-video-clips
-          // does NOT re-render it as ai-hailuo B-roll later.
-          clipSource: 'ai-hailuo',
-          clipQuality: scene.clipQuality,
-          clipStatus: 'generating',
-          referenceImageUrl: s.character.referenceImageUrl,
-          // Single-speaker dialog script — exact line, this speaker only.
-          dialogScript: `${s.character.name}: ${s.block.text}`,
-          dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
-          // Force HeyGen engine and disable any auto-routing decisions.
-          engineOverride: 'heygen',
-          aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
-          characterShot: charShot,
-          characterShots: [charShot],
-          lipSyncWithVoiceover: true,
-          transitionType: 'fade',
-          transitionDuration: 0.3,
-          // Marker for idempotent cleanup on the next regeneration AND
-          // for compose-video-clips to skip these as already-rendered.
-          cinematicPresetSlug: srsMarker,
-        });
-        const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
+        let newSceneId: string | undefined;
+        try {
+          const newSceneIdRaw = await onAddScene({
+            sceneType: scene.sceneType,
+            durationSeconds: subDuration,
+            // Mark as a finished HeyGen lip-sync scene so compose-video-clips
+            // does NOT re-render it as ai-hailuo B-roll later.
+            clipSource: 'ai-hailuo',
+            clipQuality: scene.clipQuality,
+            clipStatus: 'generating',
+            referenceImageUrl: s.character.referenceImageUrl,
+            // Single-speaker dialog script — exact line, this speaker only.
+            dialogScript: `${s.character.name}: ${s.block.text}`,
+            dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
+            // Force HeyGen engine and disable any auto-routing decisions.
+            engineOverride: 'heygen',
+            aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
+            characterShot: charShot,
+            characterShots: [charShot],
+            lipSyncWithVoiceover: true,
+            transitionType: 'fade',
+            transitionDuration: 0.3,
+            // Marker for idempotent cleanup on the next regeneration AND
+            // for compose-video-clips to skip these as already-rendered.
+            cinematicPresetSlug: srsMarker,
+          });
+          newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
 
-        // Always pass the pre-generated audioUrl — no HeyGen-internal TTS,
-        // no risk of voice swaps. Pinning audioUrl also guarantees the
-        // rendered mouth-open length === audio length === sub-scene length.
-        const r = await generate({
-          sceneId: newSceneId,
-          projectId: pidForSrs,
-          imageUrl: s.character.referenceImageUrl,
-          audioUrl: s.audioUrl,
-          aspectRatio: '9:16',
-          resolution: '720p',
-          composerCharacterId: s.character.id,
-        });
-
-        if (r?.success) okCount += 1;
+          // Always pass the pre-generated audioUrl — no HeyGen-internal TTS,
+          // no risk of voice swaps. Pinning audioUrl also guarantees the
+          // rendered mouth-open length === audio length === sub-scene length.
+          const { data, error } = await supabase.functions.invoke('generate-talking-head', {
+            body: {
+              sceneId: newSceneId,
+              projectId: pidForSrs,
+              imageUrl: s.character.referenceImageUrl,
+              audioUrl: s.audioUrl,
+              aspectRatio: '9:16',
+              resolution: '720p',
+              composerCharacterId: s.character.id,
+            },
+          });
+          if (error) throw error;
+          if ((data as any)?.success) okCount += 1;
+          else throw new Error((data as any)?.error || 'unknown error');
+        } catch (perBlockErr) {
+          const raw = perBlockErr instanceof Error ? perBlockErr.message : String(perBlockErr);
+          // Strip noisy edge-function envelope, keep our typed tag if present.
+          const friendly = /HEYGEN_UPLOAD_TRANSIENT/i.test(raw)
+            ? (language === 'de'
+                ? 'HeyGen war kurz nicht erreichbar — bitte erneut versuchen.'
+                : language === 'es'
+                ? 'HeyGen no estuvo disponible un momento — intenta de nuevo.'
+                : 'HeyGen was briefly unavailable — please retry.')
+            : raw.replace(/^Edge Function returned a non-2xx status code:?\s*/i, '');
+          failures.push({ speaker: s.character.name, reason: friendly });
+          console.error('[SceneDialogStudio] block failed', s.character.name, raw);
+          // Sub-scene already marked failed by the edge function; nothing to clean here.
+        }
       }
-      toast({
-        title: t.title,
-        description: t.success(okCount),
-      });
+      if (failures.length === 0) {
+        toast({ title: t.title, description: t.success(okCount) });
+      } else if (okCount === 0) {
+        toast({
+          title: t.failed,
+          description: failures.map((f) => `${f.speaker}: ${f.reason}`).join(' · '),
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: language === 'de'
+            ? `${okCount} von ${synthed.length} Lip-Sync-Clips erstellt`
+            : language === 'es'
+            ? `${okCount} de ${synthed.length} clips lip-sync creados`
+            : `${okCount} of ${synthed.length} lip-sync clips created`,
+          description: failures.map((f) => `${f.speaker}: ${f.reason}`).join(' · '),
+          variant: 'destructive',
+        });
+      }
     } catch (e) {
       console.error('[SceneDialogStudio] generate error', e);
       toast({

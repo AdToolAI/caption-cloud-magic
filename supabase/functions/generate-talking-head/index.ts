@@ -259,39 +259,86 @@ async function uploadHeyGenTalkingPhoto(sourceUrl: string): Promise<string> {
   const srcRes = await fetch(sourceUrl);
   if (!srcRes.ok) throw new Error(`Failed to fetch source image from ${sourceUrl}: ${srcRes.status}`);
   const blob = await srcRes.blob();
-  const buffer = await blob.arrayBuffer();
+  let buffer = await blob.arrayBuffer();
+  let contentType: 'image/jpeg' | 'image/png' =
+    (blob.type || '').toLowerCase() === 'image/png' ? 'image/png' : 'image/jpeg';
   console.log(`[talking-head] Source image fetched: ${buffer.byteLength} bytes, type=${blob.type}`);
 
-  // Allowed MIME types: image/png, image/jpeg
-  const t = (blob.type || 'image/jpeg').toLowerCase();
-  const contentType = t === 'image/png' ? 'image/png' : 'image/jpeg';
+  // Normalize: re-encode to JPEG ≤2048px, ≤8MB. HeyGen 500/40099 is most often
+  // triggered by oversized PNGs, WebP-as-JPEG, EXIF-rotated phone shots etc.
+  const needsNormalize =
+    buffer.byteLength > 8 * 1024 * 1024 ||
+    !['image/png', 'image/jpeg'].includes((blob.type || '').toLowerCase());
+  if (needsNormalize) {
+    try {
+      const { Image } = await import('npm:imagescript@1.3.0');
+      const img: any = await Image.decode(new Uint8Array(buffer));
+      const maxSide = 2048;
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      if (scale < 1) img.resize(Math.round(img.width * scale), Math.round(img.height * scale));
+      const jpg = await img.encodeJPEG(85);
+      buffer = jpg.buffer.slice(jpg.byteOffset, jpg.byteOffset + jpg.byteLength) as ArrayBuffer;
+      contentType = 'image/jpeg';
+      console.log(`[talking-head] Normalized to ${img.width}x${img.height} JPEG, ${buffer.byteLength} bytes`);
+    } catch (e: any) {
+      console.warn(`[talking-head] image normalize failed (uploading raw): ${e?.message}`);
+    }
+  }
 
-  const uploadRes = await fetch(`${HEYGEN_UPLOAD_BASE}/talking_photo`, {
-    method: 'POST',
-    headers: {
-      'X-Api-Key': HEYGEN_API_KEY,
-      'Content-Type': contentType,
-      'accept': 'application/json',
-    },
-    body: buffer,
-  });
+  // Retry transient HeyGen failures (5xx, 408, 429, vendor 40099).
+  const RETRY_DELAYS_MS = [0, 1500, 4000];
+  let lastStatus = 0;
+  let lastBody = '';
+  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt++) {
+    if (RETRY_DELAYS_MS[attempt] > 0) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    }
+    const uploadRes = await fetch(`${HEYGEN_UPLOAD_BASE}/talking_photo`, {
+      method: 'POST',
+      headers: {
+        'X-Api-Key': HEYGEN_API_KEY,
+        'Content-Type': contentType,
+        'accept': 'application/json',
+      },
+      body: buffer,
+    });
+    const respText = await uploadRes.text();
+    lastStatus = uploadRes.status;
+    lastBody = respText;
+    console.log(
+      `[talking-head] HeyGen upload attempt ${attempt + 1}/${RETRY_DELAYS_MS.length} status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`,
+    );
 
-  const respText = await uploadRes.text();
-  console.log(`[talking-head] HeyGen talking_photo upload status=${uploadRes.status}, body[0..200]=${respText.slice(0, 200)}`);
+    if (uploadRes.ok) {
+      let json: any;
+      try { json = JSON.parse(respText); }
+      catch { throw new Error(`HeyGen talking_photo upload returned non-JSON: ${respText.slice(0, 200)}`); }
+      const talkingPhotoId = json?.data?.talking_photo_id;
+      if (!talkingPhotoId) {
+        throw new Error(`HeyGen talking_photo upload missing talking_photo_id: ${JSON.stringify(json).slice(0, 200)}`);
+      }
+      return talkingPhotoId;
+    }
 
-  if (!uploadRes.ok) {
-    // Surface the avatar-limit error with a friendly, user-facing message.
+    // Non-retryable: avatar-limit hit
     if (respText.includes('401028') || /photo avatars/i.test(respText)) {
       throw new Error('HEYGEN_AVATAR_LIMIT: HeyGen-Avatar-Kontingent voll — bitte einen Moment warten und erneut versuchen. (Auto-Cleanup läuft.)');
     }
-    throw new Error(`HeyGen talking_photo upload failed [${uploadRes.status}]: ${respText.slice(0, 300)}`);
+
+    // Retryable categories
+    const isTransient =
+      uploadRes.status >= 500 ||
+      uploadRes.status === 408 ||
+      uploadRes.status === 429 ||
+      respText.includes('"code":40099');
+    if (!isTransient) break; // surface immediately
   }
 
-  let json: any;
-  try { json = JSON.parse(respText); } catch { throw new Error(`HeyGen talking_photo upload returned non-JSON: ${respText.slice(0, 200)}`); }
-  const talkingPhotoId = json?.data?.talking_photo_id;
-  if (!talkingPhotoId) throw new Error(`HeyGen talking_photo upload missing talking_photo_id in response: ${JSON.stringify(json).slice(0, 200)}`);
-  return talkingPhotoId;
+  // Final failure → typed error so the UI can show a helpful message.
+  const tag = lastStatus >= 500 || lastBody.includes('"code":40099')
+    ? 'HEYGEN_UPLOAD_TRANSIENT'
+    : 'HEYGEN_UPLOAD_REJECTED';
+  throw new Error(`${tag}: HeyGen talking_photo upload failed [${lastStatus}] ${lastBody.slice(0, 200)}`);
 }
 
 // (legacy preset prune removed — see comment in uploadHeyGenTalkingPhoto)
@@ -620,9 +667,22 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('[talking-head] Error:', error);
-    return new Response(JSON.stringify({
-      error: error instanceof Error ? error.message : 'Unknown error',
-    }), {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    // Best-effort: if a sceneId was supplied, mark the sub-scene as failed so
+    // the UI doesn't show "generating…" forever after an upload failure.
+    try {
+      const body: any = await req.clone().json().catch(() => ({}));
+      const sceneId: string | undefined = body?.sceneId;
+      if (sceneId) {
+        const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+        await admin.from('composer_scenes').update({
+          clip_status: 'failed',
+          clip_error: message.slice(0, 500),
+          updated_at: new Date().toISOString(),
+        }).eq('id', sceneId);
+      }
+    } catch (_e) { /* non-fatal */ }
+    return new Response(JSON.stringify({ error: message }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
