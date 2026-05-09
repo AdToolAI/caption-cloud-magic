@@ -337,6 +337,53 @@ export interface ComposerScene {
   lipSyncSourceClipUrl?: string | null;
   /** running | done | failed | null. */
   lipSyncStatus?: string | null;
+
+  /**
+   * Director Console — Audio Plan v1.
+   *
+   * First-class, deterministic per-speaker timing for this scene. Set by
+   * `SceneDialogStudio` after TTS completes and treated as the **single
+   * source of truth** by every downstream consumer (lip-sync, prompt
+   * composer, audio playback). Once `dialogLockedAt` is set, the
+   * derived `aiPrompt` is rebuilt from this plan — no other panel may
+   * silently overwrite the timing block.
+   */
+  audioPlan?: AudioPlan;
+  /** ISO timestamp set when `audioPlan` was finalized via TTS. */
+  dialogLockedAt?: string | null;
+}
+
+export interface AudioPlanSpeaker {
+  /** Cast character id (matches ComposerCharacter.id). */
+  characterId: string;
+  /** Display name as written in the script. */
+  name: string;
+  /** Cumulative start time within the scene, seconds. */
+  startSec: number;
+  /** Cumulative end time within the scene, seconds. */
+  endSec: number;
+  /** Spoken line, verbatim. */
+  text: string;
+  /** Voice engine identifier (elevenlabs | hume). */
+  engine?: 'elevenlabs' | 'hume';
+  /** Voice id passed to the TTS provider. */
+  voiceId?: string;
+  /** Public URL of the rendered TTS clip — also used as audio source-of-truth. */
+  audioUrl?: string;
+}
+
+export interface AudioPlan {
+  version: 1;
+  /** Per-speaker timing (in script order). */
+  speakers: AudioPlanSpeaker[];
+  /** Total spoken duration including inter-speaker gaps, seconds. */
+  totalSec: number;
+  /** Inter-speaker gap actually used to compute `startSec`/`endSec`. */
+  interSpeakerGapSec: number;
+  /** UI / VO language at lock time. */
+  language?: 'de' | 'en' | 'es';
+  /** ISO timestamp when this plan was generated. */
+  generatedAt: string;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
