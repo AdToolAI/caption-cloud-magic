@@ -189,6 +189,11 @@ export default function VideoComposerDashboard() {
   // Track which project.id we have already hydrated from DB so the effect
   // can re-run when the AutoDirector / AdDirector swaps in a new project.
   const lastSyncedProjectIdRef = useRef<string | null>(null);
+  // Always-fresh projectId — avoids stale-closure problems where callbacks
+  // (e.g. insertScenesAfter) capture an older `project.id` from the render
+  // *before* ensureProjectPersisted swapped in the freshly inserted UUID.
+  const projectIdRef = useRef<string | undefined>(project.id);
+  useEffect(() => { projectIdRef.current = project.id; }, [project.id]);
 
   // Strip the URL params after the first render so a later reload doesn't
   // re-trigger the discard-draft path (the project.id is now in state).
@@ -381,8 +386,8 @@ export default function VideoComposerDashboard() {
    * inserts a new scene server-side via the orchestrator). Keeps any local
    * unsaved field by overlaying DB rows onto the existing local store.
    */
-  const refetchScenesFromDb = useCallback(async () => {
-    const projectId = project.id;
+  const refetchScenesFromDb = useCallback(async (explicitProjectId?: string) => {
+    const projectId = explicitProjectId || projectIdRef.current || project.id;
     if (!projectId) return;
     try {
       const { data, error: dbError } = await supabase
@@ -472,6 +477,7 @@ export default function VideoComposerDashboard() {
     setIsPersisting(true);
     try {
       const result = await ensureProjectPersisted(project);
+      projectIdRef.current = result.projectId;
       setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
       // If this is an Ad Director project, ensure ad_meta is up-to-date even
       // when the project row already existed (subsequent wizard runs).
@@ -875,9 +881,12 @@ export default function VideoComposerDashboard() {
     opts?: { removeParent?: boolean },
   ): Promise<(string | undefined)[]> => {
     const removeParent = opts?.removeParent === true;
-    const projectId = project.id;
+    // Read the freshest projectId from the ref — `project.id` from the
+    // closure can still be undefined right after ensureProjectPersisted()
+    // resolved in the same click handler.
+    const projectId = projectIdRef.current || project.id;
     if (!projectId) {
-      throw new Error('Project not persisted yet — please save the project first.');
+      throw new Error('Projekt konnte nicht gespeichert werden — bitte oben „Speichern" klicken und erneut versuchen.');
     }
 
     // Build snake_case payload for the atomic DB function.
@@ -928,7 +937,8 @@ export default function VideoComposerDashboard() {
     }
 
     // Refetch from DB so local state reflects the new ordering & ids.
-    try { await refetchScenesFromDb(); } catch (e) {
+    // Pass the explicit projectId so refetch isn't skipped due to stale closure.
+    try { await refetchScenesFromDb(projectId); } catch (e) {
       console.warn('[insertScenesAfter] refetch failed (non-fatal)', e);
     }
 
@@ -1188,6 +1198,10 @@ export default function VideoComposerDashboard() {
               onRefetchScenes={refetchScenesFromDb}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
+                // Sync ref BEFORE setState so any callback that fires inside
+                // the same click handler (e.g. insertScenesAfter) sees the
+                // freshly persisted UUID without waiting for a re-render.
+                projectIdRef.current = result.projectId;
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
                 return result;
               }}
@@ -1205,6 +1219,7 @@ export default function VideoComposerDashboard() {
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
+                projectIdRef.current = result.projectId;
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
                 return result;
               }}
