@@ -145,13 +145,12 @@ export default function SceneCardSummaryHeader({
   const titlePreview = useMemo(() => {
     const candidate =
       (scene.dialogScript || '').trim() ||
-      (scene.aiPrompt || '').trim() ||
-      (scene.script || '').trim();
+      (scene.aiPrompt || '').trim();
     if (!candidate) return '';
     const firstLine = candidate.split(/\r?\n/).find((l) => l.trim().length > 0) ?? '';
     const cleaned = firstLine.replace(/^[A-Za-zÀ-ÿ][\w\s.'-]{0,40}\s*[:：]\s*/, '').trim();
     return cleaned.length > 80 ? cleaned.slice(0, 77) + '…' : cleaned;
-  }, [scene.dialogScript, scene.aiPrompt, scene.script]);
+  }, [scene.dialogScript, scene.aiPrompt]);
 
   return (
     <div
