@@ -173,8 +173,8 @@ const T = {
     successInline: (n: number) => `${n} bloque${n === 1 ? '' : 's'} de voz añadidos a esta escena.`,
     failed: 'Generación fallida',
     aiFailed: 'No se pudo generar el guion con IA',
-    srsLabel: 'Avanzado: renderizar como escenas plano-contraplano separadas',
-    srsHint: 'Por defecto: el diálogo suena como voz en off en esta escena — sin escenas extra.',
+    srsLabel: 'Avanzado: en su lugar, déjalo como voz en off sobre una escena compartida',
+    srsHint: 'Por defecto con varios hablantes (con retratos): cada hablante tiene su propio plano lip-sync. Activa el interruptor si solo quieres una escena de grupo con voz en off.',
     close: 'Cerrar',
   },
 };
