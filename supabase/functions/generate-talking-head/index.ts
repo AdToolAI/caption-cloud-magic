@@ -536,6 +536,9 @@ Deno.serve(async (req) => {
     return qaMockResponse({ corsHeaders, kind: "talking-head" });
   }
 
+  // Captured early so the catch-block can always mark the sub-scene as
+  // `failed` (even if req.json() below threw or the body was already consumed).
+  let earlySceneId: string | undefined;
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
