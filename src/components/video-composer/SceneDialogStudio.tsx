@@ -786,7 +786,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
           // Force HeyGen engine and disable any auto-routing decisions.
           engineOverride: 'heygen',
-          aiPrompt: `${s.character.name}: ${s.block.text}`,
+          aiPrompt: applyDialogToPrompt('', [s.block], language),
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
