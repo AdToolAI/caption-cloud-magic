@@ -77,6 +77,7 @@ import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
 import DirectorConsolePreview from './director-console/DirectorConsolePreview';
 import DirectorQualityCoach from './director-console/DirectorQualityCoach';
+import SceneCardSummaryHeader from './SceneCardSummaryHeader';
 import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
