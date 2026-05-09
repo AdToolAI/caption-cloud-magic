@@ -477,6 +477,7 @@ export default function VideoComposerDashboard() {
     setIsPersisting(true);
     try {
       const result = await ensureProjectPersisted(project);
+      projectIdRef.current = result.projectId;
       setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
       // If this is an Ad Director project, ensure ad_meta is up-to-date even
       // when the project row already existed (subsequent wizard runs).
