@@ -185,6 +185,10 @@ export default function SceneCard({
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   // Block L — Inline Compare Lab dialog open state
   const [compareLabOpen, setCompareLabOpen] = useState(false);
+  // Phase F — "Erweitert" drawer (Final-Prompt preview, Multi-Engine, Compare,
+  // Reference-Image-Upload). Default closed → reduces visual cluster on the
+  // Studio Bühne for non-power-users.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
   const { data: commentCounts } = useSceneCommentCounts(projectId);
