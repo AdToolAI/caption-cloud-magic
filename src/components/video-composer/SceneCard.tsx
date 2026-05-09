@@ -162,6 +162,9 @@ export default function SceneCard({
   onAddCharacter,
   language,
   onEnsurePersisted,
+  previousSceneLastFrameUrl,
+  previousSceneIndex,
+  frameFirstMode,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
