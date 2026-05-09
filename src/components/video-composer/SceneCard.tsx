@@ -889,13 +889,6 @@ export default function SceneCard({
                   }}
                   language={lang as 'en' | 'de' | 'es'}
                 />
-                <p className="text-[10px] text-muted-foreground -mt-1 px-1">
-                  {lang === 'de'
-                    ? 'Charaktere werden automatisch im Prompt erwähnt.'
-                    : lang === 'es'
-                    ? 'Los personajes se mencionan automáticamente en el prompt.'
-                    : 'Characters are mentioned automatically in the prompt.'}
-                </p>
 
                 {/* Trigger: open the per-scene Script/Dialog Studio. Available from 1 cast member upwards. */}
                 {(() => {
