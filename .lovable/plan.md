@@ -1,34 +1,27 @@
-Ich sehe zwei wichtige Signale:
+## Problem
+Der aktuelle Fehler ist nicht mehr der alte Insert-/Reihenfolge-Fehler. Die Szene wird vor dem Splitten zwar gespeichert, aber `insertScenesAfter` liest danach noch `project.id` aus einer alten React-Closure. Dadurch glaubt der Callback weiterhin, das Projekt sei nicht gespeichert und wirft: `Project not persisted yet — please save the project first.`
 
-1. Die sichtbare Toast-Meldung im Screenshot ist noch die alte Meldung. Im aktuellen Code existiert sie nicht mehr. Das spricht dafür, dass im Browser noch ein altes Frontend-Bundle läuft oder der betroffene Flow an einer alten, nicht aktualisierten Callback-Instanz hängt.
-2. Der technische Kern bleibt trotzdem die gleiche Stelle: `insertScenesAfter` ersetzt die Parent-Szene über mehrere Client-Requests. Das ist nicht wirklich atomar. Bei eindeutiger Szenen-Reihenfolge (`project_id + order_index`) kann ein Zwischenzustand scheitern, und die UI klappt den Studio-Bereich weg, bevor klar sichtbar ist, ob die Sub-Szenen angelegt wurden.
+## Plan
+1. **Persistierte Projekt-ID stabil verfügbar machen**
+   - In `VideoComposerDashboard.tsx` eine `projectRef`/aktuelle Projekt-ID-Referenz ergänzen, die bei jedem Render den neuesten Projektzustand hält.
+   - `insertScenesAfter` nicht mehr nur aus der potenziell alten Closure `project.id` lesen lassen, sondern aus der aktuellen Ref.
 
-Plan:
+2. **Nach Auto-Save sofort mit frischer ID arbeiten**
+   - Den `onEnsurePersisted`-Callback so anpassen, dass er die frisch gespeicherte `projectId` und Szenen nicht nur via `setProject` setzt, sondern auch synchron in der Ref aktualisiert.
+   - Damit kann derselbe Klick-Flow weiterlaufen, ohne auf einen neuen React-Render warten zu müssen.
 
-1. **Client-Reorder durch echte atomare Datenbankfunktion ersetzen**
-   - Eine Backend-RPC für „Parent-Szene durch Dialog-Sub-Szenen ersetzen“ erstellen.
-   - Alles in einer Transaktion ausführen: Parent laden, Tail-Szenen temporär verschieben, Parent + Audio löschen, Sub-Szenen einfügen, Tail final verschieben, neue IDs zurückgeben.
-   - Vorteil: Kein halb fertiger Zustand mehr durch mehrere einzelne Browser-Requests.
+3. **Refetch nach RPC mit expliziter Projekt-ID absichern**
+   - `refetchScenesFromDb` optional eine Projekt-ID entgegennehmen lassen.
+   - Nach `replace_composer_scene_with_children` genau die gerade verwendete ID refetchen, statt bei noch alter State-Closure nichts zu tun.
 
-2. **`VideoComposerDashboard.tsx` auf RPC umstellen**
-   - `insertScenesAfter` ruft nur noch die RPC auf und refetcht danach die Szenen aus der DB.
-   - Keine stillen `undefined`-Rückgaben mehr: Fehler werden klar geworfen und landen sichtbar in der Toast-Meldung.
-
-3. **`SceneDialogStudio.tsx` stabilisieren**
-   - Während „Splitten & Lip Sync generieren“ läuft, bleibt die Fortschrittsanzeige sichtbar.
-   - Falls das Ersetzen der Szene scheitert, wird der Prozess vor HeyGen gestoppt und zeigt die echte Ursache.
-   - Falls nur HeyGen/Lip-Sync scheitert, bleiben die neu erzeugten Sprecher-Szenen sichtbar und werden als fehlgeschlagen markiert.
-
-4. **Alte Bundle-/Cache-Symptome abfangen**
-   - Eine kleine Frontend-Version/Cache-Guard-Logik ergänzen, damit nach Deploy nicht mehr sichtbar altes Code-Bundle weiterläuft.
-   - Zusätzlich die alte Fehlermeldung vollständig entfernen/ersetzen, damit wir sofort erkennen, ob der aktuelle Code wirklich aktiv ist.
+4. **Fehlermeldung verständlicher machen**
+   - Falls wirklich keine ID verfügbar ist, die Meldung auf Deutsch und handlungsorientiert ausgeben.
+   - Keine HeyGen-/Lip-Sync-Kosten starten, wenn die Szenen-Ersetzung nicht möglich ist.
 
 5. **Verifikation**
-   - DB prüfen: Sub-Szenen mit `dialog-srs:*` müssen nach dem Klick entstehen.
-   - Logs prüfen: Der `generate-talking-head` Aufruf darf erst nach erfolgreicher Sub-Szenen-Erstellung starten.
-   - Fehlerfall prüfen: Es darf nicht mehr „Dialog-Szene konnte nicht ersetzt werden“ erscheinen; stattdessen kommt entweder die echte DB-Ursache oder ein HeyGen-spezifischer Fehler.
+   - Codepfad prüfen: `SceneDialogStudio -> onEnsurePersisted -> onInsertScenesAfter -> RPC` verwendet überall dieselbe frische Projekt-ID.
+   - Sicherstellen, dass die Fortschrittsanzeige beim Splitten offen bleibt und die alten Szenen nicht wieder einklappen, bevor die Sub-Szenen eingefügt sind.
 
-Technische Details:
-- Betroffene Dateien: `src/components/video-composer/VideoComposerDashboard.tsx`, `src/components/video-composer/SceneDialogStudio.tsx`.
-- Neue Migration: RPC/Funktion in der Datenbank für atomisches Ersetzen der Szene.
-- Kein Wechsel des Video-/Lip-Sync-Providers; es geht nur um robuste Szenen-Ersetzung und Debug-Sichtbarkeit.
+## Betroffene Dateien
+- `src/components/video-composer/VideoComposerDashboard.tsx`
+- ggf. minimale Anpassung in `src/components/video-composer/SceneDialogStudio.tsx`, nur falls die generierte Fehlermeldung dort noch präziser abgefangen werden muss.
