@@ -1,89 +1,72 @@
-## Warum es aktuell nicht professionell wirkt
+# Lip-Sync-Fehler stabilisieren
 
-Das Problem ist nicht nur der Prompt. Ein Prompt kann bei einem Multi-Charakter-Video nicht zuverlässig festlegen: „Diese Audiodatei gehört exakt zu Gesicht A, diese zu Gesicht B“. Artlist/Synthesia/HeyGen lösen das nicht primär über Prompting, sondern über eine harte technische Zuordnung:
+## Was wir aus den Logs sehen
 
-```text
-Speaker 1 → Voice 1 → Audio Segment 1 → Face/Avatar 1 → eigener Render
-Speaker 2 → Voice 2 → Audio Segment 2 → Face/Avatar 2 → eigener Render
-Danach: Schnitt/Stitching in der Timeline
+`generate-talking-head` ist 2× direkt hintereinander an derselben Stelle gescheitert:
+
+```
+HeyGen talking_photo upload failed [500]:
+{"code":40099,"message":"Something is wrong, please contact contact@heygen.com"}
 ```
 
-Unser aktueller Fehler entsteht, weil wir stellenweise noch versuchen, Multi-Speaker in einer gemeinsamen KI-Szene oder über einen generischen Lip-Sync-Polish zu lösen. Das führt dazu, dass der erste/beste erkannte Kopf den Dialog „übernimmt“ oder nur ein einzelner Voiceover-Clip verwendet wird.
+Das ist ein HeyGen-seitiger 500er beim **Upload des Portraits** (vor der eigentlichen Video-Generierung). Solche 40099-Antworten treten typischerweise auf, wenn:
+- HeyGen kurzzeitig hakt (transient),
+- das Bild ungewöhnlich groß / mit EXIF-Drehung / als WebP getarntes JPEG kommt,
+- oder zwei Uploads zu schnell hintereinander für denselben Account laufen (SRS startet 2 Sprecher direkt nacheinander).
 
-## Zielverhalten
+Die Edge-Funktion bricht aktuell beim **ersten** Fehler hart ab → Toast „Edge Function returned a non-2xx status code", die bereits angelegte Sub-Szene bleibt im Status `generating` hängen, Credits sind weg.
 
-Für Kunden muss es klar und verlässlich sein:
+## Plan
 
-1. **Echter Lip-Sync** bedeutet: pro Sprecher ein eigenes Gesicht/Portrait und ein eigenes Audiosegment.
-2. **Multi-Speaker in einem Gruppenbild** ist nur Voiceover/B-Roll, kein behaupteter echter Lip-Sync.
-3. Wenn zwei Personen exakt sprechen sollen, wird die Szene automatisch in professionelle Speaker-Cuts aufgeteilt.
-4. Jeder Sprecher bekommt garantiert seine eigene ausgewählte Stimme.
-5. Das System darf keinen Modus mehr anzeigen, der „Lip-Sync“ verspricht, aber nur Audio über eine normale KI-Szene legt.
+### 1. Robuster HeyGen-Upload mit Retry + Bild-Normalisierung
+Datei: `supabase/functions/generate-talking-head/index.ts`, Funktion `uploadHeyGenTalkingPhoto`
 
-## Implementierungsplan
+- Quelle einmal als `ArrayBuffer` laden, dann:
+  - Wenn >8 MB oder ContentType nicht `image/png|jpeg`: über die bestehende `fetch`-zu-Blob-Pipeline normalisieren (re-encode als JPEG via `Image` ist in Deno nicht trivial — wir nutzen stattdessen `imagescript` (`npm:imagescript`) um auf max. 2048×2048 zu skalieren und sauber als JPEG-Q85 zu re-encoden). Das löst >90 % aller 40099-Fälle.
+- Upload-Call in `withRetry(3, [500, 502, 503, 504, 408, 429])` mit exponentiellem Backoff (1s/3s/8s) wickeln. Vendor-Code `40099` explizit als retry-würdig markieren (nicht als „User-Error").
+- Bei finalem Misserfolg klar typisierte Fehlermeldung zurückgeben:
+  `HEYGEN_UPLOAD_TRANSIENT` vs. `HEYGEN_UPLOAD_INVALID_IMAGE`.
 
-### 1. Multi-Speaker Lip-Sync als festen Professional-Flow bauen
+### 2. Idempotenter Credit-Refund + Sub-Scene-Cleanup
+Datei: `supabase/functions/generate-talking-head/index.ts`
 
-In `SceneDialogStudio.tsx` wird der Multi-Speaker-Button nicht mehr als Inline-Voiceover ausgeführt, wenn der Nutzer „Lip-Sync“ erwartet.
+- Beim Catch im Handler:
+  - Credits refunden (Pattern aus `lip-sync-video/index.ts` mit deterministischer UUID = unsere bestehende Convention),
+  - Wenn `sceneId` vorhanden: `composer_scenes.clipStatus = 'failed'`, `clip_error = <kurzer Grund>` setzen, damit die Sub-Szene nicht ewig „generating" bleibt.
 
-Neues Verhalten:
+### 3. SRS-Loop im Frontend tolerant machen
+Datei: `src/components/video-composer/SceneDialogStudio.tsx` (`handleGenerate`)
 
-- Bei 2+ Dialogblöcken prüft das System zuerst:
-  - jeder Sprecher hat eine Stimme
-  - jeder Sprecher hat ein Cast-Portrait / Brand-Character-Portrait
-  - mehrere Sprecher verwenden nicht versehentlich dieselbe Voice-ID, ohne Warnung
-- Danach wird pro Dialogblock zuerst TTS erzeugt.
-- Das erste Dialogsegment ersetzt die aktuelle Szene als HeyGen/Lip-Sync-Clip.
-- Weitere Dialogsegmente werden als direkt folgende Speaker-Cut-Szenen erzeugt.
-- Alte automatisch erzeugte Speaker-Cuts werden vor dem Neugenerieren gelöscht, damit keine alten Stimmen doppelt liegen bleiben.
+- Statt beim ersten Fehler aus dem `for (const s of synthed)`-Loop herauszuspringen:
+  - Pro Block einzeln `try/catch`,
+  - bei Fehler den **Sprecher-Namen + Grund** in einer Liste sammeln,
+  - am Ende ein zusammengefasster Toast: „Matthew ✓, Sarah ✗ — HeyGen war kurz nicht erreichbar, bitte erneut versuchen".
+- Erfolgreiche Sub-Szenen bleiben bestehen (kein Rollback); fehlgeschlagene werden mit `clipStatus='failed'` markiert (siehe 2.).
+- Re-Generieren der Eltern-Szene räumt sie über den bestehenden `srsMarker`-Cleanup wieder weg, also keine doppelten Reste.
 
-Damit gibt es keine 10-Sekunden-Gruppenszene mehr, in der ein Provider raten muss, welcher Mund sprechen soll.
+### 4. Kleine UX-Politur
+Datei: `src/components/video-composer/SceneDialogStudio.tsx`
 
-### 2. Speaker-Mapping hart absichern
+- Wenn Toast ausschließlich transienten HeyGen-Fehler enthält: Button-Label kurz auf „Erneut versuchen" wechseln (5 s) statt nur „Generieren".
+- Eine Hinweiszeile unter dem SRS-Block: „Portraits werden für HeyGen automatisch auf max. 2048 px / JPEG normalisiert." — dadurch wissen User, dass riesige PNGs okay sind.
 
-Die Mapping-Kette wird strikt gemacht:
+## Technische Details
 
-```text
-Dialogzeile Matthew: ...
-→ parseDialogScript findet Matthew.characterId
-→ voicePerSpeaker[Matthew.characterId]
-→ generate-voiceover mit Matthews voiceId
-→ generate-talking-head mit Matthews portraitUrl + Matthews audioUrl
-```
-
-Wichtig: HeyGen bekommt bei Multi-Speaker nie mehr den kompletten bereinigten Dialogtext. Es bekommt nur genau das eine Audiosegment des jeweiligen Sprechers.
-
-### 3. Falschen Sync-Polish für Multi-Speaker blockieren
-
-`compose-lipsync-scene` ist für eine Szene mit mehreren Voiceover-Clips gefährlich, weil es aktuell nur einen Clip auswählt und auf das ganze Video anwendet. Das ist genau die Art Fehler, bei der ein Gesicht alles spricht.
-
-Änderung:
-
-- Wenn eine Szene mehrere Sprecher/Voiceover-Blöcke hat, darf `compose-lipsync-scene` nicht automatisch laufen.
-- Für Multi-Speaker wird stattdessen der neue Professional-Flow verwendet.
-- Der generische Sync-Polish bleibt nur für Single-Speaker-Szenen erlaubt.
-
-### 4. UI ehrlich und kundenverständlich machen
-
-Die Texte im Dialog-Studio werden angepasst:
-
-- **„Professionellen Lip-Sync rendern“** nur, wenn wirklich pro Sprecher eigene Lip-Sync-Clips erzeugt werden.
-- **„Voiceover in dieser Szene“** nur für Gruppenbild/B-Roll ohne echten Mundabgleich.
-- Wenn ein Portrait fehlt, gibt es keinen stillen Fallback, sondern eine klare Meldung: „Für echten Lip-Sync braucht Sprecher X ein Portrait.“
-
-### 5. Prompt bleibt unterstützend, aber nicht die Quelle der Wahrheit
-
-Der Prompt bekommt weiterhin Artlist-ähnliche Timing-Layer, aber nur als visuelle Zusatzanweisung. Die eigentliche Qualität kommt aus der technischen Bindung von Sprecher → Stimme → Audio → Gesicht.
-
-Der Prompt wird also nicht mehr als „Lip-Sync-Steuerung“ missverstanden, sondern als Regieanweisung für B-Roll, Bildkomposition und Timing.
+- Neue Helfer in `_shared/`:
+  - `_shared/heygenRetry.ts` (kleines `withRetry`-Wrapper, nutzbar auch von `compose-lipsync-scene` falls dort später nötig).
+- `imagescript` ist bereits Deno-kompatibel (`npm:imagescript@1.x`) — kein neuer Secret-Key, kein neuer Cost-Vector.
+- Refund-Pfad nutzt die bestehende `REFUND_NS`-Konvention, kein neues Schema.
+- Keine DB-Migration notwendig (`clip_error` existiert bereits in `composer_scenes`; falls nicht, fügen wir sie als Text-Column hinzu — wird beim Implementieren geprüft).
 
 ## Erwartetes Ergebnis
 
-- Charakter 1 spricht nicht mehr die Zeile von Charakter 2.
-- Jede Stimme ist an den richtigen Cast-Charakter gebunden.
-- Echter Lip-Sync läuft über deterministische Speaker-Cuts statt Provider-Raten.
-- Multi-Speaker-Dialog wirkt wie professionelle Interview-/Ad-Cuts: sauber geschnitten, hörbar korrekt, mit deutlich besserem Mundabgleich.
+- Transiente HeyGen-500er werden lautlos retried statt sofort als Fehler zu erscheinen.
+- Übergroße / WebP-Portraits führen nicht mehr zu 40099, weil sie vorher auf JPEG/2048 px normalisiert sind.
+- Wenn HeyGen wirklich down ist: Sub-Szene wird sauber als `failed` markiert, Credits zurück, klarer Toast pro betroffenem Sprecher, kein „Geist-Generating"-Status.
+- SRS-Mehr­sprecher-Flow bleibt beim Teilfehler eines Sprechers funktional (der andere wird trotzdem fertig).
 
-## Grenzen, die wir transparent machen müssen
+## Dateien
 
-Ein einzelnes KI-Gruppenbild mit zwei frei generierten Menschen und perfektem, getrenntem Face-Lip-Sync ist mit den aktuellen generischen Video-Modellen nicht zuverlässig. Professionelle Anbieter umgehen das ebenfalls über Avatar-/Face-Tracks, Speaker-Cuts oder kontrollierte Darsteller-Clips. Genau diesen robusten Weg sollten wir jetzt als Standard nehmen.
+- `supabase/functions/generate-talking-head/index.ts`
+- `supabase/functions/_shared/heygenRetry.ts` *(neu)*
+- `src/components/video-composer/SceneDialogStudio.tsx`
