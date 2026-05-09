@@ -99,6 +99,16 @@ export default function DirectorQualityCoach({ scene, language = 'en', className
 
   const failCount = result.tips.filter((t) => t.severity === 'fail').length;
   const warnCount = result.tips.filter((t) => t.severity === 'warn').length;
+  // Phase E — single coach sentence: surface the most-severe tip in the
+  // collapsed header so users see the *one* thing to fix without expanding.
+  const topTip =
+    result.tips.find((t) => t.severity === 'fail') ??
+    result.tips.find((t) => t.severity === 'warn') ??
+    null;
+  const allClearLabel =
+    language === 'de' ? 'Alles bereit — keine offenen Notizen vom Regisseur.'
+    : language === 'es' ? 'Todo listo — sin notas pendientes del director.'
+    : 'All clear — no open notes from the director.';
 
   return (
     <div
@@ -111,39 +121,44 @@ export default function DirectorQualityCoach({ scene, language = 'en', className
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/[0.02] transition-colors"
+        className="w-full flex items-center justify-between gap-3 px-3 py-2 hover:bg-white/[0.02] transition-colors text-left"
       >
-        <div className="flex items-center gap-3">
-          {/* Numeric badge */}
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {/* Numeric ring */}
           <div className={cn(
-            'h-10 w-10 rounded-full border-2 flex items-center justify-center font-mono text-sm font-bold tabular-nums',
+            'h-10 w-10 rounded-full border-2 flex items-center justify-center font-mono text-sm font-bold tabular-nums shrink-0',
             result.score >= 85 ? 'border-emerald-400/60' : result.score >= 65 ? 'border-amber-400/60' : 'border-rose-500/60',
             scoreColor(result.score),
           )}>
             {result.score}
           </div>
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{L.title}</span>
-            <span className={cn('text-xs font-medium', scoreColor(result.score))}>{verdict}</span>
+          <div className="flex flex-col items-start min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{L.title}</span>
+              <span className={cn('text-[10px] font-medium', scoreColor(result.score))}>· {verdict}</span>
+            </span>
+            {/* One coach sentence — the single most important fix */}
+            <span className={cn(
+              'text-[11px] leading-snug truncate w-full',
+              topTip ? (topTip.severity === 'fail' ? 'text-rose-200/90' : 'text-amber-200/90') : 'text-emerald-300/80',
+            )}>
+              {topTip ? `${topTip.label} — ${topTip.hint}` : allClearLabel}
+            </span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {failCount > 0 && (
-            <Badge variant="outline" className="h-5 gap-1 border-rose-500/40 bg-rose-500/10 text-[10px] text-rose-300">
-              <AlertTriangle className="h-2.5 w-2.5" />
-              {failCount}
-            </Badge>
-          )}
-          {warnCount > 0 && (
-            <Badge variant="outline" className="h-5 gap-1 border-amber-400/40 bg-amber-400/10 text-[10px] text-amber-300">
-              <Lightbulb className="h-2.5 w-2.5" />
-              {warnCount}
-            </Badge>
-          )}
-          {failCount === 0 && warnCount === 0 && (
-            <Badge variant="outline" className="h-5 gap-1 border-emerald-400/40 bg-emerald-400/10 text-[10px] text-emerald-300">
-              <CheckCircle2 className="h-2.5 w-2.5" />
-              All clear
+        <div className="flex items-center gap-1.5 shrink-0">
+          {failCount + warnCount > 0 && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'h-5 gap-1 text-[10px]',
+                failCount > 0
+                  ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+                  : 'border-amber-400/40 bg-amber-400/10 text-amber-300',
+              )}
+            >
+              {failCount > 0 ? <AlertTriangle className="h-2.5 w-2.5" /> : <Lightbulb className="h-2.5 w-2.5" />}
+              {failCount + warnCount}
             </Badge>
           )}
           {open ? <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />}
