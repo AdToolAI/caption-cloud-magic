@@ -881,7 +881,24 @@ export default function VideoComposerDashboard() {
       return partials.map(() => undefined);
     }
     const current = project.scenes;
-    const parentIdx = current.findIndex((s) => s.id === parentSceneId);
+    let parentIdx = current.findIndex((s) => s.id === parentSceneId);
+    // Fallback: if the caller passed a stale/temp id, try to find the parent
+    // by matching the persisted DB row → orderIndex. This prevents
+    // "sub-scene insert failed" when the dialog studio resolves the real
+    // DB id but the local state hasn't refreshed yet.
+    if (parentIdx < 0) {
+      try {
+        const { data: dbParent } = await supabase
+          .from('composer_scenes')
+          .select('order_index')
+          .eq('id', parentSceneId)
+          .maybeSingle();
+        const oi = (dbParent as any)?.order_index;
+        if (typeof oi === 'number') {
+          parentIdx = current.findIndex((s) => (s.orderIndex ?? -1) === oi);
+        }
+      } catch (_e) { /* ignore — handled below */ }
+    }
     if (parentIdx < 0) {
       console.warn('[VideoComposerDashboard] insertScenesAfter: parent not found', parentSceneId);
       return partials.map(() => undefined);
