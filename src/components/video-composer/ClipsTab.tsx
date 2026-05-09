@@ -113,16 +113,29 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         toast({ title: 'Kein Clip vorhanden', description: 'Generiere zuerst diese Szene.' });
         return;
       }
+      const dur = currentScene.durationSeconds || 5;
+      const lastFrameTime = Math.max(0.05, dur - 0.05);
       const result = await extractLastFrame({
         videoUrl: currentScene.clipUrl,
         sceneId: currentScene.id,
         projectId,
-        durationSeconds: currentScene.durationSeconds,
+        durationSeconds: lastFrameTime,
       });
       if (!result) return;
       const updated = scenes.map((s) =>
         s.id === nextScene.id
-          ? { ...s, referenceImageUrl: result.lastFrameUrl, clipStatus: 'pending' as const }
+          ? {
+              ...s,
+              referenceImageUrl: result.lastFrameUrl,
+              clipStatus: 'pending' as const,
+              continuityLocked: true,
+              continuationSourceSceneId: currentScene.id,
+              framePickSeconds: lastFrameTime,
+              // Default 0.3s crossfade for paired Artlist-style continuity
+              transitionStyle: (s.transitionStyle && s.transitionStyle !== 'none')
+                ? s.transitionStyle
+                : ('crossfade' as any),
+            }
           : s
       );
       onUpdateScenes(updated);
@@ -132,6 +145,37 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       });
     },
     [scenes, projectId, extractLastFrame, onUpdateScenes]
+  );
+
+  // Frame-Picker (Artlist-style): pick ANY frame, not just the last
+  const [framePickerState, setFramePickerState] = useState<{
+    source: ComposerScene;
+    target: ComposerScene;
+    targetIndex: number;
+  } | null>(null);
+
+  const handleFramePicked = useCallback(
+    (next: { referenceImageUrl: string; framePickSeconds: number; continuationSourceSceneId: string }) => {
+      if (!framePickerState) return;
+      const targetId = framePickerState.target.id;
+      const updated = scenes.map((s) =>
+        s.id === targetId
+          ? {
+              ...s,
+              referenceImageUrl: next.referenceImageUrl,
+              framePickSeconds: next.framePickSeconds,
+              continuationSourceSceneId: next.continuationSourceSceneId,
+              continuityLocked: true,
+              clipStatus: 'pending' as const,
+              transitionStyle: (s.transitionStyle && s.transitionStyle !== 'none')
+                ? s.transitionStyle
+                : ('crossfade' as any),
+            }
+          : s
+      );
+      onUpdateScenes(updated);
+    },
+    [framePickerState, scenes, onUpdateScenes]
   );
   const [stockSearch, setStockSearch] = useState<Record<string, string>>({});
   const [stockResults, setStockResults] = useState<Record<string, any[]>>({});
