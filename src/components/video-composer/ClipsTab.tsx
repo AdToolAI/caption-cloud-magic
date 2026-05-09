@@ -219,10 +219,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
           }
           // Auto-trigger Sync.so post-step when the scene opted in and a VO exists.
+          // SAFETY: never run for multi-speaker scenes — Sync.so would pick a
+          // single voiceover clip and apply it to the whole video, which is
+          // exactly the "one face speaks for both" failure mode.
+          const speakerCount = (scene.audioPlan?.speakers?.length ?? 0);
           if (
             (dbScene as any).lip_sync_with_voiceover === true &&
             !(dbScene as any).lip_sync_applied_at &&
-            (dbScene as any).lip_sync_status !== 'running'
+            (dbScene as any).lip_sync_status !== 'running' &&
+            speakerCount <= 1
           ) {
             lipSyncTargets.push(scene.id);
           }
