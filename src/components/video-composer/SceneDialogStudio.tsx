@@ -467,6 +467,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     let okCount = 0;
     let cumulativeOffset = 0;
     const timedBlocks: typeof blocks = [];
+    // Director Console — accumulator for the first-class AudioPlan.
+    // Stays in script order so `startSec`/`endSec` map directly to playback.
+    const planSpeakers: import('@/types/video-composer').AudioPlanSpeaker[] = [];
 
     // Determine if we should auto-upgrade to HeyGen lip-sync.
     // Trigger: at least one speaker in this dialog has a portrait. If not, we
