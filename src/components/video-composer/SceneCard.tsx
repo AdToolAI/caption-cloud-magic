@@ -1039,8 +1039,8 @@ export default function SceneCard({
             </AlertDialog>
 
 
-            {/* Scene-Aware Character Anchor — strategy badge + override */}
-            {scene.clipSource.startsWith('ai-') && (() => {
+            {/* Scene-Aware Character Anchor — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && scene.clipSource.startsWith('ai-') && (() => {
               const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);
               if (!anchor) return null;
               const labels: Record<string, { de: string; cost: string; tone: string }> = {
