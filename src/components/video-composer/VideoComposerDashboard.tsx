@@ -386,8 +386,8 @@ export default function VideoComposerDashboard() {
    * inserts a new scene server-side via the orchestrator). Keeps any local
    * unsaved field by overlaying DB rows onto the existing local store.
    */
-  const refetchScenesFromDb = useCallback(async () => {
-    const projectId = project.id;
+  const refetchScenesFromDb = useCallback(async (explicitProjectId?: string) => {
+    const projectId = explicitProjectId || projectIdRef.current || project.id;
     if (!projectId) return;
     try {
       const { data, error: dbError } = await supabase
