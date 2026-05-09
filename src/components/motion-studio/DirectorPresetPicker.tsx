@@ -44,6 +44,7 @@ export default function DirectorPresetPicker({
   modifiers,
   basePrompt,
   onChange,
+  embedded = false,
 }: DirectorPresetPickerProps) {
   const activeCount = Object.values(modifiers).filter(Boolean).length;
 
