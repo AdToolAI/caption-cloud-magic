@@ -737,6 +737,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Ensure the project is persisted before spawning sub-scenes (otherwise
     // onAddScene would write to a non-existent project_id).
     let pidForSrs = (projectId || scene.projectId || '').trim();
+    // Resolve the REAL persisted parent scene id. Without this we'd pass a
+    // stale/local/temp id to onInsertScenesAfter, the dashboard wouldn't find
+    // it in project.scenes, and every insert would silently no-op
+    // → user sees "sub-scene insert failed" for every speaker.
+    let resolvedParentSceneId = scene.id;
     try {
       const ids = await resolvePersistedIds();
       if (!ids) {
@@ -744,6 +749,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
       pidForSrs = ids.pid;
+      resolvedParentSceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
@@ -753,7 +759,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
     // `cinematic_preset_slug` text column — no schema change needed.
-    const srsMarker = `dialog-srs:${scene.id}`;
+    const srsMarker = `dialog-srs:${resolvedParentSceneId}`;
     try {
       // ── Pre-flight: validate every speaker has a voice + portrait BEFORE
       //    any spend, so we can't end up with a half-rendered dialog where
