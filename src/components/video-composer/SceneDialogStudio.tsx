@@ -123,8 +123,8 @@ const T = {
     successInline: (n: number) => `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`,
     failed: 'Generierung fehlgeschlagen',
     aiFailed: 'KI-Skript konnte nicht erstellt werden',
-    srsLabel: 'Erweitert: Als separate Shot-Reverse-Shot-Szenen rendern',
-    srsHint: 'Standard: Dialog läuft als Voiceover in dieser Szene — keine extra Szenen.',
+    srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',
+    srsHint: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.',
     close: 'Schließen',
   },
   en: {
@@ -148,8 +148,8 @@ const T = {
     successInline: (n: number) => `${n} voiceover block${n === 1 ? '' : 's'} attached to this scene.`,
     failed: 'Generation failed',
     aiFailed: 'AI script could not be generated',
-    srsLabel: 'Advanced: render as separate shot-reverse-shot scenes',
-    srsHint: 'Default: dialog plays as voiceover in this scene — no extra scenes.',
+    srsLabel: 'Advanced: keep it as voiceover over one shared scene instead',
+    srsHint: 'Default with multiple speakers (with portraits): each speaker gets their own lip-sync cut. Toggle on if you only want a group scene with voiceover.',
     close: 'Close',
   },
   es: {
@@ -173,8 +173,8 @@ const T = {
     successInline: (n: number) => `${n} bloque${n === 1 ? '' : 's'} de voz añadidos a esta escena.`,
     failed: 'Generación fallida',
     aiFailed: 'No se pudo generar el guion con IA',
-    srsLabel: 'Avanzado: renderizar como escenas plano-contraplano separadas',
-    srsHint: 'Por defecto: el diálogo suena como voz en off en esta escena — sin escenas extra.',
+    srsLabel: 'Avanzado: en su lugar, déjalo como voz en off sobre una escena compartida',
+    srsHint: 'Por defecto con varios hablantes (con retratos): cada hablante tiene su propio plano lip-sync. Activa el interruptor si solo quieres una escena de grupo con voz en off.',
     close: 'Cerrar',
   },
 };
@@ -640,6 +640,36 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    // Warn when two speakers share the SAME voice id — almost always a setup
+    // mistake that produces "both characters sound identical".
+    if (speakers.length >= 2) {
+      const seen = new Map<string, string>();
+      for (const sp of speakers) {
+        const cfg = voicePerSpeaker[sp.id];
+        const vid = cfg?.isCustom ? cfg?.elevenlabsVoiceId : cfg?.voiceId;
+        if (!vid) continue;
+        if (seen.has(vid)) {
+          const other = seen.get(vid)!;
+          toast({
+            title:
+              language === 'de'
+                ? 'Gleiche Stimme für zwei Sprecher'
+                : language === 'es'
+                ? 'Misma voz para dos hablantes'
+                : 'Same voice on two speakers',
+            description:
+              language === 'de'
+                ? `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`
+                : language === 'es'
+                ? `${other} y ${sp.name} usan la misma voz. Elige voces distintas.`
+                : `${other} and ${sp.name} share the same voice. Please pick different voices.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        seen.set(vid, sp.name);
+      }
+    }
     // Pin dialog into the parent scene's AI prompt immediately — visible to
     // the user and persisted alongside the script + voice map.
     try {
@@ -649,21 +679,31 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
     } catch (_) { /* noop */ }
 
-    // ── Default: Inline Voiceover-Overlay ──────────────────────────────
-    // Multi-speaker scenes default to inline voiceover (one TTS clip per
-    // block, played back-to-back over the scene's regular AI clip). This
-    // is the only safe path: routing a multi-speaker dialog to a single
-    // talking-head render would make ONE character lip-sync the whole
-    // script. Real per-speaker lip-sync requires the explicit
-    // Shot-Reverse-Shot split below (renderAsSeparateScenes === true).
-    if (!renderAsSeparateScenes) {
+    // ── Routing decision ────────────────────────────────────────────────
+    // Single speaker → inline voiceover (auto-upgrades to HeyGen if portrait).
+    // Multi speaker:
+    //   • All speakers have a portrait → PROFESSIONAL Shot-Reverse-Shot:
+    //     each speaker becomes its own HeyGen lip-sync sub-scene, so the
+    //     right face speaks the right line. This is what Artlist/Synthesia
+    //     do — there is no reliable way to make ONE generic AI clip hard-
+    //     bind two faces to two audio segments.
+    //   • Any portrait missing → inline voiceover overlay only, with a
+    //     clear honest message that real lip-sync is not available.
+    //   • The "Erweitert" switch lets power users force inline overlay
+    //     even when portraits exist.
+    const allHavePortraits = speakers.every(
+      (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+    );
+    const useProfessionalSrs = blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes
+      ? true
+      : renderAsSeparateScenes;
+
+    if (blocks.length < 2 || !useProfessionalSrs) {
       await handleGenerateInline();
       return;
     }
-    // ── Shot-Reverse-Shot path (opt-in only) ───────────────────────────
-    // Each speaker becomes its own sub-scene + HeyGen render. Requires a
-    // portrait per speaker.
-    if (blocks.length >= 2) {
+    // From here: PROFESSIONAL multi-speaker lip-sync (SRS).
+    if (blocks.length >= 2 && !allHavePortraits) {
       const missingPortrait = speakers.find(
         (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
       );
@@ -1231,28 +1271,47 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           disabled={generating || blocks.length === 0}
           className="h-7 text-xs gap-1 ml-auto"
         >
-          {generating ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
-            </>
-          ) : blocks.length >= 2 ? (
-            <>
-              <User className="h-3 w-3" />{' '}
-              {language === 'de'
-                ? `Lip-Sync generieren (${speakers.length} Szenen)`
-                : language === 'es'
-                ? `Generar lip-sync (${speakers.length} escenas)`
-                : `Generate lip-sync (${speakers.length} scenes)`}
-            </>
-          ) : renderAsSeparateScenes ? (
-            <>
-              <User className="h-3 w-3" /> {t.genBtnSrs}
-            </>
-          ) : (
-            <>
-              <Volume2 className="h-3 w-3" /> {t.genBtn}
-            </>
-          )}
+          {(() => {
+            if (generating) {
+              return (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
+                </>
+              );
+            }
+            if (blocks.length >= 2) {
+              const allPortraits = speakers.every(
+                (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+              );
+              const willSrs = allPortraits && !renderAsSeparateScenes;
+              return willSrs ? (
+                <>
+                  <User className="h-3 w-3" />{' '}
+                  {language === 'de'
+                    ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
+                    : language === 'es'
+                    ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
+                    : `Render professional lip-sync (${speakers.length} cuts)`}
+                </>
+              ) : (
+                <>
+                  <Volume2 className="h-3 w-3" /> {t.genBtn}
+                </>
+              );
+            }
+            if (renderAsSeparateScenes) {
+              return (
+                <>
+                  <User className="h-3 w-3" /> {t.genBtnSrs}
+                </>
+              );
+            }
+            return (
+              <>
+                <Volume2 className="h-3 w-3" /> {t.genBtn}
+              </>
+            );
+          })()}
         </Button>
       </div>
     </Card>
