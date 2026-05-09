@@ -640,6 +640,36 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    // Warn when two speakers share the SAME voice id — almost always a setup
+    // mistake that produces "both characters sound identical".
+    if (speakers.length >= 2) {
+      const seen = new Map<string, string>();
+      for (const sp of speakers) {
+        const cfg = voicePerSpeaker[sp.id];
+        const vid = cfg?.isCustom ? cfg?.elevenlabsVoiceId : cfg?.voiceId;
+        if (!vid) continue;
+        if (seen.has(vid)) {
+          const other = seen.get(vid)!;
+          toast({
+            title:
+              language === 'de'
+                ? 'Gleiche Stimme für zwei Sprecher'
+                : language === 'es'
+                ? 'Misma voz para dos hablantes'
+                : 'Same voice on two speakers',
+            description:
+              language === 'de'
+                ? `${other} und ${sp.name} nutzen dieselbe Stimme. Bitte unterschiedliche Stimmen wählen.`
+                : language === 'es'
+                ? `${other} y ${sp.name} usan la misma voz. Elige voces distintas.`
+                : `${other} and ${sp.name} share the same voice. Please pick different voices.`,
+            variant: 'destructive',
+          });
+          return;
+        }
+        seen.set(vid, sp.name);
+      }
+    }
     // Pin dialog into the parent scene's AI prompt immediately — visible to
     // the user and persisted alongside the script + voice map.
     try {
@@ -649,21 +679,31 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
     } catch (_) { /* noop */ }
 
-    // ── Default: Inline Voiceover-Overlay ──────────────────────────────
-    // Multi-speaker scenes default to inline voiceover (one TTS clip per
-    // block, played back-to-back over the scene's regular AI clip). This
-    // is the only safe path: routing a multi-speaker dialog to a single
-    // talking-head render would make ONE character lip-sync the whole
-    // script. Real per-speaker lip-sync requires the explicit
-    // Shot-Reverse-Shot split below (renderAsSeparateScenes === true).
-    if (!renderAsSeparateScenes) {
+    // ── Routing decision ────────────────────────────────────────────────
+    // Single speaker → inline voiceover (auto-upgrades to HeyGen if portrait).
+    // Multi speaker:
+    //   • All speakers have a portrait → PROFESSIONAL Shot-Reverse-Shot:
+    //     each speaker becomes its own HeyGen lip-sync sub-scene, so the
+    //     right face speaks the right line. This is what Artlist/Synthesia
+    //     do — there is no reliable way to make ONE generic AI clip hard-
+    //     bind two faces to two audio segments.
+    //   • Any portrait missing → inline voiceover overlay only, with a
+    //     clear honest message that real lip-sync is not available.
+    //   • The "Erweitert" switch lets power users force inline overlay
+    //     even when portraits exist.
+    const allHavePortraits = speakers.every(
+      (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+    );
+    const useProfessionalSrs = blocks.length >= 2 && allHavePortraits && !renderAsSeparateScenes
+      ? true
+      : renderAsSeparateScenes;
+
+    if (blocks.length < 2 || !useProfessionalSrs) {
       await handleGenerateInline();
       return;
     }
-    // ── Shot-Reverse-Shot path (opt-in only) ───────────────────────────
-    // Each speaker becomes its own sub-scene + HeyGen render. Requires a
-    // portrait per speaker.
-    if (blocks.length >= 2) {
+    // From here: PROFESSIONAL multi-speaker lip-sync (SRS).
+    if (blocks.length >= 2 && !allHavePortraits) {
       const missingPortrait = speakers.find(
         (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
       );
