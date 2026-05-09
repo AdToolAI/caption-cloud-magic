@@ -365,10 +365,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
       // First pass: compose prompts (so the scene-anchor compose call gets the
       // FINAL English prompt, not the raw one).
-      const composedByScene = new Map<string, ReturnType<typeof composePromptLayers>>();
+      const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
       for (const s of eligibleScenes) {
         const brandCharacterInput = buildBrandInputForScene(s);
-        composedByScene.set(s.id, composePromptLayers({
+        composedByScene.set(s.id, composeFinalPrompt({
           rawPrompt: s.aiPrompt || '',
           directorModifiers: s.directorModifiers,
           shotDirector: s.shotDirector,
@@ -376,6 +376,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           brandCharacter: brandCharacterInput,
           libraryCharacters: libCharacters,
           libraryLocations: libLocations,
+          audioPlan: s.audioPlan,
+          language: directorLanguage,
         }));
       }
 
