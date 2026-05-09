@@ -48,6 +48,7 @@ import {
 import { SortableSceneItem } from './SortableSceneItem';
 import ContinuityGuardianStrip from './ContinuityGuardianStrip';
 import RenderPipelinePanel from './RenderPipelinePanel';
+import FramePickerOverlay from './FramePickerOverlay';
 
 interface ClipsTabProps {
   scenes: ComposerScene[];
