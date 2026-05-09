@@ -44,6 +44,7 @@ import { CharacterCastPicker } from './CharacterCastPicker';
 // lines of always-visible JSX.
 import SceneStyleSheet from './SceneStyleSheet';
 import SceneStyleChip from './SceneStyleChip';
+import SceneSecondaryToggle from './SceneSecondaryToggle';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
@@ -194,8 +195,10 @@ export default function SceneCard({
   const [promptDetailsOpen, setPromptDetailsOpen] = useState(false);
   // Phase 2 (Studio Set v2) — single Sheet for Looks/Feintuning/Modifier.
   const [styleSheetOpen, setStyleSheetOpen] = useState(false);
-  // `advancedOpen` is still used to gate SceneStillFrameStudio further down.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Phase 3 (Studio Set v2) — single drawer collapsing Effects, Anchor + Face-
+  // Lock, Lip-Sync, Reference image + Still-Frame Studio and the hard-cut hint.
+  // Default closed → SceneCard reads as a focussed prompt + cast surface.
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
   const { data: commentCounts } = useSceneCommentCounts(projectId);
@@ -831,8 +834,8 @@ export default function SceneCard({
               );
             })()}
 
-            {/* Effects badges (AI-selected procedural effects layered above the clip) */}
-            {scene.effects && scene.effects.length > 0 && (
+            {/* Effects badges — Phase 3: hidden behind "Mehr ▾" drawer. */}
+            {secondaryOpen && scene.effects && scene.effects.length > 0 && (
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
                   <Wand2 className="h-2.5 w-2.5" />
@@ -1033,8 +1036,8 @@ export default function SceneCard({
             </AlertDialog>
 
 
-            {/* Scene-Aware Character Anchor — strategy badge + override */}
-            {scene.clipSource.startsWith('ai-') && (() => {
+            {/* Scene-Aware Character Anchor — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && scene.clipSource.startsWith('ai-') && (() => {
               const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);
               if (!anchor) return null;
               const labels: Record<string, { de: string; cost: string; tone: string }> = {
@@ -1076,8 +1079,8 @@ export default function SceneCard({
             })()}
 
 
-            {/* Lip-Sync toggle — for character scenes */}
-            {scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
+            {/* Lip-Sync toggle — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
               <div className="flex flex-col gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-col">
@@ -1382,51 +1385,84 @@ export default function SceneCard({
               );
             })()}
 
-            {/* Universal Reference Image — available in every clip-source mode */}
-            <div className="space-y-1.5 pt-1 border-t border-border/30">
-              <div className="text-[10px] text-muted-foreground/80 leading-snug">
-                {scene.clipSource.startsWith('ai-')
-                  ? (lang === 'de'
-                      ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
-                      : lang === 'es'
-                      ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
-                      : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
-                  : (lang === 'de'
-                      ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
-                      : lang === 'es'
-                      ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
-                      : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
-              </div>
-              {advancedOpen && scene.clipSource.startsWith('ai-') && projectId && (
-                <SceneStillFrameStudio
+            {/* Universal Reference Image — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && (
+              <div className="space-y-1.5 pt-1 border-t border-border/30">
+                <div className="text-[10px] text-muted-foreground/80 leading-snug">
+                  {scene.clipSource.startsWith('ai-')
+                    ? (lang === 'de'
+                        ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
+                        : lang === 'es'
+                        ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
+                        : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
+                    : (lang === 'de'
+                        ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
+                        : lang === 'es'
+                        ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
+                        : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
+                </div>
+                {scene.clipSource.startsWith('ai-') && projectId && (
+                  <SceneStillFrameStudio
+                    projectId={projectId}
+                    sceneId={scene.id}
+                    prompt={scene.aiPrompt || ''}
+                    composeHintImageUrl={
+                      activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                    }
+                    selectedReferenceUrl={scene.referenceImageUrl}
+                    onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                    language={lang as 'en' | 'de' | 'es'}
+                  />
+                )}
+                <SceneReferenceImageUpload
                   projectId={projectId}
                   sceneId={scene.id}
-                  prompt={scene.aiPrompt || ''}
-                  composeHintImageUrl={
-                    activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
-                  }
-                  selectedReferenceUrl={scene.referenceImageUrl}
-                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                  language={lang as 'en' | 'de' | 'es'}
+                  referenceImageUrl={scene.referenceImageUrl}
+                  onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
                 />
-              )}
-              <SceneReferenceImageUpload
-                projectId={projectId}
-                sceneId={scene.id}
-                referenceImageUrl={scene.referenceImageUrl}
-                onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
-              />
-            </div>
+              </div>
+            )}
 
-            {/* Transitions disabled in Composer — handled in Director's Cut */}
-            <div
-              className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
-              title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
-            >
-              <span className="text-[10px] text-muted-foreground">
-                Harter Schnitt → Übergänge im Director's Cut
-              </span>
-            </div>
+            {/* Hard-cut hint — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && (
+              <div
+                className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
+                title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
+              >
+                <span className="text-[10px] text-muted-foreground">
+                  Harter Schnitt → Übergänge im Director's Cut
+                </span>
+              </div>
+            )}
+
+            {/* Phase 3 (Studio Set v2) — single drawer toggle for all secondary
+                settings. Active sub-features bubble up as small pills when the
+                drawer is closed so the user keeps situational awareness. */}
+            {(() => {
+              const anchor = scene.clipSource.startsWith('ai-')
+                ? resolveSceneCharacterAnchor(scene, characters, activeBrandChar)
+                : null;
+              const anchorShort: Record<string, string> = {
+                'first-frame-direct': lang === 'de' ? 'Anker: Porträt' : 'Anchor: portrait',
+                'first-frame-composed': lang === 'de' ? 'Anker: komponiert' : 'Anchor: composed',
+                'subject-reference': lang === 'de' ? 'Anker: Subject-Ref' : 'Anchor: subject-ref',
+                'text-only': lang === 'de' ? 'Anker: Text' : 'Anchor: text',
+              };
+              return (
+                <SceneSecondaryToggle
+                  language={lang}
+                  open={secondaryOpen}
+                  onToggle={() => setSecondaryOpen((v) => !v)}
+                  summary={{
+                    effectsCount: scene.effects?.length ?? 0,
+                    anchorLabel: anchor ? (anchorShort[anchor.strategy] ?? null) : null,
+                    faceLock: Boolean(scene.forcePortraitAsFirstFrame),
+                    lipSyncOn: Boolean(scene.lipSyncWithVoiceover),
+                    hasReferenceImage: Boolean(scene.referenceImageUrl),
+                  }}
+                />
+              );
+            })()}
           </div>
 
           {/* Thumbnail preview */}
