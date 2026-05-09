@@ -1271,38 +1271,47 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           disabled={generating || blocks.length === 0}
           className="h-7 text-xs gap-1 ml-auto"
         >
-          {generating ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
-            </>
-          ) : blocks.length >= 2 && (() => {
-            const allPortraits = speakers.every(
-              (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
-            );
-            const willSrs = allPortraits && !renderAsSeparateScenes;
-            return willSrs ? (
-              <>
-                <User className="h-3 w-3" />{' '}
-                {language === 'de'
-                  ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
-                  : language === 'es'
-                  ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
-                  : `Render professional lip-sync (${speakers.length} cuts)`}
-              </>
-            ) : (
+          {(() => {
+            if (generating) {
+              return (
+                <>
+                  <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
+                </>
+              );
+            }
+            if (blocks.length >= 2) {
+              const allPortraits = speakers.every(
+                (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+              );
+              const willSrs = allPortraits && !renderAsSeparateScenes;
+              return willSrs ? (
+                <>
+                  <User className="h-3 w-3" />{' '}
+                  {language === 'de'
+                    ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
+                    : language === 'es'
+                    ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
+                    : `Render professional lip-sync (${speakers.length} cuts)`}
+                </>
+              ) : (
+                <>
+                  <Volume2 className="h-3 w-3" /> {t.genBtn}
+                </>
+              );
+            }
+            if (renderAsSeparateScenes) {
+              return (
+                <>
+                  <User className="h-3 w-3" /> {t.genBtnSrs}
+                </>
+              );
+            }
+            return (
               <>
                 <Volume2 className="h-3 w-3" /> {t.genBtn}
               </>
             );
-          })() ) : renderAsSeparateScenes ? (
-            <>
-              <User className="h-3 w-3" /> {t.genBtnSrs}
-            </>
-          ) : (
-            <>
-              <Volume2 className="h-3 w-3" /> {t.genBtn}
-            </>
-          )}
+          })()}
         </Button>
       </div>
     </Card>
