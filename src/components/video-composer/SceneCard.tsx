@@ -839,6 +839,7 @@ export default function SceneCard({
               </div>
             )}
 
+            <SceneStudioSectionHeader tab="cast" language={lang} />
             {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
             {scene.clipSource.startsWith('ai-') && ((characters && characters.length > 0) || libCharacters.length > 0) && (
               <>
