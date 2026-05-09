@@ -340,6 +340,8 @@ export default function VideoComposerDashboard() {
             continuityDriftScore: ((row as any).continuity_drift_score as any) ?? local?.continuityDriftScore,
             continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
+            audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
+            dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
           };
         });
 
