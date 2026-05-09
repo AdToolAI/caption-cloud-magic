@@ -935,6 +935,14 @@ export default function SceneCard({
               />
             )}
 
+            {/* Director Console — read-only Live Prompt + Audio Plan timeline.
+                Always derived from `scene.audioPlan` + structured slots, never
+                writes back, so the locked Audio Plan is structurally immune to
+                useEffect-style overwrites. */}
+            {scene.clipSource.startsWith('ai-') && (
+              <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
+            )}
+
             {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
             <AlertDialog open={splitConfirmOpen} onOpenChange={setSplitConfirmOpen}>
               <AlertDialogContent>
