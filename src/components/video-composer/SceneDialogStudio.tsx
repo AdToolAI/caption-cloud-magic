@@ -883,53 +883,62 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onUpdate(updates);
       } catch (e) { console.warn('[SceneDialogStudio] SRS audioPlan emit failed', e); }
 
-      // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
-      //    order, each with its OWN real duration and OWN audioUrl.
-      //    A failed render for one speaker MUST NOT abort the others — we
-      //    collect failures and show a single summary toast at the end.
-      if (!onAddScene) throw new Error('Cannot spawn sub-scenes: onAddScene missing');
+      // ── Phase 2: build all sub-scene partials in script order, then insert
+      //    them at the parent scene's position via insertScenesAfter. The
+      //    parent dialog scene is replaced so the user sees Scene #1 (Speaker
+      //    A), Scene #2 (Speaker B) in place of the dialog container instead
+      //    of new tail scenes appearing.
+      if (!onInsertScenesAfter && !onAddScene) {
+        throw new Error('Cannot spawn sub-scenes: no insert hook available');
+      }
       const failures: Array<{ speaker: string; reason: string }> = [];
-      for (const s of synthed) {
+
+      const partials: Partial<ComposerScene>[] = synthed.map((s) => {
         const charShot: CharacterShot = {
           characterId: s.character.id,
           shotType: 'profile',
         } as CharacterShot;
         const subDuration = Math.max(2, Math.min(60, Math.round(s.durationSec * 100) / 100));
-        // Per-speaker dialog map — restrict to ONLY this speaker so any
-        // downstream re-route that reads dialogVoices can never accidentally
-        // pick another speaker's voice.
         const speakerVoiceCfg = voicePerSpeaker[s.block.speakerId];
-        let newSceneId: string | undefined;
-        try {
-          const newSceneIdRaw = await onAddScene({
-            sceneType: scene.sceneType,
-            durationSeconds: subDuration,
-            // Mark as a finished HeyGen lip-sync scene so compose-video-clips
-            // does NOT re-render it as ai-hailuo B-roll later.
-            clipSource: 'ai-hailuo',
-            clipQuality: scene.clipQuality,
-            clipStatus: 'generating',
-            referenceImageUrl: s.character.referenceImageUrl,
-            // Single-speaker dialog script — exact line, this speaker only.
-            dialogScript: `${s.character.name}: ${s.block.text}`,
-            dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
-            // Force HeyGen engine and disable any auto-routing decisions.
-            engineOverride: 'heygen',
-            aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
-            characterShot: charShot,
-            characterShots: [charShot],
-            lipSyncWithVoiceover: true,
-            transitionType: 'fade',
-            transitionDuration: 0.3,
-            // Marker for idempotent cleanup on the next regeneration AND
-            // for compose-video-clips to skip these as already-rendered.
-            cinematicPresetSlug: srsMarker,
-          });
-          newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
+        return {
+          sceneType: scene.sceneType,
+          durationSeconds: subDuration,
+          clipSource: 'ai-hailuo',
+          clipQuality: scene.clipQuality,
+          clipStatus: 'generating',
+          referenceImageUrl: s.character.referenceImageUrl,
+          dialogScript: `${s.character.name}: ${s.block.text}`,
+          dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
+          engineOverride: 'heygen',
+          aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
+          characterShot: charShot,
+          characterShots: [charShot],
+          lipSyncWithVoiceover: true,
+          transitionType: 'fade',
+          transitionDuration: 0.3,
+          cinematicPresetSlug: srsMarker,
+        } as Partial<ComposerScene>;
+      });
 
-          // Always pass the pre-generated audioUrl — no HeyGen-internal TTS,
-          // no risk of voice swaps. Pinning audioUrl also guarantees the
-          // rendered mouth-open length === audio length === sub-scene length.
+      let subSceneIds: (string | undefined)[];
+      if (onInsertScenesAfter) {
+        subSceneIds = await onInsertScenesAfter(scene.id, partials, { removeParent: true });
+      } else {
+        subSceneIds = [];
+        for (const p of partials) {
+          const id = await onAddScene!(p);
+          subSceneIds.push(typeof id === 'string' ? id : undefined);
+        }
+      }
+
+      for (let i = 0; i < synthed.length; i++) {
+        const s = synthed[i];
+        const newSceneId = subSceneIds[i];
+        if (!newSceneId) {
+          failures.push({ speaker: s.character.name, reason: 'sub-scene insert failed' });
+          continue;
+        }
+        try {
           const { data, error } = await supabase.functions.invoke('generate-talking-head', {
             body: {
               sceneId: newSceneId,
@@ -946,7 +955,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           else throw new Error((data as any)?.error || 'unknown error');
         } catch (perBlockErr) {
           const raw = perBlockErr instanceof Error ? perBlockErr.message : String(perBlockErr);
-          // Strip noisy edge-function envelope, keep our typed tag if present.
           const friendly = /HEYGEN_UPLOAD_TRANSIENT/i.test(raw)
             ? (language === 'de'
                 ? 'HeyGen war kurz nicht erreichbar — bitte erneut versuchen.'
@@ -956,9 +964,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : raw.replace(/^Edge Function returned a non-2xx status code:?\s*/i, '');
           failures.push({ speaker: s.character.name, reason: friendly });
           console.error('[SceneDialogStudio] block failed', s.character.name, raw);
-          // Sub-scene already marked failed by the edge function; nothing to clean here.
+          try {
+            await supabase
+              .from('composer_scenes')
+              .update({
+                clip_status: 'failed',
+                clip_error: friendly.slice(0, 500),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', newSceneId);
+          } catch (_e) { /* non-fatal */ }
         }
       }
+
       if (failures.length === 0) {
         toast({ title: t.title, description: t.success(okCount) });
       } else if (okCount === 0) {
