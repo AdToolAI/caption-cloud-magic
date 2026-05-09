@@ -5217,6 +5217,7 @@ export type Database = {
           end_reference_image_url: string | null
           engine_override: string
           first_frame_url: string | null
+          frame_pick_seconds: number | null
           hybrid_mode: string | null
           hybrid_target_scene_id: string | null
           id: string
@@ -5288,6 +5289,7 @@ export type Database = {
           end_reference_image_url?: string | null
           engine_override?: string
           first_frame_url?: string | null
+          frame_pick_seconds?: number | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
           id?: string
@@ -5359,6 +5361,7 @@ export type Database = {
           end_reference_image_url?: string | null
           engine_override?: string
           first_frame_url?: string | null
+          frame_pick_seconds?: number | null
           hybrid_mode?: string | null
           hybrid_target_scene_id?: string | null
           id?: string
