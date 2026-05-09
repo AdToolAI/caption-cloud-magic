@@ -167,7 +167,8 @@ function FrameThumb({ preset }: { preset: CinematicStylePreset }) {
   );
 }
 
-function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProps) {
+function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick }: PresetCardProps) {
+  const isGrid = layout === 'grid';
   return (
     <motion.button
       type="button"
@@ -176,8 +177,9 @@ function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProp
       whileTap={{ scale: 0.97 }}
       title={preset.description[lang]}
       className={cn(
-        'shrink-0 relative rounded-lg border bg-card/40 backdrop-blur-sm overflow-hidden text-left transition-all group',
-        compact ? 'w-[148px] p-1.5' : 'w-[180px] p-2',
+        'relative rounded-lg border bg-card/40 backdrop-blur-sm overflow-hidden text-left transition-all group',
+        isGrid ? 'w-full p-2' : 'shrink-0',
+        !isGrid && (compact ? 'w-[148px] p-1.5' : 'w-[180px] p-2'),
         isActive
           ? 'border-primary ring-1 ring-primary/50 bg-primary/5 shadow-[0_0_18px_-6px_hsl(var(--primary)/0.6)]'
           : 'border-border/60 hover:border-primary/40',
