@@ -22,6 +22,10 @@ export interface DialogBlock {
   speakerId: string;
   speakerName: string;
   text: string;
+  /** Real TTS duration in seconds (set after voiceover is generated). */
+  durationSec?: number;
+  /** Cumulative start offset within the scene, in seconds (0-based). */
+  startSec?: number;
 }
 
 const LINE_RE = /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*[:—-]\s*(.+)$/;
