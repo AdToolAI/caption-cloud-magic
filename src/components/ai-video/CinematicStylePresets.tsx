@@ -81,6 +81,7 @@ interface PresetCardProps {
   lang: Lang;
   isActive: boolean;
   compact: boolean;
+  layout?: 'rail' | 'grid';
   onClick: () => void;
 }
 
