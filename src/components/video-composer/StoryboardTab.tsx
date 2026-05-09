@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library } from 'lucide-react';
+import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon } from 'lucide-react';
 import SceneCard from './SceneCard';
 import HybridExtendDialog from './HybridExtendDialog';
 import TalkingHeadDialog from './TalkingHeadDialog';
@@ -82,6 +82,15 @@ export default function StoryboardTab({
   useEffect(() => {
     try { localStorage.setItem(TIPS_KEY, tipsCollapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [tipsCollapsed]);
+
+  // Phase 2 — Frame-First Mode toggle (Artlist-style two-step workflow)
+  const FRAME_FIRST_KEY = 'video-composer-frame-first-mode';
+  const [frameFirstMode, setFrameFirstMode] = useState<boolean>(() => {
+    try { return localStorage.getItem(FRAME_FIRST_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(FRAME_FIRST_KEY, frameFirstMode ? '1' : '0'); } catch { /* ignore */ }
+  }, [frameFirstMode]);
 
   // Block M — Hybrid Extend dialog state
   const [hybridDialog, setHybridDialog] = useState<{
@@ -342,6 +351,15 @@ export default function StoryboardTab({
           )}
           <Button
             size="sm"
+            variant={frameFirstMode ? 'default' : 'outline'}
+            onClick={() => setFrameFirstMode((v) => !v)}
+            className="gap-1 text-xs"
+            title="Artlist-Stil: erst Still-Frame freezen, dann Video — für maximale Kontrolle und nahtlose Übergänge."
+          >
+            <ImageIcon className="h-3.5 w-3.5" /> Frame-First {frameFirstMode ? '✓' : ''}
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             onClick={() => setSnippetPickerOpen(true)}
             className="gap-1 text-xs"
@@ -459,6 +477,13 @@ export default function StoryboardTab({
                       onAddCharacter={onAddCharacter}
                       language={language}
                       onEnsurePersisted={onEnsurePersisted}
+                      previousSceneLastFrameUrl={
+                        index > 0
+                          ? scenes[index - 1].lastFrameUrl ?? scenes[index - 1].clipUrl
+                          : undefined
+                      }
+                      previousSceneIndex={index > 0 ? index : undefined}
+                      frameFirstMode={frameFirstMode}
                     />
                   </SortableSceneItem>
                 );

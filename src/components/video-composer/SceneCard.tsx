@@ -78,6 +78,8 @@ import { syncCastFromPrompt } from '@/lib/motion-studio/syncCastFromPrompt';
 import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
+import SceneAnchorLibrary from './SceneAnchorLibrary';
+import { cn } from '@/lib/utils';
 import SceneDialogStudio from './SceneDialogStudio';
 import DirectorQualityCoach from './director-console/DirectorQualityCoach';
 import ScenePromptDetailsSheet from './ScenePromptDetailsSheet';
@@ -122,6 +124,12 @@ interface SceneCardProps {
   language: string;
   /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  /** Phase 2 — last_frame_url of the previous scene, surfaced as Quick Anchor. */
+  previousSceneLastFrameUrl?: string;
+  /** Phase 2 — 1-based index of previous scene for the chip label. */
+  previousSceneIndex?: number;
+  /** Phase 2 — when true, the Frame-First Studio is highlighted as Step 1. */
+  frameFirstMode?: boolean;
 }
 
 const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
@@ -156,6 +164,9 @@ export default function SceneCard({
   onAddCharacter,
   language,
   onEnsurePersisted,
+  previousSceneLastFrameUrl,
+  previousSceneIndex,
+  frameFirstMode,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
@@ -1406,18 +1417,42 @@ export default function SceneCard({
                         ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
                         : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
                 </div>
+                {/* Phase 2 — Quick Anchor Library: prev frame, brand char, locations */}
+                <SceneAnchorLibrary
+                  selectedReferenceUrl={scene.referenceImageUrl}
+                  previousSceneLastFrameUrl={previousSceneLastFrameUrl}
+                  previousSceneIndex={previousSceneIndex}
+                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                  language={lang}
+                />
                 {scene.clipSource.startsWith('ai-') && projectId && (
-                  <SceneStillFrameStudio
-                    projectId={projectId}
-                    sceneId={scene.id}
-                    prompt={scene.aiPrompt || ''}
-                    composeHintImageUrl={
-                      activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
-                    }
-                    selectedReferenceUrl={scene.referenceImageUrl}
-                    onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                    language={lang as 'en' | 'de' | 'es'}
-                  />
+                  <div
+                    className={cn(
+                      frameFirstMode && 'rounded-md ring-2 ring-primary/40 ring-offset-1 ring-offset-background',
+                    )}
+                  >
+                    {frameFirstMode && (
+                      <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-primary">
+                        <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px]">1</span>
+                        {lang === 'de'
+                          ? 'Schritt 1 — Frame zuerst freezen'
+                          : lang === 'es'
+                          ? 'Paso 1 — congela el fotograma primero'
+                          : 'Step 1 — freeze the frame first'}
+                      </div>
+                    )}
+                    <SceneStillFrameStudio
+                      projectId={projectId}
+                      sceneId={scene.id}
+                      prompt={scene.aiPrompt || ''}
+                      composeHintImageUrl={
+                        activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                      }
+                      selectedReferenceUrl={scene.referenceImageUrl}
+                      onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                      language={lang as 'en' | 'de' | 'es'}
+                    />
+                  </div>
                 )}
                 <SceneReferenceImageUpload
                   projectId={projectId}
