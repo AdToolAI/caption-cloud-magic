@@ -78,6 +78,7 @@ import SceneDialogStudio from './SceneDialogStudio';
 import DirectorConsolePreview from './director-console/DirectorConsolePreview';
 import DirectorQualityCoach from './director-console/DirectorQualityCoach';
 import SceneCardSummaryHeader from './SceneCardSummaryHeader';
+import SceneStudioTabBar, { SceneStudioSectionHeader } from './SceneStudioTabBar';
 import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -425,7 +426,11 @@ export default function SceneCard({
   };
 
   return (
-    <Card ref={cardRef as any} className="border-border/40 bg-card/80 group overflow-hidden">
+    <Card
+      ref={cardRef as any}
+      id={`scene-card-${scene.id || index}`}
+      className="border-border/40 bg-card/80 group overflow-hidden"
+    >
       <CardContent className={isExpanded ? 'p-3 overflow-hidden' : 'p-2 overflow-hidden'}>
         <SceneCardSummaryHeader
           scene={scene}
@@ -439,23 +444,11 @@ export default function SceneCard({
           language={lang}
         />
         {isExpanded && (
-        <div className="flex gap-3 min-w-0">
-          {/* Drag handle + order */}
-          <div className="flex flex-col items-center gap-1 pt-1">
-            <GripVertical className="h-4 w-4 text-muted-foreground/40" />
-            <span className="text-[10px] font-mono text-muted-foreground">{index + 1}</span>
-            <div className="flex flex-col gap-0.5 mt-1">
-              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onMoveUp} disabled={index === 0}>
-                <ChevronUp className="h-3 w-3" />
-              </Button>
-              <Button size="icon" variant="ghost" className="h-5 w-5" onClick={onMoveDown} disabled={index === totalScenes - 1}>
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-
+        <div className="min-w-0">
+          <SceneStudioTabBar cardId={`scene-card-${scene.id || index}`} language={lang} />
           {/* Content */}
           <div className="flex-1 min-w-0 space-y-3">
+            <SceneStudioSectionHeader tab="story" language={lang} />
             {/* Top row */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -846,6 +839,7 @@ export default function SceneCard({
               </div>
             )}
 
+            <SceneStudioSectionHeader tab="cast" language={lang} />
             {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
             {scene.clipSource.startsWith('ai-') && ((characters && characters.length > 0) || libCharacters.length > 0) && (
               <>
@@ -942,6 +936,7 @@ export default function SceneCard({
               </>
             )}
 
+            <SceneStudioSectionHeader tab="audio" language={lang} />
             {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
             {scene.clipSource.startsWith('ai-') && characters && (
               <SceneDialogStudio
@@ -1270,6 +1265,7 @@ export default function SceneCard({
                 />
 
 
+                <SceneStudioSectionHeader tab="look" language={lang} />
                 <DirectorPresetPicker
                   modifiers={scene.directorModifiers || {}}
                   basePrompt={scene.aiPrompt || ''}
