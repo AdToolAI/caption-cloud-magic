@@ -122,6 +122,12 @@ interface SceneCardProps {
   language: string;
   /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  /** Phase 2 — last_frame_url of the previous scene, surfaced as Quick Anchor. */
+  previousSceneLastFrameUrl?: string;
+  /** Phase 2 — 1-based index of previous scene for the chip label. */
+  previousSceneIndex?: number;
+  /** Phase 2 — when true, the Frame-First Studio is highlighted as Step 1. */
+  frameFirstMode?: boolean;
 }
 
 const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
