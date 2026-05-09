@@ -110,6 +110,12 @@ interface SceneCardProps {
   hasOtherReadyScenes?: boolean;
   /** Allows the per-scene Dialog Studio to spawn shot-reverse-shot sub-scenes. */
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Inserts SRS sub-scenes at the parent's slot (replaces the dialog scene). */
+  onInsertScenesAfter?: (
+    parentSceneId: string,
+    partials: Partial<ComposerScene>[],
+    opts?: { removeParent?: boolean },
+  ) => Promise<(string | undefined)[]>;
   /** Propagates a newly-picked library character into the project briefing cast
    *  so prompt injection / anchor resolution finds it. */
   onAddCharacter?: (character: ComposerCharacter) => void;
@@ -146,6 +152,7 @@ export default function SceneCard({
   onHybridExtend,
   hasOtherReadyScenes,
   onAddScene,
+  onInsertScenesAfter,
   onAddCharacter,
   language,
   onEnsurePersisted,
@@ -961,6 +968,7 @@ export default function SceneCard({
                 language={lang}
                 onUpdate={onUpdate}
                 onAddScene={onAddScene}
+                onInsertScenesAfter={onInsertScenesAfter}
                 onEnsurePersisted={onEnsurePersisted}
                 autoSplitOnMount={autoSplitArmed}
                 onAutoSplitConsumed={() => setAutoSplitArmed(false)}
