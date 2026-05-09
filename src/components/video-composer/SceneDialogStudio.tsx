@@ -649,15 +649,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
     } catch (_) { /* noop */ }
 
-    // ── Auto-SRS for multi-speaker dialog ─────────────────────────────
-    // It is physically impossible to lip-sync 2+ different speakers into a
-    // single AI B-roll clip — there is only one `clip_url` per scene and
-    // the underlying i2v model has no idea who speaks when. Artlist /
-    // Synthesia / HeyGen Studio all solve this by rendering one talking-
-    // head clip per speaker and cutting them together (Shot-Reverse-Shot).
-    // We force that path automatically as soon as we have ≥2 blocks AND a
-    // portrait for every speaker. No silent fallback to fake "audio overlay
-    // pretending to be lip-sync".
+    // ── Default: Inline Voiceover-Overlay ──────────────────────────────
+    // Multi-speaker scenes default to inline voiceover (one TTS clip per
+    // block, played back-to-back over the scene's regular AI clip). This
+    // is the only safe path: routing a multi-speaker dialog to a single
+    // talking-head render would make ONE character lip-sync the whole
+    // script. Real per-speaker lip-sync requires the explicit
+    // Shot-Reverse-Shot split below (renderAsSeparateScenes === true).
+    if (!renderAsSeparateScenes) {
+      await handleGenerateInline();
+      return;
+    }
+    // ── Shot-Reverse-Shot path (opt-in only) ───────────────────────────
+    // Each speaker becomes its own sub-scene + HeyGen render. Requires a
+    // portrait per speaker.
     if (blocks.length >= 2) {
       const missingPortrait = speakers.find(
         (sp) => !sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
@@ -680,13 +685,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         });
         return;
       }
-      if (!renderAsSeparateScenes) {
-        setRenderAsSeparateScenes(true);
-        // fall through into SRS path below
-      }
-    } else if (!renderAsSeparateScenes) {
-      await handleGenerateInline();
-      return;
     }
     // Ensure the project is persisted before spawning sub-scenes (otherwise
     // onAddScene would write to a non-existent project_id).
