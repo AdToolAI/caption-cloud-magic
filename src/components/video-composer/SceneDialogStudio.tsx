@@ -944,7 +944,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const s = synthed[i];
         const newSceneId = subSceneIds[i];
         if (!newSceneId) {
-          failures.push({ speaker: s.character.name, reason: 'sub-scene insert failed' });
+          const insertFailMsg =
+            language === 'de'
+              ? 'Dialog-Szene konnte nicht ersetzt werden — bitte Seite neu laden und erneut Splitten.'
+              : language === 'es'
+              ? 'No se pudo reemplazar la escena de diálogo — recarga la página y vuelve a dividir.'
+              : 'Could not replace dialog scene — please reload the page and split again.';
+          failures.push({ speaker: s.character.name, reason: insertFailMsg });
           continue;
         }
         try {
