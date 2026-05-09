@@ -426,7 +426,19 @@ export default function SceneCard({
 
   return (
     <Card ref={cardRef as any} className="border-border/40 bg-card/80 group overflow-hidden">
-      <CardContent className="p-4 overflow-hidden">
+      <CardContent className={isExpanded ? 'p-3 overflow-hidden' : 'p-2 overflow-hidden'}>
+        <SceneCardSummaryHeader
+          scene={scene}
+          index={index}
+          totalScenes={totalScenes}
+          isExpanded={isExpanded}
+          onToggleExpand={() => setIsExpanded((v) => !v)}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          onDelete={onDelete}
+          language={lang}
+        />
+        {isExpanded && (
         <div className="flex gap-3 min-w-0">
           {/* Drag handle + order */}
           <div className="flex flex-col items-center gap-1 pt-1">
