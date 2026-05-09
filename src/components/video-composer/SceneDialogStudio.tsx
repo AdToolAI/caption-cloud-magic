@@ -467,6 +467,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     let okCount = 0;
     let cumulativeOffset = 0;
     const timedBlocks: typeof blocks = [];
+    // Director Console — accumulator for the first-class AudioPlan.
+    // Stays in script order so `startSec`/`endSec` map directly to playback.
+    const planSpeakers: import('@/types/video-composer').AudioPlanSpeaker[] = [];
 
     // Determine if we should auto-upgrade to HeyGen lip-sync.
     // Trigger: at least one speaker in this dialog has a portrait. If not, we
@@ -564,18 +567,42 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         }
 
         timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
+        planSpeakers.push({
+          characterId: c.id,
+          name: c.name,
+          startSec: Math.round(cumulativeOffset * 100) / 100,
+          endSec: Math.round((cumulativeOffset + duration) * 100) / 100,
+          text: block.text,
+          engine: cfg.engine,
+          voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+          audioUrl,
+        });
         cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
       }
 
       // Refresh the visible prompt with concrete per-speaker timestamps
       // (Audio Plan), now that real TTS durations are known.
+      // Also persist the AudioPlan as a first-class field so downstream
+      // consumers (lip-sync, prompt composer, audio playback) stop racing
+      // against the textual fallback.
       try {
         const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedBlocks, language);
-        if (timedPrompt !== (scene.aiPrompt || '')) {
-          onUpdate({ aiPrompt: timedPrompt });
-        }
-      } catch (_) { /* noop */ }
+        const audioPlan: import('@/types/video-composer').AudioPlan = {
+          version: 1,
+          speakers: planSpeakers,
+          totalSec: Math.round((cumulativeOffset - INTER_SPEAKER_GAP_SEC) * 100) / 100,
+          interSpeakerGapSec: INTER_SPEAKER_GAP_SEC,
+          language,
+          generatedAt: new Date().toISOString(),
+        };
+        const updates: Partial<ComposerScene> = {
+          audioPlan,
+          dialogLockedAt: audioPlan.generatedAt,
+        };
+        if (timedPrompt !== (scene.aiPrompt || '')) updates.aiPrompt = timedPrompt;
+        onUpdate(updates);
+      } catch (e) { console.warn('[SceneDialogStudio] audioPlan emit failed', e); }
 
       // Bump scene duration so all VO blocks fit (cap at 60s sanity)
       const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
@@ -771,21 +798,44 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
 
       // ── Phase 1b: refresh parent prompt with the real Audio Plan
-      //    (per-speaker start–end seconds) now that durations are known.
+      //    (per-speaker start–end seconds) now that durations are known,
+      //    AND emit the first-class AudioPlan so downstream lip-sync /
+      //    composer code never has to re-parse the textual fallback.
       try {
-        const timedParentBlocks = (() => {
-          let cursor = 0;
-          return synthed.map((s) => {
-            const startSec = cursor;
-            cursor += s.durationSec + INTER_SPEAKER_GAP_SEC;
-            return { ...s.block, startSec, durationSec: s.durationSec };
-          });
-        })();
+        let cursor = 0;
+        const timedParentBlocks = synthed.map((s) => {
+          const startSec = cursor;
+          cursor += s.durationSec + INTER_SPEAKER_GAP_SEC;
+          return { ...s.block, startSec, durationSec: s.durationSec };
+        });
+        const audioPlan: import('@/types/video-composer').AudioPlan = {
+          version: 1,
+          speakers: synthed.map((s, i) => ({
+            characterId: s.character.id,
+            name: s.character.name,
+            startSec: Math.round(timedParentBlocks[i].startSec! * 100) / 100,
+            endSec:
+              Math.round((timedParentBlocks[i].startSec! + s.durationSec) * 100) / 100,
+            text: s.block.text,
+            engine: s.engine,
+            voiceId: voicePerSpeaker[s.block.speakerId]?.isCustom
+              ? voicePerSpeaker[s.block.speakerId]?.elevenlabsVoiceId
+              : voicePerSpeaker[s.block.speakerId]?.voiceId,
+            audioUrl: s.audioUrl,
+          })),
+          totalSec: Math.round((cursor - INTER_SPEAKER_GAP_SEC) * 100) / 100,
+          interSpeakerGapSec: INTER_SPEAKER_GAP_SEC,
+          language,
+          generatedAt: new Date().toISOString(),
+        };
         const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedParentBlocks, language);
-        if (timedPrompt !== (scene.aiPrompt || '')) {
-          onUpdate({ aiPrompt: timedPrompt });
-        }
-      } catch (_) { /* noop */ }
+        const updates: Partial<ComposerScene> = {
+          audioPlan,
+          dialogLockedAt: audioPlan.generatedAt,
+        };
+        if (timedPrompt !== (scene.aiPrompt || '')) updates.aiPrompt = timedPrompt;
+        onUpdate(updates);
+      } catch (e) { console.warn('[SceneDialogStudio] SRS audioPlan emit failed', e); }
 
       // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
       //    order, each with its OWN real duration and OWN audioUrl.

@@ -203,6 +203,8 @@ export function useComposerPersistence() {
               last_frame_url: scene.lastFrameUrl ?? null,
               end_reference_image_url: scene.endReferenceImageUrl ?? null,
               hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
+              audio_plan: (scene.audioPlan ?? null) as any,
+              dialog_locked_at: scene.dialogLockedAt ?? null,
             } as any)
             .eq('id', scene.id);
 
@@ -251,6 +253,8 @@ export function useComposerPersistence() {
               last_frame_url: scene.lastFrameUrl ?? null,
               end_reference_image_url: scene.endReferenceImageUrl ?? null,
               hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
+              audio_plan: (scene.audioPlan ?? null) as any,
+              dialog_locked_at: scene.dialogLockedAt ?? null,
             } as any)
             .select('id')
             .single();

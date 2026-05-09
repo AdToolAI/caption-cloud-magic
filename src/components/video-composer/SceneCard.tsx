@@ -75,6 +75,7 @@ import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
+import DirectorConsolePreview from './director-console/DirectorConsolePreview';
 import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -933,6 +934,14 @@ export default function SceneCard({
                 autoSplitOnMount={autoSplitArmed}
                 onAutoSplitConsumed={() => setAutoSplitArmed(false)}
               />
+            )}
+
+            {/* Director Console — read-only Live Prompt + Audio Plan timeline.
+                Always derived from `scene.audioPlan` + structured slots, never
+                writes back, so the locked Audio Plan is structurally immune to
+                useEffect-style overwrites. */}
+            {scene.clipSource.startsWith('ai-') && (
+              <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
             )}
 
             {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}

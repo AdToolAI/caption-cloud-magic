@@ -1,0 +1,185 @@
+// =============================================================================
+// composeFinalPrompt — Director Console (8-Layer Prompt Architecture)
+// =============================================================================
+//
+// Derives the FINAL provider-ready prompt for a scene from:
+//   1. SUBJECT      (cast + auto-injected brand character)
+//   2. ACTION       (raw user prompt — what happens, in time)
+//   3. SHOT         (Shot Director / cinematic preset / director modifiers)
+//   4. LIGHT/MOOD   (currently merged into shot layer via existing dedup)
+//   5. DIALOG       (deterministic Audio Plan from `scene.audioPlan`)
+//   6. SFX/AMBIENT  (reserved — Phase 5)
+//   7. STYLE        (style preset / director modifiers — handled by dedup)
+//   8. NEGATIVE     (extracted into separate `negative_prompt` channel)
+//
+// This function is **pure**: it never mutates the scene, never writes state,
+// and never reads `aiPrompt` — only the structured slots + audioPlan.
+// That structurally eliminates the previous race-condition where
+// `useEffect` chains could overwrite the timed audio plan with a text-only
+// fallback.
+//
+// Used as a `useMemo` source by SceneCard / SceneDirectorConsole instead of
+// the legacy `applyDialogToPrompt(scene.aiPrompt, …)` pattern.
+//
+// The Veo 3 / Sora 2 / Artlist research (May 2026) consistently recommends
+// labelled layers for multi-speaker dialog. We emit them as `[N LAYER]`
+// markers so engines that respect the schema (Veo, Sora) lock onto it,
+// while comma-tolerant engines (Hailuo, Kling) just see well-ordered prose.
+// Provider-specific re-formatting lives in `providerPromptFormats.ts`.
+
+import type { AudioPlan, AudioPlanSpeaker } from '@/types/video-composer';
+import {
+  composePromptLayers,
+  type ComposerInputs,
+  type ComposerResult,
+} from './composePromptLayers';
+
+export type DirectorLanguage = 'de' | 'en' | 'es';
+
+export interface ComposeFinalPromptInputs extends ComposerInputs {
+  /** Authoritative timing data when dialog has been TTS-locked. */
+  audioPlan?: AudioPlan;
+  /** Optional sound design notes (Phase 5+). */
+  sfxNotes?: string;
+  ambientNotes?: string;
+}
+
+export interface ComposeFinalPromptResult extends ComposerResult {
+  /** The labelled, multi-line "screenplay" prompt as shipped to providers. */
+  finalPrompt: string;
+  /** Deterministic dialog block (empty string if no audioPlan). */
+  audioPlanText: string;
+  /** True if at least one speaker has a measured `endSec` > 0. */
+  hasLockedAudioPlan: boolean;
+}
+
+function fmt(n: number): string {
+  return (Math.round(n * 100) / 100).toFixed(2);
+}
+
+function snippet(text: string, max = 220): string {
+  const t = (text ?? '').trim().replace(/\s+/g, ' ');
+  return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…';
+}
+
+/**
+ * Format the Audio Plan as a human + model readable block.
+ *
+ * Output is intentionally close to the Artlist "timestamp prompting" style:
+ *   - one outcome per line
+ *   - explicit "do not deviate" instruction
+ *   - lip-sync constraint stated as its own line so models without
+ *     dialog awareness still get a strong cue
+ *   - language tag forces ElevenLabs/HeyGen to keep accent stable
+ */
+export function formatAudioPlan(
+  plan: AudioPlan | undefined,
+  language: DirectorLanguage = 'en',
+): string {
+  if (!plan?.speakers?.length) return '';
+  const lines: string[] = ['Audio plan (exact, do not deviate):'];
+  for (const s of plan.speakers) {
+    lines.push(
+      `- ${fmt(s.startSec)}s–${fmt(s.endSec)}s  ${s.name} speaks: "${snippet(s.text, 200)}"`,
+    );
+  }
+  const langWord = language === 'de' ? 'German' : language === 'es' ? 'Spanish' : 'English';
+  lines.push(
+    `Total spoken duration: ${fmt(plan.totalSec)}s. Use this exact speaker order and timing for lip-sync. Spoken language: ${langWord}.`,
+  );
+  return lines.join('\n');
+}
+
+/**
+ * Build a one-line cast summary listing every speaker referenced by the
+ * audio plan (deduped, in script order). Used for the [1 SUBJECT] layer.
+ */
+export function buildCastLine(plan?: AudioPlan): string {
+  if (!plan?.speakers?.length) return '';
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const s of plan.speakers) {
+    if (!seen.has(s.characterId)) {
+      seen.add(s.characterId);
+      names.push(s.name);
+    }
+  }
+  if (names.length === 0) return '';
+  if (names.length === 1) return `${names[0]} on camera.`;
+  const last = names.pop();
+  return `${names.join(', ')} and ${last} on camera.`;
+}
+
+const NEGATIVE_DEFAULT =
+  'no on-screen text, no captions, no subtitles, no signs, no watermarks, no logos.';
+
+/**
+ * Main composer — derives final prompt from structured inputs only.
+ */
+export function composeFinalPrompt(
+  inputs: ComposeFinalPromptInputs,
+): ComposeFinalPromptResult {
+  // 1. Run the proven dedup / brand-inject / negative-sanitize pipeline on
+  //    the raw action prompt. This produces the cinematography + subject
+  //    body PLUS a clean negative prompt.
+  const layered = composePromptLayers(inputs);
+
+  // 2. Audio Plan — first-class, immutable.
+  const lang: DirectorLanguage = (inputs.language as DirectorLanguage) ?? 'en';
+  const audioPlanText = formatAudioPlan(inputs.audioPlan, lang);
+  const hasLocked = !!inputs.audioPlan?.speakers?.some((s) => s.endSec > 0);
+
+  // 3. Stitch the labelled "screenplay" prompt. Each layer is on its own
+  //    line so:
+  //      • Veo / Sora pick up the bracketed labels as structural hints
+  //      • Hailuo / Kling read it as well-ordered prose
+  //      • Humans see exactly which slot drives which behaviour
+  const cast = buildCastLine(inputs.audioPlan);
+  const lines: string[] = [];
+
+  if (cast) lines.push(`[1 SUBJECT] ${cast}`);
+
+  // The "action" body comes from `layered.finalPrompt` minus the trailing
+  // cinematography clause (we re-emit it as its own [3 SHOT] layer below).
+  // We split on the literal " Cinematography: " marker emitted by
+  // composePromptLayers.
+  const fp = layered.finalPrompt || '';
+  let actionBody = fp;
+  let shotBody = '';
+  const cinematographyIdx = fp.indexOf('Cinematography:');
+  if (cinematographyIdx >= 0) {
+    actionBody = fp.slice(0, cinematographyIdx).replace(/[.,;\s]+$/, '').trim();
+    shotBody = fp
+      .slice(cinematographyIdx + 'Cinematography:'.length)
+      .replace(/^\s+/, '')
+      .replace(/\.\s*$/, '')
+      .trim();
+  }
+  if (actionBody) lines.push(`[2 ACTION] ${actionBody}.`);
+  if (shotBody) lines.push(`[3 SHOT] ${shotBody}.`);
+
+  if (audioPlanText) {
+    lines.push(`[5 DIALOG]\n${audioPlanText}`);
+  }
+
+  if (inputs.sfxNotes?.trim()) {
+    lines.push(`[6 SFX] ${inputs.sfxNotes.trim()}`);
+  }
+  if (inputs.ambientNotes?.trim()) {
+    lines.push(`[6 AMBIENT] ${inputs.ambientNotes.trim()}`);
+  }
+
+  // Negative — always last so providers that respect the trailing tag
+  // still pick it up even if they ignore the bracket schema.
+  const negative = layered.negativePrompt || NEGATIVE_DEFAULT;
+  lines.push(`[8 NEGATIVE] ${negative}`);
+
+  const finalPrompt = lines.join('\n');
+
+  return {
+    ...layered,
+    finalPrompt,
+    audioPlanText,
+    hasLockedAudioPlan: hasLocked,
+  };
+}

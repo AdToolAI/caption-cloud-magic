@@ -5186,6 +5186,7 @@ export type Database = {
         Row: {
           ai_prompt: string | null
           applied_style_preset_id: string | null
+          audio_plan: Json | null
           character_audio_url: string | null
           character_image_url: string | null
           character_script: string | null
@@ -5206,6 +5207,7 @@ export type Database = {
           continuity_source_scene_id: string | null
           cost_euros: number
           created_at: string
+          dialog_locked_at: string | null
           dialog_script: string | null
           dialog_voices: Json
           director_modifiers: Json | null
@@ -5254,6 +5256,7 @@ export type Database = {
         Insert: {
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
+          audio_plan?: Json | null
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
@@ -5274,6 +5277,7 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_locked_at?: string | null
           dialog_script?: string | null
           dialog_voices?: Json
           director_modifiers?: Json | null
@@ -5322,6 +5326,7 @@ export type Database = {
         Update: {
           ai_prompt?: string | null
           applied_style_preset_id?: string | null
+          audio_plan?: Json | null
           character_audio_url?: string | null
           character_image_url?: string | null
           character_script?: string | null
@@ -5342,6 +5347,7 @@ export type Database = {
           continuity_source_scene_id?: string | null
           cost_euros?: number
           created_at?: string
+          dialog_locked_at?: string | null
           dialog_script?: string | null
           dialog_voices?: Json
           director_modifiers?: Json | null
