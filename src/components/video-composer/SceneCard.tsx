@@ -1265,6 +1265,7 @@ export default function SceneCard({
                 />
 
 
+                <SceneStudioSectionHeader tab="look" language={lang} />
                 <DirectorPresetPicker
                   modifiers={scene.directorModifiers || {}}
                   basePrompt={scene.aiPrompt || ''}
