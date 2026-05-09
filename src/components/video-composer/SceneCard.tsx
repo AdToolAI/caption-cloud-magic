@@ -837,8 +837,8 @@ export default function SceneCard({
               );
             })()}
 
-            {/* Effects badges (AI-selected procedural effects layered above the clip) */}
-            {scene.effects && scene.effects.length > 0 && (
+            {/* Effects badges — Phase 3: hidden behind "Mehr ▾" drawer. */}
+            {secondaryOpen && scene.effects && scene.effects.length > 0 && (
               <div className="flex flex-wrap gap-1.5 items-center">
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
                   <Wand2 className="h-2.5 w-2.5" />
