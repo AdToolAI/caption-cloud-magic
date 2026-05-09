@@ -602,6 +602,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    // Pin dialog into the parent scene's AI prompt immediately — visible to
+    // the user and persisted alongside the script + voice map.
+    try {
+      const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
+      if (dialogPrompt !== (scene.aiPrompt || '')) {
+        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+      }
+    } catch (_) { /* noop */ }
 
     // ── Auto-SRS for multi-speaker dialog ─────────────────────────────
     // It is physically impossible to lip-sync 2+ different speakers into a
