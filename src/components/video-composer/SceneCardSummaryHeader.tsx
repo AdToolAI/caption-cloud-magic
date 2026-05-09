@@ -112,7 +112,7 @@ export default function SceneCardSummaryHeader({
     });
     const result = evaluateSceneQuality({
       scene,
-      finalPrompt: composed.prompt,
+      finalPrompt: composed.finalPrompt,
       negativePrompt: composed.negativePrompt,
       language,
     });
