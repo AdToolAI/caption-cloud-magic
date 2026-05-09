@@ -351,6 +351,15 @@ export default function StoryboardTab({
           )}
           <Button
             size="sm"
+            variant={frameFirstMode ? 'default' : 'outline'}
+            onClick={() => setFrameFirstMode((v) => !v)}
+            className="gap-1 text-xs"
+            title="Artlist-Stil: erst Still-Frame freezen, dann Video — für maximale Kontrolle und nahtlose Übergänge."
+          >
+            <ImageIcon className="h-3.5 w-3.5" /> Frame-First {frameFirstMode ? '✓' : ''}
+          </Button>
+          <Button
+            size="sm"
             variant="outline"
             onClick={() => setSnippetPickerOpen(true)}
             className="gap-1 text-xs"
