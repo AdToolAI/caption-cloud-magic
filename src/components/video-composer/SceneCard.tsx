@@ -966,11 +966,11 @@ export default function SceneCard({
                 Always derived from `scene.audioPlan` + structured slots, never
                 writes back, so the locked Audio Plan is structurally immune to
                 useEffect-style overwrites. */}
+            {/* DirectorConsolePreview moved into ScenePromptDetailsSheet
+                (Phase 1 Studio-Set v2). DirectorQualityCoach stays inline; it
+                will be folded into a status bar in Phase 3. */}
             {scene.clipSource.startsWith('ai-') && (
-              <>
-                <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
-                <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
-              </>
+              <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
             )}
 
             {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
