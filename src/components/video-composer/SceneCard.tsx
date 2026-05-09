@@ -443,9 +443,14 @@ export default function SceneCard({
     <Card
       ref={cardRef as any}
       id={`scene-card-${scene.id || index}`}
-      className="border-border/40 bg-card/80 group overflow-hidden"
+      className="relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]"
     >
-      <CardContent className={isExpanded ? 'p-3 overflow-hidden' : 'p-2 overflow-hidden'}>
+      {/* Bond-style vertical gold accent on hover */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-0 top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+      />
+      <CardContent className={isExpanded ? 'p-4 overflow-hidden' : 'p-2.5 overflow-hidden'}>
         <SceneCardSummaryHeader
           scene={scene}
           index={index}
@@ -461,7 +466,7 @@ export default function SceneCard({
         <div className="min-w-0">
           <SceneStudioTabBar cardId={`scene-card-${scene.id || index}`} language={lang} />
           {/* Content */}
-          <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex-1 min-w-0 space-y-4">
             <SceneStudioSectionHeader tab="story" language={lang} />
             {/* Top row */}
             <div className="flex items-center justify-between">
