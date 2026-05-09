@@ -1248,23 +1248,17 @@ export default function SceneCard({
                 />
 
 
-                <SceneStudioSectionHeader tab="look" language={lang} />
-                <DirectorPresetPicker
-                  modifiers={scene.directorModifiers || {}}
-                  basePrompt={scene.aiPrompt || ''}
-                  onChange={(directorModifiers) => onUpdate({ directorModifiers })}
-                />
-
-                <CinematicStylePresets
-                  value={scene.shotDirector || {}}
-                  onApply={(sel) => onUpdate({ shotDirector: sel })}
-                  compact
-                />
-
-                <SceneShotDirectorPanel
-                  value={scene.shotDirector || {}}
-                  onChange={(shotDirector) => onUpdate({ shotDirector })}
+                {/* Phase 2 (Studio Set v2) — single chip + "Stil ändern"
+                    button replaces the previous trio of always-visible style
+                    tools (DirectorPresetPicker + CinematicStylePresets +
+                    SceneShotDirectorPanel). They now live behind
+                    SceneStyleSheet (3 tabs). */}
+                <SceneStyleChip
                   language={lang}
+                  shotDirector={scene.shotDirector}
+                  hasModifiers={Object.keys(scene.directorModifiers || {}).length > 0}
+                  onOpen={() => setStyleSheetOpen(true)}
+                  onReset={() => onUpdate({ shotDirector: {} })}
                 />
 
                 {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
