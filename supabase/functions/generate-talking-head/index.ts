@@ -672,18 +672,16 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('[talking-head] Error:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    // Best-effort: if a sceneId was supplied, mark the sub-scene as failed so
-    // the UI doesn't show "generating…" forever after an upload failure.
+    // Always mark the sub-scene as failed so the UI doesn't show
+    // "generating…" forever after an upload/HeyGen failure.
     try {
-      const body: any = await req.clone().json().catch(() => ({}));
-      const sceneId: string | undefined = body?.sceneId;
-      if (sceneId) {
+      if (earlySceneId) {
         const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
         await admin.from('composer_scenes').update({
           clip_status: 'failed',
           clip_error: message.slice(0, 500),
           updated_at: new Date().toISOString(),
-        }).eq('id', sceneId);
+        }).eq('id', earlySceneId);
       }
     } catch (_e) { /* non-fatal */ }
     return new Response(JSON.stringify({ error: message }), {
