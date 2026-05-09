@@ -75,8 +75,8 @@ import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
-import DirectorConsolePreview from './director-console/DirectorConsolePreview';
 import DirectorQualityCoach from './director-console/DirectorQualityCoach';
+import ScenePromptDetailsSheet from './ScenePromptDetailsSheet';
 import SceneCardSummaryHeader from './SceneCardSummaryHeader';
 import SceneStudioTabBar, { SceneStudioSectionHeader } from './SceneStudioTabBar';
 import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
@@ -185,9 +185,11 @@ export default function SceneCard({
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   // Block L — Inline Compare Lab dialog open state
   const [compareLabOpen, setCompareLabOpen] = useState(false);
-  // Phase F — "Erweitert" drawer (Final-Prompt preview, Multi-Engine, Compare,
-  // Reference-Image-Upload). Default closed → reduces visual cluster on the
-  // Studio Bühne for non-power-users.
+  // Phase 1 (Studio Set v2) — single Sheet that consolidates the former
+  // DirectorConsolePreview, "Finaler Prompt (Vorschau)", Multi-Engine and
+  // Compare-Lab launcher. Replaces the old `advancedOpen` toggle for prompts.
+  const [promptDetailsOpen, setPromptDetailsOpen] = useState(false);
+  // `advancedOpen` is still used to gate SceneStillFrameStudio further down.
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
@@ -964,11 +966,11 @@ export default function SceneCard({
                 Always derived from `scene.audioPlan` + structured slots, never
                 writes back, so the locked Audio Plan is structurally immune to
                 useEffect-style overwrites. */}
+            {/* DirectorConsolePreview moved into ScenePromptDetailsSheet
+                (Phase 1 Studio-Set v2). DirectorQualityCoach stays inline; it
+                will be folded into a status bar in Phase 3. */}
             {scene.clipSource.startsWith('ai-') && (
-              <>
-                <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
-                <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
-              </>
+              <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
             )}
 
             {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
@@ -1199,75 +1201,26 @@ export default function SceneCard({
                   )}
                 </div>
 
-                {/* Phase F — Advanced Drawer toggle. Hides Multi-Engine,
-                    Compare-Lab, Final-Prompt-Preview & SceneStillFrame from
-                    the default view. Power-users open once. */}
+                {/* Phase 1 (Studio Set v2) — single "Prompt-Details" button
+                    replaces the former Erweitert toggle + inline Multi-Engine
+                    + inline Compare-Lab + inline Final-Prompt-Preview triplet.
+                    Everything now lives inside ScenePromptDetailsSheet so the
+                    customer sees the prompt textarea exactly once. */}
                 {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
-                  <button
-                    type="button"
-                    onClick={() => setAdvancedOpen((v) => !v)}
-                    className="flex w-full items-center justify-between rounded-md border border-dashed border-primary/30 bg-background/30 px-2 py-1.5 text-[10px] text-primary/80 hover:text-primary hover:border-primary/50 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="h-3 w-3" />
-                      {lang === 'de'
-                        ? 'Erweitert (Final-Prompt, Multi-Engine, Compare, Anker-Frame)'
-                        : lang === 'es'
-                        ? 'Avanzado (prompt final, multi-motor, compare, frame ancla)'
-                        : 'Advanced (final prompt, multi-engine, compare, anchor frame)'}
-                    </span>
-                    {advancedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </button>
-                )}
-
-                {/* Block K-6 — Multi-Engine Preview (only in structured mode with content) */}
-                {advancedOpen && promptMode === 'structured' && hasAnySlot(promptSlots) && (
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => setMultiEngineOpen((v) => !v)}
-                      className="text-[10px] text-primary/80 hover:text-primary flex items-center gap-1"
-                    >
-                      <Sparkles className="h-2.5 w-2.5" />
-                      {multiEngineOpen
-                        ? lang === 'de'
-                          ? 'Multi-Engine ausblenden'
-                          : lang === 'es'
-                          ? 'Ocultar multi-motor'
-                          : 'Hide multi-engine'
-                        : lang === 'de'
-                        ? 'Multi-Engine Vorschau anzeigen'
-                        : lang === 'es'
-                        ? 'Mostrar vista multi-motor'
-                        : 'Show multi-engine preview'}
-                    </button>
-                    {multiEngineOpen && (
-                      <MultiEnginePromptPreview
-                        slots={promptSlots}
-                        language={lang}
-                        order={promptSlotOrder}
-                        defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Block L — Inline Compare Lab launcher */}
-                {advancedOpen && (scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
-                  <div className="pt-1">
+                  <div className="flex justify-end">
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
-                      onClick={() => setCompareLabOpen(true)}
-                      className="h-7 text-[10px] gap-1.5"
+                      variant="ghost"
+                      onClick={() => setPromptDetailsOpen(true)}
+                      className="h-6 px-2 text-[10px] gap-1 text-primary/70 hover:text-primary"
                     >
-                      <Beaker className="h-3 w-3" />
+                      <Sparkles className="h-3 w-3" />
                       {lang === 'de'
-                        ? 'Auf Engines vergleichen'
+                        ? 'Prompt-Details ansehen'
                         : lang === 'es'
-                        ? 'Comparar en motores'
-                        : 'Compare on engines'}
+                        ? 'Ver detalles del prompt'
+                        : 'View prompt details'}
                     </Button>
                   </div>
                 )}
@@ -1309,86 +1262,10 @@ export default function SceneCard({
                   language={lang}
                 />
 
-                {/* Phase 6 — Live Prompt Preview Panel (centralized composer) */}
-                {advancedOpen && (() => {
-                  const composed = composePromptLayers({
-                    rawPrompt: scene.aiPrompt || '',
-                    directorModifiers: scene.directorModifiers,
-                    shotDirector: scene.shotDirector,
-                    cinematicStylePresetId: (scene as any).cinematicStylePresetId,
-                    brandCharacter: brandCharacterInput,
-                    libraryCharacters: libCharacters,
-                    libraryLocations: libLocations,
-                  });
-                  const hasAnyLayer = composed.layers.some(
-                    (l) => l.source !== 'rawPrompt' && l.applied,
-                  );
-                  if (!composed.finalPrompt && !hasAnyLayer) return null;
-                  return (
-                    <div className="rounded-md border border-dashed border-primary/30 bg-background/40 p-2">
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between mb-1"
-                        onClick={() => setPromptPreviewOpen((o) => !o)}
-                      >
-                        <Label className="text-[10px] text-muted-foreground cursor-pointer">
-                          {lang === 'de' ? 'Finaler Prompt (Vorschau)' : lang === 'es' ? 'Prompt final (vista previa)' : 'Final prompt (preview)'}
-                          {composed.dropped.length > 0 && (
-                            <span className="ml-1 text-[9px] text-amber-400/80">
-                              · {composed.dropped.length} {lang === 'de' ? 'entfernt (Dedup)' : lang === 'es' ? 'eliminados (dedup)' : 'deduped'}
-                            </span>
-                          )}
-                        </Label>
-                        <div className="flex items-center gap-1">
-                          {composed.referenceImageUrl && (
-                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-primary/40 text-primary">i2v ref</Badge>
-                          )}
-                          {composed.negativePrompt && (
-                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-amber-500/40 text-amber-400">neg</Badge>
-                          )}
-                          {brandCharacterInput && composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
-                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-emerald-500/40 text-emerald-400">brand</Badge>
-                          )}
-                          {brandCharacterInput && !composed.layers.find((l) => l.source === 'brandCharacter')?.applied && (
-                            <Badge variant="outline" className="text-[8px] h-3 px-1 border-muted-foreground/30 text-muted-foreground/60">brand · skipped</Badge>
-                          )}
-                          {promptPreviewOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                        </div>
-                      </button>
-                      <p className="text-[10px] font-mono leading-relaxed text-foreground/80 break-words whitespace-pre-line">
-                        {composed.finalPrompt}
-                      </p>
-                      {promptPreviewOpen && (
-                        <div className="mt-2 space-y-1.5 border-t border-primary/20 pt-2">
-                          {composed.layers.map((l, i) => (
-                            <div key={i} className="text-[9px] flex gap-1.5">
-                              <span className={`font-semibold shrink-0 w-32 ${l.applied ? 'text-primary/80' : 'text-muted-foreground/40 line-through'}`}>
-                                {l.label}
-                              </span>
-                              <span className={`font-mono break-words ${l.applied ? 'text-foreground/70' : 'text-muted-foreground/40 line-through'}`}>
-                                {l.text || '—'}
-                              </span>
-                            </div>
-                          ))}
-                          {composed.negativePrompt && (
-                            <div className="text-[9px] flex gap-1.5">
-                              <span className="font-semibold shrink-0 w-32 text-amber-400/80">negative_prompt →</span>
-                              <span className="font-mono text-amber-300/70 break-words">{composed.negativePrompt}</span>
-                            </div>
-                          )}
-                          {composed.dropped.length > 0 && (
-                            <div className="text-[9px] flex gap-1.5">
-                              <span className="font-semibold shrink-0 w-32 text-amber-400/60">axis dedup ✂</span>
-                              <span className="font-mono text-amber-300/50 break-words line-through">
-                                {composed.dropped.map((d) => `${d.text} (${d.source})`).join(' · ')}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
+                {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
+                    block was removed. The same composed prompt + layer
+                    breakdown now lives inside ScenePromptDetailsSheet, opened
+                    via the "Prompt-Details ansehen" button above. */}
 
               </div>
             )}
@@ -1576,6 +1453,22 @@ export default function SceneCard({
         initialType={scene.clipSource === 'stock-image' ? 'image' : 'video'}
         preferredAspect={preferredAspect}
         onSelect={handleStockSelect}
+      />
+
+      {/* Phase 1 (Studio Set v2) — single Sheet replacing inline Director
+          Console + Final-Prompt-Preview + Multi-Engine + Compare-Lab launcher. */}
+      <ScenePromptDetailsSheet
+        open={promptDetailsOpen}
+        onOpenChange={setPromptDetailsOpen}
+        scene={scene}
+        language={lang}
+        promptMode={promptMode}
+        promptSlots={promptSlots}
+        promptSlotOrder={promptSlotOrder}
+        brandCharacterInput={brandCharacterInput}
+        libCharacters={libCharacters}
+        libLocations={libLocations}
+        onOpenCompareLab={() => setCompareLabOpen(true)}
       />
 
       {/* Block L — Inline Compare Lab Dialog */}
