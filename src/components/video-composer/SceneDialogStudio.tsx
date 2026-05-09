@@ -455,6 +455,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
     }
+    // Pin dialog into the visible AI prompt immediately so the user sees the
+    // concrete speaker lines right after clicking "Generate voiceover".
+    try {
+      const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
+      if (dialogPrompt !== (scene.aiPrompt || '')) {
+        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+      }
+    } catch (_) { /* noop — non-fatal */ }
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
