@@ -1199,8 +1199,29 @@ export default function SceneCard({
                   )}
                 </div>
 
+                {/* Phase F — Advanced Drawer toggle. Hides Multi-Engine,
+                    Compare-Lab, Final-Prompt-Preview & SceneStillFrame from
+                    the default view. Power-users open once. */}
+                {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
+                  <button
+                    type="button"
+                    onClick={() => setAdvancedOpen((v) => !v)}
+                    className="flex w-full items-center justify-between rounded-md border border-dashed border-primary/30 bg-background/30 px-2 py-1.5 text-[10px] text-primary/80 hover:text-primary hover:border-primary/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-3 w-3" />
+                      {lang === 'de'
+                        ? 'Erweitert (Final-Prompt, Multi-Engine, Compare, Anker-Frame)'
+                        : lang === 'es'
+                        ? 'Avanzado (prompt final, multi-motor, compare, frame ancla)'
+                        : 'Advanced (final prompt, multi-engine, compare, anchor frame)'}
+                    </span>
+                    {advancedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                  </button>
+                )}
+
                 {/* Block K-6 — Multi-Engine Preview (only in structured mode with content) */}
-                {promptMode === 'structured' && hasAnySlot(promptSlots) && (
+                {advancedOpen && promptMode === 'structured' && hasAnySlot(promptSlots) && (
                   <div className="space-y-1">
                     <button
                       type="button"
@@ -1232,7 +1253,7 @@ export default function SceneCard({
                 )}
 
                 {/* Block L — Inline Compare Lab launcher */}
-                {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
+                {advancedOpen && (scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
                   <div className="pt-1">
                     <Button
                       type="button"
