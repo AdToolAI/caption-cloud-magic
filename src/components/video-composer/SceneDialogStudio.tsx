@@ -737,6 +737,11 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Ensure the project is persisted before spawning sub-scenes (otherwise
     // onAddScene would write to a non-existent project_id).
     let pidForSrs = (projectId || scene.projectId || '').trim();
+    // Resolve the REAL persisted parent scene id. Without this we'd pass a
+    // stale/local/temp id to onInsertScenesAfter, the dashboard wouldn't find
+    // it in project.scenes, and every insert would silently no-op
+    // → user sees "sub-scene insert failed" for every speaker.
+    let resolvedParentSceneId = scene.id;
     try {
       const ids = await resolvePersistedIds();
       if (!ids) {
@@ -744,6 +749,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
       pidForSrs = ids.pid;
+      resolvedParentSceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
@@ -753,7 +759,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
     // `cinematic_preset_slug` text column — no schema change needed.
-    const srsMarker = `dialog-srs:${scene.id}`;
+    const srsMarker = `dialog-srs:${resolvedParentSceneId}`;
     try {
       // ── Pre-flight: validate every speaker has a voice + portrait BEFORE
       //    any spend, so we can't end up with a half-rendered dialog where
@@ -781,11 +787,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       //    clips on top of the fresh ones (root cause of "random extra
       //    speakers" / "double voiceovers" in the user's report).
       try {
+        // Match both the current marker AND any legacy markers from previous
+        // sessions (when scene.id was a temp/local id). All dialog-srs:* rows
+        // for this project are eligible — they belong to the same dialog flow.
         const { data: stale } = await supabase
           .from('composer_scenes')
           .select('id')
           .eq('project_id', pidForSrs)
-          .eq('cinematic_preset_slug', srsMarker);
+          .like('cinematic_preset_slug', 'dialog-srs:%');
         const staleIds = (stale ?? []).map((r: any) => r.id).filter(Boolean);
         if (staleIds.length > 0) {
           await supabase.from('scene_audio_clips').delete().in('scene_id', staleIds);
@@ -922,7 +931,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
       let subSceneIds: (string | undefined)[];
       if (onInsertScenesAfter) {
-        subSceneIds = await onInsertScenesAfter(scene.id, partials, { removeParent: true });
+        subSceneIds = await onInsertScenesAfter(resolvedParentSceneId, partials, { removeParent: true });
       } else {
         subSceneIds = [];
         for (const p of partials) {
@@ -935,7 +944,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const s = synthed[i];
         const newSceneId = subSceneIds[i];
         if (!newSceneId) {
-          failures.push({ speaker: s.character.name, reason: 'sub-scene insert failed' });
+          const insertFailMsg =
+            language === 'de'
+              ? 'Dialog-Szene konnte nicht ersetzt werden — bitte Seite neu laden und erneut Splitten.'
+              : language === 'es'
+              ? 'No se pudo reemplazar la escena de diálogo — recarga la página y vuelve a dividir.'
+              : 'Could not replace dialog scene — please reload the page and split again.';
+          failures.push({ speaker: s.character.name, reason: insertFailMsg });
           continue;
         }
         try {
