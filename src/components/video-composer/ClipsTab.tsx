@@ -524,7 +524,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       }
 
       const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
-      const composedSingle = composePromptLayers({
+      const composedSingle = composeFinalPrompt({
         rawPrompt: targetScene.aiPrompt || '',
         directorModifiers: targetScene.directorModifiers,
         shotDirector: targetScene.shotDirector,
@@ -532,6 +532,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         brandCharacter: brandCharacterInputSingle,
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
+        audioPlan: targetScene.audioPlan,
+        language: directorLanguage,
       });
 
       const preparedSingle = targetScene.clipSource.startsWith('ai-')
