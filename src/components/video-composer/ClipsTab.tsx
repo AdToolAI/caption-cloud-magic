@@ -1031,6 +1031,25 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         </Button>
                       );
                     })()}
+                    {/* Frame-Picker (Artlist-style: pick ANY frame) */}
+                    {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
+                      const next = scenes[i + 1];
+                      if (!next) return null;
+                      const nextIsAi = next.clipSource.startsWith('ai-');
+                      if (!nextIsAi) return null;
+                      return (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 text-[10px] h-7 px-2 text-primary hover:bg-primary/10"
+                          title="Beliebigen Frame aus diesem Clip als Startbild der nächsten Szene wählen."
+                          onClick={() => setFramePickerState({ source: scene, target: next, targetIndex: i + 2 })}
+                        >
+                          <Search className="h-3 w-3" />
+                          Frame wählen…
+                        </Button>
+                      );
+                    })()}
                     {/* Generating disabled marker */}
                     {scene.clipStatus === 'generating' && (
                       <Button size="sm" disabled className="gap-1 text-[10px] h-7 px-2">
