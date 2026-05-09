@@ -18,6 +18,15 @@ interface Props {
   onApply: (selection: ShotSelection, presetId: string) => void;
   /** Compact variant (used inside the per-scene panel in the Composer). */
   compact?: boolean;
+  /**
+   * Layout of the preset cards.
+   * - `rail` (default): horizontally scrollable rail (legacy).
+   * - `grid`: responsive multi-column grid — used in the cleaned-up
+   *   SceneStyleSheet so cards never get clipped.
+   */
+  layout?: 'rail' | 'grid';
+  /** Hide the small header row (used when the parent already labels the section). */
+  hideHeader?: boolean;
 }
 
 /**
