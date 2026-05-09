@@ -706,7 +706,6 @@ export default function ComposerSequencePreview({
   // the final mux). Clips without a matching scene play at start_offset from 0.
   const SFX_FADE_SEC = 0.4;
   const sfxClipsTimeline = useMemo(() => {
-    if (!sceneAudioClips?.length) return [] as Array<{ clip: SceneAudioClip; start: number; end: number }>;
     const sceneStart = new Map<string, number>();
     // Scenes that already have a Sync.so lip-synced clip embed the VO inside
     // the video — playing the separate VO track too would double the audio.
@@ -714,15 +713,56 @@ export default function ComposerSequencePreview({
       playable.filter(s => !!s.lipSyncAppliedAt).map(s => s.id),
     );
     playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
-    return sceneAudioClips
+
+    const result: Array<{ clip: SceneAudioClip; start: number; end: number }> = [];
+    const seenSceneVoiceovers = new Set<string>();
+
+    (sceneAudioClips ?? [])
       .filter(c => !!c.url)
       .filter(c => !(c.kind === 'voiceover' && c.scene_id && lipSyncedSceneIds.has(c.scene_id)))
-      .map(c => {
+      .forEach(c => {
         const base = c.scene_id && sceneStart.has(c.scene_id) ? sceneStart.get(c.scene_id)! : 0;
         const start = base + (Number(c.start_offset) || 0);
         const dur = Math.max(0.1, Number(c.duration) || 0);
-        return { clip: c, start, end: start + dur };
+        result.push({ clip: c, start, end: start + dur });
+        if (c.kind === 'voiceover' && c.scene_id) seenSceneVoiceovers.add(c.scene_id);
       });
+
+    // ── Director Console fallback ─────────────────────────────────────────
+    // If a scene has a locked AudioPlan (Director Console / SceneDialogStudio
+    // TTS) but no matching `scene_audio_clips` rows are loaded yet, synthesize
+    // virtual voiceover clips from the plan so playback never goes silent.
+    // This guarantees "Sound is back" even when the DB row is delayed,
+    // missing, or got wiped by the idempotency cleanup.
+    playable.forEach(s => {
+      const plan = s.audioPlan;
+      if (!plan?.speakers?.length) return;
+      if (lipSyncedSceneIds.has(s.id)) return; // HeyGen already embeds audio
+      if (seenSceneVoiceovers.has(s.id)) return; // real DB rows take precedence
+      const base = sceneStart.get(s.id) ?? 0;
+      plan.speakers.forEach((sp, idx) => {
+        if (!sp.audioUrl) return;
+        const start = base + (sp.startSec || 0);
+        const end = base + (sp.endSec || sp.startSec + 1);
+        result.push({
+          // Cast to SceneAudioClip — UI only reads these fields.
+          clip: {
+            id: `audioplan:${s.id}:${idx}`,
+            scene_id: s.id,
+            kind: 'voiceover',
+            url: sp.audioUrl,
+            start_offset: sp.startSec,
+            duration: Math.max(0.1, end - start),
+            volume: 1,
+            ducking_enabled: true,
+          } as unknown as SceneAudioClip,
+          start,
+          end,
+        });
+      });
+    });
+
+    return result;
   }, [sceneAudioClips, playable, startOffsets]);
 
   // Log clip list changes (audio elements themselves are created via JSX refs
