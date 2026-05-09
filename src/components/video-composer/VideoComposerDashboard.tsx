@@ -1127,6 +1127,7 @@ export default function VideoComposerDashboard() {
               projectId={project.id}
               visualStyle={project.briefing?.visualStyle}
               characters={project.briefing?.characters}
+              language={project.language}
               onUpdateScenes={setScenes}
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {

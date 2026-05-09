@@ -24,7 +24,7 @@ import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, QUALITY_LABELS } fr
 import { recommendEngineForScene } from '@/lib/video-composer/sceneEngineRouter';
 import { SceneClipProgress } from './SceneClipProgress';
 import { probeMediaDuration } from '@/lib/probeMp4Duration';
-import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
+import { composeFinalPrompt, type DirectorLanguage } from '@/lib/motion-studio/composeFinalPrompt';
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
 import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
@@ -54,6 +54,8 @@ interface ClipsTabProps {
   projectId?: string;
   visualStyle?: string;
   characters?: ComposerCharacter[];
+  /** Project spoken language — flows into the deterministic Audio Plan block. */
+  language?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
@@ -66,7 +68,10 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, visualStyle, characters, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+  // Normalise the project language to the 3 accepted DirectorLanguage codes.
+  const directorLanguage: DirectorLanguage =
+    language === 'de' ? 'de' : language === 'es' ? 'es' : 'en';
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
@@ -359,10 +364,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
 
       // First pass: compose prompts (so the scene-anchor compose call gets the
       // FINAL English prompt, not the raw one).
-      const composedByScene = new Map<string, ReturnType<typeof composePromptLayers>>();
+      const composedByScene = new Map<string, ReturnType<typeof composeFinalPrompt>>();
       for (const s of eligibleScenes) {
         const brandCharacterInput = buildBrandInputForScene(s);
-        composedByScene.set(s.id, composePromptLayers({
+        composedByScene.set(s.id, composeFinalPrompt({
           rawPrompt: s.aiPrompt || '',
           directorModifiers: s.directorModifiers,
           shotDirector: s.shotDirector,
@@ -370,6 +375,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
           brandCharacter: brandCharacterInput,
           libraryCharacters: libCharacters,
           libraryLocations: libLocations,
+          audioPlan: s.audioPlan,
+          language: directorLanguage,
         }));
       }
 
@@ -516,7 +523,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
       }
 
       const brandCharacterInputSingle = buildBrandInputForScene(targetScene);
-      const composedSingle = composePromptLayers({
+      const composedSingle = composeFinalPrompt({
         rawPrompt: targetScene.aiPrompt || '',
         directorModifiers: targetScene.directorModifiers,
         shotDirector: targetScene.shotDirector,
@@ -524,6 +531,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, o
         brandCharacter: brandCharacterInputSingle,
         libraryCharacters: libCharacters,
         libraryLocations: libLocations,
+        audioPlan: targetScene.audioPlan,
+        language: directorLanguage,
       });
 
       const preparedSingle = targetScene.clipSource.startsWith('ai-')
