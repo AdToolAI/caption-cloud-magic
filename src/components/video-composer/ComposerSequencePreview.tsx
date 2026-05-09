@@ -611,7 +611,10 @@ export default function ComposerSequencePreview({
     playable.forEach((s) => {
       if (
         s.lipSyncAppliedAt ||
-        (s.clipSource as string) === 'ai-heygen'
+        (s.clipSource as string) === 'ai-heygen' ||
+        // Director Console — locked AudioPlan with at least one rendered clip
+        // owns the scene's spoken track even if the DB row is not yet loaded.
+        (s.audioPlan?.speakers?.some((sp) => !!sp.audioUrl))
       ) {
         ids.add(s.id);
       }
