@@ -975,6 +975,30 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
 
+      // ── Artlist-Style Auto-Chain ────────────────────────────────────
+      // Lock all freshly-spawned speaker subscenes to the parent scene's
+      // visual anchor so HeyGen lip-sync clips share the same location/look,
+      // and link Speaker N+1 → Speaker N for "Continue from frame" UI.
+      try {
+        const anchorRef = scene.lockReferenceUrl ?? scene.referenceImageUrl ?? null;
+        await Promise.all(
+          subSceneIds.map((newId, idx) => {
+            if (!newId) return Promise.resolve();
+            const prevId = idx > 0 ? subSceneIds[idx - 1] : null;
+            return supabase
+              .from('composer_scenes')
+              .update({
+                continuity_locked: true,
+                lock_reference_url: anchorRef,
+                continuity_source_scene_id: prevId ?? null,
+              } as any)
+              .eq('id', newId);
+          }),
+        );
+      } catch (chainErr) {
+        console.warn('[SceneDialogStudio] auto-chain update failed (non-fatal)', chainErr);
+      }
+
       for (let i = 0; i < synthed.length; i++) {
         const s = synthed[i];
         const newSceneId = subSceneIds[i];
