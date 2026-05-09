@@ -835,6 +835,10 @@ export default function VideoComposerDashboard() {
           prompt_slot_order: (baseScene.promptSlotOrder ?? null) as any,
           applied_style_preset_id: baseScene.appliedStylePresetId ?? null,
           cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
+          dialog_script: baseScene.dialogScript ?? null,
+          dialog_voices: (baseScene.dialogVoices ?? null) as any,
+          engine_override: baseScene.engineOverride ?? 'auto',
+          character_shots: (baseScene.characterShots ?? null) as any,
         } as any)
         .select('id')
         .single();
