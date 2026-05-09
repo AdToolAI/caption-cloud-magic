@@ -566,6 +566,7 @@ Deno.serve(async (req) => {
     }
 
     const body: TalkingHeadRequest = await req.json();
+    earlySceneId = body?.sceneId;
     const {
       sceneId,
       imageUrl,
