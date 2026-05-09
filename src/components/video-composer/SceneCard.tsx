@@ -1545,6 +1545,7 @@ export default function SceneCard({
             )}
           </div>
         </div>
+        )}
       </CardContent>
 
       {/* Stock Media Browser modal */}
