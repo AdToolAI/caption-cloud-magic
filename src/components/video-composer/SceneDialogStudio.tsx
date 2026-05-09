@@ -787,11 +787,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       //    clips on top of the fresh ones (root cause of "random extra
       //    speakers" / "double voiceovers" in the user's report).
       try {
+        // Match both the current marker AND any legacy markers from previous
+        // sessions (when scene.id was a temp/local id). All dialog-srs:* rows
+        // for this project are eligible — they belong to the same dialog flow.
         const { data: stale } = await supabase
           .from('composer_scenes')
           .select('id')
           .eq('project_id', pidForSrs)
-          .eq('cinematic_preset_slug', srsMarker);
+          .like('cinematic_preset_slug', 'dialog-srs:%');
         const staleIds = (stale ?? []).map((r: any) => r.id).filter(Boolean);
         if (staleIds.length > 0) {
           await supabase.from('scene_audio_clips').delete().in('scene_id', staleIds);
