@@ -32,6 +32,7 @@ import { useTalkingHead } from '@/hooks/useTalkingHead';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
+import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
@@ -454,6 +455,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
       return;
     }
+    // Pin dialog into the visible AI prompt immediately so the user sees the
+    // concrete speaker lines right after clicking "Generate voiceover".
+    try {
+      const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
+      if (dialogPrompt !== (scene.aiPrompt || '')) {
+        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+      }
+    } catch (_) { /* noop — non-fatal */ }
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
@@ -593,6 +602,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    // Pin dialog into the parent scene's AI prompt immediately — visible to
+    // the user and persisted alongside the script + voice map.
+    try {
+      const dialogPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, language);
+      if (dialogPrompt !== (scene.aiPrompt || '')) {
+        onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
+      }
+    } catch (_) { /* noop */ }
 
     // ── Auto-SRS for multi-speaker dialog ─────────────────────────────
     // It is physically impossible to lip-sync 2+ different speakers into a
@@ -769,7 +786,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
           // Force HeyGen engine and disable any auto-routing decisions.
           engineOverride: 'heygen',
-          aiPrompt: `${s.character.name}: ${s.block.text}`,
+          aiPrompt: applyDialogToPrompt('', [s.block], language),
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,

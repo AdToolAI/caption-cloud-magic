@@ -28,23 +28,21 @@ function snippet(text: string, max = 240): string {
   return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + '…';
 }
 
-/** English spoken-lines body. Always English regardless of UI language.
- *  IMPORTANT: We deliberately do NOT pass the literal spoken text into the
- *  prompt. Modern i2v / t2v models (Hailuo, Kling, Wan, Sora…) tend to
- *  render quoted strings as on-screen captions, which then appears as
- *  burned-in subtitles in the final video. The actual words are spoken via
- *  the ElevenLabs voiceover track — the prompt only needs to describe the
- *  speaking behaviour and forbid on-screen text. */
+/** English spoken-lines body with concrete speaker lines.
+ *  We DO include the literal text now so the prompt explicitly encodes
+ *  speaker order + content. The marker also forbids on-screen captions to
+ *  prevent i2v models from burning the quoted text into the frame. */
 export function buildSpokenLinesBlock(blocks: DialogBlock[]): string {
   if (!blocks?.length) return '';
   const speakers = Array.from(new Set(blocks.map((b) => b.speakerName).filter(Boolean)));
-  const who =
-    speakers.length === 0
-      ? 'the character'
-      : speakers.length === 1
-      ? speakers[0]
-      : `${speakers.slice(0, -1).join(', ')} and ${speakers[speakers.length - 1]}`;
-  return `${who} ${speakers.length > 1 ? 'are' : 'is'} speaking to camera with natural, subtle lip-sync mouth movement and matching facial expression. Do NOT render any on-screen text, captions, subtitles, signs, watermarks, logos or written words anywhere in the frame.`;
+  const intro =
+    speakers.length <= 1
+      ? `${speakers[0] ?? 'The character'} speaks to camera with natural, subtle lip-sync mouth movement and matching facial expression.`
+      : `${speakers.slice(0, -1).join(', ')} and ${speakers[speakers.length - 1]} speak to camera in turns with natural, subtle lip-sync mouth movement and matching facial expression. Timing must follow this exact speaker order.`;
+  const lines = blocks
+    .map((b) => `- ${b.speakerName} says: "${snippet(b.text, 200)}"`)
+    .join('\n');
+  return `${intro}\n${lines}\nDo NOT render any on-screen text, captions, subtitles, signs, watermarks, logos or written words anywhere in the frame.`;
 }
 
 export function applyDialogToPrompt(
@@ -57,6 +55,6 @@ export function applyDialogToPrompt(
   if (list.length === 0) return prose.trimStart();
 
   const body = buildSpokenLinesBlock(list);
-  const marker = `[Dialog] ${body} [/Dialog] `;
+  const marker = `[Dialog]\n${body}\n[/Dialog]\n\n`;
   return marker + prose.trimStart();
 }
