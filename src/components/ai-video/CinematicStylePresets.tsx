@@ -18,6 +18,15 @@ interface Props {
   onApply: (selection: ShotSelection, presetId: string) => void;
   /** Compact variant (used inside the per-scene panel in the Composer). */
   compact?: boolean;
+  /**
+   * Layout of the preset cards.
+   * - `rail` (default): horizontally scrollable rail (legacy).
+   * - `grid`: responsive multi-column grid — used in the cleaned-up
+   *   SceneStyleSheet so cards never get clipped.
+   */
+  layout?: 'rail' | 'grid';
+  /** Hide the small header row (used when the parent already labels the section). */
+  hideHeader?: boolean;
 }
 
 /**
@@ -27,24 +36,30 @@ interface Props {
  * applies the entire Shot Director selection (framing + angle + movement +
  * lighting) at once. Active preset is highlighted via gold ring.
  */
-export default function CinematicStylePresets({ value, onApply, compact = false }: Props) {
+export default function CinematicStylePresets({ value, onApply, compact = false, layout = 'rail', hideHeader = false }: Props) {
   const { language } = useTranslation();
   const lang = ((language as Lang) ?? 'en');
   const activeId = useMemo(() => matchPresetToSelection(value), [value]);
 
+  const containerCls = layout === 'grid'
+    ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2'
+    : 'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full';
+
   return (
     <div className={cn('space-y-2', compact && 'space-y-1.5')}>
-      <div className="flex items-center gap-1.5">
-        <Sparkles className={cn('text-primary', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} />
-        <span className={cn('font-medium text-primary', compact ? 'text-[11px]' : 'text-xs uppercase tracking-wider')}>
-          {lang === 'de' ? 'Cinematic Looks' : lang === 'es' ? 'Looks Cinematográficos' : 'Cinematic Looks'}
-        </span>
-        <span className={cn('text-muted-foreground', compact ? 'text-[9px]' : 'text-[10px]')}>
-          {lang === 'de' ? '· One-Click Director-Style' : lang === 'es' ? '· Estilo en un clic' : '· One-click director style'}
-        </span>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-1.5">
+          <Sparkles className={cn('text-primary', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} />
+          <span className={cn('font-medium text-primary', compact ? 'text-[11px]' : 'text-xs uppercase tracking-wider')}>
+            {lang === 'de' ? 'Cinematic Looks' : lang === 'es' ? 'Looks Cinematográficos' : 'Cinematic Looks'}
+          </span>
+          <span className={cn('text-muted-foreground', compact ? 'text-[9px]' : 'text-[10px]')}>
+            {lang === 'de' ? '· One-Click Director-Style' : lang === 'es' ? '· Estilo en un clic' : '· One-click director style'}
+          </span>
+        </div>
+      )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full">
+      <div className={containerCls}>
         {CINEMATIC_STYLE_PRESETS.map((preset) => (
           <PresetCard
             key={preset.id}
@@ -52,6 +67,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false 
             lang={lang}
             isActive={activeId === preset.id}
             compact={compact}
+            layout={layout}
             onClick={() => onApply(preset.selection, preset.id)}
           />
         ))}
@@ -65,6 +81,7 @@ interface PresetCardProps {
   lang: Lang;
   isActive: boolean;
   compact: boolean;
+  layout?: 'rail' | 'grid';
   onClick: () => void;
 }
 
@@ -150,7 +167,8 @@ function FrameThumb({ preset }: { preset: CinematicStylePreset }) {
   );
 }
 
-function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProps) {
+function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick }: PresetCardProps) {
+  const isGrid = layout === 'grid';
   return (
     <motion.button
       type="button"
@@ -159,8 +177,9 @@ function PresetCard({ preset, lang, isActive, compact, onClick }: PresetCardProp
       whileTap={{ scale: 0.97 }}
       title={preset.description[lang]}
       className={cn(
-        'shrink-0 relative rounded-lg border bg-card/40 backdrop-blur-sm overflow-hidden text-left transition-all group',
-        compact ? 'w-[148px] p-1.5' : 'w-[180px] p-2',
+        'relative rounded-lg border bg-card/40 backdrop-blur-sm overflow-hidden text-left transition-all group',
+        isGrid ? 'w-full p-2' : 'shrink-0',
+        !isGrid && (compact ? 'w-[148px] p-1.5' : 'w-[180px] p-2'),
         isActive
           ? 'border-primary ring-1 ring-primary/50 bg-primary/5 shadow-[0_0_18px_-6px_hsl(var(--primary)/0.6)]'
           : 'border-border/60 hover:border-primary/40',

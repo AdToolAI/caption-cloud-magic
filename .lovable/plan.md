@@ -1,103 +1,70 @@
-Du hast recht — die bisherigen Phasen haben Bausteine versteckt, aber das Grundproblem nicht gelöst: dieselben Inhalte werden 2-3x gezeigt und es gibt drei nebeneinander stehende „Stil"-Werkzeuge. Ein Kunde sieht heute auf einer einzigen Szene:
+# Stil-Modus aufräumen — „ein Raum, kein Labyrinth"
 
-- denselben Prompt **dreimal** (Director Console „Live Prompt", KI-Prompt-Textarea, „Finaler Prompt (Vorschau)")
-- **drei Stil-Tools** nebeneinander (Director Presets, Cinematic Looks, Shot Director)
-- Cast-Zeile **doppelt** (oben in der Storyboard-Tabelle + nochmal in der Karte)
-- Score, Anker, Lip-Sync, Effekte, Engine, Stock/KI/Eigenes-Tabs, Compare-Lab, Referenzbild — alles flach untereinander
-
-Der „Erweitert"-Toggle aus Phase F war zu zaghaft (er hat nur Multi-Engine-Preview, Compare-Lab, Final-Prompt und StillFrame versteckt — nicht die wirklichen Lärmquellen).
+## Problem (aus Screenshots)
+- **Verzweigt**: Im „Stil ändern"-Dialog öffnet der Modifier-Tab einen weiteren Popover („Hinzufügen") mit eigenen Tabs → Dialog-im-Dialog-Gefühl.
+- **Feintuning**: 6 Buttons öffnen jeweils einen eigenen Popover — viel Klickerei, kein Überblick über alle Achsen gleichzeitig.
+- **Looks**: horizontaler Scroll-Rail schneidet Karten am Rand ab (siehe Screenshot „Cyberpunk Neon … Roman…").
+- **Doppelte Header**: „Stil ändern" + Tabs + nochmal Modifier-Header + nochmal Shot-Director-Header.
+- **Kein zentraler Status**: aktive Auswahl ist über drei Tabs verteilt; man sieht nie auf einen Blick, was gerade gesetzt ist.
 
 ## Ziel
+Alle bestehenden Features behalten (Looks, Feintuning, Modifier), aber in **einem konsistenten Master-Detail-Layout ohne Popover-Stapel** zugänglich machen.
 
-Eine Szenenkarte sieht im Standard-Zustand nur noch das, was ein Kunde braucht, um die Szene zu **briefen** und zu **starten**. Alles andere wandert hinter klar benannte Knöpfe (Sheets/Drawer).
-
-## Neue Struktur der Szenenkarte (Default)
+## Neues Layout für `SceneStyleSheet` (max-w-4xl)
 
 ```text
-┌─ [::] [Hook ▾]  4s  €0,60  [B-Roll ▾]  [Matthew ·][Sarah ·][+]   [×] ─┐
-│                                                                       │
-│   [ Stock ] [ KI-Generiert ✓ ] [ Eigenes ]                            │
-│                                                                       │
-│   Modell:  Hailuo 2.3 Standard  · 720p · €0,15/s          [ Wechseln ]│
-│                                                                       │
-│   ┌─────────────────────────────────────────────────────────────────┐ │
-│   │ Was soll in dieser Szene passieren?                             │ │
-│   │ [ Textarea: ein einziges Prompt-Feld, EN, @-mentions ]          │ │
-│   │                                                                 │ │
-│   │ Stil:  [ Cyberpunk Neon ✓ ]  [ Stil ändern ]   [ ✨ Auto-Stil ] │ │
-│   └─────────────────────────────────────────────────────────────────┘ │
-│                                                                       │
-│   ● Drehbereit · 94            [ Skript ]  [ Voiceover ]  [ Mehr ▾ ] │
-└───────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│  🎨  Stil ändern                                       [×]   │
+│  Aktiv: [Cyberpunk Neon ×] [Loft Film ×]  · Reset alles      │
+├──────────────────────────────────────────────────────────────┤
+│  [ ✨ Looks ]  [ 🎚 Feintuning ]  [ 🎞 Modifier ]            │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Tab-Inhalt (siehe unten)                                   │
+│                                                              │
+├──────────────────────────────────────────────────────────────┤
+│  Vorschau (Cinematography-String, 1 Zeile, kursiv)           │
+│                                       [ Zurücksetzen ] [✓]   │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-Konkret heißt das:
+Die obere **Status-Leiste** zeigt globale Chips für *jeden* aktiven Eintrag aus allen drei Tabs zusammen — der Kunde sieht sofort, was gesetzt ist, egal in welchem Tab er steht.
 
-### 1. Prompt nur noch EINMAL sichtbar
-- **Behalten:** die editierbare Textarea (heute „KI-Prompt (EN) — bearbeitbar").
-- **Entfernen aus dem Default-View:**
-  - „DIRECTOR CONSOLE — LIVE PROMPT" Block mit dem token-farbigen `[2 ACTION] … [8 NEGATIVE] …` Preview.
-  - „Finaler Prompt (Vorschau)" Block weiter unten.
-  - „NEGATIVE_PROMPT (SEPARATE CHANNEL)" Block.
-- **Wo gehen sie hin?** In ein neues Sheet **„Prompt-Details ansehen"** (Button rechts unter der Textarea, klein). Dort: Live-Prompt, Negative-Channel, Token-Farbcodierung, Multi-Engine-Vergleich, Compare-Lab — alles was heute „Director Console" + Phase-F-Drawer zeigt.
+### Tab 1 · Looks (One-Click Director-Styles)
+- Scroll-Rail → **responsives Grid** `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`, keine abgeschnittenen Karten mehr.
+- Aktive Karte: Goldring + Check-Badge (wie heute).
+- Klick = wendet das gesamte Shot-Director-Set an (unverändert).
 
-### 2. Stilauswahl auf EIN Werkzeug reduzieren
-Heute konkurrieren **Director Presets**, **Cinematic Looks** (Rail mit Frame-Thumbs) und **Shot Director** (6 Dropdowns) um dieselbe Aufgabe.
+### Tab 2 · Feintuning (Shot Director, 6 Achsen)
+Statt 6 Popover-Buttons → **Master-Detail in einem Panel**:
+- Linke Spalte (≈ 200 px): Liste der 6 Achsen (Bildausschnitt, Winkel, Bewegung, Licht, Kamera, Objektiv) mit aktuellem Wert als Untertitel und Häkchen, wenn gesetzt.
+- Rechte Spalte: Optionen der ausgewählten Achse als saubere klickbare Liste mit Label + Beschreibung. Klick = direkt setzen (kein Bestätigen).
+- „Achse leeren" als kleiner Link unten in der rechten Spalte.
+- Auf Mobile: kollabierter Accordion (immer nur eine Achse offen).
 
-- **Default-Sichtbar:** ein einzelner Chip „Stil: Cyberpunk Neon" + Button „Stil ändern".
-- **„Stil ändern"** öffnet ein Sheet mit drei Tabs:
-  - **Looks** (= bisherige Cinematic-Looks-Rail mit den 16:9-Frame-Thumbs aus Phase D — One-Click-Lösung für 95% der Kunden)
-  - **Feintuning** (= bisheriger Shot Director mit 6 Achsen — für Power-User)
-  - **Director Presets** (= Stil-Modifikatoren wie „Loft Film", für Power-User)
-- Wenn ein Look gewählt ist: Chip zeigt Look-Namen + ein „×" zum Zurücksetzen. Kein Look gewählt → Chip „Kein Stil · Auto".
-- Button **„✨ Auto-Stil"** schlägt anhand von Szenentyp + Cast einen Look vor (nutzt vorhandene `recommendEngineForScene`-Logik analog).
+### Tab 3 · Modifier (Director Presets — Kamera/Objektiv/Licht/Mood/Filmstock)
+- **Popover entfällt komplett.** Kategorien als horizontale Sub-Tabs direkt im Dialog (Kamera · Objektiv · Licht · Mood · Filmstock).
+- Darunter dieselbe gerasterte Optionsliste wie heute, nur inline.
+- `DirectorPresetPicker` bekommt eine neue `embedded`-Prop, die den eigenen Wrapper-Card + den `Hinzufügen`-Popover unterdrückt und stattdessen direkt die Tabs+Liste rendert.
 
-### 3. Director Score auf eine Zeile
-- Statt eigener Box → kompakte Statuszeile am Kartenfuß: `● Drehbereit · 94` (Punkt-Farbe = Severity, Score klein dahinter).
-- Klick auf die Zeile öffnet das bestehende `DirectorQualityCoach`-Detail-Panel (bleibt unverändert dahinter).
+### Sticky Footer
+- Live-Preview des Cinematography-Suffix (`buildShotPromptSuffix`) als kursive Zeile, max 1 Zeile, truncate.
+- Buttons: `Zurücksetzen` (alle drei Bereiche) + `Fertig` (schließt Dialog).
 
-### 4. „Mehr ▾" Drawer für Sekundär-Funktionen
-Ein einziger zusammenklappbarer Bereich am Kartenfuß sammelt alles, was heute frei herumliegt:
-- **Anker / Face-Lock** (Charakter-Komposition, Nano-Banana-Kosten-Hinweis)
-- **Lip-Sync zum Voiceover** Toggle
-- **Effekte** (light-rays etc.)
-- **Referenzbild (optional)** Upload
-- **Übergang** (Harter Schnitt etc.)
-- **SceneStillFrameStudio** (nur bei `ai-*` Quellen)
+## Betroffene Dateien
+- `src/components/video-composer/SceneStyleSheet.tsx` — komplettes Re-Layout (Header-Status-Leiste, Footer, breiterer Dialog, Tabs als Pills statt Standard-`TabsList`).
+- `src/components/video-composer/SceneShotDirectorPanel.tsx` — neuer `layout="master-detail"`-Modus ohne Popover; alter Popover-Modus bleibt für Rückwärtskompatibilität in anderen Studios.
+- `src/components/ai-video/CinematicStylePresets.tsx` — neue `layout="grid"`-Prop; bestehender Scroll-Rail bleibt für andere Aufrufer.
+- `src/components/motion-studio/DirectorPresetPicker.tsx` — neue `embedded`-Prop, die Card-Wrapper + „Hinzufügen"-Popover entfernt und Kategorien als Tabs inline rendert.
 
-Default: **zu**. Beschriftung zeigt aktive Sekundär-Settings als kleine Pills, damit man auf einen Blick sieht „hier ist Lip-Sync an" — z.B. `Mehr ▾  · Lip-Sync · Anker komponiert`.
+## Was bewusst **nicht** geändert wird
+- Logik der Auswahl, Speicherung in `scene.shotDirector` / `scene.directorModifiers`, Prompt-Suffix-Bau.
+- Verhalten in anderen Studios (AI-Video-Toolkit etc.) — die alten Modi der drei Komponenten bleiben als Default erhalten, neue Layouts sind opt-in via Prop.
+- i18n-Strings in `SceneStyleSheet` werden nur ergänzt (Status-Leiste, Footer-Vorschau, „Achse leeren"), nichts entfernt.
 
-### 5. Cast-Zeile in der Karte verschlanken
-- Die große Cast-Tabelle oben (S1-S6 mit Bildern + Erklärtext über Reference-Image / Frame-Chain) bleibt **außerhalb** der Karte (Storyboard-Header) — die ist gut.
-- **Innerhalb** der Karte: nur die Cast-Pills im Header (`Matthew · Sarah · +`). Die zweite Zeile mit „Bis zu 4 Charaktere…" + „Charaktere werden automatisch im Prompt erwähnt" + Charakter-hinzufügen-Button entfällt; „+" Pill öffnet denselben CharacterCastPicker.
-
-### 6. „Skript" und „Voiceover" als sekundäre Buttons
-- Heute steht „Skript schreiben" als eigener prominenter Button mitten in der Karte. Wird zu einem schmalen Knopf in der Statusleiste neben dem Score, gleichwertig mit „Voiceover".
-
-## Was bleibt unverändert
-- Datenmodell, Logik, Edge-Functions, alle Hooks (`useBrandCharacters`, `composePromptLayers`, `resolveSceneCharacterAnchor`, …).
-- Storyboard-Übersicht über der Karte (Cast-Matrix mit S1-S6).
-- Workflow-Schiene links.
-- Die Power-User-Werkzeuge selbst (Shot Director, Compare Lab, Multi-Engine-Preview, Director Presets) — sie ziehen nur in Sheets/Tabs um.
-
-## Technische Umsetzung (kurz)
-
-1. Neue Komponenten:
-   - `ScenePromptDetailsSheet.tsx` (umfasst DirectorConsolePreview + Negative-Channel + Multi-Engine + CompareLab)
-   - `SceneStyleSheet.tsx` (3 Tabs: Looks / Feintuning / Director Presets)
-   - `SceneSecondaryDrawer.tsx` (Anker, Lip-Sync, Effekte, Referenzbild, Übergang, StillFrame)
-   - `SceneStatusBar.tsx` (Score-Pill + Skript + Voiceover + „Mehr ▾")
-   - `SceneStyleChip.tsx` (aktiver Look + „Stil ändern" + Reset)
-2. `SceneCard.tsx` wird radikal entkernt: Header (bleibt) → Tabs (bleibt) → Modell-Zeile → Prompt-Block → StatusBar → SecondaryDrawer. Alles andere fliegt aus dem JSX, Logik bleibt in den neuen Komponenten.
-3. `advancedOpen`-State und der „Erweitert"-Toggle aus Phase F werden durch das neue Schema ersetzt (gelöscht).
-4. i18n DE/EN/ES für die neuen Labels („Stil ändern" / „Change style" / „Cambiar estilo", „Mehr" / „More" / „Más", „Prompt-Details" / „Prompt details" / „Detalles del prompt", „Drehbereit" bleibt aus DirectorQualityCoach).
-5. Keine Backend-/DB-Änderungen.
-
-## Phasen
-
-- **Phase 1:** Prompt-Triplikat auflösen → `ScenePromptDetailsSheet` + Live-Prompt aus Default-View entfernen.
-- **Phase 2:** `SceneStyleSheet` (3 Tabs) + `SceneStyleChip` → Cinematic Looks / Shot Director / Director Presets verschwinden aus dem Default-View.
-- **Phase 3:** `SceneStatusBar` + `SceneSecondaryDrawer` → Score, Anker, Lip-Sync, Effekte, Referenzbild, Übergang, Skript-Button werden konsolidiert.
-- **Phase 4:** Cast-Zeile verschlanken, Cleanup, i18n, visuelle Politur.
-
-Sag „los" für Phase 1, oder gib Feedback an einzelnen Punkten (z. B. „Director Presets ganz raus" oder „Lip-Sync soll sichtbar bleiben").
+## Ergebnis für den Kunden
+- Ein einziger Dialog, keine Popovers, keine zweite Modal-Ebene.
+- Alle aktiven Stil-Entscheidungen oben auf einen Blick — überall entfernbar.
+- Feintuning: alle 6 Achsen gleichzeitig sichtbar, ein Klick zur Option.
+- Modifier: direkt sichtbare Kategorien-Tabs statt versteckter „Hinzufügen"-Button.
+- Looks: keine abgeschnittenen Karten mehr.
