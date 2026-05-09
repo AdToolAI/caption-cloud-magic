@@ -753,6 +753,10 @@ export default function VideoComposerDashboard() {
           prompt_slot_order: (s.promptSlotOrder ?? null) as any,
           applied_style_preset_id: s.appliedStylePresetId ?? null,
           cinematic_preset_slug: s.cinematicPresetSlug ?? null,
+          continuity_locked: s.continuityLocked === true,
+          lock_reference_url: s.lockReferenceUrl ?? null,
+          continuity_source_scene_id: s.continuationSourceSceneId ?? null,
+          frame_pick_seconds: s.framePickSeconds ?? null,
         } as any)
         .eq('id', s.id)
         .eq('project_id', projectId)
