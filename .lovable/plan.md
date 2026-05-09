@@ -1,72 +1,44 @@
-# Lip-Sync-Fehler stabilisieren
+Befund: Die Szene rendert nicht wirklich seit 7–10 Minuten weiter. HeyGen bricht beim Upload des Talking-Photo-Bildes mit `HEYGEN_UPLOAD_TRANSIENT` / Code `40099` ab. Die UI bleibt trotzdem auf `generating`, weil der Fehler nicht zuverlässig auf die bereits angelegte Sub-Szene zurückgeschrieben wird bzw. der Dialog-Flow die Sub-Szene vorher als „generating“ erstellt.
 
-## Was wir aus den Logs sehen
+Plan:
 
-`generate-talking-head` ist 2× direkt hintereinander an derselben Stelle gescheitert:
+1. Hängende UI-Zustände vermeiden
+- In `generate-talking-head` den Request-Body nur einmal am Anfang lesen und `sceneId` für den Catch-Block stabil verfügbar machen.
+- Bei jedem Fehler die betroffene Szene zuverlässig auf `clip_status = failed` setzen und `clip_error` speichern.
+- Optional den Response-Status bei akzeptiertem async Start auf `202` vereinheitlichen, sobald HeyGen-Job wirklich gestartet wurde.
 
+2. Sub-Szene bei Client-Fehler sofort markieren
+- In `SceneDialogStudio.tsx` im per-speaker Catch zusätzlich die neu angelegte Sub-Szene clientseitig/DB-seitig auf `failed` setzen, falls die Edge Function schon vor dem DB-Update scheitert.
+- Den Toast soll den echten Grund zeigen: „HeyGen war kurz nicht erreichbar — bitte erneut versuchen“, nicht nur endloses Rendering.
+
+3. Szene nicht mehr ans Ende hängen
+- Den bereits besprochenen Insert-Flow umsetzen: SRS-Sub-Szenen werden an der Position der Dialog-Szene eingefügt, nicht am Projektende.
+- Die Parent-Dialogszene wird nach erfolgreichem Split ersetzt, damit aus Szene 1 direkt Szene 1/2 als Lip-Sync-Shots werden.
+
+4. Nur echte Speaker-Blöcke rendern
+- Vor dem Split sichtbar/technisch prüfen, wie viele Dialog-Blöcke wirklich erkannt wurden.
+- Wenn nur Matthew im Skript steht, wird auch nur Matthew gerendert; Sarah muss als eigene Zeile im Skript stehen, sonst gibt es keine zweite Sub-Szene.
+
+5. Bestehende hängende Szene bereinigen
+- Die aktuell hängende Szene wird auf `failed` gesetzt, damit du sie erneut starten kannst statt auf einem endlosen Spinner zu bleiben.
+
+Erwartetes Ergebnis:
+```text
+Vorher:
+Szene 1 Dialogcontainer, Szene 2–6 normal, neue Lip-Sync-Szene hängt als Szene 7 auf generating
+
+Nachher:
+Szene 1 Dialogcontainer wird ersetzt durch:
+Szene 1 Matthew Lip-Sync
+Szene 2 Sarah Lip-Sync
+alte Szene 2–6 werden zu Szene 3–7
+Fehler landen sichtbar auf failed statt endlos generating
 ```
-HeyGen talking_photo upload failed [500]:
-{"code":40099,"message":"Something is wrong, please contact contact@heygen.com"}
-```
 
-Das ist ein HeyGen-seitiger 500er beim **Upload des Portraits** (vor der eigentlichen Video-Generierung). Solche 40099-Antworten treten typischerweise auf, wenn:
-- HeyGen kurzzeitig hakt (transient),
-- das Bild ungewöhnlich groß / mit EXIF-Drehung / als WebP getarntes JPEG kommt,
-- oder zwei Uploads zu schnell hintereinander für denselben Account laufen (SRS startet 2 Sprecher direkt nacheinander).
-
-Die Edge-Funktion bricht aktuell beim **ersten** Fehler hart ab → Toast „Edge Function returned a non-2xx status code", die bereits angelegte Sub-Szene bleibt im Status `generating` hängen, Credits sind weg.
-
-## Plan
-
-### 1. Robuster HeyGen-Upload mit Retry + Bild-Normalisierung
-Datei: `supabase/functions/generate-talking-head/index.ts`, Funktion `uploadHeyGenTalkingPhoto`
-
-- Quelle einmal als `ArrayBuffer` laden, dann:
-  - Wenn >8 MB oder ContentType nicht `image/png|jpeg`: über die bestehende `fetch`-zu-Blob-Pipeline normalisieren (re-encode als JPEG via `Image` ist in Deno nicht trivial — wir nutzen stattdessen `imagescript` (`npm:imagescript`) um auf max. 2048×2048 zu skalieren und sauber als JPEG-Q85 zu re-encoden). Das löst >90 % aller 40099-Fälle.
-- Upload-Call in `withRetry(3, [500, 502, 503, 504, 408, 429])` mit exponentiellem Backoff (1s/3s/8s) wickeln. Vendor-Code `40099` explizit als retry-würdig markieren (nicht als „User-Error").
-- Bei finalem Misserfolg klar typisierte Fehlermeldung zurückgeben:
-  `HEYGEN_UPLOAD_TRANSIENT` vs. `HEYGEN_UPLOAD_INVALID_IMAGE`.
-
-### 2. Idempotenter Credit-Refund + Sub-Scene-Cleanup
-Datei: `supabase/functions/generate-talking-head/index.ts`
-
-- Beim Catch im Handler:
-  - Credits refunden (Pattern aus `lip-sync-video/index.ts` mit deterministischer UUID = unsere bestehende Convention),
-  - Wenn `sceneId` vorhanden: `composer_scenes.clipStatus = 'failed'`, `clip_error = <kurzer Grund>` setzen, damit die Sub-Szene nicht ewig „generating" bleibt.
-
-### 3. SRS-Loop im Frontend tolerant machen
-Datei: `src/components/video-composer/SceneDialogStudio.tsx` (`handleGenerate`)
-
-- Statt beim ersten Fehler aus dem `for (const s of synthed)`-Loop herauszuspringen:
-  - Pro Block einzeln `try/catch`,
-  - bei Fehler den **Sprecher-Namen + Grund** in einer Liste sammeln,
-  - am Ende ein zusammengefasster Toast: „Matthew ✓, Sarah ✗ — HeyGen war kurz nicht erreichbar, bitte erneut versuchen".
-- Erfolgreiche Sub-Szenen bleiben bestehen (kein Rollback); fehlgeschlagene werden mit `clipStatus='failed'` markiert (siehe 2.).
-- Re-Generieren der Eltern-Szene räumt sie über den bestehenden `srsMarker`-Cleanup wieder weg, also keine doppelten Reste.
-
-### 4. Kleine UX-Politur
-Datei: `src/components/video-composer/SceneDialogStudio.tsx`
-
-- Wenn Toast ausschließlich transienten HeyGen-Fehler enthält: Button-Label kurz auf „Erneut versuchen" wechseln (5 s) statt nur „Generieren".
-- Eine Hinweiszeile unter dem SRS-Block: „Portraits werden für HeyGen automatisch auf max. 2048 px / JPEG normalisiert." — dadurch wissen User, dass riesige PNGs okay sind.
-
-## Technische Details
-
-- Neue Helfer in `_shared/`:
-  - `_shared/heygenRetry.ts` (kleines `withRetry`-Wrapper, nutzbar auch von `compose-lipsync-scene` falls dort später nötig).
-- `imagescript` ist bereits Deno-kompatibel (`npm:imagescript@1.x`) — kein neuer Secret-Key, kein neuer Cost-Vector.
-- Refund-Pfad nutzt die bestehende `REFUND_NS`-Konvention, kein neues Schema.
-- Keine DB-Migration notwendig (`clip_error` existiert bereits in `composer_scenes`; falls nicht, fügen wir sie als Text-Column hinzu — wird beim Implementieren geprüft).
-
-## Erwartetes Ergebnis
-
-- Transiente HeyGen-500er werden lautlos retried statt sofort als Fehler zu erscheinen.
-- Übergroße / WebP-Portraits führen nicht mehr zu 40099, weil sie vorher auf JPEG/2048 px normalisiert sind.
-- Wenn HeyGen wirklich down ist: Sub-Szene wird sauber als `failed` markiert, Credits zurück, klarer Toast pro betroffenem Sprecher, kein „Geist-Generating"-Status.
-- SRS-Mehr­sprecher-Flow bleibt beim Teilfehler eines Sprechers funktional (der andere wird trotzdem fertig).
-
-## Dateien
-
+Technische Dateien:
 - `supabase/functions/generate-talking-head/index.ts`
-- `supabase/functions/_shared/heygenRetry.ts` *(neu)*
 - `src/components/video-composer/SceneDialogStudio.tsx`
+- `src/components/video-composer/VideoComposerDashboard.tsx`
+- ggf. `SceneCard.tsx` / `StoryboardTab.tsx` für Prop-Durchreichung
+
+Keine neue Datenbankstruktur nötig; nur ein einmaliges Status-Update für die aktuell hängende Szene.

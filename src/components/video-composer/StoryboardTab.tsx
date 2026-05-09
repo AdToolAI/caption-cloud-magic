@@ -37,6 +37,13 @@ interface StoryboardTabProps {
    * persisted yet.
    */
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Inserts N sub-scenes immediately after `parentSceneId`, optionally
+   *  removing the parent (used by SceneDialogStudio for SRS lip-sync). */
+  onInsertScenesAfter?: (
+    parentSceneId: string,
+    partials: Partial<ComposerScene>[],
+    opts?: { removeParent?: boolean },
+  ) => Promise<(string | undefined)[]>;
   onGoToClips: () => void;
   language: string;
   projectId?: string;
@@ -57,6 +64,7 @@ export default function StoryboardTab({
   scenes,
   onUpdateScenes,
   onAddScene,
+  onInsertScenesAfter,
   onGoToClips,
   language,
   projectId,
@@ -447,6 +455,7 @@ export default function StoryboardTab({
                       }
                       hasOtherReadyScenes={hasOtherReadyScenes}
                       onAddScene={onAddScene}
+                      onInsertScenesAfter={onInsertScenesAfter}
                       onAddCharacter={onAddCharacter}
                       language={language}
                       onEnsurePersisted={onEnsurePersisted}

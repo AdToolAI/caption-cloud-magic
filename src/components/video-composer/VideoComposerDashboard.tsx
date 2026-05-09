@@ -863,6 +863,147 @@ export default function VideoComposerDashboard() {
     }
   }, [project.id]);
 
+  /**
+   * Insert N new scenes immediately AFTER `parentSceneId` (taking its slot
+   * when `removeParent` is true). Used by SceneDialogStudio so multi-speaker
+   * lip-sync sub-scenes appear right where the dialog scene sat — not at
+   * the end of the project.
+   */
+  const insertScenesAfter = useCallback(async (
+    parentSceneId: string,
+    partials: Partial<ComposerScene>[],
+    opts?: { removeParent?: boolean },
+  ): Promise<(string | undefined)[]> => {
+    const removeParent = opts?.removeParent === true;
+    const projectId = project.id;
+    if (!projectId) {
+      console.warn('[VideoComposerDashboard] insertScenesAfter: project not persisted yet');
+      return partials.map(() => undefined);
+    }
+    const current = project.scenes;
+    const parentIdx = current.findIndex((s) => s.id === parentSceneId);
+    if (parentIdx < 0) {
+      console.warn('[VideoComposerDashboard] insertScenesAfter: parent not found', parentSceneId);
+      return partials.map(() => undefined);
+    }
+    const parent = current[parentIdx];
+    const insertAt = removeParent ? parentIdx : parentIdx + 1;
+    const shift = partials.length - (removeParent ? 1 : 0);
+
+    // 1) Shift order_index for scenes AFTER the parent (2-step write to avoid
+    //    any potential unique-index collision while moving).
+    const tail = current.slice(parentIdx + 1);
+    if (shift !== 0 && tail.length > 0) {
+      try {
+        await Promise.all(tail.map((s) =>
+          supabase.from('composer_scenes')
+            .update({ order_index: (s.orderIndex ?? 0) + shift + 10000, updated_at: new Date().toISOString() })
+            .eq('id', s.id),
+        ));
+        await Promise.all(tail.map((s) =>
+          supabase.from('composer_scenes')
+            .update({ order_index: (s.orderIndex ?? 0) + shift, updated_at: new Date().toISOString() })
+            .eq('id', s.id),
+        ));
+      } catch (e) {
+        console.warn('[insertScenesAfter] shift failed', e);
+      }
+    }
+
+    // 2) Optionally remove the parent (and its audio clips).
+    if (removeParent) {
+      try { await supabase.from('scene_audio_clips').delete().eq('scene_id', parent.id); } catch (_e) {}
+      try { await supabase.from('composer_scenes').delete().eq('id', parent.id); } catch (e) {
+        console.warn('[insertScenesAfter] delete parent failed', e);
+      }
+    }
+
+    // 3) Insert each new scene at insertAt, insertAt+1, …
+    const newIds: (string | undefined)[] = [];
+    const inserted: ComposerScene[] = [];
+    for (let i = 0; i < partials.length; i++) {
+      const orderIndex = insertAt + i;
+      const baseScene: ComposerScene = {
+        id: `scene_${Date.now()}_${i}`,
+        projectId,
+        orderIndex,
+        sceneType: 'custom',
+        durationSeconds: 5,
+        clipSource: 'stock',
+        clipQuality: 'standard',
+        clipStatus: 'pending',
+        textOverlay: { ...DEFAULT_TEXT_OVERLAY },
+        transitionType: 'none',
+        transitionDuration: 0,
+        retryCount: 0,
+        costEuros: 0,
+        ...partials[i],
+      } as ComposerScene;
+      baseScene.orderIndex = orderIndex; // positional override wins
+
+      try {
+        const { data, error } = await supabase
+          .from('composer_scenes')
+          .insert({
+            project_id: projectId,
+            order_index: orderIndex,
+            scene_type: baseScene.sceneType,
+            duration_seconds: baseScene.durationSeconds,
+            clip_source: baseScene.clipSource,
+            clip_quality: baseScene.clipQuality || 'standard',
+            clip_status: baseScene.clipStatus ?? 'pending',
+            clip_url: baseScene.clipUrl ?? null,
+            with_audio: baseScene.withAudio !== false,
+            lip_sync_with_voiceover: baseScene.lipSyncWithVoiceover === true,
+            ai_prompt: baseScene.aiPrompt ?? null,
+            stock_keywords: baseScene.stockKeywords ?? null,
+            upload_url: baseScene.uploadUrl ?? null,
+            upload_type: baseScene.uploadType ?? null,
+            reference_image_url: baseScene.referenceImageUrl ?? null,
+            text_overlay: baseScene.textOverlay as any,
+            transition_type: baseScene.transitionType,
+            transition_duration: baseScene.transitionDuration,
+            director_modifiers: (baseScene.directorModifiers ?? {}) as any,
+            shot_director: (baseScene.shotDirector ?? {}) as any,
+            prompt_slots: (baseScene.promptSlots ?? null) as any,
+            prompt_mode: baseScene.promptMode ?? null,
+            prompt_slot_order: (baseScene.promptSlotOrder ?? null) as any,
+            applied_style_preset_id: baseScene.appliedStylePresetId ?? null,
+            cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
+            dialog_script: baseScene.dialogScript ?? null,
+            dialog_voices: (baseScene.dialogVoices ?? null) as any,
+            engine_override: baseScene.engineOverride ?? 'auto',
+            character_shots: (baseScene.characterShots ?? null) as any,
+          } as any)
+          .select('id')
+          .single();
+        if (error) throw error;
+        const newId = (data as any)?.id as string | undefined;
+        newIds.push(newId);
+        if (newId) inserted.push({ ...baseScene, id: newId });
+      } catch (err) {
+        console.warn('[insertScenesAfter] insert failed', err);
+        newIds.push(undefined);
+      }
+    }
+
+    // 4) Mirror result in local state.
+    setProject((prev) => {
+      const next = [...prev.scenes];
+      const pIdx = next.findIndex((s) => s.id === parentSceneId);
+      if (pIdx < 0) return prev;
+      for (let i = pIdx + 1; i < next.length; i++) {
+        next[i] = { ...next[i], orderIndex: (next[i].orderIndex ?? 0) + shift };
+      }
+      const spliceAt = removeParent ? pIdx : pIdx + 1;
+      const removeCount = removeParent ? 1 : 0;
+      next.splice(spliceAt, removeCount, ...inserted);
+      return { ...prev, scenes: next };
+    });
+
+    return newIds;
+  }, [project.id, project.scenes]);
+
   // the user navigates away.
   useEffect(() => {
     return () => {
@@ -1106,6 +1247,7 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
               onUpdateScenes={setScenes}
               onAddScene={addSceneToProject}
+              onInsertScenesAfter={insertScenesAfter}
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
