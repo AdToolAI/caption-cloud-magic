@@ -76,6 +76,7 @@ import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
 import SceneDialogStudio from './SceneDialogStudio';
 import DirectorConsolePreview from './director-console/DirectorConsolePreview';
+import DirectorQualityCoach from './director-console/DirectorQualityCoach';
 import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
