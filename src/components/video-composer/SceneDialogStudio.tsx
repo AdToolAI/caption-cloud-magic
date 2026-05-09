@@ -52,6 +52,13 @@ interface SceneDialogStudioProps {
   language: 'de' | 'en' | 'es';
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  /** Inserts SRS lip-sync sub-scenes at this scene's slot, replacing the
+   *  parent dialog scene so users see Scene #1/#2 instead of new tail scenes. */
+  onInsertScenesAfter?: (
+    parentSceneId: string,
+    partials: Partial<ComposerScene>[],
+    opts?: { removeParent?: boolean },
+  ) => Promise<(string | undefined)[]>;
   /** Controlled open/close — when explicitly false, renders nothing. */
   open?: boolean;
   /** Close-handler used by the in-card X button. */
@@ -187,6 +194,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   language,
   onUpdate,
   onAddScene,
+  onInsertScenesAfter,
   open,
   onClose,
   onEnsurePersisted,
