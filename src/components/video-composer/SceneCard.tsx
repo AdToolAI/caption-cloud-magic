@@ -199,9 +199,6 @@ export default function SceneCard({
   // Lock, Lip-Sync, Reference image + Still-Frame Studio and the hard-cut hint.
   // Default closed → SceneCard reads as a focussed prompt + cast surface.
   const [secondaryOpen, setSecondaryOpen] = useState(false);
-  // `advancedOpen` is no longer wired (Phase 3 superseded it). Kept as a stub
-  // to avoid touching every reference; safe to remove in a future cleanup.
-  const advancedOpen = secondaryOpen;
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
   const { data: commentCounts } = useSceneCommentCounts(projectId);
