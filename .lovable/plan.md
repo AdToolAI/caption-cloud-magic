@@ -1,71 +1,89 @@
-## Diagnose
+## Warum es aktuell nicht professionell wirkt
 
-Der Screenshot und der Code zeigen ein anderes Problem als zuerst vermutet:
+Das Problem ist nicht nur der Prompt. Ein Prompt kann bei einem Multi-Charakter-Video nicht zuverlässig festlegen: „Diese Audiodatei gehört exakt zu Gesicht A, diese zu Gesicht B“. Artlist/Synthesia/HeyGen lösen das nicht primär über Prompting, sondern über eine harte technische Zuordnung:
 
-- Die Szene ist 10 Sekunden lang, also ist die Dauer nicht der Hauptfehler.
-- Beim Clip-Render in `compose-video-clips` wird jede Szene mit Dialog + Cast automatisch zu HeyGen geroutet.
-- Der HeyGen-Zweig nimmt den ersten Charakter/sein Portrait (`primaryShot`) und schickt dann den komplett bereinigten Dialogtext (`stripSpeakerPrefixes(scene.dialogScript)`) an genau dieses eine Portrait.
-- Ergebnis: Der erste Charakter spricht beide Dialogzeilen, mit kurzer Pause dazwischen. Genau das beschreibst du.
+```text
+Speaker 1 → Voice 1 → Audio Segment 1 → Face/Avatar 1 → eigener Render
+Speaker 2 → Voice 2 → Audio Segment 2 → Face/Avatar 2 → eigener Render
+Danach: Schnitt/Stitching in der Timeline
+```
 
-Zusätzlich kann das Voiceover in der Vorschau stumm wirken, weil der Multi-Speaker-Dialog teilweise nur als Render-Anweisung im Video steckt, statt als separate, sofort abspielbare `scene_audio_clips`-Audiospur.
+Unser aktueller Fehler entsteht, weil wir stellenweise noch versuchen, Multi-Speaker in einer gemeinsamen KI-Szene oder über einen generischen Lip-Sync-Polish zu lösen. Das führt dazu, dass der erste/beste erkannte Kopf den Dialog „übernimmt“ oder nur ein einzelner Voiceover-Clip verwendet wird.
 
 ## Zielverhalten
 
-Für eine Szene mit zwei Charakteren im selben Bild:
+Für Kunden muss es klar und verlässlich sein:
 
-1. Beide Dialogblöcke bleiben zeitlich korrekt im `audioPlan`.
-2. Die Vorschau spielt beide Voiceover-Blöcke hörbar nacheinander ab.
-3. Der normale AI-Clip wird nicht mehr fälschlich als ein einzelnes HeyGen-Talking-Head gerendert.
-4. Wenn echter Lip-Sync pro Sprecher gewünscht ist, muss das bewusst über Shot-Reverse-Shot/Split-Szenen laufen — nicht automatisch über ein Gesicht.
+1. **Echter Lip-Sync** bedeutet: pro Sprecher ein eigenes Gesicht/Portrait und ein eigenes Audiosegment.
+2. **Multi-Speaker in einem Gruppenbild** ist nur Voiceover/B-Roll, kein behaupteter echter Lip-Sync.
+3. Wenn zwei Personen exakt sprechen sollen, wird die Szene automatisch in professionelle Speaker-Cuts aufgeteilt.
+4. Jeder Sprecher bekommt garantiert seine eigene ausgewählte Stimme.
+5. Das System darf keinen Modus mehr anzeigen, der „Lip-Sync“ verspricht, aber nur Audio über eine normale KI-Szene legt.
 
-## Umsetzung
+## Implementierungsplan
 
-### 1. Auto-HeyGen für Multi-Speaker im Clip-Render blockieren
+### 1. Multi-Speaker Lip-Sync als festen Professional-Flow bauen
 
-In `supabase/functions/compose-video-clips/index.ts`:
+In `SceneDialogStudio.tsx` wird der Multi-Speaker-Button nicht mehr als Inline-Voiceover ausgeführt, wenn der Nutzer „Lip-Sync“ erwartet.
 
-- `speakerCount > 1` darf im Auto-Modus nicht mehr in den HeyGen-Zweig laufen.
-- HeyGen bleibt erlaubt für:
-  - `engineOverride === 'heygen'` bei Single-Speaker
-  - explizit erzeugte Split/Sub-Szenen mit nur einem Sprecher
-- Für Multi-Speaker in einer Szene fällt der Render zurück auf den normalen AI-Clip-Provider (`ai-hailuo`, Kling, etc.) mit Voiceover-Overlay.
+Neues Verhalten:
 
-Damit kann nicht mehr passieren, dass Charakter 1 beide Rollen spricht.
+- Bei 2+ Dialogblöcken prüft das System zuerst:
+  - jeder Sprecher hat eine Stimme
+  - jeder Sprecher hat ein Cast-Portrait / Brand-Character-Portrait
+  - mehrere Sprecher verwenden nicht versehentlich dieselbe Voice-ID, ohne Warnung
+- Danach wird pro Dialogblock zuerst TTS erzeugt.
+- Das erste Dialogsegment ersetzt die aktuelle Szene als HeyGen/Lip-Sync-Clip.
+- Weitere Dialogsegmente werden als direkt folgende Speaker-Cut-Szenen erzeugt.
+- Alte automatisch erzeugte Speaker-Cuts werden vor dem Neugenerieren gelöscht, damit keine alten Stimmen doppelt liegen bleiben.
 
-### 2. Multi-Speaker-Dialog standardmäßig als Voiceover-Overlay generieren
+Damit gibt es keine 10-Sekunden-Gruppenszene mehr, in der ein Provider raten muss, welcher Mund sprechen soll.
 
-In `src/components/video-composer/SceneDialogStudio.tsx`:
+### 2. Speaker-Mapping hart absichern
 
-- Der Button „Voiceover generieren“ soll bei 2+ Sprechern standardmäßig `handleGenerateInline()` nutzen.
-- Diese Funktion erzeugt bereits pro Dialogblock eine eigene Audiodatei und speichert sie als `scene_audio_clips` mit korrektem `start_offset`.
-- Der Shot-Reverse-Shot/Split-Pfad bleibt erhalten, wird aber nur genutzt, wenn der erweiterte Schalter aktiv ist oder der bestehende Auto-Split-Button bewusst ausgelöst wird.
+Die Mapping-Kette wird strikt gemacht:
 
-### 3. Prompt-Text für Multi-Speaker klarer machen
+```text
+Dialogzeile Matthew: ...
+→ parseDialogScript findet Matthew.characterId
+→ voicePerSpeaker[Matthew.characterId]
+→ generate-voiceover mit Matthews voiceId
+→ generate-talking-head mit Matthews portraitUrl + Matthews audioUrl
+```
 
-In `src/lib/motion-studio/composeFinalPrompt.ts`:
+Wichtig: HeyGen bekommt bei Multi-Speaker nie mehr den kompletten bereinigten Dialogtext. Es bekommt nur genau das eine Audiosegment des jeweiligen Sprechers.
 
-- Die Dialog-Layer wird ergänzt um eine harte visuelle Regel:
-  - Bei Multi-Speaker im selben Shot: „Do not make one character speak all lines. If lip-sync is uncertain, keep mouths subtle/neutral and treat dialog as voiceover timing.“
-- Dadurch versteht der Videoprovider besser, dass die Audio-/Dialogstruktur nicht bedeuten soll: „ein Gesicht sagt alles“.
+### 3. Falschen Sync-Polish für Multi-Speaker blockieren
 
-### 4. Preview-Audio robuster machen
+`compose-lipsync-scene` ist für eine Szene mit mehreren Voiceover-Clips gefährlich, weil es aktuell nur einen Clip auswählt und auf das ganze Video anwendet. Das ist genau die Art Fehler, bei der ein Gesicht alles spricht.
 
-In `src/components/video-composer/ComposerSequencePreview.tsx`:
+Änderung:
 
-- Bestehende `audioPlan.speakers[].audioUrl` werden weiterhin als virtuelle Voiceover-Clips genutzt, wenn DB-Clips noch nicht geladen sind.
-- Für Altdaten sicherstellen: Voiceover-Clips werden nicht durch falsche Lip-Sync-Erkennung oder fehlende DB-Realtime-Propagation verschluckt.
-- Mute-/Volume-Logik bleibt unverändert, aber Voiceover-Clips bleiben volle Lautstärke und ohne Fade.
+- Wenn eine Szene mehrere Sprecher/Voiceover-Blöcke hat, darf `compose-lipsync-scene` nicht automatisch laufen.
+- Für Multi-Speaker wird stattdessen der neue Professional-Flow verwendet.
+- Der generische Sync-Polish bleibt nur für Single-Speaker-Szenen erlaubt.
 
-### 5. UI-Text im Dialog-Studio präzisieren
+### 4. UI ehrlich und kundenverständlich machen
 
-In `SceneDialogStudio.tsx`:
+Die Texte im Dialog-Studio werden angepasst:
 
-- Kurzer Hinweis im Dialogbereich:
-  - Standard: beide Stimmen laufen als Voiceover in dieser Szene.
-  - Für echten sprechenden Kopf pro Person: erweiterten Split-Modus aktivieren.
+- **„Professionellen Lip-Sync rendern“** nur, wenn wirklich pro Sprecher eigene Lip-Sync-Clips erzeugt werden.
+- **„Voiceover in dieser Szene“** nur für Gruppenbild/B-Roll ohne echten Mundabgleich.
+- Wenn ein Portrait fehlt, gibt es keinen stillen Fallback, sondern eine klare Meldung: „Für echten Lip-Sync braucht Sprecher X ein Portrait.“
 
-## Ergebnis
+### 5. Prompt bleibt unterstützend, aber nicht die Quelle der Wahrheit
 
-- In deiner gezeigten 10-Sekunden-Szene spricht nicht mehr der erste Charakter beide Dialoge.
-- Beide erzeugten Voiceover-Blöcke werden als Audio hörbar nacheinander abgespielt.
-- Multi-Speaker-Lip-Sync bleibt technisch sauber: entweder Voiceover über Gruppenbild oder bewusst gesplittete Einzelsprecher-Szenen.
+Der Prompt bekommt weiterhin Artlist-ähnliche Timing-Layer, aber nur als visuelle Zusatzanweisung. Die eigentliche Qualität kommt aus der technischen Bindung von Sprecher → Stimme → Audio → Gesicht.
+
+Der Prompt wird also nicht mehr als „Lip-Sync-Steuerung“ missverstanden, sondern als Regieanweisung für B-Roll, Bildkomposition und Timing.
+
+## Erwartetes Ergebnis
+
+- Charakter 1 spricht nicht mehr die Zeile von Charakter 2.
+- Jede Stimme ist an den richtigen Cast-Charakter gebunden.
+- Echter Lip-Sync läuft über deterministische Speaker-Cuts statt Provider-Raten.
+- Multi-Speaker-Dialog wirkt wie professionelle Interview-/Ad-Cuts: sauber geschnitten, hörbar korrekt, mit deutlich besserem Mundabgleich.
+
+## Grenzen, die wir transparent machen müssen
+
+Ein einzelnes KI-Gruppenbild mit zwei frei generierten Menschen und perfektem, getrenntem Face-Lip-Sync ist mit den aktuellen generischen Video-Modellen nicht zuverlässig. Professionelle Anbieter umgehen das ebenfalls über Avatar-/Face-Tracks, Speaker-Cuts oder kontrollierte Darsteller-Clips. Genau diesen robusten Weg sollten wir jetzt als Standard nehmen.
