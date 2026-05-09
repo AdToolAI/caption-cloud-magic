@@ -820,8 +820,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         engine: 'elevenlabs' | 'hume';
       };
       const synthed: Synth[] = [];
-      for (const block of blocks) {
+      for (let i = 0; i < blocks.length; i++) {
+        const block = blocks[i];
         const c = sceneCast.find((x) => x.id === block.speakerId)!;
+        setGenStage(
+          language === 'de'
+            ? `Stimme ${i + 1}/${blocks.length} (${c.name}) wird erzeugt…`
+            : language === 'es'
+            ? `Generando voz ${i + 1}/${blocks.length} (${c.name})…`
+            : `Generating voice ${i + 1}/${blocks.length} (${c.name})…`,
+        );
         const cfg = voicePerSpeaker[block.speakerId]!;
         const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
         const body = cfg.engine === 'hume'
@@ -930,15 +938,41 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         } as Partial<ComposerScene>;
       });
 
+      setGenStage(
+        language === 'de'
+          ? `Szenen werden eingefügt (${partials.length})…`
+          : language === 'es'
+          ? `Insertando escenas (${partials.length})…`
+          : `Inserting scenes (${partials.length})…`,
+      );
+
       let subSceneIds: (string | undefined)[];
-      if (onInsertScenesAfter) {
-        subSceneIds = await onInsertScenesAfter(resolvedParentSceneId, partials, { removeParent: true });
-      } else {
-        subSceneIds = [];
-        for (const p of partials) {
-          const id = await onAddScene!(p);
-          subSceneIds.push(typeof id === 'string' ? id : undefined);
+      try {
+        if (onInsertScenesAfter) {
+          subSceneIds = await onInsertScenesAfter(resolvedParentSceneId, partials, { removeParent: true });
+        } else {
+          subSceneIds = [];
+          for (const p of partials) {
+            const id = await onAddScene!(p);
+            subSceneIds.push(typeof id === 'string' ? id : undefined);
+          }
         }
+      } catch (insertErr) {
+        // Surface the REAL DB error (unique-constraint, RLS, network…) so the
+        // user knows what to do, instead of a generic "sub-scene insert failed".
+        const raw = formatError(insertErr);
+        console.error('[SceneDialogStudio] insertScenesAfter threw', insertErr);
+        toast({
+          title: t.failed,
+          description:
+            (language === 'de'
+              ? 'Szenen-Reihenfolge konnte nicht aktualisiert werden: '
+              : language === 'es'
+              ? 'No se pudo actualizar el orden de las escenas: '
+              : 'Could not update scene order: ') + raw,
+          variant: 'destructive',
+        });
+        return;
       }
 
       for (let i = 0; i < synthed.length; i++) {
@@ -947,13 +981,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (!newSceneId) {
           const insertFailMsg =
             language === 'de'
-              ? 'Dialog-Szene konnte nicht ersetzt werden — bitte Seite neu laden und erneut Splitten.'
+              ? 'Sub-Szene konnte nicht angelegt werden (siehe Konsole).'
               : language === 'es'
-              ? 'No se pudo reemplazar la escena de diálogo — recarga la página y vuelve a dividir.'
-              : 'Could not replace dialog scene — please reload the page and split again.';
+              ? 'No se pudo crear la subescena (ver consola).'
+              : 'Could not create sub-scene (see console).';
           failures.push({ speaker: s.character.name, reason: insertFailMsg });
           continue;
         }
+        setGenStage(
+          language === 'de'
+            ? `Lip-Sync ${i + 1}/${synthed.length} (${s.character.name}) wird gestartet…`
+            : language === 'es'
+            ? `Iniciando lip-sync ${i + 1}/${synthed.length} (${s.character.name})…`
+            : `Starting lip-sync ${i + 1}/${synthed.length} (${s.character.name})…`,
+        );
         try {
           const { data, error } = await supabase.functions.invoke('generate-talking-head', {
             body: {
