@@ -1310,7 +1310,7 @@ export default function SceneCard({
                 />
 
                 {/* Phase 6 — Live Prompt Preview Panel (centralized composer) */}
-                {(() => {
+                {advancedOpen && (() => {
                   const composed = composePromptLayers({
                     rawPrompt: scene.aiPrompt || '',
                     directorModifiers: scene.directorModifiers,
