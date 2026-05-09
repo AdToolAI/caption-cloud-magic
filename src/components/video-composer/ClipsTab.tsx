@@ -55,6 +55,8 @@ interface ClipsTabProps {
   projectId?: string;
   visualStyle?: string;
   characters?: ComposerCharacter[];
+  /** Project spoken language — flows into the deterministic Audio Plan block. */
+  language?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
@@ -67,7 +69,10 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, visualStyle, characters, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+  // Normalise the project language to the 3 accepted DirectorLanguage codes.
+  const directorLanguage: DirectorLanguage =
+    language === 'de' ? 'de' : language === 'es' ? 'es' : 'en';
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [singleGenerating, setSingleGenerating] = useState<Record<string, boolean>>({});
   const { extractLastFrame, extractingSceneId } = useFrameContinuity();
