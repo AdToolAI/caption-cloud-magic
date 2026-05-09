@@ -351,6 +351,20 @@ export interface ComposerScene {
   audioPlan?: AudioPlan;
   /** ISO timestamp set when `audioPlan` was finalized via TTS. */
   dialogLockedAt?: string | null;
+
+  /**
+   * Frame-First (Artlist-Style) Continuity:
+   * When this scene was created via "Continue from frame", this points to the
+   * source scene whose extracted still is used as `referenceImageUrl` here.
+   * Persisted to `composer_scenes.continuity_source_scene_id`.
+   */
+  continuationSourceSceneId?: string | null;
+  /**
+   * Position (seconds) inside the source scene's clip where the user picked
+   * the still. Lets us re-extract on demand. Maps to
+   * `composer_scenes.frame_pick_seconds`.
+   */
+  framePickSeconds?: number | null;
 }
 
 export interface AudioPlanSpeaker {
