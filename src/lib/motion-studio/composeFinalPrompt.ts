@@ -87,8 +87,17 @@ export function formatAudioPlan(
   lines.push(
     `Total spoken duration: ${fmt(plan.totalSec)}s. Use this exact speaker order and timing for lip-sync. Spoken language: ${langWord}.`,
   );
+  // Multi-speaker safeguard — without this, single-clip i2v models tend to
+  // make the first visible character lip-sync the entire dialog.
+  const uniqueSpeakers = new Set(plan.speakers.map((s) => s.characterId)).size;
+  if (uniqueSpeakers >= 2) {
+    lines.push(
+      'Multiple speakers share the frame: do NOT make one character mouth all the lines. Keep mouth movement subtle and neutral on all characters; treat the dialog above as voiceover timing, not as a single-actor monologue.',
+    );
+  }
   return lines.join('\n');
 }
+
 
 /**
  * Build a one-line cast summary listing every speaker referenced by the
