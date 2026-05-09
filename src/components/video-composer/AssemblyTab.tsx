@@ -84,7 +84,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
     return fb;
   };
 
-  const { clips: sceneAudioClips } = useSceneAudioClips(project?.id ?? null);
+  const { clips: sceneAudioClips } = useSceneAudioClips(project?.id ?? null, scenes);
   const [isRendering, setIsRendering] = useState(false);
   const [renderId, setRenderId] = useState<string | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderStatus>('idle');
