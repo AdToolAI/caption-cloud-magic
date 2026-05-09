@@ -1275,16 +1275,26 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             <>
               <Loader2 className="h-3 w-3 animate-spin" /> {t.generating}
             </>
-          ) : blocks.length >= 2 ? (
-            <>
-              <User className="h-3 w-3" />{' '}
-              {language === 'de'
-                ? `Lip-Sync generieren (${speakers.length} Szenen)`
-                : language === 'es'
-                ? `Generar lip-sync (${speakers.length} escenas)`
-                : `Generate lip-sync (${speakers.length} scenes)`}
-            </>
-          ) : renderAsSeparateScenes ? (
+          ) : blocks.length >= 2 && (() => {
+            const allPortraits = speakers.every(
+              (sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl,
+            );
+            const willSrs = allPortraits && !renderAsSeparateScenes;
+            return willSrs ? (
+              <>
+                <User className="h-3 w-3" />{' '}
+                {language === 'de'
+                  ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
+                  : language === 'es'
+                  ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
+                  : `Render professional lip-sync (${speakers.length} cuts)`}
+              </>
+            ) : (
+              <>
+                <Volume2 className="h-3 w-3" /> {t.genBtn}
+              </>
+            );
+          })() ) : renderAsSeparateScenes ? (
             <>
               <User className="h-3 w-3" /> {t.genBtnSrs}
             </>
