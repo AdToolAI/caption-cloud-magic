@@ -751,20 +751,32 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           shotType: 'profile',
         } as CharacterShot;
         const subDuration = Math.max(2, Math.min(60, Math.round(s.durationSec * 100) / 100));
+        // Per-speaker dialog map — restrict to ONLY this speaker so any
+        // downstream re-route that reads dialogVoices can never accidentally
+        // pick another speaker's voice.
+        const speakerVoiceCfg = voicePerSpeaker[s.block.speakerId];
         const newSceneIdRaw = await onAddScene({
           sceneType: scene.sceneType,
           durationSeconds: subDuration,
+          // Mark as a finished HeyGen lip-sync scene so compose-video-clips
+          // does NOT re-render it as ai-hailuo B-roll later.
           clipSource: 'ai-hailuo',
           clipQuality: scene.clipQuality,
           clipStatus: 'generating',
           referenceImageUrl: s.character.referenceImageUrl,
+          // Single-speaker dialog script — exact line, this speaker only.
+          dialogScript: `${s.character.name}: ${s.block.text}`,
+          dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
+          // Force HeyGen engine and disable any auto-routing decisions.
+          engineOverride: 'heygen',
           aiPrompt: `${s.character.name}: ${s.block.text}`,
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
           transitionType: 'fade',
           transitionDuration: 0.3,
-          // Marker for idempotent cleanup on the next regeneration.
+          // Marker for idempotent cleanup on the next regeneration AND
+          // for compose-video-clips to skip these as already-rendered.
           cinematicPresetSlug: srsMarker,
         });
         const newSceneId = typeof newSceneIdRaw === 'string' ? newSceneIdRaw : undefined;
