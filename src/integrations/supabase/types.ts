@@ -16110,6 +16110,14 @@ export type Database = {
         Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
         Returns: number
       }
+      replace_composer_scene_with_children: {
+        Args: {
+          p_children: Json
+          p_parent_scene_id: string
+          p_remove_parent?: boolean
+        }
+        Returns: string[]
+      }
       reset_monthly_credits: { Args: never; Returns: undefined }
       seed_ai_superuser_demo_data: {
         Args: { _user_id: string }
