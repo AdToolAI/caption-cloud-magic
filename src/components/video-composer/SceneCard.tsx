@@ -1201,75 +1201,26 @@ export default function SceneCard({
                   )}
                 </div>
 
-                {/* Phase F — Advanced Drawer toggle. Hides Multi-Engine,
-                    Compare-Lab, Final-Prompt-Preview & SceneStillFrame from
-                    the default view. Power-users open once. */}
+                {/* Phase 1 (Studio Set v2) — single "Prompt-Details" button
+                    replaces the former Erweitert toggle + inline Multi-Engine
+                    + inline Compare-Lab + inline Final-Prompt-Preview triplet.
+                    Everything now lives inside ScenePromptDetailsSheet so the
+                    customer sees the prompt textarea exactly once. */}
                 {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
-                  <button
-                    type="button"
-                    onClick={() => setAdvancedOpen((v) => !v)}
-                    className="flex w-full items-center justify-between rounded-md border border-dashed border-primary/30 bg-background/30 px-2 py-1.5 text-[10px] text-primary/80 hover:text-primary hover:border-primary/50 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <Sparkles className="h-3 w-3" />
-                      {lang === 'de'
-                        ? 'Erweitert (Final-Prompt, Multi-Engine, Compare, Anker-Frame)'
-                        : lang === 'es'
-                        ? 'Avanzado (prompt final, multi-motor, compare, frame ancla)'
-                        : 'Advanced (final prompt, multi-engine, compare, anchor frame)'}
-                    </span>
-                    {advancedOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                  </button>
-                )}
-
-                {/* Block K-6 — Multi-Engine Preview (only in structured mode with content) */}
-                {advancedOpen && promptMode === 'structured' && hasAnySlot(promptSlots) && (
-                  <div className="space-y-1">
-                    <button
-                      type="button"
-                      onClick={() => setMultiEngineOpen((v) => !v)}
-                      className="text-[10px] text-primary/80 hover:text-primary flex items-center gap-1"
-                    >
-                      <Sparkles className="h-2.5 w-2.5" />
-                      {multiEngineOpen
-                        ? lang === 'de'
-                          ? 'Multi-Engine ausblenden'
-                          : lang === 'es'
-                          ? 'Ocultar multi-motor'
-                          : 'Hide multi-engine'
-                        : lang === 'de'
-                        ? 'Multi-Engine Vorschau anzeigen'
-                        : lang === 'es'
-                        ? 'Mostrar vista multi-motor'
-                        : 'Show multi-engine preview'}
-                    </button>
-                    {multiEngineOpen && (
-                      <MultiEnginePromptPreview
-                        slots={promptSlots}
-                        language={lang}
-                        order={promptSlotOrder}
-                        defaultModel={clipSourceToModelKey(scene.clipSource) ?? 'ai-sora'}
-                      />
-                    )}
-                  </div>
-                )}
-
-                {/* Block L — Inline Compare Lab launcher */}
-                {advancedOpen && (scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
-                  <div className="pt-1">
+                  <div className="flex justify-end">
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
-                      onClick={() => setCompareLabOpen(true)}
-                      className="h-7 text-[10px] gap-1.5"
+                      variant="ghost"
+                      onClick={() => setPromptDetailsOpen(true)}
+                      className="h-6 px-2 text-[10px] gap-1 text-primary/70 hover:text-primary"
                     >
-                      <Beaker className="h-3 w-3" />
+                      <Sparkles className="h-3 w-3" />
                       {lang === 'de'
-                        ? 'Auf Engines vergleichen'
+                        ? 'Prompt-Details ansehen'
                         : lang === 'es'
-                        ? 'Comparar en motores'
-                        : 'Compare on engines'}
+                        ? 'Ver detalles del prompt'
+                        : 'View prompt details'}
                     </Button>
                   </div>
                 )}
