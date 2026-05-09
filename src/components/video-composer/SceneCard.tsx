@@ -38,9 +38,12 @@ import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge } from './CharacterShotBadge';
 import { CharacterCastPicker } from './CharacterCastPicker';
-import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
-import SceneShotDirectorPanel from './SceneShotDirectorPanel';
-import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
+// Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
+// SceneShotDirectorPanel are no longer rendered inline; they live behind
+// SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
+// lines of always-visible JSX.
+import SceneStyleSheet from './SceneStyleSheet';
+import SceneStyleChip from './SceneStyleChip';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
