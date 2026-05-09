@@ -466,6 +466,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
+    const timedBlocks: typeof blocks = [];
 
     // Determine if we should auto-upgrade to HeyGen lip-sync.
     // Trigger: at least one speaker in this dialog has a portrait. If not, we
@@ -562,9 +563,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           }
         }
 
-        cumulativeOffset += duration + 0.15; // small breath between speakers
+        timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
+        cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
       }
+
+      // Refresh the visible prompt with concrete per-speaker timestamps
+      // (Audio Plan), now that real TTS durations are known.
+      try {
+        const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedBlocks, language);
+        if (timedPrompt !== (scene.aiPrompt || '')) {
+          onUpdate({ aiPrompt: timedPrompt });
+        }
+      } catch (_) { /* noop */ }
 
       // Bump scene duration so all VO blocks fit (cap at 60s sanity)
       const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
