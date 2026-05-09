@@ -479,7 +479,7 @@ export default function StoryboardTab({
                       onEnsurePersisted={onEnsurePersisted}
                       previousSceneLastFrameUrl={
                         index > 0
-                          ? (scenes[index - 1] as any).lastFrameUrl ?? scenes[index - 1].clipUrl
+                          ? scenes[index - 1].lastFrameUrl ?? scenes[index - 1].clipUrl
                           : undefined
                       }
                       previousSceneIndex={index > 0 ? index : undefined}
