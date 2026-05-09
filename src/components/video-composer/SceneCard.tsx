@@ -203,7 +203,18 @@ export default function SceneCard({
   const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
   const [autoSplitArmed, setAutoSplitArmed] = useState(false);
 
-  
+  // Studio-Set UX: collapse-by-default for already-configured scenes so the
+  // storyboard reads as a scannable list. Newly-created (empty) scenes start
+  // expanded so the user lands in the editor immediately.
+  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+    const hasContent =
+      Boolean((scene.aiPrompt ?? '').trim()) ||
+      Boolean((scene.dialogScript ?? '').trim()) ||
+      Boolean(scene.clipUrl) ||
+      Boolean(scene.uploadUrl);
+    return !hasContent;
+  });
+
 
   const { systemPresets } = useStylePresets();
 
