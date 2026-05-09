@@ -931,7 +931,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
       let subSceneIds: (string | undefined)[];
       if (onInsertScenesAfter) {
-        subSceneIds = await onInsertScenesAfter(scene.id, partials, { removeParent: true });
+        subSceneIds = await onInsertScenesAfter(resolvedParentSceneId, partials, { removeParent: true });
       } else {
         subSceneIds = [];
         for (const p of partials) {
