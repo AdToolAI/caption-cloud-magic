@@ -185,9 +185,11 @@ export default function SceneCard({
   const [multiEngineOpen, setMultiEngineOpen] = useState(false);
   // Block L — Inline Compare Lab dialog open state
   const [compareLabOpen, setCompareLabOpen] = useState(false);
-  // Phase F — "Erweitert" drawer (Final-Prompt preview, Multi-Engine, Compare,
-  // Reference-Image-Upload). Default closed → reduces visual cluster on the
-  // Studio Bühne for non-power-users.
+  // Phase 1 (Studio Set v2) — single Sheet that consolidates the former
+  // DirectorConsolePreview, "Finaler Prompt (Vorschau)", Multi-Engine and
+  // Compare-Lab launcher. Replaces the old `advancedOpen` toggle for prompts.
+  const [promptDetailsOpen, setPromptDetailsOpen] = useState(false);
+  // `advancedOpen` is still used to gate SceneStillFrameStudio further down.
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
