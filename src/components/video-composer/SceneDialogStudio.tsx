@@ -273,6 +273,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   );
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [genStage, setGenStage] = useState<string | null>(null);
   const [aiBusy, setAiBusy] = useState(false);
   const [renderAsSeparateScenes, setRenderAsSeparateScenes] = useState(false);
 
