@@ -459,6 +459,13 @@ export default function StoryboardTab({
                       onAddCharacter={onAddCharacter}
                       language={language}
                       onEnsurePersisted={onEnsurePersisted}
+                      previousSceneLastFrameUrl={
+                        index > 0
+                          ? (scenes[index - 1] as any).lastFrameUrl ?? scenes[index - 1].clipUrl
+                          : undefined
+                      }
+                      previousSceneIndex={index > 0 ? index : undefined}
+                      frameFirstMode={frameFirstMode}
                     />
                   </SortableSceneItem>
                 );
