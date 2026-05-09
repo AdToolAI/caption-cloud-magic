@@ -1456,6 +1456,14 @@ export default function SceneCard({
 
       {/* Phase 1 (Studio Set v2) — single Sheet replacing inline Director
           Console + Final-Prompt-Preview + Multi-Engine + Compare-Lab launcher. */}
+      <SceneStyleSheet
+        open={styleSheetOpen}
+        onOpenChange={setStyleSheetOpen}
+        scene={scene}
+        language={lang}
+        onUpdate={onUpdate}
+      />
+
       <ScenePromptDetailsSheet
         open={promptDetailsOpen}
         onOpenChange={setPromptDetailsOpen}
