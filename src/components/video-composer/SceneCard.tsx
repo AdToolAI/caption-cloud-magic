@@ -294,9 +294,18 @@ export default function SceneCard({
   // Sync scene.dialogScript → scene.aiPrompt (and promptSlots.subject in
   // structured mode). Without this the [Dialog] marker written into aiPrompt
   // alone would be wiped on the next stitchSlots() call.
+  //
+  // IMPORTANT: If the prompt already contains a timed "Audio plan (exact, do
+  // not deviate)" marker (written by SceneDialogStudio after TTS finished),
+  // we treat that as the canonical source of truth and do NOT downgrade it
+  // back to the text-only fallback. Otherwise the per-speaker start–end
+  // timestamps would get wiped every time this effect re-runs (DB reload,
+  // character refresh, promptMode change…).
   useEffect(() => {
     if (!scene.clipSource.startsWith('ai-')) return;
     if (!characters || characters.length === 0) return;
+    const hasTimedAudioPlan = (txt: string) =>
+      /Audio plan \(exact, do not deviate\)/i.test(txt || '');
     const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
     const sceneCastChars = cast
       .map((cs) => characters.find((c) => c.id === cs.characterId))
@@ -304,12 +313,14 @@ export default function SceneCard({
     const blocks = parseDialogScript(scene.dialogScript ?? '', sceneCastChars);
     if (promptMode === 'structured') {
       const currentSubject = (promptSlots.subject as string) || '';
+      if (hasTimedAudioPlan(currentSubject)) return;
       const newSubject = applyDialogToPrompt(currentSubject, blocks, lang);
       if (newSubject !== currentSubject) {
         const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
         onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
       }
     } else {
+      if (hasTimedAudioPlan(scene.aiPrompt || '')) return;
       const newPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, lang);
       if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
     }

@@ -1,65 +1,74 @@
 ## Ziel
 
-Der `[Dialog]`-Marker im KI-Prompt soll künftig nicht nur Sprecher + Text enthalten, sondern auch die **konkreten Zeitstempel** (Start-Sekunde + Dauer) pro Zeile, basierend auf den real gemessenen TTS-Audiolängen. So weiß die KI exakt, wer wann von wann bis wann spricht — Voiceover, Lip-Sync und Schnitt sind komplett deterministisch geplant, nichts wird der KI mehr überlassen.
-
-So macht es auch Artlist (Maxim AI Director): jede Szene bekommt einen "Audio Plan" mit Speaker, Start, End, der dann an die i2v / Lip-Sync-Engine weitergereicht wird.
-
-## Format des neuen Markers
+Nach „Voiceover generieren“ muss der sichtbare KI-Prompt garantiert den exakten Audio-Plan enthalten:
 
 ```text
 [Dialog]
 Audio plan (exact, do not deviate):
-- 0.00s–3.42s  Matthew Dusatko speaks: "Welcome to DroneOcular"
-- 3.57s–7.18s  Sarah Dusatko speaks: "Tired of wasting hours fighting weeds?"
+- 0.00s–3.42s  Matthew Dusatko speaks: "..."
+- 3.57s–7.18s  Sarah Dusatko speaks: "..."
 Total spoken duration: 7.18s. Use this exact speaker order and timing for lip-sync.
-Do NOT render any on-screen text, captions, subtitles, signs, watermarks, logos or written words.
 [/Dialog]
 ```
 
-Regeln:
-- Zeitachse beginnt bei `0.00s` relativ zum Szenenstart.
-- Standard-Pause zwischen Sprechern: `0.15s` (wie bereits in `cumulativeOffset` verwendet — eine einzige Quelle der Wahrheit).
-- Idempotent: alter `[Dialog]…[/Dialog]` Block wird ersetzt, nicht dupliziert.
-- Wenn (noch) keine Audiodauer vorliegt (User hat noch nicht "Voiceover generieren" geklickt), wird wie bisher der textbasierte Marker ohne Zeitstempel ausgegeben — Fallback bleibt erhalten.
+Ja: Das ist der richtige Ansatz wie bei Artlist/AI-Director-Workflows — erst wird ein deterministischer Audio-/Speaker-Plan erzeugt, dann bekommen Video- und Lip-Sync-Schritte genau diesen Plan statt nur „Matthew und Sarah reden abwechselnd“.
+
+## Problem, das ich behebe
+
+Aktuell wird zwar Code für `durationSec/startSec` aufgerufen, aber der Prompt im UI fällt in deinem Screenshot weiter auf den Fallback zurück. Das spricht für einen State-/Persistenzfehler:
+
+- `applyDialogToPrompt(scene.aiPrompt || '', timedBlocks, ...)` nutzt noch den alten `scene.aiPrompt` aus Props.
+- Direkt davor wurde oft bereits ein Fallback-Prompt geschrieben.
+- Nach TTS wird nur `onUpdate({ aiPrompt: timedPrompt })` ausgelöst, aber die lokale Textarea/Preview kann weiterhin den alten Prompt anzeigen oder beim nächsten Update überschreiben.
+- Außerdem fehlt eine klare Speicherung der getimten Blocks im Dialog-State, dadurch kann der Audio-Plan nicht zuverlässig neu aufgebaut werden.
 
 ## Umsetzung
 
-### 1. `src/lib/talking-head/parseDialogScript.ts`
-- `DialogBlock` um zwei optionale Felder erweitern:
-  - `durationSec?: number` — reale TTS-Länge in Sekunden.
-  - `startSec?: number` — kumulativer Start innerhalb der Szene.
+### 1. SceneDialogStudio: eine Prompt-Quelle der Wahrheit
 
-### 2. `src/lib/motion-studio/applyDialogToPrompt.ts`
-- `buildSpokenLinesBlock(blocks)` neu schreiben:
-  - Wenn alle Blocks `durationSec` haben → `Audio plan (exact, do not deviate)` Variante mit `start–end` pro Zeile + `Total spoken duration`.
-  - Sonst → bisheriger sprachlicher Fallback (unverändert).
-- Konstante `INTER_SPEAKER_GAP_SEC = 0.15` exportieren, damit der Studio-Code dieselbe Pause nutzt.
-- Negativ-Constraint (`Do NOT render captions…`) bleibt unverändert.
+Ich ändere die Generate-Flows so, dass nach der TTS-Erzeugung nicht mehr vom stale `scene.aiPrompt` gearbeitet wird, sondern von einem stabilen Prompt-Basiswert:
 
-### 3. `src/components/video-composer/SceneDialogStudio.tsx`
-- **`handleGenerateInline` (Multi-Speaker-Modus)**:
-  - Nach jedem TTS-Call den Block direkt mit `startSec` (= bisheriges `cumulativeOffset` vor dem Increment) und `durationSec` anreichern.
-  - Am Ende `applyDialogToPrompt(prompt, blocksMitTiming, language)` aufrufen und `aiPrompt` über `onUpdate` schreiben.
-- **`handleGenerate` (SRS-Split-Modus)**:
-  - Genauso: aus `subs[]` (enthält bereits `durationSec` pro Block) + `INTER_SPEAKER_GAP_SEC` die `startSec` pro Block berechnen, daraus den Master-Prompt für die Parent-Szene bauen und persistieren.
-  - Pro Sub-Szene zusätzlich einen Mini-`[Dialog]` mit `0.00s–{durationSec}s` als `aiPrompt` setzen, damit auch isolierte Sub-Szenen exakte Zeitinfo tragen.
-- Beim sofortigen Pre-Update vor dem TTS-Call (nur Sprecherzeilen, noch ohne Timing) bleibt es beim Text-Fallback.
+- Vor TTS: optional Fallback schreiben.
+- Nach TTS: den aktuellen Prompt erst von altem `[Dialog]...[/Dialog]` bereinigen.
+- Dann den getimten `[Dialog] Audio plan` neu injizieren.
+- Diesen finalen Prompt in einem einzigen Update zusammen mit Dialog-/Voiceover-Daten speichern.
 
-### 4. Keine Backend-Änderungen
-- `compose-video-clips`, HeyGen, generate-voiceover, generate-voiceover-hume bleiben unverändert. Der Marker ist reine Prompt-Anreicherung; die Timing-Wahrheit für die Render-Pipeline bleibt `dialogScript` + `audioUrl` + `durationSec` pro Sub-Szene (wie heute).
+### 2. Lokales UI sofort synchronisieren
+
+Falls die Prompt-Textarea intern lokalen State hat, aktualisiere ich diesen State direkt mit dem finalen Audio-Plan, damit du ihn sofort siehst — ohne Reload, ohne erst Szene wechseln zu müssen.
+
+### 3. Timing wirklich aus realem Voiceover ableiten
+
+Für jeden Block:
+
+- `startSec = cumulativeOffset`
+- `endSec = startSec + realMeasuredTtsDuration`
+- nächster Sprecher startet nach `INTER_SPEAKER_GAP_SEC = 0.15`
+
+Dadurch landet konkret im Prompt:
+
+```text
+- 0.00s–2.10s Matthew speaks: "..."
+- 2.25s–5.43s Sarah speaks: "..."
+```
+
+### 4. SRS/Sub-Szenen ebenfalls hart timen
+
+Wenn „als separate Shot-Reverse-Shot-Szenen rendern“ aktiv ist:
+
+- Parent-Szene bekommt den kompletten Audio-Plan aller Sprecher.
+- Jede Sub-Szene bekommt zusätzlich einen Mini-Audio-Plan von `0.00s–durationSec` für genau diese Sprecherzeile.
+
+### 5. Compose-Video-Clips Absicherung
+
+Ich prüfe, ob `compose-video-clips` den Prompt eventuell durch `enrichPrompt(...)` verändert oder abschneidet. Falls ja, stelle ich sicher, dass der `[Dialog] Audio plan` vorne erhalten bleibt und an alle Provider weitergegeben wird.
 
 ## Ergebnis
 
-Im Prompt-Vorschau-Panel sieht der Nutzer nach Klick auf "Voiceover generieren" sofort:
+Nach Klick auf „Voiceover generieren“ steht im sichtbaren Prompt nicht mehr nur:
 
-```
-[Dialog]
-Audio plan (exact, do not deviate):
-- 0.00s–2.10s  Matthew Dusatko speaks: "Welcome to DroneOcular"
-- 2.25s–5.43s  Sarah Dusatko speaks: "Tired of wasting hours fighting weeds?"
-Total spoken duration: 5.43s. Use this exact speaker order and timing for lip-sync.
-Do NOT render any on-screen text, captions, subtitles, …
-[/Dialog]
+```text
+Matthew and Sarah speak to camera...
 ```
 
-Damit ist die Audio-/Lip-Sync-Planung deckungsgleich mit dem, was Artlist intern macht — Sprecher, Reihenfolge und Sekunden sind hart im Prompt verankert.
+sondern der exakte, providerfertige Audio-Plan mit Sekunden, Sprecher, Text und Gesamtdauer. Damit planen Video, Voiceover und Lip-Sync auf derselben Timing-Wahrheit statt auf Zufall.
