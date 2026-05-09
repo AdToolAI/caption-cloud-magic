@@ -1197,6 +1197,10 @@ export default function VideoComposerDashboard() {
               onRefetchScenes={refetchScenesFromDb}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
+                // Sync ref BEFORE setState so any callback that fires inside
+                // the same click handler (e.g. insertScenesAfter) sees the
+                // freshly persisted UUID without waiting for a re-render.
+                projectIdRef.current = result.projectId;
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
                 return result;
               }}
@@ -1214,6 +1218,7 @@ export default function VideoComposerDashboard() {
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
+                projectIdRef.current = result.projectId;
                 setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
                 return result;
               }}
