@@ -38,9 +38,12 @@ import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge } from './CharacterShotBadge';
 import { CharacterCastPicker } from './CharacterCastPicker';
-import DirectorPresetPicker from '@/components/motion-studio/DirectorPresetPicker';
-import SceneShotDirectorPanel from './SceneShotDirectorPanel';
-import CinematicStylePresets from '@/components/ai-video/CinematicStylePresets';
+// Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
+// SceneShotDirectorPanel are no longer rendered inline; they live behind
+// SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
+// lines of always-visible JSX.
+import SceneStyleSheet from './SceneStyleSheet';
+import SceneStyleChip from './SceneStyleChip';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
@@ -189,6 +192,8 @@ export default function SceneCard({
   // DirectorConsolePreview, "Finaler Prompt (Vorschau)", Multi-Engine and
   // Compare-Lab launcher. Replaces the old `advancedOpen` toggle for prompts.
   const [promptDetailsOpen, setPromptDetailsOpen] = useState(false);
+  // Phase 2 (Studio Set v2) — single Sheet for Looks/Feintuning/Modifier.
+  const [styleSheetOpen, setStyleSheetOpen] = useState(false);
   // `advancedOpen` is still used to gate SceneStillFrameStudio further down.
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
@@ -1243,23 +1248,17 @@ export default function SceneCard({
                 />
 
 
-                <SceneStudioSectionHeader tab="look" language={lang} />
-                <DirectorPresetPicker
-                  modifiers={scene.directorModifiers || {}}
-                  basePrompt={scene.aiPrompt || ''}
-                  onChange={(directorModifiers) => onUpdate({ directorModifiers })}
-                />
-
-                <CinematicStylePresets
-                  value={scene.shotDirector || {}}
-                  onApply={(sel) => onUpdate({ shotDirector: sel })}
-                  compact
-                />
-
-                <SceneShotDirectorPanel
-                  value={scene.shotDirector || {}}
-                  onChange={(shotDirector) => onUpdate({ shotDirector })}
+                {/* Phase 2 (Studio Set v2) — single chip + "Stil ändern"
+                    button replaces the previous trio of always-visible style
+                    tools (DirectorPresetPicker + CinematicStylePresets +
+                    SceneShotDirectorPanel). They now live behind
+                    SceneStyleSheet (3 tabs). */}
+                <SceneStyleChip
                   language={lang}
+                  shotDirector={scene.shotDirector}
+                  hasModifiers={Object.keys(scene.directorModifiers || {}).length > 0}
+                  onOpen={() => setStyleSheetOpen(true)}
+                  onReset={() => onUpdate({ shotDirector: {} })}
                 />
 
                 {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
@@ -1457,6 +1456,14 @@ export default function SceneCard({
 
       {/* Phase 1 (Studio Set v2) — single Sheet replacing inline Director
           Console + Final-Prompt-Preview + Multi-Engine + Compare-Lab launcher. */}
+      <SceneStyleSheet
+        open={styleSheetOpen}
+        onOpenChange={setStyleSheetOpen}
+        scene={scene}
+        language={lang}
+        onUpdate={onUpdate}
+      />
+
       <ScenePromptDetailsSheet
         open={promptDetailsOpen}
         onOpenChange={setPromptDetailsOpen}
