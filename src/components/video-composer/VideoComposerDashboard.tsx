@@ -877,67 +877,65 @@ export default function VideoComposerDashboard() {
     const removeParent = opts?.removeParent === true;
     const projectId = project.id;
     if (!projectId) {
-      console.warn('[VideoComposerDashboard] insertScenesAfter: project not persisted yet');
-      return partials.map(() => undefined);
+      throw new Error('Project not persisted yet — please save the project first.');
     }
-    const current = project.scenes;
-    let parentIdx = current.findIndex((s) => s.id === parentSceneId);
-    // Fallback: if the caller passed a stale/temp id, try to find the parent
-    // by matching the persisted DB row → orderIndex. This prevents
-    // "sub-scene insert failed" when the dialog studio resolves the real
-    // DB id but the local state hasn't refreshed yet.
-    if (parentIdx < 0) {
-      try {
-        const { data: dbParent } = await supabase
-          .from('composer_scenes')
-          .select('order_index')
-          .eq('id', parentSceneId)
-          .maybeSingle();
-        const oi = (dbParent as any)?.order_index;
-        if (typeof oi === 'number') {
-          parentIdx = current.findIndex((s) => (s.orderIndex ?? -1) === oi);
-        }
-      } catch (_e) { /* ignore — handled below */ }
+
+    // ── 1) Resolve parent from the DB as the source of truth (avoids stale
+    //      local ids and lets us shift by *real* order_index even when the
+    //      local store hasn't refreshed yet).
+    const { data: allDbScenes, error: fetchErr } = await supabase
+      .from('composer_scenes')
+      .select('id, order_index')
+      .eq('project_id', projectId)
+      .order('order_index', { ascending: true });
+    if (fetchErr) throw new Error(`Failed to load scenes: ${fetchErr.message}`);
+    const rows = (allDbScenes ?? []) as Array<{ id: string; order_index: number }>;
+
+    let parentRow = rows.find((r) => r.id === parentSceneId);
+    if (!parentRow) {
+      // Caller passed a stale local id → fall back to local store mapping.
+      const localParent = project.scenes.find((s) => s.id === parentSceneId);
+      if (localParent && typeof localParent.orderIndex === 'number') {
+        parentRow = rows.find((r) => r.order_index === localParent.orderIndex);
+      }
     }
-    if (parentIdx < 0) {
-      console.warn('[VideoComposerDashboard] insertScenesAfter: parent not found', parentSceneId);
-      return partials.map(() => undefined);
+    if (!parentRow) {
+      throw new Error('Parent scene not found in database — please reload the page and try again.');
     }
-    const parent = current[parentIdx];
-    const insertAt = removeParent ? parentIdx : parentIdx + 1;
+
+    const parentDbId = parentRow.id;
+    const parentOrderIndex = parentRow.order_index;
+    const insertAt = removeParent ? parentOrderIndex : parentOrderIndex + 1;
     const shift = partials.length - (removeParent ? 1 : 0);
+    const tailRows = rows.filter((r) => r.order_index > parentOrderIndex);
 
-    // 1) Shift order_index for scenes AFTER the parent (2-step write to avoid
-    //    any potential unique-index collision while moving).
-    const tail = current.slice(parentIdx + 1);
-    if (shift !== 0 && tail.length > 0) {
-      try {
-        await Promise.all(tail.map((s) =>
-          supabase.from('composer_scenes')
-            .update({ order_index: (s.orderIndex ?? 0) + shift + 10000, updated_at: new Date().toISOString() })
-            .eq('id', s.id),
-        ));
-        await Promise.all(tail.map((s) =>
-          supabase.from('composer_scenes')
-            .update({ order_index: (s.orderIndex ?? 0) + shift, updated_at: new Date().toISOString() })
-            .eq('id', s.id),
-        ));
-      } catch (e) {
-        console.warn('[insertScenesAfter] shift failed', e);
+    // ── 2) Shift tail scenes into a temp high range (avoids unique-key
+    //      collisions on (project_id, order_index)). Surface errors.
+    if (shift !== 0 && tailRows.length > 0) {
+      const TMP_BASE = 100000;
+      for (const r of tailRows) {
+        const { error } = await supabase
+          .from('composer_scenes')
+          .update({ order_index: r.order_index + TMP_BASE, updated_at: new Date().toISOString() })
+          .eq('id', r.id);
+        if (error) throw new Error(`Could not reorder scenes (temp shift): ${error.message}`);
       }
     }
 
-    // 2) Optionally remove the parent (and its audio clips).
+    // ── 3) Remove the parent + its audio clips (after shift, before insert).
     if (removeParent) {
-      try { await supabase.from('scene_audio_clips').delete().eq('scene_id', parent.id); } catch (_e) {}
-      try { await supabase.from('composer_scenes').delete().eq('id', parent.id); } catch (e) {
-        console.warn('[insertScenesAfter] delete parent failed', e);
-      }
+      const { error: audioDelErr } = await supabase
+        .from('scene_audio_clips').delete().eq('scene_id', parentDbId);
+      if (audioDelErr) console.warn('[insertScenesAfter] audio delete (non-fatal)', audioDelErr);
+      const { error: parentDelErr } = await supabase
+        .from('composer_scenes').delete().eq('id', parentDbId);
+      if (parentDelErr) throw new Error(`Could not remove parent scene: ${parentDelErr.message}`);
     }
 
-    // 3) Insert each new scene at insertAt, insertAt+1, …
+    // ── 4) Insert the new scenes at their final order_index.
     const newIds: (string | undefined)[] = [];
     const inserted: ComposerScene[] = [];
+    let insertError: string | null = null;
     for (let i = 0; i < partials.length; i++) {
       const orderIndex = insertAt + i;
       const baseScene: ComposerScene = {
@@ -956,74 +954,82 @@ export default function VideoComposerDashboard() {
         costEuros: 0,
         ...partials[i],
       } as ComposerScene;
-      baseScene.orderIndex = orderIndex; // positional override wins
+      baseScene.orderIndex = orderIndex;
 
-      try {
-        const { data, error } = await supabase
-          .from('composer_scenes')
-          .insert({
-            project_id: projectId,
-            order_index: orderIndex,
-            scene_type: baseScene.sceneType,
-            duration_seconds: baseScene.durationSeconds,
-            clip_source: baseScene.clipSource,
-            clip_quality: baseScene.clipQuality || 'standard',
-            clip_status: baseScene.clipStatus ?? 'pending',
-            clip_url: baseScene.clipUrl ?? null,
-            with_audio: baseScene.withAudio !== false,
-            lip_sync_with_voiceover: baseScene.lipSyncWithVoiceover === true,
-            ai_prompt: baseScene.aiPrompt ?? null,
-            stock_keywords: baseScene.stockKeywords ?? null,
-            upload_url: baseScene.uploadUrl ?? null,
-            upload_type: baseScene.uploadType ?? null,
-            reference_image_url: baseScene.referenceImageUrl ?? null,
-            text_overlay: baseScene.textOverlay as any,
-            transition_type: baseScene.transitionType,
-            transition_duration: baseScene.transitionDuration,
-            director_modifiers: (baseScene.directorModifiers ?? {}) as any,
-            shot_director: (baseScene.shotDirector ?? {}) as any,
-            prompt_slots: (baseScene.promptSlots ?? null) as any,
-            prompt_mode: baseScene.promptMode ?? null,
-            prompt_slot_order: (baseScene.promptSlotOrder ?? null) as any,
-            applied_style_preset_id: baseScene.appliedStylePresetId ?? null,
-            cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
-            dialog_script: baseScene.dialogScript ?? null,
-            dialog_voices: (baseScene.dialogVoices ?? null) as any,
-            engine_override: baseScene.engineOverride ?? 'auto',
-            character_shots: (baseScene.characterShots ?? null) as any,
-          } as any)
-          .select('id')
-          .single();
-        if (error) throw error;
-        const newId = (data as any)?.id as string | undefined;
-        newIds.push(newId);
-        if (newId) inserted.push({ ...baseScene, id: newId });
-      } catch (err) {
-        console.warn('[insertScenesAfter] insert failed', err);
+      const { data, error } = await supabase
+        .from('composer_scenes')
+        .insert({
+          project_id: projectId,
+          order_index: orderIndex,
+          scene_type: baseScene.sceneType,
+          duration_seconds: baseScene.durationSeconds,
+          clip_source: baseScene.clipSource,
+          clip_quality: baseScene.clipQuality || 'standard',
+          clip_status: baseScene.clipStatus ?? 'pending',
+          clip_url: baseScene.clipUrl ?? null,
+          with_audio: baseScene.withAudio !== false,
+          lip_sync_with_voiceover: baseScene.lipSyncWithVoiceover === true,
+          ai_prompt: baseScene.aiPrompt ?? null,
+          stock_keywords: baseScene.stockKeywords ?? null,
+          upload_url: baseScene.uploadUrl ?? null,
+          upload_type: baseScene.uploadType ?? null,
+          reference_image_url: baseScene.referenceImageUrl ?? null,
+          text_overlay: baseScene.textOverlay as any,
+          transition_type: baseScene.transitionType,
+          transition_duration: baseScene.transitionDuration,
+          director_modifiers: (baseScene.directorModifiers ?? {}) as any,
+          shot_director: (baseScene.shotDirector ?? {}) as any,
+          prompt_slots: (baseScene.promptSlots ?? null) as any,
+          prompt_mode: baseScene.promptMode ?? null,
+          prompt_slot_order: (baseScene.promptSlotOrder ?? null) as any,
+          applied_style_preset_id: baseScene.appliedStylePresetId ?? null,
+          cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
+          dialog_script: baseScene.dialogScript ?? null,
+          dialog_voices: (baseScene.dialogVoices ?? null) as any,
+          engine_override: baseScene.engineOverride ?? 'auto',
+          character_shots: (baseScene.characterShots ?? null) as any,
+        } as any)
+        .select('id')
+        .single();
+      if (error) {
+        console.error('[insertScenesAfter] insert failed', error);
+        insertError = error.message;
         newIds.push(undefined);
+        continue;
+      }
+      const newId = (data as any)?.id as string | undefined;
+      newIds.push(newId);
+      if (newId) inserted.push({ ...baseScene, id: newId });
+    }
+
+    // ── 5) Move tail scenes from temp range to their final position.
+    if (shift !== 0 && tailRows.length > 0) {
+      const TMP_BASE = 100000;
+      for (const r of tailRows) {
+        const { error } = await supabase
+          .from('composer_scenes')
+          .update({
+            order_index: r.order_index + TMP_BASE - TMP_BASE + shift, // = r.order_index + shift
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', r.id);
+        if (error) throw new Error(`Could not finalize scene order: ${error.message}`);
       }
     }
 
-    // 4) Mirror result in local state. Use parent.orderIndex as the anchor so
-    //    we still mirror correctly when the caller passed a stale id that
-    //    only the DB-fallback above could resolve.
-    const parentOrderIndex = parent.orderIndex ?? 0;
-    setProject((prev) => {
-      const next = [...prev.scenes];
-      let pIdx = next.findIndex((s) => s.id === parentSceneId);
-      if (pIdx < 0) pIdx = next.findIndex((s) => (s.orderIndex ?? -1) === parentOrderIndex);
-      if (pIdx < 0) return prev;
-      for (let i = pIdx + 1; i < next.length; i++) {
-        next[i] = { ...next[i], orderIndex: (next[i].orderIndex ?? 0) + shift };
-      }
-      const spliceAt = removeParent ? pIdx : pIdx + 1;
-      const removeCount = removeParent ? 1 : 0;
-      next.splice(spliceAt, removeCount, ...inserted);
-      return { ...prev, scenes: next };
-    });
+    if (insertError && newIds.every((x) => !x)) {
+      throw new Error(`Could not insert sub-scenes: ${insertError}`);
+    }
+
+    // ── 6) Refetch from DB so local state is the source of truth (avoids
+    //      stale `parent` row + ensures the new sub-scenes show up at the
+    //      right slot with their real ids).
+    try { await refetchScenesFromDb(); } catch (e) {
+      console.warn('[insertScenesAfter] refetch failed (non-fatal)', e);
+    }
 
     return newIds;
-  }, [project.id, project.scenes]);
+  }, [project.id, project.scenes, refetchScenesFromDb]);
 
   // the user navigates away.
   useEffect(() => {
