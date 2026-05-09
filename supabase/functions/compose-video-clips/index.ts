@@ -438,7 +438,16 @@ serve(async (req) => {
         const hasDialog = sceneHasDialogText(scene.dialogScript);
         const primaryShot = scene.characterShots?.find((s) => s && s.shotType !== 'absent')
           ?? (scene.characterShot && scene.characterShot.shotType !== 'absent' ? scene.characterShot : undefined);
-        const wantsHeygen = override === 'heygen' || (override === 'auto' && hasDialog && !!primaryShot);
+        const dialogSpeakers = countDialogSpeakers(scene.dialogScript);
+        // Multi-speaker scenes must NEVER auto-route to HeyGen — that would
+        // make the first speaker's portrait lip-sync the FULL dialog text
+        // (i.e. "one character speaks for both"). Multi-speaker dialog plays
+        // as voiceover overlay over the regular AI clip; explicit
+        // shot-reverse-shot split scenes (each with 1 speaker) handle real
+        // per-person lip-sync.
+        const wantsHeygen =
+          (override === 'heygen' && dialogSpeakers <= 1) ||
+          (override === 'auto' && hasDialog && !!primaryShot && dialogSpeakers <= 1);
 
         if (wantsHeygen) {
           if (!hasDialog) {
