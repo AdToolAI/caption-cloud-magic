@@ -1134,6 +1134,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         {isMonologue ? t.subtitleMono : t.subtitle}
       </p>
 
+      {generating && genStage && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-[11px] text-primary">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>{genStage}</span>
+        </div>
+      )}
       <div>
         <Label className="text-[10px] text-muted-foreground">{t.script}</Label>
         <Textarea
