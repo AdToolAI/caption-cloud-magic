@@ -44,6 +44,7 @@ import { CharacterCastPicker } from './CharacterCastPicker';
 // lines of always-visible JSX.
 import SceneStyleSheet from './SceneStyleSheet';
 import SceneStyleChip from './SceneStyleChip';
+import SceneSecondaryToggle from './SceneSecondaryToggle';
 import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
 import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
 import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
