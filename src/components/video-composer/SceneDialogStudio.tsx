@@ -1062,6 +1062,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       });
     } finally {
       setGenerating(false);
+      setGenStage(null);
     }
   };
 
