@@ -78,6 +78,8 @@ import { syncCastFromPrompt } from '@/lib/motion-studio/syncCastFromPrompt';
 import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
 import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
 import SceneStillFrameStudio from './SceneStillFrameStudio';
+import SceneAnchorLibrary from './SceneAnchorLibrary';
+import { cn } from '@/lib/utils';
 import SceneDialogStudio from './SceneDialogStudio';
 import DirectorQualityCoach from './director-console/DirectorQualityCoach';
 import ScenePromptDetailsSheet from './ScenePromptDetailsSheet';
