@@ -82,15 +82,26 @@ serve(async (req) => {
       (scene as any).lip_sync_source_clip_url || scene.clip_url || null;
     if (!sourceClipUrl) return json({ error: 'no source clip' }, 400);
 
-    // Find the voiceover clip(s) for this scene. If multiple exist (multi-line
-    // dialog), pick the longest — Sync.so accepts a single audio track.
+    // Find the voiceover clip(s) for this scene.
+    // SAFETY: if multiple distinct voiceover clips exist (multi-speaker dialog
+    // generated via SceneDialogStudio), refuse to run — Sync.so applies a
+    // single audio track to the entire video, which would make ONE face
+    // lip-sync the whole multi-speaker dialog. Multi-speaker scenes must use
+    // the per-speaker Shot-Reverse-Shot flow (HeyGen per cut) instead.
     const { data: voClips } = await supabase
       .from('scene_audio_clips')
       .select('url, duration, start_offset')
       .eq('scene_id', scene_id)
       .eq('kind', 'voiceover')
-      .order('duration', { ascending: false })
-      .limit(1);
+      .order('duration', { ascending: false });
+
+    if ((voClips?.length ?? 0) > 1) {
+      return json({
+        error: 'multi_speaker_not_supported',
+        message:
+          'This scene has multiple voiceover speakers. Generic lip-sync polish would force one face to speak all lines. Use the per-speaker Shot-Reverse-Shot flow instead.',
+      }, 409);
+    }
 
     const vo = voClips?.[0];
     if (!vo?.url) return json({ error: 'no voiceover clip for scene' }, 400);
