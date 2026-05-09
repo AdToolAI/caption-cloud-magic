@@ -367,6 +367,32 @@ serve(async (req) => {
     // Process each scene
     for (const scene of scenes) {
       // Sora 2 sunset: silently migrate any legacy 'ai-sora' scene to Veo 3.1
+      // ── SRS Lip-Sync Guard ─────────────────────────────────────────────
+      // Sub-scenes spawned by SceneDialogStudio's "split" flow are already
+      // dispatched directly to generate-talking-head with a pinned audioUrl
+      // and a specific speaker portrait. They MUST NOT be re-rendered as
+      // generic AI B-roll here — that would discard the per-speaker audio
+      // and reuse the wrong voice/timing (root cause of "Matthew with
+      // Sarah's voice"). We detect them by their cinematic_preset_slug
+      // marker `dialog-srs:<parentId>` and skip them.
+      try {
+        const { data: dbRow } = await supabaseAdmin
+          .from('composer_scenes')
+          .select('cinematic_preset_slug, clip_status, clip_url, character_audio_url')
+          .eq('id', scene.id)
+          .maybeSingle();
+        const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
+        const status = (dbRow as any)?.clip_status as string | null;
+        const hasAudio = !!(dbRow as any)?.character_audio_url;
+        if (slug && slug.startsWith('dialog-srs:') && (hasAudio || status === 'generating' || status === 'ready')) {
+          console.log(`[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`);
+          results.push({ sceneId: scene.id, status: status === 'ready' ? 'ready' : 'generating' });
+          continue;
+        }
+      } catch (e) {
+        console.warn('[compose-video-clips] SRS guard query failed (continuing):', e instanceof Error ? e.message : String(e));
+      }
+
       // (audio + cinematic) since OpenAI is sunsetting Sora 2 in 2026.
       if ((scene.clipSource as string) === 'ai-sora') {
         console.warn(`[compose-video-clips] Scene ${scene.id} clipSource 'ai-sora' is sunset — migrating to ai-veo.`);
