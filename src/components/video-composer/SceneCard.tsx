@@ -1455,6 +1455,22 @@ export default function SceneCard({
         onSelect={handleStockSelect}
       />
 
+      {/* Phase 1 (Studio Set v2) — single Sheet replacing inline Director
+          Console + Final-Prompt-Preview + Multi-Engine + Compare-Lab launcher. */}
+      <ScenePromptDetailsSheet
+        open={promptDetailsOpen}
+        onOpenChange={setPromptDetailsOpen}
+        scene={scene}
+        language={lang}
+        promptMode={promptMode}
+        promptSlots={promptSlots}
+        promptSlotOrder={promptSlotOrder}
+        brandCharacterInput={brandCharacterInput}
+        libCharacters={libCharacters}
+        libLocations={libLocations}
+        onOpenCompareLab={() => setCompareLabOpen(true)}
+      />
+
       {/* Block L — Inline Compare Lab Dialog */}
       <Dialog open={compareLabOpen} onOpenChange={setCompareLabOpen}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
