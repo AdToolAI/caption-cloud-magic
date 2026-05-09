@@ -148,8 +148,8 @@ const T = {
     successInline: (n: number) => `${n} voiceover block${n === 1 ? '' : 's'} attached to this scene.`,
     failed: 'Generation failed',
     aiFailed: 'AI script could not be generated',
-    srsLabel: 'Advanced: render as separate shot-reverse-shot scenes',
-    srsHint: 'Default: dialog plays as voiceover in this scene — no extra scenes.',
+    srsLabel: 'Advanced: keep it as voiceover over one shared scene instead',
+    srsHint: 'Default with multiple speakers (with portraits): each speaker gets their own lip-sync cut. Toggle on if you only want a group scene with voiceover.',
     close: 'Close',
   },
   es: {
