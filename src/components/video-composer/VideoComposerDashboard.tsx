@@ -934,6 +934,8 @@ export default function VideoComposerDashboard() {
       dialog_voices: (p.dialogVoices ?? null) as any,
       engine_override: p.engineOverride ?? 'auto',
       character_shots: (p.characterShots ?? null) as any,
+      continuity_locked: (p as any).continuityLocked === true,
+      lock_reference_url: (p as any).lockReferenceUrl ?? null,
     }));
 
     // Atomic: shift tail → delete parent → insert children → shift back, all
