@@ -1247,6 +1247,7 @@ export default function VideoComposerDashboard() {
               scenes={project.scenes}
               onUpdateScenes={setScenes}
               onAddScene={addSceneToProject}
+              onInsertScenesAfter={insertScenesAfter}
               onGoToClips={persistAndGoToClips}
               language={project.language}
               projectId={project.id}
