@@ -1082,8 +1082,8 @@ export default function SceneCard({
             })()}
 
 
-            {/* Lip-Sync toggle — for character scenes */}
-            {scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
+            {/* Lip-Sync toggle — Phase 3: hidden behind "Mehr ▾". */}
+            {secondaryOpen && scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
               <div className="flex flex-col gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-col">
