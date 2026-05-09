@@ -32,7 +32,7 @@ import { useTalkingHead } from '@/hooks/useTalkingHead';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
-import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
+import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
@@ -466,6 +466,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
+    const timedBlocks: typeof blocks = [];
 
     // Determine if we should auto-upgrade to HeyGen lip-sync.
     // Trigger: at least one speaker in this dialog has a portrait. If not, we
@@ -562,9 +563,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           }
         }
 
-        cumulativeOffset += duration + 0.15; // small breath between speakers
+        timedBlocks.push({ ...block, startSec: cumulativeOffset, durationSec: duration });
+        cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
       }
+
+      // Refresh the visible prompt with concrete per-speaker timestamps
+      // (Audio Plan), now that real TTS durations are known.
+      try {
+        const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedBlocks, language);
+        if (timedPrompt !== (scene.aiPrompt || '')) {
+          onUpdate({ aiPrompt: timedPrompt });
+        }
+      } catch (_) { /* noop */ }
 
       // Bump scene duration so all VO blocks fit (cap at 60s sanity)
       const totalNeeded = Math.min(60, Math.ceil(cumulativeOffset));
@@ -759,6 +770,23 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         });
       }
 
+      // ── Phase 1b: refresh parent prompt with the real Audio Plan
+      //    (per-speaker start–end seconds) now that durations are known.
+      try {
+        const timedParentBlocks = (() => {
+          let cursor = 0;
+          return synthed.map((s) => {
+            const startSec = cursor;
+            cursor += s.durationSec + INTER_SPEAKER_GAP_SEC;
+            return { ...s.block, startSec, durationSec: s.durationSec };
+          });
+        })();
+        const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedParentBlocks, language);
+        if (timedPrompt !== (scene.aiPrompt || '')) {
+          onUpdate({ aiPrompt: timedPrompt });
+        }
+      } catch (_) { /* noop */ }
+
       // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
       //    order, each with its OWN real duration and OWN audioUrl.
       if (!onAddScene) throw new Error('Cannot spawn sub-scenes: onAddScene missing');
@@ -786,7 +814,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
           // Force HeyGen engine and disable any auto-routing decisions.
           engineOverride: 'heygen',
-          aiPrompt: applyDialogToPrompt('', [s.block], language),
+          aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
