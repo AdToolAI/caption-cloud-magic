@@ -78,7 +78,7 @@ export default function VoiceSubtitlesTab({
   projectId,
 }: VoiceSubtitlesTabProps) {
   const { t } = useTranslation();
-  const { clips: sceneAudioClips } = useSceneAudioClips(projectId ?? null);
+  const { clips: sceneAudioClips } = useSceneAudioClips(projectId ?? null, scenes);
   const subtitles: SubtitlesConfig = assemblyConfig.subtitles ?? DEFAULT_SUBTITLES_CONFIG;
   const voiceover = assemblyConfig.voiceover;
   // Keep latest voiceover in a ref so async callbacks (e.g. browser-decoded
