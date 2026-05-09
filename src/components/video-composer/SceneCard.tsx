@@ -1415,18 +1415,42 @@ export default function SceneCard({
                         ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
                         : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
                 </div>
+                {/* Phase 2 — Quick Anchor Library: prev frame, brand char, locations */}
+                <SceneAnchorLibrary
+                  selectedReferenceUrl={scene.referenceImageUrl}
+                  previousSceneLastFrameUrl={previousSceneLastFrameUrl}
+                  previousSceneIndex={previousSceneIndex}
+                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                  language={lang}
+                />
                 {scene.clipSource.startsWith('ai-') && projectId && (
-                  <SceneStillFrameStudio
-                    projectId={projectId}
-                    sceneId={scene.id}
-                    prompt={scene.aiPrompt || ''}
-                    composeHintImageUrl={
-                      activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
-                    }
-                    selectedReferenceUrl={scene.referenceImageUrl}
-                    onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                    language={lang as 'en' | 'de' | 'es'}
-                  />
+                  <div
+                    className={cn(
+                      frameFirstMode && 'rounded-md ring-2 ring-primary/40 ring-offset-1 ring-offset-background',
+                    )}
+                  >
+                    {frameFirstMode && (
+                      <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-primary">
+                        <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px]">1</span>
+                        {lang === 'de'
+                          ? 'Schritt 1 — Frame zuerst freezen'
+                          : lang === 'es'
+                          ? 'Paso 1 — congela el fotograma primero'
+                          : 'Step 1 — freeze the frame first'}
+                      </div>
+                    )}
+                    <SceneStillFrameStudio
+                      projectId={projectId}
+                      sceneId={scene.id}
+                      prompt={scene.aiPrompt || ''}
+                      composeHintImageUrl={
+                        activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                      }
+                      selectedReferenceUrl={scene.referenceImageUrl}
+                      onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                      language={lang as 'en' | 'de' | 'es'}
+                    />
+                  </div>
                 )}
                 <SceneReferenceImageUpload
                   projectId={projectId}
