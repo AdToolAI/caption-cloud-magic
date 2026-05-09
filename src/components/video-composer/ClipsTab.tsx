@@ -132,8 +132,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               continuationSourceSceneId: currentScene.id,
               framePickSeconds: lastFrameTime,
               // Default 0.3s crossfade for paired Artlist-style continuity
-              transitionStyle: (s.transitionStyle && s.transitionStyle !== 'none')
-                ? s.transitionStyle
+              transitionType: (s.transitionType && s.transitionType !== 'none')
+                ? s.transitionType
                 : ('crossfade' as any),
             }
           : s
@@ -167,8 +167,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               continuationSourceSceneId: next.continuationSourceSceneId,
               continuityLocked: true,
               clipStatus: 'pending' as const,
-              transitionStyle: (s.transitionStyle && s.transitionStyle !== 'none')
-                ? s.transitionStyle
+              transitionType: (s.transitionType && s.transitionType !== 'none')
+                ? s.transitionType
                 : ('crossfade' as any),
             }
           : s
