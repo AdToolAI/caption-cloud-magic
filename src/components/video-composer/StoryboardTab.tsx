@@ -83,6 +83,15 @@ export default function StoryboardTab({
     try { localStorage.setItem(TIPS_KEY, tipsCollapsed ? '1' : '0'); } catch { /* ignore */ }
   }, [tipsCollapsed]);
 
+  // Phase 2 — Frame-First Mode toggle (Artlist-style two-step workflow)
+  const FRAME_FIRST_KEY = 'video-composer-frame-first-mode';
+  const [frameFirstMode, setFrameFirstMode] = useState<boolean>(() => {
+    try { return localStorage.getItem(FRAME_FIRST_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(FRAME_FIRST_KEY, frameFirstMode ? '1' : '0'); } catch { /* ignore */ }
+  }, [frameFirstMode]);
+
   // Block M — Hybrid Extend dialog state
   const [hybridDialog, setHybridDialog] = useState<{
     open: boolean;
