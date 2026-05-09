@@ -22,6 +22,12 @@ interface DirectorPresetPickerProps {
   modifiers: DirectorModifiers;
   basePrompt: string;
   onChange: (modifiers: DirectorModifiers, mergedPrompt: string) => void;
+  /**
+   * When true, render the category tabs + option list inline (no Card-wrapper,
+   * no "Hinzufügen" popover). Used inside SceneStyleSheet to avoid nested
+   * popovers/dialogs.
+   */
+  embedded?: boolean;
 }
 
 const CATEGORY_ORDER: PresetCategory[] = ['camera', 'lens', 'lighting', 'mood', 'film-stock'];
