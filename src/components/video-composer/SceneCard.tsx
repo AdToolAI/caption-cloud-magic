@@ -192,6 +192,8 @@ export default function SceneCard({
   // DirectorConsolePreview, "Finaler Prompt (Vorschau)", Multi-Engine and
   // Compare-Lab launcher. Replaces the old `advancedOpen` toggle for prompts.
   const [promptDetailsOpen, setPromptDetailsOpen] = useState(false);
+  // Phase 2 (Studio Set v2) — single Sheet for Looks/Feintuning/Modifier.
+  const [styleSheetOpen, setStyleSheetOpen] = useState(false);
   // `advancedOpen` is still used to gate SceneStillFrameStudio further down.
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Real-Time Collaboration — comment thread for this scene
