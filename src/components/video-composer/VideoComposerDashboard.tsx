@@ -938,8 +938,8 @@ export default function VideoComposerDashboard() {
         retryCount: 0,
         costEuros: 0,
         ...partials[i],
-        orderIndex,
       } as ComposerScene;
+      baseScene.orderIndex = orderIndex; // positional override wins
 
       try {
         const { data, error } = await supabase
