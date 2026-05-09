@@ -770,6 +770,23 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         });
       }
 
+      // ── Phase 1b: refresh parent prompt with the real Audio Plan
+      //    (per-speaker start–end seconds) now that durations are known.
+      try {
+        const timedParentBlocks = (() => {
+          let cursor = 0;
+          return synthed.map((s) => {
+            const startSec = cursor;
+            cursor += s.durationSec + INTER_SPEAKER_GAP_SEC;
+            return { ...s.block, startSec, durationSec: s.durationSec };
+          });
+        })();
+        const timedPrompt = applyDialogToPrompt(scene.aiPrompt || '', timedParentBlocks, language);
+        if (timedPrompt !== (scene.aiPrompt || '')) {
+          onUpdate({ aiPrompt: timedPrompt });
+        }
+      } catch (_) { /* noop */ }
+
       // ── Phase 2: spawn one sub-scene + HeyGen render per block, in script
       //    order, each with its OWN real duration and OWN audioUrl.
       if (!onAddScene) throw new Error('Cannot spawn sub-scenes: onAddScene missing');
@@ -797,7 +814,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
           // Force HeyGen engine and disable any auto-routing decisions.
           engineOverride: 'heygen',
-          aiPrompt: applyDialogToPrompt('', [s.block], language),
+          aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
