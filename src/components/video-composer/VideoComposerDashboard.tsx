@@ -345,6 +345,12 @@ export default function VideoComposerDashboard() {
             continuityDriftScore: ((row as any).continuity_drift_score as any) ?? local?.continuityDriftScore,
             continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
+            continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
+            lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
+            continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
+            framePickSeconds: ((row as any).frame_pick_seconds as any) != null
+              ? Number((row as any).frame_pick_seconds)
+              : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
           };
@@ -457,6 +463,12 @@ export default function VideoComposerDashboard() {
             continuityDriftScore: ((row as any).continuity_drift_score as any) ?? local?.continuityDriftScore,
             continuityDriftLabel: ((row as any).continuity_drift_label as any) ?? local?.continuityDriftLabel,
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
+            continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
+            lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
+            continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
+            framePickSeconds: ((row as any).frame_pick_seconds as any) != null
+              ? Number((row as any).frame_pick_seconds)
+              : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
           };
@@ -741,6 +753,10 @@ export default function VideoComposerDashboard() {
           prompt_slot_order: (s.promptSlotOrder ?? null) as any,
           applied_style_preset_id: s.appliedStylePresetId ?? null,
           cinematic_preset_slug: s.cinematicPresetSlug ?? null,
+          continuity_locked: s.continuityLocked === true,
+          lock_reference_url: s.lockReferenceUrl ?? null,
+          continuity_source_scene_id: s.continuationSourceSceneId ?? null,
+          frame_pick_seconds: s.framePickSeconds ?? null,
         } as any)
         .eq('id', s.id)
         .eq('project_id', projectId)
@@ -918,6 +934,8 @@ export default function VideoComposerDashboard() {
       dialog_voices: (p.dialogVoices ?? null) as any,
       engine_override: p.engineOverride ?? 'auto',
       character_shots: (p.characterShots ?? null) as any,
+      continuity_locked: (p as any).continuityLocked === true,
+      lock_reference_url: (p as any).lockReferenceUrl ?? null,
     }));
 
     // Atomic: shift tail → delete parent → insert children → shift back, all
