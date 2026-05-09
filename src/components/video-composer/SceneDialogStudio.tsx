@@ -123,8 +123,8 @@ const T = {
     successInline: (n: number) => `${n} Voiceover-Block${n === 1 ? '' : 'blöcke'} an diese Szene gehängt.`,
     failed: 'Generierung fehlgeschlagen',
     aiFailed: 'KI-Skript konnte nicht erstellt werden',
-    srsLabel: 'Erweitert: Als separate Shot-Reverse-Shot-Szenen rendern',
-    srsHint: 'Standard: Dialog läuft als Voiceover in dieser Szene — keine extra Szenen.',
+    srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',
+    srsHint: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.',
     close: 'Schließen',
   },
   en: {
