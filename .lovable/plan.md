@@ -1,61 +1,33 @@
-# Plan: Lip-Sync Fehler beim Splitten beheben
+Ich habe den Ablauf geprüft: Der Fehler entsteht sehr wahrscheinlich nicht mehr beim HeyGen-Render selbst, sondern bereits beim Ersetzen der Parent-Szene durch die zwei Sprecher-Szenen. Die Tabelle hat eine eindeutige Reihenfolge pro Projekt (`project_id + order_index`). Beim aktuellen Ablauf werden Tail-Szenen verschoben und danach werden neue Szenen an dieselben Order-Indizes eingefügt. Wenn das Verschieben wegen Constraint/Race/State-Mismatch nicht sauber durchläuft, schluckt `insertScenesAfter` den echten Datenbankfehler und liefert `undefined`; dadurch erscheint nur „Dialog-Szene konnte nicht ersetzt werden“. Außerdem wird der Studio-Bereich beim Start weggeklappt, weil die Parent-Szene sofort ersetzt/gelöscht werden soll, bevor sichtbarer Fortschritt stabil angezeigt wird.
 
-## Diagnose
+Plan:
 
-Die Fehlermeldung im Screenshot ist **nicht mehr der alte HeyGen-40099-Fehler**, sondern ein Insert-Problem:
+1. **Szenen-Ersetzung atomar und robust machen**
+   - In `VideoComposerDashboard.tsx` die aktuelle `insertScenesAfter`-Logik ersetzen durch eine sichere Reihenfolge:
+     - Parent-Szene in der DB anhand der echten ID laden (`project_id`, `order_index`).
+     - Tail-Szenen zuerst in einen temporären hohen Indexbereich verschieben.
+     - Parent samt Audio-Clips löschen.
+     - Neue Sprecher-Szenen einfügen.
+     - Tail-Szenen final zurückschieben.
+   - Fehler nicht mehr schlucken: Insert-/Shift-/Delete-Fehler werden sichtbar geloggt und als klarer Fehler zurückgegeben.
 
-```text
-Matthew Dusatko: sub-scene insert failed
-Sarah Dusatko: sub-scene insert failed
-```
+2. **Lokalen State nach DB-Operation als Source of Truth neu laden**
+   - Nach erfolgreichem Insert nicht mehr nur lokal „splicen“, sondern die Szenenliste aus der DB refetchen bzw. in exakt derselben Reihenfolge spiegeln.
+   - Dadurch verschwinden stale IDs und die UI zeigt die zwei neuen Sprecher-Szenen direkt an der richtigen Position.
 
-In der Datenbank sieht man: Die aktuelle Dialog-Szene hat Matthew + Sarah korrekt gespeichert, aber es wurden **keine** neuen Sub-Szenen angelegt.
+3. **Fortschritt beim 2-Sprecher-Split sichtbar halten**
+   - In `SceneDialogStudio.tsx` während des SRS-Flows einen kleinen Status setzen: TTS wird erstellt, Szenen werden eingesetzt, Matthew/Sarah Lip-Sync wird gestartet.
+   - Die Auto-Split-UI soll nicht einfach „zuklappen“, ohne dass der Nutzer sieht, was passiert.
 
-Der wahrscheinlich konkrete Fehler: `SceneDialogStudio` ruft zwar `resolvePersistedIds()` auf und findet die echte gespeicherte Scene-ID, übergibt danach aber weiterhin `scene.id` an `onInsertScenesAfter`. Wenn die UI noch eine alte/temp/local ID hält, findet `insertScenesAfter` den Parent in `project.scenes` nicht und gibt für beide Inserts `undefined` zurück. Dadurch entstehen exakt die Toasts „sub-scene insert failed“.
+4. **Bessere Fehlermeldung statt Sammel-Toast ohne Ursache**
+   - Wenn das Einsetzen der Sub-Szenen fehlschlägt, die echte Ursache anzeigen, z. B. „Szenen-Reihenfolge konnte nicht aktualisiert werden“ statt pro Sprecher dieselbe generische Meldung.
+   - Wenn nur HeyGen fehlschlägt, bleiben die erzeugten Sprecher-Szenen sichtbar und werden einzeln als fehlgeschlagen markiert.
 
-## Umsetzung
+5. **Aktuellen defekten Projektzustand bereinigen**
+   - Die alte Parent-Szene bleibt aktuell noch bei Order 0 stehen und es wurden keine `dialog-srs:*` Sub-Szenen erzeugt.
+   - Nach dem Code-Fix wird ein erneutes „Splitten & generieren“ diese Szene sauber ersetzen; optional kann ich zusätzlich stale `dialog-srs:*` Reste im betroffenen Projekt entfernen, falls vorhanden.
 
-### 1) Parent-ID korrekt verwenden
-In `SceneDialogStudio.tsx`:
-- `resolvePersistedIds()` liefert bereits `{ pid, sceneId }`.
-- Für SRS-Splitting wird künftig diese aufgelöste `sceneId` als `parentSceneId` gespeichert.
-- `onInsertScenesAfter(parentSceneId, partials, { removeParent: true })` statt `onInsertScenesAfter(scene.id, ...)`.
-
-Damit wird die echte DB-Szene ersetzt, nicht eine veraltete lokale ID gesucht.
-
-### 2) Fallback im Dashboard härten
-In `VideoComposerDashboard.tsx`:
-- Wenn `parentSceneId` nicht in lokalem State gefunden wird, zusätzlich per `orderIndex` fallbacken.
-- Dadurch funktionieren Inserts auch dann, wenn die Child-Komponente noch eine stale ID hat, aber die Position korrekt ist.
-
-### 3) Alte SRS-Reste bereinigen
-Einmalige Datenbereinigung:
-- verwaiste alte `dialog-srs:scene_%` Sub-Szenen löschen oder mindestens auf `failed` setzen.
-- aktuelle Parent-Dialog-Szene mit Matthew + Sarah bleibt erhalten.
-
-### 4) Bessere Fehlermeldung
-Falls Insert trotzdem fehlschlägt:
-- Statt nur „sub-scene insert failed“ im Toast: „Dialog-Szene konnte nicht ersetzt werden — bitte Seite aktualisieren und erneut Splitten“.
-- Das vermeidet Verwechslung mit HeyGen/Lip-Sync-Renderfehlern.
-
-## Erwartetes Ergebnis
-
-Nach dem Fix:
-
-```text
-Vorher:
-Szene 1 = Dialogcontainer mit Matthew + Sarah
-Splitten → Fehler: beide sub-scene insert failed
-
-Nachher:
-Szene 1 wird ersetzt durch Matthew Lip-Sync
-Szene 2 wird Sarah Lip-Sync
-alte Szene 2–5 rutschen nach hinten
-HeyGen-Fehler markieren nur die betroffene Sub-Szene als failed, statt alles abzubrechen
-```
-
-## Dateien
-
-- `src/components/video-composer/SceneDialogStudio.tsx`
-- `src/components/video-composer/VideoComposerDashboard.tsx`
-- optional: kleine DB-Bereinigung für alte verwaiste SRS-Zeilen
+Technische Details:
+- Betroffene Dateien: `src/components/video-composer/VideoComposerDashboard.tsx`, `src/components/video-composer/SceneDialogStudio.tsx`.
+- Root Cause: `insertScenesAfter` arbeitet nicht transaktional, nutzt lokalen State als Anchor und fängt DB-Fehler ab. Durch die eindeutige `composer_scenes_project_order_unique`-Constraint kann das Einfügen der zwei Sprecher-Szenen scheitern, ohne dass die echte Ursache bis zur UI gelangt.
+- Kein neues Backend-Feature nötig; nur robustere DB-Schreibreihenfolge und bessere UI-Statusanzeige.
