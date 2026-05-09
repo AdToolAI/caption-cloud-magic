@@ -5194,6 +5194,7 @@ export type Database = {
           character_shots: Json
           character_voice_id: string | null
           cinematic_preset_slug: string | null
+          clip_error: string | null
           clip_lead_in_trim_seconds: number
           clip_quality: string
           clip_source: string
@@ -5264,6 +5265,7 @@ export type Database = {
           character_shots?: Json
           character_voice_id?: string | null
           cinematic_preset_slug?: string | null
+          clip_error?: string | null
           clip_lead_in_trim_seconds?: number
           clip_quality?: string
           clip_source?: string
@@ -5334,6 +5336,7 @@ export type Database = {
           character_shots?: Json
           character_voice_id?: string | null
           cinematic_preset_slug?: string | null
+          clip_error?: string | null
           clip_lead_in_trim_seconds?: number
           clip_quality?: string
           clip_source?: string
