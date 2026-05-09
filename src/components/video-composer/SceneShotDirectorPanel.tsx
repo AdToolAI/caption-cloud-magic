@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Camera, Sun, Move, Crop, RotateCcw, Check, Aperture, Film } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,15 +27,15 @@ interface Props {
   value: ShotSelection;
   onChange: (next: ShotSelection) => void;
   language: string;
+  /**
+   * `popover` (default) — legacy compact mode with 6 popover-buttons.
+   * `master-detail` — flat in-dialog layout with axis list (left) and
+   * options list (right). No nested popovers, used in SceneStyleSheet.
+   */
+  layout?: 'popover' | 'master-detail';
 }
 
-/**
- * Compact, per-scene Shot Director panel for the Video Composer.
- * Unlike the global `ShotDirectorPanel`, this version does NOT use
- * sessionStorage — selection lives in the scene record so each scene gets
- * independent cinematography.
- */
-export default function SceneShotDirectorPanel({ value, onChange, language }: Props) {
+export default function SceneShotDirectorPanel({ value, onChange, language, layout = 'popover' }: Props) {
   const lang = ((language as Lang) ?? 'en');
   const count = getSelectionCount(value);
 
@@ -44,6 +45,10 @@ export default function SceneShotDirectorPanel({ value, onChange, language }: Pr
     else next[cat] = optionId;
     onChange(next);
   };
+
+  if (layout === 'master-detail') {
+    return <MasterDetail value={value} onChange={onChange} lang={lang} count={count} setCategory={setCategory} />;
+  }
 
   return (
     <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-2">
