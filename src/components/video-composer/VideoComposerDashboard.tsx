@@ -1004,10 +1004,14 @@ export default function VideoComposerDashboard() {
       }
     }
 
-    // 4) Mirror result in local state.
+    // 4) Mirror result in local state. Use parent.orderIndex as the anchor so
+    //    we still mirror correctly when the caller passed a stale id that
+    //    only the DB-fallback above could resolve.
+    const parentOrderIndex = parent.orderIndex ?? 0;
     setProject((prev) => {
       const next = [...prev.scenes];
-      const pIdx = next.findIndex((s) => s.id === parentSceneId);
+      let pIdx = next.findIndex((s) => s.id === parentSceneId);
+      if (pIdx < 0) pIdx = next.findIndex((s) => (s.orderIndex ?? -1) === parentOrderIndex);
       if (pIdx < 0) return prev;
       for (let i = pIdx + 1; i < next.length; i++) {
         next[i] = { ...next[i], orderIndex: (next[i].orderIndex ?? 0) + shift };
