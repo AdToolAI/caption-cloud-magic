@@ -1166,6 +1166,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           </div>
         </SortableContext>
       </DndContext>
+      {framePickerState && (
+        <FramePickerOverlay
+          open={!!framePickerState}
+          onOpenChange={(o) => { if (!o) setFramePickerState(null); }}
+          sourceScene={framePickerState.source}
+          targetScene={framePickerState.target}
+          targetSceneIndex={framePickerState.targetIndex}
+          projectId={projectId}
+          onApply={handleFramePicked}
+        />
+      )}
     </div>
   );
 }
