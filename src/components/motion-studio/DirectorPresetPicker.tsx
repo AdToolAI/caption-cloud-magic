@@ -74,6 +74,65 @@ export default function DirectorPresetPicker({
     onChange({}, basePrompt);
   };
 
+  if (embedded) {
+    return (
+      <div className="space-y-3">
+        <Tabs defaultValue="camera">
+          <TabsList className="grid w-full grid-cols-5">
+            {CATEGORY_ORDER.map((cat) => (
+              <TabsTrigger key={cat} value={cat} className="text-[10px] px-1">
+                {CATEGORY_LABELS[cat]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {CATEGORY_ORDER.map((cat) => {
+            const key = cat === 'film-stock' ? 'filmStock' : cat;
+            const activeId = modifiers[key as keyof DirectorModifiers];
+            return (
+              <TabsContent key={cat} value={cat} className="mt-3 max-h-[360px] overflow-y-auto">
+                <div className="grid sm:grid-cols-2 gap-1.5">
+                  {PRESETS_BY_CATEGORY[cat].map((preset) => {
+                    const isActive = activeId === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => togglePreset(cat, preset.id)}
+                        className={`flex items-start gap-2 rounded-md border p-2 text-left transition-colors ${
+                          isActive
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/40 hover:bg-muted/50'
+                        }`}
+                      >
+                        <span className="text-base leading-none mt-0.5">{preset.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-medium">{preset.label}</div>
+                          <div className="text-[10px] text-muted-foreground line-clamp-2">
+                            {preset.description}
+                          </div>
+                        </div>
+                        {isActive && (
+                          <Badge variant="default" className="h-4 px-1 text-[9px] shrink-0">
+                            Aktiv
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            );
+          })}
+        </Tabs>
+        {activeCount > 0 && (
+          <Button size="sm" variant="ghost" className="h-7 px-2 text-[11px]" onClick={clearAll}>
+            <X className="h-3 w-3 mr-1" /> Alle Modifier zurücksetzen
+          </Button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-2">
       <div className="flex items-center justify-between gap-2">
