@@ -189,6 +189,11 @@ export default function VideoComposerDashboard() {
   // Track which project.id we have already hydrated from DB so the effect
   // can re-run when the AutoDirector / AdDirector swaps in a new project.
   const lastSyncedProjectIdRef = useRef<string | null>(null);
+  // Always-fresh projectId — avoids stale-closure problems where callbacks
+  // (e.g. insertScenesAfter) capture an older `project.id` from the render
+  // *before* ensureProjectPersisted swapped in the freshly inserted UUID.
+  const projectIdRef = useRef<string | undefined>(project.id);
+  useEffect(() => { projectIdRef.current = project.id; }, [project.id]);
 
   // Strip the URL params after the first render so a later reload doesn't
   // re-trigger the discard-draft path (the project.id is now in state).
