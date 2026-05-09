@@ -1521,7 +1521,7 @@ export default function SceneCard({
                       ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
                       : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
               </div>
-              {scene.clipSource.startsWith('ai-') && projectId && (
+              {advancedOpen && scene.clipSource.startsWith('ai-') && projectId && (
                 <SceneStillFrameStudio
                   projectId={projectId}
                   sceneId={scene.id}
