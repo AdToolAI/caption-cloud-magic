@@ -942,7 +942,10 @@ export default function SceneCard({
                 writes back, so the locked Audio Plan is structurally immune to
                 useEffect-style overwrites. */}
             {scene.clipSource.startsWith('ai-') && (
-              <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
+              <>
+                <DirectorConsolePreview scene={scene} language={lang} className="mt-3" />
+                <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
+              </>
             )}
 
             {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
