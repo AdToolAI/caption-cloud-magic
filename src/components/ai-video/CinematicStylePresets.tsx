@@ -36,24 +36,30 @@ interface Props {
  * applies the entire Shot Director selection (framing + angle + movement +
  * lighting) at once. Active preset is highlighted via gold ring.
  */
-export default function CinematicStylePresets({ value, onApply, compact = false }: Props) {
+export default function CinematicStylePresets({ value, onApply, compact = false, layout = 'rail', hideHeader = false }: Props) {
   const { language } = useTranslation();
   const lang = ((language as Lang) ?? 'en');
   const activeId = useMemo(() => matchPresetToSelection(value), [value]);
 
+  const containerCls = layout === 'grid'
+    ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2'
+    : 'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full';
+
   return (
     <div className={cn('space-y-2', compact && 'space-y-1.5')}>
-      <div className="flex items-center gap-1.5">
-        <Sparkles className={cn('text-primary', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} />
-        <span className={cn('font-medium text-primary', compact ? 'text-[11px]' : 'text-xs uppercase tracking-wider')}>
-          {lang === 'de' ? 'Cinematic Looks' : lang === 'es' ? 'Looks Cinematográficos' : 'Cinematic Looks'}
-        </span>
-        <span className={cn('text-muted-foreground', compact ? 'text-[9px]' : 'text-[10px]')}>
-          {lang === 'de' ? '· One-Click Director-Style' : lang === 'es' ? '· Estilo en un clic' : '· One-click director style'}
-        </span>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-1.5">
+          <Sparkles className={cn('text-primary', compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} />
+          <span className={cn('font-medium text-primary', compact ? 'text-[11px]' : 'text-xs uppercase tracking-wider')}>
+            {lang === 'de' ? 'Cinematic Looks' : lang === 'es' ? 'Looks Cinematográficos' : 'Cinematic Looks'}
+          </span>
+          <span className={cn('text-muted-foreground', compact ? 'text-[9px]' : 'text-[10px]')}>
+            {lang === 'de' ? '· One-Click Director-Style' : lang === 'es' ? '· Estilo en un clic' : '· One-click director style'}
+          </span>
+        </div>
+      )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full">
+      <div className={containerCls}>
         {CINEMATIC_STYLE_PRESETS.map((preset) => (
           <PresetCard
             key={preset.id}
@@ -61,6 +67,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false 
             lang={lang}
             isActive={activeId === preset.id}
             compact={compact}
+            layout={layout}
             onClick={() => onApply(preset.selection, preset.id)}
           />
         ))}
