@@ -880,9 +880,12 @@ export default function VideoComposerDashboard() {
     opts?: { removeParent?: boolean },
   ): Promise<(string | undefined)[]> => {
     const removeParent = opts?.removeParent === true;
-    const projectId = project.id;
+    // Read the freshest projectId from the ref — `project.id` from the
+    // closure can still be undefined right after ensureProjectPersisted()
+    // resolved in the same click handler.
+    const projectId = projectIdRef.current || project.id;
     if (!projectId) {
-      throw new Error('Project not persisted yet — please save the project first.');
+      throw new Error('Projekt konnte nicht gespeichert werden — bitte oben „Speichern" klicken und erneut versuchen.');
     }
 
     // Build snake_case payload for the atomic DB function.
@@ -933,7 +936,8 @@ export default function VideoComposerDashboard() {
     }
 
     // Refetch from DB so local state reflects the new ordering & ids.
-    try { await refetchScenesFromDb(); } catch (e) {
+    // Pass the explicit projectId so refetch isn't skipped due to stale closure.
+    try { await refetchScenesFromDb(projectId); } catch (e) {
       console.warn('[insertScenesAfter] refetch failed (non-fatal)', e);
     }
 
