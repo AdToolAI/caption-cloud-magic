@@ -137,6 +137,8 @@ const AutopilotAUP = lazy(() => import("./pages/legal/AutopilotAUP"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
 const SfxLibrary = lazy(() => import("./pages/SfxLibrary"));
+const VerifyLicense = lazy(() => import("./pages/VerifyLicense"));
+const MyLicenses = lazy(() => import("./pages/MyLicenses"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
@@ -209,6 +211,7 @@ function AppLayout() {
                     <Route path="/delete-data" element={<DeleteData />} />
                     <Route path="/coming-soon" element={<ComingSoon />} />
                     <Route path="/status" element={<Status />} />
+                    <Route path="/verify/:token" element={<VerifyLicense />} />
                     
                     {/* Feature pages - enabled */}
                     <Route path="/generator" element={<Generator />} />
