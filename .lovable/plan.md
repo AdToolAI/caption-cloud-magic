@@ -1,66 +1,58 @@
-## Problem (Root Cause)
+## Ziel
+Der Klick auf **„In echte Szene einbauen“** muss sofort sichtbar reagieren und garantiert die Cinematic-Sync-Pipeline starten: Hailuo rendert die echte Szene, danach läuft Sync.so Lip-Sync.
 
-Beim Klick auf **„Cinematic-Sync starten €0.95"** passiert technisch nichts Sichtbares, weil das Override auf dem Weg zum Backend verloren geht.
+## Diagnose
+- In der Browser-/Network-Snapshot des Nutzers taucht **kein** `compose-video-clips` Request auf. Das heißt: Der Klick kommt aktuell nicht zuverlässig bis zur Backend-Funktion durch.
+- In den Backend-Logs gibt es keine aktuellen `cinematic`/`Hailuo` Treffer. Das bestätigt: Die Pipeline startet nicht, statt nur unsichtbar zu laufen.
+- Der aktuelle Code setzt den Status erst nach `ensureProject()` und `prepareSceneAnchor()`. Wenn einer dieser Schritte hängt/überschrieben wird, sieht der Nutzer keinerlei Fortschritt.
+- Außerdem kann `ensureProjectPersisted(project)` mit einem alten Parent-`project` arbeiten und die kurz zuvor gesetzten `engineOverride: 'cinematic-sync'` / `clipSource: 'ai-hailuo'` wieder überschreiben.
 
-Konkreter Ablauf im aktuellen Code (`ClipsTab.tsx`):
+## Umsetzung
+1. **Cinematic-Sync eigenen Startpfad geben**
+   - Nicht mehr über den normalen `handleGenerateSingle(scene)`-Pfad starten.
+   - Neue Funktion `handleStartCinematicSync(scene)` in `ClipsTab.tsx`.
+   - Diese Funktion setzt sofort lokal:
+     - `clipStatus: 'generating'`
+     - `engineOverride: 'cinematic-sync'`
+     - `clipSource: 'ai-hailuo'`
+     - optional `lipSyncStatus: 'pending'`
+   - Dadurch sieht der Nutzer direkt im Clip-Slot den Fortschritt, noch bevor langsame Zwischenschritte laufen.
 
-```text
-1. Dialog-Bestätigung → onUpdateScenes(updated)        ← React-State mit
-                                                        engineOverride='cinematic-sync'
-                                                        + clipSource='ai-hailuo'
-                                                        (debounced DB-Flush!)
-2. handleGenerateSingle(updatedTarget)                  ← passed-in scene IGNORIERT
-3. ensureProject() → onEnsurePersisted(project)         ← liest stale React-Closure
-                                                        → schreibt ALTE Werte
-                                                        (engine_override='auto')
-                                                        in DB
-4. targetScene = pScenes.find(s => s.orderIndex === ...) ← holt scene aus DB
-                                                        → engineOverride='auto'
-5. Backend `compose-video-clips`:
-   override='auto' + hasDialog + cast + 1 speaker → wantsHeygen = TRUE
-   → startet ERNEUT HeyGen-Render (identischer Output)
-   → Hailuo + Sync.so werden NIE aufgerufen
+2. **Persistenz ohne stale React-State**
+   - Vor dem Rendern wird gezielt nur diese Szene direkt in `composer_scenes` aktualisiert:
+     - `engine_override = 'cinematic-sync'`
+     - `clip_source = 'ai-hailuo'`
+     - `clip_status = 'generating'`
+     - `clip_url = null` oder alter Clip bleibt bewusst als Source-Preview erhalten, je nachdem was für die UI besser passt
+   - Danach wird der Payload aus dem lokal aktualisierten Scene-Objekt gebaut, nicht aus einem alten `project`-Snapshot.
+
+3. **Backend-Aufruf garantiert absetzen**
+   - `compose-video-clips` wird direkt mit `engineOverride: 'cinematic-sync'` und `clipSource: 'ai-hailuo'` aufgerufen.
+   - Falls `prepareSceneAnchor()` vorher länger dauert, bekommt die UI einen klaren Zwischenstatus wie „Szene wird vorbereitet…“.
+   - Fehler werden als Toast + roter Status angezeigt, statt still zu verschwinden.
+
+4. **Polling auch während Sync.so Phase aktiv halten**
+   - Polling darf nicht stoppen, sobald Hailuo `ready` ist, wenn `lipSyncStatus === 'running'` oder `engineOverride === 'cinematic-sync'` noch nicht fertig ist.
+   - So wird auch die zweite Phase sichtbar aktualisiert.
+
+5. **Button-Feedback verbessern**
+   - Während des Starts wird der Button disabled und zeigt Loader/Text wie „Cinematic-Sync startet…“.
+   - In der Szenenkarte wird zusätzlich ein Badge „Cinematic-Sync läuft“ angezeigt, nicht nur der normale „Fertig/Generiert…“-Status.
+
+## Technische Details
+- Änderung primär in `src/components/video-composer/ClipsTab.tsx`.
+- Kleine Ergänzung in `SceneClipProgress.tsx`, falls ein eigener `pending/preparing` LipSync-Status für die Overlay-Anzeige nötig ist.
+- Keine Datenbankmigration nötig, da die benötigten Felder bereits existieren (`engine_override`, `clip_source`, `clip_status`, `lip_sync_status`).
+
+## Validierung
+- Nach Klick muss im Network ein `compose-video-clips` Request erscheinen.
+- Request-Payload muss enthalten:
+```json
+{
+  "clipSource": "ai-hailuo",
+  "engineOverride": "cinematic-sync"
+}
 ```
-
-Resultat: User sieht eine neue HeyGen-Generierung mit demselben Avatar-vor-neutralem-Hintergrund. Die echte Szene wird nie gerendert, kein Lip-Sync läuft.
-
-## Fix
-
-**Datei: `src/components/video-composer/ClipsTab.tsx`**
-
-`handleGenerateSingle(scene)` so anpassen, dass es die `engineOverride` und `clipSource` aus dem **übergebenen** `scene`-Argument respektiert statt sie aus den frisch persistierten DB-Scenes zu überschreiben:
-
-- Nach `targetScene = pScenes.find(...) || scene` mergen:
-  ```ts
-  const effectiveTarget = {
-    ...targetScene,
-    engineOverride: scene.engineOverride ?? targetScene.engineOverride ?? 'auto',
-    clipSource: scene.clipSource ?? targetScene.clipSource,
-  };
-  ```
-- Im `compose-video-clips`-Body `effectiveTarget` statt `targetScene` verwenden (auch beim Anchor-Compose und Prompt-Compose).
-
-**Bonus-Hardening** im Cinematic-Switch-Click-Handler (Zeile 893–920):
-
-Bevor `handleGenerateSingle` aufgerufen wird, das Override **synchron in die DB schreiben**, damit auch zukünftige Reloads / Polls die richtige Engine sehen:
-
-```ts
-await supabase
-  .from('composer_scenes')
-  .update({ engine_override: 'cinematic-sync', clip_source: updatedTarget.clipSource })
-  .eq('id', t.id);
-```
-
-## Verifikation
-
-1. Auf einer fertigen HeyGen-Szene **„In echte Szene einbauen €0.95"** klicken → bestätigen.
-2. Network-Tab: `compose-video-clips` Request-Body muss `engineOverride: "cinematic-sync"` und `clipSource: "ai-hailuo"` enthalten.
-3. Edge-Function-Log sollte zeigen: `Cinematic-Sync scene … VO …s → extending to …s` und **keinen** HeyGen-Aufruf für diese Szene.
-4. UI: Phase-1-Overlay „🎬 Echte Szene wird gerendert" wird sichtbar (Hailuo läuft ~60s), danach Phase 2 „Lip-Sync läuft" (Sync.so).
-5. Nach ~2 Min: Toast „Cinematic-Sync fertig", neuer Clip zeigt Charakter in der echten Szene mit Lip-Sync.
-
-## Out of Scope
-
-- Multi-Speaker-Aufteilung (bleibt Storyboard-Tab Workflow)
-- Backend-Logik (`compose-video-clips`, `compose-lipsync-scene`) bleibt unverändert
-- Auto-Extend bleibt unverändert (funktioniert sobald das Override durchkommt)
+- Die Karte muss sofort auf Fortschritt wechseln.
+- Backend-Logs müssen Hailuo/Cinematic-Sync zeigen.
+- Nach Hailuo-Ready muss Sync.so automatisch starten und der Poller weiterlaufen.
