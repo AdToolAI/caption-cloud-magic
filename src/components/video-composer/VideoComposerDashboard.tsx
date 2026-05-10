@@ -130,7 +130,7 @@ const defaultProject: LocalProject = {
   scenes: [],
   assemblyConfig: {
     colorGrading: 'none',
-    transitionStyle: 'fade',
+    transitionStyle: 'crossfade',
     kineticText: false,
     voiceover: null,
     music: null,
