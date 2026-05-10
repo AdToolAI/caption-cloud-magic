@@ -186,7 +186,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   if (previewStatus === 'generating') {
     return (
       <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/20 to-transparent animate-[shimmer_2s_linear_infinite] [background-size:200%_100%]" />
+        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/30 to-amber-500/0 animate-pulse" />
         <Zap className="h-4 w-4 text-amber-400 relative z-10" />
         <span className="text-[9px] text-amber-300 font-medium relative z-10">Schnell-Vorschau läuft…</span>
         <span className="text-[8px] text-amber-300/70 relative z-10">~10 Sek.</span>
