@@ -1,83 +1,66 @@
-## Was ich gefunden habe
+## Problem (Root Cause)
 
-### 1. „Keine sichtbare Veränderung" – warum?
-Der Button **funktioniert technisch** korrekt:
-- `engineOverride: 'cinematic-sync'` + `clipSource: 'ai-hailuo'` werden gesetzt
-- `compose-video-clips` umgeht den HeyGen-Branch (richtig) und startet Hailuo i2v auf der echten Storyboard-Szene
-- Danach feuert `compose-lipsync-scene` automatisch (Sync.so)
+Beim Klick auf **„Cinematic-Sync starten €0.95"** passiert technisch nichts Sichtbares, weil das Override auf dem Weg zum Backend verloren geht.
 
-Aber: Im UI bleibt der **alte HeyGen-Avatar-Clip sichtbar**, bis Hailuo fertig ist (~60–90 s) und dann nochmal, bis Sync.so fertig ist (~60 s). Der einzige Hinweis ist der kleine grüne Toast oben rechts. Der Nutzer denkt, nichts passiert.
+Konkreter Ablauf im aktuellen Code (`ClipsTab.tsx`):
 
-### 2. „LipSync länger als Szene" – aktuell falsch gelöst
-`compose-lipsync-scene` Zeile 156: wenn VO > Szene, wird `sync_mode: 'cut_off'` gesetzt → **Audio wird abgeschnitten**. Du willst das Gegenteil: **Szene verlängern, damit VO komplett reinpasst**.
+```text
+1. Dialog-Bestätigung → onUpdateScenes(updated)        ← React-State mit
+                                                        engineOverride='cinematic-sync'
+                                                        + clipSource='ai-hailuo'
+                                                        (debounced DB-Flush!)
+2. handleGenerateSingle(updatedTarget)                  ← passed-in scene IGNORIERT
+3. ensureProject() → onEnsurePersisted(project)         ← liest stale React-Closure
+                                                        → schreibt ALTE Werte
+                                                        (engine_override='auto')
+                                                        in DB
+4. targetScene = pScenes.find(s => s.orderIndex === ...) ← holt scene aus DB
+                                                        → engineOverride='auto'
+5. Backend `compose-video-clips`:
+   override='auto' + hasDialog + cast + 1 speaker → wantsHeygen = TRUE
+   → startet ERNEUT HeyGen-Render (identischer Output)
+   → Hailuo + Sync.so werden NIE aufgerufen
+```
 
-### 3. Multi-Charakter-Flow – nein, so läuft es nicht
-Sync.so kann nur **eine Audiospur** auf das ganze Video legen → würde EINEN Charakter den kompletten Multi-Speaker-Dialog sprechen lassen. Daher lehnt `compose-lipsync-scene` Multi-Speaker-Szenen heute mit HTTP 409 ab. Der Pattern, den du beschreibst (Speaker 2 auf Output von Szene 1+Speaker 1), funktioniert mit Sync.so **nicht zuverlässig** – Sync.so findet automatisch das prominenteste Gesicht und würde wahrscheinlich wieder Charakter 1 lip-syncen.
+Resultat: User sieht eine neue HeyGen-Generierung mit demselben Avatar-vor-neutralem-Hintergrund. Die echte Szene wird nie gerendert, kein Lip-Sync läuft.
 
-Die saubere Lösung: Multi-Speaker-Szenen werden in **Shot-Reverse-Shot** zerlegt (eine Szene pro Sprecher, jede einzeln cinematic-synct).
+## Fix
 
----
+**Datei: `src/components/video-composer/ClipsTab.tsx`**
 
-## Plan
+`handleGenerateSingle(scene)` so anpassen, dass es die `engineOverride` und `clipSource` aus dem **übergebenen** `scene`-Argument respektiert statt sie aus den frisch persistierten DB-Scenes zu überschreiben:
 
-### A. Sichtbares Feedback während Cinematic-Sync (UI)
+- Nach `targetScene = pScenes.find(...) || scene` mergen:
+  ```ts
+  const effectiveTarget = {
+    ...targetScene,
+    engineOverride: scene.engineOverride ?? targetScene.engineOverride ?? 'auto',
+    clipSource: scene.clipSource ?? targetScene.clipSource,
+  };
+  ```
+- Im `compose-video-clips`-Body `effectiveTarget` statt `targetScene` verwenden (auch beim Anchor-Compose und Prompt-Compose).
 
-**Datei:** `src/components/video-composer/ClipsTab.tsx`
+**Bonus-Hardening** im Cinematic-Switch-Click-Handler (Zeile 893–920):
 
-- Neuer Klassifikator pro Szene: `isCinematicReRender = scene.engineOverride === 'cinematic-sync' && scene.clipStatus === 'generating'`
-- Über dem Video-Player ein **Overlay-Badge** mit Pulse-Animation:
-  > 🎬 Szene wird in echte Umgebung gerendert (Hailuo)… ~60 s
-- Sobald `clipStatus === 'ready'` UND `lip_sync_status === 'running'`: Overlay wechselt zu
-  > ✨ Lip-Sync wird auf neue Szene angewandt (Sync.so)… ~60 s
-- Sobald `lip_sync_status === 'done'`: Erfolgs-Toast „Cinematic-Sync fertig – Charakter ist jetzt in der echten Szene".
-- Polling: Schon vorhanden (`pollScenes`), aber `lip_sync_status` muss zur Select-Query hinzugefügt werden (aktuell fehlt es in der Polling-Query → Frontend bekommt es nie).
+Bevor `handleGenerateSingle` aufgerufen wird, das Override **synchron in die DB schreiben**, damit auch zukünftige Reloads / Polls die richtige Engine sehen:
 
-### B. Auto-Extend statt Cut-Off (Pipeline)
+```ts
+await supabase
+  .from('composer_scenes')
+  .update({ engine_override: 'cinematic-sync', clip_source: updatedTarget.clipSource })
+  .eq('id', t.id);
+```
 
-**Datei:** `supabase/functions/compose-video-clips/index.ts`
+## Verifikation
 
-Vor dem Hailuo-Dispatch für `engineOverride === 'cinematic-sync'`:
-1. VO-Dauer aus `scene_audio_clips` (kind='voiceover') laden
-2. Wenn `voDuration > scene.durationSeconds`:
-   - Neue Ziel-Dauer = `Math.ceil(voDuration + 0.4)` Sekunden Puffer
-   - Auf nächste Hailuo-erlaubte Dauer aufrunden (6s oder 10s lt. `hailuoVideoCredits.ts`)
-   - `scene.durationSeconds` für diesen Render auf neuen Wert setzen
-   - DB-Update: `composer_scenes.duration_seconds` persistieren + Hinweis im Console-Log
-   - Wenn VO > 10s (Hailuo-Limit): Szene auf 10s cappen UND `compose-lipsync-scene` darf weiterhin `cut_off` nutzen (mit Warn-Toast im UI)
+1. Auf einer fertigen HeyGen-Szene **„In echte Szene einbauen €0.95"** klicken → bestätigen.
+2. Network-Tab: `compose-video-clips` Request-Body muss `engineOverride: "cinematic-sync"` und `clipSource: "ai-hailuo"` enthalten.
+3. Edge-Function-Log sollte zeigen: `Cinematic-Sync scene … VO …s → extending to …s` und **keinen** HeyGen-Aufruf für diese Szene.
+4. UI: Phase-1-Overlay „🎬 Echte Szene wird gerendert" wird sichtbar (Hailuo läuft ~60s), danach Phase 2 „Lip-Sync läuft" (Sync.so).
+5. Nach ~2 Min: Toast „Cinematic-Sync fertig", neuer Clip zeigt Charakter in der echten Szene mit Lip-Sync.
 
-**Datei:** `supabase/functions/compose-lipsync-scene/index.ts`
+## Out of Scope
 
-- `sync_mode` Logik erhalten (Fallback bleibt nötig für >10s-Fälle), aber: nach erfolgreicher Auto-Extend-Pipeline ist `voDuration ≤ sceneDuration` und `loop` greift sauber.
-
-### C. Multi-Speaker im Cinematic-Sync klar erklären + Auto-Split anbieten
-
-**Datei:** `src/components/video-composer/ClipsTab.tsx`
-
-- Beim Klick auf „In echte Szene einbauen" auf einer Multi-Speaker-Szene (`countSpeakers(scene) > 1`):
-  - Confirm-Dialog erweitern: Warnung
-    > Diese Szene hat 2 Sprecher. Sync.so kann nur einen Charakter pro Clip lip-syncen. Bitte zerlege die Szene zuerst in eine Szene pro Sprecher (Shot-Reverse-Shot).
-  - Button „🎬 Cinematic-Sync starten" wird deaktiviert
-  - Optionaler Sekundär-Button „🪓 In Shot-Reverse-Shot zerlegen" – ruft bestehende Split-Logik auf (falls vorhanden, sonst Phase 2)
-
-**Datei:** `compose-lipsync-scene/index.ts`
-
-- 409-Antwort behält bisherige Message – passt schon.
-
-### D. Antwort an Nutzer (Doku im Hint-Banner)
-
-Den bestehenden Hint-Banner um einen Mini-FAQ erweitern:
-> ℹ️ Multi-Charakter-Szenen müssen in Einzel-Sprecher-Cuts zerlegt werden. Pro Cut wird Hailuo + Sync.so einmal ausgeführt – die Cuts werden danach in der Timeline aneinandergereiht (kein Layering möglich).
-
----
-
-## Technische Details
-
-| Bereich | Aufwand |
-|---|---|
-| Polling-Query erweitern (`lip_sync_status`) | 1 Zeile |
-| Overlay-Badges in ClipsTab | ~30 Zeilen JSX + CSS |
-| Auto-Extend-Logik | ~25 Zeilen in compose-video-clips, vor Hailuo-Branch |
-| Multi-Speaker-Guard im Confirm-Dialog | ~15 Zeilen |
-| FAQ-Banner-Update | 3 Zeilen |
-
-Keine DB-Migration nötig (`lip_sync_status` existiert bereits in `composer_scenes`).
+- Multi-Speaker-Aufteilung (bleibt Storyboard-Tab Workflow)
+- Backend-Logik (`compose-video-clips`, `compose-lipsync-scene`) bleibt unverändert
+- Auto-Extend bleibt unverändert (funktioniert sobald das Override durchkommt)

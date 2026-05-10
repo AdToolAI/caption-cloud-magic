@@ -588,8 +588,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       }
       const { projectId: pid, scenes: pScenes } = persisted;
 
-      // Find the up-to-date scene from persisted list (id may have been replaced)
-      const targetScene = pScenes.find(s => s.orderIndex === scene.orderIndex) || scene;
+      // Find the up-to-date scene from persisted list (id may have been replaced).
+      // CRITICAL: Merge engineOverride / clipSource from the *passed-in* scene
+      // so that callers like the Cinematic-Sync switch (which optimistically
+      // sets engineOverride='cinematic-sync' + clipSource='ai-hailuo' but
+      // hasn't flushed to DB yet) actually reach the backend with the new
+      // engine. Without this merge, the persisted DB row wins and the
+      // cinematic-switch silently re-renders the same HeyGen avatar.
+      const dbScene = pScenes.find(s => s.orderIndex === scene.orderIndex) || scene;
+      const targetScene: ComposerScene = {
+        ...dbScene,
+        engineOverride: scene.engineOverride ?? dbScene.engineOverride ?? 'auto',
+        clipSource: scene.clipSource ?? dbScene.clipSource,
+      };
 
       // Optimistic update
       if (targetScene.clipSource.startsWith('ai-')) {
@@ -892,21 +903,38 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                   {!isMultiSpeaker && (
                     <AlertDialogAction
-                      onClick={() => {
+                      onClick={async () => {
                         const t = cinematicSwitchTarget;
                         setCinematicSwitchTarget(null);
                         if (!t) return;
+                        const newClipSource = t.clipSource.startsWith('ai-') ? t.clipSource : 'ai-hailuo';
                         const updated: ComposerScene[] = scenes.map((s) =>
                           s.id === t.id
                             ? {
                                 ...s,
                                 engineOverride: 'cinematic-sync',
-                                clipSource: s.clipSource.startsWith('ai-') ? s.clipSource : 'ai-hailuo',
+                                clipSource: newClipSource,
                               }
                             : s,
                         );
                         onUpdateScenes(updated);
                         const updatedTarget = updated.find((s) => s.id === t.id) || t;
+
+                        // Hardening: persist override synchronously so polls /
+                        // reloads see the right engine even before the debounced
+                        // setScenes flush lands.
+                        try {
+                          await supabase
+                            .from('composer_scenes')
+                            .update({
+                              engine_override: 'cinematic-sync',
+                              clip_source: newClipSource,
+                            })
+                            .eq('id', t.id);
+                        } catch (err) {
+                          console.warn('[ClipsTab] cinematic-sync override persist failed:', err);
+                        }
+
                         handleGenerateSingle(updatedTarget);
                         toast({
                           title: 'Cinematic-Sync gestartet',
