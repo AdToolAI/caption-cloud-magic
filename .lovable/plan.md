@@ -1,43 +1,86 @@
-Do I know what the issue is? Ja.
+## Befund
 
-Das aktuelle Problem ist nicht mehr der Start des Renders: Die betroffene Szene hat bereits eine `clip_url` und eine `replicate_prediction_id`, bleibt aber in der Datenbank auf `clip_status='generating'` und `lip_sync_status='pending'`. Dadurch wartet das UI endlos, weil der nächste Schritt nur bei einem Statuswechsel auf `ready` startet. Zusätzlich ist `compose-clip-webhook` nicht explizit als öffentlicher Provider-Webhook konfiguriert; Replicate-Webhooks können keine Nutzer-Session mitschicken, daher muss dieser Callback ohne JWT erreichbar sein.
+Der aktuelle Cinematic-Sync macht nicht das, was die UI verspricht:
 
-Plan:
+- Die Szene wird zwar auf `cinematic-sync` gesetzt und mit Hailuo neu gerendert.
+- Es gibt aber in deinem aktuellen Projekt keine `scene_audio_clips` für diese Szenen; deshalb überspringt `compose-lipsync-scene` den Sync-Schritt mit `no_voiceover`.
+- Der Export/Preview erkennt die Szenen trotzdem als „eigene Stimme“ und mutet das globale Voiceover weg. Ergebnis: Clip läuft, aber ohne Sound.
+- Bei Multi-Charakter-Szenen kann der aktuelle Sync.so-Schritt nur eine Audiospur auf ein Gesicht anwenden. Er kann nicht zuverlässig mehrere Gesichter in einem einzigen Clip framegenau getrennt sprechen lassen.
+- Der Button „In echte Szene einbauen“ überspringt aktuell außerdem die vorhandene `compose-scene-anchor` Logik, die eigentlich alle gewählten Charaktere in die Wunschszene komponieren soll.
 
-1. Webhook-Konfiguration absichern
-   - In `supabase/config.toml` einen Funktionsblock für `compose-clip-webhook` ergänzen.
-   - `verify_jwt = false` setzen, damit externe Render-Provider den Abschluss-Webhook zuverlässig zustellen können.
-   - Optional kurze Timeouts nicht erhöhen, da der Webhook nur Status/Storage finalisiert.
+## Ziel
 
-2. Stuck-Scene-Self-Heal im Frontend einbauen
-   - In `ClipsTab.tsx` `pollScenes` erweitern:
-     - Wenn `clip_status='generating'`, aber `clip_url` bereits vorhanden ist, behandelt das UI die Szene als fertig gerendert.
-     - Für `engine_override='cinematic-sync'` wird dann automatisch der Lip-Sync-Schritt angestoßen.
-   - Damit bleibt eine Szene nicht mehr unbegrenzt auf „Wird generiert…“, falls der Webhook zwar teilweise/anderweitig Daten geschrieben hat, aber den Status nicht finalisiert hat.
+Cinematic-Sync soll nicht mehr „denselben/ähnlichen Clip ohne Voiceover“ erzeugen, sondern eine echte Produktions-Pipeline:
 
-3. Webhook robuster machen
-   - In `compose-clip-webhook` beim erfolgreichen Rendern `lip_sync_status` für Cinematic-Sync nicht blockierend lassen, sondern sauber für den nächsten Schritt vorbereiten.
-   - `clip_error` beim erfolgreichen Clip leeren, damit alte HeyGen-Fehler wie „Talking Photo deleted“ nicht neben einem neuen Hailuo-Render stehen bleiben.
+```text
+Charakter-Auswahl + Wunschszene
+        ↓
+Scene Anchor: alle gewählten Charaktere sichtbar in der gewünschten Komposition
+        ↓
+Hailuo I2V: echte Szene aus diesem Anchor rendern
+        ↓
+Voiceover sicherstellen
+        ↓
+Lip-Sync nur wenn technisch valide
+        ↓
+Preview/Export spielt genau eine korrekte Tonspur
+```
 
-4. Lip-Sync-Trigger zuverlässig machen
-   - `compose-lipsync-scene` darf bei fehlender Voiceover-Datei nicht endlos „pending“ lassen.
-   - Wenn kein Voiceover vorhanden ist, wird die Szene als nutzbarer Hailuo-Clip fertig angezeigt statt ewig zu warten.
-   - Falls ein echter Sync.so-Fehler passiert, wird `lip_sync_status='failed'` gesetzt und die UI zeigt einen klaren Fehler statt endloser Generierung.
+## Plan
 
-5. Einmalige Reparatur für aktuell hängende Szene
-   - Die aktuelle hängende Szene mit vorhandener `clip_url` wird aus `generating/pending` herausgeholt.
-   - Wenn Voiceover vorhanden ist: Lip-Sync wird neu angestoßen.
-   - Wenn kein Voiceover vorhanden ist: Szene wird auf `ready` gesetzt, damit du weiterarbeiten kannst.
+1. **Cinematic-Sync Startpfad korrigieren**
+   - `handleStartCinematicSync` nutzt wieder `prepareSceneAnchor()` statt es zu umgehen.
+   - Multi-Character-Scenes senden alle Portraits an `compose-scene-anchor`, damit die erste Frame-Komposition wirklich alle gewählten Charaktere in der Wunschszene zeigt.
+   - Die generierte Anchor-URL wird als `referenceImageUrl` persistiert, damit Hailuo daraus die echte Szene rendert.
 
-Erwartetes Ergebnis:
-- Nach einem Hailuo-Render bleibt die Szene nicht mehr 10+ Minuten im Spinner hängen.
-- Cinematic-Sync geht automatisch in den Lip-Sync-Schritt oder zeigt einen echten Fehler.
-- Bereits hängende Szenen werden beim nächsten Poll/Reload automatisch repariert.
+2. **Voiceover-Quelle reparieren**
+   - Vor `compose-lipsync-scene` wird geprüft, ob eine Szene tatsächlich eine per-scene Voiceover-Datei hat.
+   - Wenn keine `scene_audio_clips` existieren, wird aus `audioPlan.speakers[].audioUrl` automatisch ein Voiceover-Clip gespiegelt.
+   - Wenn weder `scene_audio_clips` noch `audioPlan` existieren, wird Cinematic-Sync nicht als „fertig“ markiert, sondern zeigt eine klare Aktion: erst Voiceover/Lip-Sync erzeugen.
 
-<lov-actions>
-  <lov-open-history>View History</lov-open-history>
-</lov-actions>
+3. **Keine falsche Stummschaltung mehr**
+   - Preview/Export sollen das globale Voiceover nicht stummschalten, nur weil `lipSyncWithVoiceover=true` gesetzt ist.
+   - Stummschalten nur noch, wenn wirklich eingebetteter Lip-Sync existiert (`lipSyncAppliedAt`) oder eine per-scene Voiceover-Datei vorhanden ist.
+   - Dadurch verschwinden die „beide Lip-Syncs nacheinander ohne Sound“-Effekte.
 
-<lov-actions>
-<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-</lov-actions>
+4. **Lip-Sync State Machine absichern**
+   - Die Self-Heal-Logik darf eine Cinematic-Sync-Szene mit `clip_url` nicht vorschnell als final fertig behandeln, solange `lip_sync_status='pending' | 'running'` ist.
+   - Sie soll stattdessen den nächsten Schritt starten oder einen klaren Fehler anzeigen.
+   - `compose-lipsync-scene` soll bei `no_voiceover` nicht still „ready/skipped“ setzen, sondern einen für die UI verständlichen Status/Fehler liefern.
+
+5. **Multi-Charakter ehrlich und professionell routen**
+   - Für mehrere sprechende Charaktere wird der bestehende Shot-Reverse-Shot-Flow genutzt: pro Sprecher eine eigene Szene/ein eigener Cut, mit eigenem Voiceover und eigenem Lip-Sync.
+   - Für „alle Charaktere gleichzeitig sichtbar“ wird die Hailuo-Szene mit allen Charakteren gerendert; echte framegenaue Lippenbewegung für mehrere Gesichter in einem einzigen Clip wird nicht vorgetäuscht.
+   - Die UI soll das klar trennen: „Ensemble-Shot“ vs. „sprechender Lip-Sync-Cut“.
+
+6. **Aktuelle defekte Projektdaten bereinigen**
+   - Für dein aktuelles Projekt werden die betroffenen Szenen aus `skipped/ready ohne Audio` zurück in einen sauberen Zustand gebracht.
+   - Vorhandene Clip-URLs bleiben erhalten, aber falsche `lipSyncWithVoiceover`/`lipSyncStatus` Zustände werden korrigiert, damit Preview und Weiter-Tab nicht mehr stumm/doppelt laufen.
+
+## Technische Details
+
+Betroffene Bereiche:
+
+- `src/components/video-composer/ClipsTab.tsx`
+  - Cinematic-Sync Startpfad
+  - Polling/Self-Heal
+  - Auto-Trigger Lip-Sync
+
+- `src/components/video-composer/ComposerSequencePreview.tsx`
+  - Audio-Muting-Regeln
+
+- `supabase/functions/compose-lipsync-scene/index.ts`
+  - Kein stilles `skipped` als „ready“ bei fehlendem Voiceover
+  - Fallback auf AudioPlan/gespiegelte Voiceover-Quelle vorbereiten
+
+- Datenreparatur für Projekt `6f448619-7af6-4ed5-902c-dde6f5973ba5`
+  - Falsche `skipped`/`lip_sync_with_voiceover` Zustände korrigieren
+
+## Ergebnis
+
+Nach der Änderung ist die Funktion nicht mehr irreführend:
+
+- Ensemble-Szenen zeigen alle ausgewählten Charaktere in der Wunschszene.
+- Single-Speaker Cinematic-Sync bekommt echte Audioquelle und kann sauber lip-synced werden.
+- Multi-Speaker wird professionell als Shot-Reverse-Shot geroutet statt technisch unmöglichen Multi-Face-Lip-Sync in einem Clip zu simulieren.
+- Preview und Export spielen wieder Sound korrekt und nicht doppelt/stumm.
