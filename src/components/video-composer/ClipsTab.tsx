@@ -844,9 +844,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       );
       onUpdateScenes(rolledBack);
       console.error('[ClipsTab] handleGenerateSingle failed', err);
+      const realMsg = await extractFunctionsError(err);
       toast({
         title: 'Fehler',
-        description: err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
+        description: realMsg || err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
         variant: 'destructive',
       });
     } finally {
