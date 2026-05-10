@@ -355,6 +355,10 @@ export default function VideoComposerDashboard() {
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
             previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
             previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
+            seed: ((row as any).seed as any) ?? local?.seed ?? null,
+            seedVariations: Array.isArray((row as any).seed_variations)
+              ? ((row as any).seed_variations as any)
+              : (local?.seedVariations ?? []),
           };
         });
 
@@ -475,6 +479,10 @@ export default function VideoComposerDashboard() {
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
             previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
             previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
+            seed: ((row as any).seed as any) ?? local?.seed ?? null,
+            seedVariations: Array.isArray((row as any).seed_variations)
+              ? ((row as any).seed_variations as any)
+              : (local?.seedVariations ?? []),
           };
         });
         const merged = [...dbScenes, ...localOnly]
