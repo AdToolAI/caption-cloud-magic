@@ -110,6 +110,33 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
 
+  // ── Two-Shot Hook pipeline (6-stage progress) ────────────────────────────
+  // Active whenever the audio-plan has ≥ 2 speakers (multi-character dialog).
+  // Stages are written by `compose-twoshot-audio`, `compose-video-clips` and
+  // `compose-twoshot-lipsync`. We render an overlay with a 6-step bar so the
+  // user can see exactly where the pipeline is in real time.
+  const speakerCount = scene.audioPlan?.speakers?.length ?? 0;
+  const isTwoShot = speakerCount >= 2;
+  const twoshotStage = scene.twoshotStage ?? null;
+  const TWO_SHOT_STAGES: Array<{ key: NonNullable<typeof twoshotStage>; label: string }> = [
+    { key: 'audio', label: 'Voiceover' },
+    { key: 'anchor', label: 'Anchor' },
+    { key: 'master_clip', label: 'Master-Clip' },
+    { key: 'lipsync_1', label: 'Lip-Sync 1/2' },
+    { key: 'lipsync_2', label: 'Lip-Sync 2/2' },
+    { key: 'continuity', label: 'Continuity' },
+  ];
+  const stageIndex = (() => {
+    if (!twoshotStage || twoshotStage === 'done') return -1;
+    return TWO_SHOT_STAGES.findIndex((s) => s.key === twoshotStage);
+  })();
+  const currentStageLabel = stageIndex >= 0 ? TWO_SHOT_STAGES[stageIndex].label : null;
+  const showTwoShotOverlay =
+    isTwoShot &&
+    twoshotStage &&
+    twoshotStage !== 'done' &&
+    !hqReady; // once HQ is ready (and stage = done) we hide the bar
+
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
     if (isImageScene) {
