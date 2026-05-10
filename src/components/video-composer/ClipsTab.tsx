@@ -991,7 +991,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
-                    {/* Save single scene to media library (manual, no auto-save) */}
+                    {/* Cinematic-Sync Switch — Artlist-style: render real scene with Hailuo + auto lip-sync */}
+                    {scene.clipStatus === 'ready' && isHeygen && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-[10px] h-7 px-2 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                        title="Statt HeyGen-Avatar wird die echte Wunsch-Szene mit Hailuo gerendert und der Charakter darin lip-synct (Artlist-Pipeline). ~€0.95 statt €0.30."
+                        disabled={isThisGenerating}
+                        onClick={() => setCinematicSwitchTarget(scene)}
+                      >
+                        <Clapperboard className="h-3 w-3" />
+                        In echte Szene einbauen €0.95
+                      </Button>
+                    )}
                     {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
                       const isSaved = savedSceneIds.has(scene.id);
                       const isSaving = savingSceneId === scene.id;
