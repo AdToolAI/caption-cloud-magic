@@ -242,6 +242,13 @@ export default function RenderPipelinePanel({
           </div>
         )}
       </CardContent>
+
+      <RenderPreFlightDialog
+        open={preflightOpen}
+        onOpenChange={setPreflightOpen}
+        scenes={scenes}
+        onConfirm={() => startPipeline('directors_cut')}
+      />
     </Card>
   );
 }
