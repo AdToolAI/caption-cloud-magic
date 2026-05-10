@@ -26,6 +26,11 @@ interface Props {
   referenceImageUrl?: string;
   /** Existing brand-character / location reference to guide composition. */
   composeHintImageUrl?: string;
+  /** Phase 3 — multiple references auto-injected from @character/@location mentions
+   *  (max 4). Sent to Nano Banana 2 as a multi-image content array. */
+  composeHintImageUrls?: string[];
+  /** Phase 3 — labels of injected entities, shown as pills under the header. */
+  injectedLabels?: Array<{ kind: 'character' | 'location'; name: string; thumb?: string }>;
   selectedReferenceUrl?: string;
   onPick: (url: string) => void;
   language?: 'en' | 'de' | 'es';
