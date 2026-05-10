@@ -43,8 +43,35 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
 
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
+  const [trimOpen, setTrimOpen] = useState(false);
   const variantCount = (scene.seedVariations ?? []).length;
   const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
+
+  // Phase 5.5 — Auto-detect lead-in freeze ONCE per clipUrl, only for i2v
+  // providers that haven't been trimmed yet (clip_lead_in_trim_seconds === 0).
+  // The compose-video-clips function seeds a heuristic default; we only run
+  // when that heuristic returned 0 and the clip looks i2v.
+  const autoDetectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const url = scene.clipUrl;
+    if (!url) return;
+    if (autoDetectedRef.current === url) return;
+    if ((scene.clipLeadInTrimSeconds ?? 0) > 0) return;
+    if (!I2V_PROVIDERS.includes(scene.clipSource)) return;
+    if (scene.clipStatus !== 'ready') return;
+    autoDetectedRef.current = url;
+    (async () => {
+      try {
+        const { trimSeconds } = await detectLeadInTrim(url);
+        if (trimSeconds > 0) {
+          await supabase
+            .from('composer_scenes')
+            .update({ clip_lead_in_trim_seconds: trimSeconds })
+            .eq('id', scene.id);
+        }
+      } catch { /* silent — Smart-Trim is opt-in best-effort */ }
+    })();
+  }, [scene.clipUrl, scene.clipStatus, scene.clipSource, scene.clipLeadInTrimSeconds, scene.id]);
 
   const triggerFastPreview = async () => {
     if (busy) return;
