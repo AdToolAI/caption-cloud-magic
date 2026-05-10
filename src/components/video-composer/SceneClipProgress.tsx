@@ -119,25 +119,42 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       );
     }
     const trim = Math.max(0, Number(scene.clipLeadInTrimSeconds ?? 0));
+    const showTrimButton = I2V_PROVIDERS.includes(scene.clipSource);
     return (
-      <video
-        src={scene.clipUrl}
-        className="w-full h-full object-cover"
-        controls
-        playsInline
-        preload="metadata"
-        onLoadedMetadata={(e) => {
-          const el = e.currentTarget;
-          try { el.volume = 0.9; } catch { /* noop */ }
-          if (trim > 0) {
-            try {
-              if (isFinite(el.duration) && trim < el.duration - 0.1) {
-                el.currentTime = trim;
+      <>
+        <div className="relative w-full h-full">
+          <video
+            src={scene.clipUrl}
+            className="w-full h-full object-cover"
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              try { el.volume = 0.9; } catch { /* noop */ }
+              if (trim > 0) {
+                try {
+                  if (isFinite(el.duration) && trim < el.duration - 0.1) {
+                    el.currentTime = trim;
+                  }
+                } catch { /* noop */ }
               }
-            } catch { /* noop */ }
-          }
-        }}
-      />
+            }}
+          />
+          {showTrimButton && (
+            <button
+              type="button"
+              onClick={() => setTrimOpen(true)}
+              className="absolute top-1 right-1 bg-black/70 hover:bg-black/90 text-amber-300 rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 border border-amber-500/40 shadow"
+              title={trim > 0 ? `Lead-In: ${trim.toFixed(2)}s — anpassen` : 'Smart-Trim öffnen'}
+            >
+              <Scissors className="h-2.5 w-2.5" />
+              {trim > 0 ? `${trim.toFixed(2)}s` : 'Trim'}
+            </button>
+          )}
+        </div>
+        <LeadInTrimSheet scene={scene} open={trimOpen} onOpenChange={setTrimOpen} />
+      </>
     );
   }
 
