@@ -23,6 +23,7 @@ import { MediaAlbumManager } from "@/components/media-library/MediaAlbumManager"
 import { motion, AnimatePresence } from "framer-motion";
 import { useCloudStorage } from "@/hooks/useCloudStorage";
 import { enforceLimits, deleteMediaItem, type CleanupMediaItem } from "@/lib/media-library/autoCleanup";
+import { LicenseButton } from "@/components/licensing/LicenseButton";
 
 // Storage Limits
 const MAX_VIDEOS = 500;
@@ -1265,6 +1266,31 @@ export default function MediaLibrary() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>In Album speichern</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div>
+                          <LicenseButton
+                            size="icon"
+                            variant="secondary"
+                            asset_type={item.type === 'video' ? 'video' : item.type === 'image' ? 'image' : 'asset'}
+                            asset_id={item.id}
+                            asset_title={item.title || item.storagePath?.split('/').pop() || 'Media Asset'}
+                            asset_thumbnail_url={item.url}
+                            asset_source_url={item.url}
+                            source_provider={
+                              item.source === 'upload' ? 'own-generation' :
+                              item.source === 'ai' || item.source === 'ai_generator' ? (item.type === 'video' ? 'replicate-video' : 'replicate-image') :
+                              item.source === 'video-creator' ? 'replicate-video' :
+                              'own-generation'
+                            }
+                            license_tier="commercial"
+                            metadata={{ source: item.source, type: item.type }}
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>Lizenz-Zertifikat</TooltipContent>
                     </Tooltip>
                     
                     <Tooltip>
