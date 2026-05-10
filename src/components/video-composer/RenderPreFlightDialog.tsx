@@ -68,12 +68,12 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
 
   scenes.forEach((s, i) => {
     const idx = i + 1;
-    const hasPrompt = !!(s.prompt && s.prompt.trim().length >= 4);
+    const promptText = (s.aiPrompt ?? '').trim();
+    const hasPrompt = promptText.length >= 4;
     const hasAsset =
       !!s.clipUrl ||
       !!s.uploadUrl ||
       !!s.referenceImageUrl ||
-      !!s.imageUrl ||
       s.clipStatus === 'ready';
 
     // Blocker: AI scene with neither prompt nor asset
