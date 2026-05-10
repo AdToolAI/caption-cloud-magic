@@ -353,6 +353,8 @@ export default function VideoComposerDashboard() {
               : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
+            previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
+            previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
           };
         });
 
@@ -471,6 +473,8 @@ export default function VideoComposerDashboard() {
               : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
+            previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
+            previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
           };
         });
         const merged = [...dbScenes, ...localOnly]
