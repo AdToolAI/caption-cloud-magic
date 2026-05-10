@@ -11740,6 +11740,42 @@ export type Database = {
         }
         Relationships: []
       }
+      sfx_library_cache: {
+        Row: {
+          cache_key: string
+          category: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          query: string
+          result_count: number
+          results: Json
+          source: string
+        }
+        Insert: {
+          cache_key: string
+          category?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          query: string
+          result_count?: number
+          results?: Json
+          source: string
+        }
+        Update: {
+          cache_key?: string
+          category?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          query?: string
+          result_count?: number
+          results?: Json
+          source?: string
+        }
+        Relationships: []
+      }
       smoke_test_runs: {
         Row: {
           error_message: string | null
