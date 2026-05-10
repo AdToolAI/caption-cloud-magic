@@ -19,7 +19,7 @@
  */
 import type { ComposerScene } from '@/types/video-composer';
 
-export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'broll';
+export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'cinematic-sync' | 'broll';
 
 export interface EngineRecommendation {
   engine: SceneEngine;
