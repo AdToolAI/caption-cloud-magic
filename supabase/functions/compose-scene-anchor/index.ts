@@ -214,6 +214,25 @@ serve(async (req) => {
         { onConflict: "scene_id,portrait_hash,prompt_hash" },
       );
 
+    // For multi-portrait Two-Shot anchors, ALSO persist the composed URL as
+    // `lock_reference_url` on the scene so the Continuity Guardian can
+    // compare the rendered clip against it. Single-character anchors stay
+    // out of lock_reference_url to avoid clobbering manually pinned refs.
+    if (portraits.length >= 2) {
+      try {
+        await admin
+          .from("composer_scenes")
+          .update({
+            lock_reference_url: composedUrl,
+            twoshot_stage: "anchor",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", body.sceneId);
+      } catch (e) {
+        console.warn("[compose-scene-anchor] lock_reference_url persist failed (non-fatal)", e);
+      }
+    }
+
     return new Response(
       JSON.stringify({ composedUrl, cached: false, strategy: "first-frame-composed" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
