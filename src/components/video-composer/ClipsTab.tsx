@@ -8,6 +8,7 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
+import { extractFunctionsError } from '@/lib/functionsError';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
