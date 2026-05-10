@@ -148,13 +148,19 @@ serve(async (req) => {
 
     try {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
+      // If the VO is longer than the source clip, use `cut_off` so Sync.so
+      // truncates instead of looping the audio (which produces double-speak
+      // artefacts). Default to `loop` for short VOs that need to fill the clip.
+      const sceneDuration = (scene as any).duration_seconds ?? 0;
+      const voDuration = vo.duration ?? 0;
+      const syncMode = voDuration > sceneDuration + 0.2 ? 'cut_off' : 'loop';
       const output = await replicate.run(
         "sync/lipsync-2" as `${string}/${string}`,
         {
           input: {
             video: sourceClipUrl,
             audio: vo.url,
-            sync_mode: "loop",
+            sync_mode: syncMode,
           },
         },
       );
