@@ -247,18 +247,15 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     // "ready". Verhindert das endlose "Wird generiert…" nach gelegentlichen
     // Webhook-Drops.
     //
-    // EXCEPTION: Cinematic-Sync szenen NICHT vorschnell als ready markieren —
-    // dort ist `clip_url` nur das Hailuo-Zwischenresultat; Sync.so muss noch
-    // laufen. Self-heal nur, wenn lip_sync bereits final ist (done/failed/no_voiceover).
+    // Cinematic-Sync: Hailuo-Render UND Lip-Sync sind getrennte Phasen.
+    // Sobald clip_url existiert, ist der Hailuo-Render fertig — die Szene
+    // muss als clip_status='ready' markiert werden, auch wenn der Lip-Sync
+    // noch läuft / pending ist. Die UI zeigt den Lip-Sync-Status separat.
     const stuck = (data as any[]).filter(
       (d) =>
         d.clip_status === 'generating' &&
         typeof d.clip_url === 'string' &&
-        d.clip_url.length > 0 &&
-        !(
-          d.engine_override === 'cinematic-sync' &&
-          (d.lip_sync_status === 'pending' || d.lip_sync_status === 'running')
-        ),
+        d.clip_url.length > 0,
     );
     if (stuck.length > 0) {
       await Promise.all(
@@ -271,6 +268,45 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       );
       stuck.forEach((d) => {
         d.clip_status = 'ready';
+        d.clip_error = null;
+      });
+    }
+
+    // ── Cinematic-Sync Auto-Trigger (state-based, not transition-based) ───
+    // Wenn eine Cinematic-Sync-Szene clip_url hat und lip_sync_status noch
+    // 'pending' ist, starten wir den Lip-Sync — auch nach einem Page-Reload,
+    // wo es keinen generating→ready Übergang mehr gibt.
+    const lipSyncCandidates = (data as any[]).filter(
+      (d) =>
+        d.engine_override === 'cinematic-sync' &&
+        typeof d.clip_url === 'string' &&
+        d.clip_url.length > 0 &&
+        d.lip_sync_status === 'pending' &&
+        !d.lip_sync_applied_at,
+    );
+    if (lipSyncCandidates.length > 0) {
+      // Optimistisch auf 'running' setzen, damit derselbe Browser-Tick nicht
+      // mehrfach startet.
+      await Promise.all(
+        lipSyncCandidates.map((d) =>
+          supabase
+            .from('composer_scenes')
+            .update({ lip_sync_status: 'running' })
+            .eq('id', d.id),
+        ),
+      );
+      lipSyncCandidates.forEach((d) => {
+        console.info(`[ClipsTab] State-based auto-triggering lip-sync for ${d.id}`);
+        supabase.functions
+          .invoke('compose-lipsync-scene', { body: { scene_id: d.id } })
+          .then(({ data: lsData, error: lsErr }) => {
+            if (lsErr) {
+              console.warn(`[ClipsTab] state-based lip-sync invoke failed for ${d.id}`, lsErr);
+            } else if (lsData?.error === 'no_voiceover') {
+              // Edge function already wrote no_voiceover state.
+              console.info(`[ClipsTab] lip-sync ${d.id} → no_voiceover`);
+            }
+          });
       });
     }
 
