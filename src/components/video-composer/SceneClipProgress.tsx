@@ -192,6 +192,14 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               {trim > 0 ? `${trim.toFixed(2)}s` : 'Trim'}
             </button>
           )}
+          {isTwoShot && twoshotStage === 'done' && typeof scene.continuityDriftScore === 'number' && scene.continuityDriftScore > 0.35 && (
+            <div
+              className="absolute bottom-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold flex items-center gap-1 shadow"
+              title={`Continuity-Drift ${scene.continuityDriftScore.toFixed(2)} — Charakter-Identität weicht vom Anchor ab. Re-Render empfohlen.`}
+            >
+              ⚠ Drift {scene.continuityDriftScore.toFixed(2)}
+            </div>
+          )}
         </div>
         <LeadInTrimSheet scene={scene} open={trimOpen} onOpenChange={setTrimOpen} />
       </>
