@@ -292,7 +292,20 @@ export default function StoryboardTab({
     });
   };
 
+  const { pushEntry: pushHistoryEntry } = useComposerHistoryContext();
+
   const deleteScene = (id: string) => {
+    const target = scenes.find((s) => s.id === id);
+    if (target?.projectId) {
+      // Phase 5.6 — record before-state so Cmd+Z can restore the deleted scene
+      pushHistoryEntry({
+        projectId: target.projectId,
+        sceneId: target.id,
+        actionType: 'delete-scene',
+        label: `Szene ${target.orderIndex + 1} gelöscht`,
+        beforeState: sceneToSnakeSnapshot(target),
+      }).catch(() => { /* non-fatal */ });
+    }
     onUpdateScenes(
       scenes
         .filter((s) => s.id !== id)
