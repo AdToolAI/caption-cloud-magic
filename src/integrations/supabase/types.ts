@@ -12393,6 +12393,36 @@ export type Database = {
         }
         Relationships: []
       }
+      stock_video_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          filters: Json | null
+          id: string
+          payload: Json
+          query: string | null
+          query_hash: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          filters?: Json | null
+          id?: string
+          payload: Json
+          query?: string | null
+          query_hash: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          filters?: Json | null
+          id?: string
+          payload?: Json
+          query?: string | null
+          query_hash?: string
+        }
+        Relationships: []
+      }
       storage_files: {
         Row: {
           bucket_name: string
@@ -14792,6 +14822,66 @@ export type Database = {
           total_active_days?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_video_library: {
+        Row: {
+          asset_type: string
+          created_at: string
+          download_url: string
+          duration_sec: number | null
+          external_id: string
+          fps: number | null
+          height: number | null
+          id: string
+          is_favorite: boolean
+          metadata: Json | null
+          preview_url: string | null
+          source: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string | null
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          asset_type?: string
+          created_at?: string
+          download_url: string
+          duration_sec?: number | null
+          external_id: string
+          fps?: number | null
+          height?: number | null
+          id?: string
+          is_favorite?: boolean
+          metadata?: Json | null
+          preview_url?: string | null
+          source: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string | null
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          asset_type?: string
+          created_at?: string
+          download_url?: string
+          duration_sec?: number | null
+          external_id?: string
+          fps?: number | null
+          height?: number | null
+          id?: string
+          is_favorite?: boolean
+          metadata?: Json | null
+          preview_url?: string | null
+          source?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string | null
+          user_id?: string
+          width?: number | null
         }
         Relationships: []
       }
