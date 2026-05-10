@@ -91,6 +91,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
       { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store },
       { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon },
+      { route: "/my-licenses", titleKey: "My Licenses", descKey: "PDF-Lizenz-Zertifikate für alle deine Assets — wie Envato/Artlist", icon: FileBadge2 },
     ],
   },
   {
