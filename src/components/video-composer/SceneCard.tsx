@@ -1441,17 +1441,60 @@ export default function SceneCard({
                           : 'Step 1 — freeze the frame first'}
                       </div>
                     )}
-                    <SceneStillFrameStudio
-                      projectId={projectId}
-                      sceneId={scene.id}
-                      prompt={scene.aiPrompt || ''}
-                      composeHintImageUrl={
-                        activeBrandChar?.reference_image_url ?? scene.referenceImageUrl
+                    {(() => {
+                      // Phase 3 — Auto-inject @character / @location reference images into still generation.
+                      const mentions = (() => {
+                        try {
+                          // Lazy require to avoid circular bundle
+                          // eslint-disable-next-line @typescript-eslint/no-require-imports
+                          const { findMentions } = require('@/lib/motion-studio/mentionParser');
+                          return findMentions(scene.aiPrompt || '', libCharacters, libLocations) as Array<{
+                            kind: 'character' | 'location'; id: string; name: string;
+                          }>;
+                        } catch { return []; }
+                      })();
+                      const seenIds = new Set<string>();
+                      const injectedHints: Array<{ url?: string; kind: 'character' | 'location'; name: string }> = [];
+                      for (const m of mentions) {
+                        if (seenIds.has(m.id)) continue;
+                        seenIds.add(m.id);
+                        const ent = m.kind === 'character'
+                          ? libCharacters.find((c) => c.id === m.id)
+                          : libLocations.find((l) => l.id === m.id);
+                        if (ent?.reference_image_url) {
+                          injectedHints.push({ url: ent.reference_image_url, kind: m.kind, name: ent.name });
+                        }
                       }
-                      selectedReferenceUrl={scene.referenceImageUrl}
-                      onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                      language={lang as 'en' | 'de' | 'es'}
-                    />
+                      // Always seed with the brand character (if scene features them) so a
+                      // plain prompt without @-mention still gets character lock.
+                      if (
+                        activeBrandChar?.reference_image_url &&
+                        sceneFeaturesCharacter(scene, { name: activeBrandChar.name }) &&
+                        !injectedHints.some((h) => h.url === activeBrandChar.reference_image_url)
+                      ) {
+                        injectedHints.unshift({
+                          url: activeBrandChar.reference_image_url,
+                          kind: 'character',
+                          name: activeBrandChar.name,
+                        });
+                      }
+                      const composeUrls = injectedHints.map((h) => h.url!).filter(Boolean);
+                      const fallbackHint = scene.referenceImageUrl;
+                      const labels = injectedHints.map((h) => ({ kind: h.kind, name: h.name, thumb: h.url }));
+                      return (
+                        <SceneStillFrameStudio
+                          projectId={projectId}
+                          sceneId={scene.id}
+                          prompt={scene.aiPrompt || ''}
+                          composeHintImageUrl={composeUrls[0] ?? fallbackHint}
+                          composeHintImageUrls={composeUrls.length > 0 ? composeUrls : undefined}
+                          injectedLabels={labels}
+                          selectedReferenceUrl={scene.referenceImageUrl}
+                          onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                          language={lang as 'en' | 'de' | 'es'}
+                        />
+                      );
+                    })()}
                   </div>
                 )}
                 <SceneReferenceImageUpload
