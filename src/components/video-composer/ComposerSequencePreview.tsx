@@ -661,6 +661,7 @@ export default function ComposerSequencePreview({
     const hasEmbeddedAudio = playable.some(
       (s) =>
         s.lipSyncWithVoiceover === true ||
+        !!s.lipSyncAppliedAt ||
         (s.clipSource as string) === 'ai-heygen' ||
         s.clipSource === 'upload',
     );
