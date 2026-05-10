@@ -722,6 +722,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     const newClipSource: ComposerScene['clipSource'] =
       scene.clipSource.startsWith('ai-') ? scene.clipSource : 'ai-hailuo';
 
+    const isUuid = (v?: string) =>
+      !!v && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
     // 1. Optimistic UI — flip status, engine + source RIGHT NOW so the user
     //    sees immediate feedback regardless of how slow the backend is.
     const optimistic = scenes.map((s) =>
@@ -738,42 +741,41 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     onUpdateScenes(optimistic);
 
     try {
-      // 2. Persist the engine + source override + status to DB synchronously
-      //    so the backend sees the right engine and polling won't roll us back.
+      // 2. Resolve the persisted scene id + project id WITHOUT rewriting the
+      //    full project (the old path called ensureProjectPersisted(project),
+      //    which writes a stale `project.scenes` snapshot back to DB and
+      //    silently reverted engine_override/clip_source/clip_status — that
+      //    was the root cause of "render starts and disappears").
+      let pid = projectId;
+      let targetSceneId = scene.id;
+      let dbScene: ComposerScene = { ...scene, ...optimistic.find((s) => s.id === scene.id) } as ComposerScene;
+
+      if (!isUuid(targetSceneId) || !pid) {
+        // Only when we truly don't have a persisted row yet do we fall back
+        // to the full project save — and we re-apply our overrides afterwards.
+        const persisted = await ensureProject();
+        if (!persisted) throw new Error('Projekt konnte nicht gespeichert werden');
+        pid = persisted.projectId;
+        const remapped =
+          persisted.scenes.find((s) => s.orderIndex === scene.orderIndex) ?? scene;
+        targetSceneId = remapped.id;
+        dbScene = { ...remapped };
+      }
+
+      // 3. Persist the engine + source override + status for THIS scene only.
+      //    Single-row update — no risk of clobbering anything else.
       const { error: persistErr } = await supabase
         .from('composer_scenes')
         .update({
           engine_override: 'cinematic-sync',
           clip_source: newClipSource,
           clip_status: 'generating',
+          lip_sync_status: 'pending',
+          lip_sync_with_voiceover: true,
         })
-        .eq('id', scene.id);
+        .eq('id', targetSceneId);
       if (persistErr) {
         console.warn('[ClipsTab] cinematic-sync DB persist failed:', persistErr);
-      }
-
-      // 3. Make sure the project exists (creates row + remaps scene IDs if needed).
-      const persisted = await ensureProject();
-      if (!persisted) throw new Error('Projekt konnte nicht gespeichert werden');
-      const { projectId: pid, scenes: pScenes } = persisted;
-
-      // Find the (possibly remapped) scene from the persisted snapshot.
-      const dbScene =
-        pScenes.find((s) => s.orderIndex === scene.orderIndex) ?? scene;
-
-      // 4. Re-write the override on the (possibly newly-inserted) row to be
-      //    safe against the fresh insert in ensureProjectPersisted.
-      try {
-        await supabase
-          .from('composer_scenes')
-          .update({
-            engine_override: 'cinematic-sync',
-            clip_source: newClipSource,
-            clip_status: 'generating',
-          })
-          .eq('id', dbScene.id);
-      } catch (e) {
-        console.warn('[ClipsTab] cinematic-sync re-persist failed:', e);
       }
 
       const composed = composeFinalPrompt({
