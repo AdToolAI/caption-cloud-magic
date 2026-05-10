@@ -268,8 +268,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           // single voiceover clip and apply it to the whole video, which is
           // exactly the "one face speaks for both" failure mode.
           const speakerCount = (scene.audioPlan?.speakers?.length ?? 0);
+          const isCinematicSync = (dbScene as any).engine_override === 'cinematic-sync';
           if (
-            (dbScene as any).lip_sync_with_voiceover === true &&
+            ((dbScene as any).lip_sync_with_voiceover === true || isCinematicSync) &&
             !(dbScene as any).lip_sync_applied_at &&
             (dbScene as any).lip_sync_status !== 'running' &&
             speakerCount <= 1
