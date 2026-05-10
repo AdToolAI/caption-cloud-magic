@@ -152,6 +152,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    __stage = 'parse_body';
     const body: ClipRequest = await req.json();
     const { projectId, scenes, visualStyle, characters } = body;
 
