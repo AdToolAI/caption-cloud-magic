@@ -306,7 +306,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           if (dbScene.clip_url) {
             justReady.push({ sceneId: scene.id, clipUrl: dbScene.clip_url });
           }
-          // Auto-trigger Sync.so post-step when the scene opted in and a VO exists.
+          // Auto-trigger Sync.so post-step when the scene opted in and a VO
+          // (or audio plan / character audio) exists.
           // SAFETY: never run for multi-speaker scenes — Sync.so would pick a
           // single voiceover clip and apply it to the whole video, which is
           // exactly the "one face speaks for both" failure mode.
@@ -316,6 +317,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             ((dbScene as any).lip_sync_with_voiceover === true || isCinematicSync) &&
             !(dbScene as any).lip_sync_applied_at &&
             (dbScene as any).lip_sync_status !== 'running' &&
+            (dbScene as any).lip_sync_status !== 'no_voiceover' &&
             speakerCount <= 1
           ) {
             lipSyncTargets.push(scene.id);
@@ -343,6 +345,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           toast({
             title: `Cinematic-Sync Lip-Sync fehlgeschlagen`,
             description: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`,
+            variant: 'destructive',
+          });
+        }
+        if (
+          (dbScene as any).engine_override === 'cinematic-sync' &&
+          scene.lipSyncStatus !== 'no_voiceover' &&
+          (dbScene as any).lip_sync_status === 'no_voiceover'
+        ) {
+          toast({
+            title: `Cinematic-Sync braucht ein Voiceover — Szene ${idx + 1}`,
+            description: 'Hailuo-Render ist fertig, aber es gibt kein Voiceover für den Lip-Sync. Bitte erst im Dialog/VO-Tab eine Stimme generieren, dann Cinematic-Sync erneut starten.',
             variant: 'destructive',
           });
         }
