@@ -58,6 +58,10 @@ interface ClipsTabProps {
   /** Project spoken language — flows into the deterministic Audio Plan block. */
   language?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
+  /** Local-only state update (no debounced full-scene DB flush). Required by
+   *  Cinematic-Sync start so the optimistic engine_override / clip_status
+   *  isn't clobbered by a stale snapshot 600ms later. */
+  onUpdateScenesLocalOnly?: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
@@ -69,7 +73,7 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onUpdateScenesLocalOnly, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   // Normalise the project language to the 3 accepted DirectorLanguage codes.
   const directorLanguage: DirectorLanguage =
     language === 'de' ? 'de' : language === 'es' ? 'es' : 'en';
