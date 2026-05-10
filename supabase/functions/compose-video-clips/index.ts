@@ -435,6 +435,35 @@ serve(async (req) => {
       // Hailuo-allowed duration (6s or 10s) that fits VO + 0.4s padding.
       if ((scene.engineOverride ?? 'auto') === 'cinematic-sync') {
         try {
+          // Two-Shot prep: if this scene has a multi-speaker dialog_script,
+          // synthesize a merged voiceover (one WAV with all speakers in
+          // sequence) BEFORE the auto-extend logic looks for VO duration.
+          // This is what makes the "Artlist Two-Shot Hook" work end-to-end:
+          // Hailuo renders the 10s two-shot, then Sync.so lip-syncs against
+          // the merged audio.
+          try {
+            const dlg = String((scene as any).dialogScript ?? '');
+            const speakerLines = dlg.split(/\r?\n/).filter((l) => /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l));
+            if (speakerLines.length >= 2) {
+              const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-twoshot-audio`;
+              const r = await fetch(fnUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                },
+                body: JSON.stringify({ scene_id: scene.id }),
+              });
+              if (!r.ok) {
+                console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status}`);
+              } else {
+                console.log(`[compose-video-clips] twoshot-audio prep OK for ${scene.id}`);
+              }
+            }
+          } catch (twoshotErr) {
+            console.warn(`[compose-video-clips] twoshot-audio prep exception for ${scene.id}:`, twoshotErr);
+          }
+
           const { data: voClips } = await supabaseAdmin
             .from('scene_audio_clips')
             .select('duration')
