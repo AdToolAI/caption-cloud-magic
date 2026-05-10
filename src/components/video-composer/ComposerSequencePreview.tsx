@@ -221,7 +221,18 @@ export default function ComposerSequencePreview({
     if (el) {
       // Active slot honours the user's mute toggle; standby is always muted
       // until it becomes active to avoid double-audio during preload.
-      el.muted = slot === activeSlotRef.current ? mutedRef.current : true;
+      // EXCEPTION: scenes whose audio is EMBEDDED in the MP4 (lip-sync output,
+      // HeyGen avatars, user uploads) must always play their own audio when
+      // active — otherwise the embedded voiceover is inaudible.
+      const hasEmbeddedAudio =
+        !!target.lipSyncAppliedAt ||
+        (target.clipSource as string) === 'ai-heygen' ||
+        target.clipSource === 'upload';
+      if (slot === activeSlotRef.current) {
+        el.muted = hasEmbeddedAudio ? false : mutedRef.current;
+      } else {
+        el.muted = true;
+      }
       try { el.currentTime = 0; } catch { /* noop */ }
     }
   }, [setSrcForSlot]);
@@ -260,7 +271,12 @@ export default function ComposerSequencePreview({
     const v = getVideoForSlot(activeSlotRef.current);
     if (!v) return;
     if (playing) {
-      v.muted = mutedRef.current;
+      const cur = playableRef.current[sceneIdxRef.current];
+      const hasEmbedded =
+        !!cur?.lipSyncAppliedAt ||
+        (cur?.clipSource as string) === 'ai-heygen' ||
+        cur?.clipSource === 'upload';
+      v.muted = hasEmbedded ? false : mutedRef.current;
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -273,7 +289,12 @@ export default function ComposerSequencePreview({
     const active = activeSlotRef.current;
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
-    if (va && !isImage) va.muted = muted;
+    const cur = playableRef.current[sceneIdxRef.current];
+    const hasEmbedded =
+      !!cur?.lipSyncAppliedAt ||
+      (cur?.clipSource as string) === 'ai-heygen' ||
+      cur?.clipSource === 'upload';
+    if (va && !isImage) va.muted = hasEmbedded ? false : muted;
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
@@ -311,7 +332,11 @@ export default function ComposerSequencePreview({
           const v = videoARef.current;
           if (v) {
             try { v.currentTime = 0; } catch { /* noop */ }
-            v.muted = mutedRef.current;
+            const hasEmbedded =
+              !!nextScene.lipSyncAppliedAt ||
+              (nextScene.clipSource as string) === 'ai-heygen' ||
+              nextScene.clipSource === 'upload';
+            v.muted = hasEmbedded ? false : mutedRef.current;
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
@@ -344,7 +369,11 @@ export default function ComposerSequencePreview({
       const standbyEl = getVideoForSlot(toSlot);
       if (standbyEl) {
         try { standbyEl.currentTime = 0; } catch { /* noop */ }
-        standbyEl.muted = mutedRef.current;
+        const hasEmbedded =
+          !!nextScene.lipSyncAppliedAt ||
+          (nextScene.clipSource as string) === 'ai-heygen' ||
+          nextScene.clipSource === 'upload';
+        standbyEl.muted = hasEmbedded ? false : mutedRef.current;
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade
@@ -632,6 +661,7 @@ export default function ComposerSequencePreview({
     const hasEmbeddedAudio = playable.some(
       (s) =>
         s.lipSyncWithVoiceover === true ||
+        !!s.lipSyncAppliedAt ||
         (s.clipSource as string) === 'ai-heygen' ||
         s.clipSource === 'upload',
     );
