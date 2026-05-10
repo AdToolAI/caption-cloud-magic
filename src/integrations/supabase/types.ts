@@ -5231,6 +5231,8 @@ export type Database = {
           mentioned_character_ids: string[] | null
           mentioned_location_ids: string[] | null
           order_index: number
+          preview_clip_url: string | null
+          preview_status: string | null
           progress_percent: number | null
           project_id: string
           prompt_mode: string | null
@@ -5303,6 +5305,8 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          preview_clip_url?: string | null
+          preview_status?: string | null
           progress_percent?: number | null
           project_id: string
           prompt_mode?: string | null
@@ -5375,6 +5379,8 @@ export type Database = {
           mentioned_character_ids?: string[] | null
           mentioned_location_ids?: string[] | null
           order_index?: number
+          preview_clip_url?: string | null
+          preview_status?: string | null
           progress_percent?: number | null
           project_id?: string
           prompt_mode?: string | null
