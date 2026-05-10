@@ -241,6 +241,31 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
 
     if (!data) return;
 
+    // ── Self-Heal: Stuck-Scene-Recovery ───────────────────────────────────
+    // Wenn der Webhook (Replicate, Sync.so, …) den Status nicht finalisiert
+    // hat, die Szene aber bereits eine `clip_url` hat, behandeln wir sie als
+    // "ready". Verhindert das endlose "Wird generiert…" nach gelegentlichen
+    // Webhook-Drops.
+    const stuck = (data as any[]).filter(
+      (d) =>
+        d.clip_status === 'generating' &&
+        typeof d.clip_url === 'string' &&
+        d.clip_url.length > 0,
+    );
+    if (stuck.length > 0) {
+      await Promise.all(
+        stuck.map((d) =>
+          supabase
+            .from('composer_scenes')
+            .update({ clip_status: 'ready', clip_error: null })
+            .eq('id', d.id),
+        ),
+      );
+      stuck.forEach((d) => {
+        d.clip_status = 'ready';
+      });
+    }
+
     let changed = false;
     const newPrev: Record<string, string> = { ...previousStatuses };
     // Collect scenes that just transitioned to "ready" so we can probe their

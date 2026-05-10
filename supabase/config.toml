@@ -24,6 +24,17 @@ verify_jwt = false
 [functions.save-composer-scene-to-library]
 verify_jwt = false
 
+[functions.compose-clip-webhook]
+verify_jwt = false
+
+[functions.compose-video-clips]
+verify_jwt = true
+timeout_sec = 180
+
+[functions.compose-lipsync-scene]
+verify_jwt = true
+timeout_sec = 300
+
 [functions.verify-license-certificate]
 verify_jwt = false
 
