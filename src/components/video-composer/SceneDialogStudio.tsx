@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { extractFunctionsError } from '@/lib/functionsError';
 import { useTalkingHead } from '@/hooks/useTalkingHead';
 import { useCustomVoices } from '@/hooks/useCustomVoices';
 import { supabase } from '@/integrations/supabase/client';
@@ -987,9 +988,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           console.error('[SceneDialogStudio] compose-video-clips invoke failed', invokeErr);
           // Roll back the optimistic generating state so user can retry.
           onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+          const realMsg = await extractFunctionsError(invokeErr);
           toast({
             title: t.failed,
-            description: formatError(invokeErr),
+            description: realMsg,
             variant: 'destructive',
           });
           return;

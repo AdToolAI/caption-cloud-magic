@@ -8,6 +8,7 @@ import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Sear
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
+import { extractFunctionsError } from '@/lib/functionsError';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -719,7 +720,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       setTimeout(pollScenes, 500);
     } catch (err: any) {
       console.error('Generate clips error:', err);
-      toast({ title: 'Fehler', description: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
+      const realMsg = await extractFunctionsError(err);
+      toast({ title: 'Fehler', description: realMsg || 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
     } finally {
       setIsGeneratingAll(false);
     }
@@ -842,9 +844,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       );
       onUpdateScenes(rolledBack);
       console.error('[ClipsTab] handleGenerateSingle failed', err);
+      const realMsg = await extractFunctionsError(err);
       toast({
         title: 'Fehler',
-        description: err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
+        description: realMsg || err?.message || 'Re-Roll fehlgeschlagen — bitte erneut versuchen.',
         variant: 'destructive',
       });
     } finally {
@@ -1012,9 +1015,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           : s,
       );
       (onUpdateScenesLocalOnly ?? onUpdateScenes)(rolledBack);
+      const realMsg = await extractFunctionsError(err);
       toast({
         title: 'Cinematic-Sync fehlgeschlagen',
-        description: err?.message || 'Bitte erneut versuchen.',
+        description: realMsg || err?.message || 'Bitte erneut versuchen.',
         variant: 'destructive',
       });
     } finally {

@@ -129,6 +129,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Stage marker for diagnostics — updated as we progress so a fatal
+  // error in any branch surfaces the exact phase that failed.
+  let __stage = 'init';
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -148,6 +152,7 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
+    __stage = 'parse_body';
     const body: ClipRequest = await req.json();
     const { projectId, scenes, visualStyle, characters } = body;
 
@@ -165,6 +170,7 @@ serve(async (req) => {
     }
 
     // Verify project ownership
+    __stage = 'verify_project';
     const { data: project, error: projError } = await supabaseAdmin
       .from('composer_projects')
       .select('id, user_id, status')
@@ -180,6 +186,7 @@ serve(async (req) => {
     }
 
     // Calculate total cost for AI scenes (quality-tier aware)
+    __stage = 'cost_calc';
     const aiScenes = scenes.filter(s => s.clipSource.startsWith('ai-'));
     let totalCost = 0;
     for (const scene of aiScenes) {
@@ -434,6 +441,7 @@ serve(async (req) => {
       // dialog (Sync.so cut_off). Auto-extend the scene to the smallest
       // Hailuo-allowed duration (6s or 10s) that fits VO + 0.4s padding.
       if ((scene.engineOverride ?? 'auto') === 'cinematic-sync') {
+        __stage = `cinematic_sync_prep:${scene.id}`;
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
           // synthesize a merged voiceover (one WAV with all speakers in
@@ -459,8 +467,10 @@ serve(async (req) => {
                 },
                 body: JSON.stringify({ scene_id: scene.id }),
               });
+              // Drain body to avoid leak; capture text on failure for logs.
+              const respText = await r.text().catch(() => '');
               if (!r.ok) {
-                console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status}`);
+                console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status} ${respText.slice(0, 300)}`);
               } else {
                 console.log(`[compose-video-clips] twoshot-audio prep OK for ${scene.id}`);
                 // Stage = 'master_clip' — Hailuo render begins next.
@@ -1273,10 +1283,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("[compose-video-clips] Error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error(`[compose-video-clips] FATAL @ stage=${__stage}: ${msg}`, stack || '');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: msg || "Unknown error",
+        code: 'INTERNAL',
+        stage: __stage,
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
