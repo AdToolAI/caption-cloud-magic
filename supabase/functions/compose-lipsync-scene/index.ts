@@ -62,7 +62,7 @@ serve(async (req) => {
     // Load scene + verify ownership via project
     const { data: scene, error: sErr } = await supabase
       .from('composer_scenes')
-      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover')
+      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds')
       .eq('id', scene_id)
       .single();
     if (sErr || !scene) return json({ error: 'scene not found' }, 404);
