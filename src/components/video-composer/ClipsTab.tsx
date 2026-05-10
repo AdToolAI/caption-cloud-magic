@@ -950,10 +950,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           </button>
           <div className="flex items-start gap-2">
             <Clapperboard className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
-            <div>
-              <strong className="text-emerald-300">Tipp – Artlist-Pipeline:</strong> Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund.
-              Klicke bei einer fertigen HeyGen-Szene rechts auf <span className="inline-flex items-center gap-1 px-1 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 font-medium"><Clapperboard className="h-2.5 w-2.5" />In echte Szene einbauen</span>,
-              um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern und automatisch lip-syncen zu lassen. <span className="text-amber-300">+€0.65 / Szene.</span>
+            <div className="space-y-1.5">
+              <div>
+                <strong className="text-emerald-300">Tipp – Artlist-Pipeline:</strong> Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund.
+                Klicke bei einer fertigen HeyGen-Szene rechts auf <span className="inline-flex items-center gap-1 px-1 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 font-medium"><Clapperboard className="h-2.5 w-2.5" />In echte Szene einbauen</span>,
+                um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern und automatisch lip-syncen zu lassen. <span className="text-amber-300">+€0.65 / Szene.</span>
+              </div>
+              <div className="text-[11px] text-muted-foreground/90 border-t border-emerald-500/20 pt-1.5">
+                <span className="font-semibold text-emerald-300/90">ℹ️ Multi-Charakter-Szenen:</span> Sync.so kann nur einen Charakter pro Clip lip-syncen.
+                Zerlege Multi-Speaker-Dialoge zuerst in <span className="font-medium">eine Szene pro Sprecher (Shot-Reverse-Shot)</span> — pro Cut läuft dann eine eigene Cinematic-Sync-Pipeline.
+                Es gibt <span className="italic">kein Layering</span> mehrerer Sprecher in einen Clip.
+              </div>
             </div>
           </div>
         </div>
