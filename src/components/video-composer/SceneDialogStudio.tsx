@@ -961,9 +961,22 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         // Actually trigger compose-video-clips so the master Hailuo i2v
         // render starts. Without this the card stays "generating" forever.
         try {
-          const pidFinal = (projectId || scene.projectId || '').trim();
+          // Ensure project + scene are persisted to DB — otherwise the edge
+          // function rejects with MISSING_PROJECT_ID. Mirrors the SRS path.
+          const persisted = await resolvePersistedIds();
+          const pidFinal = (persisted?.pid || projectId || scene.projectId || '').trim();
+          const sceneIdFinal = persisted?.sceneId || scene.id;
+          if (!pidFinal) {
+            onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+            toast({
+              title: t.failed,
+              description: 'Projekt konnte nicht gespeichert werden — bitte erneut versuchen.',
+              variant: 'destructive',
+            });
+            return;
+          }
           const scenePayload = {
-            id: scene.id,
+            id: sceneIdFinal,
             projectId: pidFinal,
             sceneType: scene.sceneType,
             clipSource: 'ai-hailuo' as const,
