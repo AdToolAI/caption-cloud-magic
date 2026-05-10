@@ -485,8 +485,10 @@ serve(async (req) => {
           if (voDur > 0) {
             const required = voDur + 0.4;
             const currentDur = Number(scene.durationSeconds || 0);
-            // Hailuo allowed durations: 6 or 10 (capped at 10).
-            const targetDur = required <= 6 ? 6 : 10;
+            // Hailuo allowed durations: 6 or 10. Respect user's pick — only
+            // extend if VO actually needs MORE than what they chose.
+            const fitDur = required <= 6 ? 6 : 10;
+            const targetDur = Math.max(currentDur, fitDur);
             if (targetDur > currentDur) {
               console.log(`[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > scene ${currentDur}s → extending to ${targetDur}s`);
               scene.durationSeconds = targetDur;

@@ -904,7 +904,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       // ── Phase 2: TWO-SHOT pipeline ────────────────────────────────────
       // For ≥2 speakers we KEEP the parent scene as one row and route it
       // through the cinematic-sync engine. Compose-video-clips renders ONE
-      // 10s Hailuo i2v master clip (both speakers in frame, anchored from
+      // 6s/10s Hailuo i2v master clip (both speakers in frame, anchored from
       // Nano Banana 2 two-shot composition); ClipsTab's auto-trigger then
       // detects ≥2 speakers in dialog_script and invokes
       // compose-twoshot-lipsync for sequential per-face Sync.so passes.
@@ -913,13 +913,38 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       // a 6-stage progress bar (audio → anchor → master_clip → lipsync_1
       // → lipsync_2 → continuity).
       try {
-        const masterDuration = Math.max(6, Math.min(10, Math.round(synthed.reduce((acc, s) => acc + s.durationSec, 0) + INTER_SPEAKER_GAP_SEC * (synthed.length - 1))));
+        // Single-flight guard: if this scene is already mid-render via two-shot
+        // (e.g. user double-clicked the button), do nothing.
+        if (
+          scene.clipStatus === 'generating' &&
+          (scene as any).twoshotStage &&
+          (scene as any).twoshotStage !== 'failed'
+        ) {
+          console.info('[SceneDialogStudio] two-shot already in flight — skipping re-trigger');
+          if (onClose) onClose();
+          okCount = 1;
+          return;
+        }
+
+        // Duration: respect user's chosen scene length unless audio needs more.
+        // Hailuo only allows 6s or 10s. User pick = scene.durationSeconds.
+        const audioRequired = Math.ceil(
+          synthed.reduce((acc, s) => acc + s.durationSec, 0) +
+          INTER_SPEAKER_GAP_SEC * Math.max(0, synthed.length - 1) +
+          0.4,
+        );
+        const userPick = Number(scene.durationSeconds || 6);
+        const target = Math.max(userPick, audioRequired);
+        const masterDuration = target <= 6 ? 6 : 10;
+
         const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
         const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
         for (const s of synthed) {
           const cfg = voicePerSpeaker[s.block.speakerId];
           if (cfg) dialogVoicesMap[s.character.id] = cfg;
         }
+
+        // Optimistic state — UI immediately shows "Generating".
         onUpdate({
           dialogScript: dialogScriptText,
           dialogVoices: dialogVoicesMap,
@@ -931,15 +956,54 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           lipSyncWithVoiceover: true,
           cinematicPresetSlug: srsMarker,
         });
+
+        // Actually trigger compose-video-clips so the master Hailuo i2v
+        // render starts. Without this the card stays "generating" forever.
+        try {
+          const pidFinal = (projectId || scene.projectId || '').trim();
+          const scenePayload = {
+            id: scene.id,
+            projectId: pidFinal,
+            sceneType: scene.sceneType,
+            clipSource: 'ai-hailuo' as const,
+            clipQuality: scene.clipQuality || 'standard',
+            aiPrompt: scene.aiPrompt || '',
+            negativePrompt: (scene as any).negativePrompt || undefined,
+            uploadUrl: scene.uploadUrl,
+            referenceImageUrl: scene.referenceImageUrl,
+            durationSeconds: masterDuration,
+            characterShot: scene.characterShot,
+            characterShots: scene.characterShots,
+            dialogScript: dialogScriptText,
+            dialogVoices: dialogVoicesMap,
+            engineOverride: 'cinematic-sync' as const,
+            withAudio: scene.withAudio !== false,
+          };
+          const { error: invokeErr } = await supabase.functions.invoke('compose-video-clips', {
+            body: { projectId: pidFinal, scenes: [scenePayload], characters },
+          });
+          if (invokeErr) throw invokeErr;
+        } catch (invokeErr) {
+          console.error('[SceneDialogStudio] compose-video-clips invoke failed', invokeErr);
+          // Roll back the optimistic generating state so user can retry.
+          onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+          toast({
+            title: t.failed,
+            description: formatError(invokeErr),
+            variant: 'destructive',
+          });
+          return;
+        }
+
         okCount = 1;
         toast({
           title: language === 'de' ? 'Two-Shot wird gerendert' : language === 'es' ? 'Renderizando Two-Shot' : 'Rendering Two-Shot',
           description:
             language === 'de'
-              ? 'Beide Sprecher werden in EINE Szene komponiert. Du siehst den Fortschritt live in der Clip-Karte (6 Phasen).'
+              ? `Beide Sprecher werden in EINE ${masterDuration}s-Szene komponiert. Du siehst den Fortschritt live in der Clip-Karte (6 Phasen).`
               : language === 'es'
-              ? 'Ambos hablantes se componen en UNA escena. Verás el progreso en vivo en la tarjeta del clip (6 fases).'
-              : 'Both speakers are being composed into ONE scene. Live progress shows in the clip card (6 phases).',
+              ? `Ambos hablantes se componen en UNA escena de ${masterDuration}s. Verás el progreso en vivo en la tarjeta del clip (6 fases).`
+              : `Both speakers are being composed into ONE ${masterDuration}s scene. Live progress shows in the clip card (6 phases).`,
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
