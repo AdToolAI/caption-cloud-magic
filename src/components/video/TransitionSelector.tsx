@@ -3,7 +3,8 @@ import { Label } from '@/components/ui/label';
 import { Check } from 'lucide-react';
 
 const TRANSITIONS = [
-  { id: 'none', name: 'Keine', description: 'Harter Schnitt ohne Übergang' },
+  { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
+  { id: 'crossfade', name: 'Crossfade', description: 'Sanftes Morphing zwischen Szenen' },
   { id: 'fade', name: 'Fade', description: 'Sanftes Ein-/Ausblenden' },
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
@@ -23,7 +24,10 @@ interface TransitionSelectorProps {
 export function TransitionSelector({
   value,
   onChange,
-  availableTransitions = ['fade', 'slide', 'zoom', 'wipe'],
+  // Phase 4 (Artlist-style): default palette is intentionally minimal —
+  // a hard "Cut" plus a single soft "Crossfade". Other engines remain
+  // available, but only when a caller explicitly opts in.
+  availableTransitions = ['none', 'crossfade'],
   disabled = false,
   label = 'Übergangseffekt'
 }: TransitionSelectorProps) {

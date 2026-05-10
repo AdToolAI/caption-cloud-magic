@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useMultiSceneRender, type PipelineStatus } from '@/hooks/useMultiSceneRender';
 import type { ComposerScene } from '@/types/video-composer';
+import RenderPreFlightDialog from './RenderPreFlightDialog';
 
 interface RenderPipelinePanelProps {
   projectId?: string;
@@ -55,6 +57,7 @@ export default function RenderPipelinePanel({
   onGenerateAll,
 }: RenderPipelinePanelProps) {
   const navigate = useNavigate();
+  const [preflightOpen, setPreflightOpen] = useState(false);
   const pipeline = useMultiSceneRender({
     projectId,
     scenes,
@@ -130,7 +133,7 @@ export default function RenderPipelinePanel({
             {status === 'idle' && (
               <Button
                 size="sm"
-                onClick={() => startPipeline('directors_cut')}
+                onClick={() => setPreflightOpen(true)}
                 disabled={!projectId || scenes.length === 0}
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
@@ -239,6 +242,13 @@ export default function RenderPipelinePanel({
           </div>
         )}
       </CardContent>
+
+      <RenderPreFlightDialog
+        open={preflightOpen}
+        onOpenChange={setPreflightOpen}
+        scenes={scenes}
+        onConfirm={() => startPipeline('directors_cut')}
+      />
     </Card>
   );
 }

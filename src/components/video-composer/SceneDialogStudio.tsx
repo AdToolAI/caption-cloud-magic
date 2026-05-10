@@ -932,7 +932,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           characterShot: charShot,
           characterShots: [charShot],
           lipSyncWithVoiceover: true,
-          transitionType: 'fade',
+          transitionType: 'crossfade',
           transitionDuration: 0.3,
           cinematicPresetSlug: srsMarker,
         } as Partial<ComposerScene>;
