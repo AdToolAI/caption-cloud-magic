@@ -202,7 +202,7 @@ export interface ComposerScene {
    * classic Hailuo/etc. clip without lip-sync. `sync-polish` runs Hailuo +
    * Sync.so polish pass after generation. Persisted as `engine_override`.
    */
-  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish';
+  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish' | 'cinematic-sync';
   /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly
