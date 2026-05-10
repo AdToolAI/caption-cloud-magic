@@ -42,6 +42,8 @@ export default function SceneStillFrameStudio({
   prompt,
   aspectRatio,
   composeHintImageUrl,
+  composeHintImageUrls,
+  injectedLabels,
   selectedReferenceUrl,
   onPick,
   language = 'en',
@@ -63,6 +65,14 @@ export default function SceneStillFrameStudio({
     }
     setLoading(true);
     try {
+      const merged = Array.from(
+        new Set(
+          [
+            ...(composeHintImageUrls ?? []),
+            ...(composeHintImageUrl ? [composeHintImageUrl] : []),
+          ].filter((u): u is string => !!u),
+        ),
+      ).slice(0, 4);
       const { data, error } = await supabase.functions.invoke('generate-scene-still', {
         body: {
           projectId,
@@ -70,7 +80,8 @@ export default function SceneStillFrameStudio({
           prompt,
           variants: count,
           aspectRatio,
-          referenceImageUrl: composeHintImageUrl,
+          referenceImageUrl: merged[0],
+          referenceImageUrls: merged,
         },
       });
       if (error) throw error;
