@@ -383,6 +383,23 @@ export interface ComposerScene {
    */
   previewClipUrl?: string | null;
   previewStatus?: 'idle' | 'generating' | 'ready' | 'failed' | null;
+  /**
+   * Phase 5.3 — Reroll Pro: Seed-Lock + Variant-Grid.
+   * `seed` is the master seed used (or to be used) for the HQ render.
+   * `seedVariations` is up to 4 LTX Fast-Preview takes the user can pick from.
+   * Maps to `composer_scenes.seed` (INTEGER) / `seed_variations` (JSONB).
+   */
+  seed?: number | null;
+  seedVariations?: SceneSeedVariant[];
+}
+
+/** One LTX Fast-Preview variant inside `composer_scenes.seed_variations`. */
+export interface SceneSeedVariant {
+  seed: number;
+  status: 'generating' | 'ready' | 'failed';
+  previewUrl?: string;
+  predictionId?: string;
+  createdAt: string;
 }
 
 export interface AudioPlanSpeaker {
