@@ -129,6 +129,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Stage marker for diagnostics — updated as we progress so a fatal
+  // error in any branch surfaces the exact phase that failed.
+  let __stage = 'init';
+
   try {
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
