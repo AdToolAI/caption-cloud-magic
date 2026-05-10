@@ -499,6 +499,15 @@ export default function VideoComposerDashboard() {
   // Realtime: when ANY collaborator updates a scene in this project, refetch.
   useComposerScenesRealtime(project.id, refetchScenesFromDb);
 
+  // Phase 5.6 — Undo-Stack (Cmd+Z)
+  const { undoLast: undoLastHistoryEntry, count: undoCount } = useComposerHistory(project.id);
+  useKeyboardShortcuts({
+    onUndo: () => {
+      undoLastHistoryEntry(() => refetchScenesFromDb(project.id));
+    },
+  }, !!project.id);
+
+
   const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
     try {
