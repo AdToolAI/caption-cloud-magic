@@ -7598,6 +7598,81 @@ export type Database = {
         }
         Relationships: []
       }
+      license_certificates: {
+        Row: {
+          asset_id: string
+          asset_source_url: string | null
+          asset_thumbnail_url: string | null
+          asset_title: string
+          asset_type: string
+          attribution_required: boolean
+          certificate_number: string
+          created_at: string
+          id: string
+          issued_at: string
+          license_tier: string
+          metadata: Json
+          pdf_storage_path: string | null
+          permitted_uses: string[]
+          provider_license_name: string
+          provider_license_url: string | null
+          restrictions: string[]
+          revoked_at: string | null
+          source_provider: string
+          updated_at: string
+          user_id: string
+          verify_token: string
+        }
+        Insert: {
+          asset_id: string
+          asset_source_url?: string | null
+          asset_thumbnail_url?: string | null
+          asset_title: string
+          asset_type: string
+          attribution_required?: boolean
+          certificate_number: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          license_tier?: string
+          metadata?: Json
+          pdf_storage_path?: string | null
+          permitted_uses?: string[]
+          provider_license_name: string
+          provider_license_url?: string | null
+          restrictions?: string[]
+          revoked_at?: string | null
+          source_provider: string
+          updated_at?: string
+          user_id: string
+          verify_token: string
+        }
+        Update: {
+          asset_id?: string
+          asset_source_url?: string | null
+          asset_thumbnail_url?: string | null
+          asset_title?: string
+          asset_type?: string
+          attribution_required?: boolean
+          certificate_number?: string
+          created_at?: string
+          id?: string
+          issued_at?: string
+          license_tier?: string
+          metadata?: Json
+          pdf_storage_path?: string | null
+          permitted_uses?: string[]
+          provider_license_name?: string
+          provider_license_url?: string | null
+          restrictions?: string[]
+          revoked_at?: string | null
+          source_provider?: string
+          updated_at?: string
+          user_id?: string
+          verify_token?: string
+        }
+        Relationships: []
+      }
       media_assets: {
         Row: {
           created_at: string | null
@@ -16219,6 +16294,25 @@ export type Database = {
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
+      verify_license_certificate: {
+        Args: { _token: string }
+        Returns: {
+          asset_thumbnail_url: string
+          asset_title: string
+          asset_type: string
+          attribution_required: boolean
+          certificate_number: string
+          issued_at: string
+          license_tier: string
+          licensee_initials: string
+          permitted_uses: string[]
+          provider_license_name: string
+          provider_license_url: string
+          restrictions: string[]
+          revoked_at: string
+          source_provider: string
+        }[]
+      }
     }
     Enums: {
       app_event_type:

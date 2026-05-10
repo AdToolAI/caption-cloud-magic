@@ -6,7 +6,7 @@ import {
   FolderOpen, Mic2, Music2, Video, Film, Edit, Layers, Languages, User,
   Users, Palette,
   ShieldCheck, Settings,
-  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon, AudioWaveform,
+  Gamepad2, Radio, Scissors, Store, Coins as CoinsIcon, AudioWaveform, FileBadge2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -91,6 +91,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/picture-studio", titleKey: "KI Picture Studio", descKey: "hubItemDesc.backgroundReplacer", icon: Layers },
       { route: "/marketplace", titleKey: "Template Marketplace", descKey: "Community-Templates entdecken & kaufen", icon: Store },
       { route: "/creator-studio", titleKey: "Creator Studio", descKey: "Eigene Templates verkaufen & Earnings tracken", icon: CoinsIcon },
+      { route: "/my-licenses", titleKey: "My Licenses", descKey: "PDF-Lizenz-Zertifikate für alle deine Assets — wie Envato/Artlist", icon: FileBadge2 },
     ],
   },
   {

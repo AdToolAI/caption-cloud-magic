@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { LicenseButton } from "@/components/licensing/LicenseButton";
 import { useAuth } from "@/hooks/useAuth";
 import {
   Search, Play, Pause, Heart, Loader2, AudioWaveform, Download,
@@ -260,6 +261,17 @@ export default function SfxLibrary() {
                     <Edit className="h-3 w-3 mr-1" />
                     DC
                   </Button>
+                  <LicenseButton
+                    asset_type="stock-sfx"
+                    asset_id={String(item.id)}
+                    asset_title={item.title}
+                    asset_thumbnail_url={null}
+                    asset_source_url={item.download_url}
+                    source_provider={item.source === "freesound" ? "freesound" : "pixabay"}
+                    size="icon"
+                    label=""
+                    className="h-7 w-7"
+                  />
                   <Button
                     size="icon"
                     variant="ghost"
