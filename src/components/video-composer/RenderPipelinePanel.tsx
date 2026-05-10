@@ -132,7 +132,7 @@ export default function RenderPipelinePanel({
             {status === 'idle' && (
               <Button
                 size="sm"
-                onClick={() => startPipeline('directors_cut')}
+                onClick={() => setPreflightOpen(true)}
                 disabled={!projectId || scenes.length === 0}
                 className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
               >
