@@ -262,6 +262,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         (dbScene.clip_status !== scene.clipStatus ||
           dbScene.clip_url !== scene.clipUrl ||
           (dbScene.upload_type && dbScene.upload_type !== scene.uploadType) ||
+          ((dbScene as any).engine_override && (dbScene as any).engine_override !== (scene.engineOverride ?? 'auto')) ||
+          ((dbScene as any).clip_source && (dbScene as any).clip_source !== scene.clipSource) ||
           lipChanged)
       ) {
         changed = true;
@@ -317,6 +319,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
           clipUrl: dbScene.clip_url || scene.clipUrl,
           uploadType: (dbScene.upload_type as ComposerScene['uploadType']) || scene.uploadType,
+          engineOverride: ((dbScene as any).engine_override as ComposerScene['engineOverride']) ?? scene.engineOverride ?? 'auto',
+          clipSource: ((dbScene as any).clip_source as ComposerScene['clipSource']) ?? scene.clipSource,
           lipSyncAppliedAt: (dbScene as any).lip_sync_applied_at ?? null,
           lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
           lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
