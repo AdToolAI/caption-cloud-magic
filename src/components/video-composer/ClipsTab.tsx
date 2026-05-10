@@ -708,7 +708,144 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     }
   };
 
-  const handleSearchStock = async (sceneId: string) => {
+  /**
+   * Cinematic-Sync dedicated start path. Bypasses the slow prepareSceneAnchor()
+   * detour and the stale-closure trap of handleGenerateSingle/ensureProject so
+   * the click ALWAYS produces:
+   *   1. Immediate visible "generating" state on the scene card.
+   *   2. A persisted engine_override='cinematic-sync' + clip_source='ai-hailuo'
+   *      so polls/reloads see the correct engine.
+   *   3. A guaranteed compose-video-clips invocation with the right payload.
+   */
+  const handleStartCinematicSync = async (scene: ComposerScene) => {
+    setSingleGenerating(prev => ({ ...prev, [scene.id]: true }));
+    const newClipSource: ComposerScene['clipSource'] =
+      scene.clipSource.startsWith('ai-') ? scene.clipSource : 'ai-hailuo';
+
+    // 1. Optimistic UI — flip status, engine + source RIGHT NOW so the user
+    //    sees immediate feedback regardless of how slow the backend is.
+    const optimistic = scenes.map((s) =>
+      s.id === scene.id
+        ? {
+            ...s,
+            engineOverride: 'cinematic-sync' as const,
+            clipSource: newClipSource,
+            clipStatus: 'generating' as const,
+            lipSyncStatus: 'pending' as const,
+          }
+        : s,
+    );
+    onUpdateScenes(optimistic);
+
+    try {
+      // 2. Persist the engine + source override + status to DB synchronously
+      //    so the backend sees the right engine and polling won't roll us back.
+      const { error: persistErr } = await supabase
+        .from('composer_scenes')
+        .update({
+          engine_override: 'cinematic-sync',
+          clip_source: newClipSource,
+          clip_status: 'generating',
+        })
+        .eq('id', scene.id);
+      if (persistErr) {
+        console.warn('[ClipsTab] cinematic-sync DB persist failed:', persistErr);
+      }
+
+      // 3. Make sure the project exists (creates row + remaps scene IDs if needed).
+      const persisted = await ensureProject();
+      if (!persisted) throw new Error('Projekt konnte nicht gespeichert werden');
+      const { projectId: pid, scenes: pScenes } = persisted;
+
+      // Find the (possibly remapped) scene from the persisted snapshot.
+      const dbScene =
+        pScenes.find((s) => s.orderIndex === scene.orderIndex) ?? scene;
+
+      // 4. Re-write the override on the (possibly newly-inserted) row to be
+      //    safe against the fresh insert in ensureProjectPersisted.
+      try {
+        await supabase
+          .from('composer_scenes')
+          .update({
+            engine_override: 'cinematic-sync',
+            clip_source: newClipSource,
+            clip_status: 'generating',
+          })
+          .eq('id', dbScene.id);
+      } catch (e) {
+        console.warn('[ClipsTab] cinematic-sync re-persist failed:', e);
+      }
+
+      const composed = composeFinalPrompt({
+        rawPrompt: dbScene.aiPrompt || scene.aiPrompt || '',
+        directorModifiers: dbScene.directorModifiers,
+        shotDirector: dbScene.shotDirector,
+        cinematicStylePresetId: (dbScene as any).cinematicStylePresetId,
+        brandCharacter: buildBrandInputForScene(dbScene),
+        libraryCharacters: libCharacters,
+        libraryLocations: libLocations,
+        audioPlan: dbScene.audioPlan,
+        language: directorLanguage,
+      });
+
+      // 5. Fire compose-video-clips with explicit cinematic-sync payload.
+      //    We deliberately skip prepareSceneAnchor() here — the existing
+      //    referenceImageUrl (or none) is good enough for Hailuo i2v, and
+      //    we never want this click to silently hang on Nano Banana.
+      const { data, error } = await supabase.functions.invoke('compose-video-clips', {
+        body: {
+          projectId: pid,
+          visualStyle,
+          characters,
+          scenes: [{
+            id: dbScene.id,
+            clipSource: newClipSource,
+            clipQuality: dbScene.clipQuality || 'standard',
+            aiPrompt: composed.finalPrompt,
+            negativePrompt: composed.negativePrompt || undefined,
+            referenceImageUrl: dbScene.referenceImageUrl,
+            durationSeconds: dbScene.durationSeconds,
+            characterShot: dbScene.characterShot,
+            characterShots: dbScene.characterShots,
+            dialogScript: dbScene.dialogScript,
+            dialogVoices: dbScene.dialogVoices,
+            engineOverride: 'cinematic-sync',
+            withAudio: dbScene.withAudio !== false,
+          }],
+        },
+      });
+      if (error) throw error;
+
+      const result = data?.results?.[0];
+      if (result?.status === 'failed') {
+        throw new Error(result.error || 'Cinematic-Sync Render fehlgeschlagen');
+      }
+
+      toast({
+        title: '🎬 Cinematic-Sync gestartet',
+        description: `Szene ${(scene.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene (~60 s), danach läuft Sync.so Lip-Sync automatisch.`,
+      });
+      setTimeout(pollScenes, 800);
+    } catch (err: any) {
+      console.error('[ClipsTab] handleStartCinematicSync failed', err);
+      // Roll back optimistic state.
+      const rolledBack = scenes.map((s) =>
+        s.id === scene.id
+          ? { ...s, clipStatus: scene.clipStatus, lipSyncStatus: scene.lipSyncStatus ?? null }
+          : s,
+      );
+      onUpdateScenes(rolledBack);
+      toast({
+        title: 'Cinematic-Sync fehlgeschlagen',
+        description: err?.message || 'Bitte erneut versuchen.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSingleGenerating(prev => ({ ...prev, [scene.id]: false }));
+    }
+  };
+
+
     const query = stockSearch[sceneId];
     if (!query) return;
 
