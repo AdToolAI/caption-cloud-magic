@@ -324,6 +324,21 @@ export interface ComposerScene {
   continuityLocked?: boolean;
   lockReferenceUrl?: string;
   /**
+   * Two-Shot Hook pipeline stage. Set by `compose-twoshot-audio`,
+   * `compose-video-clips` (master clip) and `compose-twoshot-lipsync`:
+   *   audio → anchor → master_clip → lipsync_1 → lipsync_2 → continuity → done
+   * Drives the multi-stage progress overlay in `SceneClipProgress`.
+   */
+  twoshotStage?:
+    | 'audio'
+    | 'anchor'
+    | 'master_clip'
+    | 'lipsync_1'
+    | 'lipsync_2'
+    | 'continuity'
+    | 'done'
+    | null;
+  /**
    * Per-scene audio toggle for AI models that natively produce sound
    * (Sora 2 / Sora 2 Pro, Veo 3.1, Kling 3 Omni). When `false`:
    *   - Veo / Kling: `generate_audio` flag is set to false at generation.
