@@ -5,6 +5,15 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
+import { LicenseButton } from '@/components/licensing/LicenseButton';
+
+const TIER_TO_PROVIDER: Record<string, string> = {
+  quick: 'replicate-music',
+  adaptive: 'replicate-music',
+  standard: 'replicate-music',
+  vocal: 'replicate-music',
+  pro: 'replicate-music',
+};
 
 interface Track {
   id: string;
@@ -131,6 +140,19 @@ export function MyTracksGrid() {
                   <Download className="h-3.5 w-3.5" />
                 </a>
               </Button>
+              <LicenseButton
+                size="sm"
+                variant="ghost"
+                className="hover:bg-primary/10"
+                label="Lizenz"
+                asset_type="music"
+                asset_id={track.id}
+                asset_title={track.title}
+                asset_source_url={track.url}
+                source_provider={TIER_TO_PROVIDER[tier] || 'replicate-music'}
+                license_tier="commercial"
+                metadata={{ tier, genre: track.genre, mood: track.mood, duration_sec: track.duration_sec }}
+              />
             </div>
           </Card>
         );

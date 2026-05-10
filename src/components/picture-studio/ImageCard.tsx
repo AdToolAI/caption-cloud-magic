@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useImageUpscaler, type UpscaleFactor } from "@/hooks/useImageUpscaler";
+import { LicenseButton } from "@/components/licensing/LicenseButton";
 
 interface ImageCardProps {
   image: {
@@ -167,6 +168,19 @@ export function ImageCard({ image, index, onDownload, onSaveToAlbum, onOpenLight
           <Button size="icon" variant="ghost" className="h-7 w-7 bg-muted/50 backdrop-blur-sm" onClick={(e) => { e.stopPropagation(); onOpenLightbox?.(image); }}>
             <Maximize2 className="h-3.5 w-3.5" />
           </Button>
+          <LicenseButton
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 bg-muted/50 backdrop-blur-sm"
+            asset_type="image"
+            asset_id={image.id || image.url}
+            asset_title={image.prompt?.slice(0, 80) || `Studio Image ${(image.style || '').toString()}`}
+            asset_thumbnail_url={image.url}
+            asset_source_url={image.url}
+            source_provider="replicate-image"
+            license_tier="commercial"
+            metadata={{ style: image.style, aspect_ratio: image.aspectRatio, upscale_factor: image.upscale_factor }}
+          />
           {onDelete && (
             <Button size="icon" variant="ghost" className="h-7 w-7 bg-destructive/20 backdrop-blur-sm hover:bg-destructive/40 text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(image); }}>
               <Trash2 className="h-3.5 w-3.5" />
