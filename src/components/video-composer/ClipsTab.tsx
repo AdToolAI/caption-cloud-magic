@@ -843,7 +843,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           ? { ...s, clipStatus: scene.clipStatus, lipSyncStatus: scene.lipSyncStatus ?? null }
           : s,
       );
-      onUpdateScenes(rolledBack);
+      (onUpdateScenesLocalOnly ?? onUpdateScenes)(rolledBack);
       toast({
         title: 'Cinematic-Sync fehlgeschlagen',
         description: err?.message || 'Bitte erneut versuchen.',
