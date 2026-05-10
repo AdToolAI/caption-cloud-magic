@@ -1,51 +1,118 @@
-## Problem (genau verifiziert)
+## Ziel — "Artlist Two-Shot Hook"
 
-Du klickst auf **„In echte Szene einbauen"** → das Hailuo-Video wird gerendert (clip_status='ready') → dann triggert die UI automatisch `compose-lipsync-scene` → diese Edge Function bricht **silent** ab, weil:
+Aus der ursprünglichen 10s-Hook-Szene (Matthew + Sarah im Dialog) wird **EINE einzige 10s-Karte** im Storyboard, in der **beide Charaktere gleichzeitig im Bild** zu sehen sind und **nacheinander lippensynchron sprechen** — ohne sichtbare Cuts, ohne dass die Szene aufgesplittet wird. Maximale Charakter-Konsistenz via Continuity Guardian + Anchor-Lock.
 
-1. Die Szene hat **kein character_audio_url** und **kein scene_audio_clip** → Fallback 3 (TTS-Resynthese) springt an.
-2. Fallback 3 ruft `generate-voiceover` (ElevenLabs) auf, übergibt aber den **Hume-Voice-Namen** `"Groovy Guy"` direkt als ElevenLabs-VoiceID → ElevenLabs antwortet mit `400 invalid_uid: 'Groovy Guy'`.
-3. Die Function setzt `lip_sync_status='no_voiceover'` und gibt 422 zurück.
-4. Im UI fängt der Auto-Trigger-Handler den Fehler nur per `console.warn` ab — **kein Toast, kein sichtbares Feedback**. Der „Lip-Sync gestartet"-Toast wird sogar fälschlich gezeigt, weil er VOR der Antwort feuert.
+---
 
-Das ist exakt derselbe Hume↔ElevenLabs-Fehler, den wir letzte Runde in `compose-video-clips` gefixt haben — aber nur dort, nicht im Lip-Sync-Pfad.
+## Pipeline (vollständig server-seitig)
 
-## Plan
+### Phase 0 — Sofort-Bereinigung
+- DB: 5 Duplikat-Zeilen aus letztem Bug löschen (Slots 6–10 des aktuellen Projekts).
+- Splitten-Knopf für Multi-Speaker-Hooks **deaktivieren** (UI-Badge bleibt, aber ohne Split-Aktion). Stattdessen primärer CTA: **"Two-Shot in echte Szene einbauen"**.
 
-### 1. `supabase/functions/compose-lipsync-scene/index.ts` — Hume-Voice-Support in Fallback 3
-Vor dem `generate-voiceover`-Call (Zeile ~163) das Voice-Objekt inspizieren:
-- Wenn `firstVoice.provider === 'HUME_AI'` ODER `firstVoice.engine === 'hume'` → stattdessen `generate-voiceover-hume` aufrufen mit `text` + `voiceName` (analog zur Lösung in `compose-video-clips`).
-- Bei Hume-Failure: aussagekräftigen `clip_error` schreiben („Hume-Stimme '…' konnte nicht synthetisiert werden").
-- Sonst (ElevenLabs): wie gehabt.
+### Phase 1 — Audio-Plan & Voiceover (gemeinsamer Master-Track)
+1. Aus `dialog_script` + `dialog_voices` einen Master-Plan bauen:
+   - Matthew 0.00 – 1.42 s ("Welcome to DroneOcular")
+   - 0.20 s Pause
+   - Sarah 1.62 – 4.10 s ("…")
+   - Total padded auf max. 10 s (Hailuo-Limit).
+2. Pro Sprecher TTS via ElevenLabs/Hume → einzelne WAVs, exakt auf die Zeitachse gemixt zu **einem** `master_voice_track.wav`.
+3. Pro Speaker zusätzlich isolierte Stems speichern (`speaker1.wav`, `speaker2.wav`) — werden für Sync.so gebraucht.
+4. Persist in `composer_scenes.audio_plan` (segments + master URL + per-speaker URLs).
 
-### 2. `supabase/functions/compose-lipsync-scene/index.ts` — Klarere Fehlertypen
-- Neuer Returncode `tts_failed` (400) mit der Original-Fehlermeldung der TTS-API, statt alles in `no_voiceover` zu stopfen. Dadurch sieht der User in der UI den echten Grund.
-- `clip_error` immer mit konkretem Hinweis befüllen (nicht nur „benötigt ein Voiceover…").
+### Phase 2 — Two-Shot-Anchor (Nano Banana 2)
+1. `compose-scene-anchor` mit `portraitUrls=[matthew, sarah]` und Prompt-Hint *"Two-Shot, both characters visible, equal framing, shared lighting and location"*.
+2. Ergebnis = **Anchor-Frame** (1 Bild). Im Storyboard als Vorschau-Thumbnail.
+3. Anchor-URL in `lock_reference_url` schreiben → Continuity Guardian aktiviert.
 
-### 3. `src/components/video-composer/ClipsTab.tsx` — Sichtbares Feedback
-- **Auto-Trigger-Handler** (~Zeile 460-480 + ~Zeile 281-310): den `error`/422/400-Response-Body inspizieren und einen **destructive Toast** mit dem `clip_error` zeigen statt nur `console.warn`.
-- **Optimistischen „Lip-Sync gestartet"-Toast entfernen** — erst zeigen, wenn die Function tatsächlich `running` zurückgibt.
-- **Scene-Card-Badge:** wenn `lip_sync_status === 'no_voiceover'` ODER `'tts_failed'`, anstelle von „Fertig" einen gelben Badge **„Lip-Sync fehlgeschlagen — Voiceover prüfen"** mit dem `clip_error` als Tooltip.
-- **Retry-Button:** in der Szenen-Aktionsleiste neben „In echte Szene einbauen" einen kleinen 🔄-Button, der `compose-lipsync-scene` erneut feuert (für den Fall, dass der User das Voiceover gefixt hat).
+### Phase 3 — Master-Clip (Hailuo i2v 10 s)
+1. Hailuo i2v mit dem Two-Shot-Anchor als first frame, 10 s, gemeinsamer Prompt mit Bewegungs-Hint *"both speakers stay in frame, subtle natural body language, no cuts"*.
+2. Output = **`master_clip.mp4` (10 s, beide Köpfe sichtbar, kein Lip-Sync)**.
 
-### 4. DB-Repair (einmalig)
-Szene `c357d482…` (`lip_sync_status='no_voiceover'`) zurücksetzen auf `lip_sync_status=NULL` + `clip_error=NULL`, damit der User nach dem Fix sauber neu starten kann.
+### Phase 4 — Sequentieller Multi-Face Lip-Sync (neuer Edge-Function-Pfad)
+Neue Funktion **`compose-twoshot-lipsync`** (ersetzt für Two-Shots den bisherigen `compose-lipsync-scene`-Aufruf):
 
-### Was NICHT geändert wird
-- Kein Refactoring der Voice-Provider-Architektur.
-- Kein Wechsel von Sync.so auf einen anderen Lip-Sync-Provider.
-- HeyGen-Pfad in `compose-video-clips` bleibt wie er ist (war bereits letzte Runde gefixt).
+```text
+input: master_clip.mp4 + audio_plan.segments[]
 
-## Technische Details
+for each segment in order:
+  1. Sync.so/lipsync-2 läuft auf dem AKTUELLEN Clip
+     mit nur DIESEM Speaker-Audio + Sync.so-Parameter
+     "active_speaker_face_index" (Sync.so unterstützt face_index 0/1).
+     Erste Iteration: face_index=0 (Matthew) mit silence-padded
+       Audio (Matthew spricht 0–1.42s, Rest Stille).
+     Zweite Iteration: face_index=1 (Sarah) auf das ERGEBNIS
+       der ersten Iteration mit Sarah-Audio (Stille 0–1.62s,
+       dann Sarah, Rest Stille).
+  result = lippensynchroner Two-Shot mit beiden Sprechern
+```
 
-| Datei | Änderung |
+Der bereits durchgesynchronisierte Speaker bleibt natürlich erhalten — Sync.so überschreibt nur den jeweils adressierten Mund. Endergebnis = ein einziges 10-s-Video.
+
+Falls Sync.so `face_index` für einen Frame nicht eindeutig auflösen kann → Fallback: **face-detection Crop → per-Face-Sync → Re-Composite** via ffmpeg in der Edge Function (Plan B, automatisch).
+
+### Phase 5 — Audio-Mix & Persist
+1. Master-Voice-Track (aus Phase 1.2) mit `clip_url` mux'en (ffmpeg in Edge), Musik-Bed bleibt unangetastet (kommt im Director's Cut dazu).
+2. `composer_scenes` der Hook-Karte aktualisieren:
+   - `clip_url` = finales 10s-Two-Shot-Video
+   - `duration_seconds` = 10
+   - `lip_sync_status` = `done`
+   - `lip_sync_source_clip_url` = master_clip.mp4 (für Re-Run)
+   - `cinematic_preset_slug` = `twoshot-cinematic-sync`
+3. **Keine** Sub-Szenen werden angelegt. Storyboard zeigt weiterhin **eine** Hook-Karte.
+
+### Phase 6 — Continuity Guardian
+1. Nach Render: 3 Frames (0s, 5s, 9.5s) extrahieren.
+2. Vergleich gegen Anchor → Drift-Score.
+3. Bei Drift > Schwelle: UI-Badge "Continuity drift erkannt — Re-render?".
+
+---
+
+## UI-Änderungen
+
+- **SceneCard (Hook mit ≥2 Sprechern)**:
+  - Großer Primär-Button: **"Two-Shot in echte Szene einbauen (€~1.50)"**.
+  - Sekundär klein: "Als Shot-Reverse-Shot splitten (Legacy)".
+  - Status während Render: "Anchor → Master-Clip → Lip-Sync 1/2 → Lip-Sync 2/2 → Continuity Check".
+- **Tipp-Banner** umtexten: "Multi-Charakter-Szenen werden jetzt als Two-Shot in einer einzigen 10s-Szene gerendert. Beide sprechen lippensynchron. Kein Splitten mehr nötig."
+
+---
+
+## Tech-Footprint
+
+| Bereich | Datei | Änderung |
+|---|---|---|
+| DB | Migration | Cleanup-Funktion + Default `removeParent` Defensive |
+| Edge | `compose-scene-anchor` | Two-Shot-Hint im Prompt |
+| Edge | **NEU** `compose-twoshot-lipsync` | sequenzielles Sync.so + ffmpeg-Mix |
+| Edge | `compose-video-clips` | Two-Shot-Routing erkennt `dialog_voices`-Count ≥ 2, ruft neue Funktion |
+| Edge | `compose-lipsync-scene` | bleibt für Single-Speaker-Cinematic-Sync |
+| Frontend | `SceneCard.tsx` | Neuer Primär-CTA, Splitten-Button degradiert |
+| Frontend | `ClipsTab.tsx` | Multi-Stage-Status für Two-Shot |
+| Frontend | `SceneDialogStudio.tsx` | Auto-Split entfernen / nur noch optional |
+
+## Kosten pro Hook
+
+| Step | Kosten |
 |---|---|
-| `supabase/functions/compose-lipsync-scene/index.ts` | Hume-Detection vor Fallback-3-TTS-Call; neuer `tts_failed`-Returncode; konkrete `clip_error`-Texte |
-| `src/components/video-composer/ClipsTab.tsx` | Destructive Toast bei Lip-Sync-Failures; Badge „Lip-Sync fehlgeschlagen"; manueller Retry-Button; optimistischer Toast entfernt |
-| DB | `UPDATE composer_scenes SET lip_sync_status=NULL, clip_error=NULL WHERE id='c357d482-ef05-4498-81d6-4e508c202ddc'` |
+| Nano Banana 2 Anchor | €0.03 |
+| Hailuo i2v 10 s | €0.95 |
+| Sync.so × 2 | €0.30 × 2 = €0.60 |
+| ElevenLabs TTS × 2 | ~€0.05 |
+| **Summe** | **≈ €1.65** |
 
-## Erwartetes Verhalten danach
+---
 
-1. Du klickst „In echte Szene einbauen" → Hailuo rendert (~30-60s, Status sichtbar).
-2. Auto-Lip-Sync startet → Toast „Lip-Sync läuft (~30s)" erscheint **nur** wenn Sync.so wirklich gestartet ist.
-3. Wenn die Hume-Stimme jetzt sauber via `generate-voiceover-hume` synthetisiert wird → Sync.so läuft durch → Szene zeigt Hailuo-Clip mit korrekt synchronen Lippen ✅
-4. Wenn irgendwas schiefgeht → **roter Toast mit echtem Grund** + gelber Badge auf der Szene + Retry-Button.
+## Risiken & Mitigation
+
+1. **Sync.so face_index nicht zuverlässig** → Fallback Plan B (Crop/Re-Composite). Beide Pfade in `compose-twoshot-lipsync`.
+2. **Hailuo zeigt nur 1 Person** trotz Two-Shot-Anchor → Anchor-Validierung mit Gemini Vision (zähle erkannte Gesichter ≥ 2, sonst Anchor-Re-Roll).
+3. **Drift im Master-Clip** → Continuity Guardian rendert Re-Run Vorschlag.
+
+## Reihenfolge der Umsetzung
+
+1. **Bereinigung + Splitten-Disable** (sofort sichtbar, kein DB-Mess mehr).
+2. **`compose-twoshot-lipsync` Edge Function** + `compose-video-clips` Routing.
+3. **UI-CTA + Multi-Stage-Status**.
+4. **Continuity Guardian Hook** für Two-Shot.
+5. **Anchor-Validierung (Face-Count ≥ 2)** als Polish.
