@@ -209,6 +209,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
+  const { characters: brandChars } = useBrandCharacters();
+  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
