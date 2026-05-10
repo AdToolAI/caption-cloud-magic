@@ -1272,6 +1272,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           : 'text-muted-foreground';
         return <p className={`text-[10px] ${cls} -mb-1`}>{label}</p>;
       })()}
+      {(() => {
+        const allPortraits = speakers.every((sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl);
+        if (blocks.length < 2 || !allPortraits || renderAsSeparateScenes) return null;
+        return (
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
+            🎭 <strong>Two-Shot-Modus:</strong>{' '}
+            {language === 'de'
+              ? 'Beide Sprecher werden in EINE 10s-Szene komponiert. Sequenzieller Lip-Sync pro Gesicht via Sync.so + Continuity Guardian.'
+              : language === 'es'
+              ? 'Ambos hablantes en UNA escena de 10s. Lip-sync secuencial por cara vía Sync.so + Continuity Guardian.'
+              : 'Both speakers composed into ONE 10s scene. Sequential per-face lip-sync via Sync.so + Continuity Guardian.'}
+          </div>
+        );
+      })()}
       <div className="flex items-center gap-2">
         <Button
           type="button"
