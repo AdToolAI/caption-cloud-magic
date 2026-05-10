@@ -3,7 +3,8 @@ import { Label } from '@/components/ui/label';
 import { Check } from 'lucide-react';
 
 const TRANSITIONS = [
-  { id: 'none', name: 'Keine', description: 'Harter Schnitt ohne Übergang' },
+  { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
+  { id: 'crossfade', name: 'Crossfade', description: 'Sanftes Morphing zwischen Szenen' },
   { id: 'fade', name: 'Fade', description: 'Sanftes Ein-/Ausblenden' },
   { id: 'slide', name: 'Slide', description: 'Seitliches Gleiten' },
   { id: 'zoom', name: 'Zoom', description: 'Hinein-/Herauszoomen' },
