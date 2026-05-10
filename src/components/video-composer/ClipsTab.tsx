@@ -903,21 +903,38 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                   {!isMultiSpeaker && (
                     <AlertDialogAction
-                      onClick={() => {
+                      onClick={async () => {
                         const t = cinematicSwitchTarget;
                         setCinematicSwitchTarget(null);
                         if (!t) return;
+                        const newClipSource = t.clipSource.startsWith('ai-') ? t.clipSource : 'ai-hailuo';
                         const updated: ComposerScene[] = scenes.map((s) =>
                           s.id === t.id
                             ? {
                                 ...s,
                                 engineOverride: 'cinematic-sync',
-                                clipSource: s.clipSource.startsWith('ai-') ? s.clipSource : 'ai-hailuo',
+                                clipSource: newClipSource,
                               }
                             : s,
                         );
                         onUpdateScenes(updated);
                         const updatedTarget = updated.find((s) => s.id === t.id) || t;
+
+                        // Hardening: persist override synchronously so polls /
+                        // reloads see the right engine even before the debounced
+                        // setScenes flush lands.
+                        try {
+                          await supabase
+                            .from('composer_scenes')
+                            .update({
+                              engine_override: 'cinematic-sync',
+                              clip_source: newClipSource,
+                            })
+                            .eq('id', t.id);
+                        } catch (err) {
+                          console.warn('[ClipsTab] cinematic-sync override persist failed:', err);
+                        }
+
                         handleGenerateSingle(updatedTarget);
                         toast({
                           title: 'Cinematic-Sync gestartet',
