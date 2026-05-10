@@ -5517,6 +5517,48 @@ export type Database = {
         }
         Relationships: []
       }
+      composer_undo_stack: {
+        Row: {
+          action_type: string
+          after_state: Json | null
+          before_state: Json | null
+          created_at: string
+          credits_charged: number
+          id: string
+          label: string | null
+          project_id: string
+          refundable: boolean
+          scene_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          credits_charged?: number
+          id?: string
+          label?: string | null
+          project_id: string
+          refundable?: boolean
+          scene_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          after_state?: Json | null
+          before_state?: Json | null
+          created_at?: string
+          credits_charged?: number
+          id?: string
+          label?: string | null
+          project_id?: string
+          refundable?: boolean
+          scene_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_approvals: {
         Row: {
           content_id: string
