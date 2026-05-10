@@ -83,7 +83,9 @@ serve(async (req) => {
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
-    const promptHash = await sha1(`${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
+    // v2 — bumped cache key so older, weaker anchors are NOT reused after the
+    // identity-lock prompt overhaul.
+    const promptHash = await sha1(`v2|${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
@@ -105,19 +107,21 @@ serve(async (req) => {
     const isMulti = portraits.length > 1;
     const peopleNoun = isMulti ? `these ${portraits.length} people` : "this person";
     const nameClause = names.length > 0
-      ? ` Reference portraits, in order: ${names.map((n, i) => `Image #${i + 1} = ${n}`).join("; ")}.`
+      ? ` Reference portraits, in strict order: ${names.map((n, i) => `Image #${i + 1} = ${n} (use ONLY image #${i + 1} for ${n}'s face)`).join("; ")}.`
       : "";
     const multiClause = isMulti
-      ? ` CRITICAL IDENTITY LOCK: Each face MUST be copied pixel-for-pixel from its reference portrait. ` +
-        `Do NOT generalize, beautify, age, slim, or re-imagine any face. ` +
-        `Preserve eye shape, nose, jawline, hairline, skin tone, facial hair and any distinctive marks EXACTLY. ` +
-        `All ${portraits.length} characters MUST appear together in the SAME frame, positioned naturally per the scene ` +
-        `(e.g. side by side, facing each other, in conversation). ` +
-        `If scene lighting differs from the portrait, only adapt skin shading — never the underlying face geometry.`
-      : ` Preserve the person's facial identity exactly — copy the face from the reference portrait without alteration.`;
+      ? ` ABSOLUTE IDENTITY LOCK — NON-NEGOTIABLE: Treat each reference portrait as a forensic photograph of a real, specific person. ` +
+        `Copy each face PIXEL-FOR-PIXEL from its reference portrait. ` +
+        `Do NOT generalize, beautify, slim, age, de-age, restyle hair, change ethnicity, or "improve" any face. ` +
+        `Preserve EXACTLY: face shape, jawline, cheekbones, nose shape and width, eye shape and spacing, eyebrow shape, lip shape, hairline, hair color, hair length, beard/stubble, skin tone, freckles, moles, scars, glasses. ` +
+        `Faces MUST remain clearly recognizable as the SAME individuals from the reference portraits — a stranger looking at the result and the references must immediately confirm it is the same people. ` +
+        `All ${portraits.length} characters appear together in the SAME frame, naturally placed per the scene (side by side, facing each other, in conversation), faces clearly visible to camera. ` +
+        `If scene lighting differs, only adapt skin shading and color temperature — NEVER alter underlying face geometry, hair, or distinctive marks. ` +
+        `Generic lookalikes, AI "average" faces, or substituted people are FORBIDDEN.`
+      : ` ABSOLUTE IDENTITY LOCK: Copy this person's face pixel-for-pixel from the reference portrait. Preserve face shape, eyes, nose, mouth, hairline, hair, skin tone and any distinctive marks EXACTLY. The result must be unmistakably the same person.`;
     const editInstruction =
       `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause} ` +
-      `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera. ` +
+      `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description, no text, no captions, no watermark.\n\n` +
       `Scene: ${body.scenePrompt}`;
 
