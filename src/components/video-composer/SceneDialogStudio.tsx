@@ -1312,10 +1312,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 <>
                   <User className="h-3 w-3" />{' '}
                   {language === 'de'
-                    ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
+                    ? `🎭 Two-Shot in echte Szene einbauen (~€1.65)`
                     : language === 'es'
-                    ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
-                    : `Render professional lip-sync (${speakers.length} cuts)`}
+                    ? `🎭 Componer Two-Shot en escena real (~€1.65)`
+                    : `🎭 Render Two-Shot into real scene (~€1.65)`}
                 </>
               ) : (
                 <>
