@@ -105,11 +105,16 @@ serve(async (req) => {
     const isMulti = portraits.length > 1;
     const peopleNoun = isMulti ? `these ${portraits.length} people` : "this person";
     const nameClause = names.length > 0
-      ? ` The reference portraits correspond, in order, to: ${names.join(", ")}.`
+      ? ` Reference portraits, in order: ${names.map((n, i) => `Image #${i + 1} = ${n}`).join("; ")}.`
       : "";
     const multiClause = isMulti
-      ? ` All ${portraits.length} characters MUST be visible in the same frame, positioned naturally according to the scene description (e.g. side by side, facing each other, in conversation). Preserve each person's individual identity exactly — do not blend faces.`
-      : "";
+      ? ` CRITICAL IDENTITY LOCK: Each face MUST be copied pixel-for-pixel from its reference portrait. ` +
+        `Do NOT generalize, beautify, age, slim, or re-imagine any face. ` +
+        `Preserve eye shape, nose, jawline, hairline, skin tone, facial hair and any distinctive marks EXACTLY. ` +
+        `All ${portraits.length} characters MUST appear together in the SAME frame, positioned naturally per the scene ` +
+        `(e.g. side by side, facing each other, in conversation). ` +
+        `If scene lighting differs from the portrait, only adapt skin shading — never the underlying face geometry.`
+      : ` Preserve the person's facial identity exactly — copy the face from the reference portrait without alteration.`;
     const editInstruction =
       `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera. ` +
