@@ -203,11 +203,17 @@ serve(async (req) => {
       // to a distinct 'no_voiceover' state and surface a clear error so the UI
       // can prompt the user to add a voiceover instead of leaving the scene
       // looking 'ready' when it actually never got lip-synced.
+      // Mark the Hailuo render itself as ready so the UI unblocks the scene
+      // (the silent clip IS the rendered scene), but flag lip_sync_status so
+      // the user sees a clear "needs voiceover" action instead of an endless
+      // spinner. Without resetting clip_status='ready' here the scene stays
+      // forever in "Wird generiert…".
       await supabase
         .from('composer_scenes')
         .update({
+          clip_status: 'ready',
           lip_sync_status: 'no_voiceover',
-          clip_error: 'Cinematic-Sync needs a voiceover for this scene. Add a Dialog/VO first, then retry.',
+          clip_error: 'Cinematic-Sync benötigt ein Voiceover für diese Szene. Bitte zuerst im Dialog/VO-Tab eine Stimme generieren, dann erneut starten.',
         })
         .eq('id', scene_id);
       return json({
