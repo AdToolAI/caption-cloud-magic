@@ -1,19 +1,33 @@
 ## Problem
 
-`/sfx-library` zeigt sofort beim Öffnen den Toast „Suche fehlgeschlagen — Failed to send a request to the Edge Function".
+Du siehst noch dieselben 5 Mixkit-Sounds, obwohl die Edge Function jetzt echte Freesound-Ergebnisse liefert (per `curl` verifiziert).
 
-## Ursache
+**Ursache:** In der Tabelle `sfx_library_cache` liegen 9 alte Einträge mit `source = 'fallback'`, die **vor** dem Hinzufügen des `FREESOUND_API_KEY` gespeichert wurden — mit 24h TTL. Die UI trifft beim Laden den Cache und bekommt die alten Mixkit-Fallbacks zurück, ohne überhaupt Freesound/Pixabay anzufragen.
 
-Der Hook ruft beim Mount automatisch `supabase.functions.invoke("search-sfx-library", …)` auf — aber die Edge Function ist **nicht deployt**. Sie existiert nur als Quellcode in `supabase/functions/search-sfx-library/index.ts`. Der Aufruf antwortet mit `404 NOT_FOUND`, was die Supabase-JS-SDK als „Failed to send a request to the Edge Function" rendert.
+```
+sfx:whoosh||10            | mixed    | 5 results
+sfx:explosion||24         | fallback | 0 results   ← Müll
+sfx:|footsteps|30         | fallback | 0 results   ← Müll
+sfx:|ambient|30           | fallback | 0 results   ← Müll
+sfx:|ui click|30          | fallback | 1 result    ← Müll
+... usw.
+```
 
-(Gleiche Klasse von Bug wie eben bei `search-stock-videos` — Code existiert, Deploy fehlt.)
+## Lösung
 
-## Fix (1 Schritt)
+### 1. Alten Fallback-Cache löschen (Migration)
+Alle Zeilen mit `source = 'fallback'` aus `sfx_library_cache` entfernen, damit beim nächsten Aufruf wirklich Freesound/Pixabay gefragt werden.
 
-1. **`search-sfx-library` deployen** (`supabase--deploy_edge_functions`).
-2. Curl-Smoke-Test: `POST /search-sfx-library` mit `{ "query": "whoosh", "limit": 5 }` → erwartet `200` mit Treffer-Array.
-3. SFX-Library-Seite neu laden — Toast verschwindet, Treffer erscheinen.
+### 2. Edge Function härten (`search-sfx-library/index.ts`)
+- **Fallback nicht mehr cachen** — nur `mixed`/`pixabay`/`freesound` Resultate in die DB schreiben. So vergiftet ein temporärer API-Ausfall nie wieder den Cache für 24h.
+- **Leere Default-Suche fixen:** Beim Page-Load ohne Query/Kategorie wird aktuell `searchTerm = ''` an Pixabay/Freesound geschickt → wenig brauchbare Ergebnisse. Default auf einen kuratierten Term setzen (z.B. `"sound effect"`) oder ein zufälliges Kategorie-Tag aus der Tag-Bar.
 
-Kein Code-Change, keine Migration.
+### 3. UI-Hinweis
+Im Ergebniscount eine kleine Quellen-Pill anzeigen (`Pixabay + Freesound` vs. `Fallback`), damit du sofort siehst ob echte oder gecachte Mixkit-Daten kommen.
 
-Sag Bescheid, wenn ich den Fix ausführen soll.
+## Erwartetes Ergebnis
+
+Nach Reload der `/sfx-library`-Seite:
+- Ergebnisse zeigen Sounds von Freesound (mit echten Usernamen als „Artist") statt 5x „Mixkit"
+- Bei jeder Suche wirst du dutzende echte Treffer sehen
+- Cache enthält nur noch valide `mixed`-Einträge

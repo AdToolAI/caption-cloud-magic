@@ -108,7 +108,9 @@ Deno.serve(async (req) => {
 
     const PIXABAY_KEY = Deno.env.get('PIXABAY_API_KEY');
     const FREESOUND_KEY = Deno.env.get('FREESOUND_API_KEY');
-    const searchTerm = [query, category].filter(Boolean).join(' ').trim();
+    const rawTerm = [query, category].filter(Boolean).join(' ').trim();
+    // Default term so empty page-load returns real sounds instead of fallbacks
+    const searchTerm = rawTerm || 'sound effect';
 
     const promises: Promise<SfxResult[]>[] = [];
     if (PIXABAY_KEY) promises.push(searchPixabay(searchTerm, Math.ceil(limit / 2), PIXABAY_KEY));
@@ -133,9 +135,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Cache (best effort)
+    // Cache (best effort) — never poison cache with fallback results
     try {
-      await supa.from('sfx_library_cache').upsert({
+      if (sourceLabel !== 'fallback') await supa.from('sfx_library_cache').upsert({
         cache_key: cacheKey,
         query,
         category: category || null,
