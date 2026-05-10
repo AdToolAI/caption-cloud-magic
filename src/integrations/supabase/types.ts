@@ -5203,6 +5203,7 @@ export type Database = {
           continuity_auto_repair: boolean
           continuity_checked_at: string | null
           continuity_drift_label: string | null
+          continuity_drift_notes: Json | null
           continuity_drift_score: number | null
           continuity_locked: boolean
           continuity_source_scene_id: string | null
@@ -5254,6 +5255,7 @@ export type Database = {
           transition_type: string
           trim_end_sec: number | null
           trim_start_sec: number | null
+          twoshot_stage: string | null
           updated_at: string
           upload_type: string | null
           upload_url: string | null
@@ -5279,6 +5281,7 @@ export type Database = {
           continuity_auto_repair?: boolean
           continuity_checked_at?: string | null
           continuity_drift_label?: string | null
+          continuity_drift_notes?: Json | null
           continuity_drift_score?: number | null
           continuity_locked?: boolean
           continuity_source_scene_id?: string | null
@@ -5330,6 +5333,7 @@ export type Database = {
           transition_type?: string
           trim_end_sec?: number | null
           trim_start_sec?: number | null
+          twoshot_stage?: string | null
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
@@ -5355,6 +5359,7 @@ export type Database = {
           continuity_auto_repair?: boolean
           continuity_checked_at?: string | null
           continuity_drift_label?: string | null
+          continuity_drift_notes?: Json | null
           continuity_drift_score?: number | null
           continuity_locked?: boolean
           continuity_source_scene_id?: string | null
@@ -5406,6 +5411,7 @@ export type Database = {
           transition_type?: string
           trim_end_sec?: number | null
           trim_start_sec?: number | null
+          twoshot_stage?: string | null
           updated_at?: string
           upload_type?: string | null
           upload_url?: string | null
