@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2 } from 'lucide-react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2 } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import RerollVariantGrid from './RerollVariantGrid';
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
