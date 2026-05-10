@@ -104,7 +104,25 @@ serve(async (req) => {
     }
 
     const vo = voClips?.[0];
-    if (!vo?.url) return json({ error: 'no voiceover clip for scene' }, 400);
+    if (!vo?.url) {
+      // No voiceover yet — we cannot lip-sync. Don't leave the scene stuck on
+      // 'pending' / 'generating'; mark the underlying clip as ready so the
+      // user can keep working. The Cinematic-Sync step will be re-runnable
+      // later once a VO is added.
+      await supabase
+        .from('composer_scenes')
+        .update({
+          lip_sync_status: 'skipped',
+          clip_status: 'ready',
+        })
+        .eq('id', scene_id);
+      return json({
+        ok: true,
+        skipped: true,
+        reason: 'no_voiceover',
+        scene_id,
+      });
+    }
 
     // Wallet check + reserve
     const { data: wallet } = await supabase

@@ -57,12 +57,15 @@ serve(async (req) => {
         console.error('[compose-clip-webhook] Storage failed, using temporary URL:', storageErr);
       }
 
-      // Update scene
+      // Update scene — also clear any stale clip_error from a previous failed
+      // engine (e.g. HeyGen "Talking Photo deleted") so the UI doesn't show a
+      // misleading error next to a freshly rendered Hailuo clip.
       await supabase
         .from('composer_scenes')
         .update({
           clip_url: permanentUrl,
           clip_status: 'ready',
+          clip_error: null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);
