@@ -136,6 +136,7 @@ const AutopilotAUP = lazy(() => import("./pages/legal/AutopilotAUP"));
 
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
+const SfxLibrary = lazy(() => import("./pages/SfxLibrary"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
 const HubPage = lazy(() => import("./pages/HubPage"));
 const Community = lazy(() => import("./pages/Community"));
