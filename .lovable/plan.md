@@ -1,80 +1,96 @@
-## Ziel — "Artlist Two-Shot Hook"
-
-Aus der ursprünglichen 10s-Hook-Szene (Matthew + Sarah im Dialog) wird **EINE einzige 10s-Karte** im Storyboard, in der **beide Charaktere gleichzeitig im Bild** zu sehen sind und **nacheinander lippensynchron sprechen** — ohne sichtbare Cuts, ohne dass die Szene aufgesplittet wird. Maximale Charakter-Konsistenz via Continuity Guardian + Anchor-Lock.
+## Ziel
+Aus der bereits zusammengeführten 10s-Hook-Karte (Matthew + Sarah) wird auf einen Klick ein einziges 10s-Video, in dem **beide Charaktere gleichzeitig im Bild** zu sehen sind und **nacheinander lippensynchron** sprechen — Artlist-Niveau, ohne Splitten, mit Continuity-Lock.
 
 ---
 
-## Pipeline (vollständig server-seitig)
+## Schritt 1 — Neue Edge Function `compose-twoshot-lipsync`
 
-### Phase 0 — Sofort-Bereinigung
-- DB: 5 Duplikat-Zeilen aus letztem Bug löschen (Slots 6–10 des aktuellen Projekts).
-- Splitten-Knopf für Multi-Speaker-Hooks **deaktivieren** (UI-Badge bleibt, aber ohne Split-Aktion). Stattdessen primärer CTA: **"Two-Shot in echte Szene einbauen"**.
-
-### Phase 1 — Audio-Plan & Voiceover (gemeinsamer Master-Track)
-1. Aus `dialog_script` + `dialog_voices` einen Master-Plan bauen:
-   - Matthew 0.00 – 1.42 s ("Welcome to DroneOcular")
-   - 0.20 s Pause
-   - Sarah 1.62 – 4.10 s ("…")
-   - Total padded auf max. 10 s (Hailuo-Limit).
-2. Pro Sprecher TTS via ElevenLabs/Hume → einzelne WAVs, exakt auf die Zeitachse gemixt zu **einem** `master_voice_track.wav`.
-3. Pro Speaker zusätzlich isolierte Stems speichern (`speaker1.wav`, `speaker2.wav`) — werden für Sync.so gebraucht.
-4. Persist in `composer_scenes.audio_plan` (segments + master URL + per-speaker URLs).
-
-### Phase 2 — Two-Shot-Anchor (Nano Banana 2)
-1. `compose-scene-anchor` mit `portraitUrls=[matthew, sarah]` und Prompt-Hint *"Two-Shot, both characters visible, equal framing, shared lighting and location"*.
-2. Ergebnis = **Anchor-Frame** (1 Bild). Im Storyboard als Vorschau-Thumbnail.
-3. Anchor-URL in `lock_reference_url` schreiben → Continuity Guardian aktiviert.
-
-### Phase 3 — Master-Clip (Hailuo i2v 10 s)
-1. Hailuo i2v mit dem Two-Shot-Anchor als first frame, 10 s, gemeinsamer Prompt mit Bewegungs-Hint *"both speakers stay in frame, subtle natural body language, no cuts"*.
-2. Output = **`master_clip.mp4` (10 s, beide Köpfe sichtbar, kein Lip-Sync)**.
-
-### Phase 4 — Sequentieller Multi-Face Lip-Sync (neuer Edge-Function-Pfad)
-Neue Funktion **`compose-twoshot-lipsync`** (ersetzt für Two-Shots den bisherigen `compose-lipsync-scene`-Aufruf):
+Sequenzieller Multi-Face Sync.so Pass auf einem einzigen Master-Clip.
 
 ```text
-input: master_clip.mp4 + audio_plan.segments[]
+Input:  master_clip_url (10s Hailuo two-shot, kein Lip-Sync)
+        audio_plan.speakers[] mit { audioUrl, startSec, endSec, faceIndex }
 
-for each segment in order:
-  1. Sync.so/lipsync-2 läuft auf dem AKTUELLEN Clip
-     mit nur DIESEM Speaker-Audio + Sync.so-Parameter
-     "active_speaker_face_index" (Sync.so unterstützt face_index 0/1).
-     Erste Iteration: face_index=0 (Matthew) mit silence-padded
-       Audio (Matthew spricht 0–1.42s, Rest Stille).
-     Zweite Iteration: face_index=1 (Sarah) auf das ERGEBNIS
-       der ersten Iteration mit Sarah-Audio (Stille 0–1.62s,
-       dann Sarah, Rest Stille).
-  result = lippensynchroner Two-Shot mit beiden Sprechern
+Pass 1: Sync.so/lipsync-2
+        → video = master_clip_url
+        → audio = speaker[0].isolatedTrack (Matthew + Stille)
+        → active_speaker_face_index = 0
+        → result_v1.mp4
+
+Pass 2: Sync.so/lipsync-2
+        → video = result_v1.mp4
+        → audio = speaker[1].isolatedTrack (Stille + Sarah)
+        → active_speaker_face_index = 1
+        → result_v2.mp4
+
+Final:  ffmpeg-Mux: result_v2.mp4 + master_voice_track.wav
+        → upload composer-clips bucket → final_clip_url
 ```
 
-Der bereits durchgesynchronisierte Speaker bleibt natürlich erhalten — Sync.so überschreibt nur den jeweils adressierten Mund. Endergebnis = ein einziges 10-s-Video.
+Fallback (Plan B) bei Sync.so-`face_index`-Fehler:
+- ffmpeg + Gemini Vision Face-Crop (links/rechts der Bildmitte)
+- Per-Crop Sync.so Single-Face → Re-Composite via ffmpeg overlay
+- Loggen: `lip_sync_strategy = 'face_index' | 'crop_recomposite'`
 
-Falls Sync.so `face_index` für einen Frame nicht eindeutig auflösen kann → Fallback: **face-detection Crop → per-Face-Sync → Re-Composite** via ffmpeg in der Edge Function (Plan B, automatisch).
+Idempotenter Refund bei Failure (deterministische UUID aus `scene_id + master_clip_url`).
+Timeout: 300s (`supabase/config.toml`).
 
-### Phase 5 — Audio-Mix & Persist
-1. Master-Voice-Track (aus Phase 1.2) mit `clip_url` mux'en (ffmpeg in Edge), Musik-Bed bleibt unangetastet (kommt im Director's Cut dazu).
-2. `composer_scenes` der Hook-Karte aktualisieren:
-   - `clip_url` = finales 10s-Two-Shot-Video
-   - `duration_seconds` = 10
-   - `lip_sync_status` = `done`
-   - `lip_sync_source_clip_url` = master_clip.mp4 (für Re-Run)
-   - `cinematic_preset_slug` = `twoshot-cinematic-sync`
-3. **Keine** Sub-Szenen werden angelegt. Storyboard zeigt weiterhin **eine** Hook-Karte.
+## Schritt 2 — Routing in `compose-video-clips`
 
-### Phase 6 — Continuity Guardian
-1. Nach Render: 3 Frames (0s, 5s, 9.5s) extrahieren.
-2. Vergleich gegen Anchor → Drift-Score.
-3. Bei Drift > Schwelle: UI-Badge "Continuity drift erkannt — Re-render?".
+Multi-Speaker-Erkennung erweitern (bereits da: ≥ 2 Sprecher → `compose-twoshot-audio`):
 
----
+```ts
+if (isMultiSpeaker) {
+  await compose-twoshot-audio    // (vorhanden) → master + per-speaker tracks
+  await Hailuo i2v 10s            // mit Two-Shot-Anchor
+  await compose-twoshot-lipsync   // (NEU) statt compose-lipsync-scene
+} else {
+  await compose-lipsync-scene     // single-speaker bleibt
+}
+```
 
-## UI-Änderungen
+`audioPlan.speakers[i].faceIndex` deterministisch aus Reihenfolge im Anchor (links = 0, rechts = 1) — kommt aus der Anchor-Validierung (Schritt 3).
 
-- **SceneCard (Hook mit ≥2 Sprechern)**:
-  - Großer Primär-Button: **"Two-Shot in echte Szene einbauen (€~1.50)"**.
-  - Sekundär klein: "Als Shot-Reverse-Shot splitten (Legacy)".
-  - Status während Render: "Anchor → Master-Clip → Lip-Sync 1/2 → Lip-Sync 2/2 → Continuity Check".
-- **Tipp-Banner** umtexten: "Multi-Charakter-Szenen werden jetzt als Two-Shot in einer einzigen 10s-Szene gerendert. Beide sprechen lippensynchron. Kein Splitten mehr nötig."
+## Schritt 3 — Two-Shot-Anchor + Validierung
+
+In `compose-scene-anchor`:
+- Bei `portraitUrls.length >= 2` Prompt-Hint hart einbauen: *"Two-Shot, both characters visible side by side, equal framing, shared lighting and location, eye-level, no cropping of either face"*.
+- Nano Banana 2 Edit-Call mit beiden Porträts.
+
+Neue Validierung (Gemini 2.5 Flash Vision):
+- Anchor-Bild → Frage: *"Wie viele unterschiedliche Personen sind klar sichtbar? Welche Position hat jede (left/right)?"*
+- Bei `count < 2` → automatischer Re-Roll (max 2 Versuche), sonst Hard-Fail mit klarer UI-Meldung.
+- Speichere `anchor_face_map = [{ name: "Matthew", position: "left", index: 0 }, { name: "Sarah", position: "right", index: 1 }]` in `composer_scenes.audio_plan` → liefert `faceIndex` für Schritt 1.
+
+## Schritt 4 — UI: Neuer CTA + Multi-Stage-Status
+
+`SceneCard.tsx` (für Multi-Speaker-Hooks):
+- Splitten-Button **degradiert** zu sekundärem Link "Als Shot-Reverse-Shot splitten (Legacy)".
+- Großer Primär-CTA: **"Two-Shot in echte Szene einbauen (€~1.65)"**.
+- Tipp-Banner umtexten: *"Multi-Charakter-Szenen werden jetzt als Two-Shot in einer einzigen 10s-Szene gerendert. Beide sprechen lippensynchron."*
+
+`ClipsTab.tsx` Multi-Stage-Progress (5 Stufen, je mit Spinner + Häkchen):
+1. Voiceover synthetisieren (Master + Stems)
+2. Two-Shot-Anchor erzeugen
+3. Master-Clip rendern (Hailuo 10s)
+4. Lip-Sync 1/2 (Matthew)
+5. Lip-Sync 2/2 (Sarah)
+6. Continuity Check
+
+Status-Quelle: neue Spalte `composer_scenes.twoshot_stage` (text, nullable) — Edge-Functions schreiben Stufen-Marker, UI pollt via vorhandenem Realtime-Channel.
+
+`SceneDialogStudio.tsx`: Auto-Split entfernen — bleibt nur als manueller Legacy-Pfad.
+
+## Schritt 5 — Continuity Guardian für Two-Shot
+
+Nach finalem Render in `compose-twoshot-lipsync`:
+- ffmpeg extrahiert 3 Frames (0s, 5s, 9.5s) aus `final_clip_url`.
+- Gemini Vision Drift-Score gegen `lock_reference_url` (Anchor):
+  - Identitäts-Match je Person (links/rechts)
+  - Hintergrund-Konsistenz
+  - Beleuchtung
+- `composer_scenes.continuity_drift_score` (0–1) + `continuity_drift_notes` persistieren.
+- Bei Score > 0.35 UI-Badge: **"Continuity-Drift erkannt — Re-Render?"** (Re-Render-Button triggert Schritt 1+2 mit gleichem Anchor).
 
 ---
 
@@ -82,37 +98,29 @@ Falls Sync.so `face_index` für einen Frame nicht eindeutig auflösen kann → F
 
 | Bereich | Datei | Änderung |
 |---|---|---|
-| DB | Migration | Cleanup-Funktion + Default `removeParent` Defensive |
-| Edge | `compose-scene-anchor` | Two-Shot-Hint im Prompt |
-| Edge | **NEU** `compose-twoshot-lipsync` | sequenzielles Sync.so + ffmpeg-Mix |
-| Edge | `compose-video-clips` | Two-Shot-Routing erkennt `dialog_voices`-Count ≥ 2, ruft neue Funktion |
-| Edge | `compose-lipsync-scene` | bleibt für Single-Speaker-Cinematic-Sync |
-| Frontend | `SceneCard.tsx` | Neuer Primär-CTA, Splitten-Button degradiert |
-| Frontend | `ClipsTab.tsx` | Multi-Stage-Status für Two-Shot |
-| Frontend | `SceneDialogStudio.tsx` | Auto-Split entfernen / nur noch optional |
+| Edge | `supabase/functions/compose-twoshot-lipsync/index.ts` | NEU |
+| Edge | `supabase/functions/compose-video-clips/index.ts` | Routing → twoshot-lipsync |
+| Edge | `supabase/functions/compose-scene-anchor/index.ts` | Two-Shot-Hint + Vision-Validierung + face_map |
+| Config | `supabase/config.toml` | `compose-twoshot-lipsync` 300s timeout |
+| DB-Migration | `composer_scenes` | `twoshot_stage text`, `continuity_drift_score numeric`, `continuity_drift_notes jsonb` |
+| Frontend | `src/components/video-composer/SceneCard.tsx` | Neuer CTA, Splitten degradiert |
+| Frontend | `src/components/video-composer/ClipsTab.tsx` | 6-Stufen-Progress, Drift-Badge |
+| Frontend | `src/components/video-composer/SceneDialogStudio.tsx` | Auto-Split entfernen |
+
+## Reihenfolge (Implementierung)
+
+1. DB-Migration (`twoshot_stage`, drift-Felder).
+2. `compose-scene-anchor` Two-Shot-Hint + Vision-Validierung + `face_map`.
+3. `compose-twoshot-lipsync` Edge Function + Config.
+4. Routing in `compose-video-clips`.
+5. Continuity Guardian Block am Ende von `compose-twoshot-lipsync`.
+6. UI-Änderungen (SceneCard CTA, ClipsTab Multi-Stage, SceneDialogStudio).
 
 ## Kosten pro Hook
-
-| Step | Kosten |
-|---|---|
-| Nano Banana 2 Anchor | €0.03 |
-| Hailuo i2v 10 s | €0.95 |
-| Sync.so × 2 | €0.30 × 2 = €0.60 |
-| ElevenLabs TTS × 2 | ~€0.05 |
-| **Summe** | **≈ €1.65** |
-
----
+~€1.65 (Anchor €0.03 · Hailuo €0.95 · Sync.so 2× €0.60 · TTS €0.05 · Vision-Checks €0.02).
 
 ## Risiken & Mitigation
-
-1. **Sync.so face_index nicht zuverlässig** → Fallback Plan B (Crop/Re-Composite). Beide Pfade in `compose-twoshot-lipsync`.
-2. **Hailuo zeigt nur 1 Person** trotz Two-Shot-Anchor → Anchor-Validierung mit Gemini Vision (zähle erkannte Gesichter ≥ 2, sonst Anchor-Re-Roll).
-3. **Drift im Master-Clip** → Continuity Guardian rendert Re-Run Vorschlag.
-
-## Reihenfolge der Umsetzung
-
-1. **Bereinigung + Splitten-Disable** (sofort sichtbar, kein DB-Mess mehr).
-2. **`compose-twoshot-lipsync` Edge Function** + `compose-video-clips` Routing.
-3. **UI-CTA + Multi-Stage-Status**.
-4. **Continuity Guardian Hook** für Two-Shot.
-5. **Anchor-Validierung (Face-Count ≥ 2)** als Polish.
+- **Sync.so face_index unzuverlässig** → automatischer Crop/Re-Composite-Fallback in Schritt 1.
+- **Hailuo zeigt nur 1 Person** → Vision-Validierung in Schritt 3 löst Anchor-Re-Roll.
+- **Drift im Master-Clip** → Continuity Guardian zeigt Re-Render-CTA.
+- **Render dauert 90–180 s** → Multi-Stage-Status macht Fortschritt sichtbar (löst die ursprüngliche "kein Feedback"-Beschwerde).
