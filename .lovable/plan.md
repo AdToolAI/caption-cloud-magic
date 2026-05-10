@@ -1,74 +1,37 @@
-## Was ist passiert
+## Ziel
+Two-Shot/Cinematic-Sync soll hörbares Voiceover haben und die ausgewählten Avatar-Referenzen deutlich zuverlässiger verwenden.
 
-Beim Two-Shot Cinematic-Sync läuft die Pipeline durch (Hailuo i2v → Sync.so/lipsync-2 mit gemerged-tem VO), aber:
+## Befund
+- Die aktuelle Szene steht in der Datenbank auf `twoshot_stage = audio`, `clip_status = ready`, hat aber **kein** `character_audio_url`, **kein** `audio_plan`, **kein** `lip_sync_applied_at` und `lip_sync_status = null`.
+- In den Logs steht: `compose-video-clips twoshot-audio prep failed ... HTTP 401 Unauthorized`.
+- Deshalb wurde zwar der stumme Master-Clip gerendert, aber der Two-Shot-Voiceover-Track wurde nicht erzeugt und der Lip-Sync wurde nie gestartet.
+- Zusätzlich ist `lip_sync_status` nicht auf `pending`; dadurch greift der Auto-Trigger in `ClipsTab` nicht.
 
-1. **Voiceover ist nicht hörbar** — die finale Lip-Sync-MP4 enthält den gemischten VO als eingebetteten Audio-Track, aber der Player startet stumm und entmutet sich nicht zuverlässig.
-2. **Gesichter werden nicht 1:1 übernommen** — Nano Banana 2 weicht beim Multi-Portrait-Compose stärker ab als beim Single-Portrait-Anchor.
+## Umsetzung
+1. **Server-seitige Two-Shot-Audio-Prep reparieren**
+   - In `compose-video-clips` den internen Aufruf von `compose-twoshot-audio` so ändern, dass er mit einem gültigen User-JWT läuft statt mit dem Service-Key.
+   - Alternativ/zusätzlich `compose-twoshot-audio` für vertrauenswürdige interne Service-Aufrufe absichern und projekt-/User-Kontext aus der Szene validieren.
 
-## Root-Cause-Analyse
+2. **Two-Shot-Status korrekt setzen**
+   - Beim Start von Cinematic-Sync konsequent setzen:
+     - `lip_sync_status = 'pending'`
+     - `lip_sync_with_voiceover = true`
+     - `twoshot_stage = 'audio' | 'anchor' | 'master_clip'`
+   - Nach erfolgreichem Audio-Prep sicherstellen, dass `character_audio_url`, `audio_plan.twoshot` und eine `scene_audio_clips`-Voiceover-Zeile vorhanden sind.
 
-**Issue 1 — Auto-Unmute greift nicht zuverlässig:**
-`ComposerSequencePreview` entmutet automatisch nur, wenn `s.lipSyncWithVoiceover === true` ODER ein globaler `voiceoverUrl` vorhanden ist. Beim Cinematic-Sync gibt es keinen globalen VO (er ist im MP4 eingebettet), und der Flag-Roundtrip (SceneDialogStudio → DB → Reload) läuft erst, wenn die nächste Polling-Runde die Szene neu lädt. Folge: Wenn der Player die fertige Lip-Sync-Szene zeigt, bleibt das `<video>`-Element auf `muted=true`, und der eingebettete VO ist unhörbar.
+3. **Auto-Trigger für bestehende/halb fertige Szenen robuster machen**
+   - `ClipsTab` so erweitern, dass Cinematic-Sync-Szenen mit `clip_url` und fehlendem `lip_sync_applied_at` auch dann den Lip-Sync starten, wenn `lip_sync_status` noch `null` ist, sofern `twoshot_stage`/`engine_override` klar Two-Shot signalisiert.
+   - Falls `character_audio_url` fehlt, soll `compose-twoshot-lipsync` zuerst `compose-twoshot-audio` erzeugen und danach Sync.so starten.
 
-Außerdem filtert `sfxClipsTimeline` (Zeile 715-717) per-szenen Voiceover-Clips raus, sobald `lipSyncAppliedAt` gesetzt ist — die separate VO-Spur, die sonst hörbar wäre, wird also explizit unterdrückt. Wenn das eingebettete Audio im stummen Video nicht durchkommt, hört der User gar nichts.
+4. **Aktuelle kaputte Szene selbstheilend machen**
+   - Für Szenen wie die aktuelle (`twoshot_stage='audio'`, fertiger Clip, aber kein Audio/LipSync) wird beim nächsten Poll automatisch Audio + Lip-Sync neu angestoßen, ohne dass der User neu rendern muss.
 
-**Issue 2 — Multi-Portrait-Prompt ist zu generisch:**
-Im `compose-scene-anchor`-Prompt steht zwar "Preserve each person's individual identity exactly", aber die Reihenfolge der Portraits wird nicht stark mit den Namen verknüpft, und es fehlt eine Klausel die fordert, dass die Gesichter aus den Referenzbildern *unverändert* übernommen werden (Nano Banana 2 neigt zu Gesichts-Neuinterpretation, wenn der Scene-Prompt sehr konkret ist).
+5. **Face-Lock verbessern, ohne falsches 1:1 zu versprechen**
+   - `compose-scene-anchor` Prompt noch stärker auf "reference image preservation" trimmen: keine Beauty-/Age-/Face-Changes, Image #1/#2 strikt an Namen binden, Gesicht frontal/erkennbar halten, keine generischen Lookalikes.
+   - Cache-Key um eine `identityLockVersion` erweitern, damit alte schwächere Anchor-Bilder nicht wiederverwendet werden.
+   - Wichtig: Bei generativer Multi-Person-Videoerzeugung ist echte pixelgenaue 1:1-Identität technisch nicht garantiert; die Änderung maximiert aber die Referenztreue und verhindert alte Cache-Treffer.
 
-## Plan
-
-### 1. `ComposerSequencePreview.tsx` — Robust-Auto-Unmute
-
-Den Auto-Unmute-Effekt (Zeile ~631) zusätzlich auf `lipSyncAppliedAt` triggern lassen — egal ob `lipSyncWithVoiceover` persistiert ist oder nicht:
-
-```ts
-const hasEmbeddedAudio = playable.some(
-  (s) =>
-    s.lipSyncWithVoiceover === true ||
-    !!s.lipSyncAppliedAt ||                    // ← NEU
-    (s.clipSource as string) === 'ai-heygen' ||
-    s.clipSource === 'upload',
-);
-```
-
-Zusätzlich: Wenn die aktive Szene `lipSyncAppliedAt` ODER `clipSource==='ai-heygen'` hat, beim Slot-Swap das Video **explizit entmuten** (in dem Effekt der `el.muted = mutedRef.current` setzt — Zeilen ~222 und ~263). Der lip-syncte MP4 trägt sein eigenes Audio; in diesem Fall gewinnt der Mute-Toggle nicht über die Embedded-Audio-Erwartung.
-
-### 2. `ComposerSequencePreview.tsx` — Embedded-Audio-Garantie auf Slot-Swap
-
-Im Slot-Swap-Path (Zeilen ~313-360) für Szenen mit `lipSyncAppliedAt` zusätzlich:
-
-```ts
-const hasEmbedded = !!scene.lipSyncAppliedAt || scene.clipSource === 'ai-heygen';
-standbyEl.muted = hasEmbedded ? false : mutedRef.current;
-```
-
-So ist garantiert, dass das fertige Two-Shot-MP4 hörbar abspielt, sobald es aktiv wird — unabhängig vom Toggle-Zustand.
-
-### 3. `compose-scene-anchor/index.ts` — Identity-Lock-Prompt für Multi-Portrait
-
-Den Multi-Clause für >1 Portrait verschärfen:
-
-```ts
-const multiClause = isMulti
-  ? ` CRITICAL: Each face must be COPIED PIXEL-FOR-PIXEL from its reference portrait. ` +
-    `Do NOT generalize, beautify, or re-imagine any face. ` +
-    `All ${portraits.length} characters MUST appear in the SAME frame, ` +
-    `positioned naturally per the scene (e.g. side by side, facing each other). ` +
-    `If the scene lighting differs from the portrait, only adapt skin tone — never the underlying face geometry.`
-  : "";
-```
-
-Außerdem den `nameClause` enger an die Reihenfolge binden: "Image #1 = NAME_A, Image #2 = NAME_B" statt einer Komma-Liste.
-
-### 4. Out of Scope
-
-- Per-Sprecher-Stitching (mehrere Sync.so-Pässe)
-- Wechsel des i2v-Providers
-- Player-UI-Änderungen außer dem Auto-Unmute
-- Anchor-Caching anpassen (Cache greift weiter über `promptHash`)
-
-## Verifikation
-
-1. Two-Shot-Szene rendern → sobald die Lip-Sync-MP4 ankommt, startet der Player automatisch entmutet und der gemischte Voiceover ist hörbar.
-2. Toggle-Mute funktioniert weiter normal — beim erneuten Aktivieren der Szene wird Embedded-Audio aber wieder zwangs-entmutet.
-3. Anchor-Bild zeigt beide Gesichter erkennbar nahe an den Original-Portraits (subjektiv besser als vorher).
+## Validierung
+- Edge-Logs dürfen keinen `twoshot-audio ... 401 Unauthorized` mehr zeigen.
+- Eine Two-Shot-Szene muss nach Master-Clip automatisch von `pending/running` zu `lip_sync_status='done'` wechseln.
+- Die Preview muss dann das final lip-synced MP4 mit eingebettetem Audio abspielen.
