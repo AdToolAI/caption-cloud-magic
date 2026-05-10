@@ -1015,9 +1015,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           : s,
       );
       (onUpdateScenesLocalOnly ?? onUpdateScenes)(rolledBack);
+      const realMsg = await extractFunctionsError(err);
       toast({
         title: 'Cinematic-Sync fehlgeschlagen',
-        description: err?.message || 'Bitte erneut versuchen.',
+        description: realMsg || err?.message || 'Bitte erneut versuchen.',
         variant: 'destructive',
       });
     } finally {
