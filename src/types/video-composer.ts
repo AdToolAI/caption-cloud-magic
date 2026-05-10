@@ -46,6 +46,14 @@ export type ClipStatus = 'pending' | 'generating' | 'ready' | 'failed';
 
 export type TransitionStyle = 'none' | 'fade' | 'crossfade' | 'wipe' | 'slide' | 'zoom';
 
+/**
+ * Phase 4 — Artlist-style minimal transition palette.
+ * The composer UI only exposes these two by default ("hard cut" + "soft morph").
+ * The wider TransitionStyle union remains valid for power-user / legacy data.
+ */
+export const DEFAULT_COMPOSER_TRANSITIONS: TransitionStyle[] = ['none', 'crossfade'];
+export const DEFAULT_SCENE_TRANSITION: TransitionStyle = 'crossfade';
+
 export type ColorGradingPreset = 'none' | 'cinematic-warm' | 'cool-blue' | 'vintage-film' | 'high-contrast' | 'moody-dark';
 
 export type TextPosition = 'top' | 'center' | 'bottom' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
