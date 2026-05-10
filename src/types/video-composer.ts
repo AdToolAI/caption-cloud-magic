@@ -612,7 +612,7 @@ export const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = {
 
 export const DEFAULT_ASSEMBLY_CONFIG: AssemblyConfig = {
   colorGrading: 'none',
-  transitionStyle: 'fade',
+  transitionStyle: 'crossfade',
   kineticText: false,
   voiceover: null,
   music: null,
