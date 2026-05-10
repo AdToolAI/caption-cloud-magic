@@ -159,12 +159,34 @@ serve(async (req) => {
       const voices = ((scene as any).dialog_voices ?? {}) as Record<string, any>;
       const firstVoice = Object.values(voices)[0] as any;
       const voiceId = typeof firstVoice === 'string' ? firstVoice : firstVoice?.voiceId;
-      if (cleanText && voiceId) {
+      // Hume-Detection: if voice is from Hume, route through generate-voiceover-hume
+      // (the ElevenLabs endpoint would 400 on a Hume voice name).
+      const isHumeVoice =
+        firstVoice &&
+        typeof firstVoice === 'object' &&
+        (firstVoice.provider === 'HUME_AI' ||
+          firstVoice.provider === 'CUSTOM_VOICE' ||
+          firstVoice.engine === 'hume');
+      const humeVoiceName = firstVoice?.voiceName ?? voiceId;
+      let ttsFailureMessage: string | null = null;
+      if (cleanText && (voiceId || humeVoiceName)) {
         try {
-          const ttsResp = await fetch(`${supabaseUrl}/functions/v1/generate-voiceover`, {
+          const endpoint = isHumeVoice ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const payload = isHumeVoice
+            ? {
+                text: cleanText,
+                voiceName: humeVoiceName,
+                provider: firstVoice?.provider || 'HUME_AI',
+                projectId: scene.project_id,
+              }
+            : { text: cleanText, voiceId, projectId: scene.project_id };
+          console.log(
+            `[compose-lipsync-scene ${scene_id}] TTS fallback via ${endpoint} (voice=${humeVoiceName ?? voiceId})`,
+          );
+          const ttsResp = await fetch(`${supabaseUrl}/functions/v1/${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': auth },
-            body: JSON.stringify({ text: cleanText, voiceId, projectId: scene.project_id }),
+            body: JSON.stringify(payload),
           });
           if (ttsResp.ok) {
             const ttsData = await ttsResp.json();
@@ -187,14 +209,41 @@ serve(async (req) => {
                 cost_credits: 0,
               });
               vo = { url: audioUrl, duration };
-              console.log(`[compose-lipsync-scene ${scene_id}] vo synthesized from dialog_script`);
+              console.log(`[compose-lipsync-scene ${scene_id}] vo synthesized from dialog_script via ${endpoint}`);
+            } else {
+              ttsFailureMessage = `${endpoint} returned no audioUrl`;
             }
           } else {
-            console.warn(`[compose-lipsync-scene ${scene_id}] generate-voiceover failed: ${ttsResp.status}`);
+            const errText = await ttsResp.text().catch(() => '');
+            ttsFailureMessage = isHumeVoice
+              ? `Hume-Stimme "${humeVoiceName}" konnte nicht synthetisiert werden (HTTP ${ttsResp.status}). Bitte im Voiceover-Tab eine andere Stimme wählen.`
+              : `ElevenLabs-Stimme "${voiceId}" konnte nicht synthetisiert werden (HTTP ${ttsResp.status}). ${errText.slice(0, 200)}`;
+            console.warn(`[compose-lipsync-scene ${scene_id}] ${endpoint} failed: ${ttsResp.status} ${errText.slice(0, 200)}`);
           }
         } catch (ttsErr) {
+          ttsFailureMessage = `TTS-Aufruf fehlgeschlagen: ${(ttsErr as Error).message}`;
           console.warn(`[compose-lipsync-scene ${scene_id}] TTS fallback exception`, ttsErr);
         }
+      }
+
+      // If TTS failed with a concrete reason, surface it as `tts_failed` so the
+      // UI can show the real cause (e.g. wrong voice provider) instead of the
+      // generic "needs voiceover" message.
+      if (!vo?.url && ttsFailureMessage) {
+        await supabase
+          .from('composer_scenes')
+          .update({
+            clip_status: 'ready',
+            lip_sync_status: 'no_voiceover',
+            clip_error: ttsFailureMessage,
+          })
+          .eq('id', scene_id);
+        return json({
+          ok: false,
+          error: 'tts_failed',
+          message: ttsFailureMessage,
+          scene_id,
+        }, 422);
       }
     }
 
@@ -203,11 +252,6 @@ serve(async (req) => {
       // to a distinct 'no_voiceover' state and surface a clear error so the UI
       // can prompt the user to add a voiceover instead of leaving the scene
       // looking 'ready' when it actually never got lip-synced.
-      // Mark the Hailuo render itself as ready so the UI unblocks the scene
-      // (the silent clip IS the rendered scene), but flag lip_sync_status so
-      // the user sees a clear "needs voiceover" action instead of an endless
-      // spinner. Without resetting clip_status='ready' here the scene stays
-      // forever in "Wird generiert…".
       await supabase
         .from('composer_scenes')
         .update({
