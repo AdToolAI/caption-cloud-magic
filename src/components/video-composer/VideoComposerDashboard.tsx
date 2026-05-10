@@ -48,6 +48,9 @@ import {
   useComposerPresence,
   useComposerScenesRealtime,
 } from '@/hooks/useComposerCollaboration';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useComposerHistory } from '@/hooks/useComposerHistory';
+import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
@@ -496,6 +499,15 @@ export default function VideoComposerDashboard() {
 
   // Realtime: when ANY collaborator updates a scene in this project, refetch.
   useComposerScenesRealtime(project.id, refetchScenesFromDb);
+
+  // Phase 5.6 — Undo-Stack (Cmd+Z)
+  const { undoLast: undoLastHistoryEntry, count: undoCount, pushEntry: pushHistoryEntry } = useComposerHistory(project.id);
+  useKeyboardShortcuts({
+    onUndo: () => {
+      undoLastHistoryEntry(() => refetchScenesFromDb(project.id));
+    },
+  }, !!project.id);
+
 
   const persistAndGoToClips = useCallback(async () => {
     setIsPersisting(true);
@@ -1040,6 +1052,7 @@ export default function VideoComposerDashboard() {
   const liveCost = project.scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
   return (
+    <ComposerHistoryContext.Provider value={{ pushEntry: pushHistoryEntry }}>
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border/40 bg-card/50 backdrop-blur-sm">
@@ -1415,5 +1428,6 @@ export default function VideoComposerDashboard() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </ComposerHistoryContext.Provider>
   );
 }
