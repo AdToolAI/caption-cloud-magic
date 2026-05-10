@@ -26,6 +26,11 @@ interface Props {
   referenceImageUrl?: string;
   /** Existing brand-character / location reference to guide composition. */
   composeHintImageUrl?: string;
+  /** Phase 3 — multiple references auto-injected from @character/@location mentions
+   *  (max 4). Sent to Nano Banana 2 as a multi-image content array. */
+  composeHintImageUrls?: string[];
+  /** Phase 3 — labels of injected entities, shown as pills under the header. */
+  injectedLabels?: Array<{ kind: 'character' | 'location'; name: string; thumb?: string }>;
   selectedReferenceUrl?: string;
   onPick: (url: string) => void;
   language?: 'en' | 'de' | 'es';
@@ -37,6 +42,8 @@ export default function SceneStillFrameStudio({
   prompt,
   aspectRatio,
   composeHintImageUrl,
+  composeHintImageUrls,
+  injectedLabels,
   selectedReferenceUrl,
   onPick,
   language = 'en',
@@ -58,6 +65,14 @@ export default function SceneStillFrameStudio({
     }
     setLoading(true);
     try {
+      const merged = Array.from(
+        new Set(
+          [
+            ...(composeHintImageUrls ?? []),
+            ...(composeHintImageUrl ? [composeHintImageUrl] : []),
+          ].filter((u): u is string => !!u),
+        ),
+      ).slice(0, 4);
       const { data, error } = await supabase.functions.invoke('generate-scene-still', {
         body: {
           projectId,
@@ -65,7 +80,8 @@ export default function SceneStillFrameStudio({
           prompt,
           variants: count,
           aspectRatio,
-          referenceImageUrl: composeHintImageUrl,
+          referenceImageUrl: merged[0],
+          referenceImageUrls: merged,
         },
       });
       if (error) throw error;
@@ -150,6 +166,25 @@ export default function SceneStillFrameStudio({
           </Button>
         </div>
       </div>
+
+      {injectedLabels && injectedLabels.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+            {language === 'de' ? 'Auto-injiziert' : language === 'es' ? 'Auto-inyectado' : 'Auto-injected'}:
+          </span>
+          {injectedLabels.slice(0, 4).map((it) => (
+            <span
+              key={`${it.kind}:${it.name}`}
+              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 text-primary px-1.5 py-[1px] text-[9px]"
+            >
+              {it.thumb && (
+                <img src={it.thumb} alt="" className="h-3 w-3 rounded-full object-cover" />
+              )}
+              {it.kind === 'character' ? '@' : '#'}{it.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       {variants.length > 0 && (
         <div className={cn('grid gap-1.5', count === 4 ? 'grid-cols-4' : 'grid-cols-2')}>

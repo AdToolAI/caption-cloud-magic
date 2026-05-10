@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon } from 'lucide-react';
 import SceneCard from './SceneCard';
+import SceneCutDriftIndicator from './SceneCutDriftIndicator';
 import HybridExtendDialog from './HybridExtendDialog';
 import TalkingHeadDialog from './TalkingHeadDialog';
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
@@ -453,39 +454,51 @@ export default function StoryboardTab({
                 const hasOtherReadyScenes = scenes.some(
                   (s) => s.id !== scene.id && s.clipStatus === 'ready' && !!s.clipUrl
                 );
+                const prev = index > 0 ? scenes[index - 1] : undefined;
                 return (
-                  <SortableSceneItem key={scene.id} id={scene.id}>
-                    <SceneCard
-                      scene={scene}
-                      index={index}
-                      totalScenes={scenes.length}
-                      projectId={projectId}
-                      characters={characters}
-                      preferredAspect={preferredAspect}
-                      onUpdate={(updates) => updateScene(scene.id, updates)}
-                      onDelete={() => deleteScene(scene.id)}
-                      onMoveUp={() => moveScene(index, index - 1)}
-                      onMoveDown={() => moveScene(index, index + 1)}
-                      onHybridExtend={
-                        projectId
-                          ? (mode) => openHybridDialog(scene, mode)
-                          : undefined
-                      }
-                      hasOtherReadyScenes={hasOtherReadyScenes}
-                      onAddScene={onAddScene}
-                      onInsertScenesAfter={onInsertScenesAfter}
-                      onAddCharacter={onAddCharacter}
-                      language={language}
-                      onEnsurePersisted={onEnsurePersisted}
-                      previousSceneLastFrameUrl={
-                        index > 0
-                          ? scenes[index - 1].lastFrameUrl ?? scenes[index - 1].clipUrl
-                          : undefined
-                      }
-                      previousSceneIndex={index > 0 ? index : undefined}
-                      frameFirstMode={frameFirstMode}
-                    />
-                  </SortableSceneItem>
+                  <div key={scene.id}>
+                    {prev && (
+                      <SceneCutDriftIndicator
+                        prev={prev}
+                        next={scene}
+                        projectId={projectId}
+                        onUpdateNext={(updates) => updateScene(scene.id, updates)}
+                        language={dialogLang}
+                      />
+                    )}
+                    <SortableSceneItem id={scene.id}>
+                      <SceneCard
+                        scene={scene}
+                        index={index}
+                        totalScenes={scenes.length}
+                        projectId={projectId}
+                        characters={characters}
+                        preferredAspect={preferredAspect}
+                        onUpdate={(updates) => updateScene(scene.id, updates)}
+                        onDelete={() => deleteScene(scene.id)}
+                        onMoveUp={() => moveScene(index, index - 1)}
+                        onMoveDown={() => moveScene(index, index + 1)}
+                        onHybridExtend={
+                          projectId
+                            ? (mode) => openHybridDialog(scene, mode)
+                            : undefined
+                        }
+                        hasOtherReadyScenes={hasOtherReadyScenes}
+                        onAddScene={onAddScene}
+                        onInsertScenesAfter={onInsertScenesAfter}
+                        onAddCharacter={onAddCharacter}
+                        language={language}
+                        onEnsurePersisted={onEnsurePersisted}
+                        previousSceneLastFrameUrl={
+                          index > 0
+                            ? scenes[index - 1].lastFrameUrl ?? scenes[index - 1].clipUrl
+                            : undefined
+                        }
+                        previousSceneIndex={index > 0 ? index : undefined}
+                        frameFirstMode={frameFirstMode}
+                      />
+                    </SortableSceneItem>
+                  </div>
                 );
               })}
             </div>

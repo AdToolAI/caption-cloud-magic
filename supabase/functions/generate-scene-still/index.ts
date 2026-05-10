@@ -31,6 +31,10 @@ interface SceneStillRequest {
   aspectRatio?: "16:9" | "9:16" | "1:1" | "4:5";
   /** Optional reference image (brand character / location) to guide composition. */
   referenceImageUrl?: string;
+  /** Phase 3 — multi-image references (auto-injected from @character/@location mentions).
+   *  When present, takes precedence over referenceImageUrl and is sent as a multi-image
+   *  content array to Nano Banana 2 (max 4). */
+  referenceImageUrls?: string[];
 }
 
 const MODEL_BY_QUALITY: Record<Quality, string> = {
@@ -57,14 +61,18 @@ async function generateVariant(
   apiKey: string,
   model: string,
   prompt: string,
-  referenceImageUrl?: string,
+  referenceImageUrls: string[],
 ): Promise<Uint8Array | null> {
-  const userContent: any = referenceImageUrl
-    ? [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: referenceImageUrl } },
-      ]
-    : prompt;
+  const userContent: any =
+    referenceImageUrls.length > 0
+      ? [
+          { type: "text", text: prompt },
+          ...referenceImageUrls.slice(0, 4).map((url) => ({
+            type: "image_url",
+            image_url: { url },
+          })),
+        ]
+      : prompt;
 
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -133,6 +141,7 @@ serve(async (req) => {
       quality = "standard",
       aspectRatio,
       referenceImageUrl,
+      referenceImageUrls,
     } = body;
 
     if (!projectId || !sceneId || !prompt?.trim()) {
@@ -143,6 +152,16 @@ serve(async (req) => {
     }
 
     const variantCount = Math.max(1, Math.min(4, variants));
+
+    // Merge single + multi reference inputs, dedupe, cap to 4.
+    const refs = Array.from(
+      new Set(
+        [
+          ...(Array.isArray(referenceImageUrls) ? referenceImageUrls : []),
+          ...(referenceImageUrl ? [referenceImageUrl] : []),
+        ].filter((u): u is string => typeof u === "string" && u.length > 0),
+      ),
+    ).slice(0, 4);
 
     // Verify project ownership
     const { data: project } = await admin
@@ -159,7 +178,7 @@ serve(async (req) => {
     }
 
     const finalPrompt = buildPrompt(prompt, aspectRatio);
-    const promptHash = await djb2Hash(`${finalPrompt}::${referenceImageUrl ?? ""}::${quality}::${variantCount}`);
+    const promptHash = await djb2Hash(`${finalPrompt}::${refs.join("|")}::${quality}::${variantCount}`);
 
     // Cache check
     const { data: cached } = await admin
@@ -181,12 +200,12 @@ serve(async (req) => {
     if (!apiKey) throw new Error("LOVABLE_API_KEY missing");
     const model = MODEL_BY_QUALITY[quality];
 
-    console.log(`[generate-scene-still] scene=${sceneId} variants=${variantCount} model=${model}`);
+    console.log(`[generate-scene-still] scene=${sceneId} variants=${variantCount} model=${model} refs=${refs.length}`);
 
     // Parallel generate
     const results = await Promise.allSettled(
       Array.from({ length: variantCount }).map(() =>
-        generateVariant(apiKey, model, finalPrompt, referenceImageUrl),
+        generateVariant(apiKey, model, finalPrompt, refs),
       ),
     );
 
