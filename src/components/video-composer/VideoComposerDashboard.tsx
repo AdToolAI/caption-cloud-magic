@@ -814,6 +814,21 @@ export default function VideoComposerDashboard() {
   }, [persistScenesToDb]);
 
   /**
+   * Local-only scene state update. Does NOT schedule a debounced DB flush
+   * and CANCELS any pending one — used by handlers (e.g. Cinematic-Sync start)
+   * that have already persisted their target row themselves and don't want
+   * a stale full-scene snapshot to clobber engine_override / clip_status.
+   */
+  const setScenesLocalOnly = useCallback((scenes: ComposerScene[]) => {
+    if (scenesPersistTimerRef.current) {
+      window.clearTimeout(scenesPersistTimerRef.current);
+      scenesPersistTimerRef.current = null;
+    }
+    pendingScenesRef.current = null;
+    setProject(prev => ({ ...prev, scenes }));
+  }, []);
+
+  /**
    * Insert a brand-new scene directly into the DB so it survives realtime
    * refetches and tab switches. Returns the persisted scene with its real UUID
    * so the caller can update local state.
@@ -1292,6 +1307,7 @@ export default function VideoComposerDashboard() {
               characters={project.briefing?.characters}
               language={project.language}
               onUpdateScenes={setScenes}
+              onUpdateScenesLocalOnly={setScenesLocalOnly}
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);

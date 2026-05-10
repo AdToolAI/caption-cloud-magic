@@ -58,6 +58,10 @@ interface ClipsTabProps {
   /** Project spoken language — flows into the deterministic Audio Plan block. */
   language?: string;
   onUpdateScenes: (scenes: ComposerScene[]) => void;
+  /** Local-only state update (no debounced full-scene DB flush). Required by
+   *  Cinematic-Sync start so the optimistic engine_override / clip_status
+   *  isn't clobbered by a stale snapshot 600ms later. */
+  onUpdateScenesLocalOnly?: (scenes: ComposerScene[]) => void;
   onGoToVoiceSubtitles: () => void;
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
@@ -69,7 +73,7 @@ const statusConfig: Record<string, { color: string; bg: string; label: string }>
   failed: { color: 'text-destructive', bg: 'bg-destructive/15 border-destructive/40', label: 'Fehlgeschlagen' },
 };
 
-export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
+export default function ClipsTab({ scenes, projectId, visualStyle, characters, language, onUpdateScenes, onUpdateScenesLocalOnly, onGoToVoiceSubtitles, onEnsurePersisted }: ClipsTabProps) {
   // Normalise the project language to the 3 accepted DirectorLanguage codes.
   const directorLanguage: DirectorLanguage =
     language === 'de' ? 'de' : language === 'es' ? 'es' : 'en';
@@ -258,6 +262,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         (dbScene.clip_status !== scene.clipStatus ||
           dbScene.clip_url !== scene.clipUrl ||
           (dbScene.upload_type && dbScene.upload_type !== scene.uploadType) ||
+          ((dbScene as any).engine_override && (dbScene as any).engine_override !== (scene.engineOverride ?? 'auto')) ||
+          ((dbScene as any).clip_source && (dbScene as any).clip_source !== scene.clipSource) ||
           lipChanged)
       ) {
         changed = true;
@@ -313,6 +319,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           clipStatus: dbScene.clip_status as ComposerScene['clipStatus'],
           clipUrl: dbScene.clip_url || scene.clipUrl,
           uploadType: (dbScene.upload_type as ComposerScene['uploadType']) || scene.uploadType,
+          engineOverride: ((dbScene as any).engine_override as ComposerScene['engineOverride']) ?? scene.engineOverride ?? 'auto',
+          clipSource: ((dbScene as any).clip_source as ComposerScene['clipSource']) ?? scene.clipSource,
           lipSyncAppliedAt: (dbScene as any).lip_sync_applied_at ?? null,
           lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
           lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
@@ -738,7 +746,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }
         : s,
     );
-    onUpdateScenes(optimistic);
+    // Use the local-only updater so the debounced full-scenes flush in the
+    // dashboard cannot overwrite engine_override / clip_status 600 ms later
+    // with a stale snapshot. The single-row DB update below is the source of truth.
+    (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
 
     try {
       // 2. Resolve the persisted scene id + project id WITHOUT rewriting the
@@ -836,7 +847,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           ? { ...s, clipStatus: scene.clipStatus, lipSyncStatus: scene.lipSyncStatus ?? null }
           : s,
       );
-      onUpdateScenes(rolledBack);
+      (onUpdateScenesLocalOnly ?? onUpdateScenes)(rolledBack);
       toast({
         title: 'Cinematic-Sync fehlgeschlagen',
         description: err?.message || 'Bitte erneut versuchen.',
