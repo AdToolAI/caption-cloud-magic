@@ -51,7 +51,7 @@ import StructuredPromptBuilder from '@/components/motion-studio/StructuredPrompt
 import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
 import MultiEnginePromptPreview from '@/components/motion-studio/MultiEnginePromptPreview';
 import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
-import { resolveMentions } from '@/lib/motion-studio/mentionParser';
+import { resolveMentions, findMentions } from '@/lib/motion-studio/mentionParser';
 import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
 import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
 import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
@@ -1443,16 +1443,7 @@ export default function SceneCard({
                     )}
                     {(() => {
                       // Phase 3 — Auto-inject @character / @location reference images into still generation.
-                      const mentions = (() => {
-                        try {
-                          // Lazy require to avoid circular bundle
-                          // eslint-disable-next-line @typescript-eslint/no-require-imports
-                          const { findMentions } = require('@/lib/motion-studio/mentionParser');
-                          return findMentions(scene.aiPrompt || '', libCharacters, libLocations) as Array<{
-                            kind: 'character' | 'location'; id: string; name: string;
-                          }>;
-                        } catch { return []; }
-                      })();
+                      const mentions = findMentions(scene.aiPrompt || '', libCharacters, libLocations);
                       const seenIds = new Set<string>();
                       const injectedHints: Array<{ url?: string; kind: 'character' | 'location'; name: string }> = [];
                       for (const m of mentions) {
