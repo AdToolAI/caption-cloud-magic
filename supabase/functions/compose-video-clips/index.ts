@@ -511,6 +511,65 @@ serve(async (req) => {
               console.warn(`[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO (${voDur.toFixed(2)}s) exceeds Hailuo 10s limit — Sync.so will cut_off.`);
             }
           }
+
+          // ── Server-side multi-cast anchor safety net ────────────────────
+          // If this cinematic-sync scene has 2+ cast characters but the
+          // referenceImageUrl is either missing or doesn't look like a
+          // composed scene anchor (no /scene-anchors/ in path), call
+          // compose-scene-anchor with ALL portraits. Without this, Hailuo
+          // i2v invents the cast and Sync.so/lipsync-2 can't switch
+          // active speakers.
+          try {
+            const castShots = (scene.characterShots ?? []).filter(
+              (s) => s && s.shotType !== 'absent' && s.characterId,
+            );
+            const refUrl = String(scene.referenceImageUrl ?? '');
+            const looksComposed = refUrl.includes('/scene-anchors/') || refUrl.includes('/composer-anchors/');
+            if (castShots.length >= 2 && !looksComposed) {
+              const portraitUrls = castShots
+                .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
+                .filter((u): u is string => typeof u === 'string' && u.length > 0)
+                .slice(0, 4);
+              const characterNames = castShots
+                .map((cs) => charById.get(cs.characterId)?.name)
+                .filter((n): n is string => typeof n === 'string' && n.length > 0);
+              if (portraitUrls.length >= 2) {
+                console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits)`);
+                const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  },
+                  body: JSON.stringify({
+                    sceneId: scene.id,
+                    portraitUrl: portraitUrls[0],
+                    portraitUrls,
+                    characterNames,
+                    scenePrompt: scene.aiPrompt || '',
+                    aspectRatio: '16:9',
+                    shotType: scene.characterShot?.shotType,
+                  }),
+                });
+                if (anchorResp.ok) {
+                  const aj = await anchorResp.json().catch(() => ({}));
+                  if (aj?.composedUrl) {
+                    scene.referenceImageUrl = aj.composedUrl;
+                    await supabaseAdmin
+                      .from('composer_scenes')
+                      .update({ reference_image_url: aj.composedUrl, updated_at: new Date().toISOString() })
+                      .eq('id', scene.id);
+                    console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor composed → ${aj.composedUrl.slice(0, 80)}…`);
+                  }
+                } else {
+                  const errTxt = await anchorResp.text().catch(() => '');
+                  console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`);
+                }
+              }
+            }
+          } catch (anchorErr) {
+            console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: multi-cast anchor safety net failed:`, anchorErr);
+          }
         } catch (extErr) {
           console.warn(`[compose-video-clips] Cinematic-Sync auto-extend failed for ${scene.id}:`, extErr);
         }
