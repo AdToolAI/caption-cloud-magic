@@ -300,11 +300,23 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         supabase.functions
           .invoke('compose-lipsync-scene', { body: { scene_id: d.id } })
           .then(({ data: lsData, error: lsErr }) => {
-            if (lsErr) {
+            // FunctionsHttpError carries the response body in `context`.
+            const errBody = (lsErr as any)?.context;
+            const reason = lsData?.error ?? errBody?.error;
+            const message = lsData?.message ?? errBody?.message;
+            if (reason === 'tts_failed' || reason === 'no_voiceover') {
+              toast({
+                title: 'Cinematic-Sync braucht ein Voiceover',
+                description: message || 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut auf "In echte Szene einbauen" klicken.',
+                variant: 'destructive',
+              });
+            } else if (lsErr) {
+              toast({
+                title: 'Lip-Sync fehlgeschlagen',
+                description: message || (lsErr as Error).message || 'Unbekannter Fehler beim Lip-Sync.',
+                variant: 'destructive',
+              });
               console.warn(`[ClipsTab] state-based lip-sync invoke failed for ${d.id}`, lsErr);
-            } else if (lsData?.error === 'no_voiceover') {
-              // Edge function already wrote no_voiceover state.
-              console.info(`[ClipsTab] lip-sync ${d.id} → no_voiceover`);
             }
           });
       });
@@ -466,13 +478,27 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         console.info(`[ClipsTab] Auto-triggering lip-sync for scene ${sceneId}`);
         supabase.functions
           .invoke('compose-lipsync-scene', { body: { scene_id: sceneId } })
-          .then(({ error }) => {
-            if (error) {
-              console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, error);
+          .then(({ data: lsData, error: lsErr }) => {
+            const errBody = (lsErr as any)?.context;
+            const reason = lsData?.error ?? errBody?.error;
+            const message = lsData?.message ?? errBody?.message;
+            if (reason === 'tts_failed' || reason === 'no_voiceover') {
+              toast({
+                title: 'Cinematic-Sync braucht ein Voiceover',
+                description: message || 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut starten.',
+                variant: 'destructive',
+              });
+            } else if (lsErr) {
+              toast({
+                title: 'Lip-Sync fehlgeschlagen',
+                description: message || (lsErr as Error).message || 'Unbekannter Fehler.',
+                variant: 'destructive',
+              });
+              console.warn(`[ClipsTab] lip-sync invoke failed for ${sceneId}`, lsErr);
             } else {
               toast({
                 title: 'Lip-Sync gestartet',
-                description: 'Charakter spricht gleich wortgenau in der Szene.',
+                description: 'Charakter spricht gleich wortgenau in der Szene (~30s).',
               });
             }
           });
