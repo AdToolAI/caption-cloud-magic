@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useMultiSceneRender, type PipelineStatus } from '@/hooks/useMultiSceneRender';
 import type { ComposerScene } from '@/types/video-composer';
+import RenderPreFlightDialog from './RenderPreFlightDialog';
 
 interface RenderPipelinePanelProps {
   projectId?: string;
