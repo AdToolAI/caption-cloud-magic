@@ -1,58 +1,51 @@
-## Befund
+## Problem (genau verifiziert)
 
-Szene 1 in deinem Composer-Projekt nutzt im Dialog die Hume-Stimme **„Dungeon Master"** (Provider `HUME_AI`, Engine `hume`). Die HeyGen-Render-Pipeline (`compose-video-clips` → `generate-talking-head`) hat aber nur einen einzigen TTS-Pfad: **ElevenLabs**. Sie übergibt den Voice-Namen 1:1 als ElevenLabs-Voice-ID, was logischerweise fehlschlägt:
+Du klickst auf **„In echte Szene einbauen"** → das Hailuo-Video wird gerendert (clip_status='ready') → dann triggert die UI automatisch `compose-lipsync-scene` → diese Edge Function bricht **silent** ab, weil:
 
-```
-[compose-video-clips] HeyGen scene … failed: 500
-ElevenLabs TTS failed: An invalid ID has been received: 'Groovy Guy'.
-status: invalid_uid
-```
+1. Die Szene hat **kein character_audio_url** und **kein scene_audio_clip** → Fallback 3 (TTS-Resynthese) springt an.
+2. Fallback 3 ruft `generate-voiceover` (ElevenLabs) auf, übergibt aber den **Hume-Voice-Namen** `"Groovy Guy"` direkt als ElevenLabs-VoiceID → ElevenLabs antwortet mit `400 invalid_uid: 'Groovy Guy'`.
+3. Die Function setzt `lip_sync_status='no_voiceover'` und gibt 422 zurück.
+4. Im UI fängt der Auto-Trigger-Handler den Fehler nur per `console.warn` ab — **kein Toast, kein sichtbares Feedback**. Der „Lip-Sync gestartet"-Toast wird sogar fälschlich gezeigt, weil er VOR der Antwort feuert.
 
-Genau derselbe Fehlertyp tritt für „Dungeon Master" auf → deshalb fällt Szene 1 reproduzierbar aus, während Szene 2 in seltenen Fällen durchläuft (z. B. wenn dort eine echte ElevenLabs-Stimme oder eine kompatible Voice-ID vergeben ist — aktuell hat Szene 2 ebenfalls Hume `Geraldine Wallace` und würde beim nächsten Retry genauso scheitern; sie steht nur deshalb auf `ready`, weil ihr alter Hailuo-Clip noch im Storage liegt).
+Das ist exakt derselbe Hume↔ElevenLabs-Fehler, den wir letzte Runde in `compose-video-clips` gefixt haben — aber nur dort, nicht im Lip-Sync-Pfad.
 
-Die UI rollt nach dem Fehler den optimistischen `generating`-Status zurück und zeigt deshalb dauerhaft „Fehlgeschlagen" für Szene 1.
+## Plan
 
-## Fix (nur Backend, keine UI-Änderungen)
+### 1. `supabase/functions/compose-lipsync-scene/index.ts` — Hume-Voice-Support in Fallback 3
+Vor dem `generate-voiceover`-Call (Zeile ~163) das Voice-Objekt inspizieren:
+- Wenn `firstVoice.provider === 'HUME_AI'` ODER `firstVoice.engine === 'hume'` → stattdessen `generate-voiceover-hume` aufrufen mit `text` + `voiceName` (analog zur Lösung in `compose-video-clips`).
+- Bei Hume-Failure: aussagekräftigen `clip_error` schreiben („Hume-Stimme '…' konnte nicht synthetisiert werden").
+- Sonst (ElevenLabs): wie gehabt.
 
-### 1. `supabase/functions/compose-video-clips/index.ts` — HeyGen-Branch (~Zeile 490–567)
+### 2. `supabase/functions/compose-lipsync-scene/index.ts` — Klarere Fehlertypen
+- Neuer Returncode `tts_failed` (400) mit der Original-Fehlermeldung der TTS-API, statt alles in `no_voiceover` zu stopfen. Dadurch sieht der User in der UI den echten Grund.
+- `clip_error` immer mit konkretem Hinweis befüllen (nicht nur „benötigt ein Voiceover…").
 
-Vor dem Aufruf von `generate-talking-head` prüfen, ob die gewählte Stimme aus einem nicht-ElevenLabs-Provider stammt:
+### 3. `src/components/video-composer/ClipsTab.tsx` — Sichtbares Feedback
+- **Auto-Trigger-Handler** (~Zeile 460-480 + ~Zeile 281-310): den `error`/422/400-Response-Body inspizieren und einen **destructive Toast** mit dem `clip_error` zeigen statt nur `console.warn`.
+- **Optimistischen „Lip-Sync gestartet"-Toast entfernen** — erst zeigen, wenn die Function tatsächlich `running` zurückgibt.
+- **Scene-Card-Badge:** wenn `lip_sync_status === 'no_voiceover'` ODER `'tts_failed'`, anstelle von „Fertig" einen gelben Badge **„Lip-Sync fehlgeschlagen — Voiceover prüfen"** mit dem `clip_error` als Tooltip.
+- **Retry-Button:** in der Szenen-Aktionsleiste neben „In echte Szene einbauen" einen kleinen 🔄-Button, der `compose-lipsync-scene` erneut feuert (für den Fall, dass der User das Voiceover gefixt hat).
 
-- Wenn `voiceCfg.provider === 'HUME_AI'` oder `voiceCfg.engine === 'hume'` (case-insensitive):
-  1. `generate-voiceover-hume` aufrufen mit `text = cleanText` und `voiceName = voiceCfg.voiceId || voiceCfg.voiceName`.
-  2. Aus der Antwort die `audioUrl` lesen.
-  3. `generate-talking-head` mit **`audioUrl`** statt `text + voiceId` aufrufen (der Endpoint unterstützt das bereits, siehe Zeile 595–599 dort).
-- Fällt die Hume-Synthese aus, klare Fehlermeldung in `clip_error` schreiben („Hume-Stimme '…' konnte nicht synthetisiert werden — bitte im Voiceover-Tab eine ElevenLabs-Stimme wählen.") statt stiller 500.
-- Wenn gar keine Voice-Config gesetzt ist, weiter wie bisher mit ElevenLabs-Default-Voice.
+### 4. DB-Repair (einmalig)
+Szene `c357d482…` (`lip_sync_status='no_voiceover'`) zurücksetzen auf `lip_sync_status=NULL` + `clip_error=NULL`, damit der User nach dem Fix sauber neu starten kann.
 
-### 2. Defensive Validierung
-
-Falls `provider`/`engine` unbekannt ist und `voiceId` länger als ~32 Zeichen alphanumerisch ist → als ElevenLabs-ID akzeptieren. Sonst: gleiche Fehlermeldung wie oben (statt blinden ElevenLabs-Call), damit der User sofort sieht, was zu tun ist.
-
-### 3. Keine Datenbank-Migration nötig
-
-`character_audio_url`, `lip_sync_status`, `clip_error` sind alle vorhanden; wir schreiben in dieselben Felder.
-
-### 4. Optional, separat: Cleanup der bereits fehlgeschlagenen Szene
-
-Das Datenfeld `clip_status` von Szene 1 (`632c7ee3…`) steht aktuell auf `ready` mit altem Hailuo-Clip; nach dem Fix einmalig "Erneut versuchen" klicken → produziert frischen HeyGen-Talking-Head mit Hume-Voice.
+### Was NICHT geändert wird
+- Kein Refactoring der Voice-Provider-Architektur.
+- Kein Wechsel von Sync.so auf einen anderen Lip-Sync-Provider.
+- HeyGen-Pfad in `compose-video-clips` bleibt wie er ist (war bereits letzte Runde gefixt).
 
 ## Technische Details
 
-```text
-compose-video-clips (HeyGen branch)
- ├─ voiceCfg.provider === 'HUME_AI'?
- │   ├─ yes → invoke('generate-voiceover-hume', { text, voiceName })
- │   │        → audioUrl
- │   │        → invoke('generate-talking-head', { imageUrl, audioUrl, … })
- │   └─ no  → invoke('generate-talking-head', { imageUrl, text, voiceId, … })
- └─ Fehler → clip_error mit konkretem Hinweis (statt 500)
-```
+| Datei | Änderung |
+|---|---|
+| `supabase/functions/compose-lipsync-scene/index.ts` | Hume-Detection vor Fallback-3-TTS-Call; neuer `tts_failed`-Returncode; konkrete `clip_error`-Texte |
+| `src/components/video-composer/ClipsTab.tsx` | Destructive Toast bei Lip-Sync-Failures; Badge „Lip-Sync fehlgeschlagen"; manueller Retry-Button; optimistischer Toast entfernt |
+| DB | `UPDATE composer_scenes SET lip_sync_status=NULL, clip_error=NULL WHERE id='c357d482-ef05-4498-81d6-4e508c202ddc'` |
 
-Edge Functions zum Re-Deploy: `compose-video-clips`.
+## Erwartetes Verhalten danach
 
-## Was nicht angefasst wird
-
-- Voice-Picker/UI bleibt wie sie ist (Hume-Stimmen weiter wählbar).
-- `generate-talking-head` selbst bleibt unverändert (audioUrl-Pfad existiert schon).
-- Szene-2-Pipeline und Cinematic-Sync werden nicht berührt.
+1. Du klickst „In echte Szene einbauen" → Hailuo rendert (~30-60s, Status sichtbar).
+2. Auto-Lip-Sync startet → Toast „Lip-Sync läuft (~30s)" erscheint **nur** wenn Sync.so wirklich gestartet ist.
+3. Wenn die Hume-Stimme jetzt sauber via `generate-voiceover-hume` synthetisiert wird → Sync.so läuft durch → Szene zeigt Hailuo-Clip mit korrekt synchronen Lippen ✅
+4. Wenn irgendwas schiefgeht → **roter Toast mit echtem Grund** + gelber Badge auf der Szene + Retry-Button.
