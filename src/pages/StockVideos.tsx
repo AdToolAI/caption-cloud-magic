@@ -14,10 +14,7 @@ import { StockVideoCard } from "@/components/stock-videos/StockVideoCard";
 import { StockVideoFilters as FiltersBar } from "@/components/stock-videos/StockVideoFilters";
 import { EditorialCollections } from "@/components/stock-videos/EditorialCollections";
 import type { StockVideoCollection } from "@/config/stockVideoCollections";
-import { useTrackPageFeature } from "@/hooks/useTrackPageFeature";
-
 export default function StockVideos() {
-  useTrackPageFeature("stock_videos");
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
