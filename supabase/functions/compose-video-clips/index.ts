@@ -441,6 +441,7 @@ serve(async (req) => {
       // dialog (Sync.so cut_off). Auto-extend the scene to the smallest
       // Hailuo-allowed duration (6s or 10s) that fits VO + 0.4s padding.
       if ((scene.engineOverride ?? 'auto') === 'cinematic-sync') {
+        __stage = `cinematic_sync_prep:${scene.id}`;
         try {
           // Two-Shot prep: if this scene has a multi-speaker dialog_script,
           // synthesize a merged voiceover (one WAV with all speakers in
