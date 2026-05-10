@@ -445,6 +445,11 @@ serve(async (req) => {
             const dlg = String((scene as any).dialogScript ?? '');
             const speakerLines = dlg.split(/\r?\n/).filter((l) => /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l));
             if (speakerLines.length >= 2) {
+              // Mark stage = 'audio' so the UI can show step 1/6.
+              await supabaseAdmin
+                .from('composer_scenes')
+                .update({ twoshot_stage: 'audio', updated_at: new Date().toISOString() })
+                .eq('id', scene.id);
               const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-twoshot-audio`;
               const r = await fetch(fnUrl, {
                 method: 'POST',
@@ -458,6 +463,11 @@ serve(async (req) => {
                 console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status}`);
               } else {
                 console.log(`[compose-video-clips] twoshot-audio prep OK for ${scene.id}`);
+                // Stage = 'master_clip' — Hailuo render begins next.
+                await supabaseAdmin
+                  .from('composer_scenes')
+                  .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                  .eq('id', scene.id);
               }
             }
           } catch (twoshotErr) {
