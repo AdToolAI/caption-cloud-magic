@@ -395,8 +395,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
   // is still running (Hailuo may already be `ready` but Sync.so is processing).
   const cinematicSyncRunning = scenes.some(
     (s) => s.engineOverride === 'cinematic-sync' &&
-      (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'pending') &&
-      s.lipSyncStatus !== 'done',
+      (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'pending'),
   );
   useEffect(() => {
     if (generatingCount === 0 && !cinematicSyncRunning) return;
