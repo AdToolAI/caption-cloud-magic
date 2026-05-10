@@ -34,6 +34,9 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const hqReady = scene.clipUrl && scene.clipStatus === 'ready';
 
   const [busy, setBusy] = useState(false);
+  const [gridOpen, setGridOpen] = useState(false);
+  const variantCount = (scene.seedVariations ?? []).length;
+  const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
 
   const triggerFastPreview = async () => {
     if (busy) return;
