@@ -1,63 +1,74 @@
-## Problem
+## Was ist passiert
 
-Beim "Two-Shot Hook" (Cinematic-Sync mit zwei Sprechern) treten drei Probleme auf:
+Beim Two-Shot Cinematic-Sync läuft die Pipeline durch (Hailuo i2v → Sync.so/lipsync-2 mit gemerged-tem VO), aber:
 
-1. **Falsche Charaktere im Bild** — Hailuo zeigt zufällige Personen, nicht die in der Szene ausgewählten Cast-Charaktere.
-2. **Erster Charakter redet zu lang** — Sync.so animiert eine Person für den gesamten Audio-Track, anstatt sauber zwischen Sprecher 1 und Sprecher 2 zu wechseln.
-3. **Voiceover ist nicht hörbar** — die finale Lip-Sync-Szene wirkt stumm bzw. man hört den gemischten Voiceover nicht.
+1. **Voiceover ist nicht hörbar** — die finale Lip-Sync-MP4 enthält den gemischten VO als eingebetteten Audio-Track, aber der Player startet stumm und entmutet sich nicht zuverlässig.
+2. **Gesichter werden nicht 1:1 übernommen** — Nano Banana 2 weicht beim Multi-Portrait-Compose stärker ab als beim Single-Portrait-Anchor.
 
 ## Root-Cause-Analyse
 
-**Issue 1 — Two-Shot überspringt den Scene-Anchor:**
-`ClipsTab.handleStartCinematicSync` ruft korrekt `prepareSceneAnchor()` auf (Nano Banana 2 komponiert alle ausgewählten Cast-Portraits in EINEN Frame, der dann an Hailuo i2v als `first_frame_image` geht). Der **Two-Shot-Pfad in `SceneDialogStudio.tsx`** (Zeile ~961-998) tut das **nicht**: er sendet `referenceImageUrl: scene.referenceImageUrl` direkt an `compose-video-clips`. Hailuo erfindet dann beide Gesichter.
+**Issue 1 — Auto-Unmute greift nicht zuverlässig:**
+`ComposerSequencePreview` entmutet automatisch nur, wenn `s.lipSyncWithVoiceover === true` ODER ein globaler `voiceoverUrl` vorhanden ist. Beim Cinematic-Sync gibt es keinen globalen VO (er ist im MP4 eingebettet), und der Flag-Roundtrip (SceneDialogStudio → DB → Reload) läuft erst, wenn die nächste Polling-Runde die Szene neu lädt. Folge: Wenn der Player die fertige Lip-Sync-Szene zeigt, bleibt das `<video>`-Element auf `muted=true`, und der eingebettete VO ist unhörbar.
 
-**Issue 2 hängt direkt an Issue 1:** Sync.so/lipsync-2 nutzt Active-Speaker-Detection auf dem Video. Wenn der Master-Clip nur EIN deutliches Gesicht enthält (oder zwei nicht zur Cast passen), animiert es das eine Gesicht über den gesamten Merged-Audio. → Sobald der korrekte Two-Shot-Anchor gerendert wird, kann lipsync-2 zwischen den beiden Gesichtern wechseln.
+Außerdem filtert `sfxClipsTimeline` (Zeile 715-717) per-szenen Voiceover-Clips raus, sobald `lipSyncAppliedAt` gesetzt ist — die separate VO-Spur, die sonst hörbar wäre, wird also explizit unterdrückt. Wenn das eingebettete Audio im stummen Video nicht durchkommt, hört der User gar nichts.
 
-**Issue 3 — Auto-Unmute trifft nicht zu:**
-Der Player-Auto-Unmute (`ComposerSequencePreview.tsx` Zeilen 631-646) entmutet erst, wenn mind. eine Szene `lipSyncWithVoiceover === true` hat (oder `voiceoverUrl`/`backgroundMusicUrl`/`sceneAudioClips` vorhanden ist). Beim Two-Shot setzt `SceneDialogStudio` zwar das Optimistic-Flag, aber die DB-Persistierung von `lipSyncWithVoiceover: true` läuft nur über das nachgelagerte Sync.so-Update. Wenn der Player die Szene lädt bevor `lip_sync_applied_at` gesetzt ist, bleibt er auf `muted=true` — der gemischte Voiceover ist im Sync.so-MP4 aber bereits eingebettet und damit unhörbar.
+**Issue 2 — Multi-Portrait-Prompt ist zu generisch:**
+Im `compose-scene-anchor`-Prompt steht zwar "Preserve each person's individual identity exactly", aber die Reihenfolge der Portraits wird nicht stark mit den Namen verknüpft, und es fehlt eine Klausel die fordert, dass die Gesichter aus den Referenzbildern *unverändert* übernommen werden (Nano Banana 2 neigt zu Gesichts-Neuinterpretation, wenn der Scene-Prompt sehr konkret ist).
 
 ## Plan
 
-### 1. `src/components/video-composer/SceneDialogStudio.tsx` — Composed Anchor für Two-Shot
+### 1. `ComposerSequencePreview.tsx` — Robust-Auto-Unmute
 
-Vor dem `supabase.functions.invoke('compose-video-clips', ...)` (Zeile ~996) den gleichen Anchor-Schritt einbauen wie `ClipsTab.handleStartCinematicSync` (Zeilen 944-972):
-
-- `prepareSceneAnchor(scene, characters, activeBrandChar, scene.aiPrompt)` aufrufen.
-- Erfolg → `composer_scenes.reference_image_url` mit dem komponierten Frame in der DB einfrieren UND `referenceImageUrl: composedFirstFrame` an die Edge Function übergeben.
-- Fehler → ohne Anchor weitermachen (Logging), damit der Render nicht blockiert.
-
-Dafür müssen `characters` (bereits als Prop vorhanden) und `activeBrandChar` (über `useActiveBrandKit`/`useAccessibleCharacters`-Hook, gleicher Pattern wie ClipsTab) ergänzt werden. Falls bereits importiert, einfach wiederverwenden.
-
-### 2. `src/components/video-composer/SceneDialogStudio.tsx` — `lipSyncWithVoiceover` zuverlässig persistieren
-
-Direkt nach der erfolgreichen Edge-Function-Invocation einen DB-Write nachschießen:
+Den Auto-Unmute-Effekt (Zeile ~631) zusätzlich auf `lipSyncAppliedAt` triggern lassen — egal ob `lipSyncWithVoiceover` persistiert ist oder nicht:
 
 ```ts
-await supabase
-  .from('composer_scenes')
-  .update({ lip_sync_with_voiceover: true, engine_override: 'cinematic-sync' })
-  .eq('id', sceneIdFinal);
+const hasEmbeddedAudio = playable.some(
+  (s) =>
+    s.lipSyncWithVoiceover === true ||
+    !!s.lipSyncAppliedAt ||                    // ← NEU
+    (s.clipSource as string) === 'ai-heygen' ||
+    s.clipSource === 'upload',
+);
 ```
 
-So liest `ComposerSequencePreview` das Flag beim nächsten Refresh und ruft `setMuted(false)` automatisch auf — der eingebettete Voiceover wird hörbar, sobald der Sync.so-Output ankommt.
+Zusätzlich: Wenn die aktive Szene `lipSyncAppliedAt` ODER `clipSource==='ai-heygen'` hat, beim Slot-Swap das Video **explizit entmuten** (in dem Effekt der `el.muted = mutedRef.current` setzt — Zeilen ~222 und ~263). Der lip-syncte MP4 trägt sein eigenes Audio; in diesem Fall gewinnt der Mute-Toggle nicht über die Embedded-Audio-Erwartung.
 
-### 3. `supabase/functions/compose-video-clips/index.ts` — Server-side Safety-Net (defensiv)
+### 2. `ComposerSequencePreview.tsx` — Embedded-Audio-Garantie auf Slot-Swap
 
-Im `cinematic_sync_prep`-Block (Zeile 443-517) **bevor** das Hailuo-Routing startet: wenn die Szene **mehr als eine Cast-Rolle** hat UND `referenceImageUrl` keine "anchor"-Markierung trägt (z. B. URL enthält nicht `/scene-anchors/`), dann `compose-scene-anchor` mit `portraitUrls[]` aller Cast-Charaktere aufrufen und `scene.referenceImageUrl` für den Hailuo-Branch überschreiben. So sind auch ältere Re-Rolls / direkte API-Aufrufe abgesichert.
+Im Slot-Swap-Path (Zeilen ~313-360) für Szenen mit `lipSyncAppliedAt` zusätzlich:
 
-### 4. Kein Render-Engine-Wechsel, kein UI-Redesign
+```ts
+const hasEmbedded = !!scene.lipSyncAppliedAt || scene.clipSource === 'ai-heygen';
+standbyEl.muted = hasEmbedded ? false : mutedRef.current;
+```
 
-Sync.so/lipsync-2 bleibt unverändert (die korrekte Komposition macht die Active-Speaker-Detection erst möglich). Audio-Mixing, Player-UI, Wallet-Logik und Continuity-Check bleiben unangetastet.
+So ist garantiert, dass das fertige Two-Shot-MP4 hörbar abspielt, sobald es aktiv wird — unabhängig vom Toggle-Zustand.
 
-## Out of Scope
+### 3. `compose-scene-anchor/index.ts` — Identity-Lock-Prompt für Multi-Portrait
 
-- Per-Speaker-Stitching (mehrere Sync.so-Pässe) — die Single-Pass-Detection genügt mit korrektem Anchor.
-- Änderungen an `compose-twoshot-audio` (Audio-Merge funktioniert bereits korrekt).
-- Refactor der Anchor-Helper / Anchor-Cache.
-- HeyGen-Pfad (separater Branch, von diesem Bug nicht betroffen).
+Den Multi-Clause für >1 Portrait verschärfen:
+
+```ts
+const multiClause = isMulti
+  ? ` CRITICAL: Each face must be COPIED PIXEL-FOR-PIXEL from its reference portrait. ` +
+    `Do NOT generalize, beautify, or re-imagine any face. ` +
+    `All ${portraits.length} characters MUST appear in the SAME frame, ` +
+    `positioned naturally per the scene (e.g. side by side, facing each other). ` +
+    `If the scene lighting differs from the portrait, only adapt skin tone — never the underlying face geometry.`
+  : "";
+```
+
+Außerdem den `nameClause` enger an die Reihenfolge binden: "Image #1 = NAME_A, Image #2 = NAME_B" statt einer Komma-Liste.
+
+### 4. Out of Scope
+
+- Per-Sprecher-Stitching (mehrere Sync.so-Pässe)
+- Wechsel des i2v-Providers
+- Player-UI-Änderungen außer dem Auto-Unmute
+- Anchor-Caching anpassen (Cache greift weiter über `promptHash`)
 
 ## Verifikation
 
-1. Two-Shot mit zwei Cast-Charakteren starten → vor dem Hailuo-Render sollte ein Anchor-Bild im `composer-anchors`/`scene-anchors` Bucket auftauchen, das beide Gesichter zeigt.
-2. Sync.so-Output: Sprecher A bewegt nur den Mund während Sekunde 0–X, Sprecher B während X–Y.
-3. Player startet automatisch entmutet, gemischter Voiceover ist hörbar.
+1. Two-Shot-Szene rendern → sobald die Lip-Sync-MP4 ankommt, startet der Player automatisch entmutet und der gemischte Voiceover ist hörbar.
+2. Toggle-Mute funktioniert weiter normal — beim erneuten Aktivieren der Szene wird Embedded-Audio aber wieder zwangs-entmutet.
+3. Anchor-Bild zeigt beide Gesichter erkennbar nahe an den Original-Portraits (subjektiv besser als vorher).
