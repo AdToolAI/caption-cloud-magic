@@ -1,11 +1,19 @@
-import { useState } from 'react';
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import RerollVariantGrid from './RerollVariantGrid';
+import LeadInTrimSheet from './LeadInTrimSheet';
+import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
+
+/** Providers that produce an i2v lead-in freeze worth auto-trimming. */
+const I2V_PROVIDERS: ReadonlyArray<string> = [
+  'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance',
+  'ai-luma', 'ai-veo', 'ai-sora', 'ai-pika', 'ai-happyhorse',
+];
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
@@ -35,8 +43,35 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
 
   const [busy, setBusy] = useState(false);
   const [gridOpen, setGridOpen] = useState(false);
+  const [trimOpen, setTrimOpen] = useState(false);
   const variantCount = (scene.seedVariations ?? []).length;
   const variantsGenerating = (scene.seedVariations ?? []).some((v) => v?.status === 'generating');
+
+  // Phase 5.5 — Auto-detect lead-in freeze ONCE per clipUrl, only for i2v
+  // providers that haven't been trimmed yet (clip_lead_in_trim_seconds === 0).
+  // The compose-video-clips function seeds a heuristic default; we only run
+  // when that heuristic returned 0 and the clip looks i2v.
+  const autoDetectedRef = useRef<string | null>(null);
+  useEffect(() => {
+    const url = scene.clipUrl;
+    if (!url) return;
+    if (autoDetectedRef.current === url) return;
+    if ((scene.clipLeadInTrimSeconds ?? 0) > 0) return;
+    if (!I2V_PROVIDERS.includes(scene.clipSource)) return;
+    if (scene.clipStatus !== 'ready') return;
+    autoDetectedRef.current = url;
+    (async () => {
+      try {
+        const { trimSeconds } = await detectLeadInTrim(url);
+        if (trimSeconds > 0) {
+          await supabase
+            .from('composer_scenes')
+            .update({ clip_lead_in_trim_seconds: trimSeconds })
+            .eq('id', scene.id);
+        }
+      } catch { /* silent — Smart-Trim is opt-in best-effort */ }
+    })();
+  }, [scene.clipUrl, scene.clipStatus, scene.clipSource, scene.clipLeadInTrimSeconds, scene.id]);
 
   const triggerFastPreview = async () => {
     if (busy) return;
@@ -84,25 +119,42 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
       );
     }
     const trim = Math.max(0, Number(scene.clipLeadInTrimSeconds ?? 0));
+    const showTrimButton = I2V_PROVIDERS.includes(scene.clipSource);
     return (
-      <video
-        src={scene.clipUrl}
-        className="w-full h-full object-cover"
-        controls
-        playsInline
-        preload="metadata"
-        onLoadedMetadata={(e) => {
-          const el = e.currentTarget;
-          try { el.volume = 0.9; } catch { /* noop */ }
-          if (trim > 0) {
-            try {
-              if (isFinite(el.duration) && trim < el.duration - 0.1) {
-                el.currentTime = trim;
+      <>
+        <div className="relative w-full h-full">
+          <video
+            src={scene.clipUrl}
+            className="w-full h-full object-cover"
+            controls
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const el = e.currentTarget;
+              try { el.volume = 0.9; } catch { /* noop */ }
+              if (trim > 0) {
+                try {
+                  if (isFinite(el.duration) && trim < el.duration - 0.1) {
+                    el.currentTime = trim;
+                  }
+                } catch { /* noop */ }
               }
-            } catch { /* noop */ }
-          }
-        }}
-      />
+            }}
+          />
+          {showTrimButton && (
+            <button
+              type="button"
+              onClick={() => setTrimOpen(true)}
+              className="absolute top-1 right-1 bg-black/70 hover:bg-black/90 text-amber-300 rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 border border-amber-500/40 shadow"
+              title={trim > 0 ? `Lead-In: ${trim.toFixed(2)}s — anpassen` : 'Smart-Trim öffnen'}
+            >
+              <Scissors className="h-2.5 w-2.5" />
+              {trim > 0 ? `${trim.toFixed(2)}s` : 'Trim'}
+            </button>
+          )}
+        </div>
+        <LeadInTrimSheet scene={scene} open={trimOpen} onOpenChange={setTrimOpen} />
+      </>
     );
   }
 
