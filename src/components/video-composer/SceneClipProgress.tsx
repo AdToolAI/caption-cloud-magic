@@ -1,5 +1,6 @@
-import { Loader2, XCircle, Sparkles, Clock, Image as ImageIcon, Film } from 'lucide-react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
+import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
