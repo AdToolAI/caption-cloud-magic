@@ -1045,43 +1045,13 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                   <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                   {!isMultiSpeaker && (
                     <AlertDialogAction
-                      onClick={async () => {
+                      onClick={() => {
                         const t = cinematicSwitchTarget;
                         setCinematicSwitchTarget(null);
                         if (!t) return;
-                        const newClipSource = t.clipSource.startsWith('ai-') ? t.clipSource : 'ai-hailuo';
-                        const updated: ComposerScene[] = scenes.map((s) =>
-                          s.id === t.id
-                            ? {
-                                ...s,
-                                engineOverride: 'cinematic-sync',
-                                clipSource: newClipSource,
-                              }
-                            : s,
-                        );
-                        onUpdateScenes(updated);
-                        const updatedTarget = updated.find((s) => s.id === t.id) || t;
-
-                        // Hardening: persist override synchronously so polls /
-                        // reloads see the right engine even before the debounced
-                        // setScenes flush lands.
-                        try {
-                          await supabase
-                            .from('composer_scenes')
-                            .update({
-                              engine_override: 'cinematic-sync',
-                              clip_source: newClipSource,
-                            })
-                            .eq('id', t.id);
-                        } catch (err) {
-                          console.warn('[ClipsTab] cinematic-sync override persist failed:', err);
-                        }
-
-                        handleGenerateSingle(updatedTarget);
-                        toast({
-                          title: 'Cinematic-Sync gestartet',
-                          description: `Szene ${(t.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene, Lip-Sync läuft danach automatisch (~2 Min).`,
-                        });
+                        // Dedicated start path — guarantees immediate visible
+                        // progress + correct engine_override + compose call.
+                        handleStartCinematicSync(t);
                       }}
                       className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950"
                     >
