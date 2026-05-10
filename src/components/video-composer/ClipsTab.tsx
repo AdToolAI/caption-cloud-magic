@@ -845,7 +845,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     }
   };
 
-
+  const handleSearchStock = async (sceneId: string) => {
     const query = stockSearch[sceneId];
     if (!query) return;
 
