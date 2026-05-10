@@ -80,6 +80,7 @@ export const hubDefinitions: HubDefinition[] = [
       { route: "/audio-studio", titleKey: "VoicePro", descKey: "hubItemDesc.audioStudio", icon: Mic2 },
       { route: "/music-studio", titleKey: "Music Studio", descKey: "Native Music Library — Stable Audio, MiniMax, ElevenLabs in einem Studio", icon: Music2 },
       { route: "/sfx-library", titleKey: "SFX Library", descKey: "Royalty-free Sound Effects (Pixabay + Freesound) für Composer & Director's Cut", icon: AudioWaveform },
+      { route: "/stock-videos", titleKey: "Stock Videos", descKey: "Premium 4K & HD Clips (Pexels + Pixabay) mit Editorial Collections — direkt in Composer & DC", icon: Film },
       { route: "/universal-creator", titleKey: "Universal Content Creator", descKey: "hubItemDesc.universalCreator", icon: Video },
       { route: "/universal-video-creator", titleKey: "Universal Video Creator", descKey: "hubItemDesc.universalVideo", icon: Film },
       { route: "/universal-directors-cut", titleKey: "Universal Director's Cut", descKey: "hubItemDesc.directorsCut", icon: Edit },

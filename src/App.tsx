@@ -137,6 +137,7 @@ const AutopilotAUP = lazy(() => import("./pages/legal/AutopilotAUP"));
 const AudioStudio = lazy(() => import("./pages/AudioStudio"));
 const MusicStudio = lazy(() => import("./pages/MusicStudio"));
 const SfxLibrary = lazy(() => import("./pages/SfxLibrary"));
+const StockVideos = lazy(() => import("./pages/StockVideos"));
 const VerifyLicense = lazy(() => import("./pages/VerifyLicense"));
 const MyLicenses = lazy(() => import("./pages/MyLicenses"));
 const VideoTranslator = lazy(() => import("./pages/VideoTranslator"));
@@ -288,6 +289,7 @@ function AppLayout() {
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/music-studio" element={<ProtectedRoute><MusicStudio /></ProtectedRoute>} />
           <Route path="/sfx-library" element={<ProtectedRoute><SfxLibrary /></ProtectedRoute>} />
+          <Route path="/stock-videos" element={<ProtectedRoute><StockVideos /></ProtectedRoute>} />
           <Route path="/my-licenses" element={<ProtectedRoute><MyLicenses /></ProtectedRoute>} />
            <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
            <Route path="/video-composer" element={<VideoComposer />} />
