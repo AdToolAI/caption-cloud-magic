@@ -467,8 +467,10 @@ serve(async (req) => {
                 },
                 body: JSON.stringify({ scene_id: scene.id }),
               });
+              // Drain body to avoid leak; capture text on failure for logs.
+              const respText = await r.text().catch(() => '');
               if (!r.ok) {
-                console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status}`);
+                console.warn(`[compose-video-clips] twoshot-audio prep failed for ${scene.id}: HTTP ${r.status} ${respText.slice(0, 300)}`);
               } else {
                 console.log(`[compose-video-clips] twoshot-audio prep OK for ${scene.id}`);
                 // Stage = 'master_clip' — Hailuo render begins next.
