@@ -332,7 +332,11 @@ export default function ComposerSequencePreview({
           const v = videoARef.current;
           if (v) {
             try { v.currentTime = 0; } catch { /* noop */ }
-            v.muted = mutedRef.current;
+            const hasEmbedded =
+              !!nextScene.lipSyncAppliedAt ||
+              (nextScene.clipSource as string) === 'ai-heygen' ||
+              nextScene.clipSource === 'upload';
+            v.muted = hasEmbedded ? false : mutedRef.current;
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
