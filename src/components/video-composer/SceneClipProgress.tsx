@@ -198,30 +198,58 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     );
   }
 
-  // PENDING → placeholder + ⚡ trigger
+  // PENDING → placeholder + ⚡ trigger + 4× grid trigger
   const Icon = scene.clipSource === 'upload' || scene.clipSource === 'stock' ? Film : Sparkles;
   return (
-    <div className="relative w-full h-full bg-muted/20 border border-dashed border-border/40 flex flex-col items-center justify-center gap-1">
-      <Icon className="h-4 w-4 text-muted-foreground/50" />
-      <span className="text-[9px] text-muted-foreground/60">Szene {index + 1}</span>
-      <span className="text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
-        <Clock className="h-2 w-2" /> bereit zum Generieren
-      </span>
-      {isAi && hasPrompt && (
-        <button
-          type="button"
-          onClick={triggerFastPreview}
-          disabled={busy}
-          className={cn(
-            'absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
-            'bg-amber-500/90 hover:bg-amber-500 text-black',
-          )}
-          title="3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)"
-        >
-          {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
-          Schnell-Vorschau
-        </button>
-      )}
-    </div>
+    <>
+      <div className="relative w-full h-full bg-muted/20 border border-dashed border-border/40 flex flex-col items-center justify-center gap-1">
+        <Icon className="h-4 w-4 text-muted-foreground/50" />
+        <span className="text-[9px] text-muted-foreground/60">Szene {index + 1}</span>
+        <span className="text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
+          <Clock className="h-2 w-2" /> bereit zum Generieren
+        </span>
+        {isAi && hasPrompt && (
+          <div className="absolute bottom-1 right-1 flex gap-1">
+            <button
+              type="button"
+              onClick={() => setGridOpen(true)}
+              disabled={busy}
+              className={cn(
+                'rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
+                'bg-black/70 hover:bg-black text-amber-300 border border-amber-500/40',
+              )}
+              title="4 Takes parallel mit verschiedenen Seeds (Reroll Pro)"
+            >
+              {variantsGenerating
+                ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                : <Grid2x2 className="h-2.5 w-2.5" />}
+              4×
+              {variantCount > 0 && !variantsGenerating && (
+                <span className="text-[8px] text-amber-300/70">({variantCount})</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={triggerFastPreview}
+              disabled={busy}
+              className={cn(
+                'rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
+                'bg-amber-500/90 hover:bg-amber-500 text-black',
+              )}
+              title="3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)"
+            >
+              {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
+              Schnell-Vorschau
+            </button>
+          </div>
+        )}
+      </div>
+      <RerollVariantGrid
+        scene={scene}
+        open={gridOpen}
+        onOpenChange={setGridOpen}
+        aspectRatio={aspectRatio}
+      />
+    </>
   );
 }
