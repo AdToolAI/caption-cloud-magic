@@ -363,6 +363,24 @@ export function DirectorsCut() {
         setComposerSourceProjectId(sourceProjectId);
         setComposerRenderId(sourceRenderId);
       }
+    } else {
+      // ── Stock Video Handoff (Phase 6.3) ──
+      let raw: string | null = null;
+      try { raw = sessionStorage.getItem('directors-cut:incoming-stock-video'); } catch { /* noop */ }
+      if (raw) {
+        try { sessionStorage.removeItem('directors-cut:incoming-stock-video'); } catch { /* noop */ }
+        try {
+          const p = JSON.parse(raw);
+          setSelectedVideo({
+            id: p.external_id ? `stock_${p.provider}_${p.external_id}` : undefined,
+            url: p.url,
+            name: p.title || t('dc.importedVideo'),
+            source: 'stock_library' as any,
+          } as any);
+        } catch (err) {
+          console.warn('[DirectorsCut] stock handoff parse failed', err);
+        }
+      }
     }
   }, [searchParams, navigate]);
 

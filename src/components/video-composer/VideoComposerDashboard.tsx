@@ -909,6 +909,39 @@ export default function VideoComposerDashboard() {
     }
   }, [project.id]);
 
+  // ── Stock Video Handoff (Phase 6.3) ──
+  // When the user clicks "Use in Composer" in /stock-videos we drop the
+  // payload into sessionStorage and navigate here. Consume it once on mount
+  // and append a ready-to-render `stock` scene.
+  const stockHandoffConsumedRef = useRef(false);
+  useEffect(() => {
+    if (stockHandoffConsumedRef.current) return;
+    let raw: string | null = null;
+    try { raw = sessionStorage.getItem('composer:incoming-stock-video'); } catch { /* noop */ }
+    if (!raw) return;
+    stockHandoffConsumedRef.current = true;
+    try { sessionStorage.removeItem('composer:incoming-stock-video'); } catch { /* noop */ }
+    try {
+      const p = JSON.parse(raw);
+      const dur = Math.max(2, Math.min(30, Math.round(Number(p.duration) || 5)));
+      void addSceneToProject({
+        sceneType: 'custom',
+        clipSource: 'stock',
+        clipQuality: 'standard',
+        clipStatus: 'ready',
+        clipUrl: p.url,
+        durationSeconds: dur,
+        stockKeywords: Array.isArray(p.tags) ? p.tags.slice(0, 6).join(', ') : undefined,
+      } as any);
+      toast({
+        title: t('composer.stockImported', { defaultValue: 'Stock-Clip importiert' }),
+        description: p.title || p.url,
+      });
+    } catch (err) {
+      console.warn('[VideoComposerDashboard] stock handoff parse failed', err);
+    }
+  }, [addSceneToProject]);
+
   /**
    * Insert N new scenes immediately AFTER `parentSceneId` (taking its slot
    * when `removeParent` is true). Used by SceneDialogStudio so multi-speaker
