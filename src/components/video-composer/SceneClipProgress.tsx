@@ -1,25 +1,73 @@
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film } from 'lucide-react';
+import { useState } from 'react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2 } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
   index: number;
+  /** Optional aspect hint forwarded to the LTX fast-preview call. */
+  aspectRatio?: '16:9' | '9:16' | '1:1' | '4:5';
 }
 
 /**
  * Visual progress display for a scene's preview slot.
- * Shows skeleton + loader while generating, error state on failure,
- * video on ready, and friendly placeholder when pending.
+ * Phase 5.1 — when a Fast-Preview proxy exists (LTX, ~3s, 384px) we surface it
+ * as a muted/looping overlay so the user can sanity-check composition while the
+ * HQ render still runs. The "⚡ Schnell-Vorschau" trigger appears for AI scenes
+ * that have a prompt but no clip yet (or that previously failed).
  */
-export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
+export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgressProps) {
   // Robust image detection: covers AI-image scenes whose uploadType
   // hasn't synced yet but whose clipSource already identifies them.
   const isImageScene =
     scene.uploadType === 'image' || scene.clipSource === 'ai-image';
 
-  // READY → show video / image
-  if (scene.clipUrl && scene.clipStatus === 'ready') {
+  const isAi = scene.clipSource.startsWith('ai-');
+  const hasPrompt = !!(scene.aiPrompt && scene.aiPrompt.trim().length >= 4);
+  const previewStatus = scene.previewStatus ?? 'idle';
+  const hasPreview = !!scene.previewClipUrl && previewStatus === 'ready';
+  const hqReady = scene.clipUrl && scene.clipStatus === 'ready';
+
+  const [busy, setBusy] = useState(false);
+
+  const triggerFastPreview = async () => {
+    if (busy) return;
+    if (!hasPrompt) {
+      toast({ title: 'Prompt fehlt', description: 'Bitte zuerst einen Prompt schreiben.', variant: 'destructive' });
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.functions.invoke('generate-fast-preview', {
+        body: {
+          sceneId: scene.id,
+          prompt: scene.aiPrompt,
+          startImageUrl: scene.referenceImageUrl || scene.firstFrameUrl || undefined,
+          aspectRatio: aspectRatio === '4:5' ? '9:16' : (aspectRatio ?? '16:9'),
+        },
+      });
+      if (error) throw error;
+      toast({
+        title: '⚡ Schnell-Vorschau gestartet',
+        description: '~10 Sekunden bis zum 3-Sekunden-Proxy.',
+      });
+    } catch (err) {
+      toast({
+        title: 'Vorschau fehlgeschlagen',
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // READY → show video / image (with optional Fast-Preview swap badge if both exist)
+  if (hqReady) {
     if (isImageScene) {
       return (
         <div className="relative w-full h-full">
@@ -41,10 +89,7 @@ export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
         preload="metadata"
         onLoadedMetadata={(e) => {
           const el = e.currentTarget;
-          // Default to a comfortable dialog-friendly volume.
           try { el.volume = 0.9; } catch { /* noop */ }
-          // Skip the frozen reference-image opening frames produced by i2v
-          // providers (Hailuo, Kling, Wan, Seedance, Luma, Veo, Sora).
           if (trim > 0) {
             try {
               if (isFinite(el.duration) && trim < el.duration - 0.1) {
@@ -57,30 +102,122 @@ export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
     );
   }
 
-  // GENERATING → Phase 5.2 provider-tinted skeleton with live ETA
+  // GENERATING (HQ) → Phase 5.2 provider-tinted skeleton with live ETA
   if (scene.clipStatus === 'generating') {
-    return <SceneGenerationSkeleton scene={scene} />;
-  }
-
-  // FAILED → red error state
-  if (scene.clipStatus === 'failed') {
     return (
-      <div className="w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
-        <XCircle className="h-5 w-5 text-destructive" />
-        <span className="text-[9px] text-destructive font-medium">Fehlgeschlagen</span>
+      <div className="relative w-full h-full">
+        <SceneGenerationSkeleton scene={scene} />
+        {hasPreview && (
+          <video
+            src={scene.previewClipUrl!}
+            className="absolute inset-0 w-full h-full object-cover opacity-90 pointer-events-none"
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
+        )}
+        {hasPreview && (
+          <div className="absolute top-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 flex items-center gap-1 shadow">
+            <Zap className="h-2.5 w-2.5" />
+            <span className="text-[8px] font-bold uppercase tracking-wide">Vorschau</span>
+          </div>
+        )}
       </div>
     );
   }
 
-  // PENDING → placeholder
-  const Icon = scene.clipSource === 'upload' ? Film : scene.clipSource === 'stock' ? Film : Sparkles;
+  // PREVIEW READY but HQ still pending/failed → autoplay proxy + offer regen
+  if (hasPreview) {
+    return (
+      <div className="relative w-full h-full bg-black">
+        <video
+          src={scene.previewClipUrl!}
+          className="w-full h-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
+        <div className="absolute top-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 flex items-center gap-1 shadow">
+          <Zap className="h-2.5 w-2.5" />
+          <span className="text-[8px] font-bold uppercase tracking-wide">Schnell-Vorschau</span>
+        </div>
+        {isAi && hasPrompt && (
+          <button
+            type="button"
+            onClick={triggerFastPreview}
+            disabled={busy}
+            className="absolute bottom-1 right-1 bg-black/70 hover:bg-black/90 text-white rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 transition"
+            title="Schnell-Vorschau neu generieren"
+          >
+            {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
+            Reroll
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // FAILED (HQ) → red error state (preserve fast-preview retry)
+  if (scene.clipStatus === 'failed') {
+    return (
+      <div className="relative w-full h-full bg-destructive/10 border border-destructive/30 flex flex-col items-center justify-center gap-1">
+        <XCircle className="h-5 w-5 text-destructive" />
+        <span className="text-[9px] text-destructive font-medium">Fehlgeschlagen</span>
+        {isAi && hasPrompt && (
+          <button
+            type="button"
+            onClick={triggerFastPreview}
+            disabled={busy || previewStatus === 'generating'}
+            className="absolute bottom-1 right-1 bg-amber-500/90 hover:bg-amber-500 text-black rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold"
+          >
+            {busy || previewStatus === 'generating'
+              ? <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              : <Zap className="h-2.5 w-2.5" />}
+            Vorschau
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // PREVIEW GENERATING (HQ pending) → shimmer w/ amber border
+  if (previewStatus === 'generating') {
+    return (
+      <div className="relative w-full h-full bg-amber-500/10 border border-amber-500/40 flex flex-col items-center justify-center gap-1 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-500/20 to-transparent animate-[shimmer_2s_linear_infinite] [background-size:200%_100%]" />
+        <Zap className="h-4 w-4 text-amber-400 relative z-10" />
+        <span className="text-[9px] text-amber-300 font-medium relative z-10">Schnell-Vorschau läuft…</span>
+        <span className="text-[8px] text-amber-300/70 relative z-10">~10 Sek.</span>
+      </div>
+    );
+  }
+
+  // PENDING → placeholder + ⚡ trigger
+  const Icon = scene.clipSource === 'upload' || scene.clipSource === 'stock' ? Film : Sparkles;
   return (
-    <div className="w-full h-full bg-muted/20 border border-dashed border-border/40 flex flex-col items-center justify-center gap-1">
+    <div className="relative w-full h-full bg-muted/20 border border-dashed border-border/40 flex flex-col items-center justify-center gap-1">
       <Icon className="h-4 w-4 text-muted-foreground/50" />
       <span className="text-[9px] text-muted-foreground/60">Szene {index + 1}</span>
       <span className="text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
         <Clock className="h-2 w-2" /> bereit zum Generieren
       </span>
+      {isAi && hasPrompt && (
+        <button
+          type="button"
+          onClick={triggerFastPreview}
+          disabled={busy}
+          className={cn(
+            'absolute bottom-1 right-1 rounded px-1.5 py-0.5 text-[9px] flex items-center gap-1 font-semibold shadow transition',
+            'bg-amber-500/90 hover:bg-amber-500 text-black',
+          )}
+          title="3-Sekunden-Vorschau in ca. 10 Sek. (LTX, ~0.005 €)"
+        >
+          {busy ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
+          Schnell-Vorschau
+        </button>
+      )}
     </div>
   );
 }
