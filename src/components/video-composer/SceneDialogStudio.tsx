@@ -987,9 +987,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           console.error('[SceneDialogStudio] compose-video-clips invoke failed', invokeErr);
           // Roll back the optimistic generating state so user can retry.
           onUpdate({ clipStatus: 'pending', twoshotStage: null as any });
+          const realMsg = await extractFunctionsError(invokeErr);
           toast({
             title: t.failed,
-            description: formatError(invokeErr),
+            description: realMsg,
             variant: 'destructive',
           });
           return;
