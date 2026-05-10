@@ -50,6 +50,7 @@ import {
 } from '@/hooks/useComposerCollaboration';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useComposerHistory } from '@/hooks/useComposerHistory';
+import { ComposerHistoryContext } from './ComposerHistoryContext';
 import { useIncrementTemplateUsage } from '@/hooks/useMotionStudioTemplates';
 import type { MotionStudioTemplate } from '@/types/motion-studio-templates';
 
