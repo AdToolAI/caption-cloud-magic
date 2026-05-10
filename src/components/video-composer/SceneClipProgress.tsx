@@ -1,5 +1,6 @@
-import { Loader2, XCircle, Sparkles, Clock, Image as ImageIcon, Film } from 'lucide-react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
+import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
@@ -56,29 +57,9 @@ export function SceneClipProgress({ scene, index }: SceneClipProgressProps) {
     );
   }
 
-  // GENERATING → animated skeleton
+  // GENERATING → Phase 5.2 provider-tinted skeleton with live ETA
   if (scene.clipStatus === 'generating') {
-    return (
-      <div className="relative w-full h-full overflow-hidden bg-gradient-to-br from-accent/20 via-primary/10 to-accent/20 animate-pulse flex flex-col items-center justify-center gap-1">
-        {/* Shimmer overlay */}
-        <div
-          className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-          style={{
-            background: 'linear-gradient(90deg, transparent, hsl(var(--accent) / 0.25), transparent)',
-            animation: 'shimmer 1.8s infinite',
-          }}
-        />
-        <Loader2 className="h-5 w-5 text-accent animate-spin relative z-10" />
-        <span className="text-[9px] text-accent font-medium relative z-10">KI rendert…</span>
-        <span className="text-[8px] text-muted-foreground relative z-10">~30–60s</span>
-        <style>{`
-          @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-          }
-        `}</style>
-      </div>
-    );
+    return <SceneGenerationSkeleton scene={scene} />;
   }
 
   // FAILED → red error state
