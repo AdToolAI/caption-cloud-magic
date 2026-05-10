@@ -236,7 +236,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url, duration_seconds, upload_type, lip_sync_applied_at, lip_sync_status, lip_sync_source_clip_url, lip_sync_with_voiceover, engine_override')
+      .select('id, clip_status, clip_url, duration_seconds, upload_type, lip_sync_applied_at, lip_sync_status, lip_sync_source_clip_url, lip_sync_with_voiceover, engine_override, clip_source')
       .eq('project_id', projectId);
 
     if (!data) return;
@@ -786,7 +786,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         })
         .eq('id', targetSceneId);
       if (persistErr) {
-        console.warn('[ClipsTab] cinematic-sync DB persist failed:', persistErr);
+        console.error('[ClipsTab] cinematic-sync DB persist failed:', persistErr);
+        throw new Error(persistErr.message || 'Cinematic-Sync konnte nicht gespeichert werden');
       }
 
       const composed = composeFinalPrompt({
