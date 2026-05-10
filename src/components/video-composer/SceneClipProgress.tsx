@@ -1,11 +1,19 @@
-import { useState } from 'react';
-import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { XCircle, Sparkles, Clock, Image as ImageIcon, Film, Zap, Loader2, Grid2x2, Scissors } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { SceneGenerationSkeleton } from './SceneGenerationSkeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import RerollVariantGrid from './RerollVariantGrid';
+import LeadInTrimSheet from './LeadInTrimSheet';
+import { detectLeadInTrim } from '@/lib/video-composer/detectLeadInTrim';
+
+/** Providers that produce an i2v lead-in freeze worth auto-trimming. */
+const I2V_PROVIDERS: ReadonlyArray<string> = [
+  'ai-hailuo', 'ai-kling', 'ai-wan', 'ai-seedance',
+  'ai-luma', 'ai-veo', 'ai-sora', 'ai-pika', 'ai-happyhorse',
+];
 
 interface SceneClipProgressProps {
   scene: ComposerScene;
