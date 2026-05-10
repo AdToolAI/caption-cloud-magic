@@ -170,6 +170,7 @@ serve(async (req) => {
     }
 
     // Verify project ownership
+    __stage = 'verify_project';
     const { data: project, error: projError } = await supabaseAdmin
       .from('composer_projects')
       .select('id, user_id, status')
