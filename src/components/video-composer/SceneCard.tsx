@@ -524,17 +524,17 @@ export default function SceneCard({
                     {showSplitHint && (
                       <Badge
                         variant="outline"
-                        className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-amber-500/60 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
+                        className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
                         title={
                           lang === 'de'
-                            ? `${speakerCount} Sprecher erkannt. Beim Composer-Render wird nur der erste Sprecher als HeyGen-Clip generiert. Klicke hier, um die Szene über das Dialog-Studio in ${speakerCount} Einzelszenen zu splitten — jeder Sprecher bekommt seinen eigenen lippensynchronen Clip.`
+                            ? `${speakerCount} Sprecher erkannt. Beim Generieren wird automatisch der Two-Shot-Hook gerendert: Anchor (beide im Bild) → 10 s Master-Clip → sequenzieller Lip-Sync für jeden Sprecher → Continuity-Check. Klick öffnet das Dialog-Studio als Fallback (eigene Cuts pro Sprecher).`
                             : lang === 'es'
-                            ? `${speakerCount} hablantes detectados. El renderizador del Composer solo genera al primero como clip HeyGen. Haz clic para dividir la escena en ${speakerCount} subescenas vía el Dialog Studio.`
-                            : `${speakerCount} speakers detected. Composer render uses only the first speaker. Click to split this scene into ${speakerCount} sub-scenes via Dialog Studio — one HeyGen lip-sync clip per speaker.`
+                            ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta automáticamente el pipeline Two-Shot Hook (anchor → master clip → lip-sync secuencial por hablante → continuity). Click abre el Dialog Studio como fallback.`
+                            : `${speakerCount} speakers detected. Generating runs the Two-Shot Hook pipeline automatically (anchor → 10 s master clip → sequential lip-sync per speaker → continuity check). Click opens Dialog Studio as a fallback (one cut per speaker).`
                         }
                         onClick={() => setSplitConfirmOpen(true)}
                       >
-                        ⚠️ {speakerCount} {lang === 'de' ? 'Sprecher · splitten' : lang === 'es' ? 'hablantes · dividir' : 'speakers · split'}
+                        🎭 {lang === 'de' ? `Two-Shot · ${speakerCount} Sprecher` : lang === 'es' ? `Two-Shot · ${speakerCount} hablantes` : `Two-Shot · ${speakerCount} speakers`}
                       </Badge>
                     )}
                     <Select
