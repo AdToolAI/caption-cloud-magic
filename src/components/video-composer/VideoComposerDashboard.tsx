@@ -540,7 +540,7 @@ export default function VideoComposerDashboard() {
         fontSize: 48,
         color: '#FFFFFF',
       },
-      transitionType: (s.transitionType ?? 'fade') as ComposerScene['transitionType'],
+      transitionType: (s.transitionType ?? 'crossfade') as ComposerScene['transitionType'],
       transitionDuration: s.transitionDuration ?? 0.5,
       retryCount: 0,
       costEuros: 0,
