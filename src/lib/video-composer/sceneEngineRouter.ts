@@ -19,7 +19,7 @@
  */
 import type { ComposerScene } from '@/types/video-composer';
 
-export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'broll';
+export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'cinematic-sync' | 'broll';
 
 export interface EngineRecommendation {
   engine: SceneEngine;
@@ -94,6 +94,15 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       label: '✨ Sync.so Polish (manuell)',
       reason: 'Vom Nutzer erzwungen — Hailuo + Sync.so Polish-Pass.',
       extraCostEur: 0.05,
+    };
+  }
+  if (override === 'cinematic-sync') {
+    return {
+      engine: 'cinematic-sync',
+      label: '🎬 Cinematic + Lip-Sync',
+      reason:
+        'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
+      extraCostEur: 0.20,
     };
   }
 

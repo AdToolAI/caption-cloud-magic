@@ -62,7 +62,7 @@ serve(async (req) => {
     // Load scene + verify ownership via project
     const { data: scene, error: sErr } = await supabase
       .from('composer_scenes')
-      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover')
+      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds')
       .eq('id', scene_id)
       .single();
     if (sErr || !scene) return json({ error: 'scene not found' }, 404);
@@ -148,13 +148,19 @@ serve(async (req) => {
 
     try {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
+      // If the VO is longer than the source clip, use `cut_off` so Sync.so
+      // truncates instead of looping the audio (which produces double-speak
+      // artefacts). Default to `loop` for short VOs that need to fill the clip.
+      const sceneDuration = (scene as any).duration_seconds ?? 0;
+      const voDuration = vo.duration ?? 0;
+      const syncMode = voDuration > sceneDuration + 0.2 ? 'cut_off' : 'loop';
       const output = await replicate.run(
         "sync/lipsync-2" as `${string}/${string}`,
         {
           input: {
             video: sourceClipUrl,
             audio: vo.url,
-            sync_mode: "loop",
+            sync_mode: syncMode,
           },
         },
       );

@@ -108,7 +108,7 @@ interface ClipScene {
   /** Map of characterId → voice (string voiceId or { voiceId }). */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /** Render-engine override: 'auto' | 'heygen' | 'broll' | 'sync-polish'. */
-  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish';
+  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish' | 'cinematic-sync';
   /** When false → request muted output (Veo/Kling generate_audio=false; Sora muted at stitch). Default true. */
   withAudio?: boolean;
 }
