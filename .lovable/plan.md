@@ -1,58 +1,33 @@
-## Ziel
-Der Klick auf **„In echte Szene einbauen“** muss sofort sichtbar reagieren und garantiert die Cinematic-Sync-Pipeline starten: Hailuo rendert die echte Szene, danach läuft Sync.so Lip-Sync.
+Ich habe den Fehler eingegrenzt: Der Klick setzt den UI-Status kurz auf `generating`, aber direkt danach wird er wieder mit einem älteren Szenen-Snapshot überschrieben. Zusätzlich gibt es in deinem Snapshot keinen `compose-video-clips` Netzwerkaufruf, d. h. der Backend-Render wird wahrscheinlich gar nicht zuverlässig erreicht.
 
-## Diagnose
-- In der Browser-/Network-Snapshot des Nutzers taucht **kein** `compose-video-clips` Request auf. Das heißt: Der Klick kommt aktuell nicht zuverlässig bis zur Backend-Funktion durch.
-- In den Backend-Logs gibt es keine aktuellen `cinematic`/`Hailuo` Treffer. Das bestätigt: Die Pipeline startet nicht, statt nur unsichtbar zu laufen.
-- Der aktuelle Code setzt den Status erst nach `ensureProject()` und `prepareSceneAnchor()`. Wenn einer dieser Schritte hängt/überschrieben wird, sieht der Nutzer keinerlei Fortschritt.
-- Außerdem kann `ensureProjectPersisted(project)` mit einem alten Parent-`project` arbeiten und die kurz zuvor gesetzten `engineOverride: 'cinematic-sync'` / `clipSource: 'ai-hailuo'` wieder überschreiben.
+Plan:
 
-## Umsetzung
-1. **Cinematic-Sync eigenen Startpfad geben**
-   - Nicht mehr über den normalen `handleGenerateSingle(scene)`-Pfad starten.
-   - Neue Funktion `handleStartCinematicSync(scene)` in `ClipsTab.tsx`.
-   - Diese Funktion setzt sofort lokal:
-     - `clipStatus: 'generating'`
-     - `engineOverride: 'cinematic-sync'`
-     - `clipSource: 'ai-hailuo'`
-     - optional `lipSyncStatus: 'pending'`
-   - Dadurch sieht der Nutzer direkt im Clip-Slot den Fortschritt, noch bevor langsame Zwischenschritte laufen.
+1. Cinematic-Sync nicht mehr über die normale `ensureProject()`-Persistenz starten
+   - Diese Persistenz schreibt die komplette alte `project.scenes`-Liste zurück und kann den gerade gesetzten `engineOverride`, `clipSource`, `clipStatus` wieder entfernen.
+   - Stattdessen wird beim Button-Klick die bestehende Scene-ID direkt verwendet und nur diese eine Szene aktualisiert.
 
-2. **Persistenz ohne stale React-State**
-   - Vor dem Rendern wird gezielt nur diese Szene direkt in `composer_scenes` aktualisiert:
-     - `engine_override = 'cinematic-sync'`
-     - `clip_source = 'ai-hailuo'`
-     - `clip_status = 'generating'`
-     - `clip_url = null` oder alter Clip bleibt bewusst als Source-Preview erhalten, je nachdem was für die UI besser passt
-   - Danach wird der Payload aus dem lokal aktualisierten Scene-Objekt gebaut, nicht aus einem alten `project`-Snapshot.
+2. Lokalen UI-Status gegen Debounce-Rollback schützen
+   - Vor dem Start wird die Szene lokal auf `engineOverride: cinematic-sync`, `clipSource: ai-hailuo`, `clipStatus: generating`, `lipSyncStatus: pending` gesetzt.
+   - Der automatische debounced Scene-Speicher darf diesen Startzustand nicht mit einer alten Version überschreiben.
 
-3. **Backend-Aufruf garantiert absetzen**
-   - `compose-video-clips` wird direkt mit `engineOverride: 'cinematic-sync'` und `clipSource: 'ai-hailuo'` aufgerufen.
-   - Falls `prepareSceneAnchor()` vorher länger dauert, bekommt die UI einen klaren Zwischenstatus wie „Szene wird vorbereitet…“.
-   - Fehler werden als Toast + roter Status angezeigt, statt still zu verschwinden.
+3. Persistenz nur für die Ziel-Szene schreiben
+   - `composer_scenes` wird nur für die angeklickte Szene aktualisiert.
+   - Keine komplette Projekt-/Scene-Neuspeicherung im Startpfad.
 
-4. **Polling auch während Sync.so Phase aktiv halten**
-   - Polling darf nicht stoppen, sobald Hailuo `ready` ist, wenn `lipSyncStatus === 'running'` oder `engineOverride === 'cinematic-sync'` noch nicht fertig ist.
-   - So wird auch die zweite Phase sichtbar aktualisiert.
+4. Backend-Aufruf garantiert auslösen
+   - Danach wird `compose-video-clips` direkt mit genau dieser Szene und explizit `engineOverride: cinematic-sync` aufgerufen.
+   - Falls kein persistiertes Projekt/keine gültige Scene-ID vorhanden ist, wird zuerst sauber gespeichert und anschließend die neu gemappte Szene verwendet.
 
-5. **Button-Feedback verbessern**
-   - Während des Starts wird der Button disabled und zeigt Loader/Text wie „Cinematic-Sync startet…“.
-   - In der Szenenkarte wird zusätzlich ein Badge „Cinematic-Sync läuft“ angezeigt, nicht nur der normale „Fertig/Generiert…“-Status.
+5. Fehler sichtbar machen statt still zurückzuspringen
+   - Wenn der Backend-Aufruf scheitert, bleibt eine klare Fehlermeldung/Toast sichtbar.
+   - Der UI-Status wird nur dann zurückgesetzt, wenn wirklich ein Fehler kommt, nicht durch normale Zwischen-Polls.
 
-## Technische Details
-- Änderung primär in `src/components/video-composer/ClipsTab.tsx`.
-- Kleine Ergänzung in `SceneClipProgress.tsx`, falls ein eigener `pending/preparing` LipSync-Status für die Overlay-Anzeige nötig ist.
-- Keine Datenbankmigration nötig, da die benötigten Felder bereits existieren (`engine_override`, `clip_source`, `clip_status`, `lip_sync_status`).
+6. Polling-Fix für Phase 1 und Phase 2
+   - Polling läuft weiter solange `clipStatus === generating` oder `engineOverride === cinematic-sync` mit `lipSyncStatus pending/running` existiert.
+   - Wenn Hailuo fertig ist, startet/überwacht die Lip-Sync-Phase weiter, statt die Szene als „fertig aber unverändert“ stehen zu lassen.
 
-## Validierung
-- Nach Klick muss im Network ein `compose-video-clips` Request erscheinen.
-- Request-Payload muss enthalten:
-```json
-{
-  "clipSource": "ai-hailuo",
-  "engineOverride": "cinematic-sync"
-}
-```
-- Die Karte muss sofort auf Fortschritt wechseln.
-- Backend-Logs müssen Hailuo/Cinematic-Sync zeigen.
-- Nach Hailuo-Ready muss Sync.so automatisch starten und der Poller weiterlaufen.
+Erwartetes Ergebnis:
+- Nach Klick auf „In echte Szene einbauen“ bleibt sofort sichtbar „Echte Szene wird gerendert“ stehen.
+- Im Netzwerk erscheint ein `compose-video-clips` Call.
+- Die Szene springt nicht mehr zurück auf den alten HeyGen-Fertigzustand.
+- Nach Hailuo folgt Sync.so automatisch, und bei längerer LipSync-Dauer wird die Szene weiterhin auf die passende Hailuo-Dauer angepasst.
