@@ -105,6 +105,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     }
   };
 
+  // Cinematic-Sync state — render-engine === 'cinematic-sync' has 2 phases
+  // (1) Hailuo i2v re-render of real scene  (2) Sync.so lip-sync polish.
+  const isCinematic = scene.engineOverride === 'cinematic-sync';
+  const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
+
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
     if (isImageScene) {
@@ -141,7 +146,15 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               }
             }}
           />
-          {showTrimButton && (
+          {/* Cinematic-Sync — Hailuo done, Sync.so still running */}
+          {lipSyncRunning && (
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 pointer-events-none">
+              <Loader2 className="h-5 w-5 text-emerald-300 animate-spin" />
+              <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">Lip-Sync läuft</span>
+              <span className="text-[8px] text-emerald-100/80">Sync.so · ~60 s</span>
+            </div>
+          )}
+          {showTrimButton && !lipSyncRunning && (
             <button
               type="button"
               onClick={() => setTrimOpen(true)}
