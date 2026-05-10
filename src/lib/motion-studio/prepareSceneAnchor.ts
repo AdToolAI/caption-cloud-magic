@@ -41,15 +41,24 @@ export interface PreparedAnchor {
   isMulti?: boolean;
 }
 
+export interface PrepareSceneAnchorOptions {
+  /** When true, ignore an existing scene.referenceImageUrl and always run the
+   *  multi-character composition (Nano Banana 2). Used by the Two-Shot path,
+   *  where we MUST re-compose so all selected cast portraits land in one frame. */
+  forceCompose?: boolean;
+}
+
 export async function prepareSceneAnchor(
   scene: ComposerScene,
   characters: ComposerCharacter[] | undefined,
   brandChar: BrandCharLike | null | undefined,
   scenePromptForCompose: string,
   aspectRatio: '16:9' | '9:16' | '1:1' = '16:9',
+  options: PrepareSceneAnchorOptions = {},
 ): Promise<PreparedAnchor> {
-  // Existing manual reference always wins.
-  if (scene.referenceImageUrl) {
+  // Existing manual reference always wins UNLESS the caller explicitly
+  // requests a re-compose (e.g. multi-speaker two-shot).
+  if (scene.referenceImageUrl && !options.forceCompose) {
     return { firstFrameUrl: scene.referenceImageUrl, composed: false };
   }
 

@@ -37,6 +37,8 @@ import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
@@ -207,6 +209,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
+  const { characters: brandChars } = useBrandCharacters();
+  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
@@ -975,6 +979,42 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             });
             return;
           }
+          // Scene-Aware Multi-Character Anchor — compose all selected cast
+          // portraits into ONE first frame via Nano Banana 2 so Hailuo i2v
+          // renders the actual chosen people (not a generic close-up). Without
+          // this, Sync.so/lipsync-2 also can't switch active speakers because
+          // there's only one face in the master clip.
+          let composedFirstFrame: string | undefined = scene.referenceImageUrl;
+          try {
+            const sceneForAnchor = {
+              ...scene,
+              durationSeconds: masterDuration,
+              dialogScript: dialogScriptText,
+            } as typeof scene;
+            const prepared = await prepareSceneAnchor(
+              sceneForAnchor,
+              characters,
+              activeBrandChar,
+              scene.aiPrompt || dialogScriptText,
+              '16:9',
+              { forceCompose: true },
+            );
+            if (prepared.firstFrameUrl) {
+              composedFirstFrame = prepared.firstFrameUrl;
+              if (prepared.composed) {
+                await supabase
+                  .from('composer_scenes')
+                  .update({ reference_image_url: composedFirstFrame })
+                  .eq('id', sceneIdFinal);
+              }
+              console.log(
+                `[SceneDialogStudio] two-shot anchor ready (composed=${prepared.composed}, multi=${prepared.isMulti ?? false})`,
+              );
+            }
+          } catch (anchorErr) {
+            console.warn('[SceneDialogStudio] two-shot prepareSceneAnchor failed (continuing without composed anchor)', anchorErr);
+          }
+
           const scenePayload = {
             id: sceneIdFinal,
             projectId: pidFinal,
@@ -984,7 +1024,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             aiPrompt: scene.aiPrompt || '',
             negativePrompt: (scene as any).negativePrompt || undefined,
             uploadUrl: scene.uploadUrl,
-            referenceImageUrl: scene.referenceImageUrl,
+            referenceImageUrl: composedFirstFrame,
             durationSeconds: masterDuration,
             characterShot: scene.characterShot,
             characterShots: scene.characterShots,
@@ -993,6 +1033,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             engineOverride: 'cinematic-sync' as const,
             withAudio: scene.withAudio !== false,
           };
+          // Persist the engine + audio-embed flag so the player auto-unmutes
+          // as soon as the lip-synced clip lands (otherwise the embedded VO
+          // is inaudible until the user manually unmutes).
+          await supabase
+            .from('composer_scenes')
+            .update({
+              engine_override: 'cinematic-sync',
+              lip_sync_with_voiceover: true,
+            })
+            .eq('id', sceneIdFinal);
           const { error: invokeErr } = await supabase.functions.invoke('compose-video-clips', {
             body: { projectId: pidFinal, scenes: [scenePayload], characters },
           });
