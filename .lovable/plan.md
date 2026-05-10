@@ -1,65 +1,83 @@
-# Den "In echte Szene einbauen"-Button sichtbar machen
+## Was ich gefunden habe
 
-## Was schiefgelaufen ist
+### 1. „Keine sichtbare Veränderung" – warum?
+Der Button **funktioniert technisch** korrekt:
+- `engineOverride: 'cinematic-sync'` + `clipSource: 'ai-hailuo'` werden gesetzt
+- `compose-video-clips` umgeht den HeyGen-Branch (richtig) und startet Hailuo i2v auf der echten Storyboard-Szene
+- Danach feuert `compose-lipsync-scene` automatisch (Sync.so)
 
-Der Button existiert im Code (`SceneCard.tsx` Zeile 566–579), aber er rendert als **winziger inline-Pill direkt neben dem Engine-Badge** in der Meta-Zeile der Szene. Auf deinem Screenshot ist diese Zeile schmal und vollgepackt mit Badges (`Hook · 3.7s · €0.30 · Fertig · HeyGen Lip-Sync · Mit Referenzbild`). Die Action-Spalte rechts mit den drei großen Buttons (`Neu generieren`, `In Mediathek`, `Continuity ✓`) ist die einzige Stelle, an der man wirklich hinschaut.
+Aber: Im UI bleibt der **alte HeyGen-Avatar-Clip sichtbar**, bis Hailuo fertig ist (~60–90 s) und dann nochmal, bis Sync.so fertig ist (~60 s). Der einzige Hinweis ist der kleine grüne Toast oben rechts. Der Nutzer denkt, nichts passiert.
 
-Außerdem: SceneCard wird im **Storyboard-Tab** verwendet, du bist aber im **Clips-Tab** (siehe Sidebar `03 Clips`). Der Clips-Tab hat seine eigene Render-Komponente (`ClipsTab.tsx`) und zeigt SceneCard gar nicht an. Mein Button war daher im Clips-Tab nie sichtbar.
+### 2. „LipSync länger als Szene" – aktuell falsch gelöst
+`compose-lipsync-scene` Zeile 156: wenn VO > Szene, wird `sync_mode: 'cut_off'` gesetzt → **Audio wird abgeschnitten**. Du willst das Gegenteil: **Szene verlängern, damit VO komplett reinpasst**.
+
+### 3. Multi-Charakter-Flow – nein, so läuft es nicht
+Sync.so kann nur **eine Audiospur** auf das ganze Video legen → würde EINEN Charakter den kompletten Multi-Speaker-Dialog sprechen lassen. Daher lehnt `compose-lipsync-scene` Multi-Speaker-Szenen heute mit HTTP 409 ab. Der Pattern, den du beschreibst (Speaker 2 auf Output von Szene 1+Speaker 1), funktioniert mit Sync.so **nicht zuverlässig** – Sync.so findet automatisch das prominenteste Gesicht und würde wahrscheinlich wieder Charakter 1 lip-syncen.
+
+Die saubere Lösung: Multi-Speaker-Szenen werden in **Shot-Reverse-Shot** zerlegt (eine Szene pro Sprecher, jede einzeln cinematic-synct).
+
+---
 
 ## Plan
 
-### 1. Den Button in die rechte Action-Spalte des Clips-Tabs verlegen
+### A. Sichtbares Feedback während Cinematic-Sync (UI)
 
-In `src/components/video-composer/ClipsTab.tsx` direkt nach dem `Neu generieren`-Button (Zeile 968–985) einen neuen prominenten Button einfügen:
+**Datei:** `src/components/video-composer/ClipsTab.tsx`
 
-```text
-┌─────────────────────────────────────┐
-│ ↻ Neu generieren €0.30              │  ← bestehend
-│ 🎬 In echte Szene einbauen €0.95   │  ← NEU (grün, emerald-Akzent)
-│ 💾 In Mediathek                     │  ← bestehend
-│ 🔗 Continuity ✓                     │  ← bestehend
-└─────────────────────────────────────┘
-```
+- Neuer Klassifikator pro Szene: `isCinematicReRender = scene.engineOverride === 'cinematic-sync' && scene.clipStatus === 'generating'`
+- Über dem Video-Player ein **Overlay-Badge** mit Pulse-Animation:
+  > 🎬 Szene wird in echte Umgebung gerendert (Hailuo)… ~60 s
+- Sobald `clipStatus === 'ready'` UND `lip_sync_status === 'running'`: Overlay wechselt zu
+  > ✨ Lip-Sync wird auf neue Szene angewandt (Sync.so)… ~60 s
+- Sobald `lip_sync_status === 'done'`: Erfolgs-Toast „Cinematic-Sync fertig – Charakter ist jetzt in der echten Szene".
+- Polling: Schon vorhanden (`pollScenes`), aber `lip_sync_status` muss zur Select-Query hinzugefügt werden (aktuell fehlt es in der Polling-Query → Frontend bekommt es nie).
 
-Sichtbarkeitsregel:
-- `scene.clipStatus === 'ready'`
-- `engineRec.engine === 'heygen-talking-head'` (nur auf HeyGen-Szenen — bei B-Roll macht Cinematic-Sync keinen Sinn)
-- Single-Speaker (Multi-Speaker bleibt bei HeyGen Shot-Reverse-Shot)
+### B. Auto-Extend statt Cut-Off (Pipeline)
 
-Klick-Verhalten:
-1. `onUpdateScenes` mit `engineOverride: 'cinematic-sync'` und `clipSource: 'ai-hailuo'` (falls noch HeyGen-only gesetzt) für die Szene.
-2. Direkt danach `handleGenerateSingle(scene)` triggern → re-rendert via Hailuo i2v + auto-Lip-Sync (Pipeline ist schon implementiert).
-3. Toast: "Wechsel zu Cinematic-Sync — Hailuo rendert die Szene neu, Lip-Sync läuft danach automatisch (~2 Min)."
+**Datei:** `supabase/functions/compose-video-clips/index.ts`
 
-### 2. Bestätigungs-Dialog vor dem Re-Roll
+Vor dem Hailuo-Dispatch für `engineOverride === 'cinematic-sync'`:
+1. VO-Dauer aus `scene_audio_clips` (kind='voiceover') laden
+2. Wenn `voDuration > scene.durationSeconds`:
+   - Neue Ziel-Dauer = `Math.ceil(voDuration + 0.4)` Sekunden Puffer
+   - Auf nächste Hailuo-erlaubte Dauer aufrunden (6s oder 10s lt. `hailuoVideoCredits.ts`)
+   - `scene.durationSeconds` für diesen Render auf neuen Wert setzen
+   - DB-Update: `composer_scenes.duration_seconds` persistieren + Hinweis im Console-Log
+   - Wenn VO > 10s (Hailuo-Limit): Szene auf 10s cappen UND `compose-lipsync-scene` darf weiterhin `cut_off` nutzen (mit Warn-Toast im UI)
 
-Da der bestehende Clip dabei verworfen wird, vor dem Trigger einen kleinen `AlertDialog` zeigen (Pattern: `setRerollTarget` existiert schon Zeile 976). Inhalte:
-- Vorher/Nachher-Erklärung in einem Satz
-- Kostendelta sichtbar (`+€0.65 vs. aktueller HeyGen-Render`)
-- Buttons: "Abbrechen" / "🎬 Cinematic-Sync starten €0.95"
+**Datei:** `supabase/functions/compose-lipsync-scene/index.ts`
 
-### 3. Inline-Pill in SceneCard.tsx aufräumen
+- `sync_mode` Logik erhalten (Fallback bleibt nötig für >10s-Fälle), aber: nach erfolgreicher Auto-Extend-Pipeline ist `voDuration ≤ sceneDuration` und `loop` greift sauber.
 
-Die kleine inline-Variante in `SceneCard.tsx` (Zeile 566–579) entfernen — sie wird durch den prominenten Action-Button im Clips-Tab ersetzt. Der Engine-Override-Select bleibt, aber als reiner Dropdown ohne Doppel-Button. Das hält das Storyboard-Layout aufgeräumt.
+### C. Multi-Speaker im Cinematic-Sync klar erklären + Auto-Split anbieten
 
-### 4. Hint-Banner über der ersten HeyGen-Szene
+**Datei:** `src/components/video-composer/ClipsTab.tsx`
 
-Wenn ≥1 Szene auf HeyGen läuft, einmal pro Projekt einen dezenten Hinweis im Clips-Tab oben anzeigen (dismissible per `localStorage`):
+- Beim Klick auf „In echte Szene einbauen" auf einer Multi-Speaker-Szene (`countSpeakers(scene) > 1`):
+  - Confirm-Dialog erweitern: Warnung
+    > Diese Szene hat 2 Sprecher. Sync.so kann nur einen Charakter pro Clip lip-syncen. Bitte zerlege die Szene zuerst in eine Szene pro Sprecher (Shot-Reverse-Shot).
+  - Button „🎬 Cinematic-Sync starten" wird deaktiviert
+  - Optionaler Sekundär-Button „🪓 In Shot-Reverse-Shot zerlegen" – ruft bestehende Split-Logik auf (falls vorhanden, sonst Phase 2)
 
-> 💡 **Tipp:** Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund. Klicke auf einer fertigen HeyGen-Szene auf **🎬 In echte Szene einbauen**, um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern (Artlist-Style). +€0.65/Szene.
+**Datei:** `compose-lipsync-scene/index.ts`
 
-So findet jeder User die Funktion — auch ohne dass ich sie im Chat erkläre.
+- 409-Antwort behält bisherige Message – passt schon.
 
-## Was sich für dich ändert
+### D. Antwort an Nutzer (Doku im Hint-Banner)
 
-- Auf Szene 1 & 2 erscheint rechts unter "Neu generieren" ein neuer grüner Button **🎬 In echte Szene einbauen €0.95**.
-- Ein Klick zeigt einen Confirm-Dialog, wechselt die Engine auf `cinematic-sync` und rendert die Szene neu — diesmal mit Hailuo i2v (Charakter in echter Storyboard-Szene) + automatischem Sync.so-Lip-Sync.
-- Pipeline-Logik (Auto-Trigger, Cut-off-Sync-Mode, Refund) ist bereits aus dem letzten Schritt deployed — es fehlt nur die sichtbare UI-Stelle.
+Den bestehenden Hint-Banner um einen Mini-FAQ erweitern:
+> ℹ️ Multi-Charakter-Szenen müssen in Einzel-Sprecher-Cuts zerlegt werden. Pro Cut wird Hailuo + Sync.so einmal ausgeführt – die Cuts werden danach in der Timeline aneinandergereiht (kein Layering möglich).
+
+---
 
 ## Technische Details
 
-- Datei: `src/components/video-composer/ClipsTab.tsx` — neuer Button-Block zwischen Zeile 985 und 987.
-- Datei: `src/components/video-composer/SceneCard.tsx` — Inline-Pill (Zeilen 566–579) entfernen.
-- Neuer State: `cinematicSwitchTarget` analog zu `rerollTarget` für den Confirm-Dialog.
-- Icon: `Clapperboard` aus lucide-react (passt thematisch).
-- Keine DB-Migration, keine Edge-Function-Änderung — alle Backend-Teile sind schon live.
+| Bereich | Aufwand |
+|---|---|
+| Polling-Query erweitern (`lip_sync_status`) | 1 Zeile |
+| Overlay-Badges in ClipsTab | ~30 Zeilen JSX + CSS |
+| Auto-Extend-Logik | ~25 Zeilen in compose-video-clips, vor Hailuo-Branch |
+| Multi-Speaker-Guard im Confirm-Dialog | ~15 Zeilen |
+| FAQ-Banner-Update | 3 Zeilen |
+
+Keine DB-Migration nötig (`lip_sync_status` existiert bereits in `composer_scenes`).

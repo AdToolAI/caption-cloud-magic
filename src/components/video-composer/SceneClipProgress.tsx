@@ -105,6 +105,11 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     }
   };
 
+  // Cinematic-Sync state — render-engine === 'cinematic-sync' has 2 phases
+  // (1) Hailuo i2v re-render of real scene  (2) Sync.so lip-sync polish.
+  const isCinematic = scene.engineOverride === 'cinematic-sync';
+  const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
+
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
     if (isImageScene) {
@@ -141,7 +146,15 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               }
             }}
           />
-          {showTrimButton && (
+          {/* Cinematic-Sync — Hailuo done, Sync.so still running */}
+          {lipSyncRunning && (
+            <div className="absolute inset-0 bg-black/55 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 pointer-events-none">
+              <Loader2 className="h-5 w-5 text-emerald-300 animate-spin" />
+              <span className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide">Lip-Sync läuft</span>
+              <span className="text-[8px] text-emerald-100/80">Sync.so · ~60 s</span>
+            </div>
+          )}
+          {showTrimButton && !lipSyncRunning && (
             <button
               type="button"
               onClick={() => setTrimOpen(true)}
@@ -177,6 +190,22 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
           <div className="absolute top-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 flex items-center gap-1 shadow">
             <Zap className="h-2.5 w-2.5" />
             <span className="text-[8px] font-bold uppercase tracking-wide">Vorschau</span>
+          </div>
+        )}
+        {/* Cinematic-Sync — explicit phase 1 banner so user knows the OLD HeyGen avatar is being replaced */}
+        {isCinematic && (
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-emerald-950/95 via-emerald-900/80 to-transparent px-2 py-1.5 pointer-events-none">
+            <div className="flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 text-emerald-300 animate-spin shrink-0" />
+              <div className="min-w-0">
+                <div className="text-[9px] font-bold text-emerald-200 uppercase tracking-wide truncate">
+                  🎬 Echte Szene wird gerendert
+                </div>
+                <div className="text-[8px] text-emerald-100/80 truncate">
+                  Hailuo · ~60 s · danach Lip-Sync
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -427,6 +427,44 @@ serve(async (req) => {
 
       const quality: Quality = scene.clipQuality === 'pro' ? 'pro' : 'standard';
 
+      // ── Cinematic-Sync auto-extend ────────────────────────────────────────
+      // When engineOverride === 'cinematic-sync', the user wants the avatar
+      // re-rendered into the real scene with Sync.so lip-sync. If the scene's
+      // voiceover is LONGER than the configured scene duration, we'd lose
+      // dialog (Sync.so cut_off). Auto-extend the scene to the smallest
+      // Hailuo-allowed duration (6s or 10s) that fits VO + 0.4s padding.
+      if ((scene.engineOverride ?? 'auto') === 'cinematic-sync') {
+        try {
+          const { data: voClips } = await supabaseAdmin
+            .from('scene_audio_clips')
+            .select('duration')
+            .eq('scene_id', scene.id)
+            .eq('kind', 'voiceover')
+            .order('duration', { ascending: false })
+            .limit(1);
+          const voDur = Number(voClips?.[0]?.duration ?? 0);
+          if (voDur > 0) {
+            const required = voDur + 0.4;
+            const currentDur = Number(scene.durationSeconds || 0);
+            // Hailuo allowed durations: 6 or 10 (capped at 10).
+            const targetDur = required <= 6 ? 6 : 10;
+            if (targetDur > currentDur) {
+              console.log(`[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO ${voDur.toFixed(2)}s > scene ${currentDur}s → extending to ${targetDur}s`);
+              scene.durationSeconds = targetDur;
+              await supabaseAdmin
+                .from('composer_scenes')
+                .update({ duration_seconds: targetDur, updated_at: new Date().toISOString() })
+                .eq('id', scene.id);
+            }
+            if (required > 10) {
+              console.warn(`[compose-video-clips] Cinematic-Sync scene ${scene.id}: VO (${voDur.toFixed(2)}s) exceeds Hailuo 10s limit — Sync.so will cut_off.`);
+            }
+          }
+        } catch (extErr) {
+          console.warn(`[compose-video-clips] Cinematic-Sync auto-extend failed for ${scene.id}:`, extErr);
+        }
+      }
+
       // ── HeyGen routing branch ─────────────────────────────────────────────
       // Triggered when:
       //   • engineOverride === 'heygen'  OR
