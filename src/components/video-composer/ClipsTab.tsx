@@ -588,8 +588,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       }
       const { projectId: pid, scenes: pScenes } = persisted;
 
-      // Find the up-to-date scene from persisted list (id may have been replaced)
-      const targetScene = pScenes.find(s => s.orderIndex === scene.orderIndex) || scene;
+      // Find the up-to-date scene from persisted list (id may have been replaced).
+      // CRITICAL: Merge engineOverride / clipSource from the *passed-in* scene
+      // so that callers like the Cinematic-Sync switch (which optimistically
+      // sets engineOverride='cinematic-sync' + clipSource='ai-hailuo' but
+      // hasn't flushed to DB yet) actually reach the backend with the new
+      // engine. Without this merge, the persisted DB row wins and the
+      // cinematic-switch silently re-renders the same HeyGen avatar.
+      const dbScene = pScenes.find(s => s.orderIndex === scene.orderIndex) || scene;
+      const targetScene: ComposerScene = {
+        ...dbScene,
+        engineOverride: scene.engineOverride ?? dbScene.engineOverride ?? 'auto',
+        clipSource: scene.clipSource ?? dbScene.clipSource,
+      };
 
       // Optimistic update
       if (targetScene.clipSource.startsWith('ai-')) {
