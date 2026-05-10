@@ -35,6 +35,18 @@ timeout_sec = 180
 verify_jwt = true
 timeout_sec = 300
 
+[functions.compose-twoshot-lipsync]
+verify_jwt = true
+timeout_sec = 300
+
+[functions.compose-twoshot-audio]
+verify_jwt = true
+timeout_sec = 180
+
+[functions.compose-scene-anchor]
+verify_jwt = true
+timeout_sec = 120
+
 [functions.verify-license-certificate]
 verify_jwt = false
 
