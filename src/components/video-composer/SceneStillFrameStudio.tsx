@@ -167,6 +167,25 @@ export default function SceneStillFrameStudio({
         </div>
       </div>
 
+      {injectedLabels && injectedLabels.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[9px] uppercase tracking-wider text-muted-foreground">
+            {language === 'de' ? 'Auto-injiziert' : language === 'es' ? 'Auto-inyectado' : 'Auto-injected'}:
+          </span>
+          {injectedLabels.slice(0, 4).map((it) => (
+            <span
+              key={`${it.kind}:${it.name}`}
+              className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 text-primary px-1.5 py-[1px] text-[9px]"
+            >
+              {it.thumb && (
+                <img src={it.thumb} alt="" className="h-3 w-3 rounded-full object-cover" />
+              )}
+              {it.kind === 'character' ? '@' : '#'}{it.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {variants.length > 0 && (
         <div className={cn('grid gap-1.5', count === 4 ? 'grid-cols-4' : 'grid-cols-2')}>
           {variants.map((v) => {
