@@ -63,17 +63,17 @@ export function useComposerHistory(projectId: string | undefined) {
       const { data: userRes } = await supabase.auth.getUser();
       const userId = userRes.user?.id;
       if (!userId) return;
-      const { error } = await supabase.from('composer_undo_stack').insert({
+      const { error } = await supabase.from('composer_undo_stack').insert([{
         project_id: params.projectId,
-        scene_id: params.sceneId ?? null,
+        scene_id: params.sceneId ?? undefined,
         user_id: userId,
         action_type: params.actionType,
-        label: params.label ?? null,
-        before_state: params.beforeState ?? null,
-        after_state: params.afterState ?? null,
+        label: params.label ?? undefined,
+        before_state: (params.beforeState ?? null) as never,
+        after_state: (params.afterState ?? null) as never,
         credits_charged: params.creditsCharged ?? 0,
         refundable: params.refundable ?? false,
-      });
+      }]);
       if (error) {
         console.warn('[useComposerHistory] push failed:', error);
         return;
