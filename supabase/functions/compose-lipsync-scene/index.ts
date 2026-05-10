@@ -62,7 +62,7 @@ serve(async (req) => {
     // Load scene + verify ownership via project
     const { data: scene, error: sErr } = await supabase
       .from('composer_scenes')
-      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds')
+      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds, dialog_script, dialog_voices, audio_plan, character_audio_url')
       .eq('id', scene_id)
       .single();
     if (sErr || !scene) return json({ error: 'scene not found' }, 404);
@@ -103,25 +103,120 @@ serve(async (req) => {
       }, 409);
     }
 
-    const vo = voClips?.[0];
+    let vo: { url?: string; duration?: number } | undefined = voClips?.[0];
+
+    // ── Voiceover resolution fallbacks ────────────────────────────────
+    // The user's expectation is "Cinematic-Sync rebuilds the existing HeyGen
+    // scene with a real environment". HeyGen scenes carry their VO inside
+    // `character_audio_url` and/or `audio_plan`, but not always in
+    // scene_audio_clips. Walk the fallbacks before giving up.
+
+    // Fallback 1 — locked AudioPlan with a single speaker that has an audioUrl.
     if (!vo?.url) {
-      // No voiceover yet — we cannot lip-sync. Don't leave the scene stuck on
-      // 'pending' / 'generating'; mark the underlying clip as ready so the
-      // user can keep working. The Cinematic-Sync step will be re-runnable
-      // later once a VO is added.
+      const planSpeakers = ((scene as any).audio_plan?.speakers ?? []) as Array<{ audioUrl?: string; endSec?: number; startSec?: number }>;
+      if (planSpeakers.length === 1 && planSpeakers[0]?.audioUrl) {
+        vo = {
+          url: planSpeakers[0].audioUrl,
+          duration: Math.max(0.1, (planSpeakers[0].endSec ?? 0) - (planSpeakers[0].startSec ?? 0)),
+        };
+        console.log(`[compose-lipsync-scene ${scene_id}] vo from audio_plan`);
+      } else if (planSpeakers.length > 1) {
+        return json({
+          error: 'multi_speaker_not_supported',
+          message:
+            'This scene has multiple voiceover speakers in the locked Audio Plan. Use the per-speaker Shot-Reverse-Shot flow.',
+        }, 409);
+      }
+    }
+
+    // Fallback 2 — character_audio_url (HeyGen wrote the TTS audio here).
+    if (!vo?.url && (scene as any).character_audio_url) {
+      vo = { url: (scene as any).character_audio_url, duration: 0 };
+      console.log(`[compose-lipsync-scene ${scene_id}] vo from character_audio_url`);
+    }
+
+    // Fallback 3 — re-synthesize from dialog_script + dialog_voices (single speaker only).
+    if (!vo?.url && (scene as any).dialog_script) {
+      const script = String((scene as any).dialog_script || '').trim();
+      // Detect speaker count to refuse multi-speaker re-synth.
+      const speakerSet = new Set<string>();
+      for (const line of script.split('\n')) {
+        const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+        if (m) speakerSet.add(m[1].trim().toLowerCase());
+      }
+      if (speakerSet.size > 1) {
+        return json({
+          error: 'multi_speaker_not_supported',
+          message:
+            'Dialog script has multiple speakers. Split into Shot-Reverse-Shot scenes first.',
+        }, 409);
+      }
+      const cleanText = script
+        .split('\n')
+        .map((l) => l.replace(/^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]\s*/, '').trim())
+        .filter((l) => l.length > 0)
+        .join(' ');
+      const voices = ((scene as any).dialog_voices ?? {}) as Record<string, any>;
+      const firstVoice = Object.values(voices)[0] as any;
+      const voiceId = typeof firstVoice === 'string' ? firstVoice : firstVoice?.voiceId;
+      if (cleanText && voiceId) {
+        try {
+          const ttsResp = await fetch(`${supabaseUrl}/functions/v1/generate-voiceover`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': auth },
+            body: JSON.stringify({ text: cleanText, voiceId, projectId: scene.project_id }),
+          });
+          if (ttsResp.ok) {
+            const ttsData = await ttsResp.json();
+            const audioUrl = ttsData?.audioUrl;
+            const duration = Number(ttsData?.duration ?? 0);
+            if (audioUrl) {
+              // Persist as scene_audio_clips so the preview/timeline can play it.
+              await supabase.from('scene_audio_clips').insert({
+                user_id: user.id,
+                project_id: scene.project_id,
+                scene_id,
+                kind: 'voiceover',
+                source: 'ai',
+                prompt: cleanText.slice(0, 500),
+                url: audioUrl,
+                start_offset: 0,
+                duration: Math.max(0.1, duration || 0),
+                volume: 1,
+                ducking_enabled: true,
+                cost_credits: 0,
+              });
+              vo = { url: audioUrl, duration };
+              console.log(`[compose-lipsync-scene ${scene_id}] vo synthesized from dialog_script`);
+            }
+          } else {
+            console.warn(`[compose-lipsync-scene ${scene_id}] generate-voiceover failed: ${ttsResp.status}`);
+          }
+        } catch (ttsErr) {
+          console.warn(`[compose-lipsync-scene ${scene_id}] TTS fallback exception`, ttsErr);
+        }
+      }
+    }
+
+    if (!vo?.url) {
+      // No voiceover anywhere. Don't pretend it succeeded — flip lip_sync_status
+      // to a distinct 'no_voiceover' state and surface a clear error so the UI
+      // can prompt the user to add a voiceover instead of leaving the scene
+      // looking 'ready' when it actually never got lip-synced.
       await supabase
         .from('composer_scenes')
         .update({
-          lip_sync_status: 'skipped',
-          clip_status: 'ready',
+          lip_sync_status: 'no_voiceover',
+          clip_error: 'Cinematic-Sync needs a voiceover for this scene. Add a Dialog/VO first, then retry.',
         })
         .eq('id', scene_id);
       return json({
-        ok: true,
-        skipped: true,
-        reason: 'no_voiceover',
+        ok: false,
+        error: 'no_voiceover',
+        message:
+          'Cinematic-Sync benötigt ein Voiceover für diese Szene. Bitte zuerst im Dialog-Studio oder Voiceover-Tab eine Stimme generieren.',
         scene_id,
-      });
+      }, 422);
     }
 
     // Wallet check + reserve
