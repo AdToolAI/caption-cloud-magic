@@ -475,6 +475,7 @@ export default function VideoComposerDashboard() {
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
             continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
+            twoshotStage: ((row as any).twoshot_stage as any) ?? local?.twoshotStage ?? null,
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null
               ? Number((row as any).frame_pick_seconds)
