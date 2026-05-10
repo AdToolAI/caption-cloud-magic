@@ -840,58 +840,89 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       {/* Cinematic-Sync Switch Confirmation */}
       <AlertDialog open={!!cinematicSwitchTarget} onOpenChange={(open) => !open && setCinematicSwitchTarget(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              <span className="inline-flex items-center gap-2">
-                <Clapperboard className="h-4 w-4 text-emerald-400" />
-                Szene {(cinematicSwitchTarget?.orderIndex ?? 0) + 1} in echte Szene einbauen?
-              </span>
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-2 text-sm">
-                <p>
-                  Statt des HeyGen-Avatar-Bilds rendert <span className="font-semibold text-emerald-300">Hailuo</span> die echte
-                  Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter
-                  via <span className="font-semibold">Sync.so Lip-Sync</span> in die Szene eingebaut — wie bei Artlist.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Kosten: <span className="font-semibold text-amber-400">~€0.95</span> (vs. €0.30 aktuell). Der bestehende Clip wird ersetzt.
-                  Die Pipeline läuft ~2 Minuten und refundiert automatisch bei Fehlern.
-                </p>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                const target = cinematicSwitchTarget;
-                setCinematicSwitchTarget(null);
-                if (!target) return;
-                // Switch the engine on this scene + ensure clipSource is Hailuo (i2v) for the real-scene render.
-                const updated: ComposerScene[] = scenes.map((s) =>
-                  s.id === target.id
-                    ? {
-                        ...s,
-                        engineOverride: 'cinematic-sync',
-                        clipSource: s.clipSource.startsWith('ai-') ? s.clipSource : 'ai-hailuo',
-                      }
-                    : s,
-                );
-                onUpdateScenes(updated);
-                const updatedTarget = updated.find((s) => s.id === target.id) || target;
-                handleGenerateSingle(updatedTarget);
-                toast({
-                  title: 'Cinematic-Sync gestartet',
-                  description: `Szene ${(target.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene, Lip-Sync läuft danach automatisch (~2 Min).`,
-                });
-              }}
-              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950"
-            >
-              <Clapperboard className="h-3.5 w-3.5 mr-1" />
-              Cinematic-Sync starten €0.95
-            </AlertDialogAction>
-          </AlertDialogFooter>
+          {(() => {
+            const target = cinematicSwitchTarget;
+            const speakerCount = target ? countSpeakers(target) : 0;
+            const isMultiSpeaker = speakerCount > 1;
+            return (
+              <>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    <span className="inline-flex items-center gap-2">
+                      <Clapperboard className="h-4 w-4 text-emerald-400" />
+                      Szene {(target?.orderIndex ?? 0) + 1} in echte Szene einbauen?
+                    </span>
+                  </AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm">
+                      {isMultiSpeaker ? (
+                        <>
+                          <p className="text-destructive font-semibold">
+                            ⚠️ Diese Szene hat {speakerCount} Sprecher.
+                          </p>
+                          <p>
+                            Sync.so kann nur <span className="font-semibold">einen Charakter</span> pro Clip lip-syncen — sonst würde eine Person den
+                            ganzen Dialog für beide sprechen. Zerlege die Szene zuerst in <span className="font-semibold">eine Szene pro Sprecher</span>{' '}
+                            (Shot-Reverse-Shot) im Storyboard, dann kannst du Cinematic-Sync pro Cut starten.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Tipp: Im Storyboard-Tab → Szene duplizieren → Dialog-Skript pro Szene auf einen Sprecher kürzen.
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p>
+                            Statt des HeyGen-Avatar-Bilds rendert <span className="font-semibold text-emerald-300">Hailuo</span> die echte
+                            Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter
+                            via <span className="font-semibold">Sync.so Lip-Sync</span> in die Szene eingebaut — wie bei Artlist.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Falls dein Voiceover länger ist als die aktuelle Szenen-Dauer, wird die Szene <span className="font-semibold">automatisch verlängert</span> (Hailuo: 6 s oder 10 s), damit das Lip-Sync vollständig läuft.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Kosten: <span className="font-semibold text-amber-400">~€0.95</span> (vs. €0.30 aktuell). Der bestehende Clip wird ersetzt.
+                            Die Pipeline läuft ~2 Minuten und refundiert automatisch bei Fehlern.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+                  {!isMultiSpeaker && (
+                    <AlertDialogAction
+                      onClick={() => {
+                        const t = cinematicSwitchTarget;
+                        setCinematicSwitchTarget(null);
+                        if (!t) return;
+                        const updated: ComposerScene[] = scenes.map((s) =>
+                          s.id === t.id
+                            ? {
+                                ...s,
+                                engineOverride: 'cinematic-sync',
+                                clipSource: s.clipSource.startsWith('ai-') ? s.clipSource : 'ai-hailuo',
+                              }
+                            : s,
+                        );
+                        onUpdateScenes(updated);
+                        const updatedTarget = updated.find((s) => s.id === t.id) || t;
+                        handleGenerateSingle(updatedTarget);
+                        toast({
+                          title: 'Cinematic-Sync gestartet',
+                          description: `Szene ${(t.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene, Lip-Sync läuft danach automatisch (~2 Min).`,
+                        });
+                      }}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950"
+                    >
+                      <Clapperboard className="h-3.5 w-3.5 mr-1" />
+                      Cinematic-Sync starten €0.95
+                    </AlertDialogAction>
+                  )}
+                </AlertDialogFooter>
+              </>
+            );
+          })()}
         </AlertDialogContent>
       </AlertDialog>
 
