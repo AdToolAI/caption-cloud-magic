@@ -110,6 +110,33 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
 
+  // ── Two-Shot Hook pipeline (6-stage progress) ────────────────────────────
+  // Active whenever the audio-plan has ≥ 2 speakers (multi-character dialog).
+  // Stages are written by `compose-twoshot-audio`, `compose-video-clips` and
+  // `compose-twoshot-lipsync`. We render an overlay with a 6-step bar so the
+  // user can see exactly where the pipeline is in real time.
+  const speakerCount = scene.audioPlan?.speakers?.length ?? 0;
+  const isTwoShot = speakerCount >= 2;
+  const twoshotStage = scene.twoshotStage ?? null;
+  const TWO_SHOT_STAGES: Array<{ key: NonNullable<typeof twoshotStage>; label: string }> = [
+    { key: 'audio', label: 'Voiceover' },
+    { key: 'anchor', label: 'Anchor' },
+    { key: 'master_clip', label: 'Master-Clip' },
+    { key: 'lipsync_1', label: 'Lip-Sync 1/2' },
+    { key: 'lipsync_2', label: 'Lip-Sync 2/2' },
+    { key: 'continuity', label: 'Continuity' },
+  ];
+  const stageIndex = (() => {
+    if (!twoshotStage || twoshotStage === 'done') return -1;
+    return TWO_SHOT_STAGES.findIndex((s) => s.key === twoshotStage);
+  })();
+  const currentStageLabel = stageIndex >= 0 ? TWO_SHOT_STAGES[stageIndex].label : null;
+  const showTwoShotOverlay =
+    isTwoShot &&
+    twoshotStage &&
+    twoshotStage !== 'done' &&
+    !hqReady; // once HQ is ready (and stage = done) we hide the bar
+
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
     if (isImageScene) {
@@ -165,6 +192,14 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               {trim > 0 ? `${trim.toFixed(2)}s` : 'Trim'}
             </button>
           )}
+          {isTwoShot && twoshotStage === 'done' && typeof scene.continuityDriftScore === 'number' && scene.continuityDriftScore > 0.35 && (
+            <div
+              className="absolute bottom-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold flex items-center gap-1 shadow"
+              title={`Continuity-Drift ${scene.continuityDriftScore.toFixed(2)} — Charakter-Identität weicht vom Anchor ab. Re-Render empfohlen.`}
+            >
+              ⚠ Drift {scene.continuityDriftScore.toFixed(2)}
+            </div>
+          )}
         </div>
         <LeadInTrimSheet scene={scene} open={trimOpen} onOpenChange={setTrimOpen} />
       </>
@@ -208,6 +243,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             </div>
           </div>
         )}
+        {showTwoShotOverlay && <TwoShotStageBar stages={TWO_SHOT_STAGES} stageIndex={stageIndex} currentLabel={currentStageLabel} />}
       </div>
     );
   }
@@ -332,5 +368,46 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
         aspectRatio={aspectRatio}
       />
     </>
+  );
+}
+
+interface TwoShotStageBarProps {
+  stages: ReadonlyArray<{ key: string; label: string }>;
+  stageIndex: number;
+  currentLabel: string | null;
+}
+
+/**
+ * 6-step progress overlay for the multi-character Two-Shot Hook pipeline.
+ * Sits on top of the generation skeleton and shows which stage is active.
+ */
+function TwoShotStageBar({ stages, stageIndex, currentLabel }: TwoShotStageBarProps) {
+  return (
+    <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-2 py-1.5 pointer-events-none">
+      <div className="flex items-center gap-1 mb-1">
+        <Loader2 className="h-3 w-3 text-amber-300 animate-spin shrink-0" />
+        <span className="text-[9px] font-bold text-amber-200 uppercase tracking-wide truncate">
+          🎭 Two-Shot Hook · {currentLabel ?? '…'}
+        </span>
+      </div>
+      <div className="flex items-center gap-0.5">
+        {stages.map((s, i) => {
+          const done = i < stageIndex;
+          const active = i === stageIndex;
+          return (
+            <div
+              key={s.key}
+              className={cn(
+                'h-1 flex-1 rounded-full transition-colors',
+                done && 'bg-amber-400',
+                active && 'bg-amber-300 animate-pulse',
+                !done && !active && 'bg-white/15',
+              )}
+              title={s.label}
+            />
+          );
+        })}
+      </div>
+    </div>
   );
 }

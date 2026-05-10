@@ -348,7 +348,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const lipChanged =
         !!dbScene &&
         ((dbScene as any).lip_sync_applied_at !== (scene.lipSyncAppliedAt ?? null) ||
-          (dbScene as any).lip_sync_status !== (scene.lipSyncStatus ?? null));
+          (dbScene as any).lip_sync_status !== (scene.lipSyncStatus ?? null) ||
+          (dbScene as any).twoshot_stage !== (scene.twoshotStage ?? null) ||
+          (dbScene as any).continuity_drift_score !== (scene.continuityDriftScore ?? null));
       if (
         dbScene &&
         (dbScene.clip_status !== scene.clipStatus ||
@@ -429,6 +431,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           lipSyncAppliedAt: (dbScene as any).lip_sync_applied_at ?? null,
           lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
           lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
+          twoshotStage: ((dbScene as any).twoshot_stage as ComposerScene['twoshotStage']) ?? null,
+          continuityDriftScore: typeof (dbScene as any).continuity_drift_score === 'number'
+            ? (dbScene as any).continuity_drift_score
+            : scene.continuityDriftScore,
         };
       }
       return scene;
