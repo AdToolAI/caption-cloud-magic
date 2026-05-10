@@ -23,7 +23,10 @@ interface TransitionSelectorProps {
 export function TransitionSelector({
   value,
   onChange,
-  availableTransitions = ['fade', 'slide', 'zoom', 'wipe'],
+  // Phase 4 (Artlist-style): default palette is intentionally minimal —
+  // a hard "Cut" plus a single soft "Crossfade". Other engines remain
+  // available, but only when a caller explicitly opts in.
+  availableTransitions = ['none', 'crossfade'],
   disabled = false,
   label = 'Übergangseffekt'
 }: TransitionSelectorProps) {
