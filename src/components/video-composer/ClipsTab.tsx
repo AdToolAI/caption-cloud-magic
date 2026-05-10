@@ -285,6 +285,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         if (scene.clipStatus === 'generating' && dbScene.clip_status === 'failed') {
           toast({ title: `Szene ${idx + 1} fehlgeschlagen`, variant: 'destructive' });
         }
+        // Cinematic-Sync: notify when Sync.so step finishes
+        if (
+          (dbScene as any).engine_override === 'cinematic-sync' &&
+          scene.lipSyncStatus !== 'done' &&
+          (dbScene as any).lip_sync_status === 'done'
+        ) {
+          toast({
+            title: `🎬 Cinematic-Sync fertig — Szene ${idx + 1}`,
+            description: 'Charakter ist jetzt in der echten Szene und lip-synct.',
+          });
+        }
+        if (
+          (dbScene as any).engine_override === 'cinematic-sync' &&
+          scene.lipSyncStatus !== 'failed' &&
+          (dbScene as any).lip_sync_status === 'failed'
+        ) {
+          toast({
+            title: `Cinematic-Sync Lip-Sync fehlgeschlagen`,
+            description: `Szene ${idx + 1}: Hailuo-Render ist fertig, aber Sync.so hatte einen Fehler. Credits wurden refundiert.`,
+            variant: 'destructive',
+          });
+        }
         newPrev[scene.id] = dbScene.clip_status;
         return {
           ...scene,
