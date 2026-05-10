@@ -742,7 +742,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           }
         : s,
     );
-    onUpdateScenes(optimistic);
+    // Use the local-only updater so the debounced full-scenes flush in the
+    // dashboard cannot overwrite engine_override / clip_status 600 ms later
+    // with a stale snapshot. The single-row DB update below is the source of truth.
+    (onUpdateScenesLocalOnly ?? onUpdateScenes)(optimistic);
 
     try {
       // 2. Resolve the persisted scene id + project id WITHOUT rewriting the
