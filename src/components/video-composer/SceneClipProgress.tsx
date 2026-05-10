@@ -235,11 +235,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             </div>
           </div>
         )}
-      </div>
-    );
-  }
-
-  // PREVIEW READY but HQ still pending/failed → autoplay proxy + offer regen
+        {showTwoShotOverlay && <TwoShotStageBar stages={TWO_SHOT_STAGES} stageIndex={stageIndex} currentLabel={currentStageLabel} />}
   if (hasPreview) {
     return (
       <div className="relative w-full h-full bg-black">
