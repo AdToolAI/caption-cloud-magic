@@ -1278,7 +1278,6 @@ export default function VideoComposerDashboard() {
             <StoryboardTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
-              onUpdateScenesLocalOnly={setScenesLocalOnly}
               onAddScene={addSceneToProject}
               onInsertScenesAfter={insertScenesAfter}
               onGoToClips={persistAndGoToClips}
@@ -1308,6 +1307,7 @@ export default function VideoComposerDashboard() {
               characters={project.briefing?.characters}
               language={project.language}
               onUpdateScenes={setScenes}
+              onUpdateScenesLocalOnly={setScenesLocalOnly}
               onGoToVoiceSubtitles={() => setActiveTab('text')}
               onEnsurePersisted={async () => {
                 const result = await ensureProjectPersisted(project);
