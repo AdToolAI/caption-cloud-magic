@@ -1041,6 +1041,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             .update({
               engine_override: 'cinematic-sync',
               lip_sync_with_voiceover: true,
+              lip_sync_status: 'pending',
             })
             .eq('id', sceneIdFinal);
           const { error: invokeErr } = await supabase.functions.invoke('compose-video-clips', {
