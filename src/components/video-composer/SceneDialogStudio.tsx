@@ -37,6 +37,8 @@ import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
+import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
