@@ -124,15 +124,15 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
       });
     }
 
-    // Warning: severe drift score from Phase 3
+    // Warning: severe drift score from Phase 3 (score is 0-100; <40 = visual break)
     const drift = s.continuityDriftScore;
-    if (typeof drift === 'number' && drift < 0.4) {
+    if (typeof drift === 'number' && drift < 40) {
       out.push({
         id: `${s.id}-drift`,
         severity: 'warning',
         sceneIndex: idx,
         icon: <ImageIcon className="h-3.5 w-3.5" />,
-        title: `Szene ${idx}: Hoher Drift (${(drift * 100).toFixed(0)}%)`,
+        title: `Szene ${idx}: Hoher Drift (${drift.toFixed(0)}/100)`,
         detail: 'Drift-Ampel meldet visuellen Bruch zur Vorgänger-Szene.',
       });
     }
