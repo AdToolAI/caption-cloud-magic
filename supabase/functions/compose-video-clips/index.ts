@@ -186,6 +186,7 @@ serve(async (req) => {
     }
 
     // Calculate total cost for AI scenes (quality-tier aware)
+    __stage = 'cost_calc';
     const aiScenes = scenes.filter(s => s.clipSource.startsWith('ai-'));
     let totalCost = 0;
     for (const scene of aiScenes) {
