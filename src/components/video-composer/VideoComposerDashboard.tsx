@@ -317,7 +317,7 @@ export default function VideoComposerDashboard() {
               fontSize: 48,
               color: '#FFFFFF',
             },
-            transitionType: row.transition_type ?? local?.transitionType ?? 'fade',
+            transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
             replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
