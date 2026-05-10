@@ -574,7 +574,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       const { projectId: pid, scenes: pScenes } = persisted;
 
       const eligibleScenes = pScenes.filter(
-        s => s.clipStatus !== 'ready' && !(s.clipSource === 'upload' && s.uploadUrl),
+        s =>
+          s.clipStatus !== 'ready' &&
+          !(s.clipSource === 'upload' && s.uploadUrl) &&
+          // Two-Shot scenes already mid-render (cinematic-sync engine + a
+          // twoshotStage set) are owned by their dedicated pipeline; don't
+          // double-trigger via "Alle generieren".
+          !(
+            s.clipStatus === 'generating' &&
+            s.engineOverride === 'cinematic-sync' &&
+            !!(s as any).twoshotStage &&
+            (s as any).twoshotStage !== 'failed'
+          ),
       );
 
       // First pass: compose prompts (so the scene-anchor compose call gets the
