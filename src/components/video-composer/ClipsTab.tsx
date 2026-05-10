@@ -187,6 +187,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     return localStorage.getItem('composer-reroll-hint-dismissed') === '1';
   });
   const [rerollTarget, setRerollTarget] = useState<ComposerScene | null>(null);
+  const [cinematicSwitchTarget, setCinematicSwitchTarget] = useState<ComposerScene | null>(null);
+  const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('composer:cinematic-sync-hint-dismissed') === '1'; } catch { return false; }
+  });
 
   const dismissRerollHint = () => {
     setRerollHintDismissed(true);
