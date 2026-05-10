@@ -178,8 +178,18 @@ serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "Unauthorized" }, 401);
-    const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    const token = auth.replace("Bearer ", "").trim();
+
+    // Internal service-role calls (e.g. from compose-video-clips two-shot prep)
+    // bypass user auth — ownership is implicit because the caller already
+    // verified the project. End-user calls go through the normal getUser path.
+    const isServiceCall = token === serviceKey;
+    let userId: string | null = null;
+    if (!isServiceCall) {
+      const { data: { user } } = await supabase.auth.getUser(token);
+      if (!user) return json({ error: "Unauthorized" }, 401);
+      userId = user.id;
+    }
 
     const body = await req.json().catch(() => ({}));
     const { scene_id, force_regenerate } = body || {};
@@ -198,7 +208,13 @@ serve(async (req) => {
       .select("id, user_id")
       .eq("id", scene.project_id)
       .single();
-    if (!project || project.user_id !== user.id) return json({ error: "Forbidden" }, 403);
+    if (!project) return json({ error: "project not found" }, 404);
+    if (!isServiceCall && project.user_id !== userId) {
+      return json({ error: "Forbidden" }, 403);
+    }
+    // For service calls, the storage path needs a user id — derive it from the
+    // project owner so the file lands in the correct user-scoped folder.
+    if (isServiceCall) userId = project.user_id;
 
     const dialogScript: string = (scene as any).dialog_script ?? "";
     const blocks = parseDialogScript(dialogScript);
