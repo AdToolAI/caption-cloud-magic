@@ -391,12 +391,18 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, scenes, onUpdateScenes]);
 
-  // Poll every 3s while generating
+  // Poll every 3s while generating OR while a Cinematic-Sync lip-sync phase
+  // is still running (Hailuo may already be `ready` but Sync.so is processing).
+  const cinematicSyncRunning = scenes.some(
+    (s) => s.engineOverride === 'cinematic-sync' &&
+      (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'pending') &&
+      s.lipSyncStatus !== 'done',
+  );
   useEffect(() => {
-    if (generatingCount === 0) return;
+    if (generatingCount === 0 && !cinematicSyncRunning) return;
     const interval = setInterval(pollScenes, 3000);
     return () => clearInterval(interval);
-  }, [generatingCount, pollScenes]);
+  }, [generatingCount, cinematicSyncRunning, pollScenes]);
 
   // One-shot poll on mount → recovers stuck 'generating' UI from a previous
   // session by reloading the actual DB truth (e.g. scene was already 'ready'
