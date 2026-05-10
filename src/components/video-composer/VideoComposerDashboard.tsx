@@ -1278,6 +1278,7 @@ export default function VideoComposerDashboard() {
             <StoryboardTab
               scenes={project.scenes}
               onUpdateScenes={setScenes}
+              onUpdateScenesLocalOnly={setScenesLocalOnly}
               onAddScene={addSceneToProject}
               onInsertScenesAfter={insertScenesAfter}
               onGoToClips={persistAndGoToClips}
