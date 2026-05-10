@@ -96,6 +96,15 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       extraCostEur: 0.05,
     };
   }
+  if (override === 'cinematic-sync') {
+    return {
+      engine: 'cinematic-sync',
+      label: '🎬 Cinematic + Lip-Sync',
+      reason:
+        'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
+      extraCostEur: 0.20,
+    };
+  }
 
   // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
