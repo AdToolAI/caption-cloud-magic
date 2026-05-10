@@ -827,10 +827,37 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         language: directorLanguage,
       });
 
+      // 4. Scene-Aware Character Anchor — composes ALL selected characters into
+      //    the requested scene composition via Nano Banana 2 (compose-scene-anchor).
+      //    Without this, Hailuo i2v has no anchor for multi-character ensembles
+      //    and falls back to a generic close-up of one person.
+      let composedFirstFrame: string | undefined = dbScene.referenceImageUrl;
+      try {
+        const prepared = await prepareSceneAnchor(
+          dbScene,
+          characters,
+          activeBrandChar,
+          composed.finalPrompt,
+        );
+        if (prepared.firstFrameUrl) {
+          composedFirstFrame = prepared.firstFrameUrl;
+          if (prepared.composed) {
+            // Freeze composed anchor on the row so subsequent re-rolls reuse it
+            // deterministically (no Nano-Banana drift).
+            await supabase
+              .from('composer_scenes')
+              .update({ reference_image_url: composedFirstFrame })
+              .eq('id', targetSceneId);
+          }
+          console.log(
+            `[ClipsTab] cinematic-sync anchor → ${prepared.anchor?.strategy ?? 'n/a'} (composed=${prepared.composed}, multi=${prepared.isMulti ?? false})`,
+          );
+        }
+      } catch (anchorErr) {
+        console.warn('[ClipsTab] cinematic-sync prepareSceneAnchor failed (continuing without composed anchor)', anchorErr);
+      }
+
       // 5. Fire compose-video-clips with explicit cinematic-sync payload.
-      //    We deliberately skip prepareSceneAnchor() here — the existing
-      //    referenceImageUrl (or none) is good enough for Hailuo i2v, and
-      //    we never want this click to silently hang on Nano Banana.
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
         body: {
           projectId: pid,
@@ -842,7 +869,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             clipQuality: dbScene.clipQuality || 'standard',
             aiPrompt: composed.finalPrompt,
             negativePrompt: composed.negativePrompt || undefined,
-            referenceImageUrl: dbScene.referenceImageUrl,
+            referenceImageUrl: composedFirstFrame,
             durationSeconds: dbScene.durationSeconds,
             characterShot: dbScene.characterShot,
             characterShots: dbScene.characterShots,
