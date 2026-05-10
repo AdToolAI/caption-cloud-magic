@@ -800,7 +800,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           visualStyle,
           characters,
           scenes: [{
-            id: dbScene.id,
+            id: targetSceneId,
             clipSource: newClipSource,
             clipQuality: dbScene.clipQuality || 'standard',
             aiPrompt: composed.finalPrompt,
