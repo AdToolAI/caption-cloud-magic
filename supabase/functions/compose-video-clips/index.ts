@@ -496,7 +496,11 @@ serve(async (req) => {
             const character = charById.get(primaryShot.characterId);
             const portraitUrl = character?.referenceImageUrl;
             const voiceCfg = scene.dialogVoices?.[primaryShot.characterId];
+            const voiceCfgObj = (typeof voiceCfg === 'object' && voiceCfg) ? voiceCfg as DialogVoiceCfg : undefined;
             const voiceId = resolveDialogVoiceId(voiceCfg);
+            const voiceProvider = (voiceCfgObj?.provider || '').toString().toUpperCase();
+            const voiceEngine = (voiceCfgObj?.engine || '').toString().toLowerCase();
+            const isHumeVoice = voiceProvider === 'HUME_AI' || voiceProvider === 'CUSTOM_VOICE' || voiceEngine === 'hume';
             const cleanText = stripSpeakerPrefixes(scene.dialogScript!);
             const speakerCount = Math.max(1, countDialogSpeakers(scene.dialogScript));
 
@@ -514,9 +518,91 @@ serve(async (req) => {
                 .update({
                   clip_status: 'generating',
                   clip_quality: quality,
+                  clip_error: null,
                   updated_at: new Date().toISOString(),
                 })
                 .eq('id', scene.id);
+
+              // ── Pre-synthesize audio for non-ElevenLabs voices ──
+              // HeyGen's text-mode TTS path only supports ElevenLabs voice IDs.
+              // If the user picked a Hume voice, synthesize it first via
+              // generate-voiceover-hume and pass the resulting audioUrl
+              // to generate-talking-head (which supports the audioUrl path).
+              let preSynthAudioUrl: string | undefined;
+              if (isHumeVoice) {
+                const humeVoiceName = voiceCfgObj?.voiceName || voiceCfgObj?.voiceId;
+                if (!humeVoiceName) {
+                  const msg = `Hume-Stimme für "${character?.name || primaryShot.characterId}" hat keinen Voice-Namen. Bitte im Voiceover-Tab erneut wählen.`;
+                  console.error(`[compose-video-clips] Scene ${scene.id} Hume voice has no name`, voiceCfgObj);
+                  await supabaseAdmin
+                    .from('composer_scenes')
+                    .update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() })
+                    .eq('id', scene.id);
+                  results.push({ sceneId: scene.id, status: 'failed', error: msg });
+                  continue;
+                }
+                try {
+                  const humeResp = await fetch(`${supabaseUrl}/functions/v1/generate-voiceover-hume`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': authHeader,
+                    },
+                    body: JSON.stringify({
+                      text: cleanText,
+                      voiceName: humeVoiceName,
+                      provider: voiceProvider === 'CUSTOM_VOICE' ? 'CUSTOM_VOICE' : 'HUME_AI',
+                      projectId,
+                    }),
+                  });
+                  if (!humeResp.ok) {
+                    const errTxt = await humeResp.text();
+                    throw new Error(`Hume TTS ${humeResp.status}: ${errTxt.slice(0, 300)}`);
+                  }
+                  const humeData = await humeResp.json();
+                  preSynthAudioUrl = humeData?.audioUrl;
+                  if (!preSynthAudioUrl) throw new Error('Hume response missing audioUrl');
+                  console.log(`[compose-video-clips] Scene ${scene.id} Hume TTS ok → ${preSynthAudioUrl.substring(0, 80)}…`);
+                } catch (humeErr) {
+                  const msg = `Hume-Stimme "${humeVoiceName}" konnte nicht synthetisiert werden — bitte im Voiceover-Tab eine andere Stimme wählen. (${humeErr instanceof Error ? humeErr.message : String(humeErr)})`;
+                  console.error(`[compose-video-clips] Scene ${scene.id} Hume synth failed:`, humeErr);
+                  await supabaseAdmin
+                    .from('composer_scenes')
+                    .update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() })
+                    .eq('id', scene.id);
+                  results.push({ sceneId: scene.id, status: 'failed', error: msg });
+                  continue;
+                }
+              } else if (voiceId && voiceId.length < 16) {
+                // Defensive: voiceIds that look like display names (short, contain spaces)
+                // are almost certainly NOT ElevenLabs IDs (which are 20+ char alnum).
+                const looksLikeName = /\s/.test(voiceId) || /[^A-Za-z0-9]/.test(voiceId);
+                if (looksLikeName) {
+                  const msg = `Stimme "${voiceId}" ist keine gültige ElevenLabs-Voice-ID. Bitte im Voiceover-Tab eine ElevenLabs-Stimme oder eine Hume-Stimme wählen.`;
+                  console.error(`[compose-video-clips] Scene ${scene.id} suspicious voiceId:`, voiceId, voiceCfgObj);
+                  await supabaseAdmin
+                    .from('composer_scenes')
+                    .update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() })
+                    .eq('id', scene.id);
+                  results.push({ sceneId: scene.id, status: 'failed', error: msg });
+                  continue;
+                }
+              }
+
+              const heygenBody: Record<string, unknown> = {
+                sceneId: scene.id,
+                projectId,
+                imageUrl: portraitUrl,
+                aspectRatio: '16:9',
+                resolution: '720p',
+                composerCharacterId: character?.id,
+              };
+              if (preSynthAudioUrl) {
+                heygenBody.audioUrl = preSynthAudioUrl;
+              } else {
+                heygenBody.text = cleanText;
+                if (voiceId) heygenBody.voiceId = voiceId;
+              }
 
               const heygenResp = await fetch(`${supabaseUrl}/functions/v1/generate-talking-head`, {
                 method: 'POST',
@@ -524,26 +610,21 @@ serve(async (req) => {
                   'Content-Type': 'application/json',
                   'Authorization': authHeader,
                 },
-                body: JSON.stringify({
-                  sceneId: scene.id,
-                  projectId,
-                  imageUrl: portraitUrl,
-                  text: cleanText,
-                  voiceId: voiceId || undefined,
-                  aspectRatio: '16:9',
-                  resolution: '720p',
-                  composerCharacterId: character?.id,
-                }),
+                body: JSON.stringify(heygenBody),
               });
 
               if (!heygenResp.ok) {
                 const errBody = await heygenResp.text();
                 console.error(`[compose-video-clips] HeyGen scene ${scene.id} failed:`, heygenResp.status, errBody);
+                let userMsg = `HeyGen-Render fehlgeschlagen (${heygenResp.status}).`;
+                if (errBody.includes('invalid_uid') || errBody.includes('An invalid ID has been received')) {
+                  userMsg = `Die gewählte Stimme ist keine gültige ElevenLabs-Voice. Bitte im Voiceover-Tab eine ElevenLabs- oder Hume-Stimme wählen.`;
+                }
                 await supabaseAdmin
                   .from('composer_scenes')
-                  .update({ clip_status: 'failed', updated_at: new Date().toISOString() })
+                  .update({ clip_status: 'failed', clip_error: userMsg, updated_at: new Date().toISOString() })
                   .eq('id', scene.id);
-                results.push({ sceneId: scene.id, status: 'failed', error: `HeyGen ${heygenResp.status}` });
+                results.push({ sceneId: scene.id, status: 'failed', error: userMsg });
               } else {
                 const heygenData = await heygenResp.json();
                 console.log(`[compose-video-clips] HeyGen scene ${scene.id} → video_id=${heygenData.predictionId}`);

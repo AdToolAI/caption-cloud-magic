@@ -1,126 +1,58 @@
 ## Befund
 
-Du hast recht: Szene 2 hängt nicht, weil sie „langsam“ ist, sondern weil der Pipeline-Zustand kaputt ist.
+Szene 1 in deinem Composer-Projekt nutzt im Dialog die Hume-Stimme **„Dungeon Master"** (Provider `HUME_AI`, Engine `hume`). Die HeyGen-Render-Pipeline (`compose-video-clips` → `generate-talking-head`) hat aber nur einen einzigen TTS-Pfad: **ElevenLabs**. Sie übergibt den Voice-Namen 1:1 als ElevenLabs-Voice-ID, was logischerweise fehlschlägt:
 
-Aktueller Datenstand für Szene 2:
-
-- `clip_status = generating`
-- `clip_url` ist bereits vorhanden
-- `lip_sync_status = pending`
-- `clip_error = Insufficient credit. This operation requires 'api' credits.`
-- Es gibt keine `scene_audio_clips` für das Projekt
-- Für `compose-lipsync-scene` gibt es keine Logs zum Lauf — der Lip-Sync-Schritt wurde also nicht sauber gestartet
-
-Der Kernfehler liegt in der State Machine: Sobald ein Cinematic-Sync-Clip eine `clip_url` hat, wird er aktuell nicht als „Hailuo-Render fertig“ behandelt, weil `lip_sync_status=pending` ist. Dadurch startet der automatische Lip-Sync nicht zuverlässig, und die UI bleibt endlos bei „Wird generiert…“.
-
-Zusätzlich ist die „2. Lip-Sync in die Szene packen“-Logik noch nicht die Artlist-ähnliche Produktionslogik. Sie hängt aktuell eher einzelne Talking-Head/Lip-Sync-Clips hintereinander, statt sie als echte Dialog-Cuts in die gewünschte Szene einzubauen.
-
-## Ziel
-
-Cinematic-Sync soll als klare mehrstufige Pipeline laufen:
-
-```text
-Scene Anchor / Ensemble Frame
-        ↓
-Hailuo rendert echte Szene
-        ↓
-Hailuo-Clip wird als Zwischenresultat fertig markiert
-        ↓
-Voiceover/Lip-Sync wird validiert
-        ↓
-Single Speaker: Sync.so auf die echte Szene
-Multi Speaker: Shot-Reverse-Shot Dialog-Cuts in der gleichen Szene
-        ↓
-Finale Szene/Sequenz ist fertig, hörbar und nicht doppelt/stumm
+```
+[compose-video-clips] HeyGen scene … failed: 500
+ElevenLabs TTS failed: An invalid ID has been received: 'Groovy Guy'.
+status: invalid_uid
 ```
 
-## Umsetzungsplan
+Genau derselbe Fehlertyp tritt für „Dungeon Master" auf → deshalb fällt Szene 1 reproduzierbar aus, während Szene 2 in seltenen Fällen durchläuft (z. B. wenn dort eine echte ElevenLabs-Stimme oder eine kompatible Voice-ID vergeben ist — aktuell hat Szene 2 ebenfalls Hume `Geraldine Wallace` und würde beim nächsten Retry genauso scheitern; sie steht nur deshalb auf `ready`, weil ihr alter Hailuo-Clip noch im Storage liegt).
 
-### 1. Cinematic-Sync State Machine reparieren
+Die UI rollt nach dem Fehler den optimistischen `generating`-Status zurück und zeigt deshalb dauerhaft „Fehlgeschlagen" für Szene 1.
 
-- `clip_status` darf nur den Video-Render beschreiben.
-- `lip_sync_status` beschreibt separat den Sync-Schritt.
-- Wenn eine Cinematic-Sync-Szene `clip_url` hat, wird sie als Hailuo-Zwischenrender fertig behandelt, statt endlos `generating` zu bleiben.
-- Der Fortschritt zeigt künftig klar:
-  - „Szene gerendert“
-  - „Lip-Sync läuft“
-  - „Voiceover fehlt“
-  - „Lip-Sync fehlgeschlagen“
-  - „Final fertig“
+## Fix (nur Backend, keine UI-Änderungen)
 
-### 2. Auto-Trigger für Lip-Sync robust machen
+### 1. `supabase/functions/compose-video-clips/index.ts` — HeyGen-Branch (~Zeile 490–567)
 
-- Der Lip-Sync wird nicht mehr nur beim Übergang `generating → ready` gestartet.
-- Wenn beim Polling erkannt wird:
-  - Cinematic-Sync aktiv
-  - `clip_url` vorhanden
-  - `lip_sync_status = pending`
-  - gültige Voiceover-Quelle vorhanden
+Vor dem Aufruf von `generate-talking-head` prüfen, ob die gewählte Stimme aus einem nicht-ElevenLabs-Provider stammt:
 
-  dann wird `compose-lipsync-scene` aktiv gestartet.
+- Wenn `voiceCfg.provider === 'HUME_AI'` oder `voiceCfg.engine === 'hume'` (case-insensitive):
+  1. `generate-voiceover-hume` aufrufen mit `text = cleanText` und `voiceName = voiceCfg.voiceId || voiceCfg.voiceName`.
+  2. Aus der Antwort die `audioUrl` lesen.
+  3. `generate-talking-head` mit **`audioUrl`** statt `text + voiceId` aufrufen (der Endpoint unterstützt das bereits, siehe Zeile 595–599 dort).
+- Fällt die Hume-Synthese aus, klare Fehlermeldung in `clip_error` schreiben („Hume-Stimme '…' konnte nicht synthetisiert werden — bitte im Voiceover-Tab eine ElevenLabs-Stimme wählen.") statt stiller 500.
+- Wenn gar keine Voice-Config gesetzt ist, weiter wie bisher mit ElevenLabs-Default-Voice.
 
-- Vor dem Invoke wird der Status auf `running` gesetzt, damit der Browser nicht mehrfach denselben Sync startet.
-- Wenn keine Voiceover-Quelle existiert, wird `no_voiceover` gesetzt und nicht weiter endlos generiert.
+### 2. Defensive Validierung
 
-### 3. Fehlende Voiceover-Spiegelung lösen
+Falls `provider`/`engine` unbekannt ist und `voiceId` länger als ~32 Zeichen alphanumerisch ist → als ElevenLabs-ID akzeptieren. Sonst: gleiche Fehlermeldung wie oben (statt blinden ElevenLabs-Call), damit der User sofort sieht, was zu tun ist.
 
-- Wenn `audioPlan.speakers[].audioUrl` vorhanden ist, aber noch kein `scene_audio_clips`-Eintrag existiert, wird dieser vor dem Lip-Sync gespiegelt.
-- Dadurch erkennt Backend, Preview und Export dieselbe Tonquelle.
-- Wenn nur Dialogtext existiert, aber kein Audio, wird die Szene nicht als fertig markiert, sondern fordert erst Voiceover-Erzeugung an.
+### 3. Keine Datenbank-Migration nötig
 
-### 4. Multi-Speaker korrekt routen
+`character_audio_url`, `lip_sync_status`, `clip_error` sind alle vorhanden; wir schreiben in dieselben Felder.
 
-Für mehrere sprechende Charaktere wird kein Fake-Multi-Face-Lip-Sync in einem einzigen Clip versprochen.
+### 4. Optional, separat: Cleanup der bereits fehlgeschlagenen Szene
 
-Stattdessen:
+Das Datenfeld `clip_status` von Szene 1 (`632c7ee3…`) steht aktuell auf `ready` mit altem Hailuo-Clip; nach dem Fix einmalig "Erneut versuchen" klicken → produziert frischen HeyGen-Talking-Head mit Hume-Voice.
 
-- Ensemble-Shot: alle gewählten Charaktere sichtbar in der Szene.
-- Dialog-Cuts: pro Sprecher ein eigener Shot-Reverse-Shot-Cut mit eigenem Voiceover und Lip-Sync.
-- Die Cuts werden anhand der AudioPlan-Zeitfenster in der richtigen Reihenfolge abgespielt.
-- Am Ende kann wieder ein Ensemble-Shot folgen, in dem alle Charaktere sichtbar sind.
+## Technische Details
 
-Das entspricht dem professionellen Schnittprinzip: nicht „ein Gesicht spricht alles“, sondern jede Sprecherzeile bekommt den passenden sichtbaren Charakter.
+```text
+compose-video-clips (HeyGen branch)
+ ├─ voiceCfg.provider === 'HUME_AI'?
+ │   ├─ yes → invoke('generate-voiceover-hume', { text, voiceName })
+ │   │        → audioUrl
+ │   │        → invoke('generate-talking-head', { imageUrl, audioUrl, … })
+ │   └─ no  → invoke('generate-talking-head', { imageUrl, text, voiceId, … })
+ └─ Fehler → clip_error mit konkretem Hinweis (statt 500)
+```
 
-### 5. UI-Blockierung verhindern
+Edge Functions zum Re-Deploy: `compose-video-clips`.
 
-- „Weiter zu Voiceover & Untertitel“ bleibt deaktiviert, solange Cinematic-Sync noch `pending` oder `running` ist.
-- Bei `failed` oder `no_voiceover` zeigt die Szene eine konkrete Aktion statt endlosem Spinner:
-  - „Voiceover erzeugen“
-  - „Lip-Sync erneut starten“
-  - „Als stumme Szene verwenden“
+## Was nicht angefasst wird
 
-### 6. Preview/Export-Audio reparieren
-
-- Globales Voiceover wird nur stummgeschaltet, wenn wirklich eine per-scene Voiceover-Spur oder eingebetteter Lip-Sync existiert.
-- `lipSyncWithVoiceover=true` allein darf keinen Ton muten.
-- Dadurch verschwinden die Effekte „zwei Lip-Syncs hintereinander“ und „ohne Sound“.
-
-### 7. Aktuelle Szene 2 bereinigen
-
-Für dein aktuelles Projekt wird Szene 2 zurück in einen sauberen Zustand gebracht:
-
-- vorhandene `clip_url` bleibt erhalten
-- falscher Endlos-Status wird entfernt
-- `lip_sync_status` wird auf einen ehrlichen Zustand gesetzt
-- alter `clip_error` wird nicht mehr versteckt, sondern als konkreter Fehler/Aktion angezeigt
-
-## Betroffene Dateien
-
-- `src/components/video-composer/ClipsTab.tsx`
-- `src/components/video-composer/SceneCard.tsx`
-- `src/components/video-composer/ComposerSequencePreview.tsx`
-- `src/hooks/useSceneAudioClips.ts`
-- `supabase/functions/compose-lipsync-scene/index.ts`
-- optional: Datenreparatur für Projekt `6f448619-7af6-4ed5-902c-dde6f5973ba5`
-
-## Ergebnis nach Umsetzung
-
-- Szene 2 bleibt nicht mehr endlos bei „Wird generiert…“ hängen.
-- Hailuo-Render und Lip-Sync werden getrennt sichtbar und steuerbar.
-- Fehlendes Voiceover führt zu einer klaren Aktion, nicht zu einem stillen Spinner.
-- Multi-Character-Dialog wird als echte Cut-Sequenz aufgebaut, statt zwei Lip-Syncs stumpf hintereinander ohne Szenenintegration abzuspielen.
-- Preview und Weiter-Tab spielen Audio wieder korrekt.
-
-<lov-actions>
-<lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-</lov-actions>
+- Voice-Picker/UI bleibt wie sie ist (Hume-Stimmen weiter wählbar).
+- `generate-talking-head` selbst bleibt unverändert (audioUrl-Pfad existiert schon).
+- Szene-2-Pipeline und Cinematic-Sync werden nicht berührt.
