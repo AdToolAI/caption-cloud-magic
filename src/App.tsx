@@ -288,6 +288,7 @@ function AppLayout() {
           <Route path="/audio-studio" element={<AudioStudio />} />
           <Route path="/music-studio" element={<ProtectedRoute><MusicStudio /></ProtectedRoute>} />
           <Route path="/sfx-library" element={<ProtectedRoute><SfxLibrary /></ProtectedRoute>} />
+          <Route path="/my-licenses" element={<ProtectedRoute><MyLicenses /></ProtectedRoute>} />
            <Route path="/sora-long-form" element={<Navigate to="/video-composer" replace />} />
            <Route path="/video-composer" element={<VideoComposer />} />
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
