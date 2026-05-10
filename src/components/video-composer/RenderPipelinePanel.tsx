@@ -57,6 +57,7 @@ export default function RenderPipelinePanel({
   onGenerateAll,
 }: RenderPipelinePanelProps) {
   const navigate = useNavigate();
+  const [preflightOpen, setPreflightOpen] = useState(false);
   const pipeline = useMultiSceneRender({
     projectId,
     scenes,
