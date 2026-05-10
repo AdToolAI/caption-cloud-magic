@@ -271,7 +271,12 @@ export default function ComposerSequencePreview({
     const v = getVideoForSlot(activeSlotRef.current);
     if (!v) return;
     if (playing) {
-      v.muted = mutedRef.current;
+      const cur = playableRef.current[sceneIdxRef.current];
+      const hasEmbedded =
+        !!cur?.lipSyncAppliedAt ||
+        (cur?.clipSource as string) === 'ai-heygen' ||
+        cur?.clipSource === 'upload';
+      v.muted = hasEmbedded ? false : mutedRef.current;
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -284,7 +289,12 @@ export default function ComposerSequencePreview({
     const active = activeSlotRef.current;
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
-    if (va && !isImage) va.muted = muted;
+    const cur = playableRef.current[sceneIdxRef.current];
+    const hasEmbedded =
+      !!cur?.lipSyncAppliedAt ||
+      (cur?.clipSource as string) === 'ai-heygen' ||
+      cur?.clipSource === 'upload';
+    if (va && !isImage) va.muted = hasEmbedded ? false : muted;
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
