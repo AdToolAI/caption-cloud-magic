@@ -297,7 +297,7 @@ serve(async (req) => {
     const totalSec = mergedPcm.length / (BITS_PER_SAMPLE / 8) / CHANNELS / SAMPLE_RATE;
 
     // Upload to user-scoped path in voiceover-audio bucket.
-    const fileName = `${user.id}/twoshot-vo/${scene_id}-${Date.now()}.wav`;
+    const fileName = `${userId}/twoshot-vo/${scene_id}-${Date.now()}.wav`;
     const { error: upErr } = await supabase.storage
       .from("voiceover-audio")
       .upload(fileName, wav, { contentType: "audio/wav", upsert: false });
