@@ -901,179 +901,52 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onUpdate(updates);
       } catch (e) { console.warn('[SceneDialogStudio] SRS audioPlan emit failed', e); }
 
-      // ── Phase 2: build all sub-scene partials in script order, then insert
-      //    them at the parent scene's position via insertScenesAfter. The
-      //    parent dialog scene is replaced so the user sees Scene #1 (Speaker
-      //    A), Scene #2 (Speaker B) in place of the dialog container instead
-      //    of new tail scenes appearing.
-      if (!onInsertScenesAfter && !onAddScene) {
-        throw new Error('Cannot spawn sub-scenes: no insert hook available');
-      }
-      const failures: Array<{ speaker: string; reason: string }> = [];
-
-      const partials: Partial<ComposerScene>[] = synthed.map((s) => {
-        const charShot: CharacterShot = {
-          characterId: s.character.id,
-          shotType: 'profile',
-        } as CharacterShot;
-        const subDuration = Math.max(2, Math.min(60, Math.round(s.durationSec * 100) / 100));
-        const speakerVoiceCfg = voicePerSpeaker[s.block.speakerId];
-        return {
-          sceneType: scene.sceneType,
-          durationSeconds: subDuration,
+      // ── Phase 2: TWO-SHOT pipeline ────────────────────────────────────
+      // For ≥2 speakers we KEEP the parent scene as one row and route it
+      // through the cinematic-sync engine. Compose-video-clips renders ONE
+      // 10s Hailuo i2v master clip (both speakers in frame, anchored from
+      // Nano Banana 2 two-shot composition); ClipsTab's auto-trigger then
+      // detects ≥2 speakers in dialog_script and invokes
+      // compose-twoshot-lipsync for sequential per-face Sync.so passes.
+      //
+      // No more sub-scene splitting — the storyboard shows ONE card with
+      // a 6-stage progress bar (audio → anchor → master_clip → lipsync_1
+      // → lipsync_2 → continuity).
+      try {
+        const masterDuration = Math.max(6, Math.min(10, Math.round(synthed.reduce((acc, s) => acc + s.durationSec, 0) + INTER_SPEAKER_GAP_SEC * (synthed.length - 1))));
+        const dialogScriptText = synthed.map((s) => `${s.character.name}: ${s.block.text}`).join('\n');
+        const dialogVoicesMap: Record<string, DialogVoiceCfg> = {};
+        for (const s of synthed) {
+          const cfg = voicePerSpeaker[s.block.speakerId];
+          if (cfg) dialogVoicesMap[s.character.id] = cfg;
+        }
+        onUpdate({
+          dialogScript: dialogScriptText,
+          dialogVoices: dialogVoicesMap,
+          durationSeconds: masterDuration,
           clipSource: 'ai-hailuo',
-          clipQuality: scene.clipQuality,
+          engineOverride: 'cinematic-sync',
           clipStatus: 'generating',
-          referenceImageUrl: s.character.referenceImageUrl,
-          dialogScript: `${s.character.name}: ${s.block.text}`,
-          dialogVoices: speakerVoiceCfg ? { [s.character.id]: speakerVoiceCfg } : undefined,
-          engineOverride: 'heygen',
-          aiPrompt: applyDialogToPrompt('', [{ ...s.block, startSec: 0, durationSec: s.durationSec }], language),
-          characterShot: charShot,
-          characterShots: [charShot],
+          twoshotStage: 'audio',
           lipSyncWithVoiceover: true,
-          transitionType: 'crossfade',
-          transitionDuration: 0.3,
           cinematicPresetSlug: srsMarker,
-        } as Partial<ComposerScene>;
-      });
-
-      setGenStage(
-        language === 'de'
-          ? `Szenen werden eingefügt (${partials.length})…`
-          : language === 'es'
-          ? `Insertando escenas (${partials.length})…`
-          : `Inserting scenes (${partials.length})…`,
-      );
-
-      let subSceneIds: (string | undefined)[];
-      try {
-        if (onInsertScenesAfter) {
-          subSceneIds = await onInsertScenesAfter(resolvedParentSceneId, partials, { removeParent: true });
-        } else {
-          subSceneIds = [];
-          for (const p of partials) {
-            const id = await onAddScene!(p);
-            subSceneIds.push(typeof id === 'string' ? id : undefined);
-          }
-        }
-      } catch (insertErr) {
-        // Surface the REAL DB error (unique-constraint, RLS, network…) so the
-        // user knows what to do, instead of a generic "sub-scene insert failed".
-        const raw = formatError(insertErr);
-        console.error('[SceneDialogStudio] insertScenesAfter threw', insertErr);
+        });
+        okCount = 1;
         toast({
-          title: t.failed,
+          title: language === 'de' ? 'Two-Shot wird gerendert' : language === 'es' ? 'Renderizando Two-Shot' : 'Rendering Two-Shot',
           description:
-            (language === 'de'
-              ? 'Szenen-Reihenfolge konnte nicht aktualisiert werden: '
-              : language === 'es'
-              ? 'No se pudo actualizar el orden de las escenas: '
-              : 'Could not update scene order: ') + raw,
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // ── Artlist-Style Auto-Chain ────────────────────────────────────
-      // Lock all freshly-spawned speaker subscenes to the parent scene's
-      // visual anchor so HeyGen lip-sync clips share the same location/look,
-      // and link Speaker N+1 → Speaker N for "Continue from frame" UI.
-      try {
-        const anchorRef = scene.lockReferenceUrl ?? scene.referenceImageUrl ?? null;
-        await Promise.all(
-          subSceneIds.map((newId, idx) => {
-            if (!newId) return Promise.resolve();
-            const prevId = idx > 0 ? subSceneIds[idx - 1] : null;
-            return supabase
-              .from('composer_scenes')
-              .update({
-                continuity_locked: true,
-                lock_reference_url: anchorRef,
-                continuity_source_scene_id: prevId ?? null,
-              } as any)
-              .eq('id', newId);
-          }),
-        );
-      } catch (chainErr) {
-        console.warn('[SceneDialogStudio] auto-chain update failed (non-fatal)', chainErr);
-      }
-
-      for (let i = 0; i < synthed.length; i++) {
-        const s = synthed[i];
-        const newSceneId = subSceneIds[i];
-        if (!newSceneId) {
-          const insertFailMsg =
             language === 'de'
-              ? 'Sub-Szene konnte nicht angelegt werden (siehe Konsole).'
+              ? 'Beide Sprecher werden in EINE Szene komponiert. Du siehst den Fortschritt live in der Clip-Karte (6 Phasen).'
               : language === 'es'
-              ? 'No se pudo crear la subescena (ver consola).'
-              : 'Could not create sub-scene (see console).';
-          failures.push({ speaker: s.character.name, reason: insertFailMsg });
-          continue;
-        }
-        setGenStage(
-          language === 'de'
-            ? `Lip-Sync ${i + 1}/${synthed.length} (${s.character.name}) wird gestartet…`
-            : language === 'es'
-            ? `Iniciando lip-sync ${i + 1}/${synthed.length} (${s.character.name})…`
-            : `Starting lip-sync ${i + 1}/${synthed.length} (${s.character.name})…`,
-        );
-        try {
-          const { data, error } = await supabase.functions.invoke('generate-talking-head', {
-            body: {
-              sceneId: newSceneId,
-              projectId: pidForSrs,
-              imageUrl: s.character.referenceImageUrl,
-              audioUrl: s.audioUrl,
-              aspectRatio: '9:16',
-              resolution: '720p',
-              composerCharacterId: s.character.id,
-            },
-          });
-          if (error) throw error;
-          if ((data as any)?.success) okCount += 1;
-          else throw new Error((data as any)?.error || 'unknown error');
-        } catch (perBlockErr) {
-          const raw = perBlockErr instanceof Error ? perBlockErr.message : String(perBlockErr);
-          const friendly = /HEYGEN_UPLOAD_TRANSIENT/i.test(raw)
-            ? (language === 'de'
-                ? 'HeyGen war kurz nicht erreichbar — bitte erneut versuchen.'
-                : language === 'es'
-                ? 'HeyGen no estuvo disponible un momento — intenta de nuevo.'
-                : 'HeyGen was briefly unavailable — please retry.')
-            : raw.replace(/^Edge Function returned a non-2xx status code:?\s*/i, '');
-          failures.push({ speaker: s.character.name, reason: friendly });
-          console.error('[SceneDialogStudio] block failed', s.character.name, raw);
-          try {
-            await supabase
-              .from('composer_scenes')
-              .update({
-                clip_status: 'failed',
-                clip_error: friendly.slice(0, 500),
-                updated_at: new Date().toISOString(),
-              })
-              .eq('id', newSceneId);
-          } catch (_e) { /* non-fatal */ }
-        }
-      }
-
-      if (failures.length === 0) {
-        toast({ title: t.title, description: t.success(okCount) });
-      } else if (okCount === 0) {
+              ? 'Ambos hablantes se componen en UNA escena. Verás el progreso en vivo en la tarjeta del clip (6 fases).'
+              : 'Both speakers are being composed into ONE scene. Live progress shows in the clip card (6 phases).',
+        });
+        if (onClose) onClose();
+      } catch (twoShotErr) {
+        console.error('[SceneDialogStudio] two-shot dispatch failed', twoShotErr);
         toast({
           title: t.failed,
-          description: failures.map((f) => `${f.speaker}: ${f.reason}`).join(' · '),
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: language === 'de'
-            ? `${okCount} von ${synthed.length} Lip-Sync-Clips erstellt`
-            : language === 'es'
-            ? `${okCount} de ${synthed.length} clips lip-sync creados`
-            : `${okCount} of ${synthed.length} lip-sync clips created`,
-          description: failures.map((f) => `${f.speaker}: ${f.reason}`).join(' · '),
+          description: formatError(twoShotErr),
           variant: 'destructive',
         });
       }
@@ -1399,6 +1272,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           : 'text-muted-foreground';
         return <p className={`text-[10px] ${cls} -mb-1`}>{label}</p>;
       })()}
+      {(() => {
+        const allPortraits = speakers.every((sp) => !!sceneCast.find((c) => c.id === sp.id)?.referenceImageUrl);
+        if (blocks.length < 2 || !allPortraits || renderAsSeparateScenes) return null;
+        return (
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
+            🎭 <strong>Two-Shot-Modus:</strong>{' '}
+            {language === 'de'
+              ? 'Beide Sprecher werden in EINE 10s-Szene komponiert. Sequenzieller Lip-Sync pro Gesicht via Sync.so + Continuity Guardian.'
+              : language === 'es'
+              ? 'Ambos hablantes en UNA escena de 10s. Lip-sync secuencial por cara vía Sync.so + Continuity Guardian.'
+              : 'Both speakers composed into ONE 10s scene. Sequential per-face lip-sync via Sync.so + Continuity Guardian.'}
+          </div>
+        );
+      })()}
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -1439,10 +1326,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 <>
                   <User className="h-3 w-3" />{' '}
                   {language === 'de'
-                    ? `Professionellen Lip-Sync rendern (${speakers.length} Cuts)`
+                    ? `🎭 Two-Shot in echte Szene einbauen (~€1.65)`
                     : language === 'es'
-                    ? `Renderizar lip-sync profesional (${speakers.length} cortes)`
-                    : `Render professional lip-sync (${speakers.length} cuts)`}
+                    ? `🎭 Componer Two-Shot en escena real (~€1.65)`
+                    : `🎭 Render Two-Shot into real scene (~€1.65)`}
                 </>
               ) : (
                 <>
