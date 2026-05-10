@@ -362,3 +362,44 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     </>
   );
 }
+
+interface TwoShotStageBarProps {
+  stages: ReadonlyArray<{ key: string; label: string }>;
+  stageIndex: number;
+  currentLabel: string | null;
+}
+
+/**
+ * 6-step progress overlay for the multi-character Two-Shot Hook pipeline.
+ * Sits on top of the generation skeleton and shows which stage is active.
+ */
+function TwoShotStageBar({ stages, stageIndex, currentLabel }: TwoShotStageBarProps) {
+  return (
+    <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-2 py-1.5 pointer-events-none">
+      <div className="flex items-center gap-1 mb-1">
+        <Loader2 className="h-3 w-3 text-amber-300 animate-spin shrink-0" />
+        <span className="text-[9px] font-bold text-amber-200 uppercase tracking-wide truncate">
+          🎭 Two-Shot Hook · {currentLabel ?? '…'}
+        </span>
+      </div>
+      <div className="flex items-center gap-0.5">
+        {stages.map((s, i) => {
+          const done = i < stageIndex;
+          const active = i === stageIndex;
+          return (
+            <div
+              key={s.key}
+              className={cn(
+                'h-1 flex-1 rounded-full transition-colors',
+                done && 'bg-amber-400',
+                active && 'bg-amber-300 animate-pulse',
+                !done && !active && 'bg-white/15',
+              )}
+              title={s.label}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
