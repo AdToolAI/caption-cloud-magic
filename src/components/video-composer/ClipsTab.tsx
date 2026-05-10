@@ -719,7 +719,8 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       setTimeout(pollScenes, 500);
     } catch (err: any) {
       console.error('Generate clips error:', err);
-      toast({ title: 'Fehler', description: 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
+      const realMsg = await extractFunctionsError(err);
+      toast({ title: 'Fehler', description: realMsg || 'Clip-Generierung fehlgeschlagen — bitte erneut versuchen.', variant: 'destructive' });
     } finally {
       setIsGeneratingAll(false);
     }
