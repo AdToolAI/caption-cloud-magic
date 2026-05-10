@@ -246,11 +246,19 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     // hat, die Szene aber bereits eine `clip_url` hat, behandeln wir sie als
     // "ready". Verhindert das endlose "Wird generiert…" nach gelegentlichen
     // Webhook-Drops.
+    //
+    // EXCEPTION: Cinematic-Sync szenen NICHT vorschnell als ready markieren —
+    // dort ist `clip_url` nur das Hailuo-Zwischenresultat; Sync.so muss noch
+    // laufen. Self-heal nur, wenn lip_sync bereits final ist (done/failed/no_voiceover).
     const stuck = (data as any[]).filter(
       (d) =>
         d.clip_status === 'generating' &&
         typeof d.clip_url === 'string' &&
-        d.clip_url.length > 0,
+        d.clip_url.length > 0 &&
+        !(
+          d.engine_override === 'cinematic-sync' &&
+          (d.lip_sync_status === 'pending' || d.lip_sync_status === 'running')
+        ),
     );
     if (stuck.length > 0) {
       await Promise.all(
