@@ -282,7 +282,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         d.engine_override === 'cinematic-sync' &&
         typeof d.clip_url === 'string' &&
         d.clip_url.length > 0 &&
-        d.lip_sync_status === 'pending' &&
+        (d.lip_sync_status === 'pending' || d.lip_sync_status == null) &&
         !d.lip_sync_applied_at,
     );
     if (lipSyncCandidates.length > 0) {
