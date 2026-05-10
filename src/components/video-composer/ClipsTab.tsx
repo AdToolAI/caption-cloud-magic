@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2, Save, Check } from 'lucide-react';
+import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2, Save, Check, Clapperboard } from 'lucide-react';
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
