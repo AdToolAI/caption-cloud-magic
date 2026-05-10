@@ -236,7 +236,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     if (!projectId) return;
     const { data } = await supabase
       .from('composer_scenes')
-      .select('id, clip_status, clip_url, duration_seconds, upload_type, lip_sync_applied_at, lip_sync_status, lip_sync_source_clip_url, lip_sync_with_voiceover, engine_override, clip_source')
+      .select('id, clip_status, clip_url, duration_seconds, upload_type, lip_sync_applied_at, lip_sync_status, lip_sync_source_clip_url, lip_sync_with_voiceover, engine_override, clip_source, dialog_script, twoshot_stage, continuity_drift_score')
       .eq('project_id', projectId);
 
     if (!data) return;
@@ -296,9 +296,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         ),
       );
       lipSyncCandidates.forEach((d) => {
-        console.info(`[ClipsTab] State-based auto-triggering lip-sync for ${d.id}`);
+        // Multi-speaker (≥2) → Two-Shot lip-sync. Single-speaker → classic.
+        const speakerCount = (() => {
+          const dlg = String(d.dialog_script ?? '');
+          const set = new Set<string>();
+          for (const line of dlg.split('\n')) {
+            const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+            if (m) set.add(m[1].trim().toLowerCase());
+          }
+          return set.size;
+        })();
+        const fnName = speakerCount >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+        console.info(`[ClipsTab] State-based auto-triggering ${fnName} for ${d.id} (speakers=${speakerCount})`);
         supabase.functions
-          .invoke('compose-lipsync-scene', { body: { scene_id: d.id } })
+          .invoke(fnName, { body: { scene_id: d.id } })
           .then(({ data: lsData, error: lsErr }) => {
             // FunctionsHttpError carries the response body in `context`.
             const errBody = (lsErr as any)?.context;
