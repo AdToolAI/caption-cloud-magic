@@ -1283,10 +1283,16 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error("[compose-video-clips] Error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    console.error(`[compose-video-clips] FATAL @ stage=${__stage}: ${msg}`, stack || '');
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: msg || "Unknown error",
+        code: 'INTERNAL',
+        stage: __stage,
+      }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
