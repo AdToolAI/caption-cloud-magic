@@ -563,20 +563,7 @@ export default function SceneCard({
                         <SelectItem value="sync-polish" className="text-xs">✨ Sync.so Polish</SelectItem>
                       </SelectContent>
                     </Select>
-                    {rec.engine === 'heygen-talking-head' && speakerCount <= 1 && (
-                      <button
-                        type="button"
-                        onClick={() => onUpdate({ engineOverride: 'cinematic-sync' as any })}
-                        className="h-5 px-2 rounded-md text-[9px] font-medium border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors"
-                        title={
-                          lang === 'de'
-                            ? 'Statt HeyGen-Avatar wird die echte Wunsch-Szene mit Hailuo gerendert und der Charakter darin lip-synct (Artlist-Pipeline). ~€0.95 statt €0.30.'
-                            : 'Render the actual storyboard scene with Hailuo and lip-sync the character into it (Artlist pipeline). ~€0.95 instead of €0.30.'
-                        }
-                      >
-                        🎬 {lang === 'de' ? 'In echte Szene einbauen' : 'Build into real scene'}
-                      </button>
-                    )}
+                    {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
                     </>
                   );
                 })()}

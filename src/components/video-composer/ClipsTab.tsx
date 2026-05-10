@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2, Save, Check } from 'lucide-react';
+import { Loader2, Play, RefreshCw, ArrowRight, CheckCircle, XCircle, Clock, Search, Film, DollarSign, Sparkles, Lightbulb, X, Link2, Save, Check, Clapperboard } from 'lucide-react';
 import { useFrameContinuity } from '@/hooks/useFrameContinuity';
 import { useSaveSceneToLibrary } from '@/hooks/useSaveSceneToLibrary';
 import { toast } from '@/hooks/use-toast';
@@ -187,6 +187,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
     return localStorage.getItem('composer-reroll-hint-dismissed') === '1';
   });
   const [rerollTarget, setRerollTarget] = useState<ComposerScene | null>(null);
+  const [cinematicSwitchTarget, setCinematicSwitchTarget] = useState<ComposerScene | null>(null);
+  const [hintDismissed, setHintDismissed] = useState<boolean>(() => {
+    try { return localStorage.getItem('composer:cinematic-sync-hint-dismissed') === '1'; } catch { return false; }
+  });
 
   const dismissRerollHint = () => {
     setRerollHintDismissed(true);
@@ -620,6 +624,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
             subjectReferenceUrl: preparedSingle?.subjectReferenceUrl,
             durationSeconds: targetScene.durationSeconds,
             characterShot: targetScene.characterShot,
+            characterShots: targetScene.characterShots,
+            dialogScript: targetScene.dialogScript,
+            dialogVoices: targetScene.dialogVoices,
+            engineOverride: targetScene.engineOverride ?? 'auto',
             withAudio: targetScene.withAudio !== false,
           }],
         },
@@ -807,6 +815,64 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Cinematic-Sync Switch Confirmation */}
+      <AlertDialog open={!!cinematicSwitchTarget} onOpenChange={(open) => !open && setCinematicSwitchTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <span className="inline-flex items-center gap-2">
+                <Clapperboard className="h-4 w-4 text-emerald-400" />
+                Szene {(cinematicSwitchTarget?.orderIndex ?? 0) + 1} in echte Szene einbauen?
+              </span>
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  Statt des HeyGen-Avatar-Bilds rendert <span className="font-semibold text-emerald-300">Hailuo</span> die echte
+                  Storyboard-Szene (Umgebung, Kamera, Licht). Danach wird der Charakter
+                  via <span className="font-semibold">Sync.so Lip-Sync</span> in die Szene eingebaut — wie bei Artlist.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Kosten: <span className="font-semibold text-amber-400">~€0.95</span> (vs. €0.30 aktuell). Der bestehende Clip wird ersetzt.
+                  Die Pipeline läuft ~2 Minuten und refundiert automatisch bei Fehlern.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const target = cinematicSwitchTarget;
+                setCinematicSwitchTarget(null);
+                if (!target) return;
+                // Switch the engine on this scene + ensure clipSource is Hailuo (i2v) for the real-scene render.
+                const updated: ComposerScene[] = scenes.map((s) =>
+                  s.id === target.id
+                    ? {
+                        ...s,
+                        engineOverride: 'cinematic-sync',
+                        clipSource: s.clipSource.startsWith('ai-') ? s.clipSource : 'ai-hailuo',
+                      }
+                    : s,
+                );
+                onUpdateScenes(updated);
+                const updatedTarget = updated.find((s) => s.id === target.id) || target;
+                handleGenerateSingle(updatedTarget);
+                toast({
+                  title: 'Cinematic-Sync gestartet',
+                  description: `Szene ${(target.orderIndex ?? 0) + 1}: Hailuo rendert die echte Szene, Lip-Sync läuft danach automatisch (~2 Min).`,
+                });
+              }}
+              className="bg-emerald-500 hover:bg-emerald-600 text-emerald-950"
+            >
+              <Clapperboard className="h-3.5 w-3.5 mr-1" />
+              Cinematic-Sync starten €0.95
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Continuity Guardian — Reference-Chaining 2.0 */}
       <ContinuityGuardianStrip
         scenes={scenes}
@@ -814,6 +880,31 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         onUpdateScenes={onUpdateScenes}
         onRepairScene={(s) => handleGenerateSingle(s)}
       />
+
+      {/* Cinematic-Sync Hint — only when ≥1 ready HeyGen scene exists and not dismissed */}
+      {!hintDismissed && scenes.some((s) => s.clipStatus === 'ready' && recommendEngineForScene(s).engine === 'heygen-talking-head') && (
+        <div className="relative rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 pr-10 text-xs text-emerald-100/90">
+          <button
+            type="button"
+            onClick={() => {
+              setHintDismissed(true);
+              try { localStorage.setItem('composer:cinematic-sync-hint-dismissed', '1'); } catch {}
+            }}
+            className="absolute top-2 right-2 p-1 rounded hover:bg-emerald-500/20 text-emerald-300/70 hover:text-emerald-200"
+            aria-label="Hinweis schließen"
+          >
+            <X className="h-3 w-3" />
+          </button>
+          <div className="flex items-start gap-2">
+            <Clapperboard className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" />
+            <div>
+              <strong className="text-emerald-300">Tipp – Artlist-Pipeline:</strong> Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund.
+              Klicke bei einer fertigen HeyGen-Szene rechts auf <span className="inline-flex items-center gap-1 px-1 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 font-medium"><Clapperboard className="h-2.5 w-2.5" />In echte Szene einbauen</span>,
+              um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern und automatisch lip-syncen zu lassen. <span className="text-amber-300">+€0.65 / Szene.</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Clip Cards */}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -983,7 +1074,20 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                         Neu generieren €{costPerClip.toFixed(2)}
                       </Button>
                     )}
-                    {/* Save single scene to media library (manual, no auto-save) */}
+                    {/* Cinematic-Sync Switch — Artlist-style: render real scene with Hailuo + auto lip-sync */}
+                    {scene.clipStatus === 'ready' && isHeygen && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1 text-[10px] h-7 px-2 border-emerald-500/50 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200"
+                        title="Statt HeyGen-Avatar wird die echte Wunsch-Szene mit Hailuo gerendert und der Charakter darin lip-synct (Artlist-Pipeline). ~€0.95 statt €0.30."
+                        disabled={isThisGenerating}
+                        onClick={() => setCinematicSwitchTarget(scene)}
+                      >
+                        <Clapperboard className="h-3 w-3" />
+                        In echte Szene einbauen €0.95
+                      </Button>
+                    )}
                     {scene.clipStatus === 'ready' && scene.clipUrl && (() => {
                       const isSaved = savedSceneIds.has(scene.id);
                       const isSaving = savingSceneId === scene.id;

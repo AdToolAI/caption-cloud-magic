@@ -1,70 +1,65 @@
-# Wie wir auf Artlist-Niveau kommen
+# Den "In echte Szene einbauen"-Button sichtbar machen
 
-## Was du gerade siehst (und warum es nicht "wie Artlist" aussieht)
+## Was schiefgelaufen ist
 
-Szene 1 & 2 sind aktuell auf **HeyGen Photo Avatar** geroutet (siehe Badge `HeyGen Lip-Sync (manuell)`). HeyGen rendert ausschließlich das **Avatar-Porträt vor neutralem Hintergrund** — die ursprünglich gewünschte Szenen-Komposition (Hook-Storyboard, Umgebung, Kameraführung) wird komplett ignoriert. Deshalb wirkt es wie ein Talking-Head-Stempel und nicht wie eine echte Werbeszene.
+Der Button existiert im Code (`SceneCard.tsx` Zeile 566–579), aber er rendert als **winziger inline-Pill direkt neben dem Engine-Badge** in der Meta-Zeile der Szene. Auf deinem Screenshot ist diese Zeile schmal und vollgepackt mit Badges (`Hook · 3.7s · €0.30 · Fertig · HeyGen Lip-Sync · Mit Referenzbild`). Die Action-Spalte rechts mit den drei großen Buttons (`Neu generieren`, `In Mediathek`, `Continuity ✓`) ist die einzige Stelle, an der man wirklich hinschaut.
 
-Artlist macht das anders:
-1. Sie rendern **zuerst die eigentliche Szene** (Charakter im Setting, mit Kamerawinkel, Licht, B-Roll-Elementen)
-2. Sie legen **danach einen Lip-Sync-Pass** über das gerenderte Video, der die Mundbewegung zum Voiceover passend macht
-
-Genau diese Pipeline existiert bei uns schon als `sync-polish`-Engine (compose-lipsync-scene + Sync.so/lipsync-2), wird aber vom Auto-Router nicht für deine Szenen vorgeschlagen.
+Außerdem: SceneCard wird im **Storyboard-Tab** verwendet, du bist aber im **Clips-Tab** (siehe Sidebar `03 Clips`). Der Clips-Tab hat seine eigene Render-Komponente (`ClipsTab.tsx`) und zeigt SceneCard gar nicht an. Mein Button war daher im Clips-Tab nie sichtbar.
 
 ## Plan
 
-### 1. Neuer Engine-Preset: "Cinematic Scene + Lip-Sync" (Artlist-Modus)
+### 1. Den Button in die rechte Action-Spalte des Clips-Tabs verlegen
 
-In `src/lib/video-composer/sceneEngineRouter.ts`:
-- Neuen Override-Wert `cinematic-sync` hinzufügen (zusätzlich zu `heygen` / `broll` / `sync-polish`).
-- `cinematic-sync` ist semantisch identisch zu `sync-polish`, aber UI-seitig als **empfohlener Default** für Szenen mit `hasDialog && hasCast` markiert (statt HeyGen).
-- Auto-Routing-Reihenfolge anpassen:
-  - Wenn `hasDialog && hasCast && scene hat einen B-Roll-Prompt / Visual-Style` → **`cinematic-sync`** (Artlist-Pfad).
-  - Wenn `hasDialog && hasCast && kein Visual-Prompt` → HeyGen (Fallback, wie heute).
-  - Multi-Speaker (≥2) bleibt zwingend HeyGen Shot-Reverse-Shot.
+In `src/components/video-composer/ClipsTab.tsx` direkt nach dem `Neu generieren`-Button (Zeile 968–985) einen neuen prominenten Button einfügen:
 
-### 2. Szenen-Render-Pipeline für `cinematic-sync` schärfen
+```text
+┌─────────────────────────────────────┐
+│ ↻ Neu generieren €0.30              │  ← bestehend
+│ 🎬 In echte Szene einbauen €0.95   │  ← NEU (grün, emerald-Akzent)
+│ 💾 In Mediathek                     │  ← bestehend
+│ 🔗 Continuity ✓                     │  ← bestehend
+└─────────────────────────────────────┘
+```
 
-In `compose-scene-anchor` + `animate-scene-hailuo` (bereits vorhanden):
-- Sicherstellen, dass für `cinematic-sync`-Szenen der **Scene-Aware Character Anchor** (Nano Banana 2) zwingend verwendet wird — Charakter wird in die Szene komponiert statt nur als Porträt-First-Frame zu dienen.
-- Voreinstellung: Hailuo 2.3 (10 s, realistic motion) + `face-lock` an + Shot-Director-Defaults aus dem Style-Preset.
-- B-Roll-Prompt ist Pflicht; falls leer, wird er aus Hook/Problem/Lösung-Beat + Brand-Tonality automatisch befüllt (LLM-Pre-Fill, eigener kleiner Helper `prefillCinematicPrompt`).
+Sichtbarkeitsregel:
+- `scene.clipStatus === 'ready'`
+- `engineRec.engine === 'heygen-talking-head'` (nur auf HeyGen-Szenen — bei B-Roll macht Cinematic-Sync keinen Sinn)
+- Single-Speaker (Multi-Speaker bleibt bei HeyGen Shot-Reverse-Shot)
 
-### 3. One-Click-Wechsel im UI auf bestehenden HeyGen-Szenen
+Klick-Verhalten:
+1. `onUpdateScenes` mit `engineOverride: 'cinematic-sync'` und `clipSource: 'ai-hailuo'` (falls noch HeyGen-only gesetzt) für die Szene.
+2. Direkt danach `handleGenerateSingle(scene)` triggern → re-rendert via Hailuo i2v + auto-Lip-Sync (Pipeline ist schon implementiert).
+3. Toast: "Wechsel zu Cinematic-Sync — Hailuo rendert die Szene neu, Lip-Sync läuft danach automatisch (~2 Min)."
 
-In `src/components/video-composer/SceneCard.tsx`:
-- Auf Szenen mit Engine-Badge `HeyGen Lip-Sync` einen sekundären Button **"🎬 In echte Szene einbauen (Artlist-Style)"** zeigen.
-- Klick:
-  - Setzt `engineOverride = 'cinematic-sync'`.
-  - Push in `useComposerHistory` (rückgängig machbar).
-  - Triggert sofort Re-Render via bestehender Clips-Pipeline (Anchor → Hailuo → Sync.so).
-- Kosten-Hinweis im Button: `~€0.95 (€0.75 B-Roll + €0.20 Lip-Sync)` statt aktuell €0.30 (HeyGen).
+### 2. Bestätigungs-Dialog vor dem Re-Roll
 
-### 4. Sync.so-Polish-Pass robuster machen
+Da der bestehende Clip dabei verworfen wird, vor dem Trigger einen kleinen `AlertDialog` zeigen (Pattern: `setRerollTarget` existiert schon Zeile 976). Inhalte:
+- Vorher/Nachher-Erklärung in einem Satz
+- Kostendelta sichtbar (`+€0.65 vs. aktueller HeyGen-Render`)
+- Buttons: "Abbrechen" / "🎬 Cinematic-Sync starten €0.95"
 
-In `compose-lipsync-scene/index.ts`:
-- Aktuell: läuft nur, wenn User manuell `lip_sync_with_voiceover` togglet.
-- Neu: Bei `engine === 'cinematic-sync'` automatisch nach erfolgreichem Hailuo-Render anhängen (Auto-Trigger im `ClipsTab`-Polling, Pattern existiert schon Zeile 343–354).
-- Zusätzlich `sync_mode` von `loop` auf `cut_off` umstellen, wenn VO länger als Video ist (verhindert Audio-Loop-Artefakte).
-- Refund-Pfad bleibt idempotent (deterministische UUID aus scene_id, siehe Memory).
+### 3. Inline-Pill in SceneCard.tsx aufräumen
 
-### 5. UI-Klarheit
+Die kleine inline-Variante in `SceneCard.tsx` (Zeile 566–579) entfernen — sie wird durch den prominenten Action-Button im Clips-Tab ersetzt. Der Engine-Override-Select bleibt, aber als reiner Dropdown ohne Doppel-Button. Das hält das Storyboard-Layout aufgeräumt.
 
-- Engine-Badge erweitern: statt `HeyGen Lip-Sync (manuell)` zeigt jede Szene jetzt eine der drei klaren Optionen mit Icons + Tooltip:
-  - 🎬 **Cinematic + Lip-Sync** (Artlist-Style, empfohlen)
-  - 🎙️ **Talking-Head** (HeyGen, schnell aber Avatar-Look)
-  - 📺 **B-Roll** (Off-Screen-Voiceover)
-- In Szene-Card kleine Vorher-/Nachher-Vorschau-Hint: "So sieht es derzeit aus → so wird es danach aussehen" (nutzt `lip_sync_source_clip_url` als Vorher).
+### 4. Hint-Banner über der ersten HeyGen-Szene
 
-## Was sich für dich konkret ändert
+Wenn ≥1 Szene auf HeyGen läuft, einmal pro Projekt einen dezenten Hinweis im Clips-Tab oben anzeigen (dismissible per `localStorage`):
 
-- Szene 1 & 2: 1 Klick auf "In echte Szene einbauen" → System nimmt deinen Hook-Beat + den Brand-Charakter Matthew/Sarah, rendert die Szene mit Hailuo (Setting, Kamera, Licht), legt Sync.so über → Endergebnis: Person steht/agiert in der gewünschten Umgebung und spricht mit korrekt synchronisierten Lippen.
-- Szene 3 & 4 (B-Roll ohne Dialog): bleiben wie sie sind — kein Lip-Sync nötig.
-- Credit-Refund läuft automatisch, wenn Sync.so failt (HeyGen-Top-Up-Story von vorhin nicht mehr nötig für diesen Pfad, weil wir auf Replicate laufen).
+> 💡 **Tipp:** Deine HeyGen-Szenen zeigen den Avatar vor neutralem Hintergrund. Klicke auf einer fertigen HeyGen-Szene auf **🎬 In echte Szene einbauen**, um die Person stattdessen in deine Wunsch-Szene mit Hailuo zu rendern (Artlist-Style). +€0.65/Szene.
 
-## Technische Details (zum Drüberlesen)
+So findet jeder User die Funktion — auch ohne dass ich sie im Chat erkläre.
 
-- Engine-Routing: `sceneEngineRouter.ts` — neuer Type-Member, neue Auto-Branch.
-- Auto-Trigger für Sync.so-Polish: bestehender Polling-Loop in `ClipsTab.tsx` (Zeile 231–355), nur Bedingung erweitern: `engine === 'cinematic-sync' && clip_status === 'ready' && !lip_sync_applied_at`.
-- Kosten-Karte (`useAIVideoWallet`) bekommt `cinematic-sync` als kombinierten Preis (Hailuo 10s 768p ≈ €0.75 + Sync €0.20 = €0.95).
-- Keine DB-Migration nötig (alle Felder existieren: `engine_override`, `lip_sync_*`, `clip_url`, `lip_sync_source_clip_url`).
-- HeyGen bleibt verfügbar als Fallback, falls Hailuo das Anchor-Bild nicht überzeugend animiert (man kann jederzeit zurückwechseln, Engine-Wechsel ist nicht-destruktiv).
+## Was sich für dich ändert
+
+- Auf Szene 1 & 2 erscheint rechts unter "Neu generieren" ein neuer grüner Button **🎬 In echte Szene einbauen €0.95**.
+- Ein Klick zeigt einen Confirm-Dialog, wechselt die Engine auf `cinematic-sync` und rendert die Szene neu — diesmal mit Hailuo i2v (Charakter in echter Storyboard-Szene) + automatischem Sync.so-Lip-Sync.
+- Pipeline-Logik (Auto-Trigger, Cut-off-Sync-Mode, Refund) ist bereits aus dem letzten Schritt deployed — es fehlt nur die sichtbare UI-Stelle.
+
+## Technische Details
+
+- Datei: `src/components/video-composer/ClipsTab.tsx` — neuer Button-Block zwischen Zeile 985 und 987.
+- Datei: `src/components/video-composer/SceneCard.tsx` — Inline-Pill (Zeilen 566–579) entfernen.
+- Neuer State: `cinematicSwitchTarget` analog zu `rerollTarget` für den Confirm-Dialog.
+- Icon: `Clapperboard` aus lucide-react (passt thematisch).
+- Keine DB-Migration, keine Edge-Function-Änderung — alle Backend-Teile sind schon live.
