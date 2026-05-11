@@ -776,7 +776,9 @@ export default function ComposerSequencePreview({
     // Scenes that already have a Sync.so lip-synced clip embed the VO inside
     // the video — playing the separate VO track too would double the audio.
     const lipSyncedSceneIds = new Set(
-      playable.filter(s => !!s.lipSyncAppliedAt).map(s => s.id),
+      playable
+        .filter(s => !!s.lipSyncAppliedAt && s.audioPlan?.twoshot?.useExternalAudio !== true)
+        .map(s => s.id),
     );
     playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
 
