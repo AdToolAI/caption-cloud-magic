@@ -200,7 +200,7 @@ function FrameThumb({ preset }: { preset: CinematicStylePreset }) {
   );
 }
 
-function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick }: PresetCardProps) {
+function PresetCard({ preset, lang, isActive, compact, layout = 'rail', thumbMode = 'identity', onClick }: PresetCardProps) {
   const isGrid = layout === 'grid';
   return (
     <motion.button
@@ -224,7 +224,7 @@ function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick 
         </div>
       )}
       {/* Real AI thumbnail (Nano Banana 2) with procedural fallback */}
-      <PresetThumbVisual preset={preset} />
+      <PresetThumbVisual preset={preset} thumbMode={thumbMode} />
       {/* Caption */}
       <div className="mt-1.5 px-0.5">
         <div className={cn(
@@ -243,8 +243,10 @@ function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick 
   );
 }
 
-function PresetThumbVisual({ preset }: { preset: CinematicStylePreset }) {
-  const thumb = getCinematicPresetThumbnail(preset.id);
+function PresetThumbVisual({ preset, thumbMode = 'identity' }: { preset: CinematicStylePreset; thumbMode?: 'identity' | 'comparable' }) {
+  // Comparable mode: same locked base scene re-styled, with identity fallback.
+  const compareThumb = thumbMode === 'comparable' ? getCinematicPresetCompareThumbnail(preset.id) : undefined;
+  const thumb = compareThumb ?? getCinematicPresetThumbnail(preset.id);
   if (thumb) {
     return (
       <div className="relative w-full overflow-hidden rounded-md border border-border/40" style={{ aspectRatio: '16 / 9' }}>
