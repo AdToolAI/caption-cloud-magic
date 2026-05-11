@@ -11,6 +11,8 @@ import {
   type ShotOption,
 } from '@/config/shotDirector';
 import { buildShotPromptSuffix, getSelectionCount } from '@/lib/shotDirector/buildShotPromptSuffix';
+import { PresetGrid } from '@/components/studio-visual/PresetGrid';
+import { getPresetThumbnail } from '@/config/studioPresetThumbnails';
 
 type Lang = 'en' | 'de' | 'es';
 
@@ -73,62 +75,60 @@ export default function SceneShotDirectorPanel({ value, onChange, language, layo
           const meta = CATEGORY_META[cat];
           const Icon = meta.icon;
           const selected = findOption(cat, value[cat]);
+          const selectedThumb = getPresetThumbnail(cat, value[cat]);
           return (
             <Popover key={cat}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`h-auto min-w-0 w-full py-1.5 px-2 flex flex-col items-start gap-0.5 text-left whitespace-normal overflow-hidden ${
-                    selected ? 'border-primary/60 bg-primary/10' : ''
+                  className={`h-auto min-w-0 w-full p-0 flex flex-col items-stretch text-left whitespace-normal overflow-hidden ${
+                    selected ? 'border-primary/60' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-1 w-full min-w-0">
-                    <Icon className={`h-3 w-3 shrink-0 ${selected ? 'text-primary' : 'text-muted-foreground'}`} />
-                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground truncate">
-                      {meta.title[lang]}
+                  <div className="relative aspect-square w-full bg-muted/30 overflow-hidden">
+                    {selectedThumb ? (
+                      <img
+                        src={selectedThumb}
+                        alt={selected?.label[lang] ?? ''}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Icon className="h-5 w-5 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                    <div className="absolute top-1 left-1 flex items-center gap-1 px-1 py-0.5 rounded bg-black/60 backdrop-blur-sm">
+                      <Icon className={`h-2 w-2 ${selected ? 'text-primary' : 'text-white/70'}`} />
+                      <span className="text-[8px] uppercase tracking-wider text-white/90">
+                        {meta.title[lang]}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="px-1.5 py-1">
+                    <span className={`block text-[10px] leading-tight w-full truncate ${selected ? 'text-primary font-medium' : 'text-foreground/60'}`}>
+                      {selected ? selected.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
                     </span>
                   </div>
-                  <span className={`text-[10px] leading-tight w-full truncate ${selected ? 'text-primary font-medium' : 'text-foreground/60'}`}>
-                    {selected ? selected.label[lang] : lang === 'de' ? 'Wählen…' : lang === 'es' ? 'Elegir…' : 'Choose…'}
-                  </span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-64 p-1.5" align="start">
-                <div className="max-h-64 overflow-y-auto space-y-0.5">
-                  {selected && (
-                    <button
-                      type="button"
-                      onClick={() => setCategory(cat, null)}
-                      className="w-full text-left px-2 py-1.5 rounded hover:bg-destructive/10 text-destructive text-[11px] flex items-center gap-1.5"
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      {lang === 'de' ? 'Entfernen' : lang === 'es' ? 'Quitar' : 'Clear'}
-                    </button>
-                  )}
-                  {SHOT_CATEGORIES[cat].map((opt: ShotOption) => {
-                    const isActive = value[cat] === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setCategory(cat, opt.id)}
-                        className={`w-full text-left px-2 py-1.5 rounded transition-colors flex items-start gap-2 ${
-                          isActive ? 'bg-primary/15' : 'hover:bg-accent/40'
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-[11px] font-medium ${isActive ? 'text-primary' : 'text-foreground'}`}>
-                            {opt.label[lang]}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground leading-snug line-clamp-2">
-                            {opt.description[lang]}
-                          </div>
-                        </div>
-                        {isActive && <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />}
-                      </button>
-                    );
-                  })}
+              <PopoverContent className="w-[380px] p-2.5" align="start">
+                <div className="mb-2 flex items-center gap-1.5">
+                  <Icon className="h-3 w-3 text-primary" />
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                    {meta.title[lang]}
+                  </span>
+                </div>
+                <div className="max-h-[420px] overflow-y-auto pr-1">
+                  <PresetGrid
+                    category={cat}
+                    options={SHOT_CATEGORIES[cat]}
+                    selectedId={value[cat]}
+                    onSelect={(id) => setCategory(cat, id)}
+                    lang={lang}
+                  />
                 </div>
               </PopoverContent>
             </Popover>
