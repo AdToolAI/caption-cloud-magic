@@ -1,108 +1,76 @@
-# Plan — Visual Picker System: Vollendung in 5 Stages
+# Stage 13 — Picker-System Final Audit & Polish
 
-Sequenzielle Implementierung der offenen Punkte nach Stage 8. Jede Stage ist in sich abgeschlossen und kann separat approved werden.
+**Ziel:** Sicherstellen, dass *alle* visuellen Picker im Projekt entweder dem **Comparable-Thumbnail**-Pattern (locked Base-Scene + Effekt) oder dem **Animated-Tile**-Pattern (locked Base-Scene + CSS-Loop, gated by `data-play`) folgen. Anschließend die beiden Memory-Regeln auf "applied universally" setzen.
 
----
-
-## Stage 9 — Memory-Flip & Dokumentation
-
-**Ziel:** Den dokumentarischen Stand mit dem Code synchronisieren.
-
-- `mem://design/studio-presets/comparable-thumbnail-rule.md` Status aktualisieren: "rule defined, predates" → "rule defined and applied to all 49 Shot Director tiles (6 axes, locked base scenes in `_bases/`)"
-- `mem://index.md` Eintrag entsprechend nachziehen
-- Kurzer Verweis auf `_bases/{axis}.jpg` als Referenz-Quelle für künftige Re-Edits
-
-**Aufwand:** Trivial (nur Memory-Writes).
+Damit ist die Picker-Architektur projektweit konsistent und das Stage-9–13 Vorhaben abgeschlossen.
 
 ---
 
-## Stage 10 — Visual QA Sweep der 49 Tiles
+## Vor-Audit (was bereits konform ist)
 
-**Ziel:** Identitäts-/Wardrobe-/Location-Drift erkennen und gezielt re-editieren.
+Schnell-Check hat ergeben:
 
-1. Browser-Screenshot der Shot-Director-Picker im Toolkit aufnehmen (alle 6 Achsen-Grids).
-2. Per Sicht-Audit Drift-Kandidaten markieren (typische Risiken: lighting-axis verliert das Trenchcoat-Outfit; lens-axis driftet in Gesicht).
-3. Pro driftende Kachel: einzelner `imagegen.edit_image`-Re-Run vom passenden `_bases/{axis}.jpg` mit verschärftem Identity-Lock.
-4. Erwartete Größenordnung: 5–10 Re-Edits.
+- **Director's Cut Filter Library** (20 Filter, `LookPanel.tsx` → `FILTER_CATEGORIES`) → nutzt bereits `LookPresetTile` mit gemeinsamer `_bases`-Master-Scene + Live-CSS-Filter. ✅
+- **Color Grading** (10 Grades, `LookPanel.tsx` → `COLOR_GRADES`) → nutzt ebenfalls `LookPresetTile` mit live CSS. ✅
+- **Transitions Picker** (`TransitionPreviewTile.tsx`) → animiert via `data-play` (hover + active). ✅
+- **Scene Animations** (`SceneAnimationPreviewTile.tsx`) → animiert via `data-play`. ✅
+- **Movement Tiles** (`MovementPreviewTile.tsx`) → animiert via `data-play`. ✅
+- **Cinematic Style Presets** → Stage 12 erledigt (Identity/Comparable Toggle).
 
-**Out of scope:** Keine Code-Änderungen, keine neuen Base-Scenes.
-
-**Aufwand:** Klein bis mittel (abhängig von Drift-Anzahl).
-
----
-
-## Stage 11 — Library-Hubs visualisieren (Pose / Wardrobe / Vibe / Prop)
-
-**Ziel:** Die 4 bereits existierenden Variant-Tabellen (siehe Memory `pose-sheets-and-vibe-variants`) bekommen ein Comparable-Picker-UI nach demselben Muster wie Shot Director.
-
-**Achsen:**
-| Hub | Source | Variants |
-|---|---|---|
-| Avatar Pose | `avatar_pose_variants` | 4 pro Avatar |
-| Avatar Wardrobe | `avatar_wardrobe_variants` | 4 Outfits |
-| Location Vibe | `location_vibe_variants` | 5 Stimmungen |
-| Location Prop | `location_prop_variants` | 4 Dressings |
-
-**Arbeit:**
-1. Neuer wiederverwendbarer `<VariantPickerGrid axis="pose|wardrobe|vibe|prop" entityId={…} />` analog zu `PresetGrid`, mit gleichem Comparable-Locking-Visual (eine Base-Composition pro Avatar/Location, nur die Achsen-Variable variiert).
-2. Mounten in `/avatars` Detail-Drawer und `/brand-locations` Detail-Drawer.
-3. Hover-/Active-State + selected-ring im Bond-2028-Stil.
-4. Keine neuen Edge-Functions — die Variants werden bereits beim Anlegen generiert.
-
-**Out of scope:** Keine neuen Variant-Generations-Pipelines, kein Marketplace-Hook.
-
-**Aufwand:** Mittel (1 neue Komponente + 2 Mount-Punkte).
+D.h. der Audit dürfte überwiegend bestätigend sein. Trotzdem brauchts einen sauberen Pass, weil verstreute Stellen (DC-Steps, Studio-Visual-Library, ältere Selector-Komponenten, Visual-Effects-Step) Verdachtsfälle bleiben.
 
 ---
 
-## Stage 12 — Cinematic Style Presets (12) vereinheitlichen
+## Audit-Pass (read-only)
 
-**Ziel:** Die 12 One-Click Director-Looks bekommen optional ein **zweites Vergleichs-Tile** mit einer gemeinsamen Base-Scene, sodass Nutzer beide Modi sehen können:
-- **Identity-Tile** (Status quo) — der charakteristische Look-Look (Noir, Cyberpunk, …) in jeweils eigener passender Szene.
-- **Comparable-Tile** (neu) — dieselbe Trenchcoat/Tokyo-Base-Scene mit dem Style-Preset angewendet.
+Pro Picker eine kurze Sicht- und Code-Prüfung. Output ist eine Findings-Tabelle:
 
-**Arbeit:**
-1. Neue Base-Scene `src/assets/studio-presets/_bases/style.jpg` (neutralerer Look damit Presets sichtbar sind).
-2. 12 `imagegen.edit_image`-Calls, je Preset → `src/assets/studio-presets/style/{id}--compare.jpg`.
-3. `CinematicStylePresetCard` bekommt einen Toggle "Identity / Comparable" oder zeigt beide nebeneinander.
-4. Memory `cinematic-style-presets` ergänzen.
+| Picker | Datei | Pattern | Status |
+|---|---|---|---|
+| DC Filter Library (20) | `LookPanel.tsx` | Comparable | ✅ erwartet |
+| DC Color Grading (10) | `LookPanel.tsx` | Comparable | ✅ erwartet |
+| DC Transition Picker | `directors-cut/ui/TransitionPicker.tsx` | Animated | prüfen |
+| DC Scene Animations | wo immer eingebunden | Animated | prüfen |
+| DC Ken-Burns | `KenBurnsImage.tsx` + Picker | Animated | prüfen |
+| Style-Look Step | `steps/StyleLookStep.tsx` | offen | prüfen |
+| Visual-Effects Step | `steps/VisualEffectsStep.tsx` | offen | prüfen |
+| Special-Effects Step | `steps/SpecialEffectsStep.tsx` | offen | prüfen |
+| AI-Style-Transfer | `features/AIStyleTransfer.tsx` | offen | prüfen |
+| Composer Visual Styles | `composerVisualStyles.ts` Picker | offen | prüfen |
+| Video TransitionSelector | `components/video/TransitionSelector.tsx` | Animated | prüfen |
 
-**Out of scope:** Keine Änderung an den Preset-Definitionen oder am Auto-Inject-Verhalten.
-
-**Aufwand:** Klein bis mittel (1 Base + 12 Edits + UI-Toggle).
-
----
-
-## Stage 13 — Filter / Color-Grading / Transitions / Scene-Anim Audit
-
-**Ziel:** Sicherstellen, dass alle anderen Studio-Picker entweder dem **Comparable-Thumbnail**- oder dem **Animated-Tile**-Pattern folgen.
-
-**Audit-Scope (laut Memory):**
-- Director's Cut Filter Library (20 Filter + 10 Color-Gradings)
-- Transitions Picker (`TransitionPreviewTile`)
-- Scene-Animations (`SceneAnimationPreviewTile`)
-- Ken-Burns Effect Picker
-
-**Arbeit:**
-1. **Audit-Pass** (read-only): Pro Picker prüfen: nutzt er bereits eine locked Base-Scene? Loopt Animation via `data-play`?
-2. **Findings-Liste** mit pro-Picker-Status: ✅ konform / ⚠️ teilweise / ❌ inkonsistent.
-3. **Fix-Pass** für non-konforme Picker:
-   - Filter/Color-Grading (30 Tiles): Falls Tiles aktuell unterschiedliche Source-Bilder nutzen → Backfill von einer Base-Scene `_bases/filter.jpg` mit 30 Edits.
-   - Transitions/Scene-Anim: Falls `data-play` nicht überall durchgezogen → angleichen.
-4. Memory `comparable-thumbnail-rule.md` & `animated-tile-rule.md` final auf "applied universally" setzen.
-
-**Out of scope:** Kein Re-Design der Picker selbst, keine neuen Filter.
-
-**Aufwand:** Mittel (Audit klein, Fix-Pass abhängig von Findings, ggf. 30 Image-Edits).
+Nichts wird in dieser Phase verändert.
 
 ---
 
-## Reihenfolge & Risiko
+## Fix-Pass (nur für Findings ≠ ✅)
 
-1. Stage 9 (Memory) — sofort, blockiert nichts.
-2. Stage 10 (QA) — vor allen Folge-Stages, damit Stage 8 als wirklich abgeschlossen gilt.
-3. Stage 11 (Library-Hubs) — größter Nutzergewinn, eigenständig.
-4. Stage 12 (Cinematic Presets) — kosmetisch, kann jederzeit.
-5. Stage 13 (Filter-Audit) — Abschluss, vereinheitlicht das gesamte Picker-System.
+Pro Non-Konform-Picker eine der folgenden minimal-invasiven Maßnahmen — keine Re-Designs, kein Verhaltenswechsel:
 
-Jede Stage einzeln approval-bar — bitte nach Approval Stage 9 starten.
+1. **Picker zeigt nur Emoji/Text statt Visual** → Wrapper-Tausch auf `LookPresetTile` (für CSS-Filter-artige Effekte) oder ein Animated-Tile-Pendant. Kein neues Asset nötig wenn live-CSS reicht.
+2. **Picker nutzt unterschiedliche Source-Bilder pro Tile** → Quelle vereinheitlichen auf bestehende Base-Scene (`_bases/framing.jpg` als Master).
+3. **Animated-Tile loopt immer (statt nur bei hover/active)** → `data-play` Gating nachziehen wie in `MovementPreviewTile` / `TransitionPreviewTile`.
+4. **Transition/Anim-Tiles ohne CSS-Keyframes** → existierende Klassen aus `motionTiles.css` einsetzen.
+
+Out of scope: neue Filter, neue Animationen, neue Base-Scenes (außer `_bases/filter.jpg` falls ein Filter-Picker tatsächlich nicht auf Master-Scene gemappt ist).
+
+---
+
+## Memory-Updates (nach Fix-Pass)
+
+- `mem://design/studio-presets/comparable-thumbnail-rule.md` → finaler Status: *"applied universally to Shot Director (49), Cinematic Style Presets compare-mode (12), DC Filter Library (20), DC Color Grading (10) — same locked base scene per family."*
+- `mem://design/studio-presets/animated-tile-rule` → finaler Status: *"applied universally — all Transition/SceneAnim/Movement/Ken-Burns pickers loop via `data-play` (hover + active) on a locked base scene."*
+- `mem://index.md` → die zwei Einträge auf den neuen Stand aktualisieren.
+
+---
+
+## Reihenfolge & geschätzter Aufwand
+
+1. Audit-Pass (read-only) — ~5 Tool-Calls, ~5 min.
+2. Findings-Report posten (kurz, tabellarisch).
+3. Fix-Pass nur falls Findings ≠ leer — Aufwand klein bis mittel.
+4. Memory-Updates — trivial.
+
+**Gesamt:** klein bis mittel, je nach Findings. Falls alles ✅, ist Stage 13 nur Audit + Memory-Flip.
+
+Nach Stage 13 ist der ursprüngliche 5-Stage-Plan vollständig abgeschlossen.

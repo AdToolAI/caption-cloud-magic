@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter } from '@/remotion/components/SVGFilters';
+import filterBaseScene from '@/assets/studio-presets/framing/establishing.jpg';
 
 // Helper to get filter CSS - uses SVG for creative filters, CSS for basic filters
 const getFilterPreviewCSS = (filterId: string): string => {
@@ -158,12 +159,16 @@ export function AIStyleTransfer({
             )}
             title={description}
           >
-            {/* Filter Preview Background */}
-            <div 
-              className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
+            {/* Filter Preview — locked base scene (Comparable Thumbnail Rule) */}
+            <img
+              src={filterBaseScene}
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-cover"
               style={{ filter: filter.preview || 'none' }}
             />
-            
+
             {/* Glassmorphism overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             
