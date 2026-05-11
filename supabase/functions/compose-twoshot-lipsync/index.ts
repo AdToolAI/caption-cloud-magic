@@ -398,21 +398,31 @@ serve(async (req) => {
         .eq("id", scene_id);
       if (updErr) {
         await refund(`db_update_failed: ${updErr.message}`);
-        return json({ error: updErr.message }, 500);
+        return;
       }
+      console.log(
+        `[compose-twoshot-lipsync ${scene_id}] ✅ done — clip=${publicUrl} drift=${driftScore}`,
+      );
+    };
 
-      return json({
-        success: true,
-        scene_id,
-        clip_url: publicUrl,
-        credits_used: COST,
-        continuity_drift_score: driftScore,
-        continuity_drift_notes: driftNotes,
-      });
-    } catch (e) {
-      await refund(`replicate_error: ${(e as Error).message}`);
-      return json({ error: (e as Error).message }, 502);
-    }
+    // Fire-and-forget: keep worker alive but return 202 to client now.
+    // Any throw inside runPipeline triggers a refund + status='failed'.
+    EdgeRuntime.waitUntil(
+      (async () => {
+        try {
+          await runPipeline();
+        } catch (e) {
+          await refund(`pipeline_exception: ${(e as Error).message}`);
+        }
+      })(),
+    );
+
+    return json({
+      accepted: true,
+      scene_id,
+      status: "running",
+      credits_reserved: COST,
+    }, 202);
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }
