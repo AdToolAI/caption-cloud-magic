@@ -18,6 +18,7 @@ import {
   Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 export interface KenBurnsKeyframe {
   id: string;
