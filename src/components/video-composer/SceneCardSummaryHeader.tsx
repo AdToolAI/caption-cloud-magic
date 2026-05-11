@@ -157,15 +157,17 @@ export default function SceneCardSummaryHeader({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-3 py-2 cursor-pointer select-none transition-colors',
-        'hover:bg-primary/5 rounded-lg',
-        isExpanded && 'border-b border-border/30 rounded-b-none mb-2',
+        'flex items-center gap-2 px-3 py-2 select-none transition-colors',
+        onToggleExpand && 'cursor-pointer hover:bg-primary/5 rounded-lg',
+        isExpanded && onToggleExpand && 'border-b border-border/30 rounded-b-none mb-2',
+        isExpanded && !onToggleExpand && 'border-b border-border/30 mb-2',
       )}
       onClick={onToggleExpand}
-      role="button"
-      aria-expanded={isExpanded}
-      tabIndex={0}
+      role={onToggleExpand ? 'button' : undefined}
+      aria-expanded={onToggleExpand ? isExpanded : undefined}
+      tabIndex={onToggleExpand ? 0 : undefined}
       onKeyDown={(e) => {
+        if (!onToggleExpand) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onToggleExpand();
