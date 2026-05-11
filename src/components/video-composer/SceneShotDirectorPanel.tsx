@@ -11,6 +11,8 @@ import {
   type ShotOption,
 } from '@/config/shotDirector';
 import { buildShotPromptSuffix, getSelectionCount } from '@/lib/shotDirector/buildShotPromptSuffix';
+import { PresetGrid } from '@/components/studio-visual/PresetGrid';
+import { getPresetThumbnail } from '@/config/studioPresetThumbnails';
 
 type Lang = 'en' | 'de' | 'es';
 
