@@ -196,7 +196,7 @@ export default function SceneStyleSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[88vh] p-0 gap-0 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[92vh] max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col">
         {/* Header */}
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/40">
           <DialogTitle className="flex items-center gap-2 text-base">

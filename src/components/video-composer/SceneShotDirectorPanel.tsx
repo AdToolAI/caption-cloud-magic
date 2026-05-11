@@ -180,7 +180,7 @@ function MasterDetail({ value, onChange, lang, count, setCategory }: MasterDetai
 
       <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] divide-y md:divide-y-0 md:divide-x divide-border/40">
         {/* Master: 6 axes */}
-        <div className="p-1.5 space-y-0.5 max-h-[400px] overflow-y-auto">
+        <div className="p-1.5 space-y-0.5">
           {cats.map((cat) => {
             const meta = CATEGORY_META[cat];
             const Icon = meta.icon;
@@ -211,7 +211,7 @@ function MasterDetail({ value, onChange, lang, count, setCategory }: MasterDetai
         </div>
 
         {/* Detail: options for active axis */}
-        <div className="p-2 max-h-[400px] overflow-y-auto">
+        <div className="p-2">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-1.5 text-[11px] font-medium">
               <ActiveIcon className="h-3 w-3 text-primary" />
