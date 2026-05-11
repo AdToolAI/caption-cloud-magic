@@ -397,9 +397,9 @@ serve(async (req) => {
       start_offset: 0,
       metadata: {
         source: "compose-twoshot-audio",
+        format: "mp3",
+        bitrate: MP3_BITRATE,
         speakers: segments,
-        sample_rate: SAMPLE_RATE,
-        gap_sec: INTER_SPEAKER_GAP_SEC,
       },
     });
     if (insertRes.error) {
