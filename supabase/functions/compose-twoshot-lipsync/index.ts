@@ -246,7 +246,7 @@ serve(async (req) => {
           }
           if (!stepUrl) {
             await refund(`pass_${p + 1}_no_output`);
-            return json({ error: `lipsync pass ${p + 1} produced no output` }, 502);
+            return;
           }
           currentVideo = stepUrl;
           outUrl = stepUrl;
