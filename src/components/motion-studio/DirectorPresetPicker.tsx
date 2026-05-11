@@ -90,33 +90,46 @@ export default function DirectorPresetPicker({
             const key = cat === 'film-stock' ? 'filmStock' : cat;
             const activeId = modifiers[key as keyof DirectorModifiers];
             return (
-              <TabsContent key={cat} value={cat} className="mt-3 max-h-[360px] overflow-y-auto">
-                <div className="grid sm:grid-cols-2 gap-1.5">
+              <TabsContent key={cat} value={cat} className="mt-3 overflow-visible">
+                <div className="grid grid-cols-2 gap-2">
                   {PRESETS_BY_CATEGORY[cat].map((preset) => {
                     const isActive = activeId === preset.id;
+                    const thumb = getModifierThumbnail(cat, preset.id);
                     return (
                       <button
                         key={preset.id}
                         type="button"
+                        title={preset.description}
                         onClick={() => togglePreset(cat, preset.id)}
-                        className={`flex items-start gap-2 rounded-md border p-2 text-left transition-colors ${
+                        className={`group relative aspect-square overflow-hidden rounded-lg border-2 transition-all ${
                           isActive
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:border-primary/40 hover:bg-muted/50'
+                            ? 'border-primary ring-2 ring-primary/40 shadow-[0_0_20px_-4px_hsl(var(--primary)/0.5)]'
+                            : 'border-border/40 hover:border-primary/60'
                         }`}
                       >
-                        <span className="text-base leading-none mt-0.5">{preset.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-medium">{preset.label}</div>
-                          <div className="text-[10px] text-muted-foreground line-clamp-2">
-                            {preset.description}
+                        {thumb ? (
+                          <img
+                            src={thumb}
+                            alt={preset.label}
+                            loading="lazy"
+                            width={512}
+                            height={512}
+                            className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center bg-muted/40 text-[10px] text-muted-foreground">
+                            {preset.label}
                           </div>
-                        </div>
-                        {isActive && (
-                          <Badge variant="default" className="h-4 px-1 text-[9px] shrink-0">
-                            Aktiv
-                          </Badge>
                         )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
+                        {isActive && (
+                          <div className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary shadow-lg">
+                            <Check className="h-3 w-3 text-primary-foreground" />
+                          </div>
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 p-2 text-left">
+                          <div className="text-[11px] font-medium leading-tight text-white">{preset.label}</div>
+                        </div>
                       </button>
                     );
                   })}
