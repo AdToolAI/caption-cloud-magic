@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon } from 'lucide-react';
@@ -13,23 +13,19 @@ import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-co
 import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { SortableSceneItem } from './SortableSceneItem';
 import { CastConsistencyMap } from './CastConsistencyMap';
+import StoryboardSceneStrip from './StoryboardSceneStrip';
+import StudioPane from './StudioPane';
+
+const SCENE_TYPE_LABEL_DE: Record<string, string> = {
+  hook: 'Hook',
+  problem: 'Problem',
+  solution: 'Lösung',
+  demo: 'Demo',
+  'social-proof': 'Social Proof',
+  cta: 'CTA',
+  custom: 'Custom',
+};
 
 interface StoryboardTabProps {
   scenes: ComposerScene[];
@@ -321,26 +317,34 @@ export default function StoryboardTab({
     onUpdateScenes(updated.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  // Storyboard v2 — selected scene drives the right-pane editor.
+  const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>(
+    scenes[0]?.id,
   );
+  // Keep selection valid when scenes change (delete / add / reorder via DB refetch).
+  useEffect(() => {
+    if (!scenes.length) {
+      if (selectedSceneId !== undefined) setSelectedSceneId(undefined);
+      return;
+    }
+    if (!selectedSceneId || !scenes.some((s) => s.id === selectedSceneId)) {
+      setSelectedSceneId(scenes[0].id);
+    }
+  }, [scenes, selectedSceneId]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = scenes.findIndex((s) => s.id === active.id);
-    const newIndex = scenes.findIndex((s) => s.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(scenes, oldIndex, newIndex);
-    onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
-  };
+  const selectedIndex = useMemo(
+    () => scenes.findIndex((s) => s.id === selectedSceneId),
+    [scenes, selectedSceneId],
+  );
+  const selectedScene = selectedIndex >= 0 ? scenes[selectedIndex] : undefined;
+  const previousSceneOfSelected =
+    selectedIndex > 0 ? scenes[selectedIndex - 1] : undefined;
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
   return (
-    <div className="space-y-4 max-w-4xl mx-auto min-w-0">
+    <div className="space-y-4 max-w-7xl mx-auto min-w-0">
       {/* Summary Bar */}
       <div className="flex items-center justify-between p-3 rounded-lg bg-card/60 border border-border/40">
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -451,7 +455,7 @@ export default function StoryboardTab({
           and the active continuity anchor (reference image / frame chain / prompt). */}
       <CastConsistencyMap scenes={scenes} characters={characters || []} />
 
-      {/* Scene Cards */}
+      {/* Scene Cards — v2 Layout: Cinematic Filmstrip (left) + persistent Studio editor (right) */}
       {scenes.length === 0 ? (
         <Card className="border-border/40 bg-card/50">
           <CardContent className="py-12 text-center">
@@ -462,63 +466,76 @@ export default function StoryboardTab({
           </CardContent>
         </Card>
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-            <div className="space-y-3">
-              {scenes.map((scene, index) => {
-                const hasOtherReadyScenes = scenes.some(
-                  (s) => s.id !== scene.id && s.clipStatus === 'ready' && !!s.clipUrl
-                );
-                const prev = index > 0 ? scenes[index - 1] : undefined;
-                return (
-                  <div key={scene.id}>
-                    {prev && (
-                      <SceneCutDriftIndicator
-                        prev={prev}
-                        next={scene}
-                        projectId={projectId}
-                        onUpdateNext={(updates) => updateScene(scene.id, updates)}
-                        language={dialogLang}
-                      />
-                    )}
-                    <SortableSceneItem id={scene.id}>
-                      <SceneCard
-                        scene={scene}
-                        index={index}
-                        totalScenes={scenes.length}
-                        projectId={projectId}
-                        characters={characters}
-                        preferredAspect={preferredAspect}
-                        onUpdate={(updates) => updateScene(scene.id, updates)}
-                        onDelete={() => deleteScene(scene.id)}
-                        onMoveUp={() => moveScene(index, index - 1)}
-                        onMoveDown={() => moveScene(index, index + 1)}
-                        onHybridExtend={
-                          projectId
-                            ? (mode) => openHybridDialog(scene, mode)
-                            : undefined
-                        }
-                        hasOtherReadyScenes={hasOtherReadyScenes}
-                        onAddScene={onAddScene}
-                        onInsertScenesAfter={onInsertScenesAfter}
-                        onAddCharacter={onAddCharacter}
-                        language={language}
-                        onEnsurePersisted={onEnsurePersisted}
-                        previousSceneLastFrameUrl={
-                          index > 0
-                            ? scenes[index - 1].lastFrameUrl ?? scenes[index - 1].clipUrl
-                            : undefined
-                        }
-                        previousSceneIndex={index > 0 ? index : undefined}
-                        frameFirstMode={frameFirstMode}
-                      />
-                    </SortableSceneItem>
-                  </div>
-                );
-              })}
-            </div>
-          </SortableContext>
-        </DndContext>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+          {/* Left: Cinematic filmstrip */}
+          <div className="lg:col-span-4 xl:col-span-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2 -mr-2">
+            <StoryboardSceneStrip
+              scenes={scenes}
+              selectedSceneId={selectedSceneId}
+              characters={characters}
+              onSelect={setSelectedSceneId}
+              onReorder={onUpdateScenes}
+              onAddScene={addScene}
+            />
+          </div>
+
+          {/* Right: persistent Studio editor for the selected scene */}
+          <div className="lg:col-span-8 xl:col-span-9 min-w-0">
+            {selectedScene && (
+              <StudioPane
+                sceneNumber={selectedIndex + 1}
+                totalScenes={scenes.length}
+                sceneTypeLabel={SCENE_TYPE_LABEL_DE[selectedScene.sceneType] ?? selectedScene.sceneType}
+              >
+                {previousSceneOfSelected && (
+                  <SceneCutDriftIndicator
+                    prev={previousSceneOfSelected}
+                    next={selectedScene}
+                    projectId={projectId}
+                    onUpdateNext={(updates) => updateScene(selectedScene.id, updates)}
+                    language={dialogLang}
+                  />
+                )}
+                <SceneCard
+                  // Re-mount on scene change so internal state (open dialogs, drafts) resets cleanly.
+                  key={selectedScene.id}
+                  scene={selectedScene}
+                  index={selectedIndex}
+                  totalScenes={scenes.length}
+                  projectId={projectId}
+                  characters={characters}
+                  preferredAspect={preferredAspect}
+                  onUpdate={(updates) => updateScene(selectedScene.id, updates)}
+                  onDelete={() => {
+                    deleteScene(selectedScene.id);
+                  }}
+                  onMoveUp={() => moveScene(selectedIndex, selectedIndex - 1)}
+                  onMoveDown={() => moveScene(selectedIndex, selectedIndex + 1)}
+                  onHybridExtend={
+                    projectId
+                      ? (mode) => openHybridDialog(selectedScene, mode)
+                      : undefined
+                  }
+                  hasOtherReadyScenes={scenes.some(
+                    (s) => s.id !== selectedScene.id && s.clipStatus === 'ready' && !!s.clipUrl,
+                  )}
+                  onAddScene={onAddScene}
+                  onInsertScenesAfter={onInsertScenesAfter}
+                  onAddCharacter={onAddCharacter}
+                  language={language}
+                  onEnsurePersisted={onEnsurePersisted}
+                  previousSceneLastFrameUrl={
+                    previousSceneOfSelected
+                      ? previousSceneOfSelected.lastFrameUrl ?? previousSceneOfSelected.clipUrl
+                      : undefined
+                  }
+                  previousSceneIndex={selectedIndex > 0 ? selectedIndex : undefined}
+                  frameFirstMode={frameFirstMode}
+                />
+              </StudioPane>
+            )}
+          </div>
+        </div>
       )}
 
       {/* Block M — Hybrid Extend dialog */}
