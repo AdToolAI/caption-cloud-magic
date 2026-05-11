@@ -1,51 +1,60 @@
-# Studio Presets — Comparable Thumbnail Regeneration (Premium/Nano Banana 2)
+# Stage 5 — Transitions & Scene Animations Studio
 
-## Goal
-Re-generate all 61 studio preset thumbnails (Lighting, Framing, Angles, Movement, Camera Bodies, Lenses, Cinematic Styles) so that **within one category, every variant shows the exact same base scene** — only the feature itself changes. The customer must instantly see *what the preset actually does*, not a different scene every time.
+Ziel: Alle Übergangs- und Szenen-Animations-Picker im Director's Cut & Composer von emoji-only Tiles auf **bewegte Mini-Loops auf der gleichen locked Base Scene** umstellen — analog zur Look Studio Logik aus Stage 4 (Artlist-Vergleich, der Kunde sieht *was der Effekt tut*, nicht ein anderes Icon).
 
-This becomes a **persistent rule** for all future preset/feature thumbnails across the editor (Shot Director, Cinematic Presets, future Pose Sheets, Wardrobe, Location Vibes, Filters, Color Grading, Transitions, Animations, etc.).
+## Prinzip (folgt der `comparable-thumbnail-rule`)
 
-## Base Scene Locking — One Scene per Category
+- **Eine** locked Base Scene (Tokyo-Master `framing/establishing.jpg`) als Scene A.
+- Eine zweite locked Scene (Tokyo-Master `framing/wide.jpg`) als Scene B für Transitions die zwei Clips brauchen.
+- Animation rein per **CSS Keyframes / transforms** — keine GIFs, keine MP4-Assets, kein Edge Call, kein Replicate, kein Asset-Pipeline. Tile loopt **on hover**, ruht still beim Verlassen → spart CPU.
+- Selected Tile loopt automatisch auch ohne Hover (User sieht aktive Wahl in Bewegung).
 
-Each axis gets ONE locked base scene description. Every variant in that axis re-uses it verbatim, only the axis-specific modifier changes.
+## Neue Komponenten
 
-| Category | Locked Base Scene | What Varies |
-|---|---|---|
-| **Framing** (8) | Woman in beige trench coat standing on a rainy Tokyo street at night, neon signs behind her | Shot size only (extreme close → extreme wide) |
-| **Angles** (8) | Same Tokyo street woman, identical pose & wardrobe | Camera angle only (eye-level, low, high, dutch, POV, OTS, bird's-eye, worm's-eye) |
-| **Movement** (10) | Same Tokyo street woman walking forward | Camera movement implied via motion blur direction + framing hint (push-in, pull-out, dolly L/R, orbit L/R, crane up/down, handheld shake, static) |
-| **Lighting** (10) | Portrait of the same woman, identical pose, plain background | Lighting setup only (golden hour, blue hour, soft studio, hard noir, neon cyberpunk, candlelight, moonlit, backlit, overcast, volumetric) |
-| **Lenses** (7) | Same woman, medium shot, same Tokyo street | Lens character only (anamorphic flare/oval bokeh, vintage Helios swirl, Cooke creamy, Sigma clinical, Leica painterly, ARRI signature, Angenieux zoom compression) |
-| **Camera Bodies** (6) | Same woman, same medium shot | Sensor/recording look only (ARRI Alexa 35 filmic, Sony Venice 2 clean digital, RED V-Raptor sharp, Panavision XL2 35mm grain, iPhone 17 Pro Max smartphone look, VHS camcorder lo-fi tape) |
-| **Cinematic Styles** (12) | Same woman + same Tokyo street, but the *whole grade & atmosphere* shifts | Full style transformation (Noir, Cyberpunk, Arthouse, Action, Horror, Romantic, Sci-Fi Mystery, Documentary, Epic Fantasy, Symmetric Storybook, Thriller, Midnight Mood) |
+```text
+src/components/studio-visual/
+  TransitionPreviewTile.tsx     // 2-Scene CSS-Transition Loop
+  SceneAnimationPreviewTile.tsx // 1-Scene CSS-Transform Loop
+```
 
-Result: a customer flipping through 8 Framing cards sees the **same woman, same street**, only the crop changes — exactly like Artlist.
+### `TransitionPreviewTile`
+- Props: `transitionId` (`none|fade|crossfade|dissolve|wipe|slide|blur|zoom|push|morph`), `label`, `isActive`, `onClick`, `durationMs?` (default 1200).
+- Rendert zwei `<img>` Layer (Scene A unten, Scene B oben) mit CSS-Klasse `tx-${transitionId}` die nur über `:hover` oder `[data-active=true]` läuft.
+- Globale Keyframes in einer einzigen scoped Stylesheet (Modul-Datei) — eine `@keyframes` pro Transition.
+- Maps 1:1 auf bestehende `transitionType` Strings — keine Resolver-Änderung nötig.
 
-## Generation Approach
+### `SceneAnimationPreviewTile`
+- Props: `animationId` (`none|zoomIn|zoomOut|zoomInSlow|zoomOutSlow|panLeft|panRight|panUp|panDown|kenBurnsTL|kenBurnsBR`), `label`, `isActive`, `intensity?` (skaliert `transform`-Range), `onClick`.
+- Ein `<img>` Layer mit `transform: scale()/translate()` Loop.
+- Maps 1:1 auf existierendes `SceneEffects.animation.type` und KenBurns-Presets.
 
-1. **Quality:** `imagegen--generate_image` with `model: "premium.gemini"` (Nano Banana 2) for all 61 thumbnails. 512×512, no transparent background.
-2. **Prompt Template per Category:**
-   ```
-   {LOCKED_BASE_SCENE}. {AXIS_MODIFIER}. Photorealistic cinematic still, 
-   square 1:1 framing, professional cinematography reference card.
-   ```
-   `LOCKED_BASE_SCENE` is identical across all variants in the axis. Only `AXIS_MODIFIER` changes.
-3. **File paths stay identical** to current `src/assets/studio-presets/{category}/{id}.jpg` — no code changes needed in `studioPresetThumbnails.ts` or `PresetGrid.tsx`.
-4. **Parallel batches** per category to keep generation time low.
+## Mount-Points (nur UI, keine Logik-Änderung)
 
-## Persistent Rule (saved to memory)
+| Datei | Was wird ersetzt |
+|---|---|
+| `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (L99–122) | Transition-Grid pro Szene → `TransitionPreviewTile` |
+| `src/components/directors-cut/ui/TransitionPicker.tsx` | Großer Standalone-Picker (genutzt in `SceneEditingStep`) → `TransitionPreviewTile` Grid |
+| `src/components/directors-cut/studio/sidebar/FXPanel.tsx` (L112–128) | Scene-Animation-Grid → `SceneAnimationPreviewTile` |
+| `src/components/directors-cut/features/KenBurnsEffect.tsx` (PRESETS) | Ken-Burns-Preset-Grid → `SceneAnimationPreviewTile` mit `kenBurns*` IDs |
+| `src/components/video-composer/StoryboardTab.tsx` *(falls inline picker)* | Composer-Transition-Tile → gleicher `TransitionPreviewTile` |
 
-A new memory entry will be saved so this convention applies to ALL future preset thumbnails the editor introduces:
+Bestehende Slider (Duration, Intensity), Defaults, State-Handler und `transitionResolver` bleiben **unverändert**.
 
-> **Studio Preset Thumbnail Rule:** Within any preset axis (Framing/Angle/Movement/Lighting/Lens/Camera/Style/Filter/Grade/Transition/Animation/Pose/Wardrobe/Vibe), every variant thumbnail MUST re-use one locked base scene per axis. Only the axis-specific modifier changes. Customer must perceive the feature, not a new scene. Use `premium.gemini` (Nano Banana 2) at 512×512.
+## Out of Scope
 
-## Out of Scope (this round)
+- Keine neuen Transition-Typen (nur visuelle Picker für die bereits existierenden 8–10).
+- Kein Server-Side Render-Patch — Lambda/Composer rendern die Effekte schon korrekt.
+- Keine neuen Tabellen, Edge Functions, Buckets oder API-Keys.
+- Subtitle-Looks und Text-Overlay-Animationen kommen in einem späteren Stage.
 
-- No code/UI changes — only asset regeneration + memory rule.
-- Pose Sheets, Wardrobe, Location Vibes, Filters and Color Grading thumbnails will follow the same rule when those stages are built (Stage 3+).
+## Memory
+
+Nach Implementierung: neue Memory-Notiz `mem://design/studio-presets/animated-tile-rule` ergänzt die bestehende `comparable-thumbnail-rule` um den Hinweis, dass alle künftigen Bewegungs-Picker (Transitions, Scene-Anims, Text-Anims, Subtitle-Karaoke…) das gleiche locked-Scene-CSS-Loop-Muster nutzen.
 
 ## Deliverables
 
-- 61 regenerated `.jpg` files (same paths, overwriting current ones).
-- 1 new memory entry under `mem://design/studio-presets/comparable-thumbnail-rule`.
-- Index update.
+1. 2 neue Komponenten (`TransitionPreviewTile`, `SceneAnimationPreviewTile`) + ein Stylesheet mit allen Keyframes.
+2. 4–5 Picker-Mounts im Director's Cut + Composer auf die neuen Tiles umgestellt.
+3. 1 neue Memory-Notiz + Index-Update.
+
+Geschätzt **klein**: rein Frontend, ~300 Zeilen + CSS, keine DB-Migration, keine Edge Function.
