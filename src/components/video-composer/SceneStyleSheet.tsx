@@ -285,7 +285,7 @@ export default function SceneStyleSheet({
               />
             </TabsContent>
 
-            <TabsContent value="modifiers" className="mt-0">
+            <TabsContent value="modifiers" className="mt-0 overflow-visible">
               <DirectorPresetPicker
                 modifiers={mods}
                 basePrompt={scene.aiPrompt || ''}
