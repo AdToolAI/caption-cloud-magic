@@ -210,7 +210,8 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const elevenKey = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
-  if (!elevenKey) return json({ error: "ELEVENLABS_API_KEY not configured" }, 500);
+  const humeKey = Deno.env.get("HUME_API_KEY") ?? "";
+  if (!elevenKey && !humeKey) return json({ error: "No TTS provider configured (ELEVENLABS_API_KEY or HUME_API_KEY)" }, 500);
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
