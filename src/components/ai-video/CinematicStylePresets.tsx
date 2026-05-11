@@ -114,6 +114,7 @@ interface PresetCardProps {
   isActive: boolean;
   compact: boolean;
   layout?: 'rail' | 'grid';
+  thumbMode?: 'identity' | 'comparable';
   onClick: () => void;
 }
 
