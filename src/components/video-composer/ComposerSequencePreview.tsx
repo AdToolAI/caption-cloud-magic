@@ -268,6 +268,20 @@ export default function ComposerSequencePreview({
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
+  // Helper: scene has embedded audio in the MP4 we should let the video play.
+  // Two-shot scenes whose merged dialogue is on an external track must NOT
+  // count as embedded — otherwise the lipsync video's last-speaker-only audio
+  // plays in addition to the merged track on the timeline.
+  const sceneHasEmbeddedAudio = (s: ComposerScene | undefined): boolean => {
+    if (!s) return false;
+    if (s.audioPlan?.twoshot?.useExternalAudio === true) return false;
+    return (
+      !!s.lipSyncAppliedAt ||
+      (s.clipSource as string) === 'ai-heygen' ||
+      s.clipSource === 'upload'
+    );
+  };
+
   // ── Active video play/pause sync ───────────────────────────────
   useEffect(() => {
     if (isImage) {
@@ -278,11 +292,7 @@ export default function ComposerSequencePreview({
     if (!v) return;
     if (playing) {
       const cur = playableRef.current[sceneIdxRef.current];
-      const hasEmbedded =
-        !!cur?.lipSyncAppliedAt ||
-        (cur?.clipSource as string) === 'ai-heygen' ||
-        cur?.clipSource === 'upload';
-      v.muted = hasEmbedded ? false : mutedRef.current;
+      v.muted = sceneHasEmbeddedAudio(cur) ? false : mutedRef.current;
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -296,11 +306,7 @@ export default function ComposerSequencePreview({
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
     const cur = playableRef.current[sceneIdxRef.current];
-    const hasEmbedded =
-      !!cur?.lipSyncAppliedAt ||
-      (cur?.clipSource as string) === 'ai-heygen' ||
-      cur?.clipSource === 'upload';
-    if (va && !isImage) va.muted = hasEmbedded ? false : muted;
+    if (va && !isImage) va.muted = sceneHasEmbeddedAudio(cur) ? false : muted;
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
