@@ -2,13 +2,16 @@
  * PresetGrid — visual picker for Shot Director options.
  *
  * Renders a 2-column grid of image thumbnails (Artlist Studio-style)
- * with label overlay. Used inside ShotDirectorPanel popovers and any
- * other surface that needs to pick from a list of cinematic options.
+ * with label overlay. For the `movement` axis, swaps the static <img>
+ * for a MovementPreviewTile that loops a CSS-keyframe transform on
+ * hover or when active (Animated Studio Preset Tiles rule).
  */
 
+import { useState } from 'react';
 import { Check, X } from 'lucide-react';
 import type { ShotCategory, ShotOption } from '@/config/shotDirector';
 import { getPresetThumbnail } from '@/config/studioPresetThumbnails';
+import { MovementPreviewTile } from './MovementPreviewTile';
 
 type Lang = 'en' | 'de' | 'es';
 
@@ -21,6 +24,8 @@ interface PresetGridProps {
 }
 
 export function PresetGrid({ category, options, selectedId, onSelect, lang }: PresetGridProps) {
+  const [hoverId, setHoverId] = useState<string | null>(null);
+
   return (
     <div className="space-y-2">
       {selectedId && (
@@ -37,12 +42,18 @@ export function PresetGrid({ category, options, selectedId, onSelect, lang }: Pr
       <div className="grid grid-cols-2 gap-2">
         {options.map((opt) => {
           const isActive = selectedId === opt.id;
+          const isHover = hoverId === opt.id;
           const thumb = getPresetThumbnail(category, opt.id);
+          const isMovement = category === 'movement';
           return (
             <button
               key={opt.id}
               type="button"
               onClick={() => onSelect(opt.id)}
+              onMouseEnter={() => setHoverId(opt.id)}
+              onMouseLeave={() => setHoverId((id) => (id === opt.id ? null : id))}
+              onFocus={() => setHoverId(opt.id)}
+              onBlur={() => setHoverId((id) => (id === opt.id ? null : id))}
               title={opt.description[lang]}
               className={`group relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                 isActive
@@ -51,14 +62,23 @@ export function PresetGrid({ category, options, selectedId, onSelect, lang }: Pr
               }`}
             >
               {thumb ? (
-                <img
-                  src={thumb}
-                  alt={opt.label[lang]}
-                  loading="lazy"
-                  width={512}
-                  height={512}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
+                isMovement ? (
+                  <MovementPreviewTile
+                    imageSrc={thumb}
+                    optionId={opt.id}
+                    alt={opt.label[lang]}
+                    play={isHover || isActive}
+                  />
+                ) : (
+                  <img
+                    src={thumb}
+                    alt={opt.label[lang]}
+                    loading="lazy"
+                    width={512}
+                    height={512}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                )
               ) : (
                 <div className="absolute inset-0 bg-muted/40 flex items-center justify-center text-[10px] text-muted-foreground">
                   {opt.label[lang]}
@@ -66,7 +86,7 @@ export function PresetGrid({ category, options, selectedId, onSelect, lang }: Pr
               )}
 
               {/* Gradient overlay for legibility */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent pointer-events-none" />
 
               {/* Active checkmark */}
               {isActive && (
