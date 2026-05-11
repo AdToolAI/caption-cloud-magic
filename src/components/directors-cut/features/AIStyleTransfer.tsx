@@ -159,12 +159,16 @@ export function AIStyleTransfer({
             )}
             title={description}
           >
-            {/* Filter Preview Background */}
-            <div 
-              className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
+            {/* Filter Preview — locked base scene (Comparable Thumbnail Rule) */}
+            <img
+              src={filterBaseScene}
+              alt=""
+              aria-hidden
+              draggable={false}
+              className="absolute inset-0 w-full h-full object-cover"
               style={{ filter: filter.preview || 'none' }}
             />
-            
+
             {/* Glassmorphism overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
             
