@@ -89,6 +89,7 @@ const Locations = () => {
                       <p className="text-[10px] text-primary/80 truncate">{loc.visual_identity_json.setting}</p>
                     )}
                   </div>
+                  <LocationVibeStrip locationId={loc.id} />
                 </Card>
               ))}
             </div>
