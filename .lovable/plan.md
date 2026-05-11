@@ -1,60 +1,83 @@
-# Stage 5 — Transitions & Scene Animations Studio
+## Stage 6 — Wardrobe & Prop Variants
 
-Ziel: Alle Übergangs- und Szenen-Animations-Picker im Director's Cut & Composer von emoji-only Tiles auf **bewegte Mini-Loops auf der gleichen locked Base Scene** umstellen — analog zur Look Studio Logik aus Stage 4 (Artlist-Vergleich, der Kunde sieht *was der Effekt tut*, nicht ein anderes Icon).
+Direct extension of Stage 3 (Pose Sheets + Vibe Strips). Same locked-identity / locked-geometry strategy, same Gemini Image (`google/gemini-3.1-flash-image-preview`) pipeline, same storage buckets — just two new axes.
 
-## Prinzip (folgt der `comparable-thumbnail-rule`)
+### Scope
 
-- **Eine** locked Base Scene (Tokyo-Master `framing/establishing.jpg`) als Scene A.
-- Eine zweite locked Scene (Tokyo-Master `framing/wide.jpg`) als Scene B für Transitions die zwei Clips brauchen.
-- Animation rein per **CSS Keyframes / transforms** — keine GIFs, keine MP4-Assets, kein Edge Call, kein Replicate, kein Asset-Pipeline. Tile loopt **on hover**, ruht still beim Verlassen → spart CPU.
-- Selected Tile loopt automatisch auch ohne Hover (User sieht aktive Wahl in Bewegung).
+**A) Avatar Wardrobe Sheets** — 4 outfit variants per `brand_character`, identity-locked.
+- Presets: `casual`, `formal`, `action`, `brand` (CI-aware: pulls brand colors if available, else neutral).
+- Stored in new `avatar_wardrobe_variants` (mirrors `avatar_pose_variants`).
+- Mounted on `/avatars/:id` (AvatarDetail) directly under the existing PoseSheet.
 
-## Neue Komponenten
+**B) Location Prop Variants** — 4 prop/dressing variants per `brand_location`, geometry-locked.
+- Presets: `empty`, `product-hero`, `lifestyle`, `event` (camera + room geometry preserved, only set-dressing changes).
+- Stored in new `location_prop_variants` (mirrors `location_vibe_variants`).
+- Mounted inline on Locations cards next to the existing VibeStrip (collapsible "Props" row).
 
-```text
-src/components/studio-visual/
-  TransitionPreviewTile.tsx     // 2-Scene CSS-Transition Loop
-  SceneAnimationPreviewTile.tsx // 1-Scene CSS-Transform Loop
+### Out of scope
+- No new studios, no Composer wiring beyond what `useUnifiedMentionLibrary` already does (variants surface automatically once rows exist, since mentions resolve by parent ID + variant tag — no schema change in mention library).
+- No regeneration UI per single tile — only "Generate Sheet" / "Regenerate Sheet" (same UX as Pose Sheet).
+- No video, no i2v calls in this stage. Pure image variants.
+
+### Database (1 migration)
+
+```sql
+create table public.avatar_wardrobe_variants (
+  id uuid primary key default gen_random_uuid(),
+  avatar_id uuid not null references public.brand_characters(id) on delete cascade,
+  outfit_id text not null,        -- 'casual' | 'formal' | 'action' | 'brand'
+  label text not null,
+  image_url text not null,
+  storage_path text,
+  created_at timestamptz default now(),
+  unique (avatar_id, outfit_id)
+);
+alter table public.avatar_wardrobe_variants enable row level security;
+-- RLS: select/insert/update/delete via avatar ownership (same shape as avatar_pose_variants)
+
+create table public.location_prop_variants (
+  id uuid primary key default gen_random_uuid(),
+  location_id uuid not null references public.brand_locations(id) on delete cascade,
+  prop_id text not null,          -- 'empty' | 'product-hero' | 'lifestyle' | 'event'
+  label text not null,
+  image_url text not null,
+  storage_path text,
+  created_at timestamptz default now(),
+  unique (location_id, prop_id)
+);
+alter table public.location_prop_variants enable row level security;
+-- RLS analog to location_vibe_variants
 ```
 
-### `TransitionPreviewTile`
-- Props: `transitionId` (`none|fade|crossfade|dissolve|wipe|slide|blur|zoom|push|morph`), `label`, `isActive`, `onClick`, `durationMs?` (default 1200).
-- Rendert zwei `<img>` Layer (Scene A unten, Scene B oben) mit CSS-Klasse `tx-${transitionId}` die nur über `:hover` oder `[data-active=true]` läuft.
-- Globale Keyframes in einer einzigen scoped Stylesheet (Modul-Datei) — eine `@keyframes` pro Transition.
-- Maps 1:1 auf bestehende `transitionType` Strings — keine Resolver-Änderung nötig.
+### Edge functions (2 new)
 
-### `SceneAnimationPreviewTile`
-- Props: `animationId` (`none|zoomIn|zoomOut|zoomInSlow|zoomOutSlow|panLeft|panRight|panUp|panDown|kenBurnsTL|kenBurnsBR`), `label`, `isActive`, `intensity?` (skaliert `transform`-Range), `onClick`.
-- Ein `<img>` Layer mit `transform: scale()/translate()` Loop.
-- Maps 1:1 auf existierendes `SceneEffects.animation.type` und KenBurns-Presets.
+- `generate-avatar-wardrobe` — clone of `generate-avatar-poses`, wardrobe presets + stronger identity-lock (face + hair untouched, only clothing/accessories swap), saves to `brand-characters` bucket under `${user_id}/wardrobe/${avatar_id}/`.
+- `generate-location-props` — clone of `generate-location-vibes`, geometry-lock prompt ("preserve camera angle, walls, floor, windows; only re-dress the set"), saves to `brand-locations` bucket under `${user_id}/props/${location_id}/`.
 
-## Mount-Points (nur UI, keine Logik-Änderung)
+Both: parallel Promise.allSettled, idempotent upsert on unique key, English prompts.
 
-| Datei | Was wird ersetzt |
-|---|---|
-| `src/components/directors-cut/studio/sidebar/CutPanel.tsx` (L99–122) | Transition-Grid pro Szene → `TransitionPreviewTile` |
-| `src/components/directors-cut/ui/TransitionPicker.tsx` | Großer Standalone-Picker (genutzt in `SceneEditingStep`) → `TransitionPreviewTile` Grid |
-| `src/components/directors-cut/studio/sidebar/FXPanel.tsx` (L112–128) | Scene-Animation-Grid → `SceneAnimationPreviewTile` |
-| `src/components/directors-cut/features/KenBurnsEffect.tsx` (PRESETS) | Ken-Burns-Preset-Grid → `SceneAnimationPreviewTile` mit `kenBurns*` IDs |
-| `src/components/video-composer/StoryboardTab.tsx` *(falls inline picker)* | Composer-Transition-Tile → gleicher `TransitionPreviewTile` |
+### UI
 
-Bestehende Slider (Duration, Intensity), Defaults, State-Handler und `transitionResolver` bleiben **unverändert**.
+- **`AvatarWardrobeSheet.tsx`** (new) — clone of `AvatarPoseSheet` skin, mounted in `AvatarDetail.tsx` under the PoseSheet card.
+- **`LocationPropStrip.tsx`** (new) — clone of `LocationVibeStrip` skin, mounted on Locations cards in a collapsible row labeled "Props".
 
-## Out of Scope
+Both reuse Card/Button/grid layout, Bond palette, no new design tokens.
 
-- Keine neuen Transition-Typen (nur visuelle Picker für die bereits existierenden 8–10).
-- Kein Server-Side Render-Patch — Lambda/Composer rendern die Effekte schon korrekt.
-- Keine neuen Tabellen, Edge Functions, Buckets oder API-Keys.
-- Subtitle-Looks und Text-Overlay-Animationen kommen in einem späteren Stage.
+### Memory
 
-## Memory
+Update `mem://features/library-hubs/pose-sheets-and-vibe-variants.md` to also list `avatar_wardrobe_variants` (4 outfits) and `location_prop_variants` (4 dressings); keep one consolidated memory for the entire Library-Hub variant system.
 
-Nach Implementierung: neue Memory-Notiz `mem://design/studio-presets/animated-tile-rule` ergänzt die bestehende `comparable-thumbnail-rule` um den Hinweis, dass alle künftigen Bewegungs-Picker (Transitions, Scene-Anims, Text-Anims, Subtitle-Karaoke…) das gleiche locked-Scene-CSS-Loop-Muster nutzen.
+### Files (new)
+- `supabase/functions/generate-avatar-wardrobe/index.ts`
+- `supabase/functions/generate-location-props/index.ts`
+- `src/components/brand-characters/AvatarWardrobeSheet.tsx`
+- `src/components/locations/LocationPropStrip.tsx`
+- 1 migration file
 
-## Deliverables
+### Files (edited)
+- `src/pages/AvatarDetail.tsx` — mount WardrobeSheet
+- `src/pages/Locations.tsx` — mount PropStrip
+- `mem://features/library-hubs/pose-sheets-and-vibe-variants.md`
+- `mem://index.md` — update bullet text
 
-1. 2 neue Komponenten (`TransitionPreviewTile`, `SceneAnimationPreviewTile`) + ein Stylesheet mit allen Keyframes.
-2. 4–5 Picker-Mounts im Director's Cut + Composer auf die neuen Tiles umgestellt.
-3. 1 neue Memory-Notiz + Index-Update.
-
-Geschätzt **klein**: rein Frontend, ~300 Zeilen + CSS, keine DB-Migration, keine Edge Function.
+Estimated size: **small** — pure clone of an established pattern, no architectural risk.

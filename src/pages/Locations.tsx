@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Plus, MapPin, Loader2, Star, Trash2 } from 'lucide-react';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { LocationVibeStrip } from '@/components/locations/LocationVibeStrip';
+import { LocationPropStrip } from '@/components/locations/LocationPropStrip';
 
 const Locations = () => {
   const { locations, isLoading, createLocation, toggleFavorite, archiveLocation } = useBrandLocations();
@@ -90,6 +91,7 @@ const Locations = () => {
                     )}
                   </div>
                   <LocationVibeStrip locationId={loc.id} />
+                  <LocationPropStrip locationId={loc.id} />
                 </Card>
               ))}
             </div>

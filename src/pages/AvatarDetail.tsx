@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AvatarPoseSheet } from '@/components/brand-characters/AvatarPoseSheet';
+import { AvatarWardrobeSheet } from '@/components/brand-characters/AvatarWardrobeSheet';
 
 const AvatarDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -54,7 +55,7 @@ const AvatarDetail = () => {
 
               <div className="space-y-6">
                 <AvatarPoseSheet avatarId={avatar.id} />
-                {/* Future: WardrobeGrid, ContextStrip */}
+                <AvatarWardrobeSheet avatarId={avatar.id} />
               </div>
             </div>
           )}

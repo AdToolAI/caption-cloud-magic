@@ -1685,6 +1685,44 @@ export type Database = {
           },
         ]
       }
+      avatar_wardrobe_variants: {
+        Row: {
+          avatar_id: string
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          outfit_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          avatar_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          outfit_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          avatar_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          outfit_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avatar_wardrobe_variants_avatar_id_fkey"
+            columns: ["avatar_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       background_music_tracks: {
         Row: {
           created_at: string | null
@@ -7719,6 +7757,44 @@ export type Database = {
           verify_token?: string
         }
         Relationships: []
+      }
+      location_prop_variants: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          location_id: string
+          prop_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          location_id: string
+          prop_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          location_id?: string
+          prop_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_prop_variants_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "brand_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       location_vibe_variants: {
         Row: {
