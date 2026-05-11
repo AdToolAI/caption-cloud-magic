@@ -43,13 +43,19 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
   const { data: accessible = [] } = useAccessibleCharacters();
 
   // Resolve the "active" character for this scene: prefer the first
-  // characterShot, fall back to the first briefing character.
-  const activeShotName =
-    scene.characterShots?.[0]?.name ||
-    (scene as any).characterShot?.name ||
-    characters?.[0]?.name;
+  // characterShot (by characterId → name via briefing), fall back to the first
+  // briefing character.
+  const activeShotId =
+    scene.characterShots?.[0]?.characterId ||
+    scene.characterShot?.characterId ||
+    characters?.[0]?.id;
+  const activeShotName = useMemo(
+    () => characters?.find((c) => c.id === activeShotId)?.name,
+    [characters, activeShotId],
+  );
   const activeChar = useMemo(
-    () => accessible.find((c) => c.name === activeShotName) ?? accessible[0],
+    () =>
+      accessible.find((c) => c.name === activeShotName) ?? accessible[0],
     [accessible, activeShotName],
   );
 
