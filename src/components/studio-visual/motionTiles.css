@@ -1,0 +1,126 @@
+/* ============================================================
+   Studio Visual — Motion Preview Tiles
+   Animated mini-loops on the LOCKED base scene so users see
+   what each transition / scene-animation actually does.
+   Loops only when [data-play="true"] (hover OR active).
+   ============================================================ */
+
+/* ---------- Scene Animations (single-image transforms) ---------- */
+.sa-stage img {
+  transform-origin: center center;
+  will-change: transform;
+}
+.sa-stage[data-play="true"] img {
+  animation-duration: 3.2s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+  animation-direction: alternate;
+}
+
+.sa-zoomIn[data-play="true"]      img { animation-name: sa-zoom-in; }
+.sa-zoomOut[data-play="true"]     img { animation-name: sa-zoom-out; }
+.sa-zoomInSlow[data-play="true"]  img { animation-name: sa-zoom-in;  animation-duration: 5.5s; }
+.sa-zoomOutSlow[data-play="true"] img { animation-name: sa-zoom-out; animation-duration: 5.5s; }
+.sa-panLeft[data-play="true"]     img { animation-name: sa-pan-left; }
+.sa-panRight[data-play="true"]    img { animation-name: sa-pan-right; }
+.sa-panUp[data-play="true"]       img { animation-name: sa-pan-up; }
+.sa-panDown[data-play="true"]     img { animation-name: sa-pan-down; }
+.sa-kenBurnsTL[data-play="true"]  img { animation-name: sa-kb-tl; }
+.sa-kenBurnsBR[data-play="true"]  img { animation-name: sa-kb-br; }
+
+@keyframes sa-zoom-in    { from { transform: scale(1.00); } to { transform: scale(1.18); } }
+@keyframes sa-zoom-out   { from { transform: scale(1.18); } to { transform: scale(1.00); } }
+@keyframes sa-pan-left   { from { transform: scale(1.18) translateX(6%);  } to { transform: scale(1.18) translateX(-6%); } }
+@keyframes sa-pan-right  { from { transform: scale(1.18) translateX(-6%); } to { transform: scale(1.18) translateX(6%);  } }
+@keyframes sa-pan-up     { from { transform: scale(1.18) translateY(6%);  } to { transform: scale(1.18) translateY(-6%); } }
+@keyframes sa-pan-down   { from { transform: scale(1.18) translateY(-6%); } to { transform: scale(1.18) translateY(6%);  } }
+@keyframes sa-kb-tl      { from { transform: scale(1.00) translate(-6%, -4%); } to { transform: scale(1.22) translate(6%, 4%);   } }
+@keyframes sa-kb-br      { from { transform: scale(1.00) translate(6%, 4%);   } to { transform: scale(1.22) translate(-6%, -4%); } }
+
+/* ---------- Transitions (Scene A → Scene B loop) ---------- */
+.tx-stage .tx-a,
+.tx-stage .tx-b {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  will-change: transform, opacity, clip-path, filter;
+}
+.tx-stage .tx-b { opacity: 0; }
+
+.tx-stage[data-play="true"] .tx-b {
+  animation-duration: 2.2s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+.tx-stage[data-play="true"] .tx-a {
+  animation-duration: 2.2s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+/* none — hard cut */
+.tx-none[data-play="true"] .tx-b { animation-name: tx-cut; }
+@keyframes tx-cut {
+  0%, 49.9% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+
+/* fade — A to black to B */
+.tx-fade[data-play="true"] .tx-a { animation-name: tx-fade-a; }
+.tx-fade[data-play="true"] .tx-b { animation-name: tx-fade-b; }
+@keyframes tx-fade-a { 0% { opacity: 1; } 40% { opacity: 0; } 60% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes tx-fade-b { 0% { opacity: 0; } 50% { opacity: 0; } 70% { opacity: 1; } 100% { opacity: 0; } }
+
+/* crossfade — direct opacity blend */
+.tx-crossfade[data-play="true"] .tx-b { animation-name: tx-crossfade; }
+@keyframes tx-crossfade { 0%, 10% { opacity: 0; } 50% { opacity: 1; } 90%, 100% { opacity: 0; } }
+
+/* dissolve — crossfade + slight desaturate flash */
+.tx-dissolve[data-play="true"] .tx-b { animation-name: tx-dissolve; }
+@keyframes tx-dissolve {
+  0%, 10% { opacity: 0; filter: blur(2px) saturate(1.4); }
+  50%     { opacity: 1; filter: blur(0)   saturate(1);   }
+  90%,100%{ opacity: 0; filter: blur(2px) saturate(1.4); }
+}
+
+/* wipe — clip-path horizontal reveal */
+.tx-wipe[data-play="true"] .tx-b { animation-name: tx-wipe; opacity: 1; }
+@keyframes tx-wipe {
+  0%, 10%   { clip-path: inset(0 100% 0 0); }
+  50%       { clip-path: inset(0 0 0 0); }
+  90%, 100% { clip-path: inset(0 100% 0 0); }
+}
+
+/* slide — B slides in from right */
+.tx-slide[data-play="true"] .tx-b { animation-name: tx-slide; opacity: 1; }
+@keyframes tx-slide {
+  0%, 10%   { transform: translateX(100%); }
+  50%       { transform: translateX(0); }
+  90%, 100% { transform: translateX(100%); }
+}
+
+/* push — A pushed out, B pushes in */
+.tx-push[data-play="true"] .tx-a { animation-name: tx-push-a; }
+.tx-push[data-play="true"] .tx-b { animation-name: tx-push-b; opacity: 1; }
+@keyframes tx-push-a { 0%, 10% { transform: translateX(0); } 50% { transform: translateX(-100%); } 90%, 100% { transform: translateX(0); } }
+@keyframes tx-push-b { 0%, 10% { transform: translateX(100%); } 50% { transform: translateX(0); } 90%, 100% { transform: translateX(100%); } }
+
+/* blur — both blur, B fades through */
+.tx-blur[data-play="true"] .tx-a { animation-name: tx-blur-a; }
+.tx-blur[data-play="true"] .tx-b { animation-name: tx-blur-b; }
+@keyframes tx-blur-a { 0% { opacity: 1; filter: blur(0); } 50% { opacity: 0; filter: blur(8px); } 100% { opacity: 1; filter: blur(0); } }
+@keyframes tx-blur-b { 0% { opacity: 0; filter: blur(8px); } 50% { opacity: 1; filter: blur(0); } 100% { opacity: 0; filter: blur(8px); } }
+
+/* zoom — A zooms out, B zooms in */
+.tx-zoom[data-play="true"] .tx-a { animation-name: tx-zoom-a; }
+.tx-zoom[data-play="true"] .tx-b { animation-name: tx-zoom-b; }
+@keyframes tx-zoom-a { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0; transform: scale(1.4); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes tx-zoom-b { 0% { opacity: 0; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0.7); } }
+
+/* morph — soft scale + crossfade with hue rotation hint */
+.tx-morph[data-play="true"] .tx-a { animation-name: tx-morph-a; }
+.tx-morph[data-play="true"] .tx-b { animation-name: tx-morph-b; }
+@keyframes tx-morph-a { 0% { opacity: 1; transform: scale(1); filter: hue-rotate(0); } 50% { opacity: 0; transform: scale(1.1); filter: hue-rotate(20deg); } 100% { opacity: 1; transform: scale(1); filter: hue-rotate(0); } }
+@keyframes tx-morph-b { 0% { opacity: 0; transform: scale(0.92) rotate(-1deg); filter: hue-rotate(-20deg); } 50% { opacity: 1; transform: scale(1) rotate(0); filter: hue-rotate(0); } 100% { opacity: 0; transform: scale(0.92) rotate(-1deg); filter: hue-rotate(-20deg); } }
