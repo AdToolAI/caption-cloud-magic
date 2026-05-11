@@ -281,20 +281,18 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           <div className="grid grid-cols-3 gap-1.5">
             {COLOR_GRADES.map(grade => {
               const isActive = (activeColorGrading.enabled && activeColorGrading.grade === grade.id) || (!activeColorGrading.enabled && grade.id === 'none');
+              const css = COLOR_GRADE_CSS[grade.id] ?? '';
+              const label = grade.id === 'none' ? t('dc.gradeNone') : grade.name;
               return (
-                <button
+                <LookPresetTile
                   key={grade.id}
+                  cssFilter={css}
+                  label={label}
+                  badge={grade.icon}
+                  isActive={isActive}
+                  intensity={isActive && css ? activeColorGrading.intensity : 1}
                   onClick={() => handleColorGradeSelect(grade.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 p-2 rounded-lg transition-all border",
-                    isActive
-                      ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                      : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
-                  )}
-                >
-                  <span className="text-sm">{grade.icon}</span>
-                  <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{grade.id === 'none' ? t('dc.gradeNone') : grade.name}</span>
-                </button>
+                />
               );
             })}
           </div>
