@@ -227,8 +227,12 @@ export function VisualEffectsStep({
                       }
                     `}
                   >
-                    <div 
-                      className="absolute inset-0 bg-gradient-to-br from-gray-600 to-gray-800"
+                    <img
+                      src={filterBaseScene}
+                      alt=""
+                      aria-hidden
+                      draggable={false}
+                      className="absolute inset-0 w-full h-full object-cover"
                       style={{ filter: filter.preview || 'none' }}
                     />
                     <span className="absolute bottom-0.5 left-0 right-0 text-[10px] text-white text-center font-medium drop-shadow">
