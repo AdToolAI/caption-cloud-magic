@@ -684,9 +684,35 @@ export default function ComposerSequencePreview({
     return ids;
   }, [sceneAudioClips, playable]);
 
+  /** Two-Shot-Szenen, deren Lip-Sync-Pipeline noch nicht durchgelaufen ist.
+   *  Hier MUSS das globale Voiceover gemutet werden — sonst legt sich der
+   *  Projekt-VO als „Phantom-Stimme" über stille Charaktere und der User
+   *  glaubt, der Lip-Sync funktioniere. */
+  const pendingTwoShotSceneIds = useMemo(() => {
+    const ids = new Set<string>();
+    playable.forEach((s) => {
+      const shots = (s as any).characterShots;
+      const hasTwoShotConfig =
+        Array.isArray(shots) &&
+        shots.length >= 2 &&
+        s.lipSyncWithVoiceover === true &&
+        typeof (s as any).dialogScript === 'string' &&
+        (s as any).dialogScript.length > 0;
+      if (hasTwoShotConfig && !s.lipSyncAppliedAt) {
+        ids.add(s.id);
+      }
+    });
+    return ids;
+  }, [playable]);
+
   /** True when the currently-active scene already has its own spoken audio
-   *  (per-scene VO clip OR embedded lip-sync). Global VO is muted while true. */
-  const currentSceneHasOwnVoice = !!currentScene && perSceneVoSceneIds.has(currentScene.id);
+   *  (per-scene VO clip OR embedded lip-sync) — OR when it's a Two-Shot
+   *  scene whose lip-sync hasn't been applied yet (in which case we mute
+   *  the global VO so the user doesn't hear a phantom voiceover). */
+  const currentSceneHasOwnVoice =
+    !!currentScene &&
+    (perSceneVoSceneIds.has(currentScene.id) ||
+      pendingTwoShotSceneIds.has(currentScene.id));
 
   // Auto-unmute when an audible track becomes available — VO, BGM, SFX, OR
   // a lip-sync / HeyGen scene whose audio is embedded directly in the video.
@@ -1014,6 +1040,14 @@ export default function ComposerSequencePreview({
         <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 backdrop-blur text-[10px] text-white/90 font-medium z-20">
           {t('videoComposer.sceneOf', { current: sceneIdx + 1, total: playable.length })}
         </div>
+
+        {/* Two-Shot Lip-Sync Pending Badge */}
+        {currentScene && pendingTwoShotSceneIds.has(currentScene.id) && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
+            <span>🎬</span>
+            <span>Lip-Sync wird vorbereitet…</span>
+          </div>
+        )}
 
         {/* Hidden voiceover audio — synced with the video timeline */}
         {voiceoverUrl && (
