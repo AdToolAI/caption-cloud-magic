@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles, Store, Coins, Clock, ShieldAlert } from 'lucide-react';
+import { Star, Trash2, TrendingUp, Image as ImageIcon, Mic2, Sparkles, Store, Coins, Clock, ShieldAlert, LayoutGrid } from 'lucide-react';
 import { type BrandCharacter, useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { AvatarVoicePicker } from './AvatarVoicePicker';
 import { AvatarPortraitDialog } from './AvatarPortraitDialog';
@@ -130,15 +131,15 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
             }}
           />
 
-          {/* Portrait + Speak Actions */}
-          <div className="grid grid-cols-2 gap-2 pt-1">
+          {/* Portrait + Speak + Studio Actions */}
+          <div className="grid grid-cols-3 gap-2 pt-1">
             <Button
               size="sm"
               variant="outline"
               className="h-8 text-xs border-primary/25"
               onClick={() => setPortraitOpen(true)}
             >
-              <ImageIcon className="h-3.5 w-3.5 mr-1.5" />
+              <ImageIcon className="h-3.5 w-3.5 mr-1" />
               Portrait
             </Button>
             <Button
@@ -148,8 +149,20 @@ export const BrandCharacterCard = ({ character }: BrandCharacterCardProps) => {
               onClick={() => setSpeakOpen(true)}
               title={canSpeak ? 'Generate Talking Head' : 'Pick a voice first'}
             >
-              <Mic2 className="h-3.5 w-3.5 mr-1.5" />
+              <Mic2 className="h-3.5 w-3.5 mr-1" />
               Speak
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs border-primary/25"
+              title="Open Avatar Studio (Pose Sheet, Wardrobe…)"
+            >
+              <Link to={`/avatars/${character.id}`}>
+                <LayoutGrid className="h-3.5 w-3.5 mr-1" />
+                Studio
+              </Link>
             </Button>
           </div>
 

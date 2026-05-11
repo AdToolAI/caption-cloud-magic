@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, MapPin, Loader2, Star, Trash2 } from 'lucide-react';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
+import { LocationVibeStrip } from '@/components/locations/LocationVibeStrip';
 
 const Locations = () => {
   const { locations, isLoading, createLocation, toggleFavorite, archiveLocation } = useBrandLocations();
@@ -88,6 +89,7 @@ const Locations = () => {
                       <p className="text-[10px] text-primary/80 truncate">{loc.visual_identity_json.setting}</p>
                     )}
                   </div>
+                  <LocationVibeStrip locationId={loc.id} />
                 </Card>
               ))}
             </div>
