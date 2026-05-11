@@ -345,7 +345,7 @@ serve(async (req) => {
     let cursor = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const voice = resolveVoice(block, dialogVoices, charByFirstName);
+      const voice = resolveVoice(block, dialogVoices, charByName);
       if (!voice) {
         return json({
           error: "missing_voice",
