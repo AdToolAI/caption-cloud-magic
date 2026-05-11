@@ -1,6 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Check } from 'lucide-react';
+import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 const TRANSITIONS = [
   { id: 'none', name: 'Cut', description: 'Harter Schnitt — Artlist-Standard' },
@@ -31,31 +30,27 @@ export function TransitionSelector({
   disabled = false,
   label = 'Übergangseffekt'
 }: TransitionSelectorProps) {
-  const filteredTransitions = TRANSITIONS.filter(t => 
+  const filteredTransitions = TRANSITIONS.filter(t =>
     availableTransitions.includes(t.id)
   );
 
   return (
     <div className="space-y-3">
       <Label>{label}</Label>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid gap-2 ${filteredTransitions.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}>
         {filteredTransitions.map((transition) => (
-          <Button
-            key={transition.id}
-            type="button"
-            variant={value === transition.id ? 'default' : 'outline'}
-            className="h-auto flex-col items-start p-3 relative"
-            onClick={() => onChange(transition.id)}
-            disabled={disabled}
-          >
-            {value === transition.id && (
-              <Check className="absolute top-2 right-2 h-4 w-4" />
-            )}
-            <span className="font-medium text-sm">{transition.name}</span>
-            <span className="text-xs text-muted-foreground font-normal mt-1">
+          <div key={transition.id} className="space-y-1">
+            <TransitionPreviewTile
+              transitionId={transition.id as TransitionId}
+              label={transition.name}
+              isActive={value === transition.id}
+              size="md"
+              onClick={() => onChange(transition.id)}
+            />
+            <p className="text-[10px] text-muted-foreground line-clamp-1 px-0.5">
               {transition.description}
-            </span>
-          </Button>
+            </p>
+          </div>
         ))}
       </div>
     </div>
