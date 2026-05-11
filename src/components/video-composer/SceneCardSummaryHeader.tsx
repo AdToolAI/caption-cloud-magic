@@ -257,28 +257,30 @@ export default function SceneCardSummaryHeader({
         >
           <Trash2 className="h-3 w-3" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] gap-1 text-primary hover:text-primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpand();
-          }}
-          title={isExpanded ? EXPAND_LABEL[language].close : EXPAND_LABEL[language].open}
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="h-3 w-3" />
-              {EXPAND_LABEL[language].close}
-            </>
-          ) : (
-            <>
-              <ChevronRight className="h-3 w-3" />
-              {EXPAND_LABEL[language].open}
-            </>
-          )}
-        </Button>
+        {onToggleExpand && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10px] gap-1 text-primary hover:text-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+            title={isExpanded ? EXPAND_LABEL[language].close : EXPAND_LABEL[language].open}
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-3 w-3" />
+                {EXPAND_LABEL[language].close}
+              </>
+            ) : (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                {EXPAND_LABEL[language].open}
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );
