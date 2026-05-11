@@ -175,31 +175,95 @@ serve(async (req) => {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
       const voDuration = Number(mergedVo.duration ?? 0);
-      const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
 
-      // Single Sync.so pass with merged audio. Lipsync-2 has built-in
-      // active-speaker detection for multi-face videos and will animate
-      // whichever face is speaking at each audio segment.
-      const output = await replicate.run(
-        "sync/lipsync-2" as `${string}/${string}`,
-        {
-          input: {
-            video: sourceClipUrl,
-            audio: mergedVo.url,
-            sync_mode: syncMode,
-          },
-        },
-      );
+      // ── Per-speaker sequential lip-sync ─────────────────────────────
+      // If compose-twoshot-audio produced per-speaker padded tracks
+      // (metadata.speakers[i].track_url), run ONE sync.so pass per speaker.
+      // Each pass feeds only that speaker's audio (silence elsewhere) into
+      // lipsync-2 so active-speaker detection has a single voice signal and
+      // animates exactly one face. This eliminates the swap caused by the
+      // model picking the wrong face on a merged multi-speaker track.
+      // Pass order follows character_shots (position 0 first).
+      const speakerMeta = Array.isArray((mergedVo as any)?.metadata?.speakers)
+        ? ((mergedVo as any).metadata.speakers as Array<any>)
+        : [];
+      const charShots = Array.isArray((scene as any).character_shots)
+        ? ((scene as any).character_shots as Array<any>)
+        : [];
+      const shotOrder = new Map<string, number>();
+      charShots.forEach((cs, idx) => {
+        const id = String(cs?.characterId ?? "").toLowerCase();
+        if (id) shotOrder.set(id, idx);
+      });
+      const passes = speakerMeta
+        .filter((s) => typeof s?.track_url === "string" && s.track_url)
+        .map((s, idx) => ({
+          ...s,
+          _shotIdx: shotOrder.has(String(s?.character_id ?? "").toLowerCase())
+            ? shotOrder.get(String(s.character_id).toLowerCase())!
+            : idx + 100, // unknown shots go last but stable
+        }))
+        .sort((a, b) => a._shotIdx - b._shotIdx);
 
-      await setStage(supabase, scene_id, "lipsync_2");
-
+      const useMultiPass = passes.length >= 2;
       let outUrl: string | null = null;
-      if (typeof output === "string") outUrl = output;
-      else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
-      else if (output && typeof output === "object") {
-        const o = output as Record<string, unknown>;
-        outUrl = (o.video || o.output || o.url) as string ?? null;
+
+      if (useMultiPass) {
+        let currentVideo = sourceClipUrl;
+        for (let p = 0; p < passes.length; p++) {
+          const pass = passes[p];
+          console.log(
+            `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length}`,
+            { speaker: pass.speaker, character_id: pass.character_id, audio: pass.track_url },
+          );
+          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2");
+          const passOutput = await replicate.run(
+            "sync/lipsync-2" as `${string}/${string}`,
+            {
+              input: {
+                video: currentVideo,
+                audio: pass.track_url,
+                sync_mode: "loop",
+                active_speaker: true,
+              },
+            },
+          );
+          let stepUrl: string | null = null;
+          if (typeof passOutput === "string") stepUrl = passOutput;
+          else if (Array.isArray(passOutput) && passOutput.length) stepUrl = passOutput[0] as string;
+          else if (passOutput && typeof passOutput === "object") {
+            const o = passOutput as Record<string, unknown>;
+            stepUrl = (o.video || o.output || o.url) as string ?? null;
+          }
+          if (!stepUrl) {
+            await refund(`pass_${p + 1}_no_output`);
+            return json({ error: `lipsync pass ${p + 1} produced no output` }, 502);
+          }
+          currentVideo = stepUrl;
+          outUrl = stepUrl;
+        }
+      } else {
+        // Fallback: legacy single merged-audio pass.
+        const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
+        const output = await replicate.run(
+          "sync/lipsync-2" as `${string}/${string}`,
+          {
+            input: {
+              video: sourceClipUrl,
+              audio: mergedVo.url,
+              sync_mode: syncMode,
+            },
+          },
+        );
+        await setStage(supabase, scene_id, "lipsync_2");
+        if (typeof output === "string") outUrl = output;
+        else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
+        else if (output && typeof output === "object") {
+          const o = output as Record<string, unknown>;
+          outUrl = (o.video || o.output || o.url) as string ?? null;
+        }
       }
+
       if (!outUrl) {
         await refund("no_output_url");
         return json({ error: "no output url" }, 502);
