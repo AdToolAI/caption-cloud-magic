@@ -35,6 +35,33 @@ const corsHeaders = {
 const MP3_BITRATE = 128_000; // bits per second
 const FALLBACK_ELEVEN_VOICE = "EXAVITQu4vr4xnSDxMaL"; // Sarah — neutral female fallback
 
+// ── Silence MP3 generator ────────────────────────────────────────────────
+// One MPEG1 Layer III frame @ 44.1 kHz / 128 kbps stereo = 417 bytes,
+// representing 1152 / 44100 ≈ 26.122 ms of audio. We construct a single
+// silent frame (valid 4-byte header + zero-filled side info + zero payload)
+// and repeat it to reach the desired silence duration. ffmpeg-based decoders
+// (which sync.so uses internally) accept these zero-data frames and output
+// silence, allowing us to pad per-speaker tracks so each speaker's audio
+// sits at its real timestamp within the scene.
+const SILENCE_FRAME_BYTES = 417;
+const SILENCE_FRAME_SEC = 1152 / 44100;
+function buildSilenceFrame(): Uint8Array {
+  const f = new Uint8Array(SILENCE_FRAME_BYTES);
+  f[0] = 0xff;
+  f[1] = 0xfb; // MPEG1, Layer III, no CRC
+  f[2] = 0x90; // 128 kbps, 44.1 kHz, no padding
+  f[3] = 0x04; // stereo, original
+  return f;
+}
+const SILENCE_FRAME = buildSilenceFrame();
+function silenceMp3(durationSec: number): Uint8Array {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return new Uint8Array(0);
+  const nFrames = Math.max(1, Math.round(durationSec / SILENCE_FRAME_SEC));
+  const out = new Uint8Array(nFrames * SILENCE_FRAME_BYTES);
+  for (let i = 0; i < nFrames; i++) out.set(SILENCE_FRAME, i * SILENCE_FRAME_BYTES);
+  return out;
+}
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
