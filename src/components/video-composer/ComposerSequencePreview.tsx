@@ -221,13 +221,19 @@ export default function ComposerSequencePreview({
     if (el) {
       // Active slot honours the user's mute toggle; standby is always muted
       // until it becomes active to avoid double-audio during preload.
-      // EXCEPTION: scenes whose audio is EMBEDDED in the MP4 (lip-sync output,
-      // HeyGen avatars, user uploads) must always play their own audio when
-      // active — otherwise the embedded voiceover is inaudible.
-      const hasEmbeddedAudio =
+      // EXCEPTION 1: scenes whose audio is EMBEDDED in the MP4 (lip-sync
+      // output, HeyGen avatars, user uploads) must always play their own
+      // audio when active — otherwise the embedded voiceover is inaudible.
+      // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
+      // useExternalAudio === true. The lipsync MP4 only embeds the LAST
+      // speaker's voice; the merged dialogue lives on the external VO
+      // track. Mute the video so we don't hear half the dialogue twice.
+      const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
+      const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
         (target.clipSource as string) === 'ai-heygen' ||
-        target.clipSource === 'upload';
+        target.clipSource === 'upload'
+      );
       if (slot === activeSlotRef.current) {
         el.muted = hasEmbeddedAudio ? false : mutedRef.current;
       } else {
