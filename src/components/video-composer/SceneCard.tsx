@@ -246,7 +246,8 @@ export default function SceneCard({
   // Studio-Set UX: collapse-by-default for already-configured scenes so the
   // storyboard reads as a scannable list. Newly-created (empty) scenes start
   // expanded so the user lands in the editor immediately.
-  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+  const [isExpandedState, setIsExpanded] = useState<boolean>(() => {
+    if (embedded) return true;
     const hasContent =
       Boolean((scene.aiPrompt ?? '').trim()) ||
       Boolean((scene.dialogScript ?? '').trim()) ||
@@ -254,6 +255,9 @@ export default function SceneCard({
       Boolean(scene.uploadUrl);
     return !hasContent;
   });
+  // When embedded inside the persistent Studio Pane, the editor is always
+  // fully open — the strip on the left handles selection/collapse.
+  const isExpanded = embedded ? true : isExpandedState;
 
 
   const { systemPresets } = useStylePresets();
