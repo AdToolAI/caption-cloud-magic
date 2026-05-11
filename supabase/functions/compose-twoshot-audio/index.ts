@@ -422,11 +422,18 @@ serve(async (req) => {
     await supabase.from("scene_audio_clips").delete().eq("scene_id", scene_id).eq("kind", "voiceover");
 
     const insertRes = await supabase.from("scene_audio_clips").insert({
+      user_id: userId,
+      project_id: scene.project_id,
       scene_id,
       kind: "voiceover",
+      source: "ai",
       url: publicUrl,
       duration: Math.round(totalSec * 100) / 100,
       start_offset: 0,
+      volume: 1,
+      ducking_enabled: false,
+      cost_credits: 0,
+      refunded: false,
       metadata: {
         source: "compose-twoshot-audio",
         format: "mp3",
