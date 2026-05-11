@@ -1,46 +1,54 @@
-## Aktueller Stand (Diagnose)
+## Diagnose
 
-Die Two-Shot-Szene `b4237058…` steht in der DB jetzt so:
-- `engine_override = cinematic-sync`, `clip_url = silent video` ✅
-- `lip_sync_status = NULL`, `lip_sync_applied_at = NULL`, `character_audio_url = NULL`, `audio_plan = NULL` ❌
-- `dialog_script` + `dialog_voices` + 2 `character_shots` sind noch da ✅
-- **Keine** `scene_audio_clips` (kind=voiceover) für die Szene
+Logs der Edge Function `compose-twoshot-lipsync` für Szene `cf97d027…`:
 
-Was der Nutzer hört: Das **globale Projekt-Voiceover** (`assemblyConfig.voiceover.audioUrl`), das in `ComposerSequencePreview` als Fallback über die Szene gelegt wird, weil die Szene selbst keinen Two-Shot-Audio-Track hat.
+```
+16:21:21  pass 1/2  Matthew Dusatko  → Sync.so/lipsync-2 (Replicate)
+16:22:48  pass 2/2  Sarah Dusatko    → Sync.so/lipsync-2 (Replicate)
+16:24:08  ERROR Http: connection closed before message completed
+```
 
-**Root-Cause:** Unser Reset hat den Two-Shot-State gelöscht, aber die Pipeline (`compose-twoshot-audio` → `compose-twoshot-lipsync`) nicht neu angestoßen. Der Auto-Trigger in `ClipsTab.tsx` (Zeile 280–335) fordert genau diesen Zustand (`engine_override='cinematic-sync'` + `clip_url` + `lip_sync_status=NULL` + `!lip_sync_applied_at`) — er feuert aber nur, wenn der Nutzer den Composer im Browser auf `ClipsTab` geöffnet hat. Der Nutzer hängt aber im **Voiceover-Tab** (Step 04 im Screenshot) — darum läuft kein Auto-Trigger.
+Beide Passes liefen ~80s + ~80s + Re-Hosting + Continuity-Vision-Call > **~3 Minuten Wall-Clock synchron in einem HTTP-Request**. Edge Functions kappen die Verbindung deutlich vor dem Ende → der Client sieht „Edge Function returned a non-2xx status code", obwohl die Pipeline serverseitig vermutlich noch läuft (oder mittendrin abgebrochen wurde, ohne `lip_sync_status='failed'` zu setzen → Szene bleibt auf `running` hängen → Auto-Trigger startet nicht neu).
+
+Das ist exakt das in der Stack-Overflow-Knowledge dokumentierte Muster: zu lang laufende synchrone Edge Function → `EdgeRuntime.waitUntil` + sofort 202 zurückgeben + Frontend pollt DB.
+
+Unser Auto-Trigger-Hook (`useTwoShotAutoTrigger`) **pollt die DB ohnehin alle 8s**. Wir müssen also nur die schwere Arbeit in einen Background-Task schieben und sofort `202 { accepted: true }` zurückgeben — das Frontend nutzt das Ergebnis nie direkt aus dem HTTP-Response, sondern liest `lip_sync_status` / `clip_url` aus `composer_scenes`.
 
 ## Plan
 
-### 1. One-Shot Re-Trigger jetzt für die betroffene Szene
-Direkt `compose-twoshot-lipsync` invoken (der hat den Fallback eingebaut, der `compose-twoshot-audio` selbst aufruft, falls der Merged-VO fehlt). Vorher `lip_sync_status='running'` setzen, damit kein Doppel-Trigger entsteht. Logs prüfen, bis `lip_sync_applied_at` und `character_audio_url` gesetzt sind.
+### 1. `compose-twoshot-lipsync` zu Async-Pattern umbauen
+- Sanity-Checks (Auth, Scene laden, Wallet, Replicate-Key) bleiben **synchron** vor dem Return — damit echte 4xx (z.B. fehlende Credits, fehlendes Voiceover) sofort beim Aufrufer landen.
+- Direkt nach den Checks: `lip_sync_status='running'`, `twoshot_stage='lipsync_1'` setzen, Credits reservieren.
+- Den heavy block (zwei sequentielle `replicate.run("sync/lipsync-2")`-Calls + Re-Host in `composer-clips` Bucket + Continuity-Vision-Call + finales DB-Update) in eine Funktion `runLipSyncPipeline(...)` extrahieren.
+- Aufruf via `EdgeRuntime.waitUntil(runLipSyncPipeline(...).catch(async (e) => { await refund(...); }))`.
+- Sofort `Response 202 { accepted: true, scene_id, status: 'running' }` zurückgeben.
+- Bei jedem Fehler im Background-Task: `lip_sync_status='failed'`, `clip_error=<reason>`, `twoshot_stage='failed'` + Refund — damit der Auto-Trigger nicht in einer Endlos-`running`-Schleife hängt.
 
-### 2. Auto-Trigger Tab-unabhängig machen
-Den State-Detektor aus `ClipsTab.tsx` (Zeilen 276–335) in einen Hook `useTwoShotAutoTrigger(projectId)` ziehen und in `VideoComposerDashboard.tsx` mounten — dort lebt er für alle Tabs (Briefing, Storyboard, Clips, Voiceover, Musik, Export). Verhalten: identisch zur aktuellen Logik, aber zusätzlich greift er auch wenn der User nie den Clips-Tab öffnet. So bleibt nichts hängen, wenn z.B. nach einem Reset oder Edit die Szene wieder „pending" wird.
+### 2. Stale-`running`-Recovery im Auto-Trigger-Hook
+`useTwoShotAutoTrigger` filtert aktuell nur Szenen mit `lip_sync_status IN (NULL, 'pending')`. Bei einem alten Hänger (Status bleibt auf `running` ohne `lip_sync_applied_at`) feuert nichts mehr — manueller Reset nötig.
 
-### 3. Playback-Schutz in `ComposerSequencePreview`
-Wenn eine Szene Two-Shot-Konfig hat (`character_shots.length >= 2 && lip_sync_with_voiceover && dialog_script`) **aber noch kein `lip_sync_applied_at`**, dann:
-- Globales `voiceoverUrl` für diese Szene **muten** (statt fallthrough), damit der User nicht ein „falsches" VO hört, das als Lip-Sync wirken soll.
-- Statusbadge oben rechts in der Szenen-Vorschau: „Lip-Sync wird vorbereitet…" statt stiller Lüge.
-Das entkoppelt visuelles Erlebnis vom Pipeline-Status — kein „Charaktere stehen stumm da, aber Stimme läuft" mehr.
+Erweitern: Wenn `lip_sync_status='running'` UND `updated_at` älter als **6 Minuten** UND `lip_sync_applied_at IS NULL` → Status auf `pending` zurücksetzen, Inflight-Lock leeren, dann normaler Trigger-Pfad. So räumt das System sich nach jedem Background-Crash selbst auf.
 
-### 4. Sichtbares Re-Trigger-CTA im Voiceover-Tab
-In der Voiceover-Stage (Step 04) eine Karte „Two-Shot Lip-Sync erneut ausführen" mit einem Button, der `compose-twoshot-lipsync` für die markierte Szene aufruft. Notfall-Knopf für Cases, in denen der Auto-Trigger nicht durchläuft (z.B. nach DB-Resets, nach manueller Voice-Änderung).
+### 3. Sofort-Recovery für die aktuell hängende Szene `cf97d027…`
+Per Migration den jetzigen Hänger zurücksetzen (`lip_sync_status=NULL`, `twoshot_stage=NULL`, `lip_sync_applied_at=NULL`, `clip_error=NULL`), damit der neue Async-Trigger sie sauber neu rendern kann. `clip_url` (silent video) bleibt erhalten. **Falls Credits beim Aborted-Run abgebucht wurden:** Wallet-Refund `+ COST` per Migration einmalig nachholen.
+
+### 4. UI-Feinschliff in `ComposerSequencePreview`
+Aktuelles „🎬 Lip-Sync wird vorbereitet…"-Badge erweitern: bei `lip_sync_status='failed'` rotes Badge „Lip-Sync fehlgeschlagen — wird neu angestoßen" zeigen, statt dass der User nur den Toast sieht. Globales VO weiter muten, solange `lip_sync_applied_at` fehlt.
 
 ### 5. Verifikation
-Nach Deploy:
-1. `compose-twoshot-lipsync` für `b4237058…` invoken
-2. Logs prüfen (audio prep OK, Sync.so passes OK)
-3. DB checken: `lip_sync_applied_at` ≠ NULL, `character_audio_url` ≠ NULL, `audio_plan.twoshot.useExternalAudio = true`
-4. Im Composer Vorschau abspielen → Charaktere reden synchron, kein Doppel-VO
+1. Deploy `compose-twoshot-lipsync`.
+2. Migration ausführen (Reset Szene `cf97d027…` + Refund falls nötig).
+3. Im Composer Voiceover-Tab öffnen — Auto-Trigger-Hook feuert nach max 8s.
+4. Edge-Function-Logs prüfen: kein „connection closed" mehr (Function returnt sofort 202).
+5. DB-Polling: nach ~3min `lip_sync_applied_at` ≠ NULL, `clip_url` ≠ silent, `audio_plan.twoshot.useExternalAudio = true`.
+6. Im Preview Szene 1 abspielen → beide Charaktere sprechen abwechselnd in voller Szenenlänge.
 
-## Technische Details (für später)
+## Technische Details
 
 **Geänderte Dateien:**
-- `src/components/video-composer/VideoComposerDashboard.tsx` — neuer Hook-Aufruf
-- `src/hooks/useTwoShotAutoTrigger.ts` (neu) — Auto-Trigger-Logik aus ClipsTab extrahiert
-- `src/components/video-composer/ClipsTab.tsx` — alte Trigger-Logik entfernen (jetzt im Hook)
-- `src/components/video-composer/ComposerSequencePreview.tsx` — `pendingTwoShotSceneIds` Set, globalen VO darüber muten
-- `src/components/video-composer/SceneVoiceoverStudio.tsx` (oder analog Voiceover-Tab) — neuer Re-Trigger-Button
+- `supabase/functions/compose-twoshot-lipsync/index.ts` — Refactor zu `EdgeRuntime.waitUntil` + 202-Response + Background-Refund-Pfad bei jedem Fail
+- `src/hooks/useTwoShotAutoTrigger.ts` — Stale-`running`-Detection (>6min ohne `lip_sync_applied_at` → reset to `pending`)
+- `src/components/video-composer/ComposerSequencePreview.tsx` — Failed-Badge zusätzlich zum Pending-Badge
+- `supabase/migrations/<ts>_reset_twoshot_lipsync_recovery.sql` — Reset Szene `cf97d027…` + Wallet-Refund einmalig
 
-**Out of Scope:** Pipeline-interna (compose-twoshot-audio/lipsync) bleiben unverändert — die funktionieren laut Code korrekt, sie werden nur nicht angestoßen.
+**Out of Scope:** `compose-twoshot-audio` (läuft schnell, kein Timeout-Problem), `compose-lipsync-scene` (Single-Speaker, bekommt das gleiche Async-Muster nur falls später nötig — separat behandeln), die Lip-Sync-Pass-Logik selbst (funktioniert laut Logs korrekt, scheitert nur am HTTP-Timeout).
