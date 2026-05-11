@@ -83,9 +83,9 @@ serve(async (req) => {
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
-    // v3 — bumped cache key after identity-lock prompt overhaul (no face morphing,
-    // preserve asymmetric details). Prevents reuse of older weaker anchors.
-    const promptHash = await sha1(`v3|${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
+    // v4 — bumped cache key after identity-lock hard-suffix (Part A fix:
+    // explicit "do NOT age, do NOT change face shape" reinforcement).
+    const promptHash = await sha1(`v4|${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
