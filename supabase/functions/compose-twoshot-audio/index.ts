@@ -48,7 +48,7 @@ interface DialogBlock {
   text: string;
 }
 
-/** Split "Matthew: hi\nSarah: hello" into ordered blocks. */
+/** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
 function parseDialogScript(script: string): DialogBlock[] {
   const blocks: DialogBlock[] = [];
   const lines = script.split(/\r?\n/);
@@ -59,7 +59,10 @@ function parseDialogScript(script: string): DialogBlock[] {
     const text = m[2].trim();
     if (!text) continue;
     blocks.push({
-      speakerName: rawSpeaker.toLowerCase().split(/\s+/)[0], // first name
+      // Keep FULL normalized name (lowercase, hyphenated) so we can match
+      // dialog_voices keys like "matthew-dusatko" — first-name match falls
+      // out as a fallback inside resolveVoice.
+      speakerName: rawSpeaker.toLowerCase().replace(/\s+/g, "-"),
       rawSpeaker,
       text,
     });
