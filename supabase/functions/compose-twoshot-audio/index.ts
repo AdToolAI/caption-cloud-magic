@@ -26,10 +26,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-const SAMPLE_RATE = 44100;
-const BITS_PER_SAMPLE = 16;
-const CHANNELS = 1;
-const INTER_SPEAKER_GAP_SEC = 0.25;
+// MP3 pipeline @ 44.1 kHz / 128 kbps CBR — both ElevenLabs and Hume can deliver
+// this format, so we can concatenate buffers byte-wise and let downstream
+// (Sync.so / ffmpeg) decode the stitched stream. Duration is derived from
+// CBR math (bytes * 8 / bitrate). A natural pause between speakers is
+// produced by appending " ... " to each non-final block's text — the TTS
+// engine handles the prosody, no synthetic silence frames needed.
+const MP3_BITRATE = 128_000; // bits per second
+const FALLBACK_ELEVEN_VOICE = "EXAVITQu4vr4xnSDxMaL"; // Sarah — neutral female fallback
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -63,43 +67,79 @@ function parseDialogScript(script: string): DialogBlock[] {
   return blocks;
 }
 
-/** Look up voiceId from dialog_voices keyed by speaker id, character id, or first-name match. */
-function resolveVoiceId(
+interface ResolvedVoice {
+  voiceId: string;
+  engine: "elevenlabs" | "hume";
+  provider?: "HUME_AI" | "CUSTOM_VOICE";
+}
+
+/** Heuristic: ElevenLabs voice IDs are 20-character alphanumeric strings. */
+function looksLikeElevenLabsId(v: string): boolean {
+  return /^[A-Za-z0-9]{20}$/.test(v);
+}
+
+/** Look up voice config from dialog_voices keyed by speaker id, character id, or first-name match. */
+function resolveVoice(
   block: DialogBlock,
-  dialogVoices: Record<string, { voiceId?: string; elevenlabsVoiceId?: string; isCustom?: boolean }>,
+  dialogVoices: Record<string, any>,
   charactersByFirstName: Map<string, { id: string; default_voice_id?: string }>,
-): string | null {
+): ResolvedVoice | null {
+  const cfgToVoice = (cfg: any): ResolvedVoice | null => {
+    if (!cfg) return null;
+    const id = cfg.isCustom ? (cfg.elevenlabsVoiceId ?? cfg.voiceId) : (cfg.voiceId ?? cfg.elevenlabsVoiceId);
+    if (!id) return null;
+    const engine: "elevenlabs" | "hume" =
+      cfg.engine === "hume" || cfg.provider === "HUME_AI" || cfg.provider === "CUSTOM_VOICE"
+        ? "hume"
+        : (cfg.engine === "elevenlabs" ? "elevenlabs" : (looksLikeElevenLabsId(String(id)) ? "elevenlabs" : "hume"));
+    return {
+      voiceId: String(id),
+      engine,
+      provider: engine === "hume" ? (cfg.provider === "CUSTOM_VOICE" ? "CUSTOM_VOICE" : "HUME_AI") : undefined,
+    };
+  };
+
   // 1) Exact key match (id-keyed)
   for (const [key, cfg] of Object.entries(dialogVoices)) {
     if (key.toLowerCase() === block.speakerName) {
-      return (cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId) ?? cfg.voiceId ?? null;
+      const v = cfgToVoice(cfg);
+      if (v) return v;
     }
   }
   // 2) Match via cast character first-name → its id → dialog_voices entry
   const c = charactersByFirstName.get(block.speakerName);
   if (c) {
-    const cfg = dialogVoices[c.id];
-    if (cfg) return (cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId) ?? cfg.voiceId ?? null;
-    if (c.default_voice_id) return c.default_voice_id;
+    const cfg = (dialogVoices as any)[c.id];
+    const v = cfgToVoice(cfg);
+    if (v) return v;
+    if (c.default_voice_id) {
+      return {
+        voiceId: c.default_voice_id,
+        engine: looksLikeElevenLabsId(c.default_voice_id) ? "elevenlabs" : "hume",
+        provider: looksLikeElevenLabsId(c.default_voice_id) ? undefined : "HUME_AI",
+      };
+    }
   }
   // 3) Take ANY voice from dialog_voices as last resort
-  const first = Object.values(dialogVoices)[0];
-  return first ? ((first.isCustom ? first.elevenlabsVoiceId : first.voiceId) ?? first.voiceId ?? null) : null;
+  for (const cfg of Object.values(dialogVoices)) {
+    const v = cfgToVoice(cfg);
+    if (v) return v;
+  }
+  return null;
 }
 
-async function elevenlabsPcm(
+async function elevenlabsMp3(
   apiKey: string,
   voiceId: string,
   text: string,
 ): Promise<Uint8Array> {
-  // Request raw 16-bit signed LE PCM @ 44.1 kHz so concatenation is trivial.
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_44100`;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "xi-api-key": apiKey,
       "Content-Type": "application/json",
-      "Accept": "audio/pcm",
+      "Accept": "audio/mpeg",
     },
     body: JSON.stringify({
       text,
@@ -117,53 +157,51 @@ async function elevenlabsPcm(
     const errText = await res.text().catch(() => "");
     throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
   }
-  const buf = await res.arrayBuffer();
-  return new Uint8Array(buf);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Concatenate PCM buffers with `gapSec` of silence between each. Returns one Uint8Array. */
-function concatPcmWithGaps(buffers: Uint8Array[], gapSec: number): Uint8Array {
-  const gapBytes = Math.round(gapSec * SAMPLE_RATE) * (BITS_PER_SAMPLE / 8) * CHANNELS;
-  const silence = new Uint8Array(gapBytes); // zero-filled
-  const total = buffers.reduce((s, b) => s + b.length, 0) + Math.max(0, buffers.length - 1) * gapBytes;
+async function humeMp3(
+  apiKey: string,
+  voiceName: string,
+  provider: "HUME_AI" | "CUSTOM_VOICE",
+  text: string,
+): Promise<Uint8Array> {
+  const res = await fetch("https://api.hume.ai/v0/tts/file", {
+    method: "POST",
+    headers: {
+      "X-Hume-Api-Key": apiKey,
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    },
+    body: JSON.stringify({
+      utterances: [
+        { text, voice: { name: voiceName, provider } },
+      ],
+      format: { type: "mp3" },
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`Hume "${voiceName}" failed (${res.status}): ${errText.slice(0, 200)}`);
+  }
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/** Concatenate MP3 byte buffers directly. Works with CBR streams from EL/Hume. */
+function concatMp3(buffers: Uint8Array[]): Uint8Array {
+  const total = buffers.reduce((s, b) => s + b.length, 0);
   const out = new Uint8Array(total);
   let off = 0;
-  for (let i = 0; i < buffers.length; i++) {
-    out.set(buffers[i], off);
-    off += buffers[i].length;
-    if (i < buffers.length - 1) {
-      out.set(silence, off);
-      off += silence.length;
-    }
+  for (const b of buffers) {
+    out.set(b, off);
+    off += b.length;
   }
   return out;
 }
 
-/** Wrap PCM 16-bit mono LE buffer in a 44-byte WAV RIFF header. */
-function pcmToWav(pcm: Uint8Array): Uint8Array {
-  const dataSize = pcm.length;
-  const byteRate = SAMPLE_RATE * CHANNELS * (BITS_PER_SAMPLE / 8);
-  const blockAlign = CHANNELS * (BITS_PER_SAMPLE / 8);
-  const out = new Uint8Array(44 + dataSize);
-  const dv = new DataView(out.buffer);
-  // RIFF chunk descriptor
-  out.set([0x52, 0x49, 0x46, 0x46], 0); // "RIFF"
-  dv.setUint32(4, 36 + dataSize, true);
-  out.set([0x57, 0x41, 0x56, 0x45], 8); // "WAVE"
-  // fmt sub-chunk
-  out.set([0x66, 0x6d, 0x74, 0x20], 12); // "fmt "
-  dv.setUint32(16, 16, true); // sub-chunk size
-  dv.setUint16(20, 1, true); // audio format = PCM
-  dv.setUint16(22, CHANNELS, true);
-  dv.setUint32(24, SAMPLE_RATE, true);
-  dv.setUint32(28, byteRate, true);
-  dv.setUint16(32, blockAlign, true);
-  dv.setUint16(34, BITS_PER_SAMPLE, true);
-  // data sub-chunk
-  out.set([0x64, 0x61, 0x74, 0x61], 36); // "data"
-  dv.setUint32(40, dataSize, true);
-  out.set(pcm, 44);
-  return out;
+/** Estimate duration of a CBR MP3 buffer at MP3_BITRATE bits/s. */
+function mp3DurationSec(buf: Uint8Array): number {
+  return (buf.length * 8) / MP3_BITRATE;
 }
 
 serve(async (req) => {
@@ -172,7 +210,8 @@ serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const elevenKey = Deno.env.get("ELEVENLABS_API_KEY") ?? "";
-  if (!elevenKey) return json({ error: "ELEVENLABS_API_KEY not configured" }, 500);
+  const humeKey = Deno.env.get("HUME_API_KEY") ?? "";
+  if (!elevenKey && !humeKey) return json({ error: "No TTS provider configured (ELEVENLABS_API_KEY or HUME_API_KEY)" }, 500);
   const supabase = createClient(supabaseUrl, serviceKey);
 
   try {
@@ -266,41 +305,82 @@ serve(async (req) => {
       }
     }
 
-    // Per-speaker TTS in script order.
-    const pcmBuffers: Uint8Array[] = [];
-    const segments: Array<{ speaker: string; startSec: number; endSec: number }> = [];
+    // Per-speaker TTS in script order. We append " ... " to each non-final
+    // block so the TTS engine produces a natural pause between speakers,
+    // avoiding the need to inject silence between MP3 frames.
+    const mp3Buffers: Uint8Array[] = [];
+    const segments: Array<{ speaker: string; engine: string; voice: string; startSec: number; endSec: number }> = [];
     let cursor = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const voiceId = resolveVoiceId(block, dialogVoices, charByFirstName);
-      if (!voiceId) {
+      const voice = resolveVoice(block, dialogVoices, charByFirstName);
+      if (!voice) {
         return json({
           error: "missing_voice",
           speaker: block.rawSpeaker,
           message: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`,
         }, 400);
       }
-      const pcm = await elevenlabsPcm(elevenKey, voiceId, block.text);
-      const samples = pcm.length / (BITS_PER_SAMPLE / 8) / CHANNELS;
-      const dur = samples / SAMPLE_RATE;
+      const isLast = i === blocks.length - 1;
+      const utterance = isLast ? block.text : `${block.text} ...`;
+      let mp3: Uint8Array;
+      try {
+        if (voice.engine === "hume") {
+          if (!humeKey) throw new Error("HUME_API_KEY not configured");
+          mp3 = await humeMp3(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
+        } else {
+          if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
+          mp3 = await elevenlabsMp3(elevenKey, voice.voiceId, utterance);
+        }
+        console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, { speaker: block.rawSpeaker, voice: voice.voiceId, bytes: mp3.length });
+      } catch (primaryErr) {
+        // Fallback path: if the requested engine fails (e.g. invalid Hume voice
+        // name on a fresh Hume account), fall back to a neutral ElevenLabs
+        // voice rather than 500-ing the whole pipeline.
+        const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+        console.warn(`[compose-twoshot-audio] ${voice.engine} failed, falling back to ElevenLabs:`, errMsg);
+        if (!elevenKey) {
+          return json({
+            error: "tts_failed",
+            speaker: block.rawSpeaker,
+            voice: voice.voiceId,
+            engine: voice.engine,
+            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+          }, 400);
+        }
+        try {
+          mp3 = await elevenlabsMp3(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+        } catch (fbErr) {
+          return json({
+            error: "tts_failed",
+            speaker: block.rawSpeaker,
+            voice: voice.voiceId,
+            engine: voice.engine,
+            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+            fallback_error: fbErr instanceof Error ? fbErr.message : String(fbErr),
+          }, 400);
+        }
+      }
+      const dur = mp3DurationSec(mp3);
       segments.push({
         speaker: block.rawSpeaker,
+        engine: voice.engine,
+        voice: voice.voiceId,
         startSec: Math.round(cursor * 100) / 100,
         endSec: Math.round((cursor + dur) * 100) / 100,
       });
-      cursor += dur + (i < blocks.length - 1 ? INTER_SPEAKER_GAP_SEC : 0);
-      pcmBuffers.push(pcm);
+      cursor += dur;
+      mp3Buffers.push(mp3);
     }
 
-    const mergedPcm = concatPcmWithGaps(pcmBuffers, INTER_SPEAKER_GAP_SEC);
-    const wav = pcmToWav(mergedPcm);
-    const totalSec = mergedPcm.length / (BITS_PER_SAMPLE / 8) / CHANNELS / SAMPLE_RATE;
+    const mergedMp3 = concatMp3(mp3Buffers);
+    const totalSec = mp3DurationSec(mergedMp3);
 
     // Upload to user-scoped path in voiceover-audio bucket.
-    const fileName = `${userId}/twoshot-vo/${scene_id}-${Date.now()}.wav`;
+    const fileName = `${userId}/twoshot-vo/${scene_id}-${Date.now()}.mp3`;
     const { error: upErr } = await supabase.storage
       .from("voiceover-audio")
-      .upload(fileName, wav, { contentType: "audio/wav", upsert: false });
+      .upload(fileName, mergedMp3, { contentType: "audio/mpeg", upsert: false });
     if (upErr) return json({ error: `upload failed: ${upErr.message}` }, 500);
     const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(fileName);
     const publicUrl = pub.publicUrl;
@@ -317,9 +397,9 @@ serve(async (req) => {
       start_offset: 0,
       metadata: {
         source: "compose-twoshot-audio",
+        format: "mp3",
+        bitrate: MP3_BITRATE,
         speakers: segments,
-        sample_rate: SAMPLE_RATE,
-        gap_sec: INTER_SPEAKER_GAP_SEC,
       },
     });
     if (insertRes.error) {
