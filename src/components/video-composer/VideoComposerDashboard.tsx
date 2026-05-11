@@ -48,6 +48,7 @@ import {
   useComposerPresence,
   useComposerScenesRealtime,
 } from '@/hooks/useComposerCollaboration';
+import { useTwoShotAutoTrigger } from '@/hooks/useTwoShotAutoTrigger';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useComposerHistory } from '@/hooks/useComposerHistory';
 import { ComposerHistoryContext } from './ComposerHistoryContext';
