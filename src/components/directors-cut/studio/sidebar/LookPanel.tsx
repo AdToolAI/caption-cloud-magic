@@ -6,6 +6,20 @@ import { GlobalEffects, SceneEffects, FilterId } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from '@/hooks/useTranslation';
+import { LookPresetTile } from '@/components/studio-visual/LookPresetTile';
+
+// CSS for color-grade live preview (mirrors NativePreviewEffects.COLOR_GRADE_MAP).
+const COLOR_GRADE_CSS: Record<string, string> = {
+  teal_orange: 'hue-rotate(-15deg) saturate(1.4) contrast(1.15) brightness(0.95)',
+  moonlight: 'hue-rotate(200deg) saturate(0.6) brightness(1.1) contrast(0.9)',
+  golden_hour: 'sepia(0.35) saturate(1.3) brightness(1.1)',
+  matrix: 'hue-rotate(90deg) saturate(1.2) contrast(1.3) brightness(0.9)',
+  bleach_bypass: 'saturate(0.35) contrast(1.5) brightness(1.05)',
+  hollywood_blue: 'hue-rotate(200deg) saturate(0.8) contrast(1.2) brightness(0.85)',
+  sunset_glow: 'sepia(0.25) hue-rotate(-15deg) saturate(1.4) brightness(1.05)',
+  forest_green: 'hue-rotate(60deg) saturate(0.75) contrast(1.1) brightness(0.95)',
+  coral_reef: 'hue-rotate(-30deg) saturate(1.3) brightness(1.1) contrast(1.05)',
+};
 
 interface LookPanelProps {
   effects: GlobalEffects;
@@ -222,23 +236,19 @@ export const LookPanel: React.FC<LookPanelProps> = ({
                 <span className="text-[9px] text-white/30 ml-auto">{category.filters.length}</span>
               </button>
               {expandedCategory === category.name && (
-                <div className="grid grid-cols-4 gap-1.5 pl-1">
+                <div className="grid grid-cols-3 gap-1.5 pl-1">
                   {category.filters.map(filter => {
                     const isActive = activeFilter === filter.id || (!activeFilter && filter.id === 'none');
                     return (
-                      <button
+                      <LookPresetTile
                         key={filter.id}
+                        cssFilter={filter.css}
+                        label={filter.name}
+                        badge={filter.icon}
+                        isActive={isActive}
+                        intensity={isActive ? activeFilterIntensity / 100 : 1}
                         onClick={() => handleFilterSelect(filter.id)}
-                        className={cn(
-                          "flex flex-col items-center gap-1 p-2 rounded-lg transition-all text-center border",
-                          isActive
-                            ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                            : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
-                        )}
-                      >
-                        <span className="text-lg">{filter.icon}</span>
-                        <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{filter.name}</span>
-                      </button>
+                      />
                     );
                   })}
                 </div>
@@ -271,20 +281,18 @@ export const LookPanel: React.FC<LookPanelProps> = ({
           <div className="grid grid-cols-3 gap-1.5">
             {COLOR_GRADES.map(grade => {
               const isActive = (activeColorGrading.enabled && activeColorGrading.grade === grade.id) || (!activeColorGrading.enabled && grade.id === 'none');
+              const css = COLOR_GRADE_CSS[grade.id] ?? '';
+              const label = grade.id === 'none' ? t('dc.gradeNone') : grade.name;
               return (
-                <button
+                <LookPresetTile
                   key={grade.id}
+                  cssFilter={css}
+                  label={label}
+                  badge={grade.icon}
+                  isActive={isActive}
+                  intensity={isActive && css ? activeColorGrading.intensity : 1}
                   onClick={() => handleColorGradeSelect(grade.id)}
-                  className={cn(
-                    "flex flex-col items-center gap-1 p-2 rounded-lg transition-all border",
-                    isActive
-                      ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                      : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
-                  )}
-                >
-                  <span className="text-sm">{grade.icon}</span>
-                  <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{grade.id === 'none' ? t('dc.gradeNone') : grade.name}</span>
-                </button>
+                />
               );
             })}
           </div>
