@@ -37,16 +37,16 @@ const formatTime = (s: number) => {
   return `${m}:${sec.padStart(5, '0')}`;
 };
 
-const TRANSITION_TYPES = [
-  { id: 'none', name: 'Keine', icon: '✕' },
-  { id: 'fade', name: 'Fade', icon: '◐' },
-  { id: 'crossfade', name: 'Crossfade', icon: '◑' },
-  { id: 'slide', name: 'Slide', icon: '▶' },
-  { id: 'zoom', name: 'Zoom', icon: '⊕' },
-  { id: 'wipe', name: 'Wipe', icon: '▤' },
-  { id: 'blur', name: 'Blur', icon: '◌' },
-  { id: 'push', name: 'Push', icon: '⇥' },
-] as const;
+const TRANSITION_TYPES: { id: TransitionId; name: string }[] = [
+  { id: 'none', name: 'Keine' },
+  { id: 'fade', name: 'Fade' },
+  { id: 'crossfade', name: 'Crossfade' },
+  { id: 'slide', name: 'Slide' },
+  { id: 'zoom', name: 'Zoom' },
+  { id: 'wipe', name: 'Wipe' },
+  { id: 'blur', name: 'Blur' },
+  { id: 'push', name: 'Push' },
+];
 
 const TransitionBlock: React.FC<{
   t: (key: string, params?: Record<string, string | number>) => any;
