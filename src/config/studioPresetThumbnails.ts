@@ -180,6 +180,21 @@ const CINEMATIC_THUMBS: Record<string, string> = {
   'midnight-mood': cinematicMidnight,
 };
 
+const CINEMATIC_COMPARE_THUMBS: Record<string, string> = {
+  'symmetric-storybook': cinematicSymmetricCmp,
+  'high-octane-action': cinematicActionCmp,
+  'slow-burn-arthouse': cinematicArthouseCmp,
+  'noir-detective': cinematicNoirCmp,
+  'cyberpunk-neon': cinematicCyberpunkCmp,
+  'epic-fantasy': cinematicFantasyCmp,
+  'documentary-realism': cinematicDocCmp,
+  'romantic-dreamy': cinematicRomanticCmp,
+  'thriller-suspense': cinematicThrillerCmp,
+  'sci-fi-mystery': cinematicSciFiCmp,
+  'horror-dread': cinematicHorrorCmp,
+  'midnight-mood': cinematicMidnightCmp,
+};
+
 export function getPresetThumbnail(category: ShotCategory, id: string | undefined): string | undefined {
   if (!id) return undefined;
   return SHOT_THUMBS[category]?.[id];
@@ -188,4 +203,14 @@ export function getPresetThumbnail(category: ShotCategory, id: string | undefine
 export function getCinematicPresetThumbnail(id: string | undefined): string | undefined {
   if (!id) return undefined;
   return CINEMATIC_THUMBS[id];
+}
+
+/**
+ * Stage 12 — Comparable variant of each Cinematic Style Preset.
+ * Same locked base scene with the preset applied, so users can compare
+ * all 12 looks on the same subject.
+ */
+export function getCinematicPresetCompareThumbnail(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  return CINEMATIC_COMPARE_THUMBS[id];
 }
