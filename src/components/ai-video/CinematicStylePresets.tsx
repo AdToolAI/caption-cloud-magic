@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Sparkles, Check } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Sparkles, Check, Eye, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import {
@@ -10,7 +10,7 @@ import {
 import type { ShotSelection } from '@/config/shotDirector';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
-import { getCinematicPresetThumbnail } from '@/config/studioPresetThumbnails';
+import { getCinematicPresetThumbnail, getCinematicPresetCompareThumbnail } from '@/config/studioPresetThumbnails';
 
 type Lang = 'en' | 'de' | 'es';
 
