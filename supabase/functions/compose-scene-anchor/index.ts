@@ -83,9 +83,9 @@ serve(async (req) => {
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
-    // v3 — bumped cache key after identity-lock prompt overhaul (no face morphing,
-    // preserve asymmetric details). Prevents reuse of older weaker anchors.
-    const promptHash = await sha1(`v3|${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
+    // v4 — bumped cache key after identity-lock hard-suffix (Part A fix:
+    // explicit "do NOT age, do NOT change face shape" reinforcement).
+    const promptHash = await sha1(`v4|${body.scenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
@@ -121,8 +121,12 @@ serve(async (req) => {
         `If scene lighting differs, only adapt skin shading and color temperature — NEVER alter underlying face geometry, hair, or distinctive marks. ` +
         `Generic lookalikes, AI "average" faces, or substituted people are FORBIDDEN.`
       : ` ABSOLUTE IDENTITY LOCK: Copy this person's face pixel-for-pixel from the reference portrait. Preserve face shape, eyes, nose, mouth, hairline, hair, skin tone, ASYMMETRIC details and any distinctive marks EXACTLY. NO morphing, NO beautification, NO de-aging. Identity preservation outranks aesthetics. The result must be unmistakably the same person.`;
+    // Hard, explicit identity-lock suffix (Part A — verbatim from spec).
+    // Appended on TOP of the multiClause so the model sees it last (recency bias).
+    const HARD_LOCK_SUFFIX =
+      ` IDENTITY LOCK (final): Preserve each person's exact facial identity, age, skin tone, hair style and color from the reference photos. Do NOT age them, do NOT change face shape. Photorealistic.`;
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description, no text, no captions, no watermark.\n\n` +
       `Scene: ${body.scenePrompt}`;

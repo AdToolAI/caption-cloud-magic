@@ -2034,6 +2034,7 @@ export type Database = {
           default_voice_provider: string | null
           description: string | null
           id: string
+          identity_lock_strength: string
           is_favorite: boolean
           license_release_path: string | null
           marketplace_status: string
@@ -2074,6 +2075,7 @@ export type Database = {
           default_voice_provider?: string | null
           description?: string | null
           id?: string
+          identity_lock_strength?: string
           is_favorite?: boolean
           license_release_path?: string | null
           marketplace_status?: string
@@ -2114,6 +2116,7 @@ export type Database = {
           default_voice_provider?: string | null
           description?: string | null
           id?: string
+          identity_lock_strength?: string
           is_favorite?: boolean
           license_release_path?: string | null
           marketplace_status?: string
