@@ -377,11 +377,7 @@ export default function ComposerSequencePreview({
       const standbyEl = getVideoForSlot(toSlot);
       if (standbyEl) {
         try { standbyEl.currentTime = 0; } catch { /* noop */ }
-        const hasEmbedded =
-          !!nextScene.lipSyncAppliedAt ||
-          (nextScene.clipSource as string) === 'ai-heygen' ||
-          nextScene.clipSource === 'upload';
-        standbyEl.muted = hasEmbedded ? false : mutedRef.current;
+        standbyEl.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade
