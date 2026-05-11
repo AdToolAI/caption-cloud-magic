@@ -221,13 +221,19 @@ export default function ComposerSequencePreview({
     if (el) {
       // Active slot honours the user's mute toggle; standby is always muted
       // until it becomes active to avoid double-audio during preload.
-      // EXCEPTION: scenes whose audio is EMBEDDED in the MP4 (lip-sync output,
-      // HeyGen avatars, user uploads) must always play their own audio when
-      // active — otherwise the embedded voiceover is inaudible.
-      const hasEmbeddedAudio =
+      // EXCEPTION 1: scenes whose audio is EMBEDDED in the MP4 (lip-sync
+      // output, HeyGen avatars, user uploads) must always play their own
+      // audio when active — otherwise the embedded voiceover is inaudible.
+      // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
+      // useExternalAudio === true. The lipsync MP4 only embeds the LAST
+      // speaker's voice; the merged dialogue lives on the external VO
+      // track. Mute the video so we don't hear half the dialogue twice.
+      const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
+      const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
         (target.clipSource as string) === 'ai-heygen' ||
-        target.clipSource === 'upload';
+        target.clipSource === 'upload'
+      );
       if (slot === activeSlotRef.current) {
         el.muted = hasEmbeddedAudio ? false : mutedRef.current;
       } else {
@@ -262,6 +268,20 @@ export default function ComposerSequencePreview({
   // ── Cleanup on unmount ─────────────────────────────────────────
   useEffect(() => () => clearAllTimers(), [clearAllTimers]);
 
+  // Helper: scene has embedded audio in the MP4 we should let the video play.
+  // Two-shot scenes whose merged dialogue is on an external track must NOT
+  // count as embedded — otherwise the lipsync video's last-speaker-only audio
+  // plays in addition to the merged track on the timeline.
+  const sceneHasEmbeddedAudio = (s: ComposerScene | undefined): boolean => {
+    if (!s) return false;
+    if (s.audioPlan?.twoshot?.useExternalAudio === true) return false;
+    return (
+      !!s.lipSyncAppliedAt ||
+      (s.clipSource as string) === 'ai-heygen' ||
+      s.clipSource === 'upload'
+    );
+  };
+
   // ── Active video play/pause sync ───────────────────────────────
   useEffect(() => {
     if (isImage) {
@@ -272,11 +292,7 @@ export default function ComposerSequencePreview({
     if (!v) return;
     if (playing) {
       const cur = playableRef.current[sceneIdxRef.current];
-      const hasEmbedded =
-        !!cur?.lipSyncAppliedAt ||
-        (cur?.clipSource as string) === 'ai-heygen' ||
-        cur?.clipSource === 'upload';
-      v.muted = hasEmbedded ? false : mutedRef.current;
+      v.muted = sceneHasEmbeddedAudio(cur) ? false : mutedRef.current;
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -290,11 +306,7 @@ export default function ComposerSequencePreview({
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
     const cur = playableRef.current[sceneIdxRef.current];
-    const hasEmbedded =
-      !!cur?.lipSyncAppliedAt ||
-      (cur?.clipSource as string) === 'ai-heygen' ||
-      cur?.clipSource === 'upload';
-    if (va && !isImage) va.muted = hasEmbedded ? false : muted;
+    if (va && !isImage) va.muted = sceneHasEmbeddedAudio(cur) ? false : muted;
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
@@ -332,11 +344,7 @@ export default function ComposerSequencePreview({
           const v = videoARef.current;
           if (v) {
             try { v.currentTime = 0; } catch { /* noop */ }
-            const hasEmbedded =
-              !!nextScene.lipSyncAppliedAt ||
-              (nextScene.clipSource as string) === 'ai-heygen' ||
-              nextScene.clipSource === 'upload';
-            v.muted = hasEmbedded ? false : mutedRef.current;
+            v.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
@@ -369,11 +377,7 @@ export default function ComposerSequencePreview({
       const standbyEl = getVideoForSlot(toSlot);
       if (standbyEl) {
         try { standbyEl.currentTime = 0; } catch { /* noop */ }
-        const hasEmbedded =
-          !!nextScene.lipSyncAppliedAt ||
-          (nextScene.clipSource as string) === 'ai-heygen' ||
-          nextScene.clipSource === 'upload';
-        standbyEl.muted = hasEmbedded ? false : mutedRef.current;
+        standbyEl.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade
@@ -514,6 +518,34 @@ export default function ComposerSequencePreview({
       (!isASource && activeSlotRef.current === 'B');
     if (!fromActive) return;
     if (advancedRef.current) return;
+    // Hold-last-frame: if the rendered MP4 is shorter than the planned scene
+    // duration (common for lip-synced two-shot clips where the video equals
+    // VO length), don't advance immediately. Pause the element on its last
+    // frame and let the watchdog/scrub naturally tick globalTime forward.
+    const cur = playableRef.current[sceneIdxRef.current];
+    const sceneDur = cur?.durationSeconds || 0;
+    const v = e.currentTarget;
+    if (sceneDur > 0 && v.currentTime + 0.15 < sceneDur) {
+      try { v.pause(); v.currentTime = Math.max(0, (v.duration || sceneDur) - 0.05); } catch { /* noop */ }
+      // Drive globalTime forward via RAF until we reach scene length, then advance.
+      const startWall = performance.now();
+      const startGlobal = (startOffsetsRef.current[sceneIdxRef.current] || 0) + v.currentTime;
+      const tick = () => {
+        if (transitioningRef.current || advancedRef.current) return;
+        const elapsed = (performance.now() - startWall) / 1000;
+        const g = startGlobal + elapsed;
+        const sceneEnd = (startOffsetsRef.current[sceneIdxRef.current] || 0) + sceneDur;
+        if (g >= sceneEnd) {
+          advancedRef.current = true;
+          advanceScene();
+          return;
+        }
+        setGlobalTime(g);
+        if (playingRef.current) rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
     advancedRef.current = true;
     advanceScene();
   };
@@ -638,11 +670,12 @@ export default function ComposerSequencePreview({
       if (c.kind === 'voiceover' && c.scene_id && c.url) ids.add(c.scene_id);
     });
     playable.forEach((s) => {
+      // Two-shot scenes with external merged audio do NOT own their voice
+      // via the embedded video — the merged track must play on top.
+      if (s.audioPlan?.twoshot?.useExternalAudio === true) return;
       if (
         s.lipSyncAppliedAt ||
         (s.clipSource as string) === 'ai-heygen' ||
-        // Director Console — locked AudioPlan with at least one rendered clip
-        // owns the scene's spoken track even if the DB row is not yet loaded.
         (s.audioPlan?.speakers?.some((sp) => !!sp.audioUrl))
       ) {
         ids.add(s.id);
@@ -743,7 +776,9 @@ export default function ComposerSequencePreview({
     // Scenes that already have a Sync.so lip-synced clip embed the VO inside
     // the video — playing the separate VO track too would double the audio.
     const lipSyncedSceneIds = new Set(
-      playable.filter(s => !!s.lipSyncAppliedAt).map(s => s.id),
+      playable
+        .filter(s => !!s.lipSyncAppliedAt && s.audioPlan?.twoshot?.useExternalAudio !== true)
+        .map(s => s.id),
     );
     playable.forEach((s, i) => sceneStart.set(s.id, startOffsets[i] || 0));
 

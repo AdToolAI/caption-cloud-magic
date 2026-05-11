@@ -350,6 +350,12 @@ serve(async (req) => {
       }
 
       // Final DB update.
+      // For multi-pass two-shot, the final video's embedded audio only
+      // contains the LAST pass's voice (sync.so muxes its input audio into
+      // the output). The full merged dialogue lives in the external merged
+      // VO track (mergedVo.url, mirrored to character_audio_url). The
+      // preview/render must mute the video and play the external track.
+      const isMultiPassTwoshot = useMultiPass;
       const updates: Record<string, unknown> = {
         clip_url: publicUrl,
         lip_sync_applied_at: new Date().toISOString(),
@@ -360,6 +366,21 @@ serve(async (req) => {
       };
       if (!(scene as any).lip_sync_source_clip_url && scene.clip_url) {
         updates.lip_sync_source_clip_url = scene.clip_url;
+      }
+      if (isMultiPassTwoshot && mergedVo?.url) {
+        const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
+        const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+        updates.audio_plan = {
+          ...prevPlan,
+          twoshot: {
+            ...prevTwoshot,
+            url: mergedVo.url,
+            useExternalAudio: true,
+            embeddedAudio: false,
+            lipsyncedAt: new Date().toISOString(),
+            passes: passes.length,
+          },
+        };
       }
 
       const { error: updErr } = await supabase

@@ -273,7 +273,7 @@ serve(async (req) => {
     // Load scene + ownership
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, dialog_script, dialog_voices, character_shots, character_audio_url, audio_plan")
+      .select("id, project_id, dialog_script, dialog_voices, character_shots, character_audio_url, audio_plan, duration_seconds")
       .eq("id", scene_id)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
@@ -443,8 +443,17 @@ serve(async (req) => {
       mp3Buffers.push(mp3);
     }
 
-    const mergedMp3 = concatMp3(mp3Buffers);
-    const totalSec = mp3DurationSec(mergedMp3);
+    const spokenMp3 = concatMp3(mp3Buffers);
+    const spokenSec = mp3DurationSec(spokenMp3);
+
+    // Pad merged track to scene.duration_seconds with trailing silence so the
+    // downstream lipsync output matches the full scene length (avoids the
+    // "video stops at 4s instead of 10s" bug). If scene duration is shorter
+    // than the spoken audio, we keep the spoken length.
+    const sceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+    const totalSec = Math.max(spokenSec, sceneDur);
+    const tailSec = Math.max(0, totalSec - spokenSec);
+    const mergedMp3 = tailSec > 0 ? concatMp3([spokenMp3, silenceMp3(tailSec)]) : spokenMp3;
 
     // Upload merged track to user-scoped path in voiceover-audio bucket.
     const stamp = Date.now();
@@ -458,9 +467,10 @@ serve(async (req) => {
 
     // ── Build & upload per-speaker padded tracks ────────────────────────
     // For each speaker, we build a track that contains silence before their
-    // segment, their own MP3, then silence padding to reach `totalSec`.
-    // The lipsync function uses these tracks to run one Sync.so pass per
-    // speaker, deterministically assigning each voice to one face.
+    // segment, their own MP3, then silence padding to reach `totalSec` (=
+    // scene length). The lipsync function uses these tracks to run one
+    // Sync.so pass per speaker, deterministically assigning each voice to
+    // one face. Trailing silence guarantees the output matches scene length.
     for (let i = 0; i < segments.length; i++) {
       try {
         const seg = segments[i];
@@ -502,8 +512,11 @@ serve(async (req) => {
       refunded: false,
       metadata: {
         source: "compose-twoshot-audio",
+        kind: "twoshot_merged",
         format: "mp3",
         bitrate: MP3_BITRATE,
+        spoken_seconds: Math.round(spokenSec * 100) / 100,
+        scene_duration_seconds: sceneDur,
         speakers: segments,
       },
     });
@@ -513,13 +526,25 @@ serve(async (req) => {
     }
 
     // Mirror onto the scene so cinematic-sync auto-extend can pick it up.
+    // `audio_plan.twoshot.useExternalAudio = true` signals the preview/render
+    // that the FINAL spoken audio lives in this merged URL — NOT inside the
+    // lipsync video (which only contains the last pass's voice). The preview
+    // must mute the embedded video audio and play `mergedUrl` instead.
     await supabase
       .from("composer_scenes")
       .update({
         character_audio_url: publicUrl,
         audio_plan: {
           ...(scene as any).audio_plan,
-          twoshot: { speakers: segments, totalSec: Math.round(totalSec * 100) / 100, url: publicUrl, generatedAt: new Date().toISOString() },
+          twoshot: {
+            speakers: segments,
+            spokenSec: Math.round(spokenSec * 100) / 100,
+            totalSec: Math.round(totalSec * 100) / 100,
+            url: publicUrl,
+            useExternalAudio: true,
+            embeddedAudio: false,
+            generatedAt: new Date().toISOString(),
+          },
         },
         updated_at: new Date().toISOString(),
       })
