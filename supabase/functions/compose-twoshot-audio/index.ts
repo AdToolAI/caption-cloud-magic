@@ -266,14 +266,16 @@ serve(async (req) => {
     // because dialog_voices is keyed by character SLUG/ID, not first name.
     const charShots = Array.isArray((scene as any).character_shots) ? (scene as any).character_shots : [];
     const charIds = charShots.map((s: any) => s?.characterId).filter(Boolean);
-    // Look up brand_characters by id AND by slug-of-name. Some scenes use
-    // slug-style ids (matthew-dusatko) that are NOT brand_characters UUIDs;
-    // in that case we still need the character row for default_voice_id.
-    const { data: characters } = charIds.length
+    // brand_characters.id is a UUID — slug-style ids (matthew-dusatko) are NOT
+    // present there. Filter to UUID-shaped ids before querying.
+    const uuidCharIds = (charIds as string[]).filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+    );
+    const { data: characters } = uuidCharIds.length
       ? await supabase
           .from("brand_characters")
           .select("id, name, default_voice_id")
-          .or(charIds.map((id: string) => `id.eq.${id}`).join(","))
+          .in("id", uuidCharIds)
       : { data: [] as any[] };
     const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
     const charByName = new Map<string, { id: string; default_voice_id?: string }>();
