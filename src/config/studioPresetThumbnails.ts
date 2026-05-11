@@ -85,6 +85,22 @@ import cinematicSciFi from '@/assets/studio-presets/cinematic/sci-fi-mystery.jpg
 import cinematicHorror from '@/assets/studio-presets/cinematic/horror-dread.jpg';
 import cinematicMidnight from '@/assets/studio-presets/cinematic/midnight-mood.jpg';
 
+// Cinematic Style Presets — Comparable variants (Stage 12).
+// Same locked base scene (`_bases/style.jpg`) re-styled into each look,
+// so users can compare all 12 director looks on the same subject.
+import cinematicSymmetricCmp from '@/assets/studio-presets/cinematic/symmetric-storybook--compare.jpg';
+import cinematicActionCmp from '@/assets/studio-presets/cinematic/high-octane-action--compare.jpg';
+import cinematicArthouseCmp from '@/assets/studio-presets/cinematic/slow-burn-arthouse--compare.jpg';
+import cinematicNoirCmp from '@/assets/studio-presets/cinematic/noir-detective--compare.jpg';
+import cinematicCyberpunkCmp from '@/assets/studio-presets/cinematic/cyberpunk-neon--compare.jpg';
+import cinematicFantasyCmp from '@/assets/studio-presets/cinematic/epic-fantasy--compare.jpg';
+import cinematicDocCmp from '@/assets/studio-presets/cinematic/documentary-realism--compare.jpg';
+import cinematicRomanticCmp from '@/assets/studio-presets/cinematic/romantic-dreamy--compare.jpg';
+import cinematicThrillerCmp from '@/assets/studio-presets/cinematic/thriller-suspense--compare.jpg';
+import cinematicSciFiCmp from '@/assets/studio-presets/cinematic/sci-fi-mystery--compare.jpg';
+import cinematicHorrorCmp from '@/assets/studio-presets/cinematic/horror-dread--compare.jpg';
+import cinematicMidnightCmp from '@/assets/studio-presets/cinematic/midnight-mood--compare.jpg';
+
 const SHOT_THUMBS: Record<ShotCategory, Record<string, string>> = {
   lighting: {
     'golden-hour': lightingGoldenHour,
@@ -164,6 +180,21 @@ const CINEMATIC_THUMBS: Record<string, string> = {
   'midnight-mood': cinematicMidnight,
 };
 
+const CINEMATIC_COMPARE_THUMBS: Record<string, string> = {
+  'symmetric-storybook': cinematicSymmetricCmp,
+  'high-octane-action': cinematicActionCmp,
+  'slow-burn-arthouse': cinematicArthouseCmp,
+  'noir-detective': cinematicNoirCmp,
+  'cyberpunk-neon': cinematicCyberpunkCmp,
+  'epic-fantasy': cinematicFantasyCmp,
+  'documentary-realism': cinematicDocCmp,
+  'romantic-dreamy': cinematicRomanticCmp,
+  'thriller-suspense': cinematicThrillerCmp,
+  'sci-fi-mystery': cinematicSciFiCmp,
+  'horror-dread': cinematicHorrorCmp,
+  'midnight-mood': cinematicMidnightCmp,
+};
+
 export function getPresetThumbnail(category: ShotCategory, id: string | undefined): string | undefined {
   if (!id) return undefined;
   return SHOT_THUMBS[category]?.[id];
@@ -172,4 +203,14 @@ export function getPresetThumbnail(category: ShotCategory, id: string | undefine
 export function getCinematicPresetThumbnail(id: string | undefined): string | undefined {
   if (!id) return undefined;
   return CINEMATIC_THUMBS[id];
+}
+
+/**
+ * Stage 12 — Comparable variant of each Cinematic Style Preset.
+ * Same locked base scene with the preset applied, so users can compare
+ * all 12 looks on the same subject.
+ */
+export function getCinematicPresetCompareThumbnail(id: string | undefined): string | undefined {
+  if (!id) return undefined;
+  return CINEMATIC_COMPARE_THUMBS[id];
 }
