@@ -1,69 +1,46 @@
-## Ziel
-Die Two-Shot-Szene soll wie eine saubere Artlist-/Cinematic-Sync-Pipeline laufen:
-- Das Video spielt die volle Szenenlänge weiter, auch wenn das Voiceover früher endet.
-- Charaktere sprechen strikt nacheinander, nicht gleichzeitig.
-- Keine doppelte Audio-Wiedergabe in der Vorschau.
-- Die Lipsync-Pipeline bekommt deterministische Sprecher-Spuren statt fehleranfälliger Auto-Erkennung.
+## Aktueller Stand (Diagnose)
 
-## Gefundene Ursache
-1. `compose-twoshot-audio` erzeugt aktuell zwar ein gemischtes MP3 und zusätzlich Sprecher-Tracks, aber die Sprecher-Tracks enthalten durch das aktuelle MP3-Silence-Padding potentiell nicht zuverlässig dekodierbare Stille. Dadurch kann Sync.so bzw. der Browser die Spuren falsch interpretieren, was Overlap oder falsche Dauer erzeugen kann.
-2. Die Composer-Vorschau kann parallel Audio aus mehreren Quellen spielen:
-   - eingebettetes Audio im lip-synced MP4
-   - `scene_audio_clips` Voiceover
-   - `audioPlan`-Fallback/virtuelle Clips
-   Dadurch entsteht „gleichzeitig reden“, obwohl die Script-Reihenfolge eigentlich stimmt.
-3. Wenn der Lipsync-Ausgabeclip kürzer als `duration_seconds` ist, stoppt der HTML-Video-Player über `onEnded` sofort, obwohl die Szene laut Timeline 10s hat. Die Vorschau braucht für lip-synced/embedded Clips eine Hold-Last-Frame-Logik bis zur Szenenlänge.
+Die Two-Shot-Szene `b4237058…` steht in der DB jetzt so:
+- `engine_override = cinematic-sync`, `clip_url = silent video` ✅
+- `lip_sync_status = NULL`, `lip_sync_applied_at = NULL`, `character_audio_url = NULL`, `audio_plan = NULL` ❌
+- `dialog_script` + `dialog_voices` + 2 `character_shots` sind noch da ✅
+- **Keine** `scene_audio_clips` (kind=voiceover) für die Szene
 
-## Umsetzung
+Was der Nutzer hört: Das **globale Projekt-Voiceover** (`assemblyConfig.voiceover.audioUrl`), das in `ComposerSequencePreview` als Fallback über die Szene gelegt wird, weil die Szene selbst keinen Two-Shot-Audio-Track hat.
 
-### 1. Two-Shot Audio robust machen
-Datei: `supabase/functions/compose-twoshot-audio/index.ts`
-- Entferne die synthetischen MP3-Silence-Frames als primäre Timing-Strategie.
-- Erzeuge stattdessen ein explizites, sequenzielles Audio-Manifest:
-  - `segments[]` mit `speaker_slug`, `character_id`, `startSec`, `endSec`, `audio_url`
-  - `totalSec`
-  - `sceneTailSec = max(0, scene.duration_seconds - totalSec)`
-- Speichere weiterhin genau einen gemergten Voiceover-Clip in `scene_audio_clips`, aber markiere ihn in `metadata` klar als `twoshot_merged`.
-- Für Lipsync-Pässe sollen einzelne Sprecher-Tracks nur dann genutzt werden, wenn sie browser-/provider-sicher sind; sonst fällt die Pipeline auf segmentweise/manifestbasierte Verarbeitung zurück.
+**Root-Cause:** Unser Reset hat den Two-Shot-State gelöscht, aber die Pipeline (`compose-twoshot-audio` → `compose-twoshot-lipsync`) nicht neu angestoßen. Der Auto-Trigger in `ClipsTab.tsx` (Zeile 280–335) fordert genau diesen Zustand (`engine_override='cinematic-sync'` + `clip_url` + `lip_sync_status=NULL` + `!lip_sync_applied_at`) — er feuert aber nur, wenn der Nutzer den Composer im Browser auf `ClipsTab` geöffnet hat. Der Nutzer hängt aber im **Voiceover-Tab** (Step 04 im Screenshot) — darum läuft kein Auto-Trigger.
 
-### 2. Lipsync nicht mehr mit fehleranfälligen überlappenden Tracks fahren
-Datei: `supabase/functions/compose-twoshot-lipsync/index.ts`
-- Multi-Pass bleibt, aber die Pass-Inputs werden hart validiert:
-  - Wenn Sprecher-Tracks fehlen/unsicher sind: kein „scheinbar erfolgreicher“ Multi-Pass, sondern klarer Fallback oder Fehler.
-  - Pass-Reihenfolge bleibt Script-Reihenfolge plus `character_shots`-Mapping.
-- `sync_mode` wird so gesetzt, dass das Ergebnis nicht auf die kurze VO-Länge gekürzt wird, wenn die Szene länger ist.
-- Nach erfolgreichem Lipsync wird die Szene mit einer eindeutigen Audio-Ownership-Markierung aktualisiert, z. B. `audio_plan.twoshot.embeddedAudio = true`, damit die UI keine separaten VO-Spuren zusätzlich abspielt.
+## Plan
 
-### 3. Vorschau: keine doppelte Stimme mehr
-Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
-- Für Szenen mit `lipSyncAppliedAt` oder `audio_plan.twoshot.embeddedAudio`:
-  - separate `scene_audio_clips` Voiceover und `audioPlan`-Voiceover werden nicht zusätzlich abgespielt.
-  - nur das eingebettete MP4-Audio ist aktiv.
-- Für nicht-lipgesyncte Szenen bleibt die bestehende SFX/VO-Preview unverändert.
+### 1. One-Shot Re-Trigger jetzt für die betroffene Szene
+Direkt `compose-twoshot-lipsync` invoken (der hat den Fallback eingebaut, der `compose-twoshot-audio` selbst aufruft, falls der Merged-VO fehlt). Vorher `lip_sync_status='running'` setzen, damit kein Doppel-Trigger entsteht. Logs prüfen, bis `lip_sync_applied_at` und `character_audio_url` gesetzt sind.
 
-### 4. Vorschau: volle Szenenlänge halten
-Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
-- Wenn ein Videoelement endet, bevor `scene.durationSeconds` erreicht ist:
-  - nicht sofort zur nächsten Szene springen,
-  - letzten Frame halten,
-  - globalen Playhead bis zur geplanten Szenenlänge weiterlaufen lassen,
-  - erst dann weitergehen.
-- Das gilt besonders für lip-synced Clips, deren Render eventuell nur Voiceover-Länge hat.
+### 2. Auto-Trigger Tab-unabhängig machen
+Den State-Detektor aus `ClipsTab.tsx` (Zeilen 276–335) in einen Hook `useTwoShotAutoTrigger(projectId)` ziehen und in `VideoComposerDashboard.tsx` mounten — dort lebt er für alle Tabs (Briefing, Storyboard, Clips, Voiceover, Musik, Export). Verhalten: identisch zur aktuellen Logik, aber zusätzlich greift er auch wenn der User nie den Clips-Tab öffnet. So bleibt nichts hängen, wenn z.B. nach einem Reset oder Edit die Szene wieder „pending" wird.
 
-### 5. Betroffene Szene zurücksetzen
-Datenbank-Aktion nach Code-Fix:
-- Szene `b4237058-710d-4a9b-b011-a0ae01f19ebc` auf erneute Two-Shot-Verarbeitung setzen:
-  - alte Two-Shot-Voiceover-Clips entfernen
-  - `character_audio_url`, `audio_plan`, `lip_sync_status`, `twoshot_stage` bereinigen
-  - ursprünglichen Silent-Clip als `clip_url`/`lip_sync_source_clip_url` erhalten
+### 3. Playback-Schutz in `ComposerSequencePreview`
+Wenn eine Szene Two-Shot-Konfig hat (`character_shots.length >= 2 && lip_sync_with_voiceover && dialog_script`) **aber noch kein `lip_sync_applied_at`**, dann:
+- Globales `voiceoverUrl` für diese Szene **muten** (statt fallthrough), damit der User nicht ein „falsches" VO hört, das als Lip-Sync wirken soll.
+- Statusbadge oben rechts in der Szenen-Vorschau: „Lip-Sync wird vorbereitet…" statt stiller Lüge.
+Das entkoppelt visuelles Erlebnis vom Pipeline-Status — kein „Charaktere stehen stumm da, aber Stimme läuft" mehr.
 
-## Validierung
-- Prüfen, dass `compose-twoshot-audio` ein Manifest mit zwei Segmenten in korrekter Reihenfolge erzeugt.
-- Prüfen, dass `compose-twoshot-lipsync` keine unsicheren parallelen Sprechertracks mehr akzeptiert.
-- In der Vorschau: Zeit läuft bis `0:10`, auch wenn Sprache früher endet.
-- In der Vorschau: nur eine Stimme zur Zeit; kein globales/per-scene Doppel-Audio zusätzlich zum eingebetteten MP4.
+### 4. Sichtbares Re-Trigger-CTA im Voiceover-Tab
+In der Voiceover-Stage (Step 04) eine Karte „Two-Shot Lip-Sync erneut ausführen" mit einem Button, der `compose-twoshot-lipsync` für die markierte Szene aufruft. Notfall-Knopf für Cases, in denen der Auto-Trigger nicht durchläuft (z.B. nach DB-Resets, nach manueller Voice-Änderung).
 
-## Nicht Teil dieses Fixes
-- Keine Änderung am Character-Identity-Lock/Anchor-Rendering selbst.
-- Kein Wechsel des Video-Providers.
-- Keine UI-Neugestaltung.
+### 5. Verifikation
+Nach Deploy:
+1. `compose-twoshot-lipsync` für `b4237058…` invoken
+2. Logs prüfen (audio prep OK, Sync.so passes OK)
+3. DB checken: `lip_sync_applied_at` ≠ NULL, `character_audio_url` ≠ NULL, `audio_plan.twoshot.useExternalAudio = true`
+4. Im Composer Vorschau abspielen → Charaktere reden synchron, kein Doppel-VO
+
+## Technische Details (für später)
+
+**Geänderte Dateien:**
+- `src/components/video-composer/VideoComposerDashboard.tsx` — neuer Hook-Aufruf
+- `src/hooks/useTwoShotAutoTrigger.ts` (neu) — Auto-Trigger-Logik aus ClipsTab extrahiert
+- `src/components/video-composer/ClipsTab.tsx` — alte Trigger-Logik entfernen (jetzt im Hook)
+- `src/components/video-composer/ComposerSequencePreview.tsx` — `pendingTwoShotSceneIds` Set, globalen VO darüber muten
+- `src/components/video-composer/SceneVoiceoverStudio.tsx` (oder analog Voiceover-Tab) — neuer Re-Trigger-Button
+
+**Out of Scope:** Pipeline-interna (compose-twoshot-audio/lipsync) bleiben unverändert — die funktionieren laut Code korrekt, sie werden nur nicht angestoßen.
