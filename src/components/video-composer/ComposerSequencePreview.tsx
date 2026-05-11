@@ -518,6 +518,34 @@ export default function ComposerSequencePreview({
       (!isASource && activeSlotRef.current === 'B');
     if (!fromActive) return;
     if (advancedRef.current) return;
+    // Hold-last-frame: if the rendered MP4 is shorter than the planned scene
+    // duration (common for lip-synced two-shot clips where the video equals
+    // VO length), don't advance immediately. Pause the element on its last
+    // frame and let the watchdog/scrub naturally tick globalTime forward.
+    const cur = playableRef.current[sceneIdxRef.current];
+    const sceneDur = cur?.durationSeconds || 0;
+    const v = e.currentTarget;
+    if (sceneDur > 0 && v.currentTime + 0.15 < sceneDur) {
+      try { v.pause(); v.currentTime = Math.max(0, (v.duration || sceneDur) - 0.05); } catch { /* noop */ }
+      // Drive globalTime forward via RAF until we reach scene length, then advance.
+      const startWall = performance.now();
+      const startGlobal = (startOffsetsRef.current[sceneIdxRef.current] || 0) + v.currentTime;
+      const tick = () => {
+        if (transitioningRef.current || advancedRef.current) return;
+        const elapsed = (performance.now() - startWall) / 1000;
+        const g = startGlobal + elapsed;
+        const sceneEnd = (startOffsetsRef.current[sceneIdxRef.current] || 0) + sceneDur;
+        if (g >= sceneEnd) {
+          advancedRef.current = true;
+          advanceScene();
+          return;
+        }
+        setGlobalTime(g);
+        if (playingRef.current) rafRef.current = requestAnimationFrame(tick);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
     advancedRef.current = true;
     advanceScene();
   };
