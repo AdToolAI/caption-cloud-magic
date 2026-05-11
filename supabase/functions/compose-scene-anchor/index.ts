@@ -121,8 +121,12 @@ serve(async (req) => {
         `If scene lighting differs, only adapt skin shading and color temperature — NEVER alter underlying face geometry, hair, or distinctive marks. ` +
         `Generic lookalikes, AI "average" faces, or substituted people are FORBIDDEN.`
       : ` ABSOLUTE IDENTITY LOCK: Copy this person's face pixel-for-pixel from the reference portrait. Preserve face shape, eyes, nose, mouth, hairline, hair, skin tone, ASYMMETRIC details and any distinctive marks EXACTLY. NO morphing, NO beautification, NO de-aging. Identity preservation outranks aesthetics. The result must be unmistakably the same person.`;
+    // Hard, explicit identity-lock suffix (Part A — verbatim from spec).
+    // Appended on TOP of the multiClause so the model sees it last (recency bias).
+    const HARD_LOCK_SUFFIX =
+      ` IDENTITY LOCK (final): Preserve each person's exact facial identity, age, skin tone, hair style and color from the reference photos. Do NOT age them, do NOT change face shape. Photorealistic.`;
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description, no text, no captions, no watermark.\n\n` +
       `Scene: ${body.scenePrompt}`;
