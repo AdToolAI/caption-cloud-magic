@@ -472,20 +472,34 @@ export default function SceneCard({
     <Card
       ref={cardRef as any}
       id={`scene-card-${scene.id || index}`}
-      className="relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]"
+      className={
+        embedded
+          ? 'relative border-0 bg-transparent shadow-none rounded-none'
+          : 'relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]'
+      }
     >
-      {/* Bond-style vertical gold accent on hover */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-0 top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-      />
-      <CardContent className={isExpanded ? 'p-4 overflow-hidden' : 'p-2.5 overflow-hidden'}>
+      {/* Bond-style vertical gold accent on hover (hidden when embedded) */}
+      {!embedded && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        />
+      )}
+      <CardContent
+        className={
+          embedded
+            ? 'p-0 overflow-visible'
+            : isExpanded
+            ? 'p-4 overflow-hidden'
+            : 'p-2.5 overflow-hidden'
+        }
+      >
         <SceneCardSummaryHeader
           scene={scene}
           index={index}
           totalScenes={totalScenes}
           isExpanded={isExpanded}
-          onToggleExpand={() => setIsExpanded((v) => !v)}
+          onToggleExpand={embedded ? undefined : () => setIsExpanded((v) => !v)}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
           onDelete={onDelete}
