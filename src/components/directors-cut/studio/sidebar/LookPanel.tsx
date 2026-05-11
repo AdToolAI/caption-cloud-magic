@@ -236,23 +236,19 @@ export const LookPanel: React.FC<LookPanelProps> = ({
                 <span className="text-[9px] text-white/30 ml-auto">{category.filters.length}</span>
               </button>
               {expandedCategory === category.name && (
-                <div className="grid grid-cols-4 gap-1.5 pl-1">
+                <div className="grid grid-cols-3 gap-1.5 pl-1">
                   {category.filters.map(filter => {
                     const isActive = activeFilter === filter.id || (!activeFilter && filter.id === 'none');
                     return (
-                      <button
+                      <LookPresetTile
                         key={filter.id}
+                        cssFilter={filter.css}
+                        label={filter.name}
+                        badge={filter.icon}
+                        isActive={isActive}
+                        intensity={isActive ? activeFilterIntensity / 100 : 1}
                         onClick={() => handleFilterSelect(filter.id)}
-                        className={cn(
-                          "flex flex-col items-center gap-1 p-2 rounded-lg transition-all text-center border",
-                          isActive
-                            ? "bg-cyan-500/15 border-cyan-500/40 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                            : "bg-[#0a0a1a]/60 border-white/5 hover:bg-white/5 hover:border-white/10"
-                        )}
-                      >
-                        <span className="text-lg">{filter.icon}</span>
-                        <span className={cn("text-[9px]", isActive ? "text-cyan-300" : "text-white/60")}>{filter.name}</span>
-                      </button>
+                      />
                     );
                   })}
                 </div>
