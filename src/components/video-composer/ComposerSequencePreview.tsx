@@ -670,11 +670,12 @@ export default function ComposerSequencePreview({
       if (c.kind === 'voiceover' && c.scene_id && c.url) ids.add(c.scene_id);
     });
     playable.forEach((s) => {
+      // Two-shot scenes with external merged audio do NOT own their voice
+      // via the embedded video — the merged track must play on top.
+      if (s.audioPlan?.twoshot?.useExternalAudio === true) return;
       if (
         s.lipSyncAppliedAt ||
         (s.clipSource as string) === 'ai-heygen' ||
-        // Director Console — locked AudioPlan with at least one rendered clip
-        // owns the scene's spoken track even if the DB row is not yet loaded.
         (s.audioPlan?.speakers?.some((sp) => !!sp.audioUrl))
       ) {
         ids.add(s.id);
