@@ -1,75 +1,66 @@
+
+# Storyboard v2 — Cinematic Filmstrip + Fused Studio Pane
+
 ## Ziel
+Den Storyboard-Tab so umbauen, dass Kunden auf einen Blick **sehen** was jede Szene zeigt und der Editor nicht mehr versteckt ist. **Keine Features entfernen** – nur visuell fusionieren.
 
-Der Modifier-Tab in `SceneStyleSheet` (über `DirectorPresetPicker` embedded) zeigt aktuell nur Text-Reihen. Jede der 5 Kategorien (Kamera, Objektiv, Licht, Color Grade, Film-Stock) bekommt eine **eigene gelockte Basis-Szene**, aus der alle Varianten dieser Kategorie via Nano Banana 2 (Gemini 3.1 Flash Image Preview) abgeleitet werden — analog zur "Comparable Studio Preset Thumbnail Rule" (Stage 13) für Shot Director.
+## Layout (neu)
 
-## 1. Fünf Basis-Szenen generieren — `imagegen` premium
-
-Eine Master-Szene pro Kategorie, gespeichert unter `src/assets/studio-presets/modifier-bases/`. Generierung mit `imagegen--generate_image` Modell `premium` (Nano Banana 2 / GPT-Image kombiniert) für maximale Foto-Qualität:
-
-| Kategorie | Basis-Szene |
-|---|---|
-| `camera` (7 Optionen) | Person geht in moderner Stadtstraße bei Tageslicht, Mid-Shot — neutraler Look, damit Kamerabewegungen klar werden |
-| `lens` (5 Optionen) | Porträt einer Person in Café, halbnah, mittlere Schärfentiefe — neutraler Brennweiten-Look |
-| `lighting` (7 Optionen) | Porträt eines Subjekts in einem Raum mit Fenster — neutrales Tageslicht als Ausgangspunkt |
-| `mood` / Color Grade (5 Optionen) | Stadtszene blaue Stunde mit Person — neutrales Color Grade |
-| `film-stock` (5 Optionen) | Straßen-Porträt mit reichen Texturen (Haut, Stoff, Beton) — clean digital als Ausgangspunkt |
-
-## 2. 29 Varianten-Thumbnails via Nano Banana 2 (Edit)
-
-Pro Preset-ID wird die jeweilige Basis-Szene mit `imagegen--edit_image` (Nano Banana 2 = `google/gemini-3.1-flash-image-preview`, das offizielle Edit-Modell) geremixt. Identity/Geometrie/Komposition bleiben gelockt, nur die Bild-Eigenschaft der jeweiligen Achse ändert sich (z. B. `cam-orbit` → "orbital tracking shot, 360° around subject"; `light-noir` → "high-contrast film noir lighting, hard shadows"; `stock-vhs` → "VHS retro tape look, scanlines, color bleed").
-
-Ablage: `src/assets/studio-presets/modifier/{category}/{presetId}.jpg`.
-
-Aufschlüsselung: 7 (camera) + 5 (lens) + 7 (lighting) + 5 (mood) + 5 (film-stock) = **29 Variant-Bilder + 5 Basis-Bilder = 34 Assets**, alle 1:1 Square (512×512), Prompts strikt englisch (Core-Regel).
-
-**Qualitäts-Fallback**: Falls eine Edit-Variante visuell nicht klar genug differenziert (z. B. `light-volumetric` ohne sichtbare God Rays), wird derselbe Edit-Call mit verstärktem Prompt + `model: 'premium'` einmal wiederholt — gleiche Eskalations-Strategie wie Stage 15 (Dutch-Tilt-Regeneration).
-
-## 3. Neuer Thumbnail-Mapper
-
-`src/config/modifierThumbnails.ts`:
-```ts
-export function getModifierThumbnail(
-  category: PresetCategory,
-  presetId: string,
-): string | undefined
+```text
+┌─ Storyboard-Tab ───────────────────────────────────────────────┐
+│ Header: Titel + kompakte Cast-Map (Avatar-Dots)                │
+├──────────────────────┬─────────────────────────────────────────┤
+│  FILMSTRIP (col-4)   │  STUDIO-PANE (col-8, sticky)            │
+│                      │                                         │
+│  ▣ Szene 01  Hook    │  Szene 02 · Problem · KI Hailuo         │
+│  ▣ Szene 02  ★aktiv  │  ┌─ Vorschau (16:9) ────────────────┐  │
+│  ▣ Szene 03  Lösung  │  │  Frame oder Spinner              │  │
+│  ▣ Szene 04  Demo    │  └──────────────────────────────────┘  │
+│  ▣ Szene 05          │  Tabs: Prompt | Cast | Style | Mehr    │
+│  + Add Scene         │  Render-Button (sticky bottom)         │
+└──────────────────────┴─────────────────────────────────────────┘
 ```
-Statisches Mapping `presetId → importierte JPG-URL` (ES6-Imports für Vite-Bundling).
 
-## 4. UI-Umbau `DirectorPresetPicker` (embedded mode)
+- **Linke Spalte**: vertikaler Filmstrip mit `aspect-video` Thumbnails (Frame-First Cache → still / fallback Gradient + Type-Icon). Status-Pill, Type-Badge, Cast-Dots, Preis. Klick selektiert.
+- **Rechte Spalte**: **persistenter Editor** der gewählten Szene, sticky beim Scrollen. Ersetzt den bisherigen `Sheet`-Trigger.
+- Continuity-Hinweise (`1→2 Beide Clips müssen gerendert sein`) bleiben als dezenter vertikaler Connector zwischen Thumbnails im Filmstrip.
 
-In `src/components/motion-studio/DirectorPresetPicker.tsx` (Zeilen 77–134) wird die Text-Liste pro Tab durch einen **2-Spalten Thumbnail-Grid** ersetzt — gleicher Look wie `PresetGrid` (Shot Director):
-- `aspect-square` Tile mit Thumbnail
-- Gradient-Overlay (`from-black/85`) + Label unten
-- Active-State: Primary-Border + Checkmark oben rechts
-- Hover: Border-Glow + leichter Scale
-- Tooltip via `title={preset.description}`
-- "Alle Modifier zurücksetzen" Button bleibt unten
+## Komponenten-Änderungen
 
-Der Popover-Mode (nicht embedded) bleibt unverändert.
+### NEU
+- **`StoryboardSceneStrip.tsx`** — Filmstrip-Liste links. Übernimmt `dnd-kit` Reorder + Add-Scene + Continuity-Connectors. Rendert je Szene ein `SceneStripTile`.
+- **`SceneStripTile.tsx`** — Aspect-video Tile mit Thumbnail (Cache: scene_still_frames first variant), Type-Badge, Render-Status-Pill, Cast-Dots, Preis. Active-State = goldener Rahmen + Glow.
+- **`StudioPane.tsx`** — Sticky rechte Spalte. Lädt für `selectedSceneId` den **bereits existierenden** `SceneStyleSheet`-Inhalt (3 Tabs: Stil/Cast/Mehr) **inline** statt im Sheet. Header mit Szenen-Titel + Render-Button.
 
-## 5. Layout-Polish im SceneStyleSheet
+### EDIT
+- **`StoryboardTab.tsx`** — Layout-Refactor: ersetzt vertikale `SortableContext`-Liste durch `<div class="grid grid-cols-12 gap-6"><StoryboardSceneStrip class="col-span-4"/><StudioPane class="col-span-8 sticky top-4"/></div>`. State: `const [selectedSceneId, setSelectedSceneId] = useState(scenes[0]?.id)`. CastConsistencyMap kollabiert in einen kompakten Header-Chip mit Hover-Popover (Detail-Tabelle on demand).
+- **`SceneCard.tsx`** — Behält gesamte Logik. Erhält neuen `variant="strip" | "full"`-Prop:
+  - `"strip"` → rendert nur Thumbnail-Tile (für Filmstrip)
+  - `"full"` → rendert die bisherige große Karte (Fallback / Mobile)
+  - Inline-Tabs werden in `"full"` weiterhin gezeigt; im neuen Layout wird der `SceneStyleSheet`-Inhalt vom `StudioPane` ohne Sheet-Wrapper gemountet.
+- **`SceneStyleSheet.tsx`** — Neuer Prop `embedded?: boolean`. Wenn `true`: rendert ohne `<Sheet>`/`<SheetContent>`-Wrapper, nur den Tab-Inhalt. Bestehender Sheet-Modus bleibt für Mobile.
+- **`CastConsistencyMap.tsx`** — Neue kompakte Variante `<CastConsistencyMap variant="chip" />` für den Header (Avatar-Dots + "5 scenes · 2 cast"). Klick öffnet bestehende Tabelle als Popover.
 
-`SceneStyleSheet.tsx` Zeile 288 (`<TabsContent value="modifiers">`): das Inner-Tabs-Layout mit `max-h-[360px] overflow-y-auto` wird auf `overflow-visible` gesetzt, damit nur der äußere Dialog-Scroll greift (gleiche Anti-Doppel-Scrollbar-Regel wie Stage 15 für Shot Director).
+### Mobile-Fallback
+Unter `md` (< 768px): Filmstrip wird horizontal scrollend, StudioPane fällt zurück auf den alten Sheet-Trigger (kein toter Code – `embedded={false}` Pfad bleibt).
 
-## Geänderte/Neue Dateien
+## Was unverändert bleibt
+- Alle Edge Functions, Datenmodelle, Hooks (`useComposerHistoryContext`, `sceneToSnakeSnapshot`)
+- Sämtliche Features in `SceneStyleSheet` (Frame-First, Shot Director, Modifier, Cast Picker, Style Presets, Cinematic-Sync)
+- Render-Pipeline, Continuity Guardian, Talking-Head Dialog, Hybrid-Extend
+- Drag-and-Drop Reorder (jetzt im Filmstrip)
+- Cast Consistency Map als Daten – nur Darstellung kompakter
 
-- **NEU**: `src/assets/studio-presets/modifier-bases/{camera,lens,lighting,colorgrade,filmstock}.jpg` (5)
-- **NEU**: `src/assets/studio-presets/modifier/{camera,lens,lighting,mood,film-stock}/*.jpg` (29)
-- **NEU**: `src/config/modifierThumbnails.ts`
-- **EDIT**: `src/components/motion-studio/DirectorPresetPicker.tsx` (embedded-Block 77–134)
-- **EDIT**: `src/components/video-composer/SceneStyleSheet.tsx` (Zeile 288, overflow)
+## Akzeptanzkriterien
+1. Beim Öffnen von `/video-composer` Tab "Storyboard" ist der Editor der ersten Szene **sichtbar ohne Klick**.
+2. Klick auf eine andere Szene im Filmstrip wechselt den Editor-Inhalt sofort, ohne Sheet-Animation.
+3. Alle Buttons aus dem alten "Studio öffnen" Sheet sind im StudioPane vorhanden und funktional.
+4. Reorder per Drag im Filmstrip funktioniert weiterhin.
+5. Render-Status, Preis, Type, Cast-Dots auf jeder Tile sichtbar.
+6. Mobile (< 768px): horizontaler Filmstrip + Sheet bleiben funktional.
 
-## Was NICHT angefasst wird
+## Out of Scope
+- Inhaltliche Änderungen am `SceneStyleSheet` (separate Aufgabe falls gewünscht)
+- Live-Generation während Editor offen (das ist ein Artlist-Feature für später)
+- Workflow-Sidebar links von Storyboard bleibt unangetastet
 
-- `directorPresets.ts` (IDs/Modifier-Strings unverändert)
-- Popover-Mode des Pickers
-- `applyDirectorModifiers` / Prompt-Komposition
-- State, API, Memory (Stage-13-Regel deckt es ab)
-
-## Memory-Update
-
-`comparable-thumbnail-rule` wird um "+ Modifier 5 Achsen (cam/lens/lighting/mood/film-stock) via Nano Banana 2" ergänzt — keine neue Datei.
-
-## Aufwand
-
-~34 Image-Generationen (5 Basis premium + 29 Edits Nano Banana 2 parallel pro Kategorie), 1 neue Config-Datei (~40 LoC), 1 Komponenten-Edit (~50 LoC ersetzt durch Grid-Render), 1 1-Zeilen-Patch im SceneStyleSheet.
