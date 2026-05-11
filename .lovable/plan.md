@@ -1,51 +1,69 @@
-## Diagnose
+## Ziel
+Die Two-Shot-Szene soll wie eine saubere Artlist-/Cinematic-Sync-Pipeline laufen:
+- Das Video spielt die volle Szenenlänge weiter, auch wenn das Voiceover früher endet.
+- Charaktere sprechen strikt nacheinander, nicht gleichzeitig.
+- Keine doppelte Audio-Wiedergabe in der Vorschau.
+- Die Lipsync-Pipeline bekommt deterministische Sprecher-Spuren statt fehleranfälliger Auto-Erkennung.
 
-Die Voice-Zuordnung in der DB ist korrekt:
-- `matthew-dusatko` → Hume "Dungeon Master" (männlich)
-- `sarah-dusatko` → Hume "Female Meditation Guide" (weiblich)
-
-`compose-twoshot-audio` mappt die Sprecher auch sauber – im fertigen MP3 spricht erst Matthew (männlich), dann Sarah (weiblich), in dieser Reihenfolge.
-
-Der Tausch entsteht eine Stufe später: `compose-twoshot-lipsync` schickt das gemerged-MP3 + Video an `sync/lipsync-2` und überlässt der Auto-Active-Speaker-Erkennung die Auswahl, **welches Gesicht** zu welchem Audiosegment den Mund bewegt. Das Modell hat nur einen Boolean `active_speaker` und keine per-Segment Face-Map. Bei sehr ähnlichen Mundbewegungen / engem Two-Shot rät es falsch und animiert konsequent das jeweils andere Gesicht – dadurch wirkt es so, als wären die Stimmen vertauscht.
-
-## Lösung: Per-Speaker Doppel-Pass Lip-Sync
-
-Statt eines einzigen Lipsync-Calls mit auto-detect machen wir **zwei sequentielle Passes**, jeweils mit nur EINER aktiven Stimme – die andere als Stille auf Track-Länge gepaddet. Dann hat sync.so genau ein sprechendes Audio-Signal und animiert deterministisch das Gesicht, das am besten dazu passt. In der **richtigen** Pass-Reihenfolge basierend auf der Anchor-Komposition (`character_shots[0]` zuerst).
-
-```text
-Pass 1: video + [Matthew-VO | Stille-Sarah]  → liefert Video mit nur Matthews Mund animiert
-Pass 2: result_pass1 + [Stille-Matthew | Sarah-VO] → final: beide Münder animiert
-```
+## Gefundene Ursache
+1. `compose-twoshot-audio` erzeugt aktuell zwar ein gemischtes MP3 und zusätzlich Sprecher-Tracks, aber die Sprecher-Tracks enthalten durch das aktuelle MP3-Silence-Padding potentiell nicht zuverlässig dekodierbare Stille. Dadurch kann Sync.so bzw. der Browser die Spuren falsch interpretieren, was Overlap oder falsche Dauer erzeugen kann.
+2. Die Composer-Vorschau kann parallel Audio aus mehreren Quellen spielen:
+   - eingebettetes Audio im lip-synced MP4
+   - `scene_audio_clips` Voiceover
+   - `audioPlan`-Fallback/virtuelle Clips
+   Dadurch entsteht „gleichzeitig reden“, obwohl die Script-Reihenfolge eigentlich stimmt.
+3. Wenn der Lipsync-Ausgabeclip kürzer als `duration_seconds` ist, stoppt der HTML-Video-Player über `onEnded` sofort, obwohl die Szene laut Timeline 10s hat. Die Vorschau braucht für lip-synced/embedded Clips eine Hold-Last-Frame-Logik bis zur Szenenlänge.
 
 ## Umsetzung
 
-1. **`compose-twoshot-audio` erweitern**
-   - Zusätzlich zum gemergten MP3 pro Sprecher ein eigenes `speaker_track_url` erzeugen: das eigene MP3 plus Stille (gleiche Länge wie der/die anderen Segmente an deren ursprünglichen Zeitpositionen).
-   - In `metadata.speakers[i]` neben `startSec/endSec` jetzt `track_url`, `speaker_slug` und `character_id` ablegen.
-   - Idempotenz: alle Tracks landen unter `…/twoshot-vo/<scene>/` und werden nur regeneriert wenn `force_regenerate`.
+### 1. Two-Shot Audio robust machen
+Datei: `supabase/functions/compose-twoshot-audio/index.ts`
+- Entferne die synthetischen MP3-Silence-Frames als primäre Timing-Strategie.
+- Erzeuge stattdessen ein explizites, sequenzielles Audio-Manifest:
+  - `segments[]` mit `speaker_slug`, `character_id`, `startSec`, `endSec`, `audio_url`
+  - `totalSec`
+  - `sceneTailSec = max(0, scene.duration_seconds - totalSec)`
+- Speichere weiterhin genau einen gemergten Voiceover-Clip in `scene_audio_clips`, aber markiere ihn in `metadata` klar als `twoshot_merged`.
+- Für Lipsync-Pässe sollen einzelne Sprecher-Tracks nur dann genutzt werden, wenn sie browser-/provider-sicher sind; sonst fällt die Pipeline auf segmentweise/manifestbasierte Verarbeitung zurück.
 
-2. **`compose-twoshot-lipsync` umbauen**
-   - Wenn `metadata.speakers` mit `track_url` vorhanden ist: für jede Speaker-Spur einen sequentiellen Lipsync-Pass starten, jeweils `active_speaker: true`, `sync_mode: "loop"`.
-   - Pass-Reihenfolge nach `character_shots`-Position (Position 0 zuerst), damit das erste animierte Gesicht zur visuellen Layout-Erwartung passt.
-   - Als Eingabe-Video für Pass N+1 das Output-Video von Pass N nehmen.
-   - Fallback (kein speakers-Array): bisheriges Single-Pass-Verhalten beibehalten.
-   - Refund-Logik weiter idempotent halten; Kosten = N × $0.05/sec der Szenenlänge – dem User über `cost_credits` korrekt zurechnen.
+### 2. Lipsync nicht mehr mit fehleranfälligen überlappenden Tracks fahren
+Datei: `supabase/functions/compose-twoshot-lipsync/index.ts`
+- Multi-Pass bleibt, aber die Pass-Inputs werden hart validiert:
+  - Wenn Sprecher-Tracks fehlen/unsicher sind: kein „scheinbar erfolgreicher“ Multi-Pass, sondern klarer Fallback oder Fehler.
+  - Pass-Reihenfolge bleibt Script-Reihenfolge plus `character_shots`-Mapping.
+- `sync_mode` wird so gesetzt, dass das Ergebnis nicht auf die kurze VO-Länge gekürzt wird, wenn die Szene länger ist.
+- Nach erfolgreichem Lipsync wird die Szene mit einer eindeutigen Audio-Ownership-Markierung aktualisiert, z. B. `audio_plan.twoshot.embeddedAudio = true`, damit die UI keine separaten VO-Spuren zusätzlich abspielt.
 
-3. **Self-Heal der betroffenen Szene**
-   - Für `b4237058-…` `scene_audio_clips` löschen, `character_audio_url`, `audio_plan` leeren, `lip_sync_status='pending'`, `twoshot_stage=NULL`, damit beim nächsten "In echte Szene einbauen" der neue Doppel-Pass greift.
+### 3. Vorschau: keine doppelte Stimme mehr
+Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
+- Für Szenen mit `lipSyncAppliedAt` oder `audio_plan.twoshot.embeddedAudio`:
+  - separate `scene_audio_clips` Voiceover und `audioPlan`-Voiceover werden nicht zusätzlich abgespielt.
+  - nur das eingebettete MP4-Audio ist aktiv.
+- Für nicht-lipgesyncte Szenen bleibt die bestehende SFX/VO-Preview unverändert.
 
-4. **Validierung**
-   - Edge-Logs: `compose-twoshot-audio` muss 2 `speaker_track_url` ausliefern, `compose-twoshot-lipsync` muss "pass 1/2" und "pass 2/2" loggen.
-   - Visuell: Matthew (links/erster Shot) bewegt zur männlichen Stimme den Mund, Sarah zur weiblichen.
+### 4. Vorschau: volle Szenenlänge halten
+Datei: `src/components/video-composer/ComposerSequencePreview.tsx`
+- Wenn ein Videoelement endet, bevor `scene.durationSeconds` erreicht ist:
+  - nicht sofort zur nächsten Szene springen,
+  - letzten Frame halten,
+  - globalen Playhead bis zur geplanten Szenenlänge weiterlaufen lassen,
+  - erst dann weitergehen.
+- Das gilt besonders für lip-synced Clips, deren Render eventuell nur Voiceover-Länge hat.
 
-## Geänderte Dateien
+### 5. Betroffene Szene zurücksetzen
+Datenbank-Aktion nach Code-Fix:
+- Szene `b4237058-710d-4a9b-b011-a0ae01f19ebc` auf erneute Two-Shot-Verarbeitung setzen:
+  - alte Two-Shot-Voiceover-Clips entfernen
+  - `character_audio_url`, `audio_plan`, `lip_sync_status`, `twoshot_stage` bereinigen
+  - ursprünglichen Silent-Clip als `clip_url`/`lip_sync_source_clip_url` erhalten
 
-- `supabase/functions/compose-twoshot-audio/index.ts`
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-- DB-Reset für die aktuelle Szene (Migration nicht nötig, einfaches Update via service role)
+## Validierung
+- Prüfen, dass `compose-twoshot-audio` ein Manifest mit zwei Segmenten in korrekter Reihenfolge erzeugt.
+- Prüfen, dass `compose-twoshot-lipsync` keine unsicheren parallelen Sprechertracks mehr akzeptiert.
+- In der Vorschau: Zeit läuft bis `0:10`, auch wenn Sprache früher endet.
+- In der Vorschau: nur eine Stimme zur Zeit; kein globales/per-scene Doppel-Audio zusätzlich zum eingebetteten MP4.
 
-## Was NICHT geändert wird
-
-- Voice-Mapping (ist korrekt)
-- Anchor-Komposition / Identity-Lock (bleibt v3)
-- `compose-video-clips` (Hailuo-Render unverändert)
+## Nicht Teil dieses Fixes
+- Keine Änderung am Character-Identity-Lock/Anchor-Rendering selbst.
+- Kein Wechsel des Video-Providers.
+- Keine UI-Neugestaltung.
