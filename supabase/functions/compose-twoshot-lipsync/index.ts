@@ -275,7 +275,7 @@ serve(async (req) => {
 
       if (!outUrl) {
         await refund("no_output_url");
-        return json({ error: "no output url" }, 502);
+        return;
       }
 
       // Re-host output in our own bucket.
