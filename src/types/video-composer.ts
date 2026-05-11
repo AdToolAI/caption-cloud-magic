@@ -436,6 +436,21 @@ export interface AudioPlanSpeaker {
   audioUrl?: string;
 }
 
+export interface AudioPlanTwoshot {
+  url?: string;
+  speakers?: Array<Record<string, unknown>>;
+  spokenSec?: number;
+  totalSec?: number;
+  /** When true, the canonical merged dialogue lives at `url` and the lipsync
+   *  MP4 only embeds the LAST pass's voice. Preview/render must mute the
+   *  embedded video audio and play `url` instead. */
+  useExternalAudio?: boolean;
+  embeddedAudio?: boolean;
+  generatedAt?: string;
+  lipsyncedAt?: string;
+  passes?: number;
+}
+
 export interface AudioPlan {
   version: 1;
   /** Per-speaker timing (in script order). */
@@ -448,6 +463,8 @@ export interface AudioPlan {
   language?: 'de' | 'en' | 'es';
   /** ISO timestamp when this plan was generated. */
   generatedAt: string;
+  /** Two-Shot multi-speaker pipeline metadata. */
+  twoshot?: AudioPlanTwoshot;
 }
 
 export type SubtitlePosition = 'top' | 'bottom';
