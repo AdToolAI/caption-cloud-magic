@@ -1,48 +1,40 @@
-## Befund
+## Ziel
+Die Two‑Shot/Cinematic‑Sync Pipeline soll wieder zuverlässig:
+- beide Charakter-Stimmen hörbar machen,
+- das Video nicht nach ca. 4s Voiceover gefühlt enden lassen, sondern die volle 10s-Szene nutzen,
+- Gesichter stärker an die Avatar-Referenzen binden.
 
-Edge-Logs zeigen den echten Fehler:
-
-```
-[compose-twoshot-audio] error
-ElevenLabs Female Meditation Guide failed (400):
-"An invalid ID has been received: 'Female Meditation Guide'"
-```
-
-Die Szene hat in `dialog_voices`:
-- `matthew-dusatko` → `engine: hume`, `voiceId: "Dungeon Master"`
-- `sarah-dusatko`  → `engine: hume`, `voiceId: "Female Meditation Guide"`
-
-Das sind **Hume-Stimmen**, aber `compose-twoshot-audio` ruft immer ElevenLabs auf und schickt den Hume-Namen als ElevenLabs-Voice-ID → 500. Danach läuft `compose-twoshot-lipsync` in 422 (kein `character_audio_url`), und im UI erscheint „Lip-Sync fehlgeschlagen – Edge Function returned a non-2xx status code".
+## Gefundene Ursachen
+- `scene_audio_clips` wird nicht gespeichert, weil beim Insert `user_id` fehlt. Dadurch findet `compose-twoshot-lipsync` später oft keinen Voiceover-Clip und verlässt sich nur auf `audio_plan`/Nebenpfade.
+- Die Voice-Zuordnung matcht Sprecher wie `Matthew Dusatko` nur über den ersten Namen (`matthew`), aber `dialog_voices` ist per Character-ID (`matthew-dusatko`) gespeichert. Dadurch fällt Matthew auf die Sarah-Stimme zurück. Deshalb hörst du nur die weibliche Stimme.
+- Das Video ist zwar als 10s Szene gerendert, aber der erzeugte Audio-Track ist nur ca. 4s lang. Sync.so bekommt aktuell keinen sauberen Auftrag, die restlichen Sekunden als stille/ambient Szene weiterlaufen zu lassen.
+- Für Avatar-Treue wird aktuell ein Nano-Banana-komponiertes First Frame an Hailuo gegeben. Das hilft der Komposition, aber Hailuo kann Gesichter danach weiter verändern. Für zwei echte Referenzcharaktere ist das nur begrenzt 1:1.
 
 ## Umsetzung
+1. **Two‑Shot Audio zuverlässig speichern**
+   - `compose-twoshot-audio` Insert in `scene_audio_clips` mit `user_id`, `project_id`, `source`, `volume`, `cost_credits`, `refunded`, `metadata` vervollständigen.
+   - Dadurch kann `compose-twoshot-lipsync` den richtigen VO-Clip stabil finden.
 
-1. **`compose-twoshot-audio` engine-aware machen**
-   - `resolveVoiceId` so erweitern, dass es `{ voiceId, engine, provider }` zurückgibt statt nur eines Strings.
-   - Pro Dialog-Block je nach `engine`:
-     - `elevenlabs` (default) → bestehender ElevenLabs-Aufruf.
-     - `hume` → neuer `humeMp3()`-Aufruf gegen `https://api.hume.ai/v0/tts/file` mit `voice: { name, provider }` und `format: { type: 'mp3' }` (analog zu `generate-voiceover-hume`).
-   - Wenn `engine` fehlt aber `voiceId` nicht wie eine ElevenLabs-ID aussieht (nicht 20 Zeichen alphanumerisch), wird automatisch Hume probiert; schlägt das fehl, sauberes Fallback auf eine Default-ElevenLabs-Stimme statt 500.
+2. **Voice-Mapping reparieren**
+   - Speaker-Normalisierung erweitern: `Matthew Dusatko` → `matthew-dusatko`, zusätzlich First-Name und Full-Name Keys prüfen.
+   - `dialog_voices` zuerst über Character-ID/Slug matchen, dann über Namen, erst danach Fallback.
+   - So bekommt Matthew wieder `Dungeon Master` und Sarah `Female Meditation Guide`.
 
-2. **Audio-Pipeline auf MP3-Concat umstellen**
-   - Bisher wird PCM 16-bit @ 44.1 kHz konkateniert und als WAV verpackt. Hume liefert MP3, kein PCM bei gleicher Rate.
-   - ElevenLabs auf `output_format=mp3_44100_128` umstellen, Hume auf `format: { type: 'mp3' }` belassen.
-   - Pro Block MP3-Bytes holen, mit kurzer Stille-MP3 (vorab generierter Buffer für `gapSec`) als Frames aneinanderhängen; Ergebnis als `audio/mpeg` in den `voiceover-audio` Bucket hochladen.
-   - Sync.so akzeptiert MP3 als Audio-Input, also kein Format-Bruch für `compose-twoshot-lipsync`.
+3. **10s Szene nach dem Skript erhalten**
+   - Nach dem letzten Dialogsegment eine stille Tail-Zone bis zur Szenendauer im `audio_plan` abbilden.
+   - `compose-twoshot-lipsync` soll bei Two‑Shot standardmäßig `sync_mode: "loop"` nur nutzen, wenn es sinnvoll ist, und die Scene-Duration/VO-Duration sauber loggen.
+   - Falls Sync.so den Clip dennoch auf Audio-Länge kürzt, wird der LipSync-Output nicht als endgültige 4s-Szene behandelt; dann bleibt/greift die 10s Master-Clip-Quelle als Basis für die weitere Vorschau/Exportlogik.
 
-3. **Self-Healing der aktuellen Szene**
-   - Stuck-Szene `ad491587-…` zurücksetzen (`character_audio_url=NULL`, `audio_plan=NULL`, `lip_sync_status='pending'`, `twoshot_stage=NULL`), damit der Auto-Trigger in `ClipsTab` einen sauberen Lauf startet, sobald die Edge-Funktion das Hume-Routing kann.
+4. **Avatar-Identität härter locken**
+   - Anchor-Prompt auf „no face morphing / identity preservation over beauty / keep asymmetric details“ schärfen.
+   - Cache-Key erneut bumpen, damit alte schwächere Anchors nicht wiederverwendet werden.
+   - In `compose-video-clips` für Cinematic‑Sync den Hailuo-Prompt mit expliziten Character-Identity-Regeln ergänzen: beide Personen müssen aus den Referenzporträts stammen; keine generischen Lookalikes; Gesichter müssen im ersten Frame erkennbar bleiben.
 
-4. **Sichtbares Logging + saubere 4xx**
-   - Wenn weder ElevenLabs- noch Hume-Aufruf klappt, mit `400` + sprechender Fehlermeldung (`"Voice 'X' (engine=hume) konnte nicht erzeugt werden"`) zurück, statt 500. So zeigt das UI den echten Grund.
+5. **Aktuelle Szene self-healen**
+   - Für die betroffene Szene den falschen Audio-Stand löschen/resetten: `scene_audio_clips` für diese Szene entfernen, `character_audio_url/audio_plan` leeren, `lip_sync_status='pending'`, `twoshot_stage=NULL`.
+   - Danach generiert die Pipeline frischen Audio-Track mit beiden Stimmen.
 
-## Out of Scope
-
-- Keine Änderungen am Face-Lock / `compose-scene-anchor`.
-- Keine Änderung am Sync.so-Aufruf selbst.
-- Keine UI-Änderung am Voice-Picker (Hume bleibt eine gültige Wahl).
-
-## Validierung
-
-- Nach Deploy: erneuter Klick auf "Lip-Sync starten" für Szene 1.
-- Edge-Logs zeigen `[compose-twoshot-audio] hume voice ok` statt ElevenLabs-400.
-- DB: Szene bekommt `character_audio_url`, `lip_sync_status` läuft `pending → running → done`, Preview spielt Voiceover über Lip-Sync-MP4.
+6. **Validierung**
+   - Edge Function Logs prüfen: Matthew muss mit `Dungeon Master`, Sarah mit `Female Meditation Guide` erzeugt werden.
+   - Datenbank prüfen: ein `scene_audio_clips` Voiceover-Row mit `user_id`, `project_id`, ca. passender Dauer und `speakers` Metadata existiert.
+   - Betroffene Functions deployen: `compose-twoshot-audio`, `compose-twoshot-lipsync`, `compose-scene-anchor`, ggf. `compose-video-clips`.

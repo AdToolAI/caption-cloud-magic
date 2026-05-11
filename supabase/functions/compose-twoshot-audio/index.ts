@@ -48,7 +48,7 @@ interface DialogBlock {
   text: string;
 }
 
-/** Split "Matthew: hi\nSarah: hello" into ordered blocks. */
+/** Split "Matthew Dusatko: hi\nSarah: hello" into ordered blocks. */
 function parseDialogScript(script: string): DialogBlock[] {
   const blocks: DialogBlock[] = [];
   const lines = script.split(/\r?\n/);
@@ -59,7 +59,10 @@ function parseDialogScript(script: string): DialogBlock[] {
     const text = m[2].trim();
     if (!text) continue;
     blocks.push({
-      speakerName: rawSpeaker.toLowerCase().split(/\s+/)[0], // first name
+      // Keep FULL normalized name (lowercase, hyphenated) so we can match
+      // dialog_voices keys like "matthew-dusatko" — first-name match falls
+      // out as a fallback inside resolveVoice.
+      speakerName: rawSpeaker.toLowerCase().replace(/\s+/g, "-"),
       rawSpeaker,
       text,
     });
@@ -78,11 +81,11 @@ function looksLikeElevenLabsId(v: string): boolean {
   return /^[A-Za-z0-9]{20}$/.test(v);
 }
 
-/** Look up voice config from dialog_voices keyed by speaker id, character id, or first-name match. */
+/** Look up voice config from dialog_voices keyed by speaker id, character id slug, or first-name match. */
 function resolveVoice(
   block: DialogBlock,
   dialogVoices: Record<string, any>,
-  charactersByFirstName: Map<string, { id: string; default_voice_id?: string }>,
+  charactersByName: Map<string, { id: string; default_voice_id?: string }>,
 ): ResolvedVoice | null {
   const cfgToVoice = (cfg: any): ResolvedVoice | null => {
     if (!cfg) return null;
@@ -99,16 +102,22 @@ function resolveVoice(
     };
   };
 
-  // 1) Exact key match (id-keyed)
-  for (const [key, cfg] of Object.entries(dialogVoices)) {
-    if (key.toLowerCase() === block.speakerName) {
-      const v = cfgToVoice(cfg);
+  const fullSlug = block.speakerName; // "matthew-dusatko"
+  const firstName = fullSlug.split("-")[0]; // "matthew"
+
+  // 1) Exact key match against dialog_voices for full slug, then first name.
+  const dvKeys = Object.keys(dialogVoices);
+  for (const candidate of [fullSlug, firstName]) {
+    const hit = dvKeys.find((k) => k.toLowerCase() === candidate);
+    if (hit) {
+      const v = cfgToVoice(dialogVoices[hit]);
       if (v) return v;
     }
   }
-  // 2) Match via cast character first-name → its id → dialog_voices entry
-  const c = charactersByFirstName.get(block.speakerName);
-  if (c) {
+  // 2) Match via cast character (full slug or first name) → its id → dialog_voices entry
+  for (const candidate of [fullSlug, firstName]) {
+    const c = charactersByName.get(candidate);
+    if (!c) continue;
     const cfg = (dialogVoices as any)[c.id];
     const v = cfgToVoice(cfg);
     if (v) return v;
@@ -261,19 +270,42 @@ serve(async (req) => {
       return json({ error: "single_speaker_or_empty", blocks: blocks.length }, 400);
     }
 
-    // Build first-name → character lookup so we can resolve voices and portraits.
+    // Build name → character lookup so we can resolve voices.
+    // We index by first name AND full slugified name (e.g. "matthew-dusatko")
+    // because dialog_voices is keyed by character SLUG/ID, not first name.
     const charShots = Array.isArray((scene as any).character_shots) ? (scene as any).character_shots : [];
     const charIds = charShots.map((s: any) => s?.characterId).filter(Boolean);
-    const { data: characters } = charIds.length
+    // brand_characters.id is a UUID — slug-style ids (matthew-dusatko) are NOT
+    // present there. Filter to UUID-shaped ids before querying.
+    const uuidCharIds = (charIds as string[]).filter((id) =>
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+    );
+    const { data: characters } = uuidCharIds.length
       ? await supabase
           .from("brand_characters")
           .select("id, name, default_voice_id")
-          .in("id", charIds)
+          .in("id", uuidCharIds)
       : { data: [] as any[] };
-    const charByFirstName = new Map<string, { id: string; default_voice_id?: string }>();
+    const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
+    const charByName = new Map<string, { id: string; default_voice_id?: string }>();
     for (const c of characters ?? []) {
-      const fn = String(c.name || "").trim().toLowerCase().split(/\s+/)[0];
-      if (fn) charByFirstName.set(fn, { id: c.id, default_voice_id: c.default_voice_id ?? undefined });
+      const full = String(c.name || "").trim().toLowerCase();
+      const fn = full.split(/\s+/)[0];
+      const slug = slugify(full);
+      const entry = { id: c.id, default_voice_id: c.default_voice_id ?? undefined };
+      if (fn) charByName.set(fn, entry);
+      if (slug) charByName.set(slug, entry);
+      if (full) charByName.set(full, entry);
+    }
+    // Also pre-index character_shots so we can map a speaker name → its
+    // characterId (matthew-dusatko) directly, without needing brand_characters.
+    for (const cs of charShots) {
+      if (!cs?.characterId) continue;
+      const idLower = String(cs.characterId).toLowerCase();
+      const fnFromId = idLower.split("-")[0];
+      const entry = { id: idLower, default_voice_id: undefined };
+      if (!charByName.has(idLower)) charByName.set(idLower, entry);
+      if (fnFromId && !charByName.has(fnFromId)) charByName.set(fnFromId, entry);
     }
 
     const dialogVoices = ((scene as any).dialog_voices ?? {}) as Record<
@@ -313,7 +345,7 @@ serve(async (req) => {
     let cursor = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const voice = resolveVoice(block, dialogVoices, charByFirstName);
+      const voice = resolveVoice(block, dialogVoices, charByName);
       if (!voice) {
         return json({
           error: "missing_voice",
@@ -390,11 +422,18 @@ serve(async (req) => {
     await supabase.from("scene_audio_clips").delete().eq("scene_id", scene_id).eq("kind", "voiceover");
 
     const insertRes = await supabase.from("scene_audio_clips").insert({
+      user_id: userId,
+      project_id: scene.project_id,
       scene_id,
       kind: "voiceover",
+      source: "ai",
       url: publicUrl,
       duration: Math.round(totalSec * 100) / 100,
       start_offset: 0,
+      volume: 1,
+      ducking_enabled: false,
+      cost_credits: 0,
+      refunded: false,
       metadata: {
         source: "compose-twoshot-audio",
         format: "mp3",
