@@ -97,29 +97,28 @@ const TransitionBlock: React.FC<{
             </button>
           </div>
 
-          {/* Transition type grid */}
-          <div className="grid grid-cols-4 gap-1">
-            {TRANSITION_TYPES.map((tr) => (
-              <button
-                key={tr.id}
-                onClick={() => {
-                  if (tr.id === 'none') {
-                    onTransitionChange(sceneId, null);
-                  } else {
-                    onTransitionChange(sceneId, tr.id, transition?.duration ?? 1.2);
-                  }
-                }}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 p-1.5 rounded-lg border text-[9px] transition-all",
-                  (hasTransition && transition?.transitionType === tr.id) || (!hasTransition && tr.id === 'none')
-                    ? "border-cyan-500/50 bg-cyan-500/15 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.15)]"
-                    : "border-white/5 text-white/50 hover:border-white/15 hover:bg-white/5"
-                )}
-              >
-                <span className="text-sm leading-none">{tr.icon}</span>
-                <span>{tr.id === 'none' ? t('dc.transitionNone') : tr.name}</span>
-              </button>
-            ))}
+          {/* Transition type grid (animated mini-loops) */}
+          <div className="grid grid-cols-4 gap-1.5">
+            {TRANSITION_TYPES.map((tr) => {
+              const active = (hasTransition && transition?.transitionType === tr.id)
+                || (!hasTransition && tr.id === 'none');
+              return (
+                <TransitionPreviewTile
+                  key={tr.id}
+                  transitionId={tr.id}
+                  label={tr.id === 'none' ? t('dc.transitionNone') : tr.name}
+                  isActive={active}
+                  size="sm"
+                  onClick={() => {
+                    if (tr.id === 'none') {
+                      onTransitionChange(sceneId, null);
+                    } else {
+                      onTransitionChange(sceneId, tr.id, transition?.duration ?? 1.2);
+                    }
+                  }}
+                />
+              );
+            })}
           </div>
 
           {/* Duration slider — only when a transition is active */}
