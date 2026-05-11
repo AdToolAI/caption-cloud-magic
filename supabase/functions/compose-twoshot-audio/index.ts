@@ -26,10 +26,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-const SAMPLE_RATE = 44100;
-const BITS_PER_SAMPLE = 16;
-const CHANNELS = 1;
-const INTER_SPEAKER_GAP_SEC = 0.25;
+// MP3 pipeline @ 44.1 kHz / 128 kbps CBR — both ElevenLabs and Hume can deliver
+// this format, so we can concatenate buffers byte-wise and let downstream
+// (Sync.so / ffmpeg) decode the stitched stream. Duration is derived from
+// CBR math (bytes * 8 / bitrate). A natural pause between speakers is
+// produced by appending " ... " to each non-final block's text — the TTS
+// engine handles the prosody, no synthetic silence frames needed.
+const MP3_BITRATE = 128_000; // bits per second
+const FALLBACK_ELEVEN_VOICE = "EXAVITQu4vr4xnSDxMaL"; // Sarah — neutral female fallback
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
