@@ -305,41 +305,82 @@ serve(async (req) => {
       }
     }
 
-    // Per-speaker TTS in script order.
-    const pcmBuffers: Uint8Array[] = [];
-    const segments: Array<{ speaker: string; startSec: number; endSec: number }> = [];
+    // Per-speaker TTS in script order. We append " ... " to each non-final
+    // block so the TTS engine produces a natural pause between speakers,
+    // avoiding the need to inject silence between MP3 frames.
+    const mp3Buffers: Uint8Array[] = [];
+    const segments: Array<{ speaker: string; engine: string; voice: string; startSec: number; endSec: number }> = [];
     let cursor = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
-      const voiceId = resolveVoiceId(block, dialogVoices, charByFirstName);
-      if (!voiceId) {
+      const voice = resolveVoice(block, dialogVoices, charByFirstName);
+      if (!voice) {
         return json({
           error: "missing_voice",
           speaker: block.rawSpeaker,
           message: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`,
         }, 400);
       }
-      const pcm = await elevenlabsPcm(elevenKey, voiceId, block.text);
-      const samples = pcm.length / (BITS_PER_SAMPLE / 8) / CHANNELS;
-      const dur = samples / SAMPLE_RATE;
+      const isLast = i === blocks.length - 1;
+      const utterance = isLast ? block.text : `${block.text} ...`;
+      let mp3: Uint8Array;
+      try {
+        if (voice.engine === "hume") {
+          if (!humeKey) throw new Error("HUME_API_KEY not configured");
+          mp3 = await humeMp3(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
+        } else {
+          if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
+          mp3 = await elevenlabsMp3(elevenKey, voice.voiceId, utterance);
+        }
+        console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, { speaker: block.rawSpeaker, voice: voice.voiceId, bytes: mp3.length });
+      } catch (primaryErr) {
+        // Fallback path: if the requested engine fails (e.g. invalid Hume voice
+        // name on a fresh Hume account), fall back to a neutral ElevenLabs
+        // voice rather than 500-ing the whole pipeline.
+        const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+        console.warn(`[compose-twoshot-audio] ${voice.engine} failed, falling back to ElevenLabs:`, errMsg);
+        if (!elevenKey) {
+          return json({
+            error: "tts_failed",
+            speaker: block.rawSpeaker,
+            voice: voice.voiceId,
+            engine: voice.engine,
+            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+          }, 400);
+        }
+        try {
+          mp3 = await elevenlabsMp3(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+        } catch (fbErr) {
+          return json({
+            error: "tts_failed",
+            speaker: block.rawSpeaker,
+            voice: voice.voiceId,
+            engine: voice.engine,
+            message: `Stimme "${voice.voiceId}" (${voice.engine}) konnte nicht erzeugt werden: ${errMsg}`,
+            fallback_error: fbErr instanceof Error ? fbErr.message : String(fbErr),
+          }, 400);
+        }
+      }
+      const dur = mp3DurationSec(mp3);
       segments.push({
         speaker: block.rawSpeaker,
+        engine: voice.engine,
+        voice: voice.voiceId,
         startSec: Math.round(cursor * 100) / 100,
         endSec: Math.round((cursor + dur) * 100) / 100,
       });
-      cursor += dur + (i < blocks.length - 1 ? INTER_SPEAKER_GAP_SEC : 0);
-      pcmBuffers.push(pcm);
+      cursor += dur;
+      mp3Buffers.push(mp3);
     }
 
-    const mergedPcm = concatPcmWithGaps(pcmBuffers, INTER_SPEAKER_GAP_SEC);
-    const wav = pcmToWav(mergedPcm);
-    const totalSec = mergedPcm.length / (BITS_PER_SAMPLE / 8) / CHANNELS / SAMPLE_RATE;
+    const mergedMp3 = concatMp3(mp3Buffers);
+    const totalSec = mp3DurationSec(mergedMp3);
 
     // Upload to user-scoped path in voiceover-audio bucket.
-    const fileName = `${userId}/twoshot-vo/${scene_id}-${Date.now()}.wav`;
+    const fileName = `${userId}/twoshot-vo/${scene_id}-${Date.now()}.mp3`;
     const { error: upErr } = await supabase.storage
       .from("voiceover-audio")
-      .upload(fileName, wav, { contentType: "audio/wav", upsert: false });
+      .upload(fileName, mergedMp3, { contentType: "audio/mpeg", upsert: false });
     if (upErr) return json({ error: `upload failed: ${upErr.message}` }, 500);
     const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(fileName);
     const publicUrl = pub.publicUrl;
