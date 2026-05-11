@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { SceneAnalysis, SceneEffects } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 interface FXPanelProps {
   chromaKey: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
