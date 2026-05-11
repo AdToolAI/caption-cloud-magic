@@ -317,20 +317,28 @@ export default function StoryboardTab({
     onUpdateScenes(updated.map((s, i) => ({ ...s, orderIndex: i })));
   };
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  // Storyboard v2 — selected scene drives the right-pane editor.
+  const [selectedSceneId, setSelectedSceneId] = useState<string | undefined>(
+    scenes[0]?.id,
   );
+  // Keep selection valid when scenes change (delete / add / reorder via DB refetch).
+  useEffect(() => {
+    if (!scenes.length) {
+      if (selectedSceneId !== undefined) setSelectedSceneId(undefined);
+      return;
+    }
+    if (!selectedSceneId || !scenes.some((s) => s.id === selectedSceneId)) {
+      setSelectedSceneId(scenes[0].id);
+    }
+  }, [scenes, selectedSceneId]);
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = scenes.findIndex((s) => s.id === active.id);
-    const newIndex = scenes.findIndex((s) => s.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const reordered = arrayMove(scenes, oldIndex, newIndex);
-    onUpdateScenes(reordered.map((s, i) => ({ ...s, orderIndex: i })));
-  };
+  const selectedIndex = useMemo(
+    () => scenes.findIndex((s) => s.id === selectedSceneId),
+    [scenes, selectedSceneId],
+  );
+  const selectedScene = selectedIndex >= 0 ? scenes[selectedIndex] : undefined;
+  const previousSceneOfSelected =
+    selectedIndex > 0 ? scenes[selectedIndex - 1] : undefined;
 
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
