@@ -1,52 +1,108 @@
-# Stage 8 — Comparable Thumbnails Backfill
+# Plan — Visual Picker System: Vollendung in 5 Stages
 
-Backfill the 49 Shot Director thumbnails so each axis uses ONE locked base scene and only the option's variable changes — fulfilling the existing comparable-thumbnail rule.
+Sequenzielle Implementierung der offenen Punkte nach Stage 8. Jede Stage ist in sich abgeschlossen und kann separat approved werden.
 
-## Scope
+---
 
-For each of the 6 axes, generate one base scene, then edit it 6–10 times (once per option), keeping wardrobe / lighting / location / camera distance constant except for the axis variable.
+## Stage 9 — Memory-Flip & Dokumentation
 
-| Axis      | Base scene (locked, English prompt)                                                                                                              | # edits |
-|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------|---------|
-| framing   | Woman in beige trench coat on rainy neon-lit Tokyo street at night, shallow depth of field, cinematic                                            | 8       |
-| angle     | Same woman, medium shot, eye-level, same wardrobe, same neon street                                                                              | 8       |
-| movement  | Same woman walking down the same street, medium shot, neutral steady frame (motion implied via blur on tile + mv-* CSS loop)                     | 10      |
-| lighting  | Same woman, medium close-up, neutral pose, plain interior backdrop (so lighting is the only variable)                                            | 10      |
-| camera    | Same woman, medium shot, neutral daylight, same wardrobe, same backdrop                                                                          | 6       |
-| lens      | Same woman, medium close-up, neutral daylight, same wardrobe, same backdrop                                                                      | 7       |
+**Ziel:** Den dokumentarischen Stand mit dem Code synchronisieren.
 
-Total: **6 base generations + 49 edits = 55 image-gen tool calls.**
+- `mem://design/studio-presets/comparable-thumbnail-rule.md` Status aktualisieren: "rule defined, predates" → "rule defined and applied to all 49 Shot Director tiles (6 axes, locked base scenes in `_bases/`)"
+- `mem://index.md` Eintrag entsprechend nachziehen
+- Kurzer Verweis auf `_bases/{axis}.jpg` als Referenz-Quelle für künftige Re-Edits
 
-## Pipeline
+**Aufwand:** Trivial (nur Memory-Writes).
 
-1. **Generate 6 base scenes** with `imagegen.generate_image` (`premium.gemini`, 512×512), save to `src/assets/studio-presets/_bases/{axis}.jpg`.
-2. **For each option**, call `imagegen.edit_image` on the matching base with:
-   ```
-   Same exact scene, same person, same wardrobe, same location, same lighting,
-   same camera distance — change ONLY the {axisLabel}: {option.promptFragment}.
-   Photoreal, cinematic, 512x512.
-   ```
-   Output overwrites `src/assets/studio-presets/{axis}/{id}.jpg` (paths already wired in `studioPresetThumbnails.ts`, no code changes needed).
-3. **Spot-check** by viewing 2–3 axis grids in the preview; if a tile drifted (different person/scene), re-edit that single option.
+---
 
-## Execution strategy
+## Stage 10 — Visual QA Sweep der 49 Tiles
 
-- Run axis-by-axis (1 base + N edits) so a failed axis doesn't block others.
-- Edits within an axis can be batched in parallel (3–4 at a time per turn, multiple turns).
-- Realistically this needs **3–4 implementation loops** to finish without hitting tool-call limits per turn.
+**Ziel:** Identitäts-/Wardrobe-/Location-Drift erkennen und gezielt re-editieren.
 
-## Out of scope
+1. Browser-Screenshot der Shot-Director-Picker im Toolkit aufnehmen (alle 6 Achsen-Grids).
+2. Per Sicht-Audit Drift-Kandidaten markieren (typische Risiken: lighting-axis verliert das Trenchcoat-Outfit; lens-axis driftet in Gesicht).
+3. Pro driftende Kachel: einzelner `imagegen.edit_image`-Re-Run vom passenden `_bases/{axis}.jpg` mit verschärftem Identity-Lock.
+4. Erwartete Größenordnung: 5–10 Re-Edits.
 
-- No code changes (thumbnail registry already maps every id → path).
-- Cinematic Style Presets (12) stay as-is — distinct looks by design.
-- No movement-axis CSS changes (already animates via Stage 7).
+**Out of scope:** Keine Code-Änderungen, keine neuen Base-Scenes.
 
-## Files touched
+**Aufwand:** Klein bis mittel (abhängig von Drift-Anzahl).
 
-- **49 jpgs replaced** under `src/assets/studio-presets/{framing,angle,movement,lighting,camera,lens}/`
-- **6 jpgs created** under `src/assets/studio-presets/_bases/`
-- **Memory:** flip `comparable-thumbnail-rule.md` status from "rule defined, predates" → "rule defined and applied to all 49 Shot Director tiles"
+---
 
-## Estimate
+## Stage 11 — Library-Hubs visualisieren (Pose / Wardrobe / Vibe / Prop)
 
-Medium. No architectural risk. Pure regenerate-and-replace using existing patterns. The cost is tool-call count, not complexity.
+**Ziel:** Die 4 bereits existierenden Variant-Tabellen (siehe Memory `pose-sheets-and-vibe-variants`) bekommen ein Comparable-Picker-UI nach demselben Muster wie Shot Director.
+
+**Achsen:**
+| Hub | Source | Variants |
+|---|---|---|
+| Avatar Pose | `avatar_pose_variants` | 4 pro Avatar |
+| Avatar Wardrobe | `avatar_wardrobe_variants` | 4 Outfits |
+| Location Vibe | `location_vibe_variants` | 5 Stimmungen |
+| Location Prop | `location_prop_variants` | 4 Dressings |
+
+**Arbeit:**
+1. Neuer wiederverwendbarer `<VariantPickerGrid axis="pose|wardrobe|vibe|prop" entityId={…} />` analog zu `PresetGrid`, mit gleichem Comparable-Locking-Visual (eine Base-Composition pro Avatar/Location, nur die Achsen-Variable variiert).
+2. Mounten in `/avatars` Detail-Drawer und `/brand-locations` Detail-Drawer.
+3. Hover-/Active-State + selected-ring im Bond-2028-Stil.
+4. Keine neuen Edge-Functions — die Variants werden bereits beim Anlegen generiert.
+
+**Out of scope:** Keine neuen Variant-Generations-Pipelines, kein Marketplace-Hook.
+
+**Aufwand:** Mittel (1 neue Komponente + 2 Mount-Punkte).
+
+---
+
+## Stage 12 — Cinematic Style Presets (12) vereinheitlichen
+
+**Ziel:** Die 12 One-Click Director-Looks bekommen optional ein **zweites Vergleichs-Tile** mit einer gemeinsamen Base-Scene, sodass Nutzer beide Modi sehen können:
+- **Identity-Tile** (Status quo) — der charakteristische Look-Look (Noir, Cyberpunk, …) in jeweils eigener passender Szene.
+- **Comparable-Tile** (neu) — dieselbe Trenchcoat/Tokyo-Base-Scene mit dem Style-Preset angewendet.
+
+**Arbeit:**
+1. Neue Base-Scene `src/assets/studio-presets/_bases/style.jpg` (neutralerer Look damit Presets sichtbar sind).
+2. 12 `imagegen.edit_image`-Calls, je Preset → `src/assets/studio-presets/style/{id}--compare.jpg`.
+3. `CinematicStylePresetCard` bekommt einen Toggle "Identity / Comparable" oder zeigt beide nebeneinander.
+4. Memory `cinematic-style-presets` ergänzen.
+
+**Out of scope:** Keine Änderung an den Preset-Definitionen oder am Auto-Inject-Verhalten.
+
+**Aufwand:** Klein bis mittel (1 Base + 12 Edits + UI-Toggle).
+
+---
+
+## Stage 13 — Filter / Color-Grading / Transitions / Scene-Anim Audit
+
+**Ziel:** Sicherstellen, dass alle anderen Studio-Picker entweder dem **Comparable-Thumbnail**- oder dem **Animated-Tile**-Pattern folgen.
+
+**Audit-Scope (laut Memory):**
+- Director's Cut Filter Library (20 Filter + 10 Color-Gradings)
+- Transitions Picker (`TransitionPreviewTile`)
+- Scene-Animations (`SceneAnimationPreviewTile`)
+- Ken-Burns Effect Picker
+
+**Arbeit:**
+1. **Audit-Pass** (read-only): Pro Picker prüfen: nutzt er bereits eine locked Base-Scene? Loopt Animation via `data-play`?
+2. **Findings-Liste** mit pro-Picker-Status: ✅ konform / ⚠️ teilweise / ❌ inkonsistent.
+3. **Fix-Pass** für non-konforme Picker:
+   - Filter/Color-Grading (30 Tiles): Falls Tiles aktuell unterschiedliche Source-Bilder nutzen → Backfill von einer Base-Scene `_bases/filter.jpg` mit 30 Edits.
+   - Transitions/Scene-Anim: Falls `data-play` nicht überall durchgezogen → angleichen.
+4. Memory `comparable-thumbnail-rule.md` & `animated-tile-rule.md` final auf "applied universally" setzen.
+
+**Out of scope:** Kein Re-Design der Picker selbst, keine neuen Filter.
+
+**Aufwand:** Mittel (Audit klein, Fix-Pass abhängig von Findings, ggf. 30 Image-Edits).
+
+---
+
+## Reihenfolge & Risiko
+
+1. Stage 9 (Memory) — sofort, blockiert nichts.
+2. Stage 10 (QA) — vor allen Folge-Stages, damit Stage 8 als wirklich abgeschlossen gilt.
+3. Stage 11 (Library-Hubs) — größter Nutzergewinn, eigenständig.
+4. Stage 12 (Cinematic Presets) — kosmetisch, kann jederzeit.
+5. Stage 13 (Filter-Audit) — Abschluss, vereinheitlicht das gesamte Picker-System.
+
+Jede Stage einzeln approval-bar — bitte nach Approval Stage 9 starten.
