@@ -1041,12 +1041,19 @@ export default function ComposerSequencePreview({
           {t('videoComposer.sceneOf', { current: sceneIdx + 1, total: playable.length })}
         </div>
 
-        {/* Two-Shot Lip-Sync Pending Badge */}
+        {/* Two-Shot Lip-Sync Pending / Failed Badge */}
         {currentScene && pendingTwoShotSceneIds.has(currentScene.id) && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
-            <span>🎬</span>
-            <span>Lip-Sync wird vorbereitet…</span>
-          </div>
+          (currentScene as any).lipSyncStatus === 'failed' ? (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20">
+              <span>⚠️</span>
+              <span>Lip-Sync fehlgeschlagen — wird neu angestoßen</span>
+            </div>
+          ) : (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
+              <span>🎬</span>
+              <span>Lip-Sync wird vorbereitet…</span>
+            </div>
+          )
         )}
 
         {/* Hidden voiceover audio — synced with the video timeline */}

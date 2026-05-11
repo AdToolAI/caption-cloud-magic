@@ -150,6 +150,7 @@ serve(async (req) => {
 
     await setStage(supabase, scene_id, "lipsync_1", {
       lip_sync_status: "running",
+      clip_error: null,
     });
 
     let refunded = false;
@@ -171,7 +172,15 @@ serve(async (req) => {
       });
     };
 
-    try {
+    // ────────────────────────────────────────────────────────────────────
+    // Async background pipeline. Edge Functions kill the connection long
+    // before two sequential sync.so passes (~3 minutes wall-clock) finish.
+    // We return 202 immediately and let `EdgeRuntime.waitUntil` keep the
+    // worker alive. The frontend (`useTwoShotAutoTrigger`) polls
+    // `composer_scenes.lip_sync_status` / `lip_sync_applied_at` for the
+    // result — no HTTP response needed.
+    // ────────────────────────────────────────────────────────────────────
+    const runPipeline = async () => {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
       const voDuration = Number(mergedVo.duration ?? 0);
@@ -237,7 +246,7 @@ serve(async (req) => {
           }
           if (!stepUrl) {
             await refund(`pass_${p + 1}_no_output`);
-            return json({ error: `lipsync pass ${p + 1} produced no output` }, 502);
+            return;
           }
           currentVideo = stepUrl;
           outUrl = stepUrl;
@@ -266,7 +275,7 @@ serve(async (req) => {
 
       if (!outUrl) {
         await refund("no_output_url");
-        return json({ error: "no output url" }, 502);
+        return;
       }
 
       // Re-host output in our own bucket.
@@ -389,21 +398,31 @@ serve(async (req) => {
         .eq("id", scene_id);
       if (updErr) {
         await refund(`db_update_failed: ${updErr.message}`);
-        return json({ error: updErr.message }, 500);
+        return;
       }
+      console.log(
+        `[compose-twoshot-lipsync ${scene_id}] ✅ done — clip=${publicUrl} drift=${driftScore}`,
+      );
+    };
 
-      return json({
-        success: true,
-        scene_id,
-        clip_url: publicUrl,
-        credits_used: COST,
-        continuity_drift_score: driftScore,
-        continuity_drift_notes: driftNotes,
-      });
-    } catch (e) {
-      await refund(`replicate_error: ${(e as Error).message}`);
-      return json({ error: (e as Error).message }, 502);
-    }
+    // Fire-and-forget: keep worker alive but return 202 to client now.
+    // Any throw inside runPipeline triggers a refund + status='failed'.
+    EdgeRuntime.waitUntil(
+      (async () => {
+        try {
+          await runPipeline();
+        } catch (e) {
+          await refund(`pipeline_exception: ${(e as Error).message}`);
+        }
+      })(),
+    );
+
+    return json({
+      accepted: true,
+      scene_id,
+      status: "running",
+      credits_reserved: COST,
+    }, 202);
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
   }

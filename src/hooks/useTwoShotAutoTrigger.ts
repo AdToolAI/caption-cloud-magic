@@ -43,9 +43,36 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script')
+          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, updated_at')
           .eq('project_id', projectId);
         if (error || !data) return;
+
+        const now = Date.now();
+        const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
+
+        // Stale-recovery: 'running' >6min ohne lip_sync_applied_at → reset
+        const stale = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > STALE_MS,
+        );
+        if (stale.length > 0) {
+          console.warn(
+            `[useTwoShotAutoTrigger] resetting ${stale.length} stale 'running' scenes`,
+          );
+          await Promise.all(
+            stale.map((d) => {
+              inflight.current.delete(d.id);
+              return supabase
+                .from('composer_scenes')
+                .update({ lip_sync_status: 'pending', clip_error: 'auto-reset: stale running' })
+                .eq('id', d.id);
+            }),
+          );
+        }
 
         const candidates = (data as any[]).filter(
           (d) =>
