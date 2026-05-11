@@ -15,6 +15,7 @@ import { SpeedRamping, SpeedKeyframe } from '../features/SpeedRamping';
 import { AIVideoUpscaling } from '../features/AIVideoUpscaling';
 import { AIFrameInterpolation } from '../features/AIFrameInterpolation';
 import { AIVideoRestoration } from '../features/AIVideoRestoration';
+import filterBaseScene from '@/assets/studio-presets/framing/establishing.jpg';
 
 interface CropVariant {
   aspectRatio: string;
