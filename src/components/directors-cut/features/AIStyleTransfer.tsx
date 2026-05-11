@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { AVAILABLE_FILTERS, FilterId } from '@/types/directors-cut';
 import { SVGFilters, SVG_FILTER_IDS, isSVGFilter } from '@/remotion/components/SVGFilters';
+import filterBaseScene from '@/assets/studio-presets/framing/establishing.jpg';
 
 // Helper to get filter CSS - uses SVG for creative filters, CSS for basic filters
 const getFilterPreviewCSS = (filterId: string): string => {
