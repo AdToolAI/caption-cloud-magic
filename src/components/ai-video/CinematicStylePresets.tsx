@@ -191,8 +191,8 @@ function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick 
           <Check className="h-2.5 w-2.5 text-primary-foreground" />
         </div>
       )}
-      {/* Real 16:9 frame thumbnail */}
-      <FrameThumb preset={preset} />
+      {/* Real AI thumbnail (Nano Banana 2) with procedural fallback */}
+      <PresetThumbVisual preset={preset} />
       {/* Caption */}
       <div className="mt-1.5 px-0.5">
         <div className={cn(
@@ -209,4 +209,23 @@ function PresetCard({ preset, lang, isActive, compact, layout = 'rail', onClick 
       </div>
     </motion.button>
   );
+}
+
+function PresetThumbVisual({ preset }: { preset: CinematicStylePreset }) {
+  const thumb = getCinematicPresetThumbnail(preset.id);
+  if (thumb) {
+    return (
+      <div className="relative w-full overflow-hidden rounded-md border border-border/40" style={{ aspectRatio: '16 / 9' }}>
+        <img
+          src={thumb}
+          alt={preset.id}
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+        />
+        <div className="absolute inset-x-0 top-0 h-[6%] bg-black/85" />
+        <div className="absolute inset-x-0 bottom-0 h-[6%] bg-black/85" />
+      </div>
+    );
+  }
+  return <FrameThumb preset={preset} />;
 }
