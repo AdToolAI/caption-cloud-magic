@@ -150,6 +150,7 @@ serve(async (req) => {
 
     await setStage(supabase, scene_id, "lipsync_1", {
       lip_sync_status: "running",
+      clip_error: null,
     });
 
     let refunded = false;
@@ -171,7 +172,15 @@ serve(async (req) => {
       });
     };
 
-    try {
+    // ────────────────────────────────────────────────────────────────────
+    // Async background pipeline. Edge Functions kill the connection long
+    // before two sequential sync.so passes (~3 minutes wall-clock) finish.
+    // We return 202 immediately and let `EdgeRuntime.waitUntil` keep the
+    // worker alive. The frontend (`useTwoShotAutoTrigger`) polls
+    // `composer_scenes.lip_sync_status` / `lip_sync_applied_at` for the
+    // result — no HTTP response needed.
+    // ────────────────────────────────────────────────────────────────────
+    const runPipeline = async () => {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
       const voDuration = Number(mergedVo.duration ?? 0);
