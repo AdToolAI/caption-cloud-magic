@@ -130,6 +130,12 @@ interface SceneCardProps {
   previousSceneIndex?: number;
   /** Phase 2 — when true, the Frame-First Studio is highlighted as Step 1. */
   frameFirstMode?: boolean;
+  /**
+   * Stage 17b — when true, this card is rendered inside the persistent
+   * Studio Pane (storyboard split-view). It is always fully expanded and
+   * drops its own card chrome to avoid double borders.
+   */
+  embedded?: boolean;
 }
 
 const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
