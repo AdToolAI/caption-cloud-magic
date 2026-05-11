@@ -37,7 +37,9 @@ interface Props {
   index: number;
   totalScenes: number;
   isExpanded: boolean;
-  onToggleExpand: () => void;
+  /** When undefined, the collapse chevron + click-to-toggle behavior are disabled
+   *  (used when the card is embedded inside the persistent Studio Pane). */
+  onToggleExpand?: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
