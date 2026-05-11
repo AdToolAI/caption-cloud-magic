@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Sparkles, Check, Zap, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 interface TransitionType {
   id: string;
@@ -183,113 +184,35 @@ export function TransitionPicker({
         </motion.div>
       )}
 
-      {/* Transition Types Grid */}
+      {/* Transition Types Grid — animated locked-base-scene mini-loops */}
       <div className="grid grid-cols-3 gap-2">
         {TRANSITION_TYPES.map((type) => {
           const isSelected = selectedType === type.id;
-          const isHovered = hoveredType === type.id;
           const isAiRecommended = aiRecommendation === type.id;
-
           return (
-            <motion.button
-              key={type.id}
-              onHoverStart={() => setHoveredType(type.id)}
-              onHoverEnd={() => setHoveredType(null)}
-              onClick={() => onTypeChange(type.id)}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              className={cn(
-                "relative p-3 rounded-xl border-2 transition-all duration-300 text-left overflow-hidden",
-                "backdrop-blur-xl",
-                isSelected
-                  ? "border-primary bg-primary/10 shadow-[0_0_20px_hsl(var(--primary)/0.2)]"
-                  : "border-border/50 hover:border-primary/50 bg-card/50"
-              )}
-            >
-              {/* Animated Preview Background */}
-              <div className="relative mb-2">
-                <div 
-                  className={cn(
-                    "w-full h-10 rounded-lg overflow-hidden bg-gradient-to-r",
-                    type.gradient
-                  )}
-                >
-                  {/* Animation Effect */}
-                  <AnimatePresence>
-                    {(isHovered || isSelected) && type.id !== 'none' && (
-                      <motion.div
-                        initial={{ x: '-100%', opacity: 0 }}
-                        animate={{ x: '100%', opacity: 1 }}
-                        exit={{ x: '100%', opacity: 0 }}
-                        transition={{ 
-                          duration: 1.5, 
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                      />
-                    )}
-                  </AnimatePresence>
-                </div>
-
-                {/* Icon Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl text-white drop-shadow-lg">{type.icon}</span>
-                </div>
-              </div>
-
-              {/* Type Info */}
-              <div className="space-y-0.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold">{type.name}</span>
-                  {isSelected && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="p-0.5 rounded-full bg-primary"
-                    >
-                      <Check className="h-2.5 w-2.5 text-primary-foreground" />
-                    </motion.div>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted-foreground line-clamp-1">
-                  {type.description}
-                </p>
-                {/* Motion transition hint */}
-                {isSelected && (type.id === 'wipe' || type.id === 'slide') && (
-                  <p className="text-[9px] text-amber-500 mt-0.5 line-clamp-2">
-                    ⚡ Vorschau kann leicht versetzt wirken — Export ist framegenau
-                  </p>
-                )}
-              </div>
-
-              {/* AI Badge */}
+            <div key={type.id} className="relative">
+              <TransitionPreviewTile
+                transitionId={type.id as TransitionId}
+                label={type.name}
+                isActive={isSelected}
+                size="md"
+                onClick={() => onTypeChange(type.id)}
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground line-clamp-1 px-0.5">
+                {type.description}
+              </p>
               {isAiRecommended && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="absolute -top-1 -right-1"
-                >
-                  <Badge className="bg-primary text-[8px] px-1.5 py-0 h-4 border-0">
-                    <Sparkles className="h-2 w-2 mr-0.5" />
-                    AI
-                  </Badge>
-                </motion.div>
+                <Badge className="absolute -top-1 -right-1 bg-primary text-[8px] px-1.5 py-0 h-4 border-0">
+                  <Sparkles className="h-2 w-2 mr-0.5" />
+                  AI
+                </Badge>
               )}
-
-              {/* AI Score Indicator */}
-              {type.aiScore && isHovered && (
-                <motion.div
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="absolute bottom-1 right-1"
-                >
-                  <Badge variant="secondary" className="text-[8px] px-1 py-0 h-3">
-                    {Math.round(type.aiScore * 100)}%
-                  </Badge>
-                </motion.div>
+              {type.aiScore && !isAiRecommended && (
+                <Badge variant="secondary" className="absolute top-1 right-1 text-[8px] px-1 py-0 h-3">
+                  {Math.round(type.aiScore * 100)}%
+                </Badge>
               )}
-            </motion.button>
+            </div>
           );
         })}
       </div>

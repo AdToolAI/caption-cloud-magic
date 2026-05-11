@@ -18,6 +18,7 @@ import {
   Play
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 export interface KenBurnsKeyframe {
   id: string;
@@ -193,23 +194,26 @@ export function KenBurnsEffect({
                 currentKeyframe.startX === preset.config.startX &&
                 currentKeyframe.endX === preset.config.endX;
               
+              const animMap: Record<string, string> = {
+                'zoom-in-center': 'zoomIn',
+                'zoom-out-center': 'zoomOut',
+                'pan-left': 'panLeft',
+                'pan-right': 'panRight',
+                'pan-up': 'panUp',
+                'pan-down': 'panDown',
+                'zoom-pan-tl': 'kenBurnsTL',
+                'zoom-pan-br': 'kenBurnsBR',
+              };
               return (
-                <motion.button
+                <SceneAnimationPreviewTile
                   key={preset.id}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  animationId={(animMap[preset.id] ?? 'zoomIn') as SceneAnimationId}
+                  label={preset.name}
+                  isActive={!!isActive}
+                  size="md"
+                  icon={<Icon className="h-3 w-3" />}
                   onClick={() => applyPreset(preset)}
-                  className={`
-                    flex flex-col items-center gap-1 p-2 rounded-lg border transition-all
-                    ${isActive 
-                      ? 'bg-primary/20 border-primary text-primary' 
-                      : 'bg-background/50 border-border/50 hover:border-primary/50 hover:bg-primary/5'
-                    }
-                  `}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span className="text-[10px] font-medium">{preset.name}</span>
-                </motion.button>
+                />
               );
             })}
           </div>

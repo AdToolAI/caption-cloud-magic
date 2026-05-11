@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { SceneAnalysis, SceneEffects } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/hooks/useTranslation';
+import { SceneAnimationPreviewTile, type SceneAnimationId } from '@/components/studio-visual/SceneAnimationPreviewTile';
 
 interface FXPanelProps {
   chromaKey: { enabled: boolean; color: string; tolerance: number; backgroundUrl?: string };
@@ -110,21 +111,21 @@ export const FXPanel: React.FC<FXPanelProps> = ({
             )}
           </div>
           <div className={cn("grid grid-cols-3 gap-1.5", !selectedSceneId && "opacity-40 pointer-events-none")}>
-            {ANIMATION_OPTIONS.map(({ type, label, icon: Icon }) => (
-              <button
-                key={type}
-                onClick={() => handleAnimationChange(type)}
-                className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-lg text-[9px] transition-all border",
-                  currentAnimation === type
-                    ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_8px_rgba(34,211,238,0.2)]"
-                    : "bg-[#0a0a1a]/80 border-white/5 text-white/50 hover:border-white/20 hover:text-white/70"
-                )}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                <span className="leading-tight text-center">{['animNone','panLeft','panRight','panUp','panDown'].includes(label) ? t(`dc.${label}`) : label}</span>
-              </button>
-            ))}
+            {ANIMATION_OPTIONS.map(({ type, label }) => {
+              const localizedLabel = ['animNone','panLeft','panRight','panUp','panDown'].includes(label)
+                ? t(`dc.${label}`)
+                : label;
+              return (
+                <SceneAnimationPreviewTile
+                  key={type}
+                  animationId={type as SceneAnimationId}
+                  label={localizedLabel}
+                  isActive={currentAnimation === type}
+                  size="sm"
+                  onClick={() => handleAnimationChange(type)}
+                />
+              );
+            })}
           </div>
           {selectedSceneId && currentAnimation !== 'none' && (
             <div className="space-y-1 pt-1">
