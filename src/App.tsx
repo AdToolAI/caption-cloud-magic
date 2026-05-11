@@ -120,6 +120,7 @@ const QACockpit = lazy(() => import("./pages/admin/QACockpit"));
 
 const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
+const AvatarDetail = lazy(() => import("./pages/AvatarDetail"));
 const Locations = lazy(() => import("./pages/Locations"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const EmailDirector = lazy(() => import("./pages/EmailDirector"));
