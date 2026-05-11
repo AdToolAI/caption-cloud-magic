@@ -1,76 +1,58 @@
-# Stage 13 — Picker-System Final Audit & Polish
+# Stage 14 — "Stil ändern"-Dialog visuell auf Studio-Niveau bringen
 
-**Ziel:** Sicherstellen, dass *alle* visuellen Picker im Projekt entweder dem **Comparable-Thumbnail**-Pattern (locked Base-Scene + Effekt) oder dem **Animated-Tile**-Pattern (locked Base-Scene + CSS-Loop, gated by `data-play`) folgen. Anschließend die beiden Memory-Regeln auf "applied universally" setzen.
+## Problem (was du siehst)
 
-Damit ist die Picker-Architektur projektweit konsistent und das Stage-9–13 Vorhaben abgeschlossen.
+Im Composer → Szene → **Stil ändern → Feintuning → Shot Director** rendert die rechte Detail-Spalte aktuell **nur Textzeilen** ("Vogelperspektive · Subjekt wirkt klein.") statt der Thumbnail-Tiles, die wir in Stage 9–13 gebaut haben.
 
----
+Grund: `SceneShotDirectorPanel` hat zwei Layouts:
+- `popover` → nutzt `PresetGrid` (Thumbnails ✅, animierte Movement-Tiles ✅, Live-Effekte ✅)
+- `master-detail` (verwendet im "Stil ändern"-Dialog) → eigene Text-Liste, **bypasst PresetGrid komplett**
 
-## Vor-Audit (was bereits konform ist)
+Die ganzen Stages 9–13 (49 Shot-Director-Bilder, comparable thumbnails, motion tiles, locked base scenes) sind also gebaut, werden aber in diesem Dialog nicht gezeigt. Im AI Video Toolkit (popover-Layout) und in den restlichen Pickern sieht man sie sehr wohl.
 
-Schnell-Check hat ergeben:
+## Fix (eine Datei, klein)
 
-- **Director's Cut Filter Library** (20 Filter, `LookPanel.tsx` → `FILTER_CATEGORIES`) → nutzt bereits `LookPresetTile` mit gemeinsamer `_bases`-Master-Scene + Live-CSS-Filter. ✅
-- **Color Grading** (10 Grades, `LookPanel.tsx` → `COLOR_GRADES`) → nutzt ebenfalls `LookPresetTile` mit live CSS. ✅
-- **Transitions Picker** (`TransitionPreviewTile.tsx`) → animiert via `data-play` (hover + active). ✅
-- **Scene Animations** (`SceneAnimationPreviewTile.tsx`) → animiert via `data-play`. ✅
-- **Movement Tiles** (`MovementPreviewTile.tsx`) → animiert via `data-play`. ✅
-- **Cinematic Style Presets** → Stage 12 erledigt (Identity/Comparable Toggle).
+**Datei:** `src/components/video-composer/SceneShotDirectorPanel.tsx`
 
-D.h. der Audit dürfte überwiegend bestätigend sein. Trotzdem brauchts einen sauberen Pass, weil verstreute Stellen (DC-Steps, Studio-Visual-Library, ältere Selector-Komponenten, Visual-Effects-Step) Verdachtsfälle bleiben.
+Im `MasterDetail`-Component (Zeilen ~213–256) den Text-`<button>`-Loop ersetzen durch:
 
----
+```tsx
+<PresetGrid
+  category={active}
+  options={SHOT_CATEGORIES[active]}
+  selectedId={value[active]}
+  onSelect={(id) => setCategory(active, id)}
+  lang={lang}
+/>
+```
 
-## Audit-Pass (read-only)
+Damit bekommt der Dialog automatisch:
+- 2-Spalten Thumbnail-Grid (`framing/establishing.jpg`-basierte comparable thumbnails)
+- Animierte Tiles für `movement` (CSS-Loop on hover/active via `MovementPreviewTile`)
+- Active-Checkmark + Hover-Border
+- Identische Optik zum Toolkit-Picker → konsistent über das ganze Produkt
 
-Pro Picker eine kurze Sicht- und Code-Prüfung. Output ist eine Findings-Tabelle:
+Die Beschreibungstexte (z.B. "Subjekt wirkt klein") landen weiterhin im `title=`-Tooltip jedes Tiles (so wie in `PresetGrid` schon implementiert).
 
-| Picker | Datei | Pattern | Status |
-|---|---|---|---|
-| DC Filter Library (20) | `LookPanel.tsx` | Comparable | ✅ erwartet |
-| DC Color Grading (10) | `LookPanel.tsx` | Comparable | ✅ erwartet |
-| DC Transition Picker | `directors-cut/ui/TransitionPicker.tsx` | Animated | prüfen |
-| DC Scene Animations | wo immer eingebunden | Animated | prüfen |
-| DC Ken-Burns | `KenBurnsImage.tsx` + Picker | Animated | prüfen |
-| Style-Look Step | `steps/StyleLookStep.tsx` | offen | prüfen |
-| Visual-Effects Step | `steps/VisualEffectsStep.tsx` | offen | prüfen |
-| Special-Effects Step | `steps/SpecialEffectsStep.tsx` | offen | prüfen |
-| AI-Style-Transfer | `features/AIStyleTransfer.tsx` | offen | prüfen |
-| Composer Visual Styles | `composerVisualStyles.ts` Picker | offen | prüfen |
-| Video TransitionSelector | `components/video/TransitionSelector.tsx` | Animated | prüfen |
+## Verifikation
 
-Nichts wird in dieser Phase verändert.
+1. `/video-composer` → Szene öffnen → "Stil ändern" → Tab "Feintuning"
+2. Linke Achsen-Liste klickbar (Winkel/Licht/Bewegung/…)
+3. Rechte Spalte zeigt jetzt **Bild-Tiles** statt Text
+4. "Bewegung" → Hover über Tile = CSS-Animation läuft
+5. Selection-Sync zur Sidebar bleibt erhalten
 
----
+## Was NICHT geändert wird
 
-## Fix-Pass (nur für Findings ≠ ✅)
+- Linke Master-Spalte (Achsen-Liste) — bleibt
+- Header-Bar mit "Alle leeren" — bleibt
+- `popover`-Layout — bleibt unverändert
+- Keine neuen Assets, kein neuer State, keine API-Änderung
 
-Pro Non-Konform-Picker eine der folgenden minimal-invasiven Maßnahmen — keine Re-Designs, kein Verhaltenswechsel:
+## Memory
 
-1. **Picker zeigt nur Emoji/Text statt Visual** → Wrapper-Tausch auf `LookPresetTile` (für CSS-Filter-artige Effekte) oder ein Animated-Tile-Pendant. Kein neues Asset nötig wenn live-CSS reicht.
-2. **Picker nutzt unterschiedliche Source-Bilder pro Tile** → Quelle vereinheitlichen auf bestehende Base-Scene (`_bases/framing.jpg` als Master).
-3. **Animated-Tile loopt immer (statt nur bei hover/active)** → `data-play` Gating nachziehen wie in `MovementPreviewTile` / `TransitionPreviewTile`.
-4. **Transition/Anim-Tiles ohne CSS-Keyframes** → existierende Klassen aus `motionTiles.css` einsetzen.
+Kein neuer Memory-Eintrag nötig — Stage 13 `comparable-thumbnail-rule` deckt diesen Fall bereits ab; der Dialog war schlicht eine Lücke in der Anwendung der Regel.
 
-Out of scope: neue Filter, neue Animationen, neue Base-Scenes (außer `_bases/filter.jpg` falls ein Filter-Picker tatsächlich nicht auf Master-Scene gemappt ist).
+## Aufwand
 
----
-
-## Memory-Updates (nach Fix-Pass)
-
-- `mem://design/studio-presets/comparable-thumbnail-rule.md` → finaler Status: *"applied universally to Shot Director (49), Cinematic Style Presets compare-mode (12), DC Filter Library (20), DC Color Grading (10) — same locked base scene per family."*
-- `mem://design/studio-presets/animated-tile-rule` → finaler Status: *"applied universally — all Transition/SceneAnim/Movement/Ken-Burns pickers loop via `data-play` (hover + active) on a locked base scene."*
-- `mem://index.md` → die zwei Einträge auf den neuen Stand aktualisieren.
-
----
-
-## Reihenfolge & geschätzter Aufwand
-
-1. Audit-Pass (read-only) — ~5 Tool-Calls, ~5 min.
-2. Findings-Report posten (kurz, tabellarisch).
-3. Fix-Pass nur falls Findings ≠ leer — Aufwand klein bis mittel.
-4. Memory-Updates — trivial.
-
-**Gesamt:** klein bis mittel, je nach Findings. Falls alles ✅, ist Stage 13 nur Audit + Memory-Flip.
-
-Nach Stage 13 ist der ursprüngliche 5-Stage-Plan vollständig abgeschlossen.
+~1 Edit, ~5 Zeilen netto, 1 Verifikations-Klick.
