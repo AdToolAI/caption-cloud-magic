@@ -261,19 +261,40 @@ serve(async (req) => {
       return json({ error: "single_speaker_or_empty", blocks: blocks.length }, 400);
     }
 
-    // Build first-name → character lookup so we can resolve voices and portraits.
+    // Build name → character lookup so we can resolve voices.
+    // We index by first name AND full slugified name (e.g. "matthew-dusatko")
+    // because dialog_voices is keyed by character SLUG/ID, not first name.
     const charShots = Array.isArray((scene as any).character_shots) ? (scene as any).character_shots : [];
     const charIds = charShots.map((s: any) => s?.characterId).filter(Boolean);
+    // Look up brand_characters by id AND by slug-of-name. Some scenes use
+    // slug-style ids (matthew-dusatko) that are NOT brand_characters UUIDs;
+    // in that case we still need the character row for default_voice_id.
     const { data: characters } = charIds.length
       ? await supabase
           .from("brand_characters")
           .select("id, name, default_voice_id")
-          .in("id", charIds)
+          .or(charIds.map((id: string) => `id.eq.${id}`).join(","))
       : { data: [] as any[] };
-    const charByFirstName = new Map<string, { id: string; default_voice_id?: string }>();
+    const slugify = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
+    const charByName = new Map<string, { id: string; default_voice_id?: string }>();
     for (const c of characters ?? []) {
-      const fn = String(c.name || "").trim().toLowerCase().split(/\s+/)[0];
-      if (fn) charByFirstName.set(fn, { id: c.id, default_voice_id: c.default_voice_id ?? undefined });
+      const full = String(c.name || "").trim().toLowerCase();
+      const fn = full.split(/\s+/)[0];
+      const slug = slugify(full);
+      const entry = { id: c.id, default_voice_id: c.default_voice_id ?? undefined };
+      if (fn) charByName.set(fn, entry);
+      if (slug) charByName.set(slug, entry);
+      if (full) charByName.set(full, entry);
+    }
+    // Also pre-index character_shots so we can map a speaker name → its
+    // characterId (matthew-dusatko) directly, without needing brand_characters.
+    for (const cs of charShots) {
+      if (!cs?.characterId) continue;
+      const idLower = String(cs.characterId).toLowerCase();
+      const fnFromId = idLower.split("-")[0];
+      const entry = { id: idLower, default_voice_id: undefined };
+      if (!charByName.has(idLower)) charByName.set(idLower, entry);
+      if (fnFromId && !charByName.has(fnFromId)) charByName.set(fnFromId, entry);
     }
 
     const dialogVoices = ((scene as any).dialog_voices ?? {}) as Record<
