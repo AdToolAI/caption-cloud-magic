@@ -10,6 +10,7 @@ import {
 import type { ShotSelection } from '@/config/shotDirector';
 import { useTranslation } from '@/hooks/useTranslation';
 import { cn } from '@/lib/utils';
+import { getCinematicPresetThumbnail } from '@/config/studioPresetThumbnails';
 
 type Lang = 'en' | 'de' | 'es';
 
