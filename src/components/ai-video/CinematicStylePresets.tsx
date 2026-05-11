@@ -41,10 +41,17 @@ export default function CinematicStylePresets({ value, onApply, compact = false,
   const { language } = useTranslation();
   const lang = ((language as Lang) ?? 'en');
   const activeId = useMemo(() => matchPresetToSelection(value), [value]);
+  // Stage 12 — Identity (legacy distinct scenes) vs Comparable (same locked base).
+  const [thumbMode, setThumbMode] = useState<'identity' | 'comparable'>('identity');
 
   const containerCls = layout === 'grid'
     ? 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2'
     : 'flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin max-w-full';
+
+  const modeLabels = {
+    identity: { en: 'Identity', de: 'Identität', es: 'Identidad' },
+    comparable: { en: 'Comparable', de: 'Vergleich', es: 'Comparar' },
+  } as const;
 
   return (
     <div className={cn('space-y-2', compact && 'space-y-1.5')}>
@@ -57,6 +64,29 @@ export default function CinematicStylePresets({ value, onApply, compact = false,
           <span className={cn('text-muted-foreground', compact ? 'text-[9px]' : 'text-[10px]')}>
             {lang === 'de' ? '· One-Click Director-Style' : lang === 'es' ? '· Estilo en un clic' : '· One-click director style'}
           </span>
+          <div className="ml-auto inline-flex items-center rounded-md border border-border/60 bg-card/40 p-0.5">
+            {(['identity', 'comparable'] as const).map((m) => {
+              const isOn = thumbMode === m;
+              const Icon = m === 'identity' ? Users : Eye;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setThumbMode(m)}
+                  className={cn(
+                    'inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded-sm transition-colors',
+                    isOn ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                  title={m === 'identity'
+                    ? (lang === 'de' ? 'Eigene Szene pro Look' : lang === 'es' ? 'Escena propia por look' : 'Distinct scene per look')
+                    : (lang === 'de' ? 'Gleiche Szene, alle Looks' : lang === 'es' ? 'Misma escena, todos los looks' : 'Same scene, all looks')}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  <span>{modeLabels[m][lang]}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -69,6 +99,7 @@ export default function CinematicStylePresets({ value, onApply, compact = false,
             isActive={activeId === preset.id}
             compact={compact}
             layout={layout}
+            thumbMode={thumbMode}
             onClick={() => onApply(preset.selection, preset.id)}
           />
         ))}
