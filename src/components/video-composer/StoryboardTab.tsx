@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon } from 'lucide-react';
@@ -13,23 +13,19 @@ import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-co
 import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { SortableSceneItem } from './SortableSceneItem';
 import { CastConsistencyMap } from './CastConsistencyMap';
+import StoryboardSceneStrip from './StoryboardSceneStrip';
+import StudioPane from './StudioPane';
+
+const SCENE_TYPE_LABEL_DE: Record<string, string> = {
+  hook: 'Hook',
+  problem: 'Problem',
+  solution: 'Lösung',
+  demo: 'Demo',
+  'social-proof': 'Social Proof',
+  cta: 'CTA',
+  custom: 'Custom',
+};
 
 interface StoryboardTabProps {
   scenes: ComposerScene[];
