@@ -502,6 +502,11 @@ export default function VideoComposerDashboard() {
   // Realtime: when ANY collaborator updates a scene in this project, refetch.
   useComposerScenesRealtime(project.id, refetchScenesFromDb);
 
+  // Tab-übergreifender Auto-Trigger für Two-Shot/Cinematic-Sync Lip-Sync.
+  // Stellt sicher, dass auch Voiceover-/Musik-/Export-Tab die Pipeline anstoßen,
+  // sobald eine Szene im "ready, but no lip-sync yet"-State steht.
+  useTwoShotAutoTrigger(project.id);
+
   // Phase 5.6 — Undo-Stack (Cmd+Z)
   const { undoLast: undoLastHistoryEntry, count: undoCount, pushEntry: pushHistoryEntry } = useComposerHistory(project.id);
   useKeyboardShortcuts({
