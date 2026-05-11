@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Sparkles, X, Wand2 } from 'lucide-react';
+import { Check, Sparkles, X, Wand2 } from 'lucide-react';
 import {
   CATEGORY_LABELS,
   DIRECTOR_PRESETS,
@@ -17,6 +17,7 @@ import {
   type DirectorModifiers,
   type PresetCategory,
 } from '@/lib/motion-studio/directorPresets';
+import { getModifierThumbnail } from '@/config/modifierThumbnails';
 
 interface DirectorPresetPickerProps {
   modifiers: DirectorModifiers;
