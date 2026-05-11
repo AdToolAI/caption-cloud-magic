@@ -81,11 +81,11 @@ function looksLikeElevenLabsId(v: string): boolean {
   return /^[A-Za-z0-9]{20}$/.test(v);
 }
 
-/** Look up voice config from dialog_voices keyed by speaker id, character id, or first-name match. */
+/** Look up voice config from dialog_voices keyed by speaker id, character id slug, or first-name match. */
 function resolveVoice(
   block: DialogBlock,
   dialogVoices: Record<string, any>,
-  charactersByFirstName: Map<string, { id: string; default_voice_id?: string }>,
+  charactersByName: Map<string, { id: string; default_voice_id?: string }>,
 ): ResolvedVoice | null {
   const cfgToVoice = (cfg: any): ResolvedVoice | null => {
     if (!cfg) return null;
@@ -102,16 +102,22 @@ function resolveVoice(
     };
   };
 
-  // 1) Exact key match (id-keyed)
-  for (const [key, cfg] of Object.entries(dialogVoices)) {
-    if (key.toLowerCase() === block.speakerName) {
-      const v = cfgToVoice(cfg);
+  const fullSlug = block.speakerName; // "matthew-dusatko"
+  const firstName = fullSlug.split("-")[0]; // "matthew"
+
+  // 1) Exact key match against dialog_voices for full slug, then first name.
+  const dvKeys = Object.keys(dialogVoices);
+  for (const candidate of [fullSlug, firstName]) {
+    const hit = dvKeys.find((k) => k.toLowerCase() === candidate);
+    if (hit) {
+      const v = cfgToVoice(dialogVoices[hit]);
       if (v) return v;
     }
   }
-  // 2) Match via cast character first-name → its id → dialog_voices entry
-  const c = charactersByFirstName.get(block.speakerName);
-  if (c) {
+  // 2) Match via cast character (full slug or first name) → its id → dialog_voices entry
+  for (const candidate of [fullSlug, firstName]) {
+    const c = charactersByName.get(candidate);
+    if (!c) continue;
     const cfg = (dialogVoices as any)[c.id];
     const v = cfgToVoice(cfg);
     if (v) return v;
