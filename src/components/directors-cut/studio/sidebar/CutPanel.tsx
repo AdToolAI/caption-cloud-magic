@@ -6,6 +6,7 @@ import { SceneAnalysis, TransitionAssignment } from '@/types/directors-cut';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from '@/hooks/useTranslation';
+import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 interface CutPanelProps {
   scenes: SceneAnalysis[];
