@@ -314,6 +314,12 @@ serve(async (req) => {
       if (isImageToVideo && !lower.includes("motion already in progress")) {
         result = result.replace(/[,.]\s*$/, "") + POSITIVE_I2V_MOTION_CUE;
       }
+      // i2v-only: HARD identity lock — biggest source of "character morphs/ages
+      // during the clip" with Hailuo/Kling/Wan. Appended last for recency bias.
+      if (isImageToVideo && !lower.includes("preserve the exact facial identity")) {
+        result = result.replace(/[,.]\s*$/, "") +
+          ", preserve the exact facial identity, age, skin tone, hair style and hair color of the people from the reference image throughout the entire shot, do not age them, do not morph their faces, do not change face shape, the same recognizable individuals from start to end";
+      }
       return result;
     };
     const negativeFor = (isImageToVideo: boolean, sceneNegative?: string): string => {
