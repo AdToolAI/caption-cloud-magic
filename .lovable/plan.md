@@ -1,40 +1,51 @@
-## Ziel
-Die Two‑Shot/Cinematic‑Sync Pipeline soll wieder zuverlässig:
-- beide Charakter-Stimmen hörbar machen,
-- das Video nicht nach ca. 4s Voiceover gefühlt enden lassen, sondern die volle 10s-Szene nutzen,
-- Gesichter stärker an die Avatar-Referenzen binden.
+## Diagnose
 
-## Gefundene Ursachen
-- `scene_audio_clips` wird nicht gespeichert, weil beim Insert `user_id` fehlt. Dadurch findet `compose-twoshot-lipsync` später oft keinen Voiceover-Clip und verlässt sich nur auf `audio_plan`/Nebenpfade.
-- Die Voice-Zuordnung matcht Sprecher wie `Matthew Dusatko` nur über den ersten Namen (`matthew`), aber `dialog_voices` ist per Character-ID (`matthew-dusatko`) gespeichert. Dadurch fällt Matthew auf die Sarah-Stimme zurück. Deshalb hörst du nur die weibliche Stimme.
-- Das Video ist zwar als 10s Szene gerendert, aber der erzeugte Audio-Track ist nur ca. 4s lang. Sync.so bekommt aktuell keinen sauberen Auftrag, die restlichen Sekunden als stille/ambient Szene weiterlaufen zu lassen.
-- Für Avatar-Treue wird aktuell ein Nano-Banana-komponiertes First Frame an Hailuo gegeben. Das hilft der Komposition, aber Hailuo kann Gesichter danach weiter verändern. Für zwei echte Referenzcharaktere ist das nur begrenzt 1:1.
+Die Voice-Zuordnung in der DB ist korrekt:
+- `matthew-dusatko` → Hume "Dungeon Master" (männlich)
+- `sarah-dusatko` → Hume "Female Meditation Guide" (weiblich)
+
+`compose-twoshot-audio` mappt die Sprecher auch sauber – im fertigen MP3 spricht erst Matthew (männlich), dann Sarah (weiblich), in dieser Reihenfolge.
+
+Der Tausch entsteht eine Stufe später: `compose-twoshot-lipsync` schickt das gemerged-MP3 + Video an `sync/lipsync-2` und überlässt der Auto-Active-Speaker-Erkennung die Auswahl, **welches Gesicht** zu welchem Audiosegment den Mund bewegt. Das Modell hat nur einen Boolean `active_speaker` und keine per-Segment Face-Map. Bei sehr ähnlichen Mundbewegungen / engem Two-Shot rät es falsch und animiert konsequent das jeweils andere Gesicht – dadurch wirkt es so, als wären die Stimmen vertauscht.
+
+## Lösung: Per-Speaker Doppel-Pass Lip-Sync
+
+Statt eines einzigen Lipsync-Calls mit auto-detect machen wir **zwei sequentielle Passes**, jeweils mit nur EINER aktiven Stimme – die andere als Stille auf Track-Länge gepaddet. Dann hat sync.so genau ein sprechendes Audio-Signal und animiert deterministisch das Gesicht, das am besten dazu passt. In der **richtigen** Pass-Reihenfolge basierend auf der Anchor-Komposition (`character_shots[0]` zuerst).
+
+```text
+Pass 1: video + [Matthew-VO | Stille-Sarah]  → liefert Video mit nur Matthews Mund animiert
+Pass 2: result_pass1 + [Stille-Matthew | Sarah-VO] → final: beide Münder animiert
+```
 
 ## Umsetzung
-1. **Two‑Shot Audio zuverlässig speichern**
-   - `compose-twoshot-audio` Insert in `scene_audio_clips` mit `user_id`, `project_id`, `source`, `volume`, `cost_credits`, `refunded`, `metadata` vervollständigen.
-   - Dadurch kann `compose-twoshot-lipsync` den richtigen VO-Clip stabil finden.
 
-2. **Voice-Mapping reparieren**
-   - Speaker-Normalisierung erweitern: `Matthew Dusatko` → `matthew-dusatko`, zusätzlich First-Name und Full-Name Keys prüfen.
-   - `dialog_voices` zuerst über Character-ID/Slug matchen, dann über Namen, erst danach Fallback.
-   - So bekommt Matthew wieder `Dungeon Master` und Sarah `Female Meditation Guide`.
+1. **`compose-twoshot-audio` erweitern**
+   - Zusätzlich zum gemergten MP3 pro Sprecher ein eigenes `speaker_track_url` erzeugen: das eigene MP3 plus Stille (gleiche Länge wie der/die anderen Segmente an deren ursprünglichen Zeitpositionen).
+   - In `metadata.speakers[i]` neben `startSec/endSec` jetzt `track_url`, `speaker_slug` und `character_id` ablegen.
+   - Idempotenz: alle Tracks landen unter `…/twoshot-vo/<scene>/` und werden nur regeneriert wenn `force_regenerate`.
 
-3. **10s Szene nach dem Skript erhalten**
-   - Nach dem letzten Dialogsegment eine stille Tail-Zone bis zur Szenendauer im `audio_plan` abbilden.
-   - `compose-twoshot-lipsync` soll bei Two‑Shot standardmäßig `sync_mode: "loop"` nur nutzen, wenn es sinnvoll ist, und die Scene-Duration/VO-Duration sauber loggen.
-   - Falls Sync.so den Clip dennoch auf Audio-Länge kürzt, wird der LipSync-Output nicht als endgültige 4s-Szene behandelt; dann bleibt/greift die 10s Master-Clip-Quelle als Basis für die weitere Vorschau/Exportlogik.
+2. **`compose-twoshot-lipsync` umbauen**
+   - Wenn `metadata.speakers` mit `track_url` vorhanden ist: für jede Speaker-Spur einen sequentiellen Lipsync-Pass starten, jeweils `active_speaker: true`, `sync_mode: "loop"`.
+   - Pass-Reihenfolge nach `character_shots`-Position (Position 0 zuerst), damit das erste animierte Gesicht zur visuellen Layout-Erwartung passt.
+   - Als Eingabe-Video für Pass N+1 das Output-Video von Pass N nehmen.
+   - Fallback (kein speakers-Array): bisheriges Single-Pass-Verhalten beibehalten.
+   - Refund-Logik weiter idempotent halten; Kosten = N × $0.05/sec der Szenenlänge – dem User über `cost_credits` korrekt zurechnen.
 
-4. **Avatar-Identität härter locken**
-   - Anchor-Prompt auf „no face morphing / identity preservation over beauty / keep asymmetric details“ schärfen.
-   - Cache-Key erneut bumpen, damit alte schwächere Anchors nicht wiederverwendet werden.
-   - In `compose-video-clips` für Cinematic‑Sync den Hailuo-Prompt mit expliziten Character-Identity-Regeln ergänzen: beide Personen müssen aus den Referenzporträts stammen; keine generischen Lookalikes; Gesichter müssen im ersten Frame erkennbar bleiben.
+3. **Self-Heal der betroffenen Szene**
+   - Für `b4237058-…` `scene_audio_clips` löschen, `character_audio_url`, `audio_plan` leeren, `lip_sync_status='pending'`, `twoshot_stage=NULL`, damit beim nächsten "In echte Szene einbauen" der neue Doppel-Pass greift.
 
-5. **Aktuelle Szene self-healen**
-   - Für die betroffene Szene den falschen Audio-Stand löschen/resetten: `scene_audio_clips` für diese Szene entfernen, `character_audio_url/audio_plan` leeren, `lip_sync_status='pending'`, `twoshot_stage=NULL`.
-   - Danach generiert die Pipeline frischen Audio-Track mit beiden Stimmen.
+4. **Validierung**
+   - Edge-Logs: `compose-twoshot-audio` muss 2 `speaker_track_url` ausliefern, `compose-twoshot-lipsync` muss "pass 1/2" und "pass 2/2" loggen.
+   - Visuell: Matthew (links/erster Shot) bewegt zur männlichen Stimme den Mund, Sarah zur weiblichen.
 
-6. **Validierung**
-   - Edge Function Logs prüfen: Matthew muss mit `Dungeon Master`, Sarah mit `Female Meditation Guide` erzeugt werden.
-   - Datenbank prüfen: ein `scene_audio_clips` Voiceover-Row mit `user_id`, `project_id`, ca. passender Dauer und `speakers` Metadata existiert.
-   - Betroffene Functions deployen: `compose-twoshot-audio`, `compose-twoshot-lipsync`, `compose-scene-anchor`, ggf. `compose-video-clips`.
+## Geänderte Dateien
+
+- `supabase/functions/compose-twoshot-audio/index.ts`
+- `supabase/functions/compose-twoshot-lipsync/index.ts`
+- DB-Reset für die aktuelle Szene (Migration nicht nötig, einfaches Update via service role)
+
+## Was NICHT geändert wird
+
+- Voice-Mapping (ist korrekt)
+- Anchor-Komposition / Identity-Lock (bleibt v3)
+- `compose-video-clips` (Hailuo-Render unverändert)
