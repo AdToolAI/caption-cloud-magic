@@ -531,6 +531,7 @@ export default function StoryboardTab({
                   }
                   previousSceneIndex={selectedIndex > 0 ? selectedIndex : undefined}
                   frameFirstMode={frameFirstMode}
+                  embedded
                 />
               </StudioPane>
             )}

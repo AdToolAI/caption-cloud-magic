@@ -37,7 +37,9 @@ interface Props {
   index: number;
   totalScenes: number;
   isExpanded: boolean;
-  onToggleExpand: () => void;
+  /** When undefined, the collapse chevron + click-to-toggle behavior are disabled
+   *  (used when the card is embedded inside the persistent Studio Pane). */
+  onToggleExpand?: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
   onDelete: () => void;
@@ -155,15 +157,17 @@ export default function SceneCardSummaryHeader({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-3 py-2 cursor-pointer select-none transition-colors',
-        'hover:bg-primary/5 rounded-lg',
-        isExpanded && 'border-b border-border/30 rounded-b-none mb-2',
+        'flex items-center gap-2 px-3 py-2 select-none transition-colors',
+        onToggleExpand && 'cursor-pointer hover:bg-primary/5 rounded-lg',
+        isExpanded && onToggleExpand && 'border-b border-border/30 rounded-b-none mb-2',
+        isExpanded && !onToggleExpand && 'border-b border-border/30 mb-2',
       )}
       onClick={onToggleExpand}
-      role="button"
-      aria-expanded={isExpanded}
-      tabIndex={0}
+      role={onToggleExpand ? 'button' : undefined}
+      aria-expanded={onToggleExpand ? isExpanded : undefined}
+      tabIndex={onToggleExpand ? 0 : undefined}
       onKeyDown={(e) => {
+        if (!onToggleExpand) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onToggleExpand();
@@ -253,28 +257,30 @@ export default function SceneCardSummaryHeader({
         >
           <Trash2 className="h-3 w-3" />
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] gap-1 text-primary hover:text-primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpand();
-          }}
-          title={isExpanded ? EXPAND_LABEL[language].close : EXPAND_LABEL[language].open}
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="h-3 w-3" />
-              {EXPAND_LABEL[language].close}
-            </>
-          ) : (
-            <>
-              <ChevronRight className="h-3 w-3" />
-              {EXPAND_LABEL[language].open}
-            </>
-          )}
-        </Button>
+        {onToggleExpand && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-[10px] gap-1 text-primary hover:text-primary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleExpand();
+            }}
+            title={isExpanded ? EXPAND_LABEL[language].close : EXPAND_LABEL[language].open}
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="h-3 w-3" />
+                {EXPAND_LABEL[language].close}
+              </>
+            ) : (
+              <>
+                <ChevronRight className="h-3 w-3" />
+                {EXPAND_LABEL[language].open}
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

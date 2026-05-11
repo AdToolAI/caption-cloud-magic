@@ -130,6 +130,12 @@ interface SceneCardProps {
   previousSceneIndex?: number;
   /** Phase 2 — when true, the Frame-First Studio is highlighted as Step 1. */
   frameFirstMode?: boolean;
+  /**
+   * Stage 17b — when true, this card is rendered inside the persistent
+   * Studio Pane (storyboard split-view). It is always fully expanded and
+   * drops its own card chrome to avoid double borders.
+   */
+  embedded?: boolean;
 }
 
 const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
@@ -167,6 +173,7 @@ export default function SceneCard({
   previousSceneLastFrameUrl,
   previousSceneIndex,
   frameFirstMode,
+  embedded,
 }: SceneCardProps) {
   const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
   const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
@@ -239,7 +246,8 @@ export default function SceneCard({
   // Studio-Set UX: collapse-by-default for already-configured scenes so the
   // storyboard reads as a scannable list. Newly-created (empty) scenes start
   // expanded so the user lands in the editor immediately.
-  const [isExpanded, setIsExpanded] = useState<boolean>(() => {
+  const [isExpandedState, setIsExpanded] = useState<boolean>(() => {
+    if (embedded) return true;
     const hasContent =
       Boolean((scene.aiPrompt ?? '').trim()) ||
       Boolean((scene.dialogScript ?? '').trim()) ||
@@ -247,6 +255,9 @@ export default function SceneCard({
       Boolean(scene.uploadUrl);
     return !hasContent;
   });
+  // When embedded inside the persistent Studio Pane, the editor is always
+  // fully open — the strip on the left handles selection/collapse.
+  const isExpanded = embedded ? true : isExpandedState;
 
 
   const { systemPresets } = useStylePresets();
@@ -461,20 +472,34 @@ export default function SceneCard({
     <Card
       ref={cardRef as any}
       id={`scene-card-${scene.id || index}`}
-      className="relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]"
+      className={
+        embedded
+          ? 'relative border-0 bg-transparent shadow-none rounded-none'
+          : 'relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]'
+      }
     >
-      {/* Bond-style vertical gold accent on hover */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-0 top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-      />
-      <CardContent className={isExpanded ? 'p-4 overflow-hidden' : 'p-2.5 overflow-hidden'}>
+      {/* Bond-style vertical gold accent on hover (hidden when embedded) */}
+      {!embedded && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute left-0 top-3 bottom-3 w-px bg-gradient-to-b from-transparent via-primary/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+        />
+      )}
+      <CardContent
+        className={
+          embedded
+            ? 'p-0 overflow-visible'
+            : isExpanded
+            ? 'p-4 overflow-hidden'
+            : 'p-2.5 overflow-hidden'
+        }
+      >
         <SceneCardSummaryHeader
           scene={scene}
           index={index}
           totalScenes={totalScenes}
           isExpanded={isExpanded}
-          onToggleExpand={() => setIsExpanded((v) => !v)}
+          onToggleExpand={embedded ? undefined : () => setIsExpanded((v) => !v)}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
           onDelete={onDelete}
