@@ -1,83 +1,63 @@
-## Stage 6 — Wardrobe & Prop Variants
+# Stage 7 — Shot Director Visual Picker (Comparable + Animated)
 
-Direct extension of Stage 3 (Pose Sheets + Vibe Strips). Same locked-identity / locked-geometry strategy, same Gemini Image (`google/gemini-3.1-flash-image-preview`) pipeline, same storage buckets — just two new axes.
+The Shot Director already renders an image-tile picker (`PresetGrid` + 49 thumbs in `src/assets/studio-presets/{axis}/`). The gap vs. our two memory rules is real:
 
-### Scope
+1. **Comparable thumbnail rule** — current thumbs use *different* hero scenes per option, so users compare scenes, not the axis itself.
+2. **Animated tile rule** — Movement options are static jpgs; users can't *see* the camera move.
 
-**A) Avatar Wardrobe Sheets** — 4 outfit variants per `brand_character`, identity-locked.
-- Presets: `casual`, `formal`, `action`, `brand` (CI-aware: pulls brand colors if available, else neutral).
-- Stored in new `avatar_wardrobe_variants` (mirrors `avatar_pose_variants`).
-- Mounted on `/avatars/:id` (AvatarDetail) directly under the existing PoseSheet.
+Stage 7 closes both gaps for the Shot Director picker. No new business logic.
 
-**B) Location Prop Variants** — 4 prop/dressing variants per `brand_location`, geometry-locked.
-- Presets: `empty`, `product-hero`, `lifestyle`, `event` (camera + room geometry preserved, only set-dressing changes).
-- Stored in new `location_prop_variants` (mirrors `location_vibe_variants`).
-- Mounted inline on Locations cards next to the existing VibeStrip (collapsible "Props" row).
+## Scope
 
-### Out of scope
-- No new studios, no Composer wiring beyond what `useUnifiedMentionLibrary` already does (variants surface automatically once rows exist, since mentions resolve by parent ID + variant tag — no schema change in mention library).
-- No regeneration UI per single tile — only "Generate Sheet" / "Regenerate Sheet" (same UX as Pose Sheet).
-- No video, no i2v calls in this stage. Pure image variants.
+### A) Comparable base-scene regeneration (6 axes × N options = 49 tiles)
 
-### Database (1 migration)
+For each axis, lock ONE base scene; only the axis variable changes per tile.
 
-```sql
-create table public.avatar_wardrobe_variants (
-  id uuid primary key default gen_random_uuid(),
-  avatar_id uuid not null references public.brand_characters(id) on delete cascade,
-  outfit_id text not null,        -- 'casual' | 'formal' | 'action' | 'brand'
-  label text not null,
-  image_url text not null,
-  storage_path text,
-  created_at timestamptz default now(),
-  unique (avatar_id, outfit_id)
-);
-alter table public.avatar_wardrobe_variants enable row level security;
--- RLS: select/insert/update/delete via avatar ownership (same shape as avatar_pose_variants)
+| Axis      | Base scene (locked)                                                   | Variable           | # tiles |
+|-----------|------------------------------------------------------------------------|--------------------|---------|
+| framing   | woman in trench coat on rainy neon street, same wardrobe/lighting     | crop distance      | 8       |
+| angle     | same woman, medium shot, same lighting                                 | camera angle       | 8       |
+| movement  | same woman walking down street, same framing                           | camera movement    | 10      |
+| lighting  | same woman, medium close, same pose                                    | lighting setup     | 10      |
+| camera    | same woman, medium shot, neutral lighting                              | camera body / look | 6       |
+| lens      | same woman, medium close, neutral lighting                             | lens character     | 7       |
 
-create table public.location_prop_variants (
-  id uuid primary key default gen_random_uuid(),
-  location_id uuid not null references public.brand_locations(id) on delete cascade,
-  prop_id text not null,          -- 'empty' | 'product-hero' | 'lifestyle' | 'event'
-  label text not null,
-  image_url text not null,
-  storage_path text,
-  created_at timestamptz default now(),
-  unique (location_id, prop_id)
-);
-alter table public.location_prop_variants enable row level security;
--- RLS analog to location_vibe_variants
-```
+Pipeline:
+- Generate 6 base scenes via `imagegen.generate_image` (`premium.gemini`, 512×512), save under `src/assets/studio-presets/_bases/{axis}.jpg`.
+- For each option, call `imagegen.edit_image` on its axis base with a strict English prompt: "Same scene, same wardrobe, same lighting — change ONLY {axisLabel}: {option.promptFragment}." Output overwrites the existing `src/assets/studio-presets/{axis}/{id}.jpg`.
+- Cinematic style presets (12) keep their distinct looks (correctly *not* comparable — they're full looks, not single-axis variants).
 
-### Edge functions (2 new)
+### B) Animated Movement tiles
 
-- `generate-avatar-wardrobe` — clone of `generate-avatar-poses`, wardrobe presets + stronger identity-lock (face + hair untouched, only clothing/accessories swap), saves to `brand-characters` bucket under `${user_id}/wardrobe/${avatar_id}/`.
-- `generate-location-props` — clone of `generate-location-vibes`, geometry-lock prompt ("preserve camera angle, walls, floor, windows; only re-dress the set"), saves to `brand-locations` bucket under `${user_id}/props/${location_id}/`.
+Reuse the existing `motionTiles.css` + `data-play` pattern from Stage 5 (Transitions/Scene-Anim).
 
-Both: parallel Promise.allSettled, idempotent upsert on unique key, English prompts.
+- New component `MovementPreviewTile.tsx` (clone of `SceneAnimationPreviewTile`): renders the locked base image and applies a CSS-keyframe transform per `optionId` (push-in → scale 1.0 → 1.15; orbit-left → translateX + scale; crane-up → translateY; handheld → small jitter + rotate; dolly-left/right → translateX; static → no anim).
+- Add 10 keyframe blocks to `motionTiles.css` (`@keyframes mv-push-in`, `mv-orbit-left`, …).
+- `data-play` gates the loop (hover on grid tile + active selection), matching existing rule.
+- Mount in `PresetGrid.tsx`: when `category === 'movement'`, swap the `<img>` for `<MovementPreviewTile imageSrc={thumb} optionId={opt.id} play={isHover || isActive} />`. Other axes stay as plain images (no behavioral change).
+- Tooltip stays the existing `title={opt.description[lang]}`.
 
-### UI
+### C) Memory updates
 
-- **`AvatarWardrobeSheet.tsx`** (new) — clone of `AvatarPoseSheet` skin, mounted in `AvatarDetail.tsx` under the PoseSheet card.
-- **`LocationPropStrip.tsx`** (new) — clone of `LocationVibeStrip` skin, mounted on Locations cards in a collapsible row labeled "Props".
+- Update `mem://design/studio-presets/comparable-thumbnail-rule` to confirm Shot Director coverage (currently only mentions the rule, now lists the 6 axes as compliant).
+- Update `mem://design/studio-presets/animated-tile-rule` to add `MovementPreviewTile` + `mv-*` keyframes alongside `TransitionPreviewTile` / `SceneAnimationPreviewTile`.
+- Update `mem://features/ai-video-studio/shot-director-ui` to note "comparable base scenes + animated movement tiles".
+- No `index.md` entry needed — both rule entries already exist.
 
-Both reuse Card/Button/grid layout, Bond palette, no new design tokens.
+## Out of scope
 
-### Memory
+- No changes to `shotDirector.ts` config, `buildShotPromptSuffix`, or any prompt-injection logic.
+- No changes to `SceneShotDirectorPanel` layout (it already uses `PresetGrid`, so it inherits B automatically).
+- No new edge functions, no DB, no Composer wiring.
+- Cinematic Style Presets thumbnails stay as-is (distinct looks by design).
 
-Update `mem://features/library-hubs/pose-sheets-and-vibe-variants.md` to also list `avatar_wardrobe_variants` (4 outfits) and `location_prop_variants` (4 dressings); keep one consolidated memory for the entire Library-Hub variant system.
+## Files
 
-### Files (new)
-- `supabase/functions/generate-avatar-wardrobe/index.ts`
-- `supabase/functions/generate-location-props/index.ts`
-- `src/components/brand-characters/AvatarWardrobeSheet.tsx`
-- `src/components/locations/LocationPropStrip.tsx`
-- 1 migration file
+- **New:** `src/components/studio-visual/MovementPreviewTile.tsx`
+- **Edited:** `src/components/studio-visual/PresetGrid.tsx` (movement-aware branch), `src/components/studio-visual/motionTiles.css` (+10 `mv-*` keyframes)
+- **Regenerated assets:** 49 jpgs under `src/assets/studio-presets/{framing,angle,movement,lighting,camera,lens}/` + 6 new `_bases/{axis}.jpg`
+- **Memory:** 2 rule files + 1 feature file updated
 
-### Files (edited)
-- `src/pages/AvatarDetail.tsx` — mount WardrobeSheet
-- `src/pages/Locations.tsx` — mount PropStrip
-- `mem://features/library-hubs/pose-sheets-and-vibe-variants.md`
-- `mem://index.md` — update bullet text
+## Estimate
 
-Estimated size: **small** — pure clone of an established pattern, no architectural risk.
+Small-to-medium. Pure visual refinement using existing patterns from Stage 3 (variant generation) and Stage 5 (animated tiles). Image generation is the only slow step (~55 calls, parallelizable).
