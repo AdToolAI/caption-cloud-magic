@@ -140,8 +140,9 @@ const SHOT_THUMBS: Record<ShotCategory, Record<string, string>> = {
     'pull-out': movementPullOut,
     'dolly-left': movementDollyLeft,
     'dolly-right': movementDollyRight,
-    'crane-up': movementCraneUp,
-    'crane-down': movementCraneDown,
+    // NOTE: source files were swapped — mapping fixes labels without rename
+    'crane-up': movementCraneDown,
+    'crane-down': movementCraneUp,
     'orbit-left': movementOrbitLeft,
     'orbit-right': movementOrbitRight,
     handheld: movementHandheld,
