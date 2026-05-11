@@ -13,9 +13,10 @@ import {
   findOption,
   type ShotCategory,
   type ShotSelection,
-  type ShotOption,
 } from '@/config/shotDirector';
 import { buildShotPromptSuffix, getSelectionCount } from '@/lib/shotDirector/buildShotPromptSuffix';
+import { PresetGrid } from '@/components/studio-visual/PresetGrid';
+import { getPresetThumbnail } from '@/config/studioPresetThumbnails';
 
 const STORAGE_KEY = 'shotDirector.selection.v1';
 
