@@ -228,31 +228,13 @@ function MasterDetail({ value, onChange, lang, count, setCategory }: MasterDetai
               </button>
             )}
           </div>
-          <div className="space-y-0.5">
-            {SHOT_CATEGORIES[active].map((opt: ShotOption) => {
-              const isOptActive = value[active] === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setCategory(active, opt.id)}
-                  className={`w-full text-left px-2 py-1.5 rounded transition-colors flex items-start gap-2 ${
-                    isOptActive ? 'bg-primary/15' : 'hover:bg-accent/40'
-                  }`}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-[11px] font-medium ${isOptActive ? 'text-primary' : 'text-foreground'}`}>
-                      {opt.label[lang]}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground leading-snug">
-                      {opt.description[lang]}
-                    </div>
-                  </div>
-                  {isOptActive && <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />}
-                </button>
-              );
-            })}
-          </div>
+          <PresetGrid
+            category={active}
+            options={SHOT_CATEGORIES[active]}
+            selectedId={value[active]}
+            onSelect={(id) => setCategory(active, id)}
+            lang={lang}
+          />
         </div>
       </div>
     </div>
