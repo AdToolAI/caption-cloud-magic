@@ -1647,6 +1647,44 @@ export type Database = {
           },
         ]
       }
+      avatar_pose_variants: {
+        Row: {
+          avatar_id: string
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          pose_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          avatar_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          pose_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          avatar_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          pose_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avatar_pose_variants_avatar_id_fkey"
+            columns: ["avatar_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       background_music_tracks: {
         Row: {
           created_at: string | null
@@ -7681,6 +7719,44 @@ export type Database = {
           verify_token?: string
         }
         Relationships: []
+      }
+      location_vibe_variants: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          location_id: string
+          storage_path: string | null
+          vibe_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          location_id: string
+          storage_path?: string | null
+          vibe_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          location_id?: string
+          storage_path?: string | null
+          vibe_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_vibe_variants_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "brand_locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       media_assets: {
         Row: {
