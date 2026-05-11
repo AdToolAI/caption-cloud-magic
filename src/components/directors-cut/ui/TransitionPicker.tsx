@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Sparkles, Check, Zap, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TransitionPreviewTile, type TransitionId } from '@/components/studio-visual/TransitionPreviewTile';
 
 interface TransitionType {
   id: string;
