@@ -10,8 +10,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-const PORTRAIT_PROMPT =
-  'Restyle this person as a centered frontal portrait, eye-level camera, neutral soft background, shoulders visible, looking directly into camera, photorealistic, soft studio lighting. Preserve the exact facial identity, hair style and color, skin tone, and any distinguishing features. Square 1:1 framing.';
+const PORTRAIT_PROMPTS = {
+  hedra:
+    'Restyle this person as a centered frontal portrait, eye-level camera, neutral soft background, shoulders visible, looking directly into camera, photorealistic, soft studio lighting. Preserve the exact facial identity, hair style and color, skin tone, and any distinguishing features. Square 1:1 framing.',
+  default_outfit:
+    'Restyle this person as a clean canonical studio portrait wearing a neutral plain heather-grey crew-neck t-shirt (or simple dark sweater if more flattering), plain off-white seamless studio backdrop, eye-level camera, shoulders and upper chest visible, frontal, looking directly into the camera, soft three-point key light, photorealistic, no logos or patterns on the clothing. Preserve the exact facial identity, hair style and color, skin tone, age, and any distinguishing features. Square 1:1 framing. This serves as the canonical base portrait for wardrobe restyling.',
+} as const;
+type PortraitVariant = keyof typeof PORTRAIT_PROMPTS;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
