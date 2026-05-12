@@ -43,6 +43,7 @@ import { SceneDirectorBox } from './SceneDirectorBox';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
+import { useWorldCatalog } from '@/hooks/useWorldCatalog';
 // Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
 // SceneShotDirectorPanel are no longer rendered inline; they live behind
 // SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
