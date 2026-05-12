@@ -71,10 +71,15 @@ async function generateOne(opts: {
   const url = signed?.signedUrl;
   if (!url) throw new Error('Sign URL failed');
 
-  await (supabaseAdmin as any).from('wardrobe_catalog_previews').upsert({
+  const { error: dbErr } = await (supabaseAdmin as any).from('wardrobe_catalog_previews').upsert({
     theme_pack, outfit_id, outfit_label, gender,
     image_url: url, storage_path: path,
   }, { onConflict: 'theme_pack,outfit_id,gender' });
+  if (dbErr) {
+    console.error('[seed-wardrobe-catalog] upsert failed', { theme_pack, outfit_id, gender, msg: dbErr.message });
+    throw new Error(`DB upsert: ${dbErr.message}`);
+  }
+  console.log('[seed-wardrobe-catalog] saved', { theme_pack, outfit_id, gender });
 }
 
 Deno.serve(async (req) => {
