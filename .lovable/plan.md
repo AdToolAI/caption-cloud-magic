@@ -1,59 +1,41 @@
-## Problem
+# Fix: New avatars show uploaded image instead of generated portrait
 
-1. **Wardrobe-Generierung schlägt fehl** mit `Edge Function returned a non-2xx status code`. Edge-Function-Logs zeigen wiederholt `error: Unauthorized`. Der User ist eingeloggt (Sidebar zeigt 22 Credits, Notifications aktiv) und ruft `supabase.functions.invoke('generate-avatar-wardrobe', …)` korrekt auf — der `Authorization`-Header wird also gesendet. Trotzdem schlägt `supabaseUser.auth.getUser()` in der Edge Function fehl.
+## Root Cause
 
-2. **Bestehende Avatare** (vor Stage 22 erstellt — z.B. Matthew & Sarah Dusatko im Screenshot) haben **kein** sauberes "default-outfit Portrait", weil das nur in `createCharacter` automatisch ausgelöst wird. Sie sehen entsprechend mit Originalbild aus, und die Wardrobe-Restyles erben Outfit/Lichtsetting des Originals statt der sauberen Studio-Base.
+`generate-avatar-portrait` successfully generates the clean studio portrait via Gemini, uploads it, but the final DB update fails with:
 
----
-
-## Lösung
-
-### Teil 1 — Auth-Fix in `generate-avatar-wardrobe`
-
-Den fragilen `supabaseUser.auth.getUser()`-Pfad (eigener anon-Client, der `/auth/v1/user` mit dem User-JWT aufruft) ersetzen durch das robuste Pattern, das wir in anderen kürzlich gefixten Functions nutzen: **Token aus dem Header extrahieren und direkt mit dem Service-Role-Client `supabaseAdmin.auth.getUser(token)` validieren**. Das umgeht potenzielle Edge-Cases mit Signing-Keys/legacy ANON_KEY-Mismatch.
-
-```ts
-const token = authHeader.replace(/^Bearer\s+/i, '');
-const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
-if (authErr || !user) throw new Error('Unauthorized');
+```
+new row for relation "brand_characters" violates check constraint "brand_characters_portrait_mode_check"
 ```
 
-Damit fällt der separate `supabaseUser`-Client komplett weg. Auth-Header wird trotzdem gefordert. Logging um den genauen Fehler erweitern (`authErr?.message`) damit künftige Auth-Probleme sofort sichtbar sind.
+The current constraint only allows `'original' | 'auto_generated' | 'manual_upload'`. Stage 22 introduced the new value `'auto_default_outfit'` in code (and types) but never extended the check constraint.
 
-### Teil 2 — "Generate Default Portrait" für bestehende Avatare
+Result: the generated portrait is uploaded to storage, but `portrait_url` / `portrait_mode` are never written → `BrandCharacterCard` falls back to `reference_image_url` (the raw upload).
 
-Zwei Touchpoints, beide nutzen die **bereits existierende** `generate-avatar-portrait` Edge Function mit `variant: 'default_outfit'` (kostet ~$0.005 pro Avatar via Gemini 3.1 Flash Image):
+## Fix
 
-**A) Per-Avatar Button auf der Avatar-Karte**
-- Neuer kleiner Button "Generate Studio Portrait" (Sparkles-Icon) auf `BrandCharacterCard.tsx`, sichtbar wenn `portrait_mode !== 'auto_default_outfit'` oder wenn der User es erneuern will.
-- Nutzt den bestehenden `useAvatarPortrait`-Hook, ergänzt um optionalen `variant`-Parameter (`'hedra' | 'default_outfit'`, default `'default_outfit'`).
-- Spinner-State während Generierung, Toast bei Fertig.
+### 1. DB migration
+Drop and recreate the constraint to include `auto_default_outfit`:
 
-**B) Bulk-Backfill Aktion auf `/brand-characters`**
-- Neuer Outline-Button neben "Repair images" → **"Generate studio portraits"**.
-- Iteriert sequentiell über alle eigenen Charaktere, bei denen `portrait_mode !== 'auto_default_outfit'`, und ruft `generate-avatar-portrait` mit `variant: 'default_outfit'` auf.
-- Progress-Toast (`x / y abgeschlossen`), abschließend Invalidate von `['brand-characters']`.
-- Confirm-Dialog vorab mit Hinweis auf ungefähre Dauer (~10–20s pro Avatar) und dass das alte Portrait überschrieben wird.
+```sql
+ALTER TABLE public.brand_characters
+  DROP CONSTRAINT IF EXISTS brand_characters_portrait_mode_check;
 
-### Out of Scope
-- Kein zusätzliches DB-Migration nötig (`portrait_mode`-Spalte existiert seit Stage 22, `generate-avatar-portrait` schreibt sie bereits).
-- Keine Änderung an `generate-avatar-portrait` selbst.
-- Keine Änderung an `clone-preset-avatar` (Preset-Avatare haben bereits saubere Portraits aus dem Seeder).
+ALTER TABLE public.brand_characters
+  ADD CONSTRAINT brand_characters_portrait_mode_check
+  CHECK (portrait_mode = ANY (ARRAY[
+    'original','auto_generated','manual_upload','auto_default_outfit'
+  ]));
+```
 
----
+### 2. Backfill existing avatars
+The user's existing avatar (Matthew Dusatko) currently has no clean portrait because every prior generation attempt failed silently on the constraint. After the migration, the existing "Generate studio portraits" bulk button on `/brand-characters` will now actually persist the result.
 
-## Geänderte Dateien
+No code changes needed — only the migration. Edge function, hooks and UI are already correct.
 
-- **edited** `supabase/functions/generate-avatar-wardrobe/index.ts` — Auth-Pattern auf Service-Role-validate-Token umgestellt + besseres Error-Logging.
-- **edited** `src/hooks/useAvatarPortrait.ts` — optionaler `variant`-Parameter.
-- **edited** `src/components/brand-characters/BrandCharacterCard.tsx` — "Generate Studio Portrait"-Button.
-- **edited** `src/pages/BrandCharacters.tsx` — "Generate studio portraits"-Bulk-Button mit Progress-Toast.
+## Validation
 
----
-
-## Validierung
-
-1. Edge Function `generate-avatar-wardrobe` redeployen, einmal aus dem UI triggern, Logs prüfen → erwarten: `start … done`, kein `Unauthorized`.
-2. Auf einem Bestands-Avatar (z.B. Matthew Dusatko) per Karten-Button "Generate Studio Portrait" klicken → neue saubere Portrait-URL erscheint.
-3. Bulk-Button auf `/brand-characters` einmal laufen lassen → alle Bestands-Avatare bekommen das default-outfit Portrait.
-4. Anschließend Wardrobe-Sheet → "Generate Wardrobe Sheet" für Medieval testen → 4 Outfits werden erfolgreich generiert.
+1. Apply migration.
+2. On `/brand-characters` click "Generate studio portraits" → Matthew gets a new clean grey-tee portrait.
+3. Add a new avatar → after upload the card shows the auto-generated default-outfit portrait, not the raw selfie.
+4. Edge function logs show `success`, no more `check constraint` error.
