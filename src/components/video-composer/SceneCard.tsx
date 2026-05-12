@@ -931,7 +931,10 @@ export default function SceneCard({
               libCharacters.length > 0 ||
               brandLocations.length > 0 ||
               brandBuildings.length > 0 ||
-              brandProps.length > 0
+              brandProps.length > 0 ||
+              catalogLocations.length > 0 ||
+              catalogBuildings.length > 0 ||
+              catalogProps.length > 0
             ) && (
               <>
                 <UnifiedAssetPicker
