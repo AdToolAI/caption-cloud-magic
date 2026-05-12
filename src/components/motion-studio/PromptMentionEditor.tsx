@@ -12,7 +12,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, AtSign } from 'lucide-react';
+import { User, MapPin, AtSign, Building2, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import {
