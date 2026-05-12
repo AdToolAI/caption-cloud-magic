@@ -417,7 +417,7 @@ export interface ComposerScene {
     outfitId: string;
     label: string;
     imageUrl: string;
-    themePack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport';
+    themePack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport' | 'business';
   };
 }
 
