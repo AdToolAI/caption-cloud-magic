@@ -38,6 +38,10 @@ import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
 import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge } from './CharacterShotBadge';
 import { CharacterCastPicker } from './CharacterCastPicker';
+import { UnifiedAssetPicker } from './UnifiedAssetPicker';
+import { useBrandLocations } from '@/hooks/useBrandLocations';
+import { useBrandBuildings } from '@/hooks/useBrandBuildings';
+import { useBrandProps } from '@/hooks/useBrandProps';
 // Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
 // SceneShotDirectorPanel are no longer rendered inline; they live behind
 // SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
