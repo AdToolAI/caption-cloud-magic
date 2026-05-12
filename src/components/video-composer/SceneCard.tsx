@@ -194,6 +194,9 @@ export default function SceneCard({
   const { locations: brandLocations } = useBrandLocations();
   const { buildings: brandBuildings } = useBrandBuildings();
   const { props: brandProps } = useBrandProps();
+  // Curated catalog (admin-seeded preview rows) — surfaced directly in the
+  // picker so users can use real-image assets without saving to their library.
+  const { catalogLocations, catalogBuildings, catalogProps } = useWorldCatalog();
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
