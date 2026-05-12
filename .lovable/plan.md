@@ -1,92 +1,85 @@
 ## Ziel
 
-Locations, Architecture und Props sollen — wie die **Preset Avatars** — sofort mit echten Vorschau-Bildern sichtbar sein und **direkt** in jede Szene/jeden Prompt übernommen werden können, **ohne sie vorher in die persönliche Library speichern zu müssen**. Charaktere bleiben "save-first" (wegen Identity-Card / Voice / Outfit-Looks). Pro Kategorie bleibt zusätzlich die eigene Library für hochgeladene oder selbst KI-generierte Items.
+Den World-Catalog (`/library`) um eine vierte Achse **"Cast" (Personen-Archetypen)** erweitern und gleichzeitig alle bestehenden Unterkategorien von **4 → 6 Bilder** anheben — damit Szenen-Director, @-Mentions und Composer für jede Epoche/Setting genug fertige Charaktere & Assets vorfinden, ohne dass etwas gespeichert werden muss.
 
-## Was es schon gibt (nicht neu bauen)
+---
 
-- `system_preset_avatars` + `clone-preset-avatar` + `PresetAvatarGallery` — Muster für Charaktere
-- `location_catalog_previews`, `building_catalog_previews`, `prop_catalog_previews` (Tabellen sind da)
-- `seed-world-catalog` Edge Function (Admin-only, generiert Vorschau-Bilder)
-- `CatalogBrowser` Komponente (zeigt Vorschau-Grid, ruft `onPick`)
-- `/library` mit Tabs People · Locations (Environments/Architecture) · Props
-- `brand_locations`, `brand_buildings`, `brand_props` + Hooks/Pages für eigene Items
-- `UnifiedAssetPicker` in jeder SceneCard (Composer) + `useUnifiedMentionLibrary` (@-Mentions)
+## Mengengerüst
 
-## Was fehlt (genau das wird gebaut)
+### A) Neue Achse: Cast Catalog (13 Sub-Packs × 6 = 78 Bilder)
 
-### Stage A — Katalog mit echten Bildern befüllen (alle Nutzer sehen sie sofort)
+| Theme | Sub-Pack | 6 Archetypen |
+|---|---|---|
+| historical | roman | Legionary, Centurion, Senator, Gladiator, Vestal, Emperor |
+| historical | medieval | Knight, Peasant, Bishop, Queen, Bard, Crusader |
+| historical | viking | Warrior, Shieldmaiden, Jarl, Skald, Berserker, Seeress |
+| historical | samurai | Samurai, Ronin, Geisha, Daimyo, Ninja, Monk |
+| historical | egyptian | Pharaoh, Priestess, Scribe, Charioteer, Worker, Royal Guard |
+| historical | greek | Hoplite, Philosopher, Athlete, Oracle, Trader, King |
+| historical | ww2 | Soldier, Pilot, Nurse, Resistance Fighter, Officer, Engineer (no political insignia) |
+| historical | wildwest | Sheriff, Outlaw, Saloon Owner, Prospector, Cowgirl, Native Scout |
+| modern | professions | Doctor, Chef, Police Officer, Firefighter, Pilot, Barista |
+| modern | business | CEO, Lawyer, Trader, Consultant, Receptionist, Manager |
+| modern | creative | Photographer, DJ, Designer, Painter, Filmmaker, Influencer |
+| fantasy | classic | Wizard, Elf Ranger, Dwarf, Paladin, Sorceress, Druid |
+| scifi | cyberpunk | Hacker, Netrunner, Street Samurai, Corp Suit, Mech Pilot, Synth |
 
-1. **Specs erweitern** in `seed-world-catalog/index.ts` auf eine breite, kuratierte Auswahl analog Wardrobe-Theme-Packs:
-   - **Locations / Environments** (theme_pack:item-pattern):
-     `nature:wheat-field`, `nature:beach-sunset`, `nature:forest-path`, `nature:mountain-vista`, `urban:neon-alley`, `urban:rooftop-night`, `urban:cafe-interior`, `urban:subway-platform`, `studio:white-cyc`, `studio:black-stage`, `interior:modern-office`, `interior:loft-apartment`, `interior:warehouse`, `historical:medieval-village`, `historical:ww2-bridge`, `desert:dunes-dawn`, `arctic:icefield`, `tropical:jungle-river`
-   - **Locations / Architecture**: `historical:gothic-cathedral`, `historical:roman-temple`, `historical:samurai-castle`, `modern:glass-tower`, `modern:minimal-villa`, `industrial:steel-bridge`, `religious:mosque`, `religious:hindu-temple`, `infrastructure:airport-terminal`, `infrastructure:train-station`
-   - **Props**: `vehicle:vintage-car`, `vehicle:motorbike`, `vehicle:leopard-tank`, `vehicle:fighter-jet`, `tech:vintage-camera`, `tech:laptop`, `tech:smartphone`, `furniture:leather-armchair`, `furniture:wooden-desk`, `instrument:electric-guitar`, `instrument:grand-piano`, `weapon:katana`, `weapon:bow`, `tool:hammer`, `tool:typewriter`, `food:espresso-cup`, `food:pizza`, `lifestyle:vinyl-record`, `lifestyle:leather-suitcase`
-   - jeweils mit englischem Visual-Prompt (Core-Rule)
-2. **Seed ausführen** für `location`, `building`, `prop`. Kein Schema-Change, nur Specs + Lauf.
-3. **Architecture-Sub-Tab** im `/library` Locations-Tab pickt jetzt aus `building_catalog_previews` (heute zeigt der Tab nur eigene Buildings) — `CatalogBrowser kind="building"` einbinden.
+Composite-Key wie bei Wardrobe: `historical:roman`, `scifi:cyberpunk` … (kompatibel mit bestehender Pill-Row UI).
 
-### Stage B — Direkt in Szenen einsetzen, ohne Library-Save
+### B) Bestehende Packs auf 6 erweitern (+2 pro Pack)
 
-Heute persistiert `applySceneAssetsToPrompt` die Auswahl als slugifizierte `@mentions`, die `useUnifiedMentionLibrary` auf gespeicherte Brand-Items auflöst. Katalog-Items sind nicht in der Library → würden ins Leere zeigen.
+| Achse | Packs | Neu-Bilder |
+|---|---|---|
+| Locations | 7 | 14 |
+| Buildings | 10 | 20 |
+| Props | 10 | 20 |
+| **Summe Erweiterung** | **27** | **54** |
 
-1. **Neue Tabelle `scene_catalog_refs`** (pro Szene/Workspace, leichtgewichtig):
-   - `id`, `user_id`, `scene_id` (composer scene), `kind` (`location|building|prop`), `catalog_id` (FK auf `*_catalog_previews`), `slug` (slug aus label), `created_at`
-   - RLS: nur Owner (Standard-Pattern)
-   - Zweck: erlaubt der Resolver-Pipeline, eine Mention wie `@gothic-cathedral` ohne Library-Eintrag aufzulösen
-2. **`useUnifiedMentionLibrary` erweitern**: zusätzlich `location_catalog_previews` / `building_catalog_previews` / `prop_catalog_previews` als virtuelle Locations einlesen (mit `image_url` als `reference_image_url` und Tag `catalog`). Dadurch funktionieren `@catalog-slugs` automatisch in **Composer + Toolkit** ohne weitere Änderungen am Resolver.
-3. **`UnifiedAssetPicker` (SceneCard)**: pro Family (Location, Architecture, Props) einen **"Browse Catalog"**-Button neben "Add" → öffnet `CatalogBrowser` als Popover/Dialog. `onPick` slugifiziert das Label und ruft `applySceneAssetsToPrompt` mit dem neuen Slug → identische Persistenz wie heute.
-4. **Composer Scene Director Box**: matched jetzt zusätzlich gegen Katalog-Pool, nicht nur User-Library. So findet "ein Soldat fährt mit einem Leopard Panzer über eine Brücke" automatisch `@leopard-tank` + `@steel-bridge` aus dem Katalog.
+### C) Gesamt
 
-### Stage C — Library-Seite: Katalog-Kacheln direkt nutzbar
+| Bucket | Vorher | Nachher | Neu zu generieren |
+|---|---:|---:|---:|
+| Locations | 28 | 42 | +14 |
+| Buildings | 40 | 60 | +20 |
+| Props | 40 | 60 | +20 |
+| **Cast (neu)** | 0 | 78 | +78 |
+| **Total** | **108** | **240** | **+132 Bilder** |
 
-In `/library` (Locations/Architecture/Props Tabs) bekommen die `CatalogBrowser`-Tiles eine sichtbare **"In nächste Szene übernehmen"**-Quick-Action (analog zum bestehenden `composer:incoming-stock-video` sessionStorage-Handoff): legt einen Eintrag in `sessionStorage` ab, den der Composer beim Mount aufnimmt und auf die aktive/neue Szene anwendet. So muss man nichts speichern — ein Klick reicht.
+Kosten-Schätzung (Gemini Image, ~€0.04/Bild): **~€5.30** einmalig. Laufzeit über `seed-world-catalog` Batches (8/Aufruf, ~12 s): **~3–4 Min** pro Achse, gesamt **~15 Min**.
 
-Optional pro Tile bleibt **"Save to my Library"** als sekundäre Aktion (klont in `brand_locations/buildings/props` mit Identity-Extraktion) — für Power-User, die später Variants generieren wollen.
+---
 
-### Stage D — Charakter-Verhalten unverändert
+## Technische Umsetzung
 
-Charaktere bleiben "Save-first" (wegen Identity-Card, Voice, Wardrobe/Pose-Variants, Outfit-Looks). `PresetAvatarGallery` zeigt sie weiter mit "Use this Avatar"-Klon. Keine Änderung.
+### 1. Neue Tabelle `character_catalog_previews`
+Identisches Schema wie die drei bestehenden `*_catalog_previews` (id, theme_pack, slug, label, image_url, prompt_seed, created_at), Public-Read RLS, Admin-Write.
 
-## Technische Details
+### 2. Seeder-Erweiterung (`supabase/functions/seed-world-catalog/index.ts`)
+- Neuer `kind: 'character'` Branch mit eigener Slot-Liste (13 Packs × 6 = 78 Slots)
+- Bestehende Slot-Listen für location/building/prop von 4 → 6 Einträge pro Pack erhöhen
+- Idempotent (skip wenn `slug` existiert) — alte 108 Bilder bleiben unangetastet, nur die +132 neuen werden generiert
+- Prompts strikt EN, mit konsistentem Style-Suffix pro Kind (Cast: "full-body cinematic portrait, neutral studio backdrop, even lighting, photoreal")
 
-```text
-Datenfluss (neu für Locations/Buildings/Props):
+### 3. UI-Hooks (read-only Anpassungen)
+- `useWorldCatalog.ts`: vierten Query-Block `catalogCharacters` ergänzen
+- `useUnifiedMentionLibrary.ts`: Cast-Catalog-Rows in `characters[]` mergen (analog zu Locations heute), getaggt `['catalog']`, library-first Dedupe bleibt unverändert → gespeicherte Avatare gewinnen weiter
+- `CatalogBrowser.tsx`: `kind: 'character'` Variante; sessionStorage-Handoff erbt Composer-Receiver
+- `Library.tsx` (`/library`): Cast-Katalog im **People-Tab** als 2. Sektion unter den persönlichen Avataren anzeigen — kein Save nötig, klick = direkt im Composer/Toolkit nutzbar
 
-  Catalog Tile  ──pick──▶  applySceneAssetsToPrompt(@slug)
-                            │
-                            ▼
-                 scene.aiPrompt mit <!--scene-assets-->@slug<!--/-->
-                            │
-                            ▼
-   useUnifiedMentionLibrary  (jetzt auch Katalog-Pool)
-                            │
-                            ▼
-     resolveMentions ──▶ image_url als reference
-                            │
-                            ▼
-       Vidu Q2 / Hailuo i2v / Nano Banana scene anchor
-```
+### 4. Scene Director (`supabase/functions/scene-director/index.ts`)
+Cast-Catalog als zusätzlichen Match-Pool registrieren (analog Locations/Buildings/Props), damit z. B. „Ein Senator betritt den Senat" automatisch `@senator` + `@roman-senate` injiziert.
 
-- **Keine** Änderung an `resolveMentions`, render-pipeline oder edge-functions außer `seed-world-catalog` (specs).
-- **Cache**: Katalog-Query in `useUnifiedMentionLibrary` mit `staleTime: 5min` (Daten ändern sich selten).
-- **Slug-Kollisionen**: Library-Items gewinnen über Katalog (selbe Dedupe-Regel wie heute Brand vs Motion-Studio).
+### 5. Ausführung
+Nach Approval: Migration → Seeder-Edit deployen → 4× `seed-world-catalog` (location, building, prop, character) bis `done:true`.
 
-## Dateien
+---
 
-**Neu**
-- `supabase/migrations/<ts>_scene_catalog_refs.sql` — Tabelle + RLS *(nur falls Stage B.1 wirklich nötig; Stage B.2 allein reicht meist, dann entfällt diese Migration)*
-- ggf. `src/components/library-hubs/CatalogPickAction.tsx` — Quick-Action Wrapper
+## Out of Scope (später, separat)
+- Cast-Variants (Posen/Outfits) für Catalog-Charaktere — Catalog ist bewusst „take it as is", Variants gibt's nur für gespeicherte Brand Characters.
+- Weitere Themen (Bollywood, Anime, Folklore) — können später als reine Daten-Erweiterung nachgezogen werden.
+- Voice-Matching für Cast-Catalog (Catalog-Personen haben kein `default_voice_id`).
 
-**Editiert**
-- `supabase/functions/seed-world-catalog/index.ts` — Specs erweitern (Locations / Architecture / Props)
-- `src/hooks/useUnifiedMentionLibrary.ts` — Katalog-Pool als virtuelle Locations einlesen
-- `src/components/video-composer/UnifiedAssetPicker.tsx` — "Browse Catalog"-Button pro Family
-- `src/pages/Library.tsx` — Architecture-Sub-Tab nutzt `CatalogBrowser kind="building"`; Quick-Action pro Tile
-- `src/components/library-hubs/CatalogBrowser.tsx` — `onPick` Default = sessionStorage-Handoff zum Composer
-- `supabase/functions/scene-director/index.ts` — Katalog-Pool zusätzlich an `resolveAssets` übergeben
+---
 
-## Out of Scope
-
-- Kein Marketplace, keine 70/30-Revenue-Share Erweiterung auf Locations/Props
-- Keine Identity-Extraktion für Katalog-Items (das passiert nur, wenn man "Save to my Library" klickt)
-- Keine Variants (Vibes/Props) auf Katalog-Items — die bleiben Library-only
+## Bestätigung erbeten
+Soll ich genau so umsetzen, oder möchtest du Themen/Anzahl pro Pack anpassen (z. B. 4 statt 6, oder weitere Sub-Packs wie `historical:wildwest` ergänzen/streichen)?
