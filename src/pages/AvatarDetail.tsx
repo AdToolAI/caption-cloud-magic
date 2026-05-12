@@ -22,10 +22,14 @@ interface SelectedOutfit {
   themePack: string;
 }
 
+type Gender = 'female' | 'male' | 'neutral';
+
 const AvatarDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
   const [selectedOutfit, setSelectedOutfit] = useState<SelectedOutfit | null>(null);
   const [openedLook, setOpenedLook] = useState<OutfitLook | null>(null);
+  const [savingGender, setSavingGender] = useState(false);
 
   const { data: avatar, isLoading } = useQuery({
     queryKey: ['avatar-detail', id],
@@ -39,6 +43,24 @@ const AvatarDetail = () => {
   });
 
   const previewUrl = avatar?.portrait_url || avatar?.reference_image_url;
+
+  const saveGender = async (g: Gender) => {
+    if (!id || savingGender) return;
+    setSavingGender(true);
+    try {
+      const { error } = await supabase
+        .from('brand_characters')
+        .update({ gender: g } as any)
+        .eq('id', id);
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ['avatar-detail', id] });
+      toast.success(`Gender set to ${g}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to save gender');
+    } finally {
+      setSavingGender(false);
+    }
+  };
 
   return (
     <>
