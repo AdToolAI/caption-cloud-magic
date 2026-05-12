@@ -127,7 +127,7 @@ Deno.serve(async (req) => {
       .from('brand_characters')
       .update({
         portrait_url: portraitUrl,
-        portrait_mode: 'auto_generated',
+        portrait_mode: portraitVariant === 'default_outfit' ? 'auto_default_outfit' : 'auto_generated',
       })
       .eq('id', character_id);
     if (updErr) throw new Error(`DB update failed: ${updErr.message}`);
