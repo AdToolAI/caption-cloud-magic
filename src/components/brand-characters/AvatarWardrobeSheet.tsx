@@ -288,7 +288,9 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   }, [catalog, userOutfits]);
 
   const isLoading = loadingUser || loadingCatalog;
-  const isEmpty = !isLoading && variantsBySlot.size === 0;
+  const hasUserOverrides = userOutfits.length > 0;
+  // Catalog still warming up for this combo (rare during rollout). Don't block — show skeletons.
+  const catalogPending = !isLoading && catalog.length === 0 && !hasUserOverrides;
 
   const handleGenerate = async () => {
     if (isGenerating) return;
