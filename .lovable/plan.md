@@ -1,49 +1,102 @@
-## Stage 20: Business Theme Pack für Wardrobe
+## Stage 21: Hierarchische Wardrobe Theme Packs
 
-Add a 6th theme pack `business` to the existing Artlist-style Wardrobe system. Same architecture as Lifestyle/Historical/Fantasy/Sci-Fi/Sport — 4 identity-locked full-body outfits via Gemini 3.1 Flash Image.
+Aktuell sind die 6 Theme Packs flach (4 Outfits pro Theme). Wir machen alle Themes 2-stufig: **Theme → Sub-Pack → 4 Outfits**. Architektur identisch zu Stage 20 (Gemini 3.1 Flash Image, identity-lock, ~$0.005/Outfit).
 
-### Gender Handling
+### Ziel-Struktur
 
-Outfit-Prompts werden **geschlechtsneutral** formuliert (z.B. "tailored two-piece business suit" statt "men's suit"). Der Identity-Lock von Gemini übernimmt automatisch das Geschlecht, die Frisur und den Körperbau des Avatar-Porträts — so funktioniert das System bereits bei allen 5 bestehenden Packs (ein Frauen-Avatar bekommt automatisch eine Damen-Variante des Knight-Outfits etc.). Damit ist die Anforderung "männlich und weiblich" out-of-the-box erfüllt, ohne pro Outfit zwei Varianten generieren zu müssen (würde Kosten verdoppeln).
+```text
+Lifestyle
+├── Everyday      → Casual, Streetwear, Brunch, Loungewear
+├── Formal        → Black Tie, Cocktail, Wedding Guest, Gala
+├── Seasonal      → Summer, Winter, Rainy Day, Spring
+└── Brand         → Brand Hero, Brand Casual, Brand Formal, Brand Sport
 
-Falls in Zukunft strikt getrennte male/female-Cuts gewünscht sind, können wir das als Stage 21 nachschieben (Auto-Detect Gender via Vision + duplizierte Outfit-IDs `executive-m` / `executive-f`).
+Business
+├── Corporate     → Executive Suit, Boardroom, Banker, Consultant
+├── Startup       → Smart Casual, Founder Hoodie, Power Blazer, Pitch
+├── Creative      → Designer, Agency, Architect, Editor
+└── Travel        → Airport Pro, Conference, Networking, Coworking
 
-### 4 Business-Outfits
+Historical (7 Eras)
+├── Antiquity        → Roman Legionary, Greek Hoplite, Egyptian Royal, Celtic Warrior
+├── Medieval         → Knight, Viking, Crusader, Monk
+├── Renaissance      → Noble, Musketeer, Pirate, Court
+├── Industrial       → Edwardian, Victorian, Steampunk, Wild West
+├── World War I      → Doughboy, Tommy, Pilot Ace, Trench Officer
+├── World War II     → GI, German Soldier, RAF Pilot, Resistance
+└── Feudal Japan     → Samurai, Ninja, Geisha, Ronin
 
-1. **Executive Suit** — tailored dark navy two-piece business suit, crisp white dress shirt, silk tie or silk scarf, polished leather shoes, premium boardroom styling
-2. **Smart Casual** — fitted blazer over white shirt, dark chinos, leather loafers, modern startup-office look, no tie
-3. **Power Blazer** — structured charcoal blazer with statement lapels, fitted black turtleneck, slim trousers, confident keynote-stage styling
-4. **Founder Hoodie** — premium minimal hoodie in heather grey under an unstructured wool blazer, dark jeans, white sneakers, Silicon Valley founder aesthetic
+Fantasy
+├── Light    → Wizard, Elven Ranger, Paladin, Royal
+├── Dark     → Dark Knight, Necromancer, Assassin, Vampire
+└── Mythic   → Dragon Rider, Druid, Sorceress, Forest Guardian
 
-Alle mit identity-lock prompt suffix (face, hair, skin tone, body proportions preserved), full-body, soft neutral studio background, photorealistic — identisch zum bestehenden Standard.
+Sci-Fi
+├── Space    → Astronaut, Star Captain, Alien Diplomat, Mech Pilot
+├── Cyber    → Cyberpunk, Netrunner, Corp Exec, Street Samurai
+└── Future   → Holo Suit, Bio-Engineer, Energy Knight, Drone Pilot
+
+Sport
+├── Team       → Football, Basketball, Baseball, Soccer
+├── Combat     → MMA, Boxing, Karate, Fencing
+└── Outdoor    → Tennis, Skiing, Climbing, Cycling
+```
+
+**Total:** 6 Themes, 23 Sub-Packs, 92 Outfit-Slots (alle lazy on-demand, $0.02/Sub-Pack).
+
+### Technik
+
+**DB (keine Migration nötig):** `avatar_wardrobe_variants.theme_pack` speichert weiterhin den Sub-Pack-Key direkt — wir migrieren von `'historical'` zu `'historical:medieval'`. Spalte ist `TEXT`, Unique-Index `(avatar_id, theme_pack, outfit_id)` greift unverändert. Bestehende Zeilen mit altem flachen Wert (`'historical'`, `'lifestyle'` etc.) bleiben gültig — UI zeigt sie nicht mehr an, sind aber nicht broken (User kann den neuen Sub-Pack einfach neu generieren).
+
+**Edge Function `generate-avatar-wardrobe`:**
+- `THEME_PACKS` wird verschachtelt: `Record<ThemeId, Record<SubPackId, Outfit[]>>`
+- Request akzeptiert `{ avatar_id, theme_pack, sub_pack }` → wird intern zu Composite-Key `${theme}:${sub}` für DB-Storage
+- Validator: Whitelist aller `theme:sub` Kombinationen
+- Generierungs-Logik unverändert (4 parallele Gemini-Calls)
+
+**`AvatarWardrobeSheet.tsx`:**
+- State: `theme: ThemeId` + `subPack: SubPackId`
+- Erste Pill-Reihe: 6 Theme-Pills (wie heute)
+- Zweite Pill-Reihe (conditional, animated reveal): Sub-Pack-Pills für gewähltes Theme
+- Bei Theme-Wechsel: erstes Sub-Pack auto-selektieren
+- `PACK_SLOTS` wird zu `PACK_SLOTS[theme][subPack]`
+- Query-Key: `['avatar-wardrobe', avatarId, theme, subPack]`
+- Composite-Key wird beim DB-Read und beim Edge-Call konstruiert
+
+**`SceneAvatarMode.tsx`:**
+- `scene.selectedOutfit` bekommt zusätzliches Feld `subPack` (für Re-Selection beim Reload)
+- Default-Pack: `historical:medieval` statt `historical` (Backward-Compatible über Migration im Component)
+
+**`src/types/video-composer.ts`:**
+- `selectedOutfit.themePack` bleibt — Wert ist jetzt Composite-String
+
+### Prompt-Hinweise
+
+Alle Outfit-Prompts gender-neutral formuliert ("gender-appropriate cut") — Identity-Lock von Gemini übernimmt Geschlecht/Frisur/Körperbau automatisch (gleiche Strategie wie Stage 20).
+
+Sensible historische Uniformen (WW2 German Soldier) → neutrale, generische Wehrmacht-Felduniform ohne Hoheitsabzeichen / SS-Symbolik. Prompt enthält explizit "no political insignia, no swastikas, generic field uniform". Das ist Standard-Praxis bei Stock-Footage.
 
 ### Files to Edit
 
-**`supabase/functions/generate-avatar-wardrobe/index.ts`**
-- `ThemePack` type: add `'business'`
-- `THEME_PACKS`: add `business: [...]` array with 4 outfits above
-- `VALID_PACKS` set: add `'business'`
-
-**`src/components/brand-characters/AvatarWardrobeSheet.tsx`**
-- `WardrobeThemePack` type: add `'business'`
-- Theme pills array: add `{ id: 'business', label: 'Business', emoji: '💼' }`
-- Local fallback `THEME_PACKS_LOCAL` (used for skeleton labels): add 4 business outfit labels
-
-**No DB migration needed** — `theme_pack` column is already `TEXT`, unique index already covers `(avatar_id, theme_pack, outfit_id)`.
-
-**No edge function deploy parameters change** — same Gemini call, same cost (~$0.005 / outfit, ~$0.02 / pack).
+- `supabase/functions/generate-avatar-wardrobe/index.ts` (verschachtelte THEME_PACKS, sub_pack Param)
+- `src/components/brand-characters/AvatarWardrobeSheet.tsx` (2-stufige Pills, Composite-Key)
+- `src/components/video-composer/SceneAvatarMode.tsx` (subPack im selectedOutfit)
+- `src/types/video-composer.ts` (Typ-Hinweis ergänzen)
+- `.lovable/plan.md` (Stage 21 dokumentieren)
 
 ### Out of Scope
 
-- Gender-split outfits (Stage 21 if requested)
-- New themes beyond Business
-- Wardrobe UI redesign
-- 3D model integration
+- Brand Props (Panzer/Gebäude/Objekte) → eigene Stage 22 falls gewünscht
+- Auto-Migration alter flacher Einträge (User regeneriert einfach)
+- 3-stufige Hierarchie (Theme → Sub → Sub-Sub)
+- Gender-Split Outfits (würde Kosten verdoppeln)
 
-### Cost Impact
+### Kosten
 
-+1 theme pack à 4 outfits = +$0.02 per Avatar (only when user clicks "Generate Business Pack"). All packs cached after first generation.
+- Pro Sub-Pack-Generierung: $0.02 (4 Outfits à $0.005)
+- Lazy: nur generiert wenn User auf "Generate" klickt
+- Cached danach permanent in DB
 
 ### Memory Update
 
-`mem://features/avatars/wardrobe-theme-packs` — change "5 themed outfit packs" → "6 themed outfit packs (Lifestyle/Historical/Fantasy/Sci-Fi/Sport/Business)".
+`mem://features/avatars/wardrobe-theme-packs` → "**Hierarchical 2-tier theme packs**: 6 Themes × 23 Sub-Packs × 4 Outfits = 92 Outfit-Slots. `theme_pack` column stores composite key `theme:subpack` (e.g. `historical:ww2`). Lifestyle/Business/Historical/Fantasy/Sci-Fi/Sport, je 3-7 Sub-Packs."
