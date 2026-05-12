@@ -126,7 +126,13 @@ Deno.serve(async (req) => {
     );
     const allTodo = force
       ? targets
-      : targets.filter((t) => !existingSet.has(`${t.theme_pack}|${t.outfit_id}|${t.gender}`));
+      : targets.filter((t) => !existingSet.has(`${t.theme_pack}|${t.outfit.id}|${t.gender}`));
+
+    // Shuffle so parallel invocations don't all hammer the same first slots.
+    for (let i = allTodo.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allTodo[i], allTodo[j]] = [allTodo[j], allTodo[i]];
+    }
 
     const todo = allTodo.slice(0, MAX_PER_INVOCATION);
     const remainingAfter = Math.max(0, allTodo.length - todo.length);
