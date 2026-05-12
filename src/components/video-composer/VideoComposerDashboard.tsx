@@ -715,12 +715,16 @@ export default function VideoComposerDashboard() {
     campaign: 'Cutdowns & A/B-Varianten',
   };
 
-  const STEPS: StepItem[] = TABS.map((t) => ({
-    id: t.id,
-    label: t.label,
-    hint: STEP_HINTS[t.id],
-    icon: t.icon,
-  }));
+  // User-visible workflow steps — Stage 18 hides the technical "Clips" step
+  // because clip generation now happens inline inside the Storyboard player tiles.
+  const STEPS: TopStepperStep[] = TABS
+    .filter((tab) => tab.id !== 'clips')
+    .map((t) => ({
+      id: t.id,
+      label: t.label,
+      hint: STEP_HINTS[t.id],
+      icon: t.icon,
+    }));
 
   useEffect(() => {
     saveDraft(project);
