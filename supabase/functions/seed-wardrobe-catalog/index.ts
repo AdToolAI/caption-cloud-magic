@@ -140,36 +140,33 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Run chunk in background — return immediately so the caller is not bound by client timeouts.
-    const work = (async () => {
-      let completed = 0, failed = 0;
-      for (let i = 0; i < todo.length; i += BATCH_SIZE) {
-        const batch = todo.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(batch.map((t) =>
-          generateOne({
-            supabaseAdmin,
-            apiKey: LOVABLE_API_KEY,
-            theme_pack: t.theme_pack,
-            outfit_id: t.outfit.id,
-            outfit_label: t.outfit.label,
-            modifier: t.outfit.modifier,
-            gender: t.gender,
-          }),
-        ));
-        for (const r of results) {
-          if (r.status === 'fulfilled') completed++; else failed++;
-        }
+    // Run chunk SYNCHRONOUSLY — wait until images are stored before responding.
+    // No waitUntil: previous attempts lost background work mid-flight.
+    let completed = 0, failed = 0;
+    for (let i = 0; i < todo.length; i += BATCH_SIZE) {
+      const batch = todo.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((t) =>
+        generateOne({
+          supabaseAdmin,
+          apiKey: LOVABLE_API_KEY,
+          theme_pack: t.theme_pack,
+          outfit_id: t.outfit.id,
+          outfit_label: t.outfit.label,
+          modifier: t.outfit.modifier,
+          gender: t.gender,
+        }),
+      ));
+      for (const r of results) {
+        if (r.status === 'fulfilled') completed++; else { failed++; console.error('[seed] slot failed', (r as any).reason?.message); }
       }
-      console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
-    })().catch((err) => console.error('[seed-wardrobe-catalog] chunk failed', err));
-
-    // @ts-ignore — Deno deploy runtime
-    EdgeRuntime.waitUntil(work);
+    }
+    console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
 
     return new Response(JSON.stringify({
       success: true,
       done: remainingAfter === 0,
-      queued: todo.length,
+      processed: completed,
+      failed,
       remaining: remainingAfter,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
