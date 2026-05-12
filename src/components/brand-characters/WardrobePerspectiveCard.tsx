@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ArrowLeft, Sparkles, ImageIcon, Save, Check } from 'lucide-react';
+import { Loader2, ArrowLeft, Sparkles, ImageIcon, Save, Check, ZoomIn } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { OutfitLightbox, type LightboxFrame } from './OutfitLightbox';
 
 const PERSPECTIVES = [
   { id: 'front', label: 'Front' },
