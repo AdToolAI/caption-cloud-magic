@@ -30,7 +30,7 @@ const PERSPECTIVES: { id: 'front' | 'back' | 'side' | 'top'; label: string; modi
 ];
 
 const IDENTITY_LOCK =
-  'CRITICAL: Preserve the EXACT face, age, skin tone, hair style, hair color, eye color and body proportions of the reference person. Do not alter the face or hair. Preserve the EXACT outfit, fabric, color, cut and accessories from the reference image — only the camera angle changes. Soft neutral studio background, photorealistic, head-to-toe framing.';
+  'CRITICAL: Preserve the EXACT face, age, skin tone, hair style, hair color, eye color and body proportions of the reference person. Do not alter the face or hair. Soft neutral studio background, photorealistic, head-to-toe full-body framing.';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
