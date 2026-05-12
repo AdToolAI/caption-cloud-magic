@@ -2116,6 +2116,54 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_buildings: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_favorite: boolean
+          name: string
+          reference_image_url: string
+          storage_path: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          visual_identity_json: Json | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name: string
+          reference_image_url: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          visual_identity_json?: Json | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name?: string
+          reference_image_url?: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          visual_identity_json?: Json | null
+        }
+        Relationships: []
+      }
       brand_character_usage: {
         Row: {
           character_id: string
@@ -2526,6 +2574,54 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_props: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_favorite: boolean
+          name: string
+          reference_image_url: string
+          storage_path: string | null
+          tags: string[] | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+          visual_identity_json: Json | null
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name: string
+          reference_image_url: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+          visual_identity_json?: Json | null
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_favorite?: boolean
+          name?: string
+          reference_image_url?: string
+          storage_path?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+          visual_identity_json?: Json | null
+        }
+        Relationships: []
+      }
       brand_templates: {
         Row: {
           brand_kit_id: string
@@ -2698,6 +2794,36 @@ export type Database = {
           user_email?: string | null
           user_id?: string | null
           viewport?: string | null
+        }
+        Relationships: []
+      }
+      building_catalog_previews: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          prompt: string | null
+          storage_path: string | null
+          theme_pack: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack?: string
         }
         Relationships: []
       }
@@ -7828,6 +7954,36 @@ export type Database = {
         }
         Relationships: []
       }
+      location_catalog_previews: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          prompt: string | null
+          storage_path: string | null
+          theme_pack: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack?: string
+        }
+        Relationships: []
+      }
       location_prop_variants: {
         Row: {
           created_at: string
@@ -10043,6 +10199,36 @@ export type Database = {
           sample_caption?: string
           tone?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      prop_catalog_previews: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          prompt: string | null
+          storage_path: string | null
+          theme_pack: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack?: string
         }
         Relationships: []
       }
