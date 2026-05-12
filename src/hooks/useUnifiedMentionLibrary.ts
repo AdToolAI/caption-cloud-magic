@@ -10,6 +10,8 @@
 // resolution pipeline. Writes still go to each library's own page.
 
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
