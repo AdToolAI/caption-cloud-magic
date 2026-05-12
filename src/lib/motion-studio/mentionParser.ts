@@ -45,10 +45,27 @@ export interface ResolvedPrompt {
  * Names are matched case-insensitive and accept hyphens / underscores
  * inside the @-tag (e.g. `@Sarah_Kim`, `@coffee-shop`).
  */
+/** Slugify a name to match `@token` form: lowercase, spaces→`-`, strip punctuation. */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '');
+}
+
 function buildIndex<T extends { name: string }>(items: T[]): Map<string, T> {
   const map = new Map<string, T>();
   for (const item of items) {
-    if (item?.name) map.set(item.name.toLowerCase(), item);
+    if (!item?.name) continue;
+    const lower = item.name.toLowerCase();
+    map.set(lower, item);
+    // Also accept slugified form so `@gothic-cathedral` resolves "Gothic Cathedral".
+    const slug = slugify(item.name);
+    if (slug && !map.has(slug)) map.set(slug, item);
+    // And underscore-normalized form.
+    const under = slug.replace(/-/g, '_');
+    if (under && !map.has(under)) map.set(under, item);
   }
   return map;
 }
