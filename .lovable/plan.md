@@ -1,69 +1,49 @@
-## Ziel
+## Stage 20: Business Theme Pack für Wardrobe
 
-Im `SceneAvatarMode` (Storyboard → Avatar-Tab) sind „Wardrobe" und „Pose-Sheet" aktuell **nur Info-Kärtchen ohne Klick**. Wir bauen sie zu einem **Artlist-ähnlichen Wardrobe-System** um: inline klickbar, mit Ganzkörper-Outfit-Varianten in mehreren Themen-Welten (Lifestyle, Historical, Fantasy, Sci-Fi, Sport) — alle mit gelocktem Gesicht via Gemini Image (Nano Banana 2). Beste Preis-Leistung: ~$0.005 pro Outfit.
+Add a 6th theme pack `business` to the existing Artlist-style Wardrobe system. Same architecture as Lifestyle/Historical/Fantasy/Sci-Fi/Sport — 4 identity-locked full-body outfits via Gemini 3.1 Flash Image.
 
----
+### Gender Handling
 
-## Stufe 1 — Wardrobe & Pose-Sheet inline klickbar
+Outfit-Prompts werden **geschlechtsneutral** formuliert (z.B. "tailored two-piece business suit" statt "men's suit"). Der Identity-Lock von Gemini übernimmt automatisch das Geschlecht, die Frisur und den Körperbau des Avatar-Porträts — so funktioniert das System bereits bei allen 5 bestehenden Packs (ein Frauen-Avatar bekommt automatisch eine Damen-Variante des Knight-Outfits etc.). Damit ist die Anforderung "männlich und weiblich" out-of-the-box erfüllt, ohne pro Outfit zwei Varianten generieren zu müssen (würde Kosten verdoppeln).
 
-**`src/components/video-composer/SceneAvatarMode.tsx`**
-- Aus den beiden Hint-Kärtchen werden **expandierbare Panels** (`<Collapsible>` von shadcn) — Klick öffnet das Panel direkt unter dem aktiven Charakter, der Avatar-Stage und Player rechts bleiben sichtbar.
-- Wardrobe-Panel rendert `<AvatarWardrobeSheet avatarId={activeChar.id} />` (existiert bereits, nutzt `VariantPickerGrid` + `generate-avatar-wardrobe`).
-- Pose-Panel rendert `<AvatarPoseSheet avatarId={activeChar.id} />` (existiert bereits).
-- Wenn kein `activeChar`: Hint „Bitte erst einen Cast wählen", Buttons disabled.
-- Auswahl einer Outfit-Variante → schreibt `selectedOutfitVariantId` + `outfitImageUrl` auf `scene` zurück. Stage zeigt sofort die neue Variante.
+Falls in Zukunft strikt getrennte male/female-Cuts gewünscht sind, können wir das als Stage 21 nachschieben (Auto-Detect Gender via Vision + duplizierte Outfit-IDs `executive-m` / `executive-f`).
 
-## Stufe 2 — Themen-Outfits („Artlist-Style")
+### 4 Business-Outfits
+
+1. **Executive Suit** — tailored dark navy two-piece business suit, crisp white dress shirt, silk tie or silk scarf, polished leather shoes, premium boardroom styling
+2. **Smart Casual** — fitted blazer over white shirt, dark chinos, leather loafers, modern startup-office look, no tie
+3. **Power Blazer** — structured charcoal blazer with statement lapels, fitted black turtleneck, slim trousers, confident keynote-stage styling
+4. **Founder Hoodie** — premium minimal hoodie in heather grey under an unstructured wool blazer, dark jeans, white sneakers, Silicon Valley founder aesthetic
+
+Alle mit identity-lock prompt suffix (face, hair, skin tone, body proportions preserved), full-body, soft neutral studio background, photorealistic — identisch zum bestehenden Standard.
+
+### Files to Edit
 
 **`supabase/functions/generate-avatar-wardrobe/index.ts`**
-- Optionaler Body-Param: `theme_pack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport'` (Default `lifestyle` → keine Regression).
-- Neue Themen-Sets (jeweils 4 Outfits, **Ganzkörper, Studio-BG, Identity-Lock**):
+- `ThemePack` type: add `'business'`
+- `THEME_PACKS`: add `business: [...]` array with 4 outfits above
+- `VALID_PACKS` set: add `'business'`
 
-| Pack | Outfits |
-|---|---|
-| **lifestyle** ✅ schon da | Casual · Formal · Action · Brand |
-| **historical** | Knight in plate armor · Roman Legionary · Viking warrior · Edwardian gentleman/lady |
-| **fantasy** | Wizard with robes · Elven Ranger · Dark Knight · Royal coronation attire |
-| **scifi** | Astronaut suit · Cyberpunk streetwear · Mech-pilot uniform · Holo-suit |
-| **sport** | Football kit · Basketball jersey · Tennis whites · MMA fight gear |
+**`src/components/brand-characters/AvatarWardrobeSheet.tsx`**
+- `WardrobeThemePack` type: add `'business'`
+- Theme pills array: add `{ id: 'business', label: 'Business', emoji: '💼' }`
+- Local fallback `THEME_PACKS_LOCAL` (used for skeleton labels): add 4 business outfit labels
 
-- Identity-Lock-Prompt bleibt streng (Gesicht/Proportionen unverändert), Modifier erweitert um „**full-body, head-to-toe, soft neutral studio background, photorealistic**".
-- Modell: weiterhin `google/gemini-3.1-flash-image-preview` via Lovable AI Gateway.
+**No DB migration needed** — `theme_pack` column is already `TEXT`, unique index already covers `(avatar_id, theme_pack, outfit_id)`.
 
-**Migration `avatar_wardrobe_variants`:**
-- Spalte `theme_pack TEXT NOT NULL DEFAULT 'lifestyle'` ergänzen.
-- Alten Unique-Index `(avatar_id, outfit_id)` droppen, neuen anlegen: `(avatar_id, theme_pack, outfit_id)` → mehrere Theme-Sets pro Avatar koexistieren ohne Idempotenz-Konflikt.
+**No edge function deploy parameters change** — same Gemini call, same cost (~$0.005 / outfit, ~$0.02 / pack).
 
-**`AvatarWardrobeSheet`:**
-- Neue Prop `themePack` + Theme-Pack-Pills oberhalb der Grid (Lifestyle · Historical · Fantasy · Sci-Fi · Sport).
-- Query-Key: `['avatar-wardrobe', avatarId, themePack]`.
-- „Generate"-Call schickt `theme_pack` mit.
+### Out of Scope
 
-## Stufe 3 — Ganzkörper-Stage („Artlist-Showroom")
+- Gender-split outfits (Stage 21 if requested)
+- New themes beyond Business
+- Wardrobe UI redesign
+- 3D model integration
 
-**`AvatarStage3D.tsx`:**
-- Wenn `selectedOutfitVariantId` gesetzt → zeige das **Ganzkörper-Outfit-Bild** statt des Brustbild-Porträts.
-- Optik: weicher Gradient-Boden, Spotlight-Cone, sanfter Parallax-Tilt (existiert bereits), Slow-Float-Animation („lebendiges Schaufenster").
-- Toggle oben rechts: **[Porträt] [Outfit-Showroom]**.
-- Mini-Hint: „Kein 3D-Modell — gerenderte Outfit-Variante mit Identity-Lock" (klein, einklappbar).
+### Cost Impact
 
-## Out of Scope (bewusst)
++1 theme pack à 4 outfits = +$0.02 per Avatar (only when user clicks "Generate Business Pack"). All packs cached after first generation.
 
-- Echtes WebGL-3D-Modell (Trellis/Hunyuan) — nur als optionale Stufe 4 später (Marketing-Wow).
-- Cloth-Rigging / Live-Outfit-Wechsel ohne Re-Render — physisch unmöglich ohne vollständige 3D-Pipeline.
-- Lip-Sync / Wallet / i18n.
+### Memory Update
 
-## Akzeptanz
-
-1. Klick auf „Wardrobe" im Avatar-Tab öffnet inline ein klickbares Variant-Grid.
-2. Über dem Grid: 5 Theme-Pack-Pills. Wechsel lädt Varianten des aktiven Packs.
-3. „Generate" mit Theme „Historical" produziert 4 Ganzkörper-Outfits (Knight, Roman, Viking, Edwardian) mit unverändertem Gesicht.
-4. Klick auf eine Variante → Stage zeigt das Ganzkörper-Outfit-Bild.
-5. Pose-Sheet öffnet analog inline und ist klickbar.
-6. Kein Tab-Wechsel, Player rechts bleibt sichtbar.
-
-## Kostenschätzung
-
-- 1 Outfit ≈ $0.005 (Gemini 3.1 Flash Image)
-- 1 komplettes Theme-Pack (4 Outfits) ≈ **$0.02**
-- Alle 5 Packs für 1 Avatar ≈ **$0.10** — einmalig, gecacht.
+`mem://features/avatars/wardrobe-theme-packs` — change "5 themed outfit packs" → "6 themed outfit packs (Lifestyle/Historical/Fantasy/Sci-Fi/Sport/Business)".
