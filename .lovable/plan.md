@@ -1,115 +1,92 @@
-## Scene Director — natürlichsprachlicher Szenen-Builder mit Asset-Auto-Match & Duration-Fit
+## Ziel
 
-Ziel: Der User beschreibt eine Szene in natürlicher Sprache („2. Weltkrieg, ein Soldat fährt mit einem Leopard-Panzer über eine Brücke"), und der Composer:
-1. **findet automatisch passende Library-Assets** (Avatare, Locations, Buildings, Props) und injiziert sie als `@-Mentions`,
-2. **passt die Beschreibung an die Szenenlänge an** — überzählige Aktionen werden gestrichen oder in Folgeszenen ausgelagert,
-3. **schreibt einen render-fertigen englischen Prompt** im Stil des bestehenden Storyboard-Generators (mit Negative-Clauses gegen Text/Captions etc.).
+Locations, Architecture und Props sollen — wie die **Preset Avatars** — sofort mit echten Vorschau-Bildern sichtbar sein und **direkt** in jede Szene/jeden Prompt übernommen werden können, **ohne sie vorher in die persönliche Library speichern zu müssen**. Charaktere bleiben "save-first" (wegen Identity-Card / Voice / Outfit-Looks). Pro Kategorie bleibt zusätzlich die eigene Library für hochgeladene oder selbst KI-generierte Items.
 
-So bleibt die volle AI-Generierung möglich, aber der User kontrolliert die Geschichte Szene für Szene.
+## Was es schon gibt (nicht neu bauen)
 
----
+- `system_preset_avatars` + `clone-preset-avatar` + `PresetAvatarGallery` — Muster für Charaktere
+- `location_catalog_previews`, `building_catalog_previews`, `prop_catalog_previews` (Tabellen sind da)
+- `seed-world-catalog` Edge Function (Admin-only, generiert Vorschau-Bilder)
+- `CatalogBrowser` Komponente (zeigt Vorschau-Grid, ruft `onPick`)
+- `/library` mit Tabs People · Locations (Environments/Architecture) · Props
+- `brand_locations`, `brand_buildings`, `brand_props` + Hooks/Pages für eigene Items
+- `UnifiedAssetPicker` in jeder SceneCard (Composer) + `useUnifiedMentionLibrary` (@-Mentions)
 
-### 1) Neue Edge Function `scene-director`
+## Was fehlt (genau das wird gebaut)
 
-Single-shot Lovable-AI-Call (`google/gemini-3-flash-preview`) mit **Tool-Calling**, der folgende Inputs bekommt:
+### Stage A — Katalog mit echten Bildern befüllen (alle Nutzer sehen sie sofort)
 
-```ts
-{
-  description: string,               // user-Eingabe in beliebiger Sprache
-  durationSeconds: number,           // 3–15s, fix vom Composer
-  language: 'en' | 'de' | 'es',      // UI-Sprache (Skript darf lokalisiert sein)
-  brandKitContext?: string,          // optional kurze Brand/Style-Notiz
-  library: {
-    characters: { id, name, slug, identityCardPrompt }[],
-    locations:  { id, name, slug, prompt_descriptor }[],
-    buildings:  { id, name, slug, prompt_descriptor }[],
-    props:      { id, name, slug, prompt_descriptor }[],
-  }
-}
+1. **Specs erweitern** in `seed-world-catalog/index.ts` auf eine breite, kuratierte Auswahl analog Wardrobe-Theme-Packs:
+   - **Locations / Environments** (theme_pack:item-pattern):
+     `nature:wheat-field`, `nature:beach-sunset`, `nature:forest-path`, `nature:mountain-vista`, `urban:neon-alley`, `urban:rooftop-night`, `urban:cafe-interior`, `urban:subway-platform`, `studio:white-cyc`, `studio:black-stage`, `interior:modern-office`, `interior:loft-apartment`, `interior:warehouse`, `historical:medieval-village`, `historical:ww2-bridge`, `desert:dunes-dawn`, `arctic:icefield`, `tropical:jungle-river`
+   - **Locations / Architecture**: `historical:gothic-cathedral`, `historical:roman-temple`, `historical:samurai-castle`, `modern:glass-tower`, `modern:minimal-villa`, `industrial:steel-bridge`, `religious:mosque`, `religious:hindu-temple`, `infrastructure:airport-terminal`, `infrastructure:train-station`
+   - **Props**: `vehicle:vintage-car`, `vehicle:motorbike`, `vehicle:leopard-tank`, `vehicle:fighter-jet`, `tech:vintage-camera`, `tech:laptop`, `tech:smartphone`, `furniture:leather-armchair`, `furniture:wooden-desk`, `instrument:electric-guitar`, `instrument:grand-piano`, `weapon:katana`, `weapon:bow`, `tool:hammer`, `tool:typewriter`, `food:espresso-cup`, `food:pizza`, `lifestyle:vinyl-record`, `lifestyle:leather-suitcase`
+   - jeweils mit englischem Visual-Prompt (Core-Rule)
+2. **Seed ausführen** für `location`, `building`, `prop`. Kein Schema-Change, nur Specs + Lauf.
+3. **Architecture-Sub-Tab** im `/library` Locations-Tab pickt jetzt aus `building_catalog_previews` (heute zeigt der Tab nur eigene Buildings) — `CatalogBrowser kind="building"` einbinden.
+
+### Stage B — Direkt in Szenen einsetzen, ohne Library-Save
+
+Heute persistiert `applySceneAssetsToPrompt` die Auswahl als slugifizierte `@mentions`, die `useUnifiedMentionLibrary` auf gespeicherte Brand-Items auflöst. Katalog-Items sind nicht in der Library → würden ins Leere zeigen.
+
+1. **Neue Tabelle `scene_catalog_refs`** (pro Szene/Workspace, leichtgewichtig):
+   - `id`, `user_id`, `scene_id` (composer scene), `kind` (`location|building|prop`), `catalog_id` (FK auf `*_catalog_previews`), `slug` (slug aus label), `created_at`
+   - RLS: nur Owner (Standard-Pattern)
+   - Zweck: erlaubt der Resolver-Pipeline, eine Mention wie `@gothic-cathedral` ohne Library-Eintrag aufzulösen
+2. **`useUnifiedMentionLibrary` erweitern**: zusätzlich `location_catalog_previews` / `building_catalog_previews` / `prop_catalog_previews` als virtuelle Locations einlesen (mit `image_url` als `reference_image_url` und Tag `catalog`). Dadurch funktionieren `@catalog-slugs` automatisch in **Composer + Toolkit** ohne weitere Änderungen am Resolver.
+3. **`UnifiedAssetPicker` (SceneCard)**: pro Family (Location, Architecture, Props) einen **"Browse Catalog"**-Button neben "Add" → öffnet `CatalogBrowser` als Popover/Dialog. `onPick` slugifiziert das Label und ruft `applySceneAssetsToPrompt` mit dem neuen Slug → identische Persistenz wie heute.
+4. **Composer Scene Director Box**: matched jetzt zusätzlich gegen Katalog-Pool, nicht nur User-Library. So findet "ein Soldat fährt mit einem Leopard Panzer über eine Brücke" automatisch `@leopard-tank` + `@steel-bridge` aus dem Katalog.
+
+### Stage C — Library-Seite: Katalog-Kacheln direkt nutzbar
+
+In `/library` (Locations/Architecture/Props Tabs) bekommen die `CatalogBrowser`-Tiles eine sichtbare **"In nächste Szene übernehmen"**-Quick-Action (analog zum bestehenden `composer:incoming-stock-video` sessionStorage-Handoff): legt einen Eintrag in `sessionStorage` ab, den der Composer beim Mount aufnimmt und auf die aktive/neue Szene anwendet. So muss man nichts speichern — ein Klick reicht.
+
+Optional pro Tile bleibt **"Save to my Library"** als sekundäre Aktion (klont in `brand_locations/buildings/props` mit Identity-Extraktion) — für Power-User, die später Variants generieren wollen.
+
+### Stage D — Charakter-Verhalten unverändert
+
+Charaktere bleiben "Save-first" (wegen Identity-Card, Voice, Wardrobe/Pose-Variants, Outfit-Looks). `PresetAvatarGallery` zeigt sie weiter mit "Use this Avatar"-Klon. Keine Änderung.
+
+## Technische Details
+
+```text
+Datenfluss (neu für Locations/Buildings/Props):
+
+  Catalog Tile  ──pick──▶  applySceneAssetsToPrompt(@slug)
+                            │
+                            ▼
+                 scene.aiPrompt mit <!--scene-assets-->@slug<!--/-->
+                            │
+                            ▼
+   useUnifiedMentionLibrary  (jetzt auch Katalog-Pool)
+                            │
+                            ▼
+     resolveMentions ──▶ image_url als reference
+                            │
+                            ▼
+       Vidu Q2 / Hailuo i2v / Nano Banana scene anchor
 ```
 
-Das Modell bekommt zwei Tools:
+- **Keine** Änderung an `resolveMentions`, render-pipeline oder edge-functions außer `seed-world-catalog` (specs).
+- **Cache**: Katalog-Query in `useUnifiedMentionLibrary` mit `staleTime: 5min` (Daten ändern sich selten).
+- **Slug-Kollisionen**: Library-Items gewinnen über Katalog (selbe Dedupe-Regel wie heute Brand vs Motion-Studio).
 
-- **`resolveAssets`** — gibt für jede genannte Person/Location/Bauwerk/Objekt die beste passende Library-`id` (oder `null` wenn keiner passt) plus einen Konfidenz-Score zurück. Fuzzy-Match auf Name + Beschreibung; Slug wird daraus für die Mention abgeleitet.
+## Dateien
 
-- **`emitScene`** — finalisiert die Szene mit:
-  ```ts
-  {
-    aiPrompt: string,            // English, render-ready, ≤ visualBudget Tokens
-    dialogScript?: string,       // optional, in `language`, ≤ speechBudget Wörter
-    matchedAssets: {
-      characters: id[], locations: id[], buildings: id[], props: id[]
-    },
-    droppedActions: string[],    // Aktionen, die nicht in die Sekunden passten
-    followupSceneSuggestions: string[], // 0–2 Vorschläge für Folgeszenen
-    confidence: 'high' | 'medium' | 'low'
-  }
-  ```
+**Neu**
+- `supabase/migrations/<ts>_scene_catalog_refs.sql` — Tabelle + RLS *(nur falls Stage B.1 wirklich nötig; Stage B.2 allein reicht meist, dann entfällt diese Migration)*
+- ggf. `src/components/library-hubs/CatalogPickAction.tsx` — Quick-Action Wrapper
 
-**Duration-Budgeting (server-seitig vor Tool-Call als Hard-Constraint im System-Prompt):**
+**Editiert**
+- `supabase/functions/seed-world-catalog/index.ts` — Specs erweitern (Locations / Architecture / Props)
+- `src/hooks/useUnifiedMentionLibrary.ts` — Katalog-Pool als virtuelle Locations einlesen
+- `src/components/video-composer/UnifiedAssetPicker.tsx` — "Browse Catalog"-Button pro Family
+- `src/pages/Library.tsx` — Architecture-Sub-Tab nutzt `CatalogBrowser kind="building"`; Quick-Action pro Tile
+- `src/components/library-hubs/CatalogBrowser.tsx` — `onPick` Default = sessionStorage-Handoff zum Composer
+- `supabase/functions/scene-director/index.ts` — Katalog-Pool zusätzlich an `resolveAssets` übergeben
 
-| Sekunden | Max. distinkte Aktionen | Max. Kamera-Bewegungen | Max. Skript-Wörter (≈ 2.3 W/s) | Max. distinkte Assets |
-|---|---|---|---|---|
-| 3–4s | 1 | 1 | 7–9 | 2 |
-| 5–6s | 1–2 | 1 | 12–14 | 3 |
-| 7–9s | 2 | 2 | 16–20 | 4 |
-| 10–12s | 2–3 | 2 | 23–28 | 5 |
-| 13–15s | 3 | 2–3 | 30–35 | 6 |
+## Out of Scope
 
-Übersteigt die User-Beschreibung das Budget → das Modell **muss** überzählige Aktionen in `droppedActions` listen und 1–2 Folgeszenen in `followupSceneSuggestions` vorschlagen, statt sie einzudampfen. So entstehen keine „matschigen" Prompts.
-
-**Resilienz:**
-- Brand-Negative-Clauses (kein Text/Captions/Logos, keine politischen Insignien) werden serverseitig immer angehängt — das Modell darf sie nicht weglassen.
-- Visuelle Sprache **immer Englisch** (Core-Memory-Regel), `dialogScript` darf lokalisiert sein.
-- Fallback: wenn der Tool-Call fehlschlägt, einmaliger Retry mit `gemini-2.5-flash`; danach 502 mit klarer Fehlermeldung (kein stiller Stub).
-
----
-
-### 2) UI im SceneCard — „✨ Beschreibe diese Szene"
-
-Direkt über dem bestehenden Prompt-Editor (zwischen UnifiedAssetPicker und PromptMentionEditor) ein neuer kollapsibler Block:
-
-```
-┌─ ✨ Szene aus Beschreibung ──────────────── [▾] ─┐
-│  [ 2. Weltkrieg. Soldat fährt Leopard      ]    │
-│  [ über eine Brücke bei Sonnenaufgang.     ]    │
-│                                                  │
-│  Dauer: 8s   Max ~16 Wörter Skript / 2 Assets   │
-│  [ ✨ Szene generieren ]   [ ↻ Neu würfeln ]    │
-└──────────────────────────────────────────────────┘
-```
-
-Nach dem Klick:
-1. Spinner + „Suche passende Assets aus deiner Library…"
-2. Bei Erfolg: `aiPrompt`, `dialogScript`, `characterShots` und der neue `<!--scene-assets-->`-Block (über `applySceneAssetsToPrompt`) werden in die Szene geschrieben — der UnifiedAssetPicker zeigt die neuen Slots automatisch an.
-3. **Diff-Toast** statt stiller Überschreibung: „Ersetzt: 2 Assets, 28→16 Wörter Skript. 1 Aktion verschoben → Folgeszene-Vorschlag verfügbar."
-4. **„Folgeszene anlegen"-Button** wenn `followupSceneSuggestions[]` nicht leer ist — fügt direkt eine neue Szene hinter der aktuellen mit dem Vorschlag als Beschreibung ein.
-5. **„Asset fehlt"-Hinweise**: wenn `confidence: low` oder `null` Matches → Inline-Chip „Leopard-Panzer nicht in deiner Props-Library — [Generate with AI]" mit Direkt-Sprung in den `generate-world-asset`-Flow.
-
----
-
-### 3) Konsistente Schreib-Richtung (kein Doppelschreiben)
-
-- `aiPrompt` wird wie heute über `onUpdate({ aiPrompt })` gesetzt.
-- `@-Mentions` für die gematchten Library-Assets werden über das in Stage 5 eingeführte `applySceneAssetsToPrompt` als Auto-Block am Anfang injiziert — damit die existierende `useUnifiedMentionLibrary`-Resolver-Pipeline (Vidu Q2 / Hailuo i2v / Nano-Banana-Anchor) automatisch Reference-Images weiterreicht.
-- Cast-Slots werden über `characterShots` gesetzt (gleicher Pfad wie heute der Picker).
-- **Idempotent**: erneutes Generieren mit gleicher Beschreibung erzeugt deterministisch dieselbe Szene (cache-key `sha1(description + duration + library.versionHash)`), Cache 24h in `scene_director_cache` Tabelle.
-
----
-
-### Out of scope (bewusst nicht in dieser Stage)
-
-- Kein Re-Run des Storyboards für die ganze Timeline — Scene Director arbeitet **immer pro einzelner Szene**.
-- Keine neuen Assets werden automatisch generiert — bei Lücken erscheint nur der Hinweis-Chip (one-click in den bestehenden `generate-world-asset`-Flow).
-- Keine Anpassung der Render-Pipelines — alle Edits laufen durch die bestehenden Felder/Mentions, die Renderer sehen keinen Unterschied.
-
----
-
-### Technische Details
-
-- **Neu**: `supabase/functions/scene-director/index.ts` (Lovable AI Gateway, Tool-Calling, ~250 LOC)
-- **Neu**: Migration für `scene_director_cache` (key, payload, created_at; RLS: user_id only)
-- **Neu**: `src/components/video-composer/SceneDirectorBox.tsx`
-- **Neu**: `src/lib/sceneDirector/durationBudget.ts` (Tabelle oben als reine Funktion)
-- **Edit**: `SceneCard.tsx` — neuer Block über dem PromptMentionEditor + Folgeszenen-Insert via bereits vorhandenem `onInsertScenesAfter`
-- Wiederverwendet: `applySceneAssetsToPrompt`, `useBrandLocations/Buildings/Props`, `useUnifiedMentionLibrary`, `compose-video-storyboard`-Negative-Clauses (als Konstante extrahiert in `_shared/scene-director-rules.ts`)
+- Kein Marketplace, keine 70/30-Revenue-Share Erweiterung auf Locations/Props
+- Keine Identity-Extraktion für Katalog-Items (das passiert nur, wenn man "Save to my Library" klickt)
+- Keine Variants (Vibes/Props) auf Katalog-Items — die bleiben Library-only
