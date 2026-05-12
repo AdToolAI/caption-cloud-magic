@@ -94,6 +94,36 @@ export const AddBrandCharacterDialog = ({ open, onOpenChange }: AddBrandCharacte
           </div>
 
           <div>
+            <Label>Gender *</Label>
+            <div className="mt-1.5 grid grid-cols-3 gap-2">
+              {GENDERS.map((g) => {
+                const active = gender === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => setGender(g.id)}
+                    title={g.hint}
+                    className={
+                      'rounded-lg border px-2 py-2 text-xs font-semibold transition-all flex flex-col items-center gap-0.5 ' +
+                      (active
+                        ? 'border-primary/70 bg-primary/15 text-primary shadow-[0_0_12px_-4px_hsl(var(--primary)/0.55)]'
+                        : 'border-border/40 bg-card/30 text-muted-foreground hover:text-foreground hover:border-border/70')
+                    }
+                    aria-pressed={active}
+                  >
+                    <span className="text-base leading-none" aria-hidden>{g.emoji}</span>
+                    {g.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              Locks wardrobe previews to gender-appropriate outfits. Choose Neutral to keep both selectable.
+            </p>
+          </div>
+
+          <div>
             <Label>Reference Image *</Label>
             <label
               htmlFor="char-file"
