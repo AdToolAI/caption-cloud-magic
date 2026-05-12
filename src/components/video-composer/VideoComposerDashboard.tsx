@@ -1413,7 +1413,6 @@ export default function VideoComposerDashboard() {
             </Tabs>
           </div>
         </div>
-      </div>
 
       {/* Reset Confirmation Dialog */}
       <MotionStudioTemplatePicker
