@@ -20,7 +20,7 @@ export interface BrandCharacter {
   default_voice_provider: 'elevenlabs' | 'custom' | null;
   default_voice_name: string | null;
   portrait_url: string | null;
-  portrait_mode: 'original' | 'auto_generated' | 'manual_upload' | null;
+  portrait_mode: 'original' | 'auto_generated' | 'auto_default_outfit' | 'manual_upload' | null;
   default_language: string | null;
   default_aspect_ratio: string | null;
   // Marketplace
@@ -161,7 +161,7 @@ export const useBrandCharacters = () => {
       default_voice_provider?: 'elevenlabs' | 'custom' | null;
       default_voice_name?: string | null;
       portrait_url?: string | null;
-      portrait_mode?: 'original' | 'auto_generated' | 'manual_upload' | null;
+      portrait_mode?: 'original' | 'auto_generated' | 'auto_default_outfit' | 'manual_upload' | null;
       default_language?: string | null;
       default_aspect_ratio?: string | null;
       name?: string;
