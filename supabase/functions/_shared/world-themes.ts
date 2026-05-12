@@ -9,7 +9,7 @@ export interface CatalogItem { id: string; label: string; modifier: string }
 // theme_pack format mirrors wardrobe: "<theme>" or "<theme>:<sub>".
 export type ThemePacks = Record<string, Record<string, CatalogItem[]>>;
 
-// ---------- LOCATIONS (7 packs × 6 = 42) ----------
+// ---------- LOCATIONS ----------
 export const LOCATION_THEMES: ThemePacks = {
   indoor: {
     living: [
@@ -19,6 +19,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'penthouse-night', label: 'Penthouse Night', modifier: 'luxury penthouse living room at night with city skyline through panoramic windows, dim warm lighting' },
       { id: 'industrial-loft', label: 'Industrial Loft', modifier: 'converted industrial loft with exposed brick walls, steel beams, large factory windows, leather couch, moody ambient light' },
       { id: 'japanese-ryokan', label: 'Japanese Ryokan', modifier: 'traditional japanese ryokan room with tatami floor, shoji paper screens, low wooden table, soft lantern light' },
+      { id: 'art-deco-lounge', label: 'Art Deco Lounge', modifier: 'opulent art deco living room with brass chevron details, emerald velvet sofa, marble fireplace, geometric chandelier, evening light' },
+      { id: 'bohemian-loft', label: 'Bohemian Loft', modifier: 'bohemian loft with macrame wall hangings, layered persian rugs, hanging plants, vintage rattan chair, warm afternoon light' },
     ],
     workspace: [
       { id: 'home-office', label: 'Home Office', modifier: 'modern home office with wooden desk, monitor, plants, soft daylight from side window, focused atmosphere' },
@@ -27,6 +29,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'creative-studio', label: 'Creative Studio', modifier: 'creative photo studio with seamless paper backdrop, softboxes, wooden floor, professional production atmosphere' },
       { id: 'podcast-studio', label: 'Podcast Studio', modifier: 'modern podcast studio with acoustic foam panels, broadcast microphones on boom arms, warm rim lighting, deep blue ambient backdrop' },
       { id: 'coworking-cafe', label: 'Coworking Café', modifier: 'bright modern coworking café with communal wooden tables, hanging pendant lights, plants, soft daylight, creative buzz' },
+      { id: 'architects-studio', label: 'Architect Studio', modifier: 'architects studio with large drafting tables, blueprints pinned to walls, scale models, north-facing daylight, focused atmosphere' },
+      { id: 'newsroom', label: 'Newsroom', modifier: 'modern newsroom with rows of desks, multiple monitors, world clocks on wall, large LED screens, busy professional energy' },
     ],
     venue: [
       { id: 'fine-dining', label: 'Fine Dining', modifier: 'upscale fine-dining restaurant interior, candlelight, white tablecloths, dark wood, intimate evening ambience' },
@@ -35,6 +39,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'art-gallery', label: 'Art Gallery', modifier: 'minimal white-cube art gallery, polished concrete floor, gallery spotlights, framed artworks on white walls' },
       { id: 'jazz-club', label: 'Jazz Club', modifier: 'intimate underground jazz club, small stage with grand piano, red curtain backdrop, smoky warm spotlight, cabaret tables' },
       { id: 'boutique-hotel', label: 'Boutique Hotel Lobby', modifier: 'luxurious boutique hotel lobby with velvet armchairs, marble floor, brass chandelier, fresh flowers, warm evening light' },
+      { id: 'wine-cellar', label: 'Wine Cellar', modifier: 'private wine cellar with stone-arched ceiling, oak barrels, candlelit tasting table, racks of dusty vintage bottles' },
+      { id: 'library-grand', label: 'Grand Library', modifier: 'grand two-story old library with floor-to-ceiling oak shelves, rolling ladder, green banker lamps, cathedral arched windows' },
     ],
   },
   outdoor: {
@@ -45,6 +51,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'desert-dunes', label: 'Desert Dunes', modifier: 'vast golden desert sand dunes at sunset, long shadows, warm orange light, minimalist landscape' },
       { id: 'misty-lake', label: 'Misty Lake', modifier: 'serene mountain lake at dawn with low mist over the water, pine forest reflection, soft pastel sky' },
       { id: 'lavender-field', label: 'Lavender Field', modifier: 'endless purple lavender field in provence at golden hour, lone tree on horizon, warm summer light' },
+      { id: 'redwood-grove', label: 'Redwood Grove', modifier: 'towering ancient redwood grove with shafts of golden sunlight, ferns, mossy ground, cathedral-like silence' },
+      { id: 'volcanic-coast', label: 'Volcanic Coast', modifier: 'dramatic volcanic black-sand coastline with basalt sea stacks, churning surf, overcast nordic light, cinematic' },
     ],
     urban: [
       { id: 'downtown-street', label: 'Downtown Street', modifier: 'busy modern downtown street at golden hour, glass skyscrapers, soft bokeh traffic lights, cinematic depth' },
@@ -53,6 +61,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'historic-square', label: 'Historic Square', modifier: 'european historic city square at twilight, cobblestones, warm streetlamps, baroque facades, cinematic depth' },
       { id: 'subway-platform', label: 'Subway Platform', modifier: 'gritty urban subway platform with fluorescent tube lighting, tiled walls, motion-blurred train, cinematic perspective' },
       { id: 'graffiti-alley', label: 'Graffiti Alley', modifier: 'narrow urban alley covered in colorful street-art graffiti, soft afternoon backlight, fire escapes, gritty cool atmosphere' },
+      { id: 'night-market', label: 'Night Market', modifier: 'asian night market with hanging paper lanterns, food stalls steaming, neon signs, crowded warm cinematic atmosphere' },
+      { id: 'brutalist-plaza', label: 'Brutalist Plaza', modifier: 'vast brutalist concrete plaza at sunset, monumental geometric structures, long shadows, lone figure for scale' },
     ],
     travel: [
       { id: 'beach-paradise', label: 'Beach Paradise', modifier: 'tropical paradise beach, white sand, palm trees, turquoise water, soft golden sunlight, postcard atmosphere' },
@@ -61,6 +71,8 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'tuscan-vineyard', label: 'Tuscan Vineyard', modifier: 'rolling Tuscan vineyard at golden hour, cypress trees, warm sunlight, romantic Italian countryside' },
       { id: 'santorini-village', label: 'Santorini Village', modifier: 'whitewashed cycladic santorini village with blue domes, narrow stairways, mediterranean sea backdrop, golden sun' },
       { id: 'iceland-glacier', label: 'Iceland Glacier', modifier: 'dramatic icelandic glacier landscape with black sand beach and ice chunks, overcast nordic light, cinematic wide shot' },
+      { id: 'patagonia-spires', label: 'Patagonia Spires', modifier: 'jagged patagonian granite spires above turquoise glacial lake, dramatic clouds, cinematic adventure landscape' },
+      { id: 'morocco-medina', label: 'Morocco Medina', modifier: 'narrow moroccan medina alley with arched doorways, vibrant tiles, hanging lanterns, warm earth tones, soft evening light' },
     ],
   },
   scifi: {
@@ -71,11 +83,91 @@ export const LOCATION_THEMES: ThemePacks = {
       { id: 'lab-bioluminescent', label: 'Bioluminescent Lab', modifier: 'futuristic biotech lab with bioluminescent tanks, glowing teal and purple light, sleek dark surfaces, sci-fi atmosphere' },
       { id: 'underwater-dome', label: 'Underwater Dome', modifier: 'futuristic underwater research dome interior with curved glass wall showing deep ocean and bioluminescent fish, blue ambient glow' },
       { id: 'alien-jungle', label: 'Alien Jungle', modifier: 'lush alien planet jungle with bioluminescent oversized plants, twin moons in violet sky, cinematic sci-fi atmosphere' },
+      { id: 'hyperloop-station', label: 'Hyperloop Station', modifier: 'futuristic hyperloop transit station with sleek glass tubes, holographic schedules, polished white floors, cool ambient lighting' },
+      { id: 'orbital-ring', label: 'Orbital Ring', modifier: 'interior of a massive orbital ring habitat with curved horizon, parkland and skyscrapers, distant earth through ceiling glass' },
+    ],
+    spaceship: [
+      { id: 'ship-bridge', label: 'Ship Bridge', modifier: 'futuristic spaceship command bridge with curved viewscreen showing stars, glowing consoles, captain chair, cool blue ambient light' },
+      { id: 'ship-hangar', label: 'Ship Hangar', modifier: 'cavernous spaceship hangar bay with shuttles, crew working, force-field doorway opening to space, dramatic floodlights' },
+      { id: 'ship-engine-room', label: 'Engine Room', modifier: 'starship engine room with massive glowing fusion core, exposed conduits, steam vents, orange-cyan ambient light, industrial sci-fi' },
+      { id: 'ship-mess-hall', label: 'Mess Hall', modifier: 'spaceship crew mess hall with long metal tables, food dispensers, large viewport showing nebula, soft warm lighting' },
+      { id: 'ship-airlock', label: 'Airlock', modifier: 'spaceship airlock chamber with thick reinforced door, suit racks, warning lights, claustrophobic industrial sci-fi atmosphere' },
+      { id: 'ship-observation', label: 'Observation Deck', modifier: 'spaceship observation deck with floor-to-ceiling curved viewport showing planet below, lounge seating, dim ambient lighting' },
+    ],
+    colony: [
+      { id: 'mars-dome', label: 'Mars Dome', modifier: 'interior of mars colony agricultural dome with rows of green crops, geodesic glass roof, red martian landscape outside' },
+      { id: 'lunar-base', label: 'Lunar Base', modifier: 'lunar surface colony with white modular habitats, solar arrays, rover tracks in regolith, earth in black sky' },
+      { id: 'orbital-station', label: 'Orbital Station', modifier: 'rotating orbital space station interior corridor with curving floor, viewports to stars, clean white sci-fi aesthetic' },
+      { id: 'terraform-site', label: 'Terraform Site', modifier: 'terraforming construction site on alien world with massive atmospheric processors, dust haze, dramatic distant mountains' },
+      { id: 'biosphere', label: 'Biosphere', modifier: 'sealed biosphere research dome with lush jungle interior, walkways, mist, soft skylight through glass panels' },
+      { id: 'control-room', label: 'Mission Control', modifier: 'futuristic mission control room with large wall of monitors showing planetary data, tiered consoles, focused operators, blue ambient light' },
+    ],
+  },
+  nature_extra: {
+    desert: [
+      { id: 'dune-sea', label: 'Dune Sea', modifier: 'endless ochre dune sea under deep blue sky, wind ripples on sand, lone caravan footprints, cinematic wide shot' },
+      { id: 'desert-oasis', label: 'Desert Oasis', modifier: 'palm-fringed desert oasis with reflective pool, surrounding red dunes, warm afternoon light, romantic atmosphere' },
+      { id: 'red-canyon', label: 'Red Canyon', modifier: 'narrow slot canyon with swirling red sandstone walls, shaft of sunlight from above, dramatic cinematic depth' },
+      { id: 'salt-flat', label: 'Salt Flat', modifier: 'mirror-like salt flat reflecting pastel twilight sky, distant mountains, geometric pattern, surreal minimalist landscape' },
+      { id: 'desert-mesa', label: 'Mesa Country', modifier: 'monumental red mesa rock formations under huge sky, sagebrush plain, golden hour, cinematic western landscape' },
+      { id: 'sandstorm', label: 'Sandstorm', modifier: 'approaching wall of orange sandstorm over flat desert, dramatic dust haze, lone tree silhouette, ominous atmosphere' },
+    ],
+    arctic: [
+      { id: 'glacier-tongue', label: 'Glacier Tongue', modifier: 'massive blue glacier tongue meeting dark sea, calving icebergs, overcast nordic light, dramatic scale' },
+      { id: 'fjord', label: 'Norwegian Fjord', modifier: 'deep norwegian fjord with sheer cliffs, mirror water, lone red cabin on shore, dramatic morning mist' },
+      { id: 'ice-cave', label: 'Ice Cave', modifier: 'crystal-blue ice cave interior with rippled translucent walls, shaft of daylight from entrance, magical cool atmosphere' },
+      { id: 'tundra', label: 'Arctic Tundra', modifier: 'vast arctic tundra with low mossy hummocks, wandering reindeer trails, low golden midnight sun, cinematic wide shot' },
+      { id: 'frozen-lake', label: 'Frozen Lake', modifier: 'cracked frozen lake surface with snow-dusted pines around, low pink twilight sky, lone fisherman hut in distance' },
+      { id: 'aurora-night', label: 'Aurora Night', modifier: 'green and purple aurora borealis dancing above snowy spruce forest, starry sky, mirror-still lake, magical atmosphere' },
+    ],
+    tropical: [
+      { id: 'jungle-clearing', label: 'Jungle Clearing', modifier: 'lush rainforest clearing with shaft of golden light, oversized leaves, mist between trees, exotic atmosphere' },
+      { id: 'beach-lagoon', label: 'Beach Lagoon', modifier: 'turquoise tropical lagoon ringed by palms and coral reef, white sand beach, soft midday sun, paradise atmosphere' },
+      { id: 'jungle-waterfall', label: 'Jungle Waterfall', modifier: 'tall jungle waterfall plunging into pool, lush ferns and orchids, mist rainbow, soft cinematic light' },
+      { id: 'mangrove', label: 'Mangrove Swamp', modifier: 'tangled mangrove swamp with arching roots over still tea-colored water, dappled light, mysterious quiet atmosphere' },
+      { id: 'volcano-slope', label: 'Volcano Slope', modifier: 'lush volcano slope with black lava trails through jungle, crater steam at top, dramatic tropical landscape' },
+      { id: 'coral-reef', label: 'Coral Reef', modifier: 'underwater coral reef with vibrant fish schools, sunbeams from surface, vivid blues and oranges, cinematic marine scene' },
+    ],
+  },
+  urban_extra: {
+    rooftop: [
+      { id: 'roof-nyc', label: 'NYC Rooftop', modifier: 'manhattan rooftop with empire state building view, water tower silhouette, golden hour, cinematic skyline' },
+      { id: 'roof-tokyo', label: 'Tokyo Rooftop', modifier: 'tokyo rooftop at night with shibuya crossing glow below, neon signs, distant tower, atmospheric urban view' },
+      { id: 'roof-dubai', label: 'Dubai Rooftop', modifier: 'luxury dubai skyscraper rooftop infinity pool, burj khalifa in distance, sunset over desert metropolis' },
+      { id: 'roof-london', label: 'London Rooftop', modifier: 'london rooftop view at blue hour with thames, st pauls dome, shard, cinematic moody british sky' },
+      { id: 'roof-berlin', label: 'Berlin Rooftop', modifier: 'berlin rooftop terrace with tv tower in distance, industrial chimneys, overcast cinematic light, urban grit' },
+      { id: 'roof-la', label: 'LA Rooftop', modifier: 'los angeles rooftop with palm silhouettes and downtown skyline, hazy pink sunset, hollywood hills in distance' },
+    ],
+    underground: [
+      { id: 'subway-tunnel', label: 'Subway Tunnel', modifier: 'dimly lit subway tunnel with curving track, distant headlight, tiled walls, cinematic perspective, urban grit' },
+      { id: 'sewer', label: 'Sewer Chamber', modifier: 'large vaulted sewer chamber with shallow stream, single shaft of light from grate above, dramatic moody atmosphere' },
+      { id: 'parking-garage', label: 'Parking Garage', modifier: 'underground concrete parking garage at night, fluorescent strip lights, lone car, cinematic noir atmosphere' },
+      { id: 'bunker', label: 'Concrete Bunker', modifier: 'cold-war concrete bunker corridor with steel doors, single bare bulb lighting, claustrophobic gritty atmosphere' },
+      { id: 'club-basement', label: 'Club Basement', modifier: 'underground techno club basement with concrete walls, fog, magenta and cyan strobes, silhouettes of dancers' },
+      { id: 'service-tunnel', label: 'Service Tunnel', modifier: 'long industrial service tunnel with pipes and cables along walls, vanishing-point perspective, cool fluorescent light' },
+    ],
+  },
+  interior_extra: {
+    luxury: [
+      { id: 'penthouse-suite', label: 'Penthouse Suite', modifier: 'luxury penthouse suite living area with floor-to-ceiling skyline windows, marble floor, designer furniture, evening glow' },
+      { id: 'yacht-deck', label: 'Yacht Deck', modifier: 'luxury super-yacht aft deck at sunset, polished teak, white loungers, champagne table, calm sea horizon' },
+      { id: 'private-jet', label: 'Private Jet Cabin', modifier: 'luxury private jet cabin interior with cream leather seats, polished wood trim, soft sunset through oval windows' },
+      { id: 'ballroom', label: 'Grand Ballroom', modifier: 'opulent grand ballroom with crystal chandeliers, marble columns, mirrored walls, polished parquet floor, golden warm lighting' },
+      { id: 'spa', label: 'Luxury Spa', modifier: 'minimalist luxury spa with stone tub, candles, dripping water feature, soft warm uplighting, serene atmosphere' },
+      { id: 'vault', label: 'Vault Room', modifier: 'high-security bank vault interior with massive circular door open, rows of safety deposit boxes, cool polished steel' },
+    ],
+    industrial: [
+      { id: 'warehouse', label: 'Warehouse', modifier: 'massive empty industrial warehouse with steel trusses, dust shafts of light from skylights, polished concrete floor' },
+      { id: 'factory-floor', label: 'Factory Floor', modifier: 'modern factory floor with robotic assembly arms, conveyor belts, blue ambient lighting, sleek industrial atmosphere' },
+      { id: 'aircraft-hangar', label: 'Aircraft Hangar', modifier: 'cavernous aircraft hangar with single jet under spotlights, steel beams, high ceiling, dramatic scale' },
+      { id: 'refinery', label: 'Oil Refinery', modifier: 'sprawling oil refinery interior at night with glowing pipes, steam vents, orange flares, gritty industrial atmosphere' },
+      { id: 'steel-mill', label: 'Steel Mill', modifier: 'steel mill interior with glowing molten metal pour, sparks, silhouetted workers, intense orange dramatic lighting' },
+      { id: 'shipyard', label: 'Shipyard Drydock', modifier: 'massive shipyard drydock with half-built hull, towering cranes, scaffolding, overcast industrial atmosphere' },
     ],
   },
 };
 
-// ---------- BUILDINGS (10 packs × 6 = 60) ----------
+// ---------- BUILDINGS ----------
 export const BUILDING_THEMES: ThemePacks = {
   sacred: {
     christian: [
@@ -85,6 +177,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'orthodox-monastery', label: 'Orthodox Monastery', modifier: 'orthodox monastery with golden onion domes, white stone walls, gilded crosses, mountain backdrop' },
       { id: 'romanesque-abbey', label: 'Romanesque Abbey', modifier: 'medieval romanesque stone abbey with rounded arches, cloister courtyard, tall bell tower, soft overcast light' },
       { id: 'modern-cathedral', label: 'Modern Cathedral', modifier: 'modernist concrete cathedral with sweeping curves, slit stained-glass strips, dramatic geometric facade, blue hour' },
+      { id: 'mission-church', label: 'Mission Church', modifier: 'spanish colonial mission church with white adobe walls, red tile roof, single bell tower, palm trees, warm sun' },
+      { id: 'wooden-stave-church', label: 'Stave Church', modifier: 'norwegian wooden stave church with tiered dragon-headed roofs, dark tarred timber, snow-dusted forest, overcast nordic light' },
     ],
     eastern: [
       { id: 'zen-temple', label: 'Zen Temple', modifier: 'tranquil japanese zen temple with red wooden gate, raked gravel garden, cherry blossoms, soft mist' },
@@ -93,6 +187,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'mosque', label: 'Mosque', modifier: 'elegant mosque with white marble dome, slender minarets, intricate geometric tilework, blue sky' },
       { id: 'tibetan-monastery', label: 'Tibetan Monastery', modifier: 'tibetan monastery with white walls and red trim on a himalayan ridge, prayer flags, snow peaks backdrop' },
       { id: 'thai-temple', label: 'Thai Temple', modifier: 'ornate thai buddhist temple with gilded pointed roofs, vibrant red and gold details, palm trees, golden light' },
+      { id: 'shinto-shrine', label: 'Shinto Shrine', modifier: 'red torii gates leading to a small shinto shrine in cedar forest, mossy stone path, soft morning light' },
+      { id: 'desert-mosque', label: 'Desert Mosque', modifier: 'sand-coloured adobe desert mosque with single minaret and dome, palm grove, warm sunset light, north-african atmosphere' },
     ],
   },
   residential: {
@@ -103,6 +199,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'mediterranean-villa', label: 'Mediterranean Villa', modifier: 'mediterranean villa with terracotta roof, white stucco walls, cypress trees, infinity pool, golden sunset' },
       { id: 'georgian-townhouse', label: 'Georgian Townhouse', modifier: 'elegant georgian townhouse facade with red brick, white sash windows, black door, iron railing, soft daylight' },
       { id: 'french-chateau', label: 'French Château', modifier: 'romantic french loire chateau with conical towers, manicured gardens, reflecting pond, golden hour' },
+      { id: 'venetian-palazzo', label: 'Venetian Palazzo', modifier: 'pastel venetian palazzo facade with gothic arched windows, balconies with flowers, canal in foreground, golden light' },
+      { id: 'cape-cod', label: 'Cape Cod House', modifier: 'classic new england cape cod house with weathered grey shingles, white trim, picket fence, hydrangeas, soft daylight' },
     ],
     modern: [
       { id: 'glass-villa', label: 'Glass Villa', modifier: 'modern glass villa with cantilevered roof, infinity pool, minimalist landscaping, dusk lighting from interior' },
@@ -111,6 +209,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'desert-bungalow', label: 'Desert Bungalow', modifier: 'low-slung desert modernist bungalow, palm trees, stone path, pool reflecting pink sunset sky' },
       { id: 'tiny-house', label: 'Tiny House', modifier: 'modern minimalist tiny house on wheels in alpine meadow, large windows, wood cladding, golden hour' },
       { id: 'eco-treehouse', label: 'Eco Treehouse', modifier: 'futuristic eco treehouse suspended in tropical canopy, curved wood and glass shell, lantern lighting, dusk' },
+      { id: 'shipping-container', label: 'Container Home', modifier: 'modern stacked shipping-container house with weathered steel and large windows, deck with pine trees, golden hour' },
+      { id: 'earth-berm', label: 'Earth-Berm Home', modifier: 'sustainable earth-bermed home with grass roof, curved glass facade looking onto meadow, warm interior glow at dusk' },
     ],
   },
   historical: {
@@ -121,6 +221,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'samurai-castle', label: 'Samurai Castle', modifier: 'japanese samurai castle with white walls, multi-tiered black tile roofs, cherry blossoms, blue sky' },
       { id: 'egyptian-pyramid', label: 'Egyptian Pyramid', modifier: 'great egyptian pyramid of giza at golden hour, vast desert sand, dramatic blue sky, cinematic wide shot' },
       { id: 'mayan-temple', label: 'Mayan Temple', modifier: 'mayan stone step pyramid temple in jungle clearing, lush vegetation, mist, soft morning light' },
+      { id: 'persian-palace', label: 'Persian Palace', modifier: 'ancient persian palace ruins with bull-headed columns, carved reliefs, golden desert light, epic scale' },
+      { id: 'incan-citadel', label: 'Incan Citadel', modifier: 'incan stone citadel terraces on andean ridge, cloud forest below, dramatic morning mist, cinematic wide shot' },
     ],
     landmark: [
       { id: 'lighthouse', label: 'Lighthouse', modifier: 'tall striped lighthouse on rocky coast, stormy sea, dramatic sky, beam of light at dusk' },
@@ -129,6 +231,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'stone-bridge', label: 'Stone Bridge', modifier: 'arched stone bridge over misty river, autumn forest, soft morning light, romantic landscape' },
       { id: 'clock-tower', label: 'Clock Tower', modifier: 'iconic stone clock tower with ornate gothic detail, warm streetlamp light, evening city square' },
       { id: 'opera-house', label: 'Opera House', modifier: 'grand neoclassical opera house facade with columns and statues, illuminated at night, wide plaza' },
+      { id: 'old-train-station', label: 'Old Train Station', modifier: 'grand 19th-century train station facade with iron-and-glass canopy, clock, hansom cabs, golden hour' },
+      { id: 'colonial-fort', label: 'Colonial Fort', modifier: 'star-shaped colonial coastal fort with cannon ramparts, weathered stone, ocean backdrop, dramatic sky' },
     ],
   },
   fortified: {
@@ -139,6 +243,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'desert-citadel', label: 'Desert Citadel', modifier: 'sandstone desert citadel with crenellated walls, palm grove, warm sunset light' },
       { id: 'moorish-fort', label: 'Moorish Fort', modifier: 'andalusian moorish hilltop fortress with sand-coloured walls, horseshoe arches, palm trees, warm light' },
       { id: 'cliff-monastery', label: 'Cliff Monastery', modifier: 'fortified monastery clinging to a sheer cliff face, narrow stone bridge, mountain mist, dramatic scale' },
+      { id: 'concentric-castle', label: 'Concentric Castle', modifier: 'concentric welsh castle with double curtain walls, round towers, moat, overcast dramatic sky' },
+      { id: 'ruined-keep', label: 'Ruined Keep', modifier: 'crumbling ruined medieval keep on a misty moor, ivy-covered walls, lone raven, atmospheric overcast light' },
     ],
     bridges: [
       { id: 'roman-aqueduct', label: 'Roman Aqueduct', modifier: 'monumental roman stone aqueduct with tiered arches over a green valley, golden hour' },
@@ -147,6 +253,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'glass-skybridge', label: 'Glass Skybridge', modifier: 'futuristic glass-floor skybridge between two skyscrapers at dusk, glowing city below' },
       { id: 'rope-bridge', label: 'Rope Bridge', modifier: 'wooden rope bridge across a misty mountain canyon, dense jungle below, dramatic adventure atmosphere' },
       { id: 'medieval-drawbridge', label: 'Medieval Drawbridge', modifier: 'medieval stone gatehouse with wooden drawbridge over moat, banners, overcast sky' },
+      { id: 'tower-bridge', label: 'Tower Bridge', modifier: 'iconic gothic-revival twin-tower bascule bridge over wide river at blue hour, illuminated, cinematic urban view' },
+      { id: 'cable-stay-bridge', label: 'Cable-Stay Bridge', modifier: 'soaring modern cable-stayed bridge with white pylons, fan of cables, sunset reflecting on river below' },
     ],
   },
   modern: {
@@ -157,6 +265,8 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'concert-arena', label: 'Concert Arena', modifier: 'futuristic concert arena exterior at night, illuminated facade, crowd silhouettes, dramatic lighting' },
       { id: 'opera-modern', label: 'Modern Opera', modifier: 'iconic modern opera house with shell-like sculptural roof, harbor backdrop, blue hour lighting' },
       { id: 'stadium', label: 'Stadium', modifier: 'huge modern football stadium exterior at night, illuminated curved facade, crowds streaming in, dramatic floodlights' },
+      { id: 'museum-modern', label: 'Modern Museum', modifier: 'iconic modernist museum with sculptural titanium-clad facade, plaza with sculpture, golden hour' },
+      { id: 'helix-tower', label: 'Helix Tower', modifier: 'futuristic helix-shaped residential tower with planted balconies spiralling up, dusk sky, cinematic urban view' },
     ],
     tech: [
       { id: 'data-center', label: 'Data Center', modifier: 'industrial data center exterior at dusk with cooling towers, fenced perimeter, blue ambient lighting' },
@@ -165,11 +275,77 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'solar-array', label: 'Solar Array', modifier: 'vast desert solar panel array reflecting blue sky, geometric patterns, distant mountains' },
       { id: 'satellite-dish', label: 'Satellite Dish Array', modifier: 'large radio telescope dish array on a high desert plateau, starry twilight sky, cinematic sci-fi mood' },
       { id: 'fusion-plant', label: 'Fusion Plant', modifier: 'futuristic fusion energy plant exterior with glowing reactor dome, cooling towers, blue ambient night light' },
+      { id: 'tidal-station', label: 'Tidal Power Station', modifier: 'futuristic tidal power station built into sea wall, churning surf around turbines, overcast dramatic light' },
+      { id: 'quantum-lab', label: 'Quantum Lab', modifier: 'futuristic quantum research facility exterior with mirrored glass, glowing blue accents, snow-covered surroundings, night' },
+    ],
+  },
+  egyptian_arch: {
+    ancient_egypt: [
+      { id: 'egyptian-temple', label: 'Egyptian Temple', modifier: 'massive ancient egyptian temple complex facade with hieroglyph-covered pylons, statues, palm trees, golden desert light' },
+      { id: 'egyptian-palace', label: 'Pharaoh Palace', modifier: 'lavish ancient egyptian pharaoh palace exterior with painted columns, lotus motifs, sphinx statues, warm sun' },
+      { id: 'egyptian-obelisk', label: 'Obelisk Plaza', modifier: 'tall egyptian granite obelisk in sunlit temple courtyard, hieroglyphs catching light, blue desert sky' },
+      { id: 'egyptian-market', label: 'Egyptian Market Hall', modifier: 'covered ancient egyptian market hall with linen awnings, painted columns, baskets of goods, warm afternoon light' },
+      { id: 'egyptian-step-pyramid', label: 'Step Pyramid', modifier: 'ancient egyptian step pyramid of djoser at golden hour, vast empty desert plain, dramatic blue sky' },
+    ],
+    aztec_arch: [
+      { id: 'aztec-step-pyramid', label: 'Aztec Pyramid', modifier: 'massive aztec stepped stone pyramid temple in jungle clearing, carved serpent heads, dramatic sunlight' },
+      { id: 'aztec-palace', label: 'Aztec Palace', modifier: 'aztec ruler palace exterior with carved stone reliefs, brightly painted walls, jungle backdrop, mid-day sun' },
+      { id: 'aztec-ballcourt', label: 'Aztec Ballcourt', modifier: 'mesoamerican stone ballcourt with sloped walls, stone hoop, jungle around, warm afternoon light' },
+      { id: 'aztec-market', label: 'Aztec Market', modifier: 'busy open aztec market plaza with stone temple backdrop, woven canopies, baskets of corn and pottery, vivid colors' },
+      { id: 'aztec-temple-precinct', label: 'Temple Precinct', modifier: 'aztec sacred temple precinct with twin stair pyramids, stone serpent walls, drifting smoke, dramatic sunset' },
+    ],
+    feudal_japan_arch: [
+      { id: 'jp-pagoda', label: 'Pagoda', modifier: 'five-tiered wooden japanese pagoda among autumn maples, soft golden hour, calm temple grounds' },
+      { id: 'jp-castle', label: 'Japanese Castle', modifier: 'feudal japanese castle on stone foundation with curved black-tile roofs and white plaster walls, cherry blossoms, blue sky' },
+      { id: 'jp-tea-house', label: 'Tea House', modifier: 'simple japanese tea house with thatched roof, paper-screen door, mossy stone path through bamboo, soft mist' },
+      { id: 'jp-shrine-gate', label: 'Shrine Gate', modifier: 'large vermillion torii gate in shallow water at sunset, mountain backdrop, calm reflection, iconic japan' },
+      { id: 'jp-castle-gate', label: 'Castle Gate', modifier: 'massive wooden japanese castle gate with iron studs, stone walls, lit by lanterns, cinematic feudal atmosphere' },
+    ],
+  },
+  modern_extra: {
+    infrastructure: [
+      { id: 'airport-terminal', label: 'Airport Terminal', modifier: 'futuristic airport terminal exterior with sweeping curved roof, glass facade, jets at gates, blue hour lighting' },
+      { id: 'train-station-modern', label: 'Train Station', modifier: 'modern train station with massive iron-and-glass roof, sleek bullet trains at platforms, golden hour' },
+      { id: 'iconic-bridge', label: 'Iconic Bridge', modifier: 'iconic modern arch bridge spanning wide river at sunset, city skyline backdrop, cinematic wide shot' },
+      { id: 'modern-stadium', label: 'Modern Stadium', modifier: 'modern stadium exterior with weave-pattern facade illuminated colorfully at night, plaza with crowds' },
+      { id: 'mega-hospital', label: 'Modern Hospital', modifier: 'modern hospital complex exterior with glass facade and helipad, ambulance bay, daylight, clean professional look' },
+    ],
+    retail: [
+      { id: 'luxury-store', label: 'Luxury Boutique', modifier: 'flagship luxury boutique facade with marble pillars, gold lettering, illuminated window displays, evening city street' },
+      { id: 'modern-mall', label: 'Modern Mall', modifier: 'modern shopping mall exterior with curved glass facade, illuminated logo signs, evening blue hour, bustling plaza' },
+      { id: 'cafe-facade', label: 'Café Façade', modifier: 'charming corner café façade with awning, sidewalk tables with bistro chairs, flower boxes, warm afternoon light' },
+      { id: 'fashion-boutique', label: 'Fashion Boutique', modifier: 'modern minimalist fashion boutique facade with large window, mannequin display, brushed-brass signage, soft daylight' },
+      { id: 'supermarket', label: 'Supermarket', modifier: 'modern supermarket exterior with long horizontal facade, illuminated logo, parking lot, dusk sky' },
+    ],
+    landmarks: [
+      { id: 'super-skyscraper', label: 'Super-Tall Tower', modifier: 'super-tall modern skyscraper piercing low clouds, ground-level view with passersby for scale, cinematic dramatic perspective' },
+      { id: 'cultural-museum', label: 'Cultural Museum', modifier: 'iconic modern museum with deconstructivist titanium facade, plaza with visitors, golden hour cinematic light' },
+      { id: 'modern-opera', label: 'Modern Opera', modifier: 'sculptural modern opera house with white shell roof segments, harbor reflecting at twilight, cinematic landmark' },
+      { id: 'mega-cathedral', label: 'Mega Cathedral', modifier: 'unfinished modernist cathedral with organic spires, sandstone facade, urban square at golden hour' },
+      { id: 'sky-observatory', label: 'Sky Observatory', modifier: 'futuristic glass-floored sky observatory at top of skyscraper, panoramic city below at dusk, cinematic atmosphere' },
+    ],
+  },
+  scifi_arch: {
+    megastructure: [
+      { id: 'arcology', label: 'Arcology', modifier: 'massive futuristic arcology mega-building rising above clouds, layered terraces with greenery, sunset sky, epic scale' },
+      { id: 'spaceport', label: 'Spaceport', modifier: 'futuristic spaceport exterior with launching shuttles, control tower, gantry structures, dusk sky with vapor trails' },
+      { id: 'orbital-ring-arch', label: 'Orbital Ring', modifier: 'view of distant orbital ring structure crossing the sky above a futuristic city skyline at twilight, cinematic sci-fi' },
+      { id: 'habitat-dome', label: 'Habitat Dome', modifier: 'massive geodesic habitat dome on alien plain, glowing interior visible through panels, twin moons in violet sky' },
+      { id: 'mega-tower', label: 'Mega Tower', modifier: 'titanic vertical mega-tower city block piercing the cloud layer, layered districts visible, atmospheric perspective' },
+    ],
+  },
+  fantasy_arch: {
+    strongholds: [
+      { id: 'wizard-tower', label: 'Wizard Tower', modifier: 'tall lone wizard tower of dark stone with crooked turrets and glowing arcane window, stormy sky with lightning, dramatic' },
+      { id: 'dwarven-hall', label: 'Dwarven Hall', modifier: 'monumental dwarven mountain hall entrance with carved stone gate, runes glowing softly, torchlight, epic scale' },
+      { id: 'elven-palace', label: 'Elven Palace', modifier: 'graceful elven palace of white stone with thin arching spires, woven into ancient forest, soft golden light, ethereal' },
+      { id: 'dark-fortress', label: 'Dark Fortress', modifier: 'ominous dark fortress of black basalt with jagged spires, lava moat, red ember glow, oppressive cinematic atmosphere' },
+      { id: 'ruined-keep-fan', label: 'Ruined Keep', modifier: 'overgrown fantasy ruined keep on misty moor, ivy-covered walls, broken tower, atmospheric overcast dawn' },
     ],
   },
 };
 
-// ---------- PROPS (10 packs × 6 = 60) ----------
+// ---------- PROPS ----------
 export const PROP_THEMES: ThemePacks = {
   furniture: {
     seating: [
@@ -179,6 +355,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'rattan-lounger', label: 'Rattan Lounger', modifier: 'woven rattan lounge chair with linen cushion, boho styling, neutral studio backdrop' },
       { id: 'velvet-bench', label: 'Velvet Bench', modifier: 'low emerald-green velvet upholstered bench with brass legs, neutral studio backdrop' },
       { id: 'gaming-chair', label: 'Gaming Chair', modifier: 'modern ergonomic gaming chair in black and red, racing-style, neutral studio backdrop' },
+      { id: 'eames-lounge', label: 'Lounge & Ottoman', modifier: 'iconic mid-century plywood lounge chair with matching ottoman, dark walnut and black leather, neutral studio backdrop' },
+      { id: 'papasan-chair', label: 'Papasan Chair', modifier: 'oversized round rattan papasan chair with thick cream cushion, neutral studio backdrop, soft shadow' },
     ],
     tables: [
       { id: 'oak-dining', label: 'Oak Dining Table', modifier: 'large solid oak dining table with chamfered edges, neutral studio backdrop' },
@@ -187,6 +365,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'wooden-bench', label: 'Wooden Bench', modifier: 'long live-edge wooden bench, raw natural finish, neutral studio backdrop' },
       { id: 'glass-side-table', label: 'Glass Side Table', modifier: 'minimal round smoked-glass side table with thin black metal frame, neutral studio backdrop' },
       { id: 'rustic-farm-table', label: 'Rustic Farm Table', modifier: 'long reclaimed-wood rustic farm table with iron x-frame legs, neutral studio backdrop' },
+      { id: 'standing-desk', label: 'Standing Desk', modifier: 'modern adjustable-height standing desk with bamboo top and white frame, neutral studio backdrop' },
+      { id: 'nesting-tables', label: 'Nesting Tables', modifier: 'set of three nesting side tables in walnut with rounded edges, neutral studio backdrop, soft shadow' },
     ],
   },
   vehicles: {
@@ -197,6 +377,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'electric-sedan', label: 'Electric Sedan', modifier: 'modern white electric sedan with minimalist design, three-quarter front view, studio lighting, no logos' },
       { id: 'pickup-truck', label: 'Pickup Truck', modifier: 'rugged matte-grey pickup truck with off-road tires, three-quarter front view, studio lighting, no logos' },
       { id: 'compact-city-car', label: 'Compact City Car', modifier: 'cute compact city car in pastel mint, three-quarter front view, soft studio lighting, no logos' },
+      { id: 'rally-car', label: 'Rally Car', modifier: 'mud-splattered all-wheel-drive rally car with roof scoop and roll cage, three-quarter view, studio lighting, no logos' },
+      { id: 'limousine', label: 'Limousine', modifier: 'glossy black stretch limousine, side three-quarter view, soft studio lighting, no logos' },
     ],
     transport: [
       { id: 'vintage-bicycle', label: 'Vintage Bicycle', modifier: 'classic dutch city bicycle with leather saddle, woven basket, neutral studio backdrop' },
@@ -205,6 +387,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'helicopter', label: 'Helicopter', modifier: 'sleek private helicopter on helipad, studio-like overcast lighting, side view' },
       { id: 'cafe-motorcycle', label: 'Café Motorcycle', modifier: 'classic café-racer motorcycle in black and chrome, side view, neutral studio backdrop' },
       { id: 'private-jet', label: 'Private Jet', modifier: 'sleek private jet on tarmac at golden hour, three-quarter view, no logos' },
+      { id: 'cargo-van', label: 'Cargo Van', modifier: 'modern white cargo van with no markings, three-quarter front view, soft studio lighting, no logos' },
+      { id: 'speedboat', label: 'Speedboat', modifier: 'sleek modern speedboat skipping over calm turquoise sea, side view, sunny sky, no logos' },
     ],
   },
   tech: {
@@ -215,6 +399,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'drone', label: 'Drone', modifier: 'sleek black quadcopter drone hovering, soft studio backdrop, dramatic rim light' },
       { id: 'tablet', label: 'Tablet', modifier: 'premium tablet with stylus, blank screen, three-quarter view, neutral studio backdrop' },
       { id: 'smartwatch', label: 'Smartwatch', modifier: 'modern smartwatch with sport band, blank dial, three-quarter view, neutral studio backdrop' },
+      { id: 'wireless-earbuds', label: 'Wireless Earbuds', modifier: 'pair of premium wireless earbuds with charging case, white finish, neutral studio backdrop, soft shadow' },
+      { id: 'e-reader', label: 'E-Reader', modifier: 'modern matte e-reader with blank e-ink screen, soft three-quarter view, neutral studio backdrop' },
     ],
     studio: [
       { id: 'cinema-camera', label: 'Cinema Camera', modifier: 'professional cinema camera on tripod with cinema lens, neutral studio backdrop' },
@@ -223,6 +409,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'softbox', label: 'Softbox Light', modifier: 'large softbox studio light on stand, soft glow, dark studio backdrop' },
       { id: 'gimbal-rig', label: 'Gimbal Rig', modifier: 'professional 3-axis camera gimbal stabilizer rig with mirrorless camera, neutral studio backdrop' },
       { id: 'broadcast-headphones', label: 'Studio Headphones', modifier: 'premium over-ear studio reference headphones in matte black, neutral studio backdrop, soft shadow' },
+      { id: 'teleprompter', label: 'Teleprompter', modifier: 'professional teleprompter rig in front of broadcast camera, dark studio backdrop, dramatic side light' },
+      { id: 'led-panel', label: 'LED Panel', modifier: 'large bi-color LED panel light on c-stand with diffuser, dark studio backdrop, glowing softly' },
     ],
   },
   food: {
@@ -233,6 +421,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'matcha-latte', label: 'Matcha Latte', modifier: 'ceramic cup of matcha latte with foam art, light wood backdrop, soft daylight' },
       { id: 'craft-beer', label: 'Craft Beer', modifier: 'tall craft beer pint glass with golden lager and foam head, dark moody studio backdrop' },
       { id: 'fresh-smoothie', label: 'Fresh Smoothie', modifier: 'tall glass of berry smoothie with fresh fruit garnish and straw, light studio backdrop, food photography' },
+      { id: 'champagne-flute', label: 'Champagne Flute', modifier: 'crystal champagne flute with rising bubbles, soft backlight, dark moody studio backdrop' },
+      { id: 'iced-coffee', label: 'Iced Coffee', modifier: 'tall glass of iced coffee with cream swirl and ice cubes, condensation, light studio backdrop, food photography' },
     ],
     plates: [
       { id: 'gourmet-plate', label: 'Gourmet Plate', modifier: 'minimalist fine-dining plated dish, sauce dots, microgreens, dark plate, overhead studio shot' },
@@ -241,6 +431,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'fruit-bowl', label: 'Fruit Bowl', modifier: 'colorful fresh fruit bowl with berries and citrus, neutral studio backdrop, overhead shot' },
       { id: 'gourmet-burger', label: 'Gourmet Burger', modifier: 'gourmet beef burger with melted cheese and brioche bun, side view, dark moody studio backdrop' },
       { id: 'pasta-bowl', label: 'Pasta Bowl', modifier: 'rustic bowl of fresh pasta with herbs and parmesan, overhead studio shot, warm light' },
+      { id: 'ramen-bowl', label: 'Ramen Bowl', modifier: 'steaming bowl of tonkotsu ramen with chashu, soft egg, scallions, dark wooden table, overhead shot' },
+      { id: 'cheese-board', label: 'Cheese Board', modifier: 'rustic wooden cheese board with assorted cheeses, grapes, nuts, honey pot, overhead studio shot, warm light' },
     ],
   },
   tools: {
@@ -251,6 +443,8 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'film-camera', label: 'Film Camera', modifier: 'vintage 35mm film camera with leather strap, neutral studio backdrop, soft shadow' },
       { id: 'electric-guitar', label: 'Electric Guitar', modifier: 'iconic sunburst electric guitar on stand, dark studio backdrop, dramatic side light' },
       { id: 'pottery-wheel', label: 'Pottery Wheel', modifier: 'spinning clay vessel on a pottery wheel mid-shaping, hands of artist, warm rustic studio light' },
+      { id: 'typewriter', label: 'Typewriter', modifier: 'vintage manual typewriter with sheet of paper, dark wooden desk, soft warm desk lamp light' },
+      { id: 'sewing-machine', label: 'Sewing Machine', modifier: 'classic mid-century sewing machine on wooden table with fabric and spools, soft daylight, craftsperson atmosphere' },
     ],
     work: [
       { id: 'briefcase', label: 'Briefcase', modifier: 'premium leather executive briefcase, brass clasps, neutral studio backdrop' },
@@ -259,13 +453,78 @@ export const PROP_THEMES: ThemePacks = {
       { id: 'medical-kit', label: 'Medical Kit', modifier: 'professional medical kit open with stethoscope and instruments, clean white backdrop' },
       { id: 'chefs-knife', label: 'Chef\u2019s Knife', modifier: 'premium chef knife with damascus steel blade and walnut handle on wooden cutting board, food-photography lighting' },
       { id: 'lab-flask', label: 'Lab Flask', modifier: 'glass laboratory erlenmeyer flask with glowing teal liquid, dark scientific backdrop, soft rim light' },
+      { id: 'engineering-blueprint', label: 'Blueprint Set', modifier: 'rolled architectural blueprints with drafting compass and ruler on dark wood desk, warm desk lamp light' },
+      { id: 'first-aid-kit', label: 'First Aid Kit', modifier: 'red first-aid kit open with bandages, scissors, ointments, clean white studio backdrop, soft shadow' },
+    ],
+  },
+  weapons: {
+    historical_weapons: [
+      { id: 'gladius', label: 'Roman Gladius', modifier: 'roman gladius shortsword with bronze pommel and red leather grip, displayed on dark wood, dramatic museum light' },
+      { id: 'longsword', label: 'Medieval Longsword', modifier: 'medieval steel longsword with cross guard and leather-wrapped grip, dark studio backdrop, dramatic rim light' },
+      { id: 'katana', label: 'Katana', modifier: 'japanese katana with black saya scabbard and red silk wrapping, displayed on wooden stand, dark studio backdrop' },
+      { id: 'flintlock-musket', label: 'Flintlock Musket', modifier: 'antique flintlock musket with brass fittings and walnut stock, displayed on dark wood, dramatic museum light' },
+      { id: 'war-hammer', label: 'War Hammer', modifier: 'medieval steel war hammer with spike and leather-wrapped haft, dark studio backdrop, dramatic side light' },
+    ],
+    modern_weapons: [
+      { id: 'handgun-prop', label: 'Handgun (Prop)', modifier: 'modern matte-black semi-automatic pistol prop, side view, neutral studio backdrop, no logos' },
+      { id: 'tactical-rifle-prop', label: 'Tactical Rifle (Prop)', modifier: 'modern tactical carbine rifle prop with optic and grip, side view, neutral studio backdrop, no logos' },
+      { id: 'tactical-knife', label: 'Tactical Knife', modifier: 'modern matte-black tactical folding knife with serrated edge, neutral studio backdrop, dramatic side light' },
+      { id: 'taser', label: 'Stun Device', modifier: 'modern yellow and black stun device, side view, neutral studio backdrop, no logos' },
+      { id: 'baton', label: 'Telescoping Baton', modifier: 'extended telescoping steel baton, dark studio backdrop, dramatic side light' },
+    ],
+    scifi_weapons: [
+      { id: 'plasma-rifle', label: 'Plasma Rifle', modifier: 'sleek sci-fi plasma rifle with glowing blue energy cell, side view, dark studio backdrop, dramatic rim light' },
+      { id: 'energy-sword', label: 'Energy Sword', modifier: 'futuristic energy sword with humming blue plasma blade, dark studio backdrop, dramatic glow' },
+      { id: 'combat-drone', label: 'Combat Drone', modifier: 'small sci-fi quadrotor combat drone with sensor array, hovering, dark studio backdrop, dramatic rim light' },
+      { id: 'exo-glove', label: 'Exo Power Glove', modifier: 'futuristic black power-assist exo glove with glowing palm emitter, neutral studio backdrop, dramatic light' },
+      { id: 'emp-grenade', label: 'EMP Grenade', modifier: 'sci-fi cylindrical emp grenade with glowing blue indicator ring, dark studio backdrop, dramatic side light' },
+    ],
+  },
+  vehicles_eras: {
+    historical_vehicles: [
+      { id: 'roman-chariot', label: 'Roman Chariot', modifier: 'roman two-wheeled war chariot with bronze fittings, side view, neutral studio backdrop, soft shadow' },
+      { id: 'horse-carriage', label: 'Horse Carriage', modifier: 'elegant 19th-century black horse-drawn carriage, side view, neutral studio backdrop, soft shadow' },
+      { id: 'sailing-ship', label: 'Sailing Ship', modifier: 'classic three-masted wooden sailing ship under full sail on calm sea, side view, soft daylight' },
+      { id: 'biplane', label: 'Biplane', modifier: 'vintage red biplane with wooden propeller, three-quarter view, neutral studio backdrop, no logos' },
+      { id: 'steam-locomotive', label: 'Steam Locomotive', modifier: 'classic black steam locomotive with red wheels, side view on track, soft daylight, no logos' },
+    ],
+    modern_vehicles: [
+      { id: 'sports-car-modern', label: 'Sports Car', modifier: 'sleek modern red sports car, three-quarter front view, polished studio floor, soft studio lighting, no logos' },
+      { id: 'motorcycle', label: 'Motorcycle', modifier: 'modern naked motorcycle in black and orange, side view, neutral studio backdrop, dramatic side light, no logos' },
+      { id: 'civilian-helicopter', label: 'Helicopter', modifier: 'modern civilian helicopter in white and blue livery, side view, neutral studio backdrop, no logos' },
+      { id: 'mega-yacht', label: 'Mega Yacht', modifier: 'sleek white mega yacht on calm sea at sunset, three-quarter view, no logos, cinematic light' },
+      { id: 'e-scooter', label: 'E-Scooter', modifier: 'modern electric stand-up scooter with wide deck, side view, neutral studio backdrop, soft shadow, no logos' },
+    ],
+    scifi_vehicles: [
+      { id: 'hover-bike', label: 'Hover Bike', modifier: 'futuristic hover bike with glowing thrusters, side view, neutral studio backdrop, dramatic rim light' },
+      { id: 'mech-suit', label: 'Mech Suit', modifier: 'towering humanoid combat mech with armored panels, three-quarter view, neutral studio backdrop, dramatic top light' },
+      { id: 'shuttle', label: 'Shuttle Craft', modifier: 'sleek sci-fi atmospheric shuttle craft on landing gear, three-quarter view, neutral studio backdrop, dramatic light' },
+      { id: 'space-fighter', label: 'Space Fighter', modifier: 'sci-fi single-seat space fighter craft with swept wings, side view, dark starry backdrop, dramatic rim light' },
+      { id: 'rover', label: 'Planet Rover', modifier: 'futuristic six-wheel planetary exploration rover with sensor mast, three-quarter view, neutral studio backdrop' },
+    ],
+  },
+  food_global: {
+    global_dishes: [
+      { id: 'sushi-platter-global', label: 'Sushi Platter', modifier: 'elegant assorted nigiri and maki sushi platter on dark slate board, overhead shot, food-photography lighting' },
+      { id: 'pasta-italian', label: 'Italian Pasta', modifier: 'rustic plate of fresh tagliatelle al ragu with parmesan and basil, overhead shot, warm light, food photography' },
+      { id: 'gourmet-burger-global', label: 'Gourmet Burger', modifier: 'gourmet double cheeseburger with brioche bun and crispy fries, side view, dark moody studio backdrop' },
+      { id: 'dim-sum', label: 'Dim Sum', modifier: 'bamboo steamer with assorted dim sum dumplings and chopsticks, overhead shot, warm food-photography lighting' },
+      { id: 'paella', label: 'Paella', modifier: 'large pan of spanish seafood paella with prawns and mussels, lemon wedges, overhead shot, food-photography lighting' },
+    ],
+  },
+  tech_gadgets: {
+    gadgets: [
+      { id: 'vintage-camera', label: 'Vintage Camera', modifier: 'vintage rangefinder film camera with brass details and leather wrap, neutral studio backdrop, soft shadow' },
+      { id: 'hologram-projector', label: 'Hologram Projector', modifier: 'small futuristic disc projecting glowing teal holographic interface, dark studio backdrop, dramatic rim light' },
+      { id: 'ar-glasses', label: 'AR Glasses', modifier: 'sleek modern augmented-reality smart glasses with subtle glow, three-quarter view, neutral studio backdrop, no logos' },
+      { id: 'retro-radio', label: 'Retro Radio', modifier: 'classic 1960s tabletop transistor radio with chrome dial, neutral studio backdrop, warm rim light' },
+      { id: 'mini-drone', label: 'Mini Drone', modifier: 'compact white quadcopter mini drone hovering, neutral studio backdrop, dramatic top light, no logos' },
     ],
   },
 };
 
-// ---------- CHARACTERS (13 packs × 6 = 78) ----------
+// ---------- CHARACTERS ----------
 // Cast Catalog. Style lock pushes "full-body cinematic portrait, neutral studio backdrop".
-// Items below describe identity + signature wardrobe; the seeder appends the style lock.
 export const CHARACTER_THEMES: ThemePacks = {
   historical: {
     roman: [
@@ -275,6 +534,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'roman-gladiator', label: 'Roman Gladiator', modifier: 'roman murmillo gladiator with crested helmet, manica arm guard, large rectangular shield and short sword, leather subligaculum' },
       { id: 'roman-vestal', label: 'Roman Vestal', modifier: 'roman vestal virgin priestess in long white stola and palla, hair veiled with white infula, holding sacred flame' },
       { id: 'roman-emperor', label: 'Roman Emperor', modifier: 'roman emperor in golden laurel crown and richly embroidered purple toga, regal jewelry, imperial bearing' },
+      { id: 'roman-praetorian', label: 'Praetorian Guard', modifier: 'roman praetorian guard in muscled cuirass with attic helmet, oval shield with thunderbolt motif, spear, disciplined stance' },
+      { id: 'roman-slave', label: 'Roman Servant', modifier: 'roman household servant in plain undyed tunic with rope belt, sandals, modest expression, simple period attire' },
     ],
     medieval: [
       { id: 'medieval-knight', label: 'Medieval Knight', modifier: 'medieval knight in full plate armor with surcoat, longsword and heater shield with heraldic blazon, helm under arm' },
@@ -283,6 +544,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'medieval-queen', label: 'Medieval Queen', modifier: 'medieval queen in flowing burgundy gown with gold embroidery, golden crown, ermine-trimmed cloak, regal posture' },
       { id: 'medieval-bard', label: 'Medieval Bard', modifier: 'medieval bard in colourful tunic with feathered cap, holding a lute, lively expressive face' },
       { id: 'medieval-crusader', label: 'Crusader Knight', modifier: 'crusader knight in chainmail hauberk and white tabard with red cross, steel helm, sword and kite shield' },
+      { id: 'medieval-monk', label: 'Monk', modifier: 'medieval monk in brown wool habit with rope belt and hood, tonsured head, illuminated manuscript in hands' },
+      { id: 'medieval-blacksmith', label: 'Blacksmith', modifier: 'medieval blacksmith in leather apron over linen tunic, soot-streaked face, hammer in hand, muscular forearms' },
     ],
     viking: [
       { id: 'viking-warrior', label: 'Viking Warrior', modifier: 'viking warrior in fur-trimmed leather armor, round wooden shield, axe, braided beard, fierce stance' },
@@ -291,6 +554,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'viking-skald', label: 'Skald', modifier: 'viking skald poet in earthy wool robe, fur shoulders, holding small harp, weathered storyteller face' },
       { id: 'viking-berserker', label: 'Berserker', modifier: 'viking berserker bare-chested with bear-fur cloak, war paint, two axes, wild ferocious expression' },
       { id: 'viking-seeress', label: 'Seeress', modifier: 'viking völva seeress in dark hooded robe with bone necklaces, staff topped with antler, mystical aura' },
+      { id: 'viking-explorer', label: 'Viking Explorer', modifier: 'viking explorer in heavy fur cloak, leather tunic, holding navigation sunstone, sea-weathered confident face' },
+      { id: 'viking-blacksmith', label: 'Norse Smith', modifier: 'norse smith in leather apron with hammer, soot-streaked face, simple wool tunic, muscular forearms, period attire' },
     ],
     samurai: [
       { id: 'samurai-warrior', label: 'Samurai', modifier: 'samurai warrior in full lacquered ō-yoroi armor with horned kabuto helmet, katana at side, stoic expression' },
@@ -299,6 +564,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'samurai-daimyo', label: 'Daimyo', modifier: 'feudal japanese daimyo lord in richly embroidered kimono and kataginu, swords at side, dignified bearing' },
       { id: 'samurai-ninja', label: 'Ninja', modifier: 'shinobi ninja in dark indigo gi with masked face cloth, ninjato sword across back, shuriken pouch, agile crouch' },
       { id: 'samurai-monk', label: 'Warrior Monk', modifier: 'sōhei warrior monk with shaved head, simple grey robe, naginata polearm, calm but resolute face' },
+      { id: 'samurai-archer', label: 'Yumi Archer', modifier: 'feudal japanese archer with longbow and quiver, light leather armor over indigo gi, focused calm expression' },
+      { id: 'samurai-court-lady', label: 'Court Lady', modifier: 'heian-era court lady in twelve-layer junihitoe kimono with long flowing black hair, painted face, demure pose' },
     ],
     egyptian: [
       { id: 'egypt-pharaoh', label: 'Pharaoh', modifier: 'ancient egyptian pharaoh in nemes striped headcloth with uraeus, golden pectoral collar, crook and flail, regal pose' },
@@ -307,6 +574,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'egypt-charioteer', label: 'Charioteer', modifier: 'ancient egyptian chariot warrior in leather scale armor with composite bow, blue and gold headband, athletic build' },
       { id: 'egypt-worker', label: 'Stoneworker', modifier: 'ancient egyptian stoneworker in simple white loincloth with leather belt, copper chisel and mallet, dust-covered skin' },
       { id: 'egypt-royal-guard', label: 'Royal Guard', modifier: 'ancient egyptian royal guard with bronze khopesh sword, leather breastplate, striped headcloth, tall and imposing' },
+      { id: 'egypt-queen', label: 'Egyptian Queen', modifier: 'ancient egyptian queen in pleated white gown with gold belt, vulture crown, ornate jewelry, kohl-rimmed eyes, regal pose' },
+      { id: 'egypt-vizier', label: 'Vizier', modifier: 'ancient egyptian vizier in long white robe with golden sash, holding staff of office, dignified intelligent expression' },
     ],
     greek: [
       { id: 'greek-hoplite', label: 'Hoplite', modifier: 'ancient greek hoplite warrior in bronze cuirass and corinthian helmet, large round aspis shield with sigma, doru spear' },
@@ -323,6 +592,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'ww2-resistance', label: 'Resistance Fighter', modifier: '1940s resistance fighter in worn civilian coat and beret, scarf, satchel, shadowed determined face, no insignia' },
       { id: 'ww2-officer', label: 'Field Officer', modifier: 'WWII era field officer in tailored olive uniform with peaked cap and binoculars, no insignia, decisive posture' },
       { id: 'ww2-engineer', label: 'Field Engineer', modifier: 'WWII era combat engineer in dusty olive coveralls and helmet, tool belt and field radio, focused practical look' },
+      { id: 'ww2-radio', label: 'Radio Operator', modifier: 'WWII era field radio operator in olive uniform with backpack radio and headset, focused listening expression, no insignia' },
+      { id: 'ww2-medic', label: 'Combat Medic', modifier: 'WWII era combat medic in olive uniform with white-circle red-cross helmet, medical satchel, urgent compassionate expression' },
     ],
     wildwest: [
       { id: 'west-sheriff', label: 'Sheriff', modifier: 'old west sheriff in long brown duster coat, vest with star badge, wide-brimmed cowboy hat, revolver in holster, weathered face' },
@@ -331,6 +602,40 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'west-prospector', label: 'Prospector', modifier: 'old west gold prospector in patched flannel shirt, suspenders, battered hat, holding pickaxe, grizzled bearded face' },
       { id: 'west-cowgirl', label: 'Cowgirl', modifier: 'old west cowgirl in fringed leather jacket and divided riding skirt, bandana, lasso in hand, confident smile' },
       { id: 'west-scout', label: 'Frontier Scout', modifier: 'frontier scout in fringed buckskin jacket, fur cap, rifle across back, weathered observant face' },
+      { id: 'west-gambler', label: 'Riverboat Gambler', modifier: 'old west gambler in dark frock coat and brocade vest, ribbon tie, top hat, fanned playing cards, sly knowing smile' },
+      { id: 'west-bounty', label: 'Bounty Hunter', modifier: 'old west bounty hunter in long oilskin duster, wide-brimmed hat shadowing eyes, rifle across chest, intimidating stance' },
+    ],
+    aztec: [
+      { id: 'aztec-warrior', label: 'Eagle Warrior', modifier: 'aztec eagle warrior in feathered eagle-head helmet and quilted cotton armor with feather panels, obsidian macuahuitl club' },
+      { id: 'aztec-priest', label: 'Aztec Priest', modifier: 'aztec priest in long black robe with painted face, jade jewelry, holding obsidian ceremonial knife, intense expression' },
+      { id: 'aztec-farmer', label: 'Aztec Farmer', modifier: 'aztec farmer in plain white cotton tunic and loincloth, woven sandals, holding hoe, earnest weathered face' },
+      { id: 'aztec-noble', label: 'Aztec Noble', modifier: 'aztec noble in vibrant feathered cloak, jade and gold jewelry, embroidered loincloth, regal dignified bearing' },
+      { id: 'aztec-healer', label: 'Aztec Healer', modifier: 'aztec ticitl healer woman in embroidered huipil with herb pouch, jade necklace, calm wise expression' },
+      { id: 'aztec-merchant', label: 'Pochteca Merchant', modifier: 'aztec pochteca trader in patterned cloak, walking staff, bundle of trade goods, observant calculating expression' },
+    ],
+    feudal_japan: [
+      { id: 'fj-daimyo', label: 'Daimyo Lord', modifier: 'feudal japanese daimyo in formal kataginu over richly embroidered kimono, two swords, fan in hand, dignified posture' },
+      { id: 'fj-peasant', label: 'Rice Peasant', modifier: 'feudal japanese peasant in simple indigo cotton kimono and conical straw hat, holding sickle, weathered honest face' },
+      { id: 'fj-tea-master', label: 'Tea Master', modifier: 'feudal japanese tea master in subdued grey kimono and hakama, holding bamboo whisk and tea bowl, serene expression' },
+      { id: 'fj-sumo', label: 'Sumo Wrestler', modifier: 'feudal japanese sumo wrestler in traditional mawashi belt, topknot hairstyle, powerful build, focused stance' },
+      { id: 'fj-court-lady', label: 'Heian Court Lady', modifier: 'heian-era court lady in flowing twelve-layer kimono with long black hair, painted brows, holding silk fan, demure pose' },
+      { id: 'fj-archer', label: 'Yumi Archer', modifier: 'feudal japanese archer in light samurai armor over indigo gi, longbow drawn, focused calm expression' },
+    ],
+    victorian: [
+      { id: 'vic-gentleman', label: 'Gentleman', modifier: 'victorian gentleman in three-piece morning suit, ascot tie, top hat, walking cane, neatly trimmed beard, dignified posture' },
+      { id: 'vic-lady', label: 'Victorian Lady', modifier: 'victorian lady in elegant bustle gown with lace trim, parasol, gloved hands, hair in chignon, demure smile' },
+      { id: 'vic-detective', label: 'Detective', modifier: 'victorian detective in long tweed coat with deerstalker cap, holding pipe and magnifying glass, sharp inquisitive expression' },
+      { id: 'vic-maid', label: 'Maid', modifier: 'victorian maid in long black dress with white pinafore apron and lace cap, holding silver tray, modest serene expression' },
+      { id: 'vic-factory-worker', label: 'Factory Worker', modifier: 'victorian factory worker in soot-streaked shirt with rolled sleeves, leather apron, flat cap, weary determined face' },
+      { id: 'vic-doctor', label: 'Victorian Doctor', modifier: 'victorian physician in dark frock coat and waistcoat, holding leather doctors bag, spectacles, kind serious expression' },
+    ],
+    twenties: [
+      { id: '20s-flapper', label: 'Flapper', modifier: '1920s flapper in beaded fringe dress, feathered headband, long pearl necklace, bobbed hair, smoky eyes, vivacious smile' },
+      { id: '20s-gangster', label: 'Prohibition Gangster', modifier: '1920s gangster in pinstripe double-breasted suit, fedora pulled low, narrow tie, cigar, intimidating cool expression' },
+      { id: '20s-jazz-singer', label: 'Jazz Singer', modifier: '1920s jazz lounge singer in long sequined gown, opera gloves, vintage microphone, dramatic spotlight, expressive face' },
+      { id: '20s-bootlegger', label: 'Bootlegger', modifier: '1920s bootlegger in tweed jacket and flat cap, suspenders, holding wooden crate of bottles, sly grin' },
+      { id: '20s-socialite', label: 'Socialite', modifier: '1920s high society lady in art-deco evening gown, long fur stole, diamond jewelry, elegant marcel-waved hair' },
+      { id: '20s-cop', label: 'Beat Cop', modifier: '1920s police officer in dark blue uniform with high-collared tunic, brass buttons, custodian helmet, billy club, stern moustache' },
     ],
   },
   modern: {
@@ -341,6 +646,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'mod-firefighter', label: 'Firefighter', modifier: 'modern firefighter in turnout gear with reflective stripes, helmet under arm, soot-marked face, heroic stance' },
       { id: 'mod-pilot', label: 'Airline Pilot', modifier: 'modern airline captain in dark navy uniform with epaulets and white shirt, peaked cap, confident professional smile' },
       { id: 'mod-barista', label: 'Barista', modifier: 'modern speciality coffee barista in denim apron over henley shirt, beanie, holding cup, friendly creative vibe' },
+      { id: 'mod-teacher', label: 'Teacher', modifier: 'modern teacher in smart casual shirt and trousers, holding textbook, friendly approachable smile, classroom backdrop' },
+      { id: 'mod-mechanic', label: 'Mechanic', modifier: 'modern auto mechanic in navy coveralls with rolled sleeves, grease-streaked hands, holding wrench, confident grin' },
     ],
     business: [
       { id: 'biz-ceo', label: 'CEO', modifier: 'modern CEO in tailored charcoal suit with crisp shirt no tie, confident relaxed posture, premium executive look' },
@@ -349,6 +656,8 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'biz-consultant', label: 'Consultant', modifier: 'modern management consultant in smart-casual blazer over open-collar shirt, holding tablet, approachable confident look' },
       { id: 'biz-receptionist', label: 'Receptionist', modifier: 'modern hotel receptionist in tailored uniform blazer with name-badge style accent, warm welcoming smile, polished hair' },
       { id: 'biz-manager', label: 'Project Manager', modifier: 'modern tech project manager in smart casual outfit with rolled sleeves, glasses, holding sticky-notes, calm leader vibe' },
+      { id: 'biz-accountant', label: 'Accountant', modifier: 'modern accountant in light grey suit with thin tie, holding laptop, neat hair, calm analytical expression' },
+      { id: 'biz-marketing', label: 'Marketing Lead', modifier: 'modern marketing lead in stylish blazer over t-shirt, holding presentation deck, energetic confident smile' },
     ],
     creative: [
       { id: 'cre-photographer', label: 'Photographer', modifier: 'modern photographer in black tee and utility vest, camera around neck, focused creative expression' },
@@ -357,6 +666,40 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'cre-painter', label: 'Painter', modifier: 'modern painter in paint-splattered apron over t-shirt, holding palette and brush, focused artistic expression' },
       { id: 'cre-filmmaker', label: 'Filmmaker', modifier: 'modern indie filmmaker in casual jacket with vintage cinema camera on shoulder, observant directorial look' },
       { id: 'cre-influencer', label: 'Influencer', modifier: 'modern lifestyle influencer in trendy outfit holding ring-light selfie phone, natural styled hair, bright friendly smile' },
+      { id: 'cre-writer', label: 'Writer', modifier: 'modern novelist in cozy turtleneck and glasses, sitting with notebook and coffee, contemplative expression' },
+      { id: 'cre-musician', label: 'Musician', modifier: 'modern indie musician in distressed jacket with acoustic guitar across back, beanie, soulful expression' },
+    ],
+    sports: [
+      { id: 'sp-footballer', label: 'Footballer', modifier: 'modern professional football player in plain athletic jersey and shorts, cleats, confident athletic stance, no logos' },
+      { id: 'sp-boxer', label: 'Boxer', modifier: 'modern professional boxer in trunks and red gloves, hand-wrapped wrists, intense focused expression, athletic build' },
+      { id: 'sp-surfer', label: 'Surfer', modifier: 'modern surfer in wet wetsuit unzipped to waist, holding surfboard, salt-tousled hair, sun-kissed confident smile' },
+      { id: 'sp-gymnast', label: 'Gymnast', modifier: 'modern gymnast in plain leotard, athletic build, hair in tight bun, poised confident stance' },
+      { id: 'sp-cyclist', label: 'Cyclist', modifier: 'modern road cyclist in plain lycra kit and helmet, sunglasses, holding road bike by stem, focused athletic look' },
+      { id: 'sp-coach', label: 'Coach', modifier: 'modern sports coach in track jacket and cap, whistle around neck, holding clipboard, motivational confident expression' },
+    ],
+    medical: [
+      { id: 'med-surgeon', label: 'Surgeon', modifier: 'modern surgeon in green scrubs and surgical cap with mask down around neck, focused calm expression, hospital backdrop' },
+      { id: 'med-paramedic', label: 'Paramedic', modifier: 'modern paramedic in dark uniform with reflective stripes, radio on shoulder, holding medical bag, alert capable look' },
+      { id: 'med-therapist', label: 'Therapist', modifier: 'modern therapist in soft blazer and turtleneck, sitting with notepad, warm empathetic listening expression' },
+      { id: 'med-researcher', label: 'Researcher', modifier: 'modern lab researcher in white coat and protective glasses, holding pipette near beaker, focused scientific expression' },
+      { id: 'med-dentist', label: 'Dentist', modifier: 'modern dentist in pastel scrubs with mask down around neck, dental loupes on glasses, friendly reassuring smile' },
+      { id: 'med-vet', label: 'Veterinarian', modifier: 'modern veterinarian in light-blue scrubs with stethoscope, holding small puppy, kind warm smile' },
+    ],
+    military: [
+      { id: 'mil-soldier', label: 'Soldier', modifier: 'modern infantry soldier in generic camo combat uniform with plate carrier and helmet, rifle slung, no insignia, focused stance' },
+      { id: 'mil-specops', label: 'Special Operator', modifier: 'modern special operations soldier in low-vis gear with bump helmet and night-vision mounted, beard, no insignia, alert posture' },
+      { id: 'mil-sniper', label: 'Sniper', modifier: 'modern military sniper in ghillie suit with face camo, holding bolt-action precision rifle, calm focused expression, no insignia' },
+      { id: 'mil-engineer', label: 'Combat Engineer', modifier: 'modern combat engineer in camo uniform with tool pouches and helmet, holding wire cutters, practical determined look, no insignia' },
+      { id: 'mil-medic', label: 'Combat Medic', modifier: 'modern combat medic in camo uniform with red-cross armband and medical pouches, urgent compassionate expression, no insignia' },
+      { id: 'mil-drone-op', label: 'Drone Operator', modifier: 'modern military drone operator in flight suit at console with goggles up on head, focused tactical expression, no insignia' },
+    ],
+    nightlife: [
+      { id: 'nl-bartender', label: 'Bartender', modifier: 'modern speakeasy bartender in vest over rolled-sleeve shirt, suspenders, holding shaker mid-pour, cool composed smile' },
+      { id: 'nl-club-owner', label: 'Club Owner', modifier: 'modern nightclub owner in sharp black suit with open collar, gold chain, confident knowing smile, neon backlight' },
+      { id: 'nl-bouncer', label: 'Bouncer', modifier: 'modern nightclub bouncer in tight black t-shirt with earpiece, muscular build, arms crossed, stern intimidating expression' },
+      { id: 'nl-dancer', label: 'Club Dancer', modifier: 'modern club go-go dancer in stylish glittering outfit, athletic build, mid-dance pose, energetic confident expression, no logos' },
+      { id: 'nl-promoter', label: 'Party Promoter', modifier: 'modern nightlife promoter in stylish jacket with phone in hand, charismatic outgoing smile, neon backlight' },
+      { id: 'nl-vip', label: 'VIP Guest', modifier: 'modern nightclub VIP in luxury designer outfit with sunglasses indoors, champagne glass in hand, cool confident vibe' },
     ],
   },
   fantasy: {
@@ -367,6 +710,24 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'fan-paladin', label: 'Paladin', modifier: 'fantasy paladin in gleaming silver-and-gold plate armor with holy emblem on tabard, glowing longsword, righteous noble stance' },
       { id: 'fan-sorceress', label: 'Sorceress', modifier: 'fantasy sorceress in deep-purple flowing robe with arcane embroidery, crystal staff, glowing magical wisps around hands' },
       { id: 'fan-druid', label: 'Druid', modifier: 'fantasy druid in earthen leaf-cloak with antler headdress, gnarled wooden staff with vines, gentle wise expression' },
+      { id: 'fan-rogue', label: 'Rogue', modifier: 'fantasy rogue in dark hooded leather armor with twin daggers, half-mask covering lower face, sly cunning eyes' },
+      { id: 'fan-bard', label: 'Bard', modifier: 'fantasy bard in colourful tunic and feathered cap, holding ornate lute, charismatic charming expression' },
+    ],
+    dark: [
+      { id: 'dk-necromancer', label: 'Necromancer', modifier: 'dark fantasy necromancer in tattered black robe with bone jewelry, glowing green orb in hand, gaunt sinister face' },
+      { id: 'dk-vampire-lord', label: 'Vampire Lord', modifier: 'dark fantasy vampire lord in ornate gothic black-and-crimson coat with high collar, pale skin, fanged smirk, intense red eyes' },
+      { id: 'dk-witch', label: 'Witch', modifier: 'dark fantasy witch in long black hooded cloak with bone amulets, crooked staff, glowing purple eyes, mysterious aura' },
+      { id: 'dk-demon-hunter', label: 'Demon Hunter', modifier: 'dark fantasy demon hunter in spiked black armor with twin curved blades, glowing runes, hooded grim expression' },
+      { id: 'dk-lich', label: 'Lich', modifier: 'dark fantasy skeletal lich in tattered ornate robe with crown of bone, glowing eye sockets, holding orb of dark energy' },
+      { id: 'dk-cultist', label: 'Cultist', modifier: 'dark fantasy cultist in deep red hooded robe with arcane sigils, dagger in hand, shadowed face, fanatical stance' },
+    ],
+    nature_fan: [
+      { id: 'na-druid-forest', label: 'Forest Druid', modifier: 'fantasy forest druid in mossy bark-armor robe with leaf crown, gnarled staff with glowing acorn, gentle wise expression' },
+      { id: 'na-centaur', label: 'Centaur', modifier: 'fantasy centaur with chestnut horse body and warrior human torso, leather armor, longbow across back, noble stance' },
+      { id: 'na-faun', label: 'Faun', modifier: 'fantasy faun with goat legs and small curved horns, simple leather wraps, holding panpipes, playful charming expression' },
+      { id: 'na-elven-archer', label: 'Wood-Elf Archer', modifier: 'fantasy wood-elf archer with long platinum hair, leather and silk forest armor, ornate longbow drawn, focused calm expression' },
+      { id: 'na-tree-shepherd', label: 'Tree Shepherd', modifier: 'fantasy ent-like tree shepherd with mossy bark skin, vines for beard, glowing amber eyes, towering gentle presence' },
+      { id: 'na-beast-tamer', label: 'Beast Tamer', modifier: 'fantasy beast tamer in leather and fur armor with wolf companion at side, scarred confident face, woodland atmosphere' },
     ],
   },
   scifi: {
@@ -377,6 +738,54 @@ export const CHARACTER_THEMES: ThemePacks = {
       { id: 'cy-corp-suit', label: 'Corp Suit', modifier: 'cyberpunk megacorp executive in glossy black suit with metallic lapel chip, slick hair, cold confident expression, neon office backdrop' },
       { id: 'cy-mech-pilot', label: 'Mech Pilot', modifier: 'cyberpunk mech pilot in pressurized flight suit with helmet under arm, neon-blue HUD glow on visor, athletic stance' },
       { id: 'cy-synth', label: 'Synth Android', modifier: 'cyberpunk humanoid synth android with porcelain-smooth skin, exposed circuit lines on neck, glowing iris, sleek minimalist outfit' },
+      { id: 'cy-bartender', label: 'Cyber Bartender', modifier: 'cyberpunk neon bar bartender with chrome cyber-arm, neon-pink mohawk, leather vest, mixing glowing drink, confident smirk' },
+      { id: 'cy-bounty', label: 'Cyber Bounty Hunter', modifier: 'cyberpunk bounty hunter in armored long coat with smartgun, cybernetic eye implant, dust mask down around neck, intimidating stance' },
+    ],
+    space_opera: [
+      { id: 'so-captain', label: 'Starship Captain', modifier: 'sci-fi starship captain in tailored uniform with rank insignia, command jacket, confident commanding presence, bridge backdrop' },
+      { id: 'so-alien-diplomat', label: 'Alien Diplomat', modifier: 'sci-fi humanoid alien diplomat with subtly textured skin and luminous eyes, ornate ceremonial robe, dignified poised expression' },
+      { id: 'so-bounty', label: 'Space Bounty Hunter', modifier: 'sci-fi space bounty hunter in patchwork armor with jet-pack and helmet under arm, scarred face, blaster pistol at hip' },
+      { id: 'so-engineer', label: 'Ship Engineer', modifier: 'sci-fi starship engineer in greasy work coveralls with tool harness, plasma torch in hand, smudged practical expression' },
+      { id: 'so-pilot', label: 'Star Pilot', modifier: 'sci-fi star fighter pilot in flight suit with helmet under arm, brave roguish grin, hangar backdrop' },
+      { id: 'so-smuggler', label: 'Smuggler', modifier: 'sci-fi space smuggler in worn leather jacket and holstered blaster, vest over collared shirt, sly confident smirk' },
+    ],
+    post_apocalyptic: [
+      { id: 'pa-wanderer', label: 'Wanderer', modifier: 'post-apocalyptic lone wanderer in dust-covered hooded coat over patchwork clothes, gas mask on belt, weary determined expression' },
+      { id: 'pa-raider', label: 'Raider', modifier: 'post-apocalyptic raider in spiked leather armor and welded-plate scraps, war paint, machete in hand, savage grin' },
+      { id: 'pa-scavenger', label: 'Scavenger', modifier: 'post-apocalyptic scavenger in layered ragged clothing with goggles on forehead, bulging tool satchel, resourceful watchful expression' },
+      { id: 'pa-medic', label: 'Wasteland Medic', modifier: 'post-apocalyptic medic in patched clothes with red-cross armband and worn doctors bag, kind tired compassionate face' },
+      { id: 'pa-mutant', label: 'Mutant', modifier: 'post-apocalyptic mutant survivor with subtle skin lesions and asymmetric features, ragged clothes, melancholy strong presence' },
+      { id: 'pa-trader', label: 'Wasteland Trader', modifier: 'post-apocalyptic trader in long weathered coat, brimmed hat, satchel of curios, sly merchant smile' },
+    ],
+  },
+  anime: {
+    shonen: [
+      { id: 'an-hero', label: 'Shonen Hero', modifier: 'anime-style shonen hero with spiky hair and torn martial arts uniform, glowing aura, determined confident pose, vibrant cinematic look' },
+      { id: 'an-rival', label: 'Rival', modifier: 'anime-style rival character with cool black hair and stylish dark uniform, smirking confident expression, dramatic backlight' },
+      { id: 'an-mentor', label: 'Mentor', modifier: 'anime-style elder mentor with white beard and traditional robes, walking staff, wise calm expression, dramatic light' },
+      { id: 'an-mascot', label: 'Mascot Companion', modifier: 'anime-style cute small mascot creature with big eyes and fluffy body, magical glow, cheerful expression, full body' },
+      { id: 'an-villain', label: 'Villain', modifier: 'anime-style villain in dark ornate armor with flowing cape, glowing eyes, menacing smirk, dramatic dark backlight' },
+      { id: 'an-sidekick', label: 'Sidekick', modifier: 'anime-style cheerful sidekick character with bright hair color and casual battle outfit, energetic smiling pose' },
+    ],
+  },
+  bollywood: {
+    classic: [
+      { id: 'bw-hero', label: 'Bollywood Hero', modifier: 'classic bollywood film hero in tailored kurta or stylish suit, charismatic smile, perfectly styled hair, romantic confident pose' },
+      { id: 'bw-heroine', label: 'Bollywood Heroine', modifier: 'classic bollywood film heroine in vibrant embroidered sari with traditional jewelry, long flowing dark hair, expressive radiant smile' },
+      { id: 'bw-villain', label: 'Bollywood Villain', modifier: 'classic bollywood film villain in dark suit with menacing smirk, slicked hair, dramatic shadowy lighting, intense pose' },
+      { id: 'bw-comic', label: 'Comic Relief', modifier: 'classic bollywood comic-relief actor in colourful loose shirt, expressive playful face, exaggerated cheerful pose' },
+      { id: 'bw-patriarch', label: 'Family Patriarch', modifier: 'classic bollywood family patriarch in elegant achkan and turban, white beard, dignified warm expression' },
+      { id: 'bw-dancer', label: 'Dancer', modifier: 'classic bollywood dancer in vibrant lehenga choli with intricate jewelry, mid-dance pose, expressive joyful face' },
+    ],
+  },
+  folklore: {
+    slavic: [
+      { id: 'sl-baba-yaga', label: 'Baba Yaga', modifier: 'slavic folklore baba yaga witch crone in tattered embroidered shawl, hunched posture, crooked staff, knowing wicked grin' },
+      { id: 'sl-cossack', label: 'Cossack', modifier: 'slavic cossack warrior in red embroidered tunic and wide sharovary trousers, fur papakha hat, sabre at side, fierce mustache' },
+      { id: 'sl-tsar', label: 'Tsar', modifier: 'slavic tsar in heavy embroidered kaftan with fur trim, jeweled crown, ornate staff, regal dignified bearing' },
+      { id: 'sl-volkh', label: 'Volkh Sorcerer', modifier: 'slavic folklore sorcerer in long embroidered linen robe with bear-fur cloak, wooden staff, mystical wise expression' },
+      { id: 'sl-rusalka', label: 'Rusalka', modifier: 'slavic folklore water-spirit rusalka with long pale hair, flowing wet white shift, ethereal melancholy beauty' },
+      { id: 'sl-bogatyr', label: 'Bogatyr', modifier: 'slavic bogatyr knight in chainmail and pointed helm, large round shield and mace, heroic powerful stance' },
     ],
   },
 };
