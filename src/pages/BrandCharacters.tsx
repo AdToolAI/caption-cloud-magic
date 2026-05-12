@@ -35,6 +35,42 @@ const BrandCharacters = () => {
     }
   };
 
+  const handleBackfillPortraits = async () => {
+    const targets = characters.filter((c) => c.portrait_mode !== 'auto_default_outfit');
+    if (targets.length === 0) {
+      toast.info('All avatars already have a clean studio portrait.');
+      return;
+    }
+    if (!confirm(
+      `Generate clean studio portraits for ${targets.length} avatar(s)?\n\n` +
+      `This overwrites the current portrait with a wardrobe-ready base. ` +
+      `Takes ~10–20 seconds per avatar.`
+    )) return;
+
+    setBackfilling(true);
+    let done = 0;
+    let failed = 0;
+    const t = toast.loading(`Generating studio portraits 0/${targets.length}…`);
+    for (const c of targets) {
+      try {
+        const { error } = await supabase.functions.invoke('generate-avatar-portrait', {
+          body: { character_id: c.id, variant: 'default_outfit' },
+        });
+        if (error) throw error;
+        done += 1;
+      } catch (e: any) {
+        console.error('[backfill portrait]', c.id, e);
+        failed += 1;
+      }
+      toast.loading(`Generating studio portraits ${done + failed}/${targets.length}…`, { id: t });
+    }
+    queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
+    toast.dismiss(t);
+    if (failed === 0) toast.success(`Generated ${done} studio portraits`);
+    else toast.warning(`Done — ${done} ok, ${failed} failed`);
+    setBackfilling(false);
+  };
+
   return (
     <>
       <Helmet>
