@@ -176,9 +176,9 @@ export function CatalogBrowser({ kind, onPick }: Props) {
           {visible.map((row) => (
             <button
               key={row.id}
-              onClick={() => onPick?.(row)}
+              onClick={() => handlePick(row)}
               className="group relative overflow-hidden rounded-md border border-border/40 hover:border-primary/60 transition aspect-[4/3] bg-muted"
-              title={`${row.theme_pack} · ${row.label}`}
+              title={`${row.theme_pack} · ${row.label} — click to use in next scene`}
             >
               <img
                 src={row.image_url}
@@ -188,6 +188,9 @@ export function CatalogBrowser({ kind, onPick }: Props) {
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 to-transparent p-1.5">
                 <div className="text-[10px] font-medium truncate">{row.label}</div>
+              </div>
+              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition bg-primary/90 text-primary-foreground rounded-full px-1.5 py-0.5 text-[9px] inline-flex items-center gap-0.5">
+                <Send className="h-2.5 w-2.5" /> Use
               </div>
             </button>
           ))}
