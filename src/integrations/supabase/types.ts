@@ -2113,6 +2113,7 @@ export type Database = {
           default_voice_name: string | null
           default_voice_provider: string | null
           description: string | null
+          gender: string | null
           id: string
           identity_lock_strength: string
           is_favorite: boolean
@@ -2155,6 +2156,7 @@ export type Database = {
           default_voice_name?: string | null
           default_voice_provider?: string | null
           description?: string | null
+          gender?: string | null
           id?: string
           identity_lock_strength?: string
           is_favorite?: boolean
@@ -2197,6 +2199,7 @@ export type Database = {
           default_voice_name?: string | null
           default_voice_provider?: string | null
           description?: string | null
+          gender?: string | null
           id?: string
           identity_lock_strength?: string
           is_favorite?: boolean
@@ -15784,6 +15787,128 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      wardrobe_catalog_previews: {
+        Row: {
+          created_at: string
+          gender: string
+          id: string
+          image_url: string
+          outfit_id: string
+          outfit_label: string
+          storage_path: string
+          theme_pack: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          gender: string
+          id?: string
+          image_url: string
+          outfit_id: string
+          outfit_label: string
+          storage_path: string
+          theme_pack: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          gender?: string
+          id?: string
+          image_url?: string
+          outfit_id?: string
+          outfit_label?: string
+          storage_path?: string
+          theme_pack?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wardrobe_catalog_seed_jobs: {
+        Row: {
+          completed_slots: number
+          created_at: string
+          error_log: Json
+          failed_slots: number
+          id: string
+          status: string
+          total_slots: number
+          triggered_by: string | null
+          updated_at: string
+        }
+        Insert: {
+          completed_slots?: number
+          created_at?: string
+          error_log?: Json
+          failed_slots?: number
+          id?: string
+          status?: string
+          total_slots?: number
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Update: {
+          completed_slots?: number
+          created_at?: string
+          error_log?: Json
+          failed_slots?: number
+          id?: string
+          status?: string
+          total_slots?: number
+          triggered_by?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wardrobe_perspective_renders: {
+        Row: {
+          avatar_id: string
+          created_at: string
+          id: string
+          image_url: string
+          outfit_id: string
+          outfit_label: string
+          perspective: string
+          storage_path: string
+          theme_pack: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_id: string
+          created_at?: string
+          id?: string
+          image_url: string
+          outfit_id: string
+          outfit_label: string
+          perspective: string
+          storage_path: string
+          theme_pack: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_id?: string
+          created_at?: string
+          id?: string
+          image_url?: string
+          outfit_id?: string
+          outfit_label?: string
+          perspective?: string
+          storage_path?: string
+          theme_pack?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wardrobe_perspective_renders_avatar_id_fkey"
+            columns: ["avatar_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       webhook_endpoints: {
         Row: {
