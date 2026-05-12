@@ -7,6 +7,7 @@ import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacter
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { Card } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { PresetAvatarGallery } from '@/components/brand-characters/PresetAvatarGallery';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -94,28 +95,34 @@ const BrandCharacters = () => {
             </Card>
           </div>
 
-          {/* Grid */}
+          {/* Preset gallery (always visible — quick start) */}
+          <PresetAvatarGallery />
+
+          {/* Your library */}
           {isLoading ? (
             <div className="text-center py-20 text-muted-foreground">Loading…</div>
           ) : characters.length === 0 ? (
-            <div className="text-center py-20">
+            <div className="text-center py-16 border-t border-border/40">
               <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 mb-4">
                 <Sparkles className="h-8 w-8 text-primary" />
               </div>
-              <h2 className="font-serif text-2xl mb-2">No characters yet</h2>
+              <h2 className="font-serif text-2xl mb-2">Or upload your own</h2>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Add your first brand character to lock visual consistency across every video and image you create.
+                Upload a single reference image — we'll auto-extract an identity card and generate a clean studio portrait you can dress up.
               </p>
               <Button onClick={() => setAddOpen(true)} className="bg-primary text-primary-foreground">
-                <Plus className="h-4 w-4 mr-2" /> Create First Character
+                <Plus className="h-4 w-4 mr-2" /> Upload Your Own
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {characters.map((c) => (
-                <BrandCharacterCard key={c.id} character={c} />
-              ))}
-            </div>
+            <>
+              <h2 className="font-serif text-2xl mb-4 mt-2">Your Avatars</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+                {characters.map((c) => (
+                  <BrandCharacterCard key={c.id} character={c} />
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

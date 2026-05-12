@@ -104,6 +104,18 @@ export const useBrandCharacters = () => {
         .select()
         .single();
       if (error) throw error;
+
+      // 5) Auto-generate a clean canonical "default outfit" studio portrait so
+      //    every new avatar immediately has a wardrobe-ready base frame.
+      //    Soft-fail — the avatar is fully usable without it.
+      try {
+        await supabase.functions.invoke('generate-avatar-portrait', {
+          body: { character_id: row.id, variant: 'default_outfit' },
+        });
+      } catch (e) {
+        console.warn('[createCharacter] default-outfit portrait generation failed:', e);
+      }
+
       return row as BrandCharacter;
     },
     onSuccess: () => {

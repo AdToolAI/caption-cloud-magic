@@ -1,102 +1,97 @@
-## Stage 21: Hierarchische Wardrobe Theme Packs
+## Ziel
 
-Aktuell sind die 6 Theme Packs flach (4 Outfits pro Theme). Wir machen alle Themes 2-stufig: **Theme → Sub-Pack → 4 Outfits**. Architektur identisch zu Stage 20 (Gemini 3.1 Flash Image, identity-lock, ~$0.005/Outfit).
+Zwei zusammenhängende Erweiterungen der Avatar Library:
 
-### Ziel-Struktur
+1. **Preset-Avatar-Bibliothek** — Eine kuratierte Auswahl an fertigen Avataren, die jeder Nutzer ohne Upload sofort verwenden kann.
+2. **Auto-Standard-Portrait beim Erstellen** — Beim Hochladen eines eigenen Charakterbildes wird automatisch ein "Default Outfit"-Portrait via Gemini erzeugt, das danach genauso wie eigene Fotos via Wardrobe umgezogen werden kann.
 
-```text
-Lifestyle
-├── Everyday      → Casual, Streetwear, Brunch, Loungewear
-├── Formal        → Black Tie, Cocktail, Wedding Guest, Gala
-├── Seasonal      → Summer, Winter, Rainy Day, Spring
-└── Brand         → Brand Hero, Brand Casual, Brand Formal, Brand Sport
+---
 
-Business
-├── Corporate     → Executive Suit, Boardroom, Banker, Consultant
-├── Startup       → Smart Casual, Founder Hoodie, Power Blazer, Pitch
-├── Creative      → Designer, Agency, Architect, Editor
-└── Travel        → Airport Pro, Conference, Networking, Coworking
+## Teil 1 — Preset Avatar Library
 
-Historical (7 Eras)
-├── Antiquity        → Roman Legionary, Greek Hoplite, Egyptian Royal, Celtic Warrior
-├── Medieval         → Knight, Viking, Crusader, Monk
-├── Renaissance      → Noble, Musketeer, Pirate, Court
-├── Industrial       → Edwardian, Victorian, Steampunk, Wild West
-├── World War I      → Doughboy, Tommy, Pilot Ace, Trench Officer
-├── World War II     → GI, German Soldier, RAF Pilot, Resistance
-└── Feudal Japan     → Samurai, Ninja, Geisha, Ronin
+**Konzept:** 12 kuratierte System-Avatare (gemischt: Geschlecht, Alter, Ethnie, Stil — z.B. *Business Woman*, *Casual Guy*, *Creative Artist*, *Senior Mentor*, *Athletic Trainer*, *Tech Founder*, *Doctor*, *Teacher*, *Influencer*, *Chef*, *Designer*, *Speaker*).
 
-Fantasy
-├── Light    → Wizard, Elven Ranger, Paladin, Royal
-├── Dark     → Dark Knight, Necromancer, Assassin, Vampire
-└── Mythic   → Dragon Rider, Druid, Sorceress, Forest Guardian
+**UI** auf `/brand-characters`:
+- Neuer Tab/Sektion **"Preset Avatars"** über dem eigenen Grid (Carousel oder 3×4 Grid).
+- Jede Karte: Portrait + Name + Rolle + Button **"Use this Avatar"** → klont den Preset als persönlichen Avatar in `brand_characters` (mit eigenem `user_id`), inkl. portrait_url, identity_json, voice. Danach voll editierbar/wardrobe-fähig.
+- Solange der Nutzer noch keinen Avatar hat: Empty-State zeigt direkt die Presets statt nur "Create First".
 
-Sci-Fi
-├── Space    → Astronaut, Star Captain, Alien Diplomat, Mech Pilot
-├── Cyber    → Cyberpunk, Netrunner, Corp Exec, Street Samurai
-└── Future   → Holo Suit, Bio-Engineer, Energy Knight, Drone Pilot
+**Daten-Modell:**
+- Neue Tabelle `system_preset_avatars` (oder Reuse von `brand_characters` mit `user_id = NULL` + Flag `is_system_preset = true`). Empfehlung: **eigene Tabelle** `system_preset_avatars` für saubere Trennung.
+- Spalten: `id`, `name`, `role_label`, `gender`, `description`, `portrait_url`, `reference_image_url`, `visual_identity_json`, `default_voice_id`, `sort_order`, `is_active`.
+- RLS: `SELECT` für `authenticated` (alle dürfen lesen), `INSERT/UPDATE/DELETE` nur Admin.
 
-Sport
-├── Team       → Football, Basketball, Baseball, Soccer
-├── Combat     → MMA, Boxing, Karate, Fencing
-└── Outdoor    → Tennis, Skiing, Climbing, Cycling
-```
+**Klon-Flow:**
+- Neue Edge Function `clone-preset-avatar` (nimmt `preset_id`):
+  1. Lädt Preset-Row.
+  2. Kopiert `portrait_url` + `reference_image_url` aus System-Bucket → `brand-characters/{user_id}/...` (RLS-konformer Pfad).
+  3. Insert in `brand_characters` mit `user_id = auth.uid()`, identity_json, default_voice_id, `cloned_from_preset = preset_id`.
+  4. Returnt neue `character_id`.
+- Frontend: neuer Hook `usePresetAvatars()` + `useClonePresetAvatar()`.
 
-**Total:** 6 Themes, 23 Sub-Packs, 92 Outfit-Slots (alle lazy on-demand, $0.02/Sub-Pack).
+**Seeding:**
+- 12 Portraits werden mit Gemini Image (premium) generiert, in `system-preset-avatars` Storage-Bucket (public read) abgelegt, dann via Migration als Rows seeded. Identity-Cards lassen wir vom bestehenden `extract-character-identity` Edge-Function generieren.
 
-### Technik
+**Marktplatz-Verhältnis:** Klar abgegrenzt — Presets sind **kostenlos und global**, der Marketplace bleibt für bezahlte Community-Charaktere. `useAccessibleCharacters` muss nicht angefasst werden, da Klone normale `brand_characters` werden.
 
-**DB (keine Migration nötig):** `avatar_wardrobe_variants.theme_pack` speichert weiterhin den Sub-Pack-Key direkt — wir migrieren von `'historical'` zu `'historical:medieval'`. Spalte ist `TEXT`, Unique-Index `(avatar_id, theme_pack, outfit_id)` greift unverändert. Bestehende Zeilen mit altem flachen Wert (`'historical'`, `'lifestyle'` etc.) bleiben gültig — UI zeigt sie nicht mehr an, sind aber nicht broken (User kann den neuen Sub-Pack einfach neu generieren).
+---
 
-**Edge Function `generate-avatar-wardrobe`:**
-- `THEME_PACKS` wird verschachtelt: `Record<ThemeId, Record<SubPackId, Outfit[]>>`
-- Request akzeptiert `{ avatar_id, theme_pack, sub_pack }` → wird intern zu Composite-Key `${theme}:${sub}` für DB-Storage
-- Validator: Whitelist aller `theme:sub` Kombinationen
-- Generierungs-Logik unverändert (4 parallele Gemini-Calls)
+## Teil 2 — Auto-Standard-Portrait beim Avatar-Upload
 
-**`AvatarWardrobeSheet.tsx`:**
-- State: `theme: ThemeId` + `subPack: SubPackId`
-- Erste Pill-Reihe: 6 Theme-Pills (wie heute)
-- Zweite Pill-Reihe (conditional, animated reveal): Sub-Pack-Pills für gewähltes Theme
-- Bei Theme-Wechsel: erstes Sub-Pack auto-selektieren
-- `PACK_SLOTS` wird zu `PACK_SLOTS[theme][subPack]`
-- Query-Key: `['avatar-wardrobe', avatarId, theme, subPack]`
-- Composite-Key wird beim DB-Read und beim Edge-Call konstruiert
+**Heute:** Bei `createCharacter` wird das Originalbild gespeichert + Identity-Card extrahiert. `portrait_url` bleibt leer, bis der Nutzer im Detail-View manuell auf "Generate Portrait" klickt.
 
-**`SceneAvatarMode.tsx`:**
-- `scene.selectedOutfit` bekommt zusätzliches Feld `subPack` (für Re-Selection beim Reload)
-- Default-Pack: `historical:medieval` statt `historical` (Backward-Compatible über Migration im Component)
+**Neu:** Direkt im Upload-Flow wird automatisch ein **"Standard Outfit"-Portrait** mitgeneriert.
 
-**`src/types/video-composer.ts`:**
-- `selectedOutfit.themePack` bleibt — Wert ist jetzt Composite-String
+**Was bedeutet "Standard Outfit"?** Neutral, Studio-Look, weißer Hintergrund, schlichtes graues T-Shirt / dunkler Pullover (geschlechtsadaptiert), eye-level, frontal, schultern sichtbar — dieser dient als **kanonischer Base-Frame** für alle Wardrobe-Variants (genau wie bei Presets).
 
-### Prompt-Hinweise
+**Implementierung:**
+1. **`generate-avatar-portrait` Edge Function erweitern:**
+   - Prompt-Variante `'default_outfit'` hinzufügen, die explizit "wearing a clean neutral grey t-shirt / dark sweater, plain white studio backdrop, soft key light" enthält (Identitäts-Lock bleibt).
+   - Akzeptiert optional `{ variant: 'hedra' | 'default_outfit' }`. Default bleibt 'hedra' für Rückwärtskompatibilität.
+   - Speichert in den bestehenden `portrait_url` und setzt `portrait_mode = 'auto_default_outfit'`.
+2. **`useBrandCharacters.createCharacter` erweitern:**
+   - Nach dem Insert: `await supabase.functions.invoke('generate-avatar-portrait', { body: { character_id: row.id, variant: 'default_outfit' }})`.
+   - Non-blocking visual: Toast "Avatar saved — generating standard portrait…", danach Refetch. Wenn der Portrait-Call fehlschlägt → soft-fail mit Hinweis-Toast, der Avatar bleibt nutzbar.
+3. **`AddBrandCharacterDialog`:** Loading-State zeigt jetzt 2 Steps:
+   - "Extracting identity…" (wie bisher)
+   - "Generating standard portrait…" (neu, ~10–20s)
+4. **Wardrobe:** Funktioniert automatisch — die existierende `generate-avatar-wardrobe` Function nutzt `portrait_url` als Identity-Lock-Source. Da das Standard-Outfit jetzt ein sauberer Studio-Frame ist, werden die Wardrobe-Outfits sogar konsistenter.
 
-Alle Outfit-Prompts gender-neutral formuliert ("gender-appropriate cut") — Identity-Lock von Gemini übernimmt Geschlecht/Frisur/Körperbau automatisch (gleiche Strategie wie Stage 20).
+**Kosten:** ~$0.005 zusätzlich pro Avatar-Erstellung (Gemini 3.1 Flash Image). Keine zusätzliche Credit-Verrechnung nötig (wie bei Wardrobe heute auch).
 
-Sensible historische Uniformen (WW2 German Soldier) → neutrale, generische Wehrmacht-Felduniform ohne Hoheitsabzeichen / SS-Symbolik. Prompt enthält explizit "no political insignia, no swastikas, generic field uniform". Das ist Standard-Praxis bei Stock-Footage.
+---
 
-### Files to Edit
+## Geänderte Dateien
 
-- `supabase/functions/generate-avatar-wardrobe/index.ts` (verschachtelte THEME_PACKS, sub_pack Param)
-- `src/components/brand-characters/AvatarWardrobeSheet.tsx` (2-stufige Pills, Composite-Key)
-- `src/components/video-composer/SceneAvatarMode.tsx` (subPack im selectedOutfit)
-- `src/types/video-composer.ts` (Typ-Hinweis ergänzen)
-- `.lovable/plan.md` (Stage 21 dokumentieren)
+**Teil 1 (Preset Library):**
+- *Migration:* `system_preset_avatars` Tabelle + RLS + `system-preset-avatars` Storage-Bucket (public read)
+- *Migration:* `brand_characters.cloned_from_preset` Spalte (uuid, nullable)
+- *Edge Function (neu):* `supabase/functions/clone-preset-avatar/index.ts`
+- *Edge Function (neu, einmalig):* `seed-preset-avatars` (generiert Portraits + Identity-Cards für die 12 Presets)
+- *Hook (neu):* `src/hooks/usePresetAvatars.ts`
+- *Component (neu):* `src/components/brand-characters/PresetAvatarGallery.tsx`
+- *Edit:* `src/pages/BrandCharacters.tsx` (Tab + Empty-State integration)
 
-### Out of Scope
+**Teil 2 (Auto-Portrait):**
+- *Edit:* `supabase/functions/generate-avatar-portrait/index.ts` (variant param + default_outfit prompt)
+- *Edit:* `src/hooks/useBrandCharacters.ts` (auto-invoke nach Insert)
+- *Edit:* `src/components/brand-characters/AddBrandCharacterDialog.tsx` (2-Step-Loading)
 
-- Brand Props (Panzer/Gebäude/Objekte) → eigene Stage 22 falls gewünscht
-- Auto-Migration alter flacher Einträge (User regeneriert einfach)
-- 3-stufige Hierarchie (Theme → Sub → Sub-Sub)
-- Gender-Split Outfits (würde Kosten verdoppeln)
+**Memory:** Update `mem://features/avatars/avatar-library` (Preset Library + Auto Default-Outfit Portrait).
 
-### Kosten
+---
 
-- Pro Sub-Pack-Generierung: $0.02 (4 Outfits à $0.005)
-- Lazy: nur generiert wenn User auf "Generate" klickt
-- Cached danach permanent in DB
+## Out of Scope
 
-### Memory Update
+- Mehrere Portrait-Varianten (Hedra-Frontal **und** Default-Outfit nebeneinander) — wir überschreiben bewusst das eine `portrait_url`-Feld. Wenn später gewünscht: separate Spalte `default_outfit_url` ergänzen.
+- Preset-Marktplatz / Premium-Presets / User-shared Presets — bleibt im Marketplace-Modul.
+- Auto-Wardrobe-Vorgenerierung beim Klonen eines Presets — bleibt on-demand wie heute (~$0.02 pro Sub-Pack).
 
-`mem://features/avatars/wardrobe-theme-packs` → "**Hierarchical 2-tier theme packs**: 6 Themes × 23 Sub-Packs × 4 Outfits = 92 Outfit-Slots. `theme_pack` column stores composite key `theme:subpack` (e.g. `historical:ww2`). Lifestyle/Business/Historical/Fantasy/Sci-Fi/Sport, je 3-7 Sub-Packs."
+---
+
+## Offene Frage (1)
+
+Wieviele Preset-Avatare sollen wir launchen?
+- **A) 6 Stück** — schnell, fokussiert (3♀ / 3♂, Mix aus Business/Casual/Creative)
+- **B) 12 Stück** *(empfohlen)* — solide Auswahl mit Diversität in Geschlecht/Alter/Stil
+- **C) 24 Stück** — breite Bibliothek inkl. Nischenrollen (Doctor, Chef, Athlete, Speaker, …)
