@@ -186,6 +186,12 @@ export function resolveMentions(
   if (locLines.length > 0) {
     blocks.push(`Setting:\n${locLines.join('\n')}`);
   }
+  if (buildingLines.length > 0) {
+    blocks.push(`Architecture (keep landmarks consistent):\n${buildingLines.join('\n')}`);
+  }
+  if (propLines.length > 0) {
+    blocks.push(`Props (keep object designs consistent):\n${propLines.join('\n')}`);
+  }
 
   // Pick a reference image: prefer single character, fallback to single location.
   let referenceImageUrl: string | undefined;
