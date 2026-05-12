@@ -1229,20 +1229,22 @@ export default function VideoComposerDashboard() {
         </div>
       )}
 
+      {/* Workflow stepper (horizontal, sticky beneath the header) */}
+      <div className="max-w-7xl mx-auto px-4">
+        <MotionStudioTopStepper
+          steps={STEPS}
+          activeStep={activeTab}
+          isStepDone={isStepDone}
+          isStepAccessible={isStepAccessible}
+          onSelect={(id) => handleTabChange(id as TabId)}
+        />
+      </div>
+
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
-          <MotionStudioStepSidebar
-            steps={STEPS}
-            activeStep={activeTab}
-            isStepDone={isStepDone}
-            isStepAccessible={isStepAccessible}
-            onSelect={(id) => handleTabChange(id as TabId)}
-          />
-
-          <div className="flex-1 min-w-0">
-            <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-              <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
+        <div className="min-w-0">
+          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
+            <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
                   const isAccessible = i === 0 ||
