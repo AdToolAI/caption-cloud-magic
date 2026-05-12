@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const kind = (body?.kind ?? 'location') as WorldKind;
-    if (!['location', 'building', 'prop'].includes(kind)) throw new Error('Invalid kind');
+    if (!['location', 'building', 'prop', 'character'].includes(kind)) throw new Error('Invalid kind');
     const force: boolean = !!body?.force;
     const themeFilter: string | undefined = body?.theme_pack;
 
