@@ -11,7 +11,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type WorldCatalogKind = 'location' | 'building' | 'prop';
+export type WorldCatalogKind = 'location' | 'building' | 'prop' | 'character';
 
 export interface WorldCatalogItem {
   id: string;
@@ -25,6 +25,7 @@ const TABLE: Record<WorldCatalogKind, string> = {
   location: 'location_catalog_previews',
   building: 'building_catalog_previews',
   prop: 'prop_catalog_previews',
+  character: 'character_catalog_previews',
 };
 
 async function fetchKind(kind: WorldCatalogKind): Promise<WorldCatalogItem[]> {
@@ -60,11 +61,18 @@ export function useWorldCatalog() {
     queryFn: () => fetchKind('prop'),
     staleTime: 5 * 60 * 1000,
   });
+  const characters = useQuery({
+    queryKey: ['world-catalog', 'character'],
+    queryFn: () => fetchKind('character'),
+    staleTime: 5 * 60 * 1000,
+  });
 
   return {
     catalogLocations: locations.data ?? [],
     catalogBuildings: buildings.data ?? [],
     catalogProps: props.data ?? [],
-    isLoading: locations.isLoading || buildings.isLoading || props.isLoading,
+    catalogCharacters: characters.data ?? [],
+    isLoading:
+      locations.isLoading || buildings.isLoading || props.isLoading || characters.isLoading,
   };
 }
