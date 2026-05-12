@@ -37,7 +37,7 @@ import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
-import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
+import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
