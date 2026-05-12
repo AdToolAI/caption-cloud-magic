@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
@@ -198,9 +197,11 @@ function parseInitial(input?: string): { theme: WardrobeTheme; sub: string } {
 
 interface Props {
   avatarId: string;
+  /** Avatar's gender hint, used as default for the toggle. */
+  avatarGender?: 'male' | 'female' | 'neutral' | null;
   /** When provided, selecting a variant calls back with image url + meta */
   onSelect?: (variant: {
-    variantId: string;
+    variantId: string | null;
     outfitId: string;
     label: string;
     imageUrl: string;
@@ -213,11 +214,13 @@ interface Props {
   initialPack?: string;
 }
 
-export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', initialPack }: Props) {
-  const qc = useQueryClient();
+export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout = 'sheet', initialPack }: Props) {
   const initial = parseInitial(initialPack);
   const [theme, setTheme] = useState<WardrobeTheme>(initial.theme);
   const [sub, setSub] = useState<string>(initial.sub);
+  const [gender, setGender] = useState<'male' | 'female'>(
+    avatarGender === 'male' ? 'male' : 'female',
+  );
 
   // When theme changes, snap to the first sub-pack of that theme.
   useEffect(() => {
@@ -229,38 +232,48 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
   const compositeKey = `${theme}:${sub}`;
   const activeSub = SUB_PACKS[theme].find((sp) => sp.id === sub) ?? SUB_PACKS[theme][0];
 
-  const { data: outfits = [], isLoading } = useQuery({
+  // Per-user generated outfits (highest priority — show user's own avatar in that outfit)
+  const { data: userOutfits = [], isLoading: loadingUser } = useQuery({
     queryKey: ['avatar-wardrobe', avatarId, compositeKey],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('avatar_wardrobe_variants')
         .select('id, outfit_id, label, image_url, theme_pack')
         .eq('avatar_id', avatarId)
+        .eq('theme_pack', compositeKey);
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; outfit_id: string; label: string; image_url: string }>;
+    },
+  });
+
+  // Shared catalog previews (gendered generic models). Always loaded.
+  const { data: catalog = [], isLoading: loadingCatalog } = useQuery({
+    queryKey: ['wardrobe-catalog', compositeKey, gender],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('wardrobe_catalog_previews')
+        .select('outfit_id, outfit_label, image_url, gender')
         .eq('theme_pack', compositeKey)
-        .order('created_at', { ascending: true });
+        .eq('gender', gender);
       if (error) throw error;
-      return (data || []) as Array<{ id: string; outfit_id: string; label: string; image_url: string; theme_pack: string }>;
+      return (data || []) as Array<{ outfit_id: string; outfit_label: string; image_url: string; gender: string }>;
     },
   });
 
-  const generate = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('generate-avatar-wardrobe', {
-        body: { avatar_id: avatarId, theme_pack: theme, sub_pack: sub },
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data: any) => {
-      toast.success(`Generated ${data?.generated ?? 0} ${activeSub.label} outfits`);
-      qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, compositeKey] });
-    },
-    onError: (e: any) => toast.error(e?.message || 'Wardrobe generation failed'),
-  });
+  const variantsBySlot = useMemo(() => {
+    const map = new Map<string, VariantRecord & { isUser: boolean }>();
+    // Catalog first (placeholder previews)
+    for (const c of catalog) {
+      map.set(c.outfit_id, { variantId: '', label: c.outfit_label, imageUrl: c.image_url, isUser: false });
+    }
+    // User overrides win
+    for (const u of userOutfits) {
+      map.set(u.outfit_id, { variantId: u.id, label: u.label, imageUrl: u.image_url, isUser: true });
+    }
+    return map as Map<string, VariantRecord>;
+  }, [catalog, userOutfits]);
 
-  const variantsBySlot = new Map<string, VariantRecord>(
-    outfits.map((o) => [o.outfit_id, { variantId: o.id, label: o.label, imageUrl: o.image_url }]),
-  );
+  const isLoading = loadingUser || loadingCatalog;
 
   return (
     <div className="space-y-3">
@@ -288,27 +301,50 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
         })}
       </div>
 
-      {/* Tier 2 — Sub-pack pills (visually nested under the theme row) */}
-      <div className="flex flex-wrap gap-1.5 pl-2 border-l-2 border-primary/30 ml-1">
-        {SUB_PACKS[theme].map((sp) => {
-          const active = sub === sp.id;
-          return (
+      {/* Tier 2 — Sub-pack pills + gender toggle */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-1.5 pl-2 border-l-2 border-primary/30 ml-1">
+          {SUB_PACKS[theme].map((sp) => {
+            const active = sub === sp.id;
+            return (
+              <button
+                key={sp.id}
+                type="button"
+                onClick={() => setSub(sp.id)}
+                className={cn(
+                  'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all',
+                  active
+                    ? 'border-primary/70 bg-primary/20 text-primary'
+                    : 'border-border/30 bg-card/20 text-muted-foreground hover:text-foreground hover:border-border/60',
+                )}
+                aria-pressed={active}
+              >
+                {sp.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Gender toggle for catalog previews */}
+        <div className="inline-flex items-center rounded-full border border-border/40 bg-card/30 p-0.5 text-[11px] font-semibold shrink-0">
+          {(['female', 'male'] as const).map((g) => (
             <button
-              key={sp.id}
+              key={g}
               type="button"
-              onClick={() => setSub(sp.id)}
+              onClick={() => setGender(g)}
               className={cn(
-                'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all',
-                active
-                  ? 'border-primary/70 bg-primary/20 text-primary'
-                  : 'border-border/30 bg-card/20 text-muted-foreground hover:text-foreground hover:border-border/60',
+                'rounded-full px-2.5 py-0.5 transition-all',
+                gender === g
+                  ? 'bg-primary/20 text-primary'
+                  : 'text-muted-foreground hover:text-foreground',
               )}
-              aria-pressed={active}
+              aria-pressed={gender === g}
+              title={g === 'female' ? 'Female model preview' : 'Male model preview'}
             >
-              {sp.label}
+              {g === 'female' ? '♀' : '♂'}
             </button>
-          );
-        })}
+          ))}
+        </div>
       </div>
 
       <VariantPickerGrid
@@ -316,12 +352,10 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
         slots={activeSub.slots}
         variantsBySlot={variantsBySlot}
         isLoading={isLoading}
-        onGenerate={() => generate.mutate()}
-        isGenerating={generate.isPending}
         layout={layout}
         onSelect={(slotId, variant) => {
           onSelect?.({
-            variantId: variant.variantId,
+            variantId: variant.variantId || null,
             outfitId: slotId,
             label: variant.label,
             imageUrl: variant.imageUrl,
