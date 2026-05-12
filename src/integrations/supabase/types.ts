@@ -1694,6 +1694,7 @@ export type Database = {
           label: string
           outfit_id: string
           storage_path: string | null
+          theme_pack: string
         }
         Insert: {
           avatar_id: string
@@ -1703,6 +1704,7 @@ export type Database = {
           label: string
           outfit_id: string
           storage_path?: string | null
+          theme_pack?: string
         }
         Update: {
           avatar_id?: string
@@ -1712,6 +1714,7 @@ export type Database = {
           label?: string
           outfit_id?: string
           storage_path?: string | null
+          theme_pack?: string
         }
         Relationships: [
           {

@@ -406,6 +406,19 @@ export interface ComposerScene {
    */
   seed?: number | null;
   seedVariations?: SceneSeedVariant[];
+  /**
+   * Wardrobe selection (Stage 19). Picked from `AvatarWardrobeSheet` themed
+   * outfit grid in the Avatar mode. Persisted only on the client scene draft
+   * for now — the image url is used as the avatar-stage display image and as
+   * the optional reference image for downstream renders.
+   */
+  selectedOutfit?: {
+    variantId: string;
+    outfitId: string;
+    label: string;
+    imageUrl: string;
+    themePack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport';
+  };
 }
 
 /** One LTX Fast-Preview variant inside `composer_scenes.seed_variations`. */
