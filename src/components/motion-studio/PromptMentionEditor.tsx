@@ -34,7 +34,7 @@ interface PromptMentionEditorProps {
 }
 
 interface Suggestion {
-  kind: 'character' | 'location';
+  kind: 'character' | 'location' | 'building' | 'prop';
   id: string;
   name: string;
   description: string;
@@ -43,9 +43,20 @@ interface Suggestion {
 
 const MAX_SUGGESTIONS = 8;
 
-/** Convert a free-form name into a valid `@token` (no spaces, no punctuation). */
+/** Convert a free-form name into a valid `@token`: lowercase, hyphenated, no punctuation. */
 function nameToToken(name: string): string {
-  return name.trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_\-]/g, '');
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '');
+}
+
+function subKindOf(tags: string[] | undefined): 'building' | 'prop' | 'location' {
+  if (!tags) return 'location';
+  if (tags.includes('building')) return 'building';
+  if (tags.includes('prop')) return 'prop';
+  return 'location';
 }
 
 function buildSuggestions(
