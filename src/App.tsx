@@ -300,7 +300,7 @@ function AppLayout() {
            <Route path="/email-director" element={<ProtectedRoute><EmailDirector /></ProtectedRoute>} />
            <Route path="/motion-studio" element={<MotionStudioHub />} />
            <Route path="/motion-studio/studio" element={<MotionStudioStudioMode />} />
-           <Route path="/motion-studio/library" element={<MotionStudioLibrary />} />
+           <Route path="/motion-studio/library" element={<Navigate to="/library" replace />} />
            <Route path="/marketplace" element={<Marketplace />} />
            <Route path="/autopilot" element={<ProtectedRoute><Autopilot /></ProtectedRoute>} />
            <Route path="/creator-studio" element={<ProtectedRoute><CreatorStudio /></ProtectedRoute>} />
