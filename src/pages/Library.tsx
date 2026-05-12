@@ -260,6 +260,7 @@ interface AssetTabBodyProps {
 }
 
 function AssetTabBody({
+  kind,
   label,
   items,
   isLoading,
