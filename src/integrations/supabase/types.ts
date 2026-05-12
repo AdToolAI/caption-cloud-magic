@@ -1647,6 +1647,59 @@ export type Database = {
           },
         ]
       }
+      avatar_outfit_looks: {
+        Row: {
+          avatar_id: string
+          back_url: string | null
+          cover_url: string
+          created_at: string
+          front_url: string | null
+          id: string
+          name: string
+          outfit_id: string
+          side_url: string | null
+          theme_pack: string
+          top_url: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_id: string
+          back_url?: string | null
+          cover_url: string
+          created_at?: string
+          front_url?: string | null
+          id?: string
+          name: string
+          outfit_id: string
+          side_url?: string | null
+          theme_pack: string
+          top_url?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_id?: string
+          back_url?: string | null
+          cover_url?: string
+          created_at?: string
+          front_url?: string | null
+          id?: string
+          name?: string
+          outfit_id?: string
+          side_url?: string | null
+          theme_pack?: string
+          top_url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avatar_outfit_looks_avatar_id_fkey"
+            columns: ["avatar_id"]
+            isOneToOne: false
+            referencedRelation: "brand_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       avatar_pose_variants: {
         Row: {
           avatar_id: string

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, ArrowLeft, Sparkles, ImageIcon } from 'lucide-react';
+import { Loader2, ArrowLeft, Sparkles, ImageIcon, Save, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,13 +21,15 @@ interface Props {
   outfitLabel: string;
   fallbackImageUrl: string;
   onBack: () => void;
+  onSaved?: () => void;
 }
 
 export function WardrobePerspectiveCard({
-  avatarId, themePack, outfitId, outfitLabel, fallbackImageUrl, onBack,
+  avatarId, themePack, outfitId, outfitLabel, fallbackImageUrl, onBack, onSaved,
 }: Props) {
   const qc = useQueryClient();
   const queryKey = ['wardrobe-perspectives', avatarId, themePack, outfitId];
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey,
@@ -64,16 +66,52 @@ export function WardrobePerspectiveCard({
     onError: (e: any) => toast.error(e?.message || 'Perspective generation failed'),
   });
 
-  // Auto-fire once if we have nothing yet
-  useEffect(() => {
-    if (!isLoading && rows.length === 0 && !generate.isPending) {
-      generate.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
-
-  const byPerspective = new Map(rows.map((r) => [r.perspective, r.image_url]));
+  const byPerspective = useMemo(
+    () => new Map(rows.map((r) => [r.perspective, r.image_url])),
+    [rows],
+  );
   const isBusy = generate.isPending;
+  const allFour =
+    !!byPerspective.get('front') && !!byPerspective.get('back') &&
+    !!byPerspective.get('side')  && !!byPerspective.get('top');
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const front = byPerspective.get('front')!;
+      const back = byPerspective.get('back') ?? null;
+      const side = byPerspective.get('side') ?? null;
+      const top = byPerspective.get('top') ?? null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+      const { data, error } = await (supabase as any)
+        .from('avatar_outfit_looks')
+        .insert({
+          user_id: user.id,
+          avatar_id: avatarId,
+          name: outfitLabel,
+          theme_pack: themePack,
+          outfit_id: outfitId,
+          cover_url: front,
+          front_url: front,
+          back_url: back,
+          side_url: side,
+          top_url: top,
+        })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return data.id as string;
+    },
+    onSuccess: (id) => {
+      setSavedId(id);
+      toast.success('Outfit saved to your library');
+      qc.invalidateQueries({ queryKey: ['avatar-outfit-looks', avatarId] });
+      onSaved?.();
+    },
+    onError: (e: any) => toast.error(e?.message || 'Save failed'),
+  });
+
+  const showInitialGenerateCTA = !isLoading && rows.length === 0 && !isBusy;
 
   return (
     <Card className="p-4 bg-card/60 border-primary/15 h-fit space-y-3">
@@ -81,16 +119,18 @@ export function WardrobePerspectiveCard({
         <Button variant="ghost" size="sm" onClick={onBack} className="h-7 px-2 text-xs">
           <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Portrait
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-7 px-2 text-[11px] text-primary"
-          onClick={() => generate.mutate()}
-          disabled={isBusy}
-        >
-          {isBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
-          {rows.length > 0 ? 'Regenerate' : 'Generate'}
-        </Button>
+        {rows.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-[11px] text-primary"
+            onClick={() => generate.mutate()}
+            disabled={isBusy}
+          >
+            {isBusy ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Sparkles className="h-3 w-3 mr-1" />}
+            Regenerate
+          </Button>
+        )}
       </div>
 
       <div>
@@ -101,46 +141,90 @@ export function WardrobePerspectiveCard({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        {PERSPECTIVES.map((p) => {
-          const url = byPerspective.get(p.id);
-          return (
-            <div
-              key={p.id}
-              className={cn(
-                'relative aspect-[3/4] rounded-md overflow-hidden border border-border/40 bg-muted/20',
-              )}
-            >
-              {url ? (
-                <img
-                  src={url}
-                  alt={`${outfitLabel} — ${p.label}`}
-                  loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              ) : (
-                <>
-                  <img
-                    src={fallbackImageUrl}
-                    alt={`${outfitLabel} placeholder`}
-                    className="absolute inset-0 w-full h-full object-cover opacity-25"
-                  />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-1">
-                    {isBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    ) : (
-                      <ImageIcon className="h-4 w-4" />
-                    )}
-                  </div>
-                </>
-              )}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-1.5">
-                <span className="text-[10px] font-medium text-white drop-shadow">{p.label}</span>
+      {showInitialGenerateCTA ? (
+        <div className="rounded-md border border-dashed border-primary/30 bg-primary/5 p-6 text-center space-y-3">
+          <div className="grid grid-cols-2 gap-2 opacity-30 pointer-events-none">
+            {PERSPECTIVES.map((p) => (
+              <div key={p.id} className="aspect-[3/4] rounded-md bg-muted/30 flex items-center justify-center">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
               </div>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+          <Button onClick={() => generate.mutate()} className="w-full" size="sm">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Generate 4 perspectives
+          </Button>
+          <p className="text-[10px] text-muted-foreground">~30 seconds · identity & outfit locked</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            {PERSPECTIVES.map((p) => {
+              const url = byPerspective.get(p.id);
+              return (
+                <div
+                  key={p.id}
+                  className={cn(
+                    'relative aspect-[3/4] rounded-md overflow-hidden border border-border/40 bg-muted/20',
+                  )}
+                >
+                  {url ? (
+                    <img
+                      src={url}
+                      alt={`${outfitLabel} — ${p.label}`}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    <>
+                      <img
+                        src={fallbackImageUrl}
+                        alt={`${outfitLabel} placeholder`}
+                        className="absolute inset-0 w-full h-full object-cover opacity-25"
+                      />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground gap-1">
+                        {isBusy ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        ) : (
+                          <ImageIcon className="h-4 w-4" />
+                        )}
+                      </div>
+                    </>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-1.5">
+                    <span className="text-[10px] font-medium text-white drop-shadow">{p.label}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {isBusy && (
+            <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              Locking face & outfit · generating angles…
+            </p>
+          )}
+
+          {allFour && (
+            <Button
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !!savedId}
+              size="sm"
+              className="w-full"
+              variant={savedId ? 'secondary' : 'default'}
+            >
+              {save.isPending ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> Saving…</>
+              ) : savedId ? (
+                <><Check className="h-3.5 w-3.5 mr-2" /> Saved to library</>
+              ) : (
+                <><Save className="h-3.5 w-3.5 mr-2" /> Save outfit to library</>
+              )}
+            </Button>
+          )}
+        </>
+      )}
     </Card>
   );
 }

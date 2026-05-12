@@ -9,6 +9,9 @@ import { Card } from '@/components/ui/card';
 import { AvatarPoseSheet } from '@/components/brand-characters/AvatarPoseSheet';
 import { AvatarWardrobeSheet } from '@/components/brand-characters/AvatarWardrobeSheet';
 import { WardrobePerspectiveCard } from '@/components/brand-characters/WardrobePerspectiveCard';
+import { SavedOutfitsSection } from '@/components/brand-characters/SavedOutfitsSection';
+import { SavedOutfitViewerCard } from '@/components/brand-characters/SavedOutfitViewerCard';
+import type { OutfitLook } from '@/hooks/useSavedOutfits';
 
 interface SelectedOutfit {
   outfitId: string;
@@ -20,6 +23,7 @@ interface SelectedOutfit {
 const AvatarDetail = () => {
   const { id } = useParams<{ id: string }>();
   const [selectedOutfit, setSelectedOutfit] = useState<SelectedOutfit | null>(null);
+  const [openedLook, setOpenedLook] = useState<OutfitLook | null>(null);
 
   const { data: avatar, isLoading } = useQuery({
     queryKey: ['avatar-detail', id],
@@ -50,46 +54,64 @@ const AvatarDetail = () => {
           ) : !avatar ? (
             <Card className="p-12 text-center">Avatar not found.</Card>
           ) : (
-            <div className="grid lg:grid-cols-[380px_1fr] gap-6">
-              {selectedOutfit ? (
-                <WardrobePerspectiveCard
-                  avatarId={avatar.id}
-                  themePack={selectedOutfit.themePack}
-                  outfitId={selectedOutfit.outfitId}
-                  outfitLabel={selectedOutfit.label}
-                  fallbackImageUrl={selectedOutfit.imageUrl}
-                  onBack={() => setSelectedOutfit(null)}
-                />
-              ) : (
-                <Card className="p-4 bg-card/60 border-primary/15 h-fit">
-                  <div className="aspect-[4/5] rounded-lg overflow-hidden bg-muted/20 mb-3">
-                    {previewUrl && (
-                      <img src={previewUrl} alt={avatar.name} className="w-full h-full object-cover" />
+            <div className="space-y-6">
+              <div className="grid lg:grid-cols-[380px_1fr] gap-6">
+                {openedLook ? (
+                  <SavedOutfitViewerCard
+                    look={openedLook}
+                    onBack={() => setOpenedLook(null)}
+                  />
+                ) : selectedOutfit ? (
+                  <WardrobePerspectiveCard
+                    avatarId={avatar.id}
+                    themePack={selectedOutfit.themePack}
+                    outfitId={selectedOutfit.outfitId}
+                    outfitLabel={selectedOutfit.label}
+                    fallbackImageUrl={selectedOutfit.imageUrl}
+                    onBack={() => setSelectedOutfit(null)}
+                  />
+                ) : (
+                  <Card className="p-4 bg-card/60 border-primary/15 h-fit">
+                    <div className="aspect-[4/5] rounded-lg overflow-hidden bg-muted/20 mb-3">
+                      {previewUrl && (
+                        <img src={previewUrl} alt={avatar.name} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <h1 className="font-serif text-2xl">{avatar.name}</h1>
+                    {avatar.description && (
+                      <p className="text-sm text-muted-foreground mt-1.5">{avatar.description}</p>
                     )}
-                  </div>
-                  <h1 className="font-serif text-2xl">{avatar.name}</h1>
-                  {avatar.description && (
-                    <p className="text-sm text-muted-foreground mt-1.5">{avatar.description}</p>
-                  )}
-                  {avatar.default_voice_name && (
-                    <p className="text-xs text-primary mt-3">🎙 {avatar.default_voice_name}</p>
-                  )}
-                </Card>
-              )}
+                    {avatar.default_voice_name && (
+                      <p className="text-xs text-primary mt-3">🎙 {avatar.default_voice_name}</p>
+                    )}
+                  </Card>
+                )}
 
-              <div className="space-y-6">
-                <AvatarPoseSheet avatarId={avatar.id} />
-                <AvatarWardrobeSheet
-                  avatarId={avatar.id}
-                  avatarGender={avatar.gender ?? null}
-                  onSelect={(v) => setSelectedOutfit({
-                    outfitId: v.outfitId,
-                    label: v.label,
-                    imageUrl: v.imageUrl,
-                    themePack: v.themePack,
-                  })}
-                />
+                <div className="space-y-6">
+                  <AvatarPoseSheet avatarId={avatar.id} />
+                  <AvatarWardrobeSheet
+                    avatarId={avatar.id}
+                    avatarGender={avatar.gender ?? null}
+                    onSelect={(v) => {
+                      setOpenedLook(null);
+                      setSelectedOutfit({
+                        outfitId: v.outfitId,
+                        label: v.label,
+                        imageUrl: v.imageUrl,
+                        themePack: v.themePack,
+                      });
+                    }}
+                  />
+                </div>
               </div>
+
+              <SavedOutfitsSection
+                avatarId={avatar.id}
+                onOpen={(look) => {
+                  setSelectedOutfit(null);
+                  setOpenedLook(look);
+                }}
+              />
             </div>
           )}
         </div>
