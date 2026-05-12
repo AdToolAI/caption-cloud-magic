@@ -330,9 +330,10 @@ function AssetTabBody({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-end">
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New {label}
+      <div className="flex items-center justify-end gap-2">
+        <GenerateAssetButton kind={kind} label={label} />
+        <Button onClick={() => setOpen(true)} variant="outline">
+          <Plus className="h-4 w-4 mr-2" /> Upload {label}
         </Button>
       </div>
 
