@@ -2105,6 +2105,7 @@ export type Database = {
         Row: {
           archived_at: string | null
           average_rating: number
+          cloned_from_preset: string | null
           created_at: string
           default_aspect_ratio: string | null
           default_language: string | null
@@ -2146,6 +2147,7 @@ export type Database = {
         Insert: {
           archived_at?: string | null
           average_rating?: number
+          cloned_from_preset?: string | null
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
@@ -2187,6 +2189,7 @@ export type Database = {
         Update: {
           archived_at?: string | null
           average_rating?: number
+          cloned_from_preset?: string | null
           created_at?: string
           default_aspect_ratio?: string | null
           default_language?: string | null
@@ -2225,7 +2228,15 @@ export type Database = {
           visual_identity_json?: Json | null
           voice_sample_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "brand_characters_cloned_from_preset_fkey"
+            columns: ["cloned_from_preset"]
+            isOneToOne: false
+            referencedRelation: "system_preset_avatars"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       brand_consistency_history: {
         Row: {
@@ -13127,6 +13138,54 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           value?: Json
+        }
+        Relationships: []
+      }
+      system_preset_avatars: {
+        Row: {
+          created_at: string
+          default_voice_id: string | null
+          description: string | null
+          gender: string
+          id: string
+          is_active: boolean
+          name: string
+          portrait_url: string | null
+          reference_image_url: string | null
+          role_label: string
+          sort_order: number
+          updated_at: string
+          visual_identity_json: Json | null
+        }
+        Insert: {
+          created_at?: string
+          default_voice_id?: string | null
+          description?: string | null
+          gender: string
+          id?: string
+          is_active?: boolean
+          name: string
+          portrait_url?: string | null
+          reference_image_url?: string | null
+          role_label: string
+          sort_order?: number
+          updated_at?: string
+          visual_identity_json?: Json | null
+        }
+        Update: {
+          created_at?: string
+          default_voice_id?: string | null
+          description?: string | null
+          gender?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          portrait_url?: string | null
+          reference_image_url?: string | null
+          role_label?: string
+          sort_order?: number
+          updated_at?: string
+          visual_identity_json?: Json | null
         }
         Relationships: []
       }
