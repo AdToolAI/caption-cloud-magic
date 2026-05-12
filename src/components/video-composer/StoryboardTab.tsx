@@ -343,6 +343,17 @@ export default function StoryboardTab({
   const previousSceneOfSelected =
     selectedIndex > 0 ? scenes[selectedIndex - 1] : undefined;
 
+  // Stage 18 — 3-mode left pane (Editor / Stil / Avatar)
+  const [leftMode, setLeftMode] = useState<LeftPaneMode>('editor');
+
+  // Stage 18 — inline scene generation directly from the player tile
+  const { generate: generateScene, generating: generatingMap } = useSceneGenerate({
+    projectId,
+    characters,
+    onOptimisticPatch: (id, patch) => updateScene(id, patch),
+    ensureProject: onEnsurePersisted,
+  });
+
   const totalDuration = scenes.reduce((sum, s) => sum + s.durationSeconds, 0);
   const totalCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
 
