@@ -43,6 +43,7 @@ import { SceneDirectorBox } from './SceneDirectorBox';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
+import { useWorldCatalog } from '@/hooks/useWorldCatalog';
 // Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
 // SceneShotDirectorPanel are no longer rendered inline; they live behind
 // SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
@@ -193,6 +194,15 @@ export default function SceneCard({
   const { locations: brandLocations } = useBrandLocations();
   const { buildings: brandBuildings } = useBrandBuildings();
   const { props: brandProps } = useBrandProps();
+  // Curated catalog (admin-seeded preview rows) — surfaced directly in the
+  // picker so users can use real-image assets without saving to their library.
+  const { catalogLocations, catalogBuildings, catalogProps } = useWorldCatalog();
+  // Library-first dedupe by lowercased name: a saved Brand asset always wins
+  // over a catalog row with the same label so user edits / identity cards stick.
+  const mergeWithCatalog = <T extends { name: string }>(saved: T[], catalog: T[]): T[] => {
+    const seen = new Set(saved.map((s) => s.name.trim().toLowerCase()));
+    return [...saved, ...catalog.filter((c) => !seen.has(c.name.trim().toLowerCase()))];
+  };
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
@@ -921,7 +931,10 @@ export default function SceneCard({
               libCharacters.length > 0 ||
               brandLocations.length > 0 ||
               brandBuildings.length > 0 ||
-              brandProps.length > 0
+              brandProps.length > 0 ||
+              catalogLocations.length > 0 ||
+              catalogBuildings.length > 0 ||
+              catalogProps.length > 0
             ) && (
               <>
                 <UnifiedAssetPicker
@@ -954,15 +967,18 @@ export default function SceneCard({
                     }
                     onUpdate(updates);
                   }}
-                  locations={brandLocations.map((l) => ({
-                    id: l.id, name: l.name, reference_image_url: l.reference_image_url,
-                  }))}
-                  buildings={brandBuildings.map((b) => ({
-                    id: b.id, name: b.name, reference_image_url: b.reference_image_url,
-                  }))}
-                  props={brandProps.map((p) => ({
-                    id: p.id, name: p.name, reference_image_url: p.reference_image_url,
-                  }))}
+                  locations={mergeWithCatalog(
+                    brandLocations.map((l) => ({ id: l.id, name: l.name, reference_image_url: l.reference_image_url })),
+                    catalogLocations.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
+                  buildings={mergeWithCatalog(
+                    brandBuildings.map((b) => ({ id: b.id, name: b.name, reference_image_url: b.reference_image_url })),
+                    catalogBuildings.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
+                  props={mergeWithCatalog(
+                    brandProps.map((p) => ({ id: p.id, name: p.name, reference_image_url: p.reference_image_url })),
+                    catalogProps.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
                   prompt={
                     promptMode === 'structured'
                       ? ((promptSlots.subject as string) || '')

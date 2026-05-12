@@ -5,10 +5,11 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Loader2, Sparkles, Wand2 } from 'lucide-react';
+import { Loader2, Sparkles, Wand2, Send } from 'lucide-react';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { toast } from 'sonner';
 
@@ -34,9 +35,37 @@ interface Props {
 
 export function CatalogBrowser({ kind, onPick }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { isAdmin } = useUserRoles();
   const [seeding, setSeeding] = useState(false);
   const [activeTheme, setActiveTheme] = useState<string | 'all'>('all');
+
+  // Default pick handler: handoff to the Composer via sessionStorage so the
+  // user can drop a catalog tile straight into their next scene without saving
+  // it to their personal library first. Receiver lives in VideoComposer/index.
+  const handlePick = (row: Row) => {
+    if (onPick) return onPick(row);
+    const payload = {
+      kind,
+      catalog_id: row.id,
+      label: row.label,
+      image_url: row.image_url,
+      theme_pack: row.theme_pack,
+      ts: Date.now(),
+    };
+    try {
+      sessionStorage.setItem('composer:incoming-asset', JSON.stringify(payload));
+    } catch {
+      // ignore quota issues
+    }
+    toast.success(`${row.label} → ready for next scene`, {
+      description: 'Open the Motion Studio to drop it in.',
+      action: {
+        label: 'Open',
+        onClick: () => navigate('/video-composer'),
+      },
+    });
+  };
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['world-catalog', kind],
@@ -147,9 +176,9 @@ export function CatalogBrowser({ kind, onPick }: Props) {
           {visible.map((row) => (
             <button
               key={row.id}
-              onClick={() => onPick?.(row)}
+              onClick={() => handlePick(row)}
               className="group relative overflow-hidden rounded-md border border-border/40 hover:border-primary/60 transition aspect-[4/3] bg-muted"
-              title={`${row.theme_pack} · ${row.label}`}
+              title={`${row.theme_pack} · ${row.label} — click to use in next scene`}
             >
               <img
                 src={row.image_url}
@@ -159,6 +188,9 @@ export function CatalogBrowser({ kind, onPick }: Props) {
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/95 to-transparent p-1.5">
                 <div className="text-[10px] font-medium truncate">{row.label}</div>
+              </div>
+              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition bg-primary/90 text-primary-foreground rounded-full px-1.5 py-0.5 text-[9px] inline-flex items-center gap-0.5">
+                <Send className="h-2.5 w-2.5" /> Use
               </div>
             </button>
           ))}

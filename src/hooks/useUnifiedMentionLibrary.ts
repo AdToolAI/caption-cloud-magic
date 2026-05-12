@@ -17,6 +17,7 @@ import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useWorldCatalog } from '@/hooks/useWorldCatalog';
 import type {
   MotionStudioCharacter,
   MotionStudioLocation,
@@ -83,6 +84,8 @@ export function useUnifiedMentionLibrary(): {
   const { locations: brandLocs = [], isLoading: locsLoading } = useBrandLocations();
   const { buildings: brandBuildings = [], isLoading: buildingsLoading } = useBrandBuildings();
   const { props: brandProps = [], isLoading: propsLoading } = useBrandProps();
+  const { catalogLocations, catalogBuildings, catalogProps, isLoading: catalogLoading } =
+    useWorldCatalog();
   const { characters: msChars = [], locations: msLocs = [], loading: msLoading } =
     useMotionStudioLibrary();
 
@@ -130,15 +133,35 @@ export function useUnifiedMentionLibrary(): {
   const locations = useMemo(() => {
     const tagged = (rows: any[], tag: string) =>
       rows.map((r) => ({ ...adaptLocation(r), tags: [...(r.tags ?? []), tag] }));
+    // Catalog rows are virtual (no user_id, no description) but expose a
+    // reference_image_url so resolveMentions feeds them into Vidu/Hailuo i2v
+    // / Nano Banana scene-anchor exactly like saved Brand items.
+    const catalogToLoc = (rows: any[], tag: string): any[] =>
+      rows.map((r) => ({
+        id: `catalog:${r.kind}:${r.id}`,
+        user_id: null,
+        name: r.name,
+        description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
+        reference_image_url: r.reference_image_url,
+        lighting_notes: '',
+        tags: ['catalog', tag],
+        usage_count: 0,
+        workspace_id: null,
+        created_at: '',
+        updated_at: '',
+      }));
     return dedupe(
       [
         ...brandLocs.map(adaptLocation),
         ...tagged(brandBuildings, 'building'),
         ...tagged(brandProps, 'prop'),
+        ...catalogToLoc(catalogLocations, 'location'),
+        ...catalogToLoc(catalogBuildings, 'building'),
+        ...catalogToLoc(catalogProps, 'prop'),
       ],
       msLocs,
     );
-  }, [brandLocs, brandBuildings, brandProps, msLocs]);
+  }, [brandLocs, brandBuildings, brandProps, catalogLocations, catalogBuildings, catalogProps, msLocs]);
 
   return {
     characters,
@@ -149,6 +172,7 @@ export function useUnifiedMentionLibrary(): {
       buildingsLoading ||
       propsLoading ||
       msLoading ||
-      looksLoading,
+      looksLoading ||
+      catalogLoading,
   };
 }
