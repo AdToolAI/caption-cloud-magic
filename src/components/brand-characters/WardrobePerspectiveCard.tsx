@@ -31,6 +31,7 @@ export function WardrobePerspectiveCard({
   const qc = useQueryClient();
   const queryKey = ['wardrobe-perspectives', avatarId, themePack, outfitId];
   const [savedId, setSavedId] = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey,
