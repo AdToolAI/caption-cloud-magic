@@ -22,11 +22,15 @@ export function SavedOutfitsSection({ avatarId, onOpen }: Props) {
 
   return (
     <Card className="p-4 bg-card/40 border-primary/10">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-1">
         <Shirt className="h-4 w-4 text-primary" />
         <h2 className="font-serif text-base">Saved Outfits</h2>
         <span className="text-[11px] text-muted-foreground">({looks.length})</span>
       </div>
+      <p className="text-[11px] text-muted-foreground mb-3">
+        💡 Click any outfit to preview in 4 angles · then send it to the <strong>AI Video Studio</strong> or
+        <strong> Motion Studio</strong> to lock identity & wardrobe in your scenes.
+      </p>
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
         {looks.map((look) => (
           <div key={look.id} className="group relative">
