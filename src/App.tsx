@@ -273,7 +273,7 @@ function AppLayout() {
           <Route path="/ai-video-studio" element={<AIVideoToolkit />} />
           <Route path="/ai-video-toolkit" element={<Navigate to="/ai-video-studio" replace />} />
           <Route path="/brand-characters" element={<ProtectedRoute><BrandCharacters /></ProtectedRoute>} />
-          <Route path="/avatars" element={<ProtectedRoute><BrandCharacters /></ProtectedRoute>} />
+          <Route path="/avatars" element={<Navigate to="/library" replace />} />
           <Route path="/avatars/:id" element={<ProtectedRoute><AvatarDetail /></ProtectedRoute>} />
           <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
