@@ -12,10 +12,11 @@ const corsHeaders = {
 };
 
 const GENDERS: Array<'male' | 'female'> = ['male', 'female'];
-const BATCH_SIZE = 6;
-// Process at most this many slots per invocation, then return.
-// Caller (admin / curl loop) re-invokes until { done: true }.
-const MAX_PER_INVOCATION = 12;
+// Tiny synchronous chunk per invocation. The caller polls until { done: true }.
+// Each Gemini image call ~5–10s. 4 in parallel ≈ 10–15s total → safely below
+// any edge-function timeout. No background waitUntil — we wait for upserts.
+const BATCH_SIZE = 4;
+const MAX_PER_INVOCATION = 4;
 
 const STYLE_LOCK =
   'photorealistic full-body editorial fashion photo, neutral light-grey studio background, soft cinematic lighting, head-to-toe framing, 3:4 portrait, attractive generic model with neutral pleasant face (NOT a celebrity), centered subject';
@@ -125,7 +126,13 @@ Deno.serve(async (req) => {
     );
     const allTodo = force
       ? targets
-      : targets.filter((t) => !existingSet.has(`${t.theme_pack}|${t.outfit_id}|${t.gender}`));
+      : targets.filter((t) => !existingSet.has(`${t.theme_pack}|${t.outfit.id}|${t.gender}`));
+
+    // Shuffle so parallel invocations don't all hammer the same first slots.
+    for (let i = allTodo.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [allTodo[i], allTodo[j]] = [allTodo[j], allTodo[i]];
+    }
 
     const todo = allTodo.slice(0, MAX_PER_INVOCATION);
     const remainingAfter = Math.max(0, allTodo.length - todo.length);
@@ -139,36 +146,33 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Run chunk in background — return immediately so the caller is not bound by client timeouts.
-    const work = (async () => {
-      let completed = 0, failed = 0;
-      for (let i = 0; i < todo.length; i += BATCH_SIZE) {
-        const batch = todo.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(batch.map((t) =>
-          generateOne({
-            supabaseAdmin,
-            apiKey: LOVABLE_API_KEY,
-            theme_pack: t.theme_pack,
-            outfit_id: t.outfit.id,
-            outfit_label: t.outfit.label,
-            modifier: t.outfit.modifier,
-            gender: t.gender,
-          }),
-        ));
-        for (const r of results) {
-          if (r.status === 'fulfilled') completed++; else failed++;
-        }
+    // Run chunk SYNCHRONOUSLY — wait until images are stored before responding.
+    // No waitUntil: previous attempts lost background work mid-flight.
+    let completed = 0, failed = 0;
+    for (let i = 0; i < todo.length; i += BATCH_SIZE) {
+      const batch = todo.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((t) =>
+        generateOne({
+          supabaseAdmin,
+          apiKey: LOVABLE_API_KEY,
+          theme_pack: t.theme_pack,
+          outfit_id: t.outfit.id,
+          outfit_label: t.outfit.label,
+          modifier: t.outfit.modifier,
+          gender: t.gender,
+        }),
+      ));
+      for (const r of results) {
+        if (r.status === 'fulfilled') completed++; else { failed++; console.error('[seed] slot failed', (r as any).reason?.message); }
       }
-      console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
-    })().catch((err) => console.error('[seed-wardrobe-catalog] chunk failed', err));
-
-    // @ts-ignore — Deno deploy runtime
-    EdgeRuntime.waitUntil(work);
+    }
+    console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
 
     return new Response(JSON.stringify({
       success: true,
       done: remainingAfter === 0,
-      queued: todo.length,
+      processed: completed,
+      failed,
       remaining: remainingAfter,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
