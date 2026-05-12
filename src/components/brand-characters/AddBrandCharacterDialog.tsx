@@ -12,10 +12,19 @@ interface AddBrandCharacterDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type Gender = 'female' | 'male' | 'neutral';
+
+const GENDERS: Array<{ id: Gender; label: string; emoji: string; hint: string }> = [
+  { id: 'female', label: 'Female', emoji: '♀', hint: 'Locks all wardrobe previews to female outfits' },
+  { id: 'male', label: 'Male', emoji: '♂', hint: 'Locks all wardrobe previews to male outfits' },
+  { id: 'neutral', label: 'Neutral', emoji: '⚪', hint: 'Both genders selectable in wardrobe' },
+];
+
 export const AddBrandCharacterDialog = ({ open, onOpenChange }: AddBrandCharacterDialogProps) => {
   const { createCharacter } = useBrandCharacters();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [gender, setGender] = useState<Gender>('neutral');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
@@ -30,13 +39,19 @@ export const AddBrandCharacterDialog = ({ open, onOpenChange }: AddBrandCharacte
   const reset = () => {
     setName('');
     setDescription('');
+    setGender('neutral');
     setFile(null);
     setPreview(null);
   };
 
   const handleSubmit = async () => {
     if (!file || !name.trim()) return;
-    await createCharacter.mutateAsync({ name: name.trim(), description: description.trim() || undefined, file });
+    await createCharacter.mutateAsync({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      gender,
+      file,
+    });
     reset();
     onOpenChange(false);
   };
