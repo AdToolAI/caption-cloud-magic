@@ -50,7 +50,7 @@ export const AddBrandCharacterDialog = ({ open, onOpenChange }: AddBrandCharacte
             Add Brand Character
           </DialogTitle>
           <DialogDescription>
-            Upload a reference image. AI will automatically extract a visual identity card you can reuse across all video & picture studios.
+            Upload a reference image. AI extracts a visual identity card and generates a clean canonical studio portrait you can immediately re-dress with the wardrobe.
           </DialogDescription>
         </DialogHeader>
 
