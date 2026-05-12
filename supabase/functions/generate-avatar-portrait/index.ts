@@ -138,7 +138,8 @@ Deno.serve(async (req) => {
       JSON.stringify({
         success: true,
         portrait_url: portraitUrl,
-        portrait_mode: 'auto_generated',
+        portrait_mode: portraitVariant === 'default_outfit' ? 'auto_default_outfit' : 'auto_generated',
+        variant: portraitVariant,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
