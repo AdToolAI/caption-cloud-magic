@@ -171,12 +171,49 @@ function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
 }
 
 // ============================================================
-// Tab: Locations
+// Tab: Locations  (Sub-Toggle: Environments | Architecture)
 // ============================================================
 function LocationsTab() {
+  const [params, setParams] = useSearchParams();
+  const sub = (params.get('sub') as 'env' | 'arch') || 'env';
+
+  const setSub = (next: 'env' | 'arch') => {
+    setParams((p) => {
+      p.set('tab', 'locations');
+      p.set('sub', next);
+      return p;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex p-1 rounded-full bg-muted/40 border border-border/40 text-xs">
+        <button
+          onClick={() => setSub('env')}
+          className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${
+            sub === 'env' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <MapPin className="h-3.5 w-3.5" /> Environments
+        </button>
+        <button
+          onClick={() => setSub('arch')}
+          className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${
+            sub === 'arch' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Building2 className="h-3.5 w-3.5" /> Architecture
+        </button>
+      </div>
+
+      {sub === 'env' ? <EnvironmentsPane /> : <ArchitecturePane />}
+    </div>
+  );
+}
+
+function EnvironmentsPane() {
   const { locations, isLoading, createLocation, toggleFavorite, archiveLocation } =
     useBrandLocations();
-
   return (
     <AssetTabBody
       kind="location"
@@ -187,19 +224,15 @@ function LocationsTab() {
       onToggleFavorite={(id, fav) => toggleFavorite.mutate({ id, is_favorite: fav })}
       onArchive={(id) => archiveLocation.mutate(id)}
       icon={MapPin}
-      emptyTitle="No locations yet"
-      emptyBody="Add your first location to lock atmosphere across scenes — wheat fields, neon alleys, modern offices."
+      emptyTitle="No environments yet"
+      emptyBody="Add your first environment to lock atmosphere across scenes — wheat fields, neon alleys, modern offices."
     />
   );
 }
 
-// ============================================================
-// Tab: Buildings
-// ============================================================
-function BuildingsTab() {
+function ArchitecturePane() {
   const { buildings, isLoading, createBuilding, toggleFavorite, archiveBuilding } =
     useBrandBuildings();
-
   return (
     <AssetTabBody
       kind="building"
@@ -210,8 +243,8 @@ function BuildingsTab() {
       onToggleFavorite={(id, fav) => toggleFavorite.mutate({ id, is_favorite: fav })}
       onArchive={(id) => archiveBuilding.mutate(id)}
       icon={Building2}
-      emptyTitle="No buildings yet"
-      emptyBody="Save churches, houses, castles, temples or modern architecture to drop them into any scene as a consistent backdrop."
+      emptyTitle="No architecture yet"
+      emptyBody="Save churches, houses, castles, temples, skyscrapers or bridges to drop them into any scene as a consistent backdrop."
     />
   );
 }
