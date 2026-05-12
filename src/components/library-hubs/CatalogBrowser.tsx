@@ -13,12 +13,13 @@ import { Loader2, Sparkles, Wand2, Send } from 'lucide-react';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { toast } from 'sonner';
 
-type Kind = 'location' | 'building' | 'prop';
+type Kind = 'location' | 'building' | 'prop' | 'character';
 
-const TABLE: Record<Kind, 'location_catalog_previews' | 'building_catalog_previews' | 'prop_catalog_previews'> = {
+const TABLE: Record<Kind, 'location_catalog_previews' | 'building_catalog_previews' | 'prop_catalog_previews' | 'character_catalog_previews'> = {
   location: 'location_catalog_previews',
   building: 'building_catalog_previews',
   prop: 'prop_catalog_previews',
+  character: 'character_catalog_previews',
 };
 
 interface Row {

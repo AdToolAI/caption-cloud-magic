@@ -20,17 +20,20 @@ const STYLE_LOCK: Record<WorldKind, string> = {
   location: 'photorealistic cinematic establishing shot, 16:9, soft cinematic lighting, no people, no text, no logos, hero scene background',
   building: 'photorealistic architectural exterior establishing shot, 16:9, golden hour or dramatic light, no people, no text, no logos, full building visible',
   prop: 'photorealistic product / object photo, neutral light-grey studio background, soft studio lighting, centered subject, 1:1, no people, no text, no logos',
+  character: 'photorealistic full-body cinematic character portrait, neutral light-grey studio backdrop, soft cinematic three-point lighting, sharp focus, 3:4, single subject centered, no text, no logos, no political insignia',
 };
 
 const TABLE: Record<WorldKind, string> = {
   location: 'location_catalog_previews',
   building: 'building_catalog_previews',
   prop: 'prop_catalog_previews',
+  character: 'character_catalog_previews',
 };
 const BUCKET: Record<WorldKind, string> = {
   location: 'brand-locations',
   building: 'brand-buildings',
   prop: 'brand-props',
+  character: 'brand-characters',
 };
 
 async function generateOne(opts: {
@@ -107,7 +110,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const kind = (body?.kind ?? 'location') as WorldKind;
-    if (!['location', 'building', 'prop'].includes(kind)) throw new Error('Invalid kind');
+    if (!['location', 'building', 'prop', 'character'].includes(kind)) throw new Error('Invalid kind');
     const force: boolean = !!body?.force;
     const themeFilter: string | undefined = body?.theme_pack;
 
