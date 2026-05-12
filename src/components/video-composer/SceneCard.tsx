@@ -915,10 +915,16 @@ export default function SceneCard({
 
             <SceneStudioSectionHeader tab="cast" language={lang} />
             {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
-            {scene.clipSource.startsWith('ai-') && ((characters && characters.length > 0) || libCharacters.length > 0) && (
+            {scene.clipSource.startsWith('ai-') && (
+              (characters && characters.length > 0) ||
+              libCharacters.length > 0 ||
+              brandLocations.length > 0 ||
+              brandBuildings.length > 0 ||
+              brandProps.length > 0
+            ) && (
               <>
-                <CharacterCastPicker
-                  characters={characters}
+                <UnifiedAssetPicker
+                  characters={characters ?? []}
                   libraryCharacters={libCharacters.map((c): ComposerCharacter => ({
                     id: c.id,
                     name: c.name,
@@ -927,9 +933,9 @@ export default function SceneCard({
                     referenceImageUrl: c.reference_image_url ?? undefined,
                   }))}
                   onAddToBriefing={onAddCharacter}
-                  value={scene.characterShots}
-                  legacyValue={scene.characterShot}
-                  onChange={(next) => {
+                  cast={scene.characterShots}
+                  legacyCast={scene.characterShot}
+                  onCastChange={(next) => {
                     const updates: Partial<ComposerScene> = {
                       characterShots: next,
                       // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
@@ -946,6 +952,31 @@ export default function SceneCard({
                       updates.aiPrompt = applyCastToPrompt(scene.aiPrompt || '', next, characters, lang);
                     }
                     onUpdate(updates);
+                  }}
+                  locations={brandLocations.map((l) => ({
+                    id: l.id, name: l.name, reference_image_url: l.reference_image_url,
+                  }))}
+                  buildings={brandBuildings.map((b) => ({
+                    id: b.id, name: b.name, reference_image_url: b.reference_image_url,
+                  }))}
+                  props={brandProps.map((p) => ({
+                    id: p.id, name: p.name, reference_image_url: p.reference_image_url,
+                  }))}
+                  prompt={
+                    promptMode === 'structured'
+                      ? ((promptSlots.subject as string) || '')
+                      : (scene.aiPrompt || '')
+                  }
+                  onPromptChange={(nextPrompt) => {
+                    if (promptMode === 'structured') {
+                      const nextSlots: PromptSlots = { ...promptSlots, subject: nextPrompt };
+                      onUpdate({
+                        promptSlots: nextSlots,
+                        aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+                      });
+                    } else {
+                      onUpdate({ aiPrompt: nextPrompt });
+                    }
                   }}
                   language={lang as 'en' | 'de' | 'es'}
                 />
