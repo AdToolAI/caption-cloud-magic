@@ -43,8 +43,10 @@ Deno.serve(async (req) => {
     } = await supabaseUser.auth.getUser();
     if (authErr || !user) throw new Error('Unauthorized');
 
-    const { character_id } = await req.json();
+    const { character_id, variant } = await req.json();
     if (!character_id) throw new Error('character_id required');
+    const portraitVariant: PortraitVariant =
+      variant === 'default_outfit' ? 'default_outfit' : 'hedra';
 
     // Fetch character
     const { data: character, error: chErr } = await supabaseAdmin
