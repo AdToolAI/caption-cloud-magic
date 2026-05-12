@@ -1,13 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
-export type WardrobeThemePack = 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport' | 'business';
+/**
+ * Stage 21 — Hierarchical theme packs.
+ * Theme → Sub-Pack → 4 Outfits. DB stores composite key `${theme}:${sub}`
+ * in `avatar_wardrobe_variants.theme_pack`.
+ */
+export type WardrobeTheme =
+  | 'lifestyle' | 'business' | 'historical' | 'fantasy' | 'scifi' | 'sport';
 
-const THEME_PACKS: Array<{ id: WardrobeThemePack; label: string; emoji: string }> = [
+/** Backwards-compat alias — many callers still import this name. */
+export type WardrobeThemePack = WardrobeTheme;
+
+interface SubPack { id: string; label: string; slots: Array<{ id: string; label: string }>; }
+
+const THEMES: Array<{ id: WardrobeTheme; label: string; emoji: string }> = [
   { id: 'lifestyle', label: 'Lifestyle', emoji: '👕' },
   { id: 'business', label: 'Business', emoji: '💼' },
   { id: 'historical', label: 'Historical', emoji: '⚔️' },
@@ -16,67 +27,216 @@ const THEME_PACKS: Array<{ id: WardrobeThemePack; label: string; emoji: string }
   { id: 'sport', label: 'Sport', emoji: '⚽' },
 ];
 
-const PACK_SLOTS: Record<WardrobeThemePack, Array<{ id: string; label: string }>> = {
+const SUB_PACKS: Record<WardrobeTheme, SubPack[]> = {
   lifestyle: [
-    { id: 'casual', label: 'Casual' },
-    { id: 'formal', label: 'Formal' },
-    { id: 'action', label: 'Action' },
-    { id: 'brand', label: 'Brand' },
-  ],
-  historical: [
-    { id: 'knight', label: 'Knight' },
-    { id: 'roman', label: 'Roman Legionary' },
-    { id: 'viking', label: 'Viking' },
-    { id: 'edwardian', label: 'Edwardian' },
-  ],
-  fantasy: [
-    { id: 'wizard', label: 'Wizard' },
-    { id: 'elven-ranger', label: 'Elven Ranger' },
-    { id: 'dark-knight', label: 'Dark Knight' },
-    { id: 'royal', label: 'Royal' },
-  ],
-  scifi: [
-    { id: 'astronaut', label: 'Astronaut' },
-    { id: 'cyberpunk', label: 'Cyberpunk' },
-    { id: 'mech-pilot', label: 'Mech Pilot' },
-    { id: 'holo-suit', label: 'Holo Suit' },
-  ],
-  sport: [
-    { id: 'football', label: 'Football' },
-    { id: 'basketball', label: 'Basketball' },
-    { id: 'tennis', label: 'Tennis' },
-    { id: 'mma', label: 'MMA Fighter' },
+    { id: 'everyday', label: 'Everyday', slots: [
+      { id: 'casual', label: 'Casual' },
+      { id: 'streetwear', label: 'Streetwear' },
+      { id: 'brunch', label: 'Brunch' },
+      { id: 'loungewear', label: 'Loungewear' },
+    ]},
+    { id: 'formal', label: 'Formal', slots: [
+      { id: 'black-tie', label: 'Black Tie' },
+      { id: 'cocktail', label: 'Cocktail' },
+      { id: 'wedding-guest', label: 'Wedding Guest' },
+      { id: 'gala', label: 'Gala' },
+    ]},
+    { id: 'seasonal', label: 'Seasonal', slots: [
+      { id: 'summer', label: 'Summer' },
+      { id: 'winter', label: 'Winter' },
+      { id: 'rainy', label: 'Rainy Day' },
+      { id: 'spring', label: 'Spring' },
+    ]},
+    { id: 'brand', label: 'Brand', slots: [
+      { id: 'brand-hero', label: 'Brand Hero' },
+      { id: 'brand-casual', label: 'Brand Casual' },
+      { id: 'brand-formal', label: 'Brand Formal' },
+      { id: 'brand-sport', label: 'Brand Sport' },
+    ]},
   ],
   business: [
-    { id: 'executive-suit', label: 'Executive Suit' },
-    { id: 'smart-casual', label: 'Smart Casual' },
-    { id: 'power-blazer', label: 'Power Blazer' },
-    { id: 'founder-hoodie', label: 'Founder Hoodie' },
+    { id: 'corporate', label: 'Corporate', slots: [
+      { id: 'executive-suit', label: 'Executive Suit' },
+      { id: 'boardroom', label: 'Boardroom' },
+      { id: 'banker', label: 'Banker' },
+      { id: 'consultant', label: 'Consultant' },
+    ]},
+    { id: 'startup', label: 'Startup', slots: [
+      { id: 'smart-casual', label: 'Smart Casual' },
+      { id: 'founder-hoodie', label: 'Founder Hoodie' },
+      { id: 'power-blazer', label: 'Power Blazer' },
+      { id: 'pitch', label: 'Pitch Day' },
+    ]},
+    { id: 'creative', label: 'Creative', slots: [
+      { id: 'designer', label: 'Designer' },
+      { id: 'agency', label: 'Agency Lead' },
+      { id: 'architect', label: 'Architect' },
+      { id: 'editor', label: 'Editor' },
+    ]},
+    { id: 'travel', label: 'Travel', slots: [
+      { id: 'airport-pro', label: 'Airport Pro' },
+      { id: 'conference', label: 'Conference' },
+      { id: 'networking', label: 'Networking' },
+      { id: 'coworking', label: 'Coworking' },
+    ]},
+  ],
+  historical: [
+    { id: 'antiquity', label: 'Antiquity', slots: [
+      { id: 'roman', label: 'Roman Legionary' },
+      { id: 'greek-hoplite', label: 'Greek Hoplite' },
+      { id: 'egyptian-royal', label: 'Egyptian Royal' },
+      { id: 'celtic-warrior', label: 'Celtic Warrior' },
+    ]},
+    { id: 'medieval', label: 'Medieval', slots: [
+      { id: 'knight', label: 'Knight' },
+      { id: 'viking', label: 'Viking' },
+      { id: 'crusader', label: 'Crusader' },
+      { id: 'monk', label: 'Monk' },
+    ]},
+    { id: 'renaissance', label: 'Renaissance', slots: [
+      { id: 'noble', label: 'Renaissance Noble' },
+      { id: 'musketeer', label: 'Musketeer' },
+      { id: 'pirate', label: 'Pirate' },
+      { id: 'court', label: 'Court Attendant' },
+    ]},
+    { id: 'industrial', label: 'Industrial', slots: [
+      { id: 'edwardian', label: 'Edwardian' },
+      { id: 'victorian', label: 'Victorian' },
+      { id: 'steampunk', label: 'Steampunk' },
+      { id: 'wild-west', label: 'Wild West' },
+    ]},
+    { id: 'world-war-1', label: 'World War I', slots: [
+      { id: 'doughboy', label: 'US Doughboy' },
+      { id: 'tommy', label: 'British Tommy' },
+      { id: 'pilot-ace', label: 'Pilot Ace' },
+      { id: 'trench-officer', label: 'Trench Officer' },
+    ]},
+    { id: 'world-war-2', label: 'World War II', slots: [
+      { id: 'gi', label: 'US GI' },
+      { id: 'german-soldier', label: 'German Soldier' },
+      { id: 'raf-pilot', label: 'RAF Pilot' },
+      { id: 'resistance', label: 'Resistance' },
+    ]},
+    { id: 'feudal-japan', label: 'Feudal Japan', slots: [
+      { id: 'samurai', label: 'Samurai' },
+      { id: 'ninja', label: 'Ninja' },
+      { id: 'geisha', label: 'Geisha' },
+      { id: 'ronin', label: 'Ronin' },
+    ]},
+  ],
+  fantasy: [
+    { id: 'light', label: 'Light', slots: [
+      { id: 'wizard', label: 'Wizard' },
+      { id: 'elven-ranger', label: 'Elven Ranger' },
+      { id: 'paladin', label: 'Paladin' },
+      { id: 'royal', label: 'Royal' },
+    ]},
+    { id: 'dark', label: 'Dark', slots: [
+      { id: 'dark-knight', label: 'Dark Knight' },
+      { id: 'necromancer', label: 'Necromancer' },
+      { id: 'assassin', label: 'Assassin' },
+      { id: 'vampire', label: 'Vampire Lord' },
+    ]},
+    { id: 'mythic', label: 'Mythic', slots: [
+      { id: 'dragon-rider', label: 'Dragon Rider' },
+      { id: 'druid', label: 'Druid' },
+      { id: 'sorceress', label: 'Sorceress' },
+      { id: 'forest-guardian', label: 'Forest Guardian' },
+    ]},
+  ],
+  scifi: [
+    { id: 'space', label: 'Space', slots: [
+      { id: 'astronaut', label: 'Astronaut' },
+      { id: 'star-captain', label: 'Star Captain' },
+      { id: 'alien-diplomat', label: 'Alien Diplomat' },
+      { id: 'mech-pilot', label: 'Mech Pilot' },
+    ]},
+    { id: 'cyber', label: 'Cyber', slots: [
+      { id: 'cyberpunk', label: 'Cyberpunk' },
+      { id: 'netrunner', label: 'Netrunner' },
+      { id: 'corp-exec', label: 'Corp Exec' },
+      { id: 'street-samurai', label: 'Street Samurai' },
+    ]},
+    { id: 'future', label: 'Future', slots: [
+      { id: 'holo-suit', label: 'Holo Suit' },
+      { id: 'bio-engineer', label: 'Bio-Engineer' },
+      { id: 'energy-knight', label: 'Energy Knight' },
+      { id: 'drone-pilot', label: 'Drone Pilot' },
+    ]},
+  ],
+  sport: [
+    { id: 'team', label: 'Team', slots: [
+      { id: 'football', label: 'Football' },
+      { id: 'basketball', label: 'Basketball' },
+      { id: 'baseball', label: 'Baseball' },
+      { id: 'american-football', label: 'American Football' },
+    ]},
+    { id: 'combat', label: 'Combat', slots: [
+      { id: 'mma', label: 'MMA Fighter' },
+      { id: 'boxing', label: 'Boxing' },
+      { id: 'karate', label: 'Karate' },
+      { id: 'fencing', label: 'Fencing' },
+    ]},
+    { id: 'outdoor', label: 'Outdoor', slots: [
+      { id: 'tennis', label: 'Tennis' },
+      { id: 'skiing', label: 'Skiing' },
+      { id: 'climbing', label: 'Rock Climbing' },
+      { id: 'cycling', label: 'Cycling' },
+    ]},
   ],
 };
+
+/** Parse composite "theme:sub" key. Falls back to defaults if malformed. */
+function parseInitial(input?: string): { theme: WardrobeTheme; sub: string } {
+  const raw = input ?? 'lifestyle';
+  const [t, s] = raw.split(':');
+  const theme = (THEMES.find((p) => p.id === t)?.id ?? 'lifestyle') as WardrobeTheme;
+  const subs = SUB_PACKS[theme];
+  const sub = subs.find((sp) => sp.id === s)?.id ?? subs[0].id;
+  return { theme, sub };
+}
 
 interface Props {
   avatarId: string;
   /** When provided, selecting a variant calls back with image url + meta */
-  onSelect?: (variant: { variantId: string; outfitId: string; label: string; imageUrl: string; themePack: WardrobeThemePack }) => void;
+  onSelect?: (variant: {
+    variantId: string;
+    outfitId: string;
+    label: string;
+    imageUrl: string;
+    /** Composite `theme:sub` key (e.g. "historical:medieval") */
+    themePack: string;
+  }) => void;
   /** Compact strip layout for inline use in scene editors */
   layout?: 'sheet' | 'strip';
-  /** Initial theme pack */
-  initialPack?: WardrobeThemePack;
+  /** Initial theme pack — accepts plain theme ("historical") or composite ("historical:medieval"). */
+  initialPack?: string;
 }
 
-export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', initialPack = 'lifestyle' }: Props) {
+export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', initialPack }: Props) {
   const qc = useQueryClient();
-  const [pack, setPack] = useState<WardrobeThemePack>(initialPack);
+  const initial = parseInitial(initialPack);
+  const [theme, setTheme] = useState<WardrobeTheme>(initial.theme);
+  const [sub, setSub] = useState<string>(initial.sub);
+
+  // When theme changes, snap to the first sub-pack of that theme.
+  useEffect(() => {
+    if (!SUB_PACKS[theme].some((sp) => sp.id === sub)) {
+      setSub(SUB_PACKS[theme][0].id);
+    }
+  }, [theme, sub]);
+
+  const compositeKey = `${theme}:${sub}`;
+  const activeSub = SUB_PACKS[theme].find((sp) => sp.id === sub) ?? SUB_PACKS[theme][0];
 
   const { data: outfits = [], isLoading } = useQuery({
-    queryKey: ['avatar-wardrobe', avatarId, pack],
+    queryKey: ['avatar-wardrobe', avatarId, compositeKey],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
         .from('avatar_wardrobe_variants')
         .select('id, outfit_id, label, image_url, theme_pack')
         .eq('avatar_id', avatarId)
-        .eq('theme_pack', pack)
+        .eq('theme_pack', compositeKey)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return (data || []) as Array<{ id: string; outfit_id: string; label: string; image_url: string; theme_pack: string }>;
@@ -86,14 +246,14 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
   const generate = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('generate-avatar-wardrobe', {
-        body: { avatar_id: avatarId, theme_pack: pack },
+        body: { avatar_id: avatarId, theme_pack: theme, sub_pack: sub },
       });
       if (error) throw error;
       return data;
     },
     onSuccess: (data: any) => {
-      toast.success(`Generated ${data?.generated ?? 0} ${THEME_PACKS.find(p => p.id === pack)?.label} outfits`);
-      qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, pack] });
+      toast.success(`Generated ${data?.generated ?? 0} ${activeSub.label} outfits`);
+      qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, compositeKey] });
     },
     onError: (e: any) => toast.error(e?.message || 'Wardrobe generation failed'),
   });
@@ -104,15 +264,15 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
 
   return (
     <div className="space-y-3">
-      {/* Theme-pack pills */}
+      {/* Tier 1 — Theme pills */}
       <div className="flex flex-wrap gap-1.5">
-        {THEME_PACKS.map((p) => {
-          const active = pack === p.id;
+        {THEMES.map((p) => {
+          const active = theme === p.id;
           return (
             <button
               key={p.id}
               type="button"
-              onClick={() => setPack(p.id)}
+              onClick={() => setTheme(p.id)}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all',
                 active
@@ -128,9 +288,32 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
         })}
       </div>
 
+      {/* Tier 2 — Sub-pack pills (visually nested under the theme row) */}
+      <div className="flex flex-wrap gap-1.5 pl-2 border-l-2 border-primary/30 ml-1">
+        {SUB_PACKS[theme].map((sp) => {
+          const active = sub === sp.id;
+          return (
+            <button
+              key={sp.id}
+              type="button"
+              onClick={() => setSub(sp.id)}
+              className={cn(
+                'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium transition-all',
+                active
+                  ? 'border-primary/70 bg-primary/20 text-primary'
+                  : 'border-border/30 bg-card/20 text-muted-foreground hover:text-foreground hover:border-border/60',
+              )}
+              aria-pressed={active}
+            >
+              {sp.label}
+            </button>
+          );
+        })}
+      </div>
+
       <VariantPickerGrid
         axis="wardrobe"
-        slots={PACK_SLOTS[pack]}
+        slots={activeSub.slots}
         variantsBySlot={variantsBySlot}
         isLoading={isLoading}
         onGenerate={() => generate.mutate()}
@@ -142,7 +325,7 @@ export function AvatarWardrobeSheet({ avatarId, onSelect, layout = 'sheet', init
             outfitId: slotId,
             label: variant.label,
             imageUrl: variant.imageUrl,
-            themePack: pack,
+            themePack: compositeKey,
           });
         }}
       />
