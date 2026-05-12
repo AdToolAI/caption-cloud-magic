@@ -13,6 +13,9 @@ const corsHeaders = {
 
 const GENDERS: Array<'male' | 'female'> = ['male', 'female'];
 const BATCH_SIZE = 6;
+// Process at most this many slots per invocation, then return.
+// Caller (admin / curl loop) re-invokes until { done: true }.
+const MAX_PER_INVOCATION = 24;
 
 const STYLE_LOCK =
   'photorealistic full-body editorial fashion photo, neutral light-grey studio background, soft cinematic lighting, head-to-toe framing, 3:4 portrait, attractive generic model with neutral pleasant face (NOT a celebrity), centered subject';
