@@ -57,42 +57,31 @@ Deno.serve(async (req) => {
       throw new Error('avatar_id, theme_pack, outfit_id required');
     }
 
-    // Verify avatar ownership
+    // Verify avatar ownership and get identity portrait
     const { data: avatar, error: avErr } = await supabaseAdmin
       .from('brand_characters')
-      .select('id, user_id, name')
+      .select('id, user_id, name, portrait_url, reference_image_url')
       .eq('id', avatar_id).single();
     if (avErr || !avatar) throw new Error('Avatar not found');
     if (avatar.user_id !== user.id) throw new Error('Forbidden');
 
-    // Resolve source image: prefer the user-rendered wardrobe variant; fall back to catalog preview.
-    let sourceUrl: string | null = source_image_url ?? null;
-    if (!sourceUrl) {
-      const { data: variant } = await supabaseAdmin
-        .from('avatar_wardrobe_variants')
-        .select('image_url')
-        .eq('avatar_id', avatar_id)
-        .eq('theme_pack', theme_pack)
-        .eq('outfit_id', outfit_id)
-        .maybeSingle();
-      sourceUrl = variant?.image_url ?? null;
-    }
-    if (!sourceUrl) {
-      // Fall back to catalog (gendered)
-      const { data: catalog } = await supabaseAdmin
-        .from('wardrobe_catalog_previews')
-        .select('image_url')
-        .eq('theme_pack', theme_pack)
-        .eq('outfit_id', outfit_id)
-        .limit(1).maybeSingle();
-      sourceUrl = catalog?.image_url ?? null;
-    }
-    if (!sourceUrl) throw new Error('No source image found for this outfit. Generate the wardrobe variant first.');
+    // Identity anchor: ALWAYS the avatar's own portrait (preserves user's face).
+    const identityUrl: string | null =
+      (avatar as any).portrait_url || (avatar as any).reference_image_url || source_image_url || null;
+    if (!identityUrl) throw new Error('Avatar has no portrait — generate it first.');
+
+    // Outfit modifier: lookup canonical wording from THEME_PACKS.
+    const outfit = lookupOutfit(theme_pack, outfit_id);
+    const outfitModifier = outfit?.modifier
+      ?? `outfit described as: ${outfit_label ?? outfit_id}`;
+    const resolvedLabel = outfit?.label ?? outfit_label ?? outfit_id;
 
     console.log('[generate-wardrobe-perspectives] start', { avatar_id, theme_pack, outfit_id });
 
     const results = await Promise.allSettled(PERSPECTIVES.map(async (p) => {
-      const prompt = `Render the SAME person in the SAME outfit as the reference image, but seen as a ${p.modifier}. ${IDENTITY_LOCK} 3:4 portrait framing.`;
+      const prompt =
+        `Render the SAME person from the reference photo, now wearing ${outfitModifier}. ` +
+        `Camera: ${p.modifier}. ${IDENTITY_LOCK} 3:4 portrait framing.`;
       const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
@@ -100,7 +89,7 @@ Deno.serve(async (req) => {
           model: 'google/gemini-3.1-flash-image-preview',
           messages: [{ role: 'user', content: [
             { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: sourceUrl } },
+            { type: 'image_url', image_url: { url: identityUrl } },
           ]}],
           modalities: ['image', 'text'],
         }),
