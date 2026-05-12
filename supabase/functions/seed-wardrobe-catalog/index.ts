@@ -115,76 +115,63 @@ Deno.serve(async (req) => {
     const existingSet = new Set(
       (existing ?? []).map((r: any) => `${r.theme_pack}|${r.outfit_id}|${r.gender}`),
     );
-    const todo = force
+    const allTodo = force
       ? targets
       : targets.filter((t) => !existingSet.has(`${t.theme_pack}|${t.outfit_id}|${t.gender}`));
 
-    const { data: job, error: jobErr } = await (supabaseAdmin as any)
-      .from('wardrobe_catalog_seed_jobs')
-      .insert({
-        triggered_by: user.id,
-        status: 'running',
-        total_slots: todo.length,
-      })
-      .select('id').single();
-    if (jobErr) throw new Error(`Job create: ${jobErr.message}`);
-    const jobId = job.id as string;
+    const todo = allTodo.slice(0, MAX_PER_INVOCATION);
+    const remainingAfter = Math.max(0, allTodo.length - todo.length);
 
-    console.log('[seed-wardrobe-catalog] queued', { todo: todo.length, force, themeFilter });
+    console.log('[seed-wardrobe-catalog] processing', { thisRun: todo.length, remainingAfter, force, themeFilter });
 
-    // Background: process in throttled batches
-    const work = (async () => {
-      let completed = 0, failed = 0;
-      const errors: any[] = [];
-      for (let i = 0; i < todo.length; i += BATCH_SIZE) {
-        const batch = todo.slice(i, i + BATCH_SIZE);
-        const results = await Promise.allSettled(batch.map((t) =>
-          generateOne({
-            supabaseAdmin,
-            apiKey: LOVABLE_API_KEY,
-            theme_pack: t.theme_pack,
-            outfit_id: t.outfit.id,
-            outfit_label: t.outfit.label,
-            modifier: t.outfit.modifier,
-            gender: t.gender,
-          }),
-        ));
-        for (let k = 0; k < results.length; k++) {
-          const r = results[k];
-          if (r.status === 'fulfilled') {
-            completed++;
-          } else {
-            failed++;
-            errors.push({
-              theme_pack: batch[k].theme_pack,
-              outfit_id: batch[k].outfit.id,
-              gender: batch[k].gender,
-              error: String((r as any).reason).slice(0, 220),
-            });
-          }
+    if (todo.length === 0) {
+      return new Response(JSON.stringify({
+        success: true, done: true, processed: 0, remaining: 0,
+        total_existing: existingSet.size,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Synchronous chunked processing — runs to completion within this invocation
+    let completed = 0, failed = 0;
+    const errors: any[] = [];
+    for (let i = 0; i < todo.length; i += BATCH_SIZE) {
+      const batch = todo.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((t) =>
+        generateOne({
+          supabaseAdmin,
+          apiKey: LOVABLE_API_KEY,
+          theme_pack: t.theme_pack,
+          outfit_id: t.outfit.id,
+          outfit_label: t.outfit.label,
+          modifier: t.outfit.modifier,
+          gender: t.gender,
+        }),
+      ));
+      for (let k = 0; k < results.length; k++) {
+        const r = results[k];
+        if (r.status === 'fulfilled') {
+          completed++;
+        } else {
+          failed++;
+          errors.push({
+            theme_pack: batch[k].theme_pack,
+            outfit_id: batch[k].outfit.id,
+            gender: batch[k].gender,
+            error: String((r as any).reason).slice(0, 220),
+          });
         }
-        await (supabaseAdmin as any).from('wardrobe_catalog_seed_jobs').update({
-          completed_slots: completed,
-          failed_slots: failed,
-          error_log: errors.slice(-50),
-        }).eq('id', jobId);
       }
-      await (supabaseAdmin as any).from('wardrobe_catalog_seed_jobs').update({
-        status: 'done',
-      }).eq('id', jobId);
-      console.log('[seed-wardrobe-catalog] done', { completed, failed });
-    })().catch(async (err) => {
-      console.error('[seed-wardrobe-catalog] background failed', err);
-      await (supabaseAdmin as any).from('wardrobe_catalog_seed_jobs').update({
-        status: 'failed',
-      }).eq('id', jobId);
-    });
+    }
 
-    // @ts-ignore — Deno deploy runtime
-    EdgeRuntime.waitUntil(work);
+    console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
 
     return new Response(JSON.stringify({
-      success: true, job_id: jobId, queued: todo.length, skipped: targets.length - todo.length,
+      success: true,
+      done: remainingAfter === 0,
+      processed: completed,
+      failed,
+      remaining: remainingAfter,
+      errors: errors.slice(-10),
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
