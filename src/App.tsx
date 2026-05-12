@@ -122,6 +122,7 @@ const AIVideoToolkit = lazy(() => import("./pages/AIVideoToolkit"));
 const BrandCharacters = lazy(() => import("./pages/BrandCharacters"));
 const AvatarDetail = lazy(() => import("./pages/AvatarDetail"));
 const Locations = lazy(() => import("./pages/Locations"));
+const Library = lazy(() => import("./pages/Library"));
 const VideoComposer = lazy(() => import("./pages/VideoComposer"));
 const EmailDirector = lazy(() => import("./pages/EmailDirector"));
 const MotionStudioLibrary = lazy(() => import("./pages/MotionStudio/Library"));
