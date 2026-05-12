@@ -98,10 +98,11 @@ export const useBrandCharacters = () => {
           user_id: user.id,
           name: input.name,
           description: input.description ?? null,
+          gender: input.gender ?? null,
           reference_image_url: imageUrl,
           storage_path: path,
           visual_identity_json: identity,
-        })
+        } as any)
         .select()
         .single();
       if (error) throw error;
