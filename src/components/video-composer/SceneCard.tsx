@@ -188,6 +188,10 @@ export default function SceneCard({
     : undefined;
   // Library for live mention resolution preview
   const { characters: libCharacters, locations: libLocations } = useUnifiedMentionLibrary();
+  // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
+  const { locations: brandLocations } = useBrandLocations();
+  const { buildings: brandBuildings } = useBrandBuildings();
+  const { props: brandProps } = useBrandProps();
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
