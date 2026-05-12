@@ -14,7 +14,7 @@ const corsHeaders = {
 };
 
 const BATCH_SIZE = 8;
-const MAX_PER_INVOCATION = 16;
+const MAX_PER_INVOCATION = 8;
 
 const STYLE_LOCK: Record<WorldKind, string> = {
   location: 'photorealistic cinematic establishing shot, 16:9, soft cinematic lighting, no people, no text, no logos, hero scene background',
