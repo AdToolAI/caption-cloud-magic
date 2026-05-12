@@ -110,6 +110,16 @@ const BrandCharacters = () => {
                 {repairing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
                 Repair images
               </Button>
+              <Button
+                onClick={handleBackfillPortraits}
+                variant="outline"
+                size="lg"
+                disabled={backfilling || characters.length === 0}
+                title="Generate clean wardrobe-ready studio portraits for existing avatars"
+              >
+                {backfilling ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
+                Generate studio portraits
+              </Button>
             </div>
           </div>
 
