@@ -37,7 +37,7 @@ import { useComposerPersistence, persistAssemblyConfig, persistAdMeta } from '@/
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
-import MotionStudioStepSidebar, { type StepItem } from './MotionStudioStepSidebar';
+import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
@@ -715,12 +715,16 @@ export default function VideoComposerDashboard() {
     campaign: 'Cutdowns & A/B-Varianten',
   };
 
-  const STEPS: StepItem[] = TABS.map((t) => ({
-    id: t.id,
-    label: t.label,
-    hint: STEP_HINTS[t.id],
-    icon: t.icon,
-  }));
+  // User-visible workflow steps — Stage 18 hides the technical "Clips" step
+  // because clip generation now happens inline inside the Storyboard player tiles.
+  const STEPS: TopStepperStep[] = TABS
+    .filter((tab) => tab.id !== 'clips')
+    .map((t) => ({
+      id: t.id,
+      label: t.label,
+      hint: STEP_HINTS[t.id],
+      icon: t.icon,
+    }));
 
   useEffect(() => {
     saveDraft(project);
@@ -1225,20 +1229,22 @@ export default function VideoComposerDashboard() {
         </div>
       )}
 
+      {/* Workflow stepper (horizontal, sticky beneath the header) */}
+      <div className="max-w-7xl mx-auto px-4">
+        <MotionStudioTopStepper
+          steps={STEPS}
+          activeStep={activeTab}
+          isStepDone={isStepDone}
+          isStepAccessible={isStepAccessible}
+          onSelect={(id) => handleTabChange(id as TabId)}
+        />
+      </div>
+
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
-          <MotionStudioStepSidebar
-            steps={STEPS}
-            activeStep={activeTab}
-            isStepDone={isStepDone}
-            isStepAccessible={isStepAccessible}
-            onSelect={(id) => handleTabChange(id as TabId)}
-          />
-
-          <div className="flex-1 min-w-0">
-            <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-              <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
+        <div className="min-w-0">
+          <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
+            <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
                   const isAccessible = i === 0 ||
@@ -1407,7 +1413,6 @@ export default function VideoComposerDashboard() {
             </Tabs>
           </div>
         </div>
-      </div>
 
       {/* Reset Confirmation Dialog */}
       <MotionStudioTemplatePicker

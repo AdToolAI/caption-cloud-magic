@@ -1,119 +1,46 @@
-## Stage 18 — "One-Page Composer" + 3-Modus-Leiste links (Editor · Stil · Avatar Studio)
+## Warum es noch genauso aussieht
 
-### Ziel
-Komplettes Composer-Redesign in einer Stage:
-1. **Workflow-Stepper oben** als horizontale Leiste (statt linker Sidebar).
-2. **Linke Spalte = 3-Modus-Leiste** mit segmentiertem Switcher:
-   - **① Editor** – Prompt/Cast/Audio/Look/Erweitert (heutige `SceneCard` embedded)
-   - **② Stil** – kompletter Looks/Feintuning/Modifier-Bereich (heutiger SceneStyleSheet-Inhalt, jetzt als feste Spalte statt Modal)
-   - **③ Avatar** – neues "Character-Workshop" mit 3D-Vorschau, Wardrobe, Features (Game-Engine-Look)
-3. **Rechte Spalte = Szenen-Mini-Player** mit Inline-"Generieren"-Button → Clips-Tab entfällt aus User-Sicht.
-4. Render-Pipeline (Frame-Chain, Splits, Lipsync) komplett unsichtbar — am Ende läuft im Mini-Player nur das fertige Video mit VO + Lip-Sync.
+Die Stage-18-Komponenten (`MotionStudioTopStepper`, `StoryboardLeftPane`, `StoryboardScenePlayerList`, `SceneInlinePlayer`, `SceneStyleMode`, `SceneAvatarMode`, `useSceneGenerate`) wurden zwar erstellt — aber **nirgends importiert**:
 
-### Layout
+- `VideoComposerDashboard.tsx` rendert weiterhin `<MotionStudioStepSidebar />` (Zeile 1231) → linke vertikale Workflow-Leiste bleibt sichtbar.
+- `StoryboardTab.tsx` rendert weiterhin `<StoryboardSceneStrip />` + `<StudioPane><SceneCard/></StudioPane>` (Zeilen 469–540) → kein 3-Mode-Switcher, keine Inline-Player rechts.
 
-```text
-┌────────────────────────────────────────────────────────────────────┐
-│ [① Briefing] [② Storyboard ●] [③ Voice] [④ Musik] [⑤ Export]      │ ← Top-Stepper
-├────────────────────────────────────────────────────────┬───────────┤
-│  [ ✎ Editor ] [ 🎨 Stil ] [ 👤 Avatar ]   ← Modus-Switch│ SZENEN · 5│
-│ ───────────────────────────────────────────────────────│┌─────────┐│
-│                                                        ││▶ S1     ││
-│   { dynamischer Inhalt je nach Modus }                 ││[Gener.] ││ ← aktiv
-│                                                        │└─────────┘│
-│   Editor:  Prompt · Cast · Audio · Look · Erweitert    │┌─────────┐│
-│   Stil:    Looks-Grid · Feintuning · Modifier · Live-  ││▶ S2     ││
-│            Preview (alles inline, kein Modal)          ││[Gener.] ││
-│   Avatar:  3D-Bühne · Outfit · Hair · Accessories ·    │└─────────┘│
-│            Pose · Voice · Save-to-Cast                 │ …         │
-│                                                        │ [+ Szene] │
-└────────────────────────────────────────────────────────┴───────────┘
-```
+Der Screenshot bestätigt das exakt: alte vertikale Workflow-Liste, alter Editor unten.
 
-Viewport 1060px: links `col-span-8`, rechts `col-span-4`. <1024px: Szenen werden zur horizontalen Schiene unter der Hauptspalte; Modus-Switch bleibt sticky oben.
+## Was zu tun ist (rein visuelles Wiring, keine Logik-Änderungen)
 
-### Umsetzung
+### 1. Top-Stepper aktivieren (`VideoComposerDashboard.tsx`)
 
-**1. `VideoComposerDashboard.tsx` — Top-Stepper**
-- `MotionStudioStepSidebar` ersetzen durch neue `MotionStudioTopStepper` (sticky horizontale Leiste, 5 Pills: Briefing/Storyboard/Voice/Musik/Export). Clips-Tab fliegt aus dem Stepper, Datei + `?tab=clips` bleiben als Power-User-Fallback erhalten.
-- Hauptcontent nutzt volle Breite.
+- Import `MotionStudioStepSidebar` → `MotionStudioTopStepper` (`StepItem` bleibt strukturgleich → Typ lokal beibehalten).
+- "Clips"-Step aus `TABS` (Zeile 670) entfernen, damit der Stepper nur noch **Briefing → Storyboard → Voice → Musik → Export** zeigt. `'clips'` bleibt in `TabId` / `TAB_ORDER` / `TabsContent` erhalten als versteckter Fallback (`?tab=clips` Deep-Link, `persistAndGoToClips`).
+- Layout (Zeile 1229–1239): von `flex gap-6` mit Sidebar links → vertikalem Stack. Stepper kommt **vor** dem `<div className="max-w-7xl ...">` als sticky Top-Bar; darunter bekommt der Tab-Content die volle Breite (`flex-1` Wrapper entfällt).
+- Mobile `<TabsList>` bleibt unverändert.
 
-**2. Neue Komponente `MotionStudioTopStepper.tsx`**
-- Glass-Pills im Bond-2028-Stil, gold-Glow für aktiv, Check-Icon für done, Progress-Bar darunter.
+### 2. Storyboard-Layout neu verdrahten (`StoryboardTab.tsx`)
 
-**3. `StoryboardTab.tsx` — neues 2-Spalten-Layout**
-- Links: neuer `<StoryboardLeftPane mode={editor|style|avatar} />` (`col-span-8`).
-- Rechts: `<StoryboardScenePlayerList />` (`col-span-4`, scrollt).
-- `CastConsistencyMap` wandert in eine kleine "Cast-Map anzeigen"-Disclosure über dem Modus-Switch.
+- Imports: `StoryboardSceneStrip` + `StudioPane` raus → `StoryboardLeftPane` + `StoryboardScenePlayerList` + `useSceneGenerate` rein.
+- `useSceneGenerate({ projectId, characters, onOptimisticPatch: (id, patch) => updateScene(id, patch), ensureProject: onEnsurePersisted })` → `generate` + `generating` map.
+- Lokaler State `const [leftMode, setLeftMode] = useState<LeftPaneMode>('editor')`.
+- Block ab Zeile 469 ersetzen:
+  - **Links (`lg:col-span-8`)**: `<StoryboardLeftPane mode={leftMode} onModeChange={setLeftMode} sceneNumber=… editorSlot={<SceneCard …/>} styleSlot={<SceneStyleMode scene={selectedScene} onUpdate=… />} avatarSlot={<SceneAvatarMode scene={selectedScene} characters={characters} onUpdate=… />} />`
+  - **Rechts (`lg:col-span-4`, sticky)**: `<StoryboardScenePlayerList scenes={scenes} selectedSceneId={selectedSceneId} generatingMap={generating} onSelect={setSelectedSceneId} onReorder={onUpdateScenes} onAddScene={addScene} onGenerate={generate} />`
+- `previousSceneOfSelected` + `SceneCutDriftIndicator` bleiben oberhalb der `SceneCard` im `editorSlot` erhalten.
+- Summary-Bar (Zeile 349–406) und Tipps + CastConsistencyMap bleiben unverändert oberhalb. Die "Clips generieren →" CTA bleibt für Power-User (führt jetzt nur noch in den versteckten Clips-Tab).
 
-**4. Neue Komponente `StoryboardLeftPane.tsx`**
-- 3-Tab-Switcher (segmented control, Bond-Glass-Stil) mit Persistenz pro Szene in Local State.
-- Body switcht zwischen:
-  - `<SceneEditorMode />` → bisherige `<SceneCard embedded />` Logik
-  - `<SceneStyleMode />` → Inhalt aus `SceneStyleSheet` (Looks-Grid, Feintuning, Modifier, Live-Preview-Footer) als Inline-View, kein Modal
-  - `<SceneAvatarMode />` → neuer Character-Workshop (siehe Punkt 5)
-- "Stil ändern"-Button im Editor-Modus springt automatisch in Stil-Tab statt Sheet zu öffnen. "Cast bearbeiten" springt in Avatar-Tab.
+### 3. Sanity-Check der bereits gebauten Sub-Komponenten
 
-**5. Neue Komponente `SceneAvatarMode.tsx` — Game-Engine-Look Character Workshop**
-- **Bühnen-Header**: 16:9 "3D-Stage" mit dem aktiven Cast-Member.
-  - Datenquelle: vorhandene `brand_characters.portrait_url` (Hedra-optimiert, 2D Hi-Res).
-  - 3D-Effekt via CSS: parallax + tilt-on-mouse (`framer-motion`), Bond-Spotlight-Glow, gold Rim-Light, Drehpunkt-Indikator. Optional 360°-Karussell aus den `avatar_pose_variants` (4 Posen) + `avatar_wardrobe_variants` (4 Outfits) — die existieren bereits laut Memory.
-  - Toggle Pose ↔ Outfit ↔ Vibe wie ein Charakter-Selektor (PS5-Style, große Tiles unten).
-- **Linke Spalte (innerhalb Avatar-Modus)**: Cast-Member-Liste der Szene, "+ Avatar hinzufügen" → öffnet `useAccessibleCharacters` (own + purchased + Marketplace-Teaser).
-- **Rechte Spalte**: Anpass-Stack (Tabs):
-  - **Look**: Outfit-Grid (`avatar_wardrobe_variants`), Pose-Grid (`avatar_pose_variants`).
-  - **Voice**: Voice-Picker aus `default_voice_id` + Custom-Voices.
-  - **Lip-Sync**: Toggle "Diese Szene = Talking-Head" → schaltet im Render-Pfad automatisch HeyGen/Cinematic-Sync ein (heute manueller Step).
-  - **Identity**: Quick-Link zum vollen `BrandCharacters` für Re-Upload / neuen Charakter.
-- **Footer**: "In dieser Szene verwenden" speichert Auswahl in `scene.cast` + `scene.shotDirector` (z. B. Pose) — keine Backend-Änderung, nur das bestehende `scene_cast`-Field bekommt zusätzliche `selectedPose` / `selectedWardrobe` IDs.
-- **Marketing-Versprechen "wir übertreffen Artlist"**: Workshop-Frame mit subtilem Grid-Bokeh, animiertem Cyan-Scanline-Sweep, gold Studio-Spots, sound-design-tauglicher Idle-Animation (CSS-Loop). Kein echtes 3D-Engine-WebGL — wir simulieren den Look mit den vorhandenen 2D-Varianten + CSS/Framer.
+- `SceneStyleMode` / `SceneAvatarMode` Props müssen mit dem `selectedScene`-Shape übereinstimmen (`scene`, `onUpdate(updates)`, `characters`). Falls Prop-Namen abweichen → minimaler Anpass-Patch in den jeweiligen Files (kein Logik-Change).
+- `SceneInlinePlayer` muss `scene.clipUrl` + Status-Badge rendern; "Generieren"-Button disabled, wenn `isGenerating` oder kein `aiPrompt`.
 
-**6. Neue Komponente `StoryboardScenePlayerList.tsx`**
-- Jede Szene = 16:9 Mini-Player-Karte (`SceneInlinePlayer`) mit:
-  - Thumbnail oder fertiges Video (autoplay-on-hover, muted).
-  - Großer **"Generieren"** / **"Neu generieren"** Center-Button wenn kein Clip.
-  - Status-Pill: `Wartet`, `Generiert…`, `✓ Fertig`. Während Render: animierter Schimmer + dezenter Text "Szene wird gebaut…" — **keine** Pipeline-Details.
-  - Footer: Type · Dauer · Kosten · Drag-Handle. Aktive Szene = goldener Border-Glow.
-- DnD bleibt (`@dnd-kit`).
+### Nicht im Scope
 
-**7. Neue Hook `useSceneGenerate.ts`**
-- Extrahiert die heutige `handleGenerateScene`-Logik aus `ClipsTab` so, dass sie aus dem InlinePlayer aufrufbar ist.
-- Triggert nach erfolgreichem Clip automatisch HeyGen / Cinematic-Sync, wenn die Szene als Talking-Head/Lipsync markiert ist → Endresultat = ein einziger fertig synchronisierter Clip im Player.
-- Wallet, Refund, Realtime-Subscription bleiben wie bisher.
-
-**8. Hidden Pipeline**
-- `RenderPipelinePanel`, `ContinuityGuardianStrip`, `SceneClipProgress` aus dem Storyboard entfernen. Nur unter `?debug=pipeline` für interne Diagnose.
-
-### Files
-
-**Neu**
-- `src/components/video-composer/MotionStudioTopStepper.tsx`
-- `src/components/video-composer/StoryboardLeftPane.tsx`
-- `src/components/video-composer/SceneStyleMode.tsx` (extrahiert aus `SceneStyleSheet`-Body, ohne Modal-Wrapper)
-- `src/components/video-composer/SceneAvatarMode.tsx` (Character-Workshop)
-- `src/components/video-composer/AvatarStage3D.tsx` (CSS/Framer-Tilt-Stage + Pose-Karussell)
-- `src/components/video-composer/SceneInlinePlayer.tsx`
-- `src/components/video-composer/StoryboardScenePlayerList.tsx`
-- `src/hooks/useSceneGenerate.ts`
-
-**Geändert**
-- `src/components/video-composer/VideoComposerDashboard.tsx` (Sidebar→TopStepper, Tab-Liste)
-- `src/components/video-composer/StoryboardTab.tsx` (Editor links via `StoryboardLeftPane`, Player-Liste rechts)
-- `src/components/video-composer/StudioPane.tsx` (Padding/Width-Tune)
-- `src/components/video-composer/SceneStyleSheet.tsx` (Body in eigene Komponente extrahiert, Sheet bleibt als Mobile-Fallback)
-
-### Out of Scope
-- Keine echte 3D-Engine (Three.js/WebGL). 3D-Look wird mit Tilt + Pose-Varianten + CSS-Lighting simuliert. Echte WebGL-Avatare = separate spätere Stage.
-- Keine neuen Edge-Functions, Wallet-Logik, Tabellen.
-- Keine i18n-Erweiterung — neue Strings als Fallback EN inline.
-- Mobile-Specific-Rebuild: nur Stack-Fallback <1024px.
+- Keine neuen Edge Functions, kein neues Realtime, keine Wallet/i18n-Arbeit.
+- `MotionStudioStepSidebar.tsx` und `StoryboardSceneStrip.tsx` bleiben im Repo (rückwärtskompatibel), werden nur nicht mehr importiert.
+- Avatar-Mode bleibt CSS/Framer-Tilt-Stage (kein echtes Three.js).
 
 ### Akzeptanz
-1. `/video-composer` zeigt **horizontale Stepper-Leiste** oben, keine linke Step-Sidebar mehr.
-2. Storyboard-Tab: links **3-Modus-Leiste** (Editor/Stil/Avatar) mit segmentiertem Switch oben, rechts **Mini-Player-Liste**.
-3. Avatar-Modus zeigt aktiven Cast-Member auf einer Game-Engine-artigen Bühne mit Tilt-Effekt, Pose- und Outfit-Karussell.
-4. Klick auf "Generieren" in einem Mini-Player → Status-Animation → fertiger Clip mit VO + Lip-Sync läuft direkt im Player. Kein Tab-Wechsel, keine Pipeline-Details sichtbar.
-5. Stepper zeigt nur 5 Schritte (Briefing → Storyboard → Voice → Musik → Export). Clips fehlt aus User-Sicht.
-6. Bestehende Wallet-, Refund-, Realtime-, Marketplace-Logik unverändert.
 
-Soll ich so umsetzen?
+Nach dem Wiring zeigt `/video-composer`:
+1. Horizontale Glass-Pill-Stepper-Leiste oben (5 Steps, kein "Clips" mehr).
+2. Im Storyboard-Tab links 3-Mode-Switcher (Editor / Stil / Avatar), rechts Liste von Mini-Playern mit "Generieren"-Button pro Szene.
+3. Klick auf "Generieren" startet `compose-video-clips` für genau diese Szene → Status-Animation im Mini-Player → fertiger Clip erscheint inline, **ohne Tab-Wechsel**.
