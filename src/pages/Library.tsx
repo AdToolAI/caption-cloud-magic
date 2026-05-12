@@ -33,6 +33,7 @@ import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
+import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 
 type TabKey = 'people' | 'locations' | 'buildings' | 'props';
 
