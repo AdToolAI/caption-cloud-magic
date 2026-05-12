@@ -481,74 +481,89 @@ export default function StoryboardTab({
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
-          {/* Left: Cinematic filmstrip */}
-          <div className="lg:col-span-4 xl:col-span-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2 -mr-2">
-            <StoryboardSceneStrip
-              scenes={scenes}
-              selectedSceneId={selectedSceneId}
-              characters={characters}
-              onSelect={setSelectedSceneId}
-              onReorder={onUpdateScenes}
-              onAddScene={addScene}
-            />
-          </div>
-
-          {/* Right: persistent Studio editor for the selected scene */}
-          <div className="lg:col-span-8 xl:col-span-9 min-w-0">
+          {/* Left: 3-mode editor pane (Editor / Stil / Avatar) */}
+          <div className="lg:col-span-8 min-w-0">
             {selectedScene && (
-              <StudioPane
+              <StoryboardLeftPane
+                mode={leftMode}
+                onModeChange={setLeftMode}
                 sceneNumber={selectedIndex + 1}
                 totalScenes={scenes.length}
                 sceneTypeLabel={SCENE_TYPE_LABEL_DE[selectedScene.sceneType] ?? selectedScene.sceneType}
-              >
-                {previousSceneOfSelected && (
-                  <SceneCutDriftIndicator
-                    prev={previousSceneOfSelected}
-                    next={selectedScene}
-                    projectId={projectId}
-                    onUpdateNext={(updates) => updateScene(selectedScene.id, updates)}
+                editorSlot={
+                  <>
+                    {previousSceneOfSelected && (
+                      <SceneCutDriftIndicator
+                        prev={previousSceneOfSelected}
+                        next={selectedScene}
+                        projectId={projectId}
+                        onUpdateNext={(updates) => updateScene(selectedScene.id, updates)}
+                        language={dialogLang}
+                      />
+                    )}
+                    <SceneCard
+                      key={selectedScene.id}
+                      scene={selectedScene}
+                      index={selectedIndex}
+                      totalScenes={scenes.length}
+                      projectId={projectId}
+                      characters={characters}
+                      preferredAspect={preferredAspect}
+                      onUpdate={(updates) => updateScene(selectedScene.id, updates)}
+                      onDelete={() => deleteScene(selectedScene.id)}
+                      onMoveUp={() => moveScene(selectedIndex, selectedIndex - 1)}
+                      onMoveDown={() => moveScene(selectedIndex, selectedIndex + 1)}
+                      onHybridExtend={
+                        projectId ? (mode) => openHybridDialog(selectedScene, mode) : undefined
+                      }
+                      hasOtherReadyScenes={scenes.some(
+                        (s) => s.id !== selectedScene.id && s.clipStatus === 'ready' && !!s.clipUrl,
+                      )}
+                      onAddScene={onAddScene}
+                      onInsertScenesAfter={onInsertScenesAfter}
+                      onAddCharacter={onAddCharacter}
+                      language={language}
+                      onEnsurePersisted={onEnsurePersisted}
+                      previousSceneLastFrameUrl={
+                        previousSceneOfSelected
+                          ? previousSceneOfSelected.lastFrameUrl ?? previousSceneOfSelected.clipUrl
+                          : undefined
+                      }
+                      previousSceneIndex={selectedIndex > 0 ? selectedIndex : undefined}
+                      frameFirstMode={frameFirstMode}
+                      embedded
+                    />
+                  </>
+                }
+                styleSlot={
+                  <SceneStyleMode
+                    scene={selectedScene}
                     language={dialogLang}
+                    onUpdate={(updates) => updateScene(selectedScene.id, updates)}
                   />
-                )}
-                <SceneCard
-                  // Re-mount on scene change so internal state (open dialogs, drafts) resets cleanly.
-                  key={selectedScene.id}
-                  scene={selectedScene}
-                  index={selectedIndex}
-                  totalScenes={scenes.length}
-                  projectId={projectId}
-                  characters={characters}
-                  preferredAspect={preferredAspect}
-                  onUpdate={(updates) => updateScene(selectedScene.id, updates)}
-                  onDelete={() => {
-                    deleteScene(selectedScene.id);
-                  }}
-                  onMoveUp={() => moveScene(selectedIndex, selectedIndex - 1)}
-                  onMoveDown={() => moveScene(selectedIndex, selectedIndex + 1)}
-                  onHybridExtend={
-                    projectId
-                      ? (mode) => openHybridDialog(selectedScene, mode)
-                      : undefined
-                  }
-                  hasOtherReadyScenes={scenes.some(
-                    (s) => s.id !== selectedScene.id && s.clipStatus === 'ready' && !!s.clipUrl,
-                  )}
-                  onAddScene={onAddScene}
-                  onInsertScenesAfter={onInsertScenesAfter}
-                  onAddCharacter={onAddCharacter}
-                  language={language}
-                  onEnsurePersisted={onEnsurePersisted}
-                  previousSceneLastFrameUrl={
-                    previousSceneOfSelected
-                      ? previousSceneOfSelected.lastFrameUrl ?? previousSceneOfSelected.clipUrl
-                      : undefined
-                  }
-                  previousSceneIndex={selectedIndex > 0 ? selectedIndex : undefined}
-                  frameFirstMode={frameFirstMode}
-                  embedded
-                />
-              </StudioPane>
+                }
+                avatarSlot={
+                  <SceneAvatarMode
+                    scene={selectedScene}
+                    characters={characters}
+                    onUpdate={(updates) => updateScene(selectedScene.id, updates)}
+                  />
+                }
+              />
             )}
+          </div>
+
+          {/* Right: inline player tiles with per-scene "Generieren" CTA */}
+          <div className="lg:col-span-4 min-w-0 lg:sticky lg:top-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pr-2 -mr-2">
+            <StoryboardScenePlayerList
+              scenes={scenes}
+              selectedSceneId={selectedSceneId}
+              generatingMap={generatingMap}
+              onSelect={setSelectedSceneId}
+              onReorder={onUpdateScenes}
+              onAddScene={addScene}
+              onGenerate={generateScene}
+            />
           </div>
         </div>
       )}
