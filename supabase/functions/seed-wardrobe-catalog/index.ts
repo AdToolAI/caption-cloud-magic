@@ -12,10 +12,11 @@ const corsHeaders = {
 };
 
 const GENDERS: Array<'male' | 'female'> = ['male', 'female'];
-const BATCH_SIZE = 6;
-// Process at most this many slots per invocation, then return.
-// Caller (admin / curl loop) re-invokes until { done: true }.
-const MAX_PER_INVOCATION = 12;
+// Tiny synchronous chunk per invocation. The caller polls until { done: true }.
+// Each Gemini image call ~5–10s. 4 in parallel ≈ 10–15s total → safely below
+// any edge-function timeout. No background waitUntil — we wait for upserts.
+const BATCH_SIZE = 4;
+const MAX_PER_INVOCATION = 4;
 
 const STYLE_LOCK =
   'photorealistic full-body editorial fashion photo, neutral light-grey studio background, soft cinematic lighting, head-to-toe framing, 3:4 portrait, attractive generic model with neutral pleasant face (NOT a celebrity), centered subject';
