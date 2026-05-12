@@ -35,13 +35,12 @@ import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 
-type TabKey = 'people' | 'locations' | 'buildings' | 'props';
+type TabKey = 'people' | 'locations' | 'props';
 
-const TABS: { key: TabKey; label: string; icon: typeof Users; cta: string }[] = [
-  { key: 'people', label: 'People', icon: Users, cta: 'New Avatar' },
-  { key: 'locations', label: 'Locations', icon: MapPin, cta: 'New Location' },
-  { key: 'buildings', label: 'Buildings', icon: Building2, cta: 'New Building' },
-  { key: 'props', label: 'Props', icon: Package, cta: 'New Prop' },
+const TABS: { key: TabKey; label: string; icon: typeof Users }[] = [
+  { key: 'people', label: 'People', icon: Users },
+  { key: 'locations', label: 'Locations', icon: MapPin },
+  { key: 'props', label: 'Props', icon: Package },
 ];
 
 const Library = () => {
@@ -52,6 +51,7 @@ const Library = () => {
   const setTab = (next: TabKey) => {
     setParams((p) => {
       p.set('tab', next);
+      p.delete('sub');
       return p;
     });
   };
@@ -62,7 +62,7 @@ const Library = () => {
         <title>Cast & World — Your unified asset library | useadtool</title>
         <meta
           name="description"
-          content="One library for every visual building block of your videos: people, locations, buildings and props — all reusable, all consistent."
+          content="One library for every visual building block of your videos: people, locations, architecture and props — all reusable, all consistent."
         />
       </Helmet>
 
@@ -75,7 +75,7 @@ const Library = () => {
             </div>
             <h1 className="font-serif text-4xl md:text-5xl">Your Asset Library</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              People, places, buildings and props — all stored as reusable identities so
+              People, places, architecture and props — all stored as reusable identities so
               every scene you generate stays visually consistent.
             </p>
           </header>
@@ -99,10 +99,6 @@ const Library = () => {
 
             <TabsContent value="locations">
               <LocationsTab />
-            </TabsContent>
-
-            <TabsContent value="buildings">
-              <BuildingsTab />
             </TabsContent>
 
             <TabsContent value="props">
