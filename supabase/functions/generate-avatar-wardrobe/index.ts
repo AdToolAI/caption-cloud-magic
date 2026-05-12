@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 type Outfit = { id: string; label: string; modifier: string };
-type ThemePack = 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport';
+type ThemePack = 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport' | 'business';
 
 const THEME_PACKS: Record<ThemePack, Outfit[]> = {
   lifestyle: [
@@ -43,9 +43,15 @@ const THEME_PACKS: Record<ThemePack, Outfit[]> = {
     { id: 'tennis', label: 'Tennis', modifier: 'classic tennis whites: collared polo shirt and white shorts or pleated skirt, tennis shoes, holding a racquet, clean athletic styling' },
     { id: 'mma', label: 'MMA Fighter', modifier: 'MMA fight gear: shirtless or rashguard top, fight shorts, fingerless gloves, hand wraps, athletic and intense' },
   ],
+  business: [
+    { id: 'executive-suit', label: 'Executive Suit', modifier: 'tailored dark navy two-piece business suit with crisp white dress shirt, silk tie or silk neck scarf, polished leather shoes, premium boardroom executive styling, gender-appropriate cut matching the subject' },
+    { id: 'smart-casual', label: 'Smart Casual', modifier: 'modern smart-casual office look: fitted unstructured blazer over a clean white shirt or blouse, dark chinos or tailored trousers, leather loafers, no tie, contemporary startup-office styling, gender-appropriate cut' },
+    { id: 'power-blazer', label: 'Power Blazer', modifier: 'structured charcoal power blazer with statement lapels over a fitted black turtleneck, slim tailored trousers, polished ankle boots, confident keynote-stage styling, gender-appropriate cut' },
+    { id: 'founder-hoodie', label: 'Founder Hoodie', modifier: 'premium minimal heather-grey hoodie under an unstructured wool blazer, dark slim jeans, clean white sneakers, modern Silicon Valley founder aesthetic, gender-appropriate cut' },
+  ],
 };
 
-const VALID_PACKS = new Set<ThemePack>(['lifestyle', 'historical', 'fantasy', 'scifi', 'sport']);
+const VALID_PACKS = new Set<ThemePack>(['lifestyle', 'historical', 'fantasy', 'scifi', 'sport', 'business']);
 
 const IDENTITY_LOCK =
   'CRITICAL: Preserve the EXACT face, age, skin tone, hair style, hair color, eye color, facial features and body proportions of the reference person. Do not alter the face or hair. Only the clothing and accessories change. Full-body, head-to-toe framing on a soft neutral studio background. Photorealistic.';

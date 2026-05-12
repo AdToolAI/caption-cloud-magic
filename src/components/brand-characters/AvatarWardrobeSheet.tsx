@@ -5,10 +5,11 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
-export type WardrobeThemePack = 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport';
+export type WardrobeThemePack = 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport' | 'business';
 
 const THEME_PACKS: Array<{ id: WardrobeThemePack; label: string; emoji: string }> = [
   { id: 'lifestyle', label: 'Lifestyle', emoji: '👕' },
+  { id: 'business', label: 'Business', emoji: '💼' },
   { id: 'historical', label: 'Historical', emoji: '⚔️' },
   { id: 'fantasy', label: 'Fantasy', emoji: '🧙' },
   { id: 'scifi', label: 'Sci-Fi', emoji: '🚀' },
@@ -45,6 +46,12 @@ const PACK_SLOTS: Record<WardrobeThemePack, Array<{ id: string; label: string }>
     { id: 'basketball', label: 'Basketball' },
     { id: 'tennis', label: 'Tennis' },
     { id: 'mma', label: 'MMA Fighter' },
+  ],
+  business: [
+    { id: 'executive-suit', label: 'Executive Suit' },
+    { id: 'smart-casual', label: 'Smart Casual' },
+    { id: 'power-blazer', label: 'Power Blazer' },
+    { id: 'founder-hoodie', label: 'Founder Hoodie' },
   ],
 };
 
