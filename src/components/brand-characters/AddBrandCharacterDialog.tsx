@@ -113,7 +113,7 @@ export const AddBrandCharacterDialog = ({ open, onOpenChange }: AddBrandCharacte
             className="bg-primary text-primary-foreground"
           >
             {createCharacter.isPending ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Extracting identity…</>
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Extracting identity & generating portrait…</>
             ) : (
               <><Sparkles className="h-4 w-4 mr-2" /> Save Character</>
             )}
