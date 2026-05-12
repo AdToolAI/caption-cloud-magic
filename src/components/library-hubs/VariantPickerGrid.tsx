@@ -126,6 +126,14 @@ export function VariantPickerGrid({
                 loading="lazy"
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               />
+            ) : axis === 'wardrobe' ? (
+              // Wardrobe: catalog auto-fills in the background.
+              // Always show a shimmering skeleton instead of "Not generated".
+              <div className="absolute inset-0 bg-gradient-to-br from-muted/40 via-muted/20 to-muted/40 animate-pulse flex items-end p-2">
+                <span className="text-[10px] text-muted-foreground/70 leading-tight drop-shadow">
+                  {slot.label}
+                </span>
+              </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/60 gap-1 px-1 text-center">
                 {isGenerating || isLoading ? (
