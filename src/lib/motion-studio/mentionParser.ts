@@ -149,6 +149,8 @@ export function resolveMentions(
   const seenLocs = new Set<string>();
   const charLines: string[] = [];
   const locLines: string[] = [];
+  const buildingLines: string[] = [];
+  const propLines: string[] = [];
 
   for (const m of matches) {
     if (m.kind === 'character' && !seenChars.has(m.id)) {
@@ -168,7 +170,11 @@ export function resolveMentions(
         const lighting = l.lighting_notes?.trim();
         const desc = l.description?.trim();
         const parts = [desc, lighting ? `Lighting: ${lighting}` : null].filter(Boolean);
-        locLines.push(`- ${l.name}: ${parts.join(' — ') || 'recurring location'}`);
+        const line = `- ${l.name}: ${parts.join(' — ') || 'recurring asset'}`;
+        const tags = (l.tags ?? []) as string[];
+        if (tags.includes('building')) buildingLines.push(line);
+        else if (tags.includes('prop')) propLines.push(line);
+        else locLines.push(line);
       }
     }
   }
