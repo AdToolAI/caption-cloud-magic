@@ -1270,10 +1270,9 @@ export default function SceneCard({
                               durationSeconds: scene.durationSeconds,
                               clipSource: scene.clipSource,
                               clipQuality: scene.clipQuality,
-                              aiPrompt: '',
-                              // Pre-fill via the comment block so the user sees the suggestion in the SceneDirectorBox on focus
-                              dialogScript: '',
-                              textOverlayText: d,
+                              // Seed the new scene's prompt with the suggestion so the user can
+                              // refine or re-run the Scene Director on it immediately.
+                              aiPrompt: d,
                             })),
                           );
                         }
