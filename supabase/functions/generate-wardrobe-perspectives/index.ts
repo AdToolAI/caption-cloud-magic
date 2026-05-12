@@ -1,14 +1,26 @@
 // generate-wardrobe-perspectives — Stage 24
 // Generates 4 locked-identity perspective renders (front/back/side/top)
-// for an avatar wearing a chosen outfit. Persists to wardrobe_perspective_renders.
+// of the avatar wearing the chosen outfit. Uses the avatar's portrait as
+// identity anchor + outfit modifier from THEME_PACKS so we always preserve
+// the USER's face, even when no per-user wardrobe variant exists yet.
 // Idempotent per (avatar_id, theme_pack, outfit_id, perspective).
 
 import { createClient } from 'npm:@supabase/supabase-js@2.39.3';
+import { THEME_PACKS } from '../_shared/wardrobe-themes.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
+
+function lookupOutfit(themePackComposite: string, outfitId: string) {
+  const [theme, sub] = themePackComposite.split(':');
+  const subs = (THEME_PACKS as any)[theme];
+  if (!subs) return null;
+  const outfits = subs[sub];
+  if (!outfits) return null;
+  return outfits.find((o: any) => o.id === outfitId) ?? null;
+}
 
 const PERSPECTIVES: { id: 'front' | 'back' | 'side' | 'top'; label: string; modifier: string }[] = [
   { id: 'front', label: 'Front', modifier: 'centered FRONTAL full-body shot, eye-level, looking straight at the camera, shoulders square, head-to-toe framing' },
