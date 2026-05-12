@@ -70,8 +70,12 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await supabaseUser.auth.getUser();
     if (authErr || !user) throw new Error('Unauthorized');
 
-    const { avatar_id } = await req.json();
+    const body = await req.json().catch(() => ({}));
+    const { avatar_id } = body;
+    const themePack: ThemePack = VALID_PACKS.has(body?.theme_pack) ? body.theme_pack : 'lifestyle';
     if (!avatar_id) throw new Error('avatar_id required');
+
+    const OUTFITS = THEME_PACKS[themePack];
 
     const { data: avatar, error: avErr } = await supabaseAdmin
       .from('brand_characters')
@@ -88,10 +92,10 @@ Deno.serve(async (req) => {
       if (signed?.signedUrl) sourceUrl = signed.signedUrl;
     }
 
-    console.log('[generate-avatar-wardrobe] start', { avatar_id, user_id: user.id });
+    console.log('[generate-avatar-wardrobe] start', { avatar_id, theme_pack: themePack, user_id: user.id });
 
     const results = await Promise.allSettled(OUTFITS.map(async (outfit) => {
-      const prompt = `Restyle the same person wearing a ${outfit.modifier}. Soft neutral studio background, photorealistic. ${IDENTITY_LOCK} Square 1:1 framing.`;
+      const prompt = `Restyle the same person wearing a ${outfit.modifier}. Soft neutral studio background, full-body head-to-toe framing, photorealistic. ${IDENTITY_LOCK} 3:4 portrait framing.`;
       const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
@@ -114,7 +118,7 @@ Deno.serve(async (req) => {
 
       const base64 = dataUri.split(',')[1];
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      const path = `${user.id}/wardrobe/${avatar_id}/${outfit.id}-${crypto.randomUUID()}.png`;
+      const path = `${user.id}/wardrobe/${avatar_id}/${themePack}/${outfit.id}-${crypto.randomUUID()}.png`;
       const { error: upErr } = await supabaseAdmin.storage
         .from('brand-characters')
         .upload(path, bytes, { contentType: 'image/png', upsert: false });
@@ -126,8 +130,8 @@ Deno.serve(async (req) => {
       if (!url) throw new Error('Sign URL failed');
 
       await supabaseAdmin.from('avatar_wardrobe_variants').upsert({
-        avatar_id, outfit_id: outfit.id, label: outfit.label, image_url: url, storage_path: path,
-      }, { onConflict: 'avatar_id,outfit_id' });
+        avatar_id, theme_pack: themePack, outfit_id: outfit.id, label: outfit.label, image_url: url, storage_path: path,
+      }, { onConflict: 'avatar_id,theme_pack,outfit_id' });
 
       return { outfit_id: outfit.id, url };
     }));
@@ -136,7 +140,7 @@ Deno.serve(async (req) => {
     const failed = results.filter(r => r.status === 'rejected').map((r: any) => String(r.reason));
     console.log('[generate-avatar-wardrobe] done', { ok, failed: failed.length });
 
-    return new Response(JSON.stringify({ success: true, generated: ok, failed }), {
+    return new Response(JSON.stringify({ success: true, theme_pack: themePack, generated: ok, failed }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
