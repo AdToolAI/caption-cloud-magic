@@ -14,8 +14,11 @@ import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
 import { CastConsistencyMap } from './CastConsistencyMap';
-import StoryboardSceneStrip from './StoryboardSceneStrip';
-import StudioPane from './StudioPane';
+import StoryboardLeftPane, { type LeftPaneMode } from './StoryboardLeftPane';
+import StoryboardScenePlayerList from './StoryboardScenePlayerList';
+import SceneStyleMode from './SceneStyleMode';
+import SceneAvatarMode from './SceneAvatarMode';
+import { useSceneGenerate } from '@/hooks/useSceneGenerate';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
