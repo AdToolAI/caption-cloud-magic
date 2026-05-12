@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
         avatar_id,
         theme_pack,
         outfit_id,
-        outfit_label: outfit_label ?? p.label,
+        outfit_label: resolvedLabel,
         perspective: p.id,
         image_url: url,
         storage_path: path,
