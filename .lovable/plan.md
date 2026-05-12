@@ -39,3 +39,8 @@ Die `applyCastToPrompt`-Marker-Logik (`[Cast: …]`) wird um zwei analoge Marker
 - Keine neue Tabelle, kein Migration-File
 - Keine Änderung am Render-Pipeline-Code (Vidu/Hailuo/Compose-Anchor) — die Mention-Resolution-Schicht reicht bereits alle Reference-URLs durch
 - Avatar-Detail-Seite (`/avatars/:id`) bleibt unverändert erreichbar
+
+## ✅ Stage 5 — implementiert
+- `UnifiedAssetPicker.tsx` ersetzt CharacterCastPicker im SceneCard und fügt Locations/Buildings/Props als Chip-Reihen hinzu.
+- `applySceneAssetsToPrompt.ts` injiziert slugifizierte @-Mentions als Auto-Block am Prompt-Anfang (idempotent, reversibel).
+- Sidebar: `/avatars` + `/motion-studio/library` zusammengeführt zu einem Eintrag `/library` ("Cast & World Library"); alte Routen redirecten auf `/library`, `/avatars/:id` bleibt erreichbar.
