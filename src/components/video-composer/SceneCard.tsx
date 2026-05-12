@@ -39,6 +39,7 @@ import SceneReferenceImageUpload from './SceneReferenceImageUpload';
 import { CharacterShotBadge } from './CharacterShotBadge';
 import { CharacterCastPicker } from './CharacterCastPicker';
 import { UnifiedAssetPicker } from './UnifiedAssetPicker';
+import { SceneDirectorBox } from './SceneDirectorBox';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
@@ -1228,6 +1229,56 @@ export default function SceneCard({
                     🔁 Lip-Sync neu rendern
                   </button>
                 )}
+              </div>
+            )}
+            {scene.clipSource.startsWith('ai-') && (
+              <div className="space-y-2">
+                <SceneDirectorBox
+                  scene={scene}
+                  lang={lang as 'en' | 'de' | 'es'}
+                  characters={characters}
+                  libraryCharacters={libCharacters.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    description: c.description ?? null,
+                    reference_image_url: c.reference_image_url ?? undefined,
+                  }))}
+                  locations={brandLocations.map((l) => ({ id: l.id, name: l.name, description: l.description ?? null, reference_image_url: l.reference_image_url }))}
+                  buildings={brandBuildings.map((b) => ({ id: b.id, name: b.name, description: b.description ?? null, reference_image_url: b.reference_image_url }))}
+                  props={brandProps.map((p) => ({ id: p.id, name: p.name, description: p.description ?? null, reference_image_url: p.reference_image_url }))}
+                  onAddCharacter={onAddCharacter}
+                  onApply={({ aiPrompt, dialogScript, characterShots }) => {
+                    const updates: Partial<ComposerScene> = { aiPrompt };
+                    if (dialogScript !== undefined) updates.dialogScript = dialogScript;
+                    if (characterShots && characterShots.length > 0) {
+                      updates.characterShots = characterShots;
+                      updates.characterShot = characterShots[0];
+                    }
+                    if (promptMode === 'structured') {
+                      // Drop back to free mode so the user sees the new prompt verbatim.
+                      updates.promptMode = 'free';
+                    }
+                    onUpdate(updates);
+                  }}
+                  onInsertFollowups={
+                    onInsertScenesAfter
+                      ? (descriptions) => {
+                          onInsertScenesAfter(
+                            scene.id,
+                            descriptions.map((d) => ({
+                              sceneType: scene.sceneType,
+                              durationSeconds: scene.durationSeconds,
+                              clipSource: scene.clipSource,
+                              clipQuality: scene.clipQuality,
+                              // Seed the new scene's prompt with the suggestion so the user can
+                              // refine or re-run the Scene Director on it immediately.
+                              aiPrompt: d,
+                            })),
+                          );
+                        }
+                      : undefined
+                  }
+                />
               </div>
             )}
             {scene.clipSource.startsWith('ai-') && (
