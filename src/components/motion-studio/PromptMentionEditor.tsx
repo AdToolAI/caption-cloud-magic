@@ -77,7 +77,7 @@ function buildSuggestions(
   const locSugg: Suggestion[] = locations
     .filter((l) => l.name && (q === '' || l.name.toLowerCase().includes(q)))
     .map((l) => ({
-      kind: 'location' as const,
+      kind: subKindOf((l as any).tags),
       id: l.id,
       name: l.name,
       description: l.description || l.lighting_notes || '',
