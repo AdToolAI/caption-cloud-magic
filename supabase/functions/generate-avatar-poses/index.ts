@@ -27,17 +27,17 @@ Deno.serve(async (req) => {
     if (!authHeader) throw new Error('Missing authorization header');
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
 
-    const supabaseUser = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const { data: { user }, error: authErr } = await supabaseUser.auth.getUser();
-    if (authErr || !user) throw new Error('Unauthorized');
+    const token = authHeader.replace(/^Bearer\s+/i, '');
+    const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+    if (authErr || !user) {
+      console.error('[generate-avatar-poses] auth failed:', authErr?.message);
+      throw new Error('Unauthorized');
+    }
 
     const { avatar_id } = await req.json();
     if (!avatar_id) throw new Error('avatar_id required');
