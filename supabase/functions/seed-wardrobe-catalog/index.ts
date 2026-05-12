@@ -113,10 +113,13 @@ Deno.serve(async (req) => {
       GENDERS.map((g) => ({ ...s, gender: g })),
     );
 
-    // Skip already-rendered unless forced
-    const { data: existing } = await (supabaseAdmin as any)
+    // Skip already-rendered unless forced — paginate to bypass PostgREST 1000-row default
+    const { data: existing, error: existingErr } = await (supabaseAdmin as any)
       .from('wardrobe_catalog_previews')
-      .select('theme_pack, outfit_id, gender');
+      .select('theme_pack, outfit_id, gender')
+      .range(0, 9999);
+    if (existingErr) console.error('[seed] existing select error', existingErr.message);
+    console.log('[seed] existing rows fetched:', (existing ?? []).length);
     const existingSet = new Set(
       (existing ?? []).map((r: any) => `${r.theme_pack}|${r.outfit_id}|${r.gender}`),
     );
