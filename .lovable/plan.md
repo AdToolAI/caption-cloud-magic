@@ -1,46 +1,69 @@
-## Warum es noch genauso aussieht
+## Ziel
 
-Die Stage-18-Komponenten (`MotionStudioTopStepper`, `StoryboardLeftPane`, `StoryboardScenePlayerList`, `SceneInlinePlayer`, `SceneStyleMode`, `SceneAvatarMode`, `useSceneGenerate`) wurden zwar erstellt — aber **nirgends importiert**:
+Im `SceneAvatarMode` (Storyboard → Avatar-Tab) sind „Wardrobe" und „Pose-Sheet" aktuell **nur Info-Kärtchen ohne Klick**. Wir bauen sie zu einem **Artlist-ähnlichen Wardrobe-System** um: inline klickbar, mit Ganzkörper-Outfit-Varianten in mehreren Themen-Welten (Lifestyle, Historical, Fantasy, Sci-Fi, Sport) — alle mit gelocktem Gesicht via Gemini Image (Nano Banana 2). Beste Preis-Leistung: ~$0.005 pro Outfit.
 
-- `VideoComposerDashboard.tsx` rendert weiterhin `<MotionStudioStepSidebar />` (Zeile 1231) → linke vertikale Workflow-Leiste bleibt sichtbar.
-- `StoryboardTab.tsx` rendert weiterhin `<StoryboardSceneStrip />` + `<StudioPane><SceneCard/></StudioPane>` (Zeilen 469–540) → kein 3-Mode-Switcher, keine Inline-Player rechts.
+---
 
-Der Screenshot bestätigt das exakt: alte vertikale Workflow-Liste, alter Editor unten.
+## Stufe 1 — Wardrobe & Pose-Sheet inline klickbar
 
-## Was zu tun ist (rein visuelles Wiring, keine Logik-Änderungen)
+**`src/components/video-composer/SceneAvatarMode.tsx`**
+- Aus den beiden Hint-Kärtchen werden **expandierbare Panels** (`<Collapsible>` von shadcn) — Klick öffnet das Panel direkt unter dem aktiven Charakter, der Avatar-Stage und Player rechts bleiben sichtbar.
+- Wardrobe-Panel rendert `<AvatarWardrobeSheet avatarId={activeChar.id} />` (existiert bereits, nutzt `VariantPickerGrid` + `generate-avatar-wardrobe`).
+- Pose-Panel rendert `<AvatarPoseSheet avatarId={activeChar.id} />` (existiert bereits).
+- Wenn kein `activeChar`: Hint „Bitte erst einen Cast wählen", Buttons disabled.
+- Auswahl einer Outfit-Variante → schreibt `selectedOutfitVariantId` + `outfitImageUrl` auf `scene` zurück. Stage zeigt sofort die neue Variante.
 
-### 1. Top-Stepper aktivieren (`VideoComposerDashboard.tsx`)
+## Stufe 2 — Themen-Outfits („Artlist-Style")
 
-- Import `MotionStudioStepSidebar` → `MotionStudioTopStepper` (`StepItem` bleibt strukturgleich → Typ lokal beibehalten).
-- "Clips"-Step aus `TABS` (Zeile 670) entfernen, damit der Stepper nur noch **Briefing → Storyboard → Voice → Musik → Export** zeigt. `'clips'` bleibt in `TabId` / `TAB_ORDER` / `TabsContent` erhalten als versteckter Fallback (`?tab=clips` Deep-Link, `persistAndGoToClips`).
-- Layout (Zeile 1229–1239): von `flex gap-6` mit Sidebar links → vertikalem Stack. Stepper kommt **vor** dem `<div className="max-w-7xl ...">` als sticky Top-Bar; darunter bekommt der Tab-Content die volle Breite (`flex-1` Wrapper entfällt).
-- Mobile `<TabsList>` bleibt unverändert.
+**`supabase/functions/generate-avatar-wardrobe/index.ts`**
+- Optionaler Body-Param: `theme_pack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport'` (Default `lifestyle` → keine Regression).
+- Neue Themen-Sets (jeweils 4 Outfits, **Ganzkörper, Studio-BG, Identity-Lock**):
 
-### 2. Storyboard-Layout neu verdrahten (`StoryboardTab.tsx`)
+| Pack | Outfits |
+|---|---|
+| **lifestyle** ✅ schon da | Casual · Formal · Action · Brand |
+| **historical** | Knight in plate armor · Roman Legionary · Viking warrior · Edwardian gentleman/lady |
+| **fantasy** | Wizard with robes · Elven Ranger · Dark Knight · Royal coronation attire |
+| **scifi** | Astronaut suit · Cyberpunk streetwear · Mech-pilot uniform · Holo-suit |
+| **sport** | Football kit · Basketball jersey · Tennis whites · MMA fight gear |
 
-- Imports: `StoryboardSceneStrip` + `StudioPane` raus → `StoryboardLeftPane` + `StoryboardScenePlayerList` + `useSceneGenerate` rein.
-- `useSceneGenerate({ projectId, characters, onOptimisticPatch: (id, patch) => updateScene(id, patch), ensureProject: onEnsurePersisted })` → `generate` + `generating` map.
-- Lokaler State `const [leftMode, setLeftMode] = useState<LeftPaneMode>('editor')`.
-- Block ab Zeile 469 ersetzen:
-  - **Links (`lg:col-span-8`)**: `<StoryboardLeftPane mode={leftMode} onModeChange={setLeftMode} sceneNumber=… editorSlot={<SceneCard …/>} styleSlot={<SceneStyleMode scene={selectedScene} onUpdate=… />} avatarSlot={<SceneAvatarMode scene={selectedScene} characters={characters} onUpdate=… />} />`
-  - **Rechts (`lg:col-span-4`, sticky)**: `<StoryboardScenePlayerList scenes={scenes} selectedSceneId={selectedSceneId} generatingMap={generating} onSelect={setSelectedSceneId} onReorder={onUpdateScenes} onAddScene={addScene} onGenerate={generate} />`
-- `previousSceneOfSelected` + `SceneCutDriftIndicator` bleiben oberhalb der `SceneCard` im `editorSlot` erhalten.
-- Summary-Bar (Zeile 349–406) und Tipps + CastConsistencyMap bleiben unverändert oberhalb. Die "Clips generieren →" CTA bleibt für Power-User (führt jetzt nur noch in den versteckten Clips-Tab).
+- Identity-Lock-Prompt bleibt streng (Gesicht/Proportionen unverändert), Modifier erweitert um „**full-body, head-to-toe, soft neutral studio background, photorealistic**".
+- Modell: weiterhin `google/gemini-3.1-flash-image-preview` via Lovable AI Gateway.
 
-### 3. Sanity-Check der bereits gebauten Sub-Komponenten
+**Migration `avatar_wardrobe_variants`:**
+- Spalte `theme_pack TEXT NOT NULL DEFAULT 'lifestyle'` ergänzen.
+- Alten Unique-Index `(avatar_id, outfit_id)` droppen, neuen anlegen: `(avatar_id, theme_pack, outfit_id)` → mehrere Theme-Sets pro Avatar koexistieren ohne Idempotenz-Konflikt.
 
-- `SceneStyleMode` / `SceneAvatarMode` Props müssen mit dem `selectedScene`-Shape übereinstimmen (`scene`, `onUpdate(updates)`, `characters`). Falls Prop-Namen abweichen → minimaler Anpass-Patch in den jeweiligen Files (kein Logik-Change).
-- `SceneInlinePlayer` muss `scene.clipUrl` + Status-Badge rendern; "Generieren"-Button disabled, wenn `isGenerating` oder kein `aiPrompt`.
+**`AvatarWardrobeSheet`:**
+- Neue Prop `themePack` + Theme-Pack-Pills oberhalb der Grid (Lifestyle · Historical · Fantasy · Sci-Fi · Sport).
+- Query-Key: `['avatar-wardrobe', avatarId, themePack]`.
+- „Generate"-Call schickt `theme_pack` mit.
 
-### Nicht im Scope
+## Stufe 3 — Ganzkörper-Stage („Artlist-Showroom")
 
-- Keine neuen Edge Functions, kein neues Realtime, keine Wallet/i18n-Arbeit.
-- `MotionStudioStepSidebar.tsx` und `StoryboardSceneStrip.tsx` bleiben im Repo (rückwärtskompatibel), werden nur nicht mehr importiert.
-- Avatar-Mode bleibt CSS/Framer-Tilt-Stage (kein echtes Three.js).
+**`AvatarStage3D.tsx`:**
+- Wenn `selectedOutfitVariantId` gesetzt → zeige das **Ganzkörper-Outfit-Bild** statt des Brustbild-Porträts.
+- Optik: weicher Gradient-Boden, Spotlight-Cone, sanfter Parallax-Tilt (existiert bereits), Slow-Float-Animation („lebendiges Schaufenster").
+- Toggle oben rechts: **[Porträt] [Outfit-Showroom]**.
+- Mini-Hint: „Kein 3D-Modell — gerenderte Outfit-Variante mit Identity-Lock" (klein, einklappbar).
 
-### Akzeptanz
+## Out of Scope (bewusst)
 
-Nach dem Wiring zeigt `/video-composer`:
-1. Horizontale Glass-Pill-Stepper-Leiste oben (5 Steps, kein "Clips" mehr).
-2. Im Storyboard-Tab links 3-Mode-Switcher (Editor / Stil / Avatar), rechts Liste von Mini-Playern mit "Generieren"-Button pro Szene.
-3. Klick auf "Generieren" startet `compose-video-clips` für genau diese Szene → Status-Animation im Mini-Player → fertiger Clip erscheint inline, **ohne Tab-Wechsel**.
+- Echtes WebGL-3D-Modell (Trellis/Hunyuan) — nur als optionale Stufe 4 später (Marketing-Wow).
+- Cloth-Rigging / Live-Outfit-Wechsel ohne Re-Render — physisch unmöglich ohne vollständige 3D-Pipeline.
+- Lip-Sync / Wallet / i18n.
+
+## Akzeptanz
+
+1. Klick auf „Wardrobe" im Avatar-Tab öffnet inline ein klickbares Variant-Grid.
+2. Über dem Grid: 5 Theme-Pack-Pills. Wechsel lädt Varianten des aktiven Packs.
+3. „Generate" mit Theme „Historical" produziert 4 Ganzkörper-Outfits (Knight, Roman, Viking, Edwardian) mit unverändertem Gesicht.
+4. Klick auf eine Variante → Stage zeigt das Ganzkörper-Outfit-Bild.
+5. Pose-Sheet öffnet analog inline und ist klickbar.
+6. Kein Tab-Wechsel, Player rechts bleibt sichtbar.
+
+## Kostenschätzung
+
+- 1 Outfit ≈ $0.005 (Gemini 3.1 Flash Image)
+- 1 komplettes Theme-Pack (4 Outfits) ≈ **$0.02**
+- Alle 5 Packs für 1 Avatar ≈ **$0.10** — einmalig, gecacht.
