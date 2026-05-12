@@ -1,20 +1,41 @@
-## Cast & World — Unified Library (live)
+## Stage 5 — Unified Picker & Sidebar-Konsolidierung
 
-### Done
-- Migration: `brand_buildings`, `brand_props` + 3 catalog tables.
-- Hooks: `useBrandBuildings`, `useBrandProps`.
-- `useUnifiedMentionLibrary` aggregiert Buildings + Props.
-- `/library` Hub mit 3 Top-Tabs **People / Locations / Props**.
-- **Locations** hat Sub-Toggle **Environments | Architecture** — Architecture nutzt `brand_buildings` + Building-Catalog (Sacred / Residential / Historical / Fortified [Castles + Bridges] / Modern).
-- World-Themes: Buildings erweitert um `fortified:castles` (4) + `fortified:bridges` (4) → ~32 Architecture-Slots.
-- Resumable `seed-world-catalog` Edge-Function + `CatalogBrowser` (Admin-Seeder).
+Ziel: Im Composer-Storyboard ist der bisherige Cast-Picker auf Charaktere beschränkt — Locations/Buildings/Props müssen umständlich per Hand getippt oder per @-Mention referenziert werden. Stage 5 vereint sie in einem einzigen Picker pro Szene und räumt die Sidebar auf.
 
-### Open
-- Stage 3 ✅ — `generate-world-asset` Edge Function (Nano Banana 2 → brand-locations Bucket → `extract-location-identity` → Insert in `brand_locations`/`brand_buildings`/`brand_props` mit Identity-Card). „Generate with AI" Button im Library-Hub für alle drei Kinds; Assets erscheinen automatisch via `useUnifiedMentionLibrary` in Toolkit + Composer + Vidu/Hailuo i2v.
+### Was gebaut wird
 
-- Stage 4 ✅ — `@-Mention` System voll integriert: `mentionParser` matcht jetzt slugifizierte Namen (`@gothic-cathedral` → "Gothic Cathedral"), Buildings/Props bekommen eigene Sections im resolved Prompt (`Architecture:`, `Props:`), Autocomplete-Dropdown zeigt Building/Prop-Badges + Icons. Reference-Image wird automatisch in Toolkit + Composer (via `composePromptLayers`) injiziert.
+**1) `<UnifiedAssetPicker />`** — neuer Picker pro Composer-Szene mit 4 Tabs:
+- **Cast** (bestehende `CharacterCastPicker`-Logik, max 4 Slots, Shot-Type pro Slot — bleibt 1:1 erhalten)
+- **Locations** (Quelle: `useBrandLocations`, max 1 Slot pro Szene)
+- **Architecture** (Quelle: `useBrandBuildings`, max 1 Slot)
+- **Props** (Quelle: `useBrandProps`, max 3 Slots)
 
-### Open
-- Stage 5: `<UnifiedAssetPicker />` im Composer-Storyboard ersetzt `<CharacterCastPicker />`.
-- Sidebar: „Avatars" / „Locations" auf einen einzigen „Library" Eintrag konsolidieren.
+Tabs zeigen einen Counter-Badge (z. B. "Cast 2 · Loc 1 · Bld 0 · Props 2") und nutzen die Thumbnails aus `reference_image_url`. Suchfeld + „Generate with AI"-Shortcut, der direkt `generate-world-asset` aufruft (gleicher Flow wie im `/library`-Hub).
 
+**2) Persistenz ohne Schema-Änderung** — Locations/Buildings/Props werden als slugifizierte `@mentions` an den Anfang des Scene-Prompts injiziert (z. B. `@gothic-cathedral @vintage-camera`). Dadurch:
+- Kein DB-Schema-Update nötig
+- `resolveMentions` + `useUnifiedMentionLibrary` injizieren automatisch die Reference-Images für Vidu Q2 (Multi-Reference), Hailuo i2v und Nano-Banana-Anchor — die Pipeline existiert bereits
+- @-Mentions im Prompt-Editor und der Picker bleiben in Sync (Add im Picker → Mention erscheint im Prompt; Tippen einer Mention → Picker zeigt sie als ausgewählt)
+
+Die `applyCastToPrompt`-Marker-Logik (`[Cast: …]`) wird um zwei analoge Marker erweitert: `[Setting: …]` und `[Props: …]`. Beide sind idempotent (regex-basiert ersetzbar) und werden vom Mention-Resolver beim Hydraten ignoriert, sodass keine Doppel-Sektion entsteht.
+
+**3) Sidebar / Hub-Konsolidierung** — in `src/config/hubConfig.ts`:
+- Zeile 89 `/avatars` → entfernen
+- Zeile 90 `/motion-studio/library` → entfernen
+- Neu: ein einziger Eintrag **`/library`** mit Titel „Cast & World Library" und Beschreibung „Avatare, Locations, Buildings & Props — alles in einer Bibliothek"
+- `/avatars` und `/motion-studio/library` als Routen erhalten und dort eine `<Navigate to="/library" replace />` Redirect-Komponente, damit alte Bookmarks nicht brechen
+
+### Technische Details
+
+- Neuer Komponentenpfad: `src/components/video-composer/UnifiedAssetPicker.tsx`
+- Helper-Modul: `src/lib/motion-studio/applySceneAssetsToPrompt.ts` (analog zu `applyCastToPrompt.ts`, exportiert `applySettingMarker` + `applyPropsMarker`)
+- `SceneCard.tsx` Zeile 912: `<CharacterCastPicker>` durch `<UnifiedAssetPicker>` ersetzen, Props-Mapping ergänzen (`locations`, `buildings`, `props` aus den drei Hooks)
+- Scene-Datentyp bleibt unverändert — alle neuen Assets leben im `prompt`-String als Mentions
+- `hubConfig.ts`: 2 Items entfernt, 1 Item `/library` mit Icon `Sparkles` (oder `Library` aus lucide-react) ergänzt
+- `App.tsx`: Routen `/avatars` und `/motion-studio/library` zeigen weiter auf ihre Detail-Seiten **NUR** wenn Pfad-Suffix existiert (`/avatars/:id` bleibt für AvatarDetail); reine Listen-Routen redirecten auf `/library`
+
+### Out of scope (explizit nicht in dieser Stage)
+
+- Keine neue Tabelle, kein Migration-File
+- Keine Änderung am Render-Pipeline-Code (Vidu/Hailuo/Compose-Anchor) — die Mention-Resolution-Schicht reicht bereits alle Reference-URLs durch
+- Avatar-Detail-Seite (`/avatars/:id`) bleibt unverändert erreichbar
