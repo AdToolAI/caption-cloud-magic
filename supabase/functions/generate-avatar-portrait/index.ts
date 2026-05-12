@@ -81,7 +81,7 @@ Deno.serve(async (req) => {
           {
             role: 'user',
             content: [
-              { type: 'text', text: PORTRAIT_PROMPT },
+              { type: 'text', text: PORTRAIT_PROMPTS[portraitVariant] },
               { type: 'image_url', image_url: { url: sourceUrl } },
             ],
           },
