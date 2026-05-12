@@ -18,11 +18,14 @@ export function useAvatarPortrait() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const generate = async (characterId: string): Promise<AvatarPortraitResult | null> => {
+  const generate = async (
+    characterId: string,
+    variant: 'hedra' | 'default_outfit' = 'hedra',
+  ): Promise<AvatarPortraitResult | null> => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('generate-avatar-portrait', {
-        body: { character_id: characterId },
+        body: { character_id: characterId, variant },
       });
       if (error) throw error;
       if (!data?.portrait_url) throw new Error('No portrait returned');
@@ -30,7 +33,10 @@ export function useAvatarPortrait() {
       queryClient.invalidateQueries({ queryKey: ['brand-characters'] });
       toast({
         title: 'Portrait generated',
-        description: 'Hedra-optimized frontal portrait saved to this avatar.',
+        description:
+          variant === 'default_outfit'
+            ? 'Clean studio portrait saved — ready for wardrobe.'
+            : 'Hedra-optimized frontal portrait saved to this avatar.',
       });
       return data as AvatarPortraitResult;
     } catch (e) {
