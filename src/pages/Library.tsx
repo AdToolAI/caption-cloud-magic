@@ -2,7 +2,7 @@
 // Buildings and Props in a single Hub. Replaces the standalone
 // /avatars and /locations pages while keeping their detail routes intact.
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -35,13 +35,12 @@ import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 
-type TabKey = 'people' | 'locations' | 'buildings' | 'props';
+type TabKey = 'people' | 'locations' | 'props';
 
-const TABS: { key: TabKey; label: string; icon: typeof Users; cta: string }[] = [
-  { key: 'people', label: 'People', icon: Users, cta: 'New Avatar' },
-  { key: 'locations', label: 'Locations', icon: MapPin, cta: 'New Location' },
-  { key: 'buildings', label: 'Buildings', icon: Building2, cta: 'New Building' },
-  { key: 'props', label: 'Props', icon: Package, cta: 'New Prop' },
+const TABS: { key: TabKey; label: string; icon: typeof Users }[] = [
+  { key: 'people', label: 'People', icon: Users },
+  { key: 'locations', label: 'Locations', icon: MapPin },
+  { key: 'props', label: 'Props', icon: Package },
 ];
 
 const Library = () => {
@@ -52,6 +51,7 @@ const Library = () => {
   const setTab = (next: TabKey) => {
     setParams((p) => {
       p.set('tab', next);
+      p.delete('sub');
       return p;
     });
   };
@@ -62,7 +62,7 @@ const Library = () => {
         <title>Cast & World — Your unified asset library | useadtool</title>
         <meta
           name="description"
-          content="One library for every visual building block of your videos: people, locations, buildings and props — all reusable, all consistent."
+          content="One library for every visual building block of your videos: people, locations, architecture and props — all reusable, all consistent."
         />
       </Helmet>
 
@@ -75,7 +75,7 @@ const Library = () => {
             </div>
             <h1 className="font-serif text-4xl md:text-5xl">Your Asset Library</h1>
             <p className="text-muted-foreground mt-2 max-w-2xl">
-              People, places, buildings and props — all stored as reusable identities so
+              People, places, architecture and props — all stored as reusable identities so
               every scene you generate stays visually consistent.
             </p>
           </header>
@@ -99,10 +99,6 @@ const Library = () => {
 
             <TabsContent value="locations">
               <LocationsTab />
-            </TabsContent>
-
-            <TabsContent value="buildings">
-              <BuildingsTab />
             </TabsContent>
 
             <TabsContent value="props">
@@ -175,12 +171,49 @@ function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
 }
 
 // ============================================================
-// Tab: Locations
+// Tab: Locations  (Sub-Toggle: Environments | Architecture)
 // ============================================================
 function LocationsTab() {
+  const [params, setParams] = useSearchParams();
+  const sub = (params.get('sub') as 'env' | 'arch') || 'env';
+
+  const setSub = (next: 'env' | 'arch') => {
+    setParams((p) => {
+      p.set('tab', 'locations');
+      p.set('sub', next);
+      return p;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="inline-flex p-1 rounded-full bg-muted/40 border border-border/40 text-xs">
+        <button
+          onClick={() => setSub('env')}
+          className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${
+            sub === 'env' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <MapPin className="h-3.5 w-3.5" /> Environments
+        </button>
+        <button
+          onClick={() => setSub('arch')}
+          className={`px-3 py-1.5 rounded-full transition flex items-center gap-1.5 ${
+            sub === 'arch' ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Building2 className="h-3.5 w-3.5" /> Architecture
+        </button>
+      </div>
+
+      {sub === 'env' ? <EnvironmentsPane /> : <ArchitecturePane />}
+    </div>
+  );
+}
+
+function EnvironmentsPane() {
   const { locations, isLoading, createLocation, toggleFavorite, archiveLocation } =
     useBrandLocations();
-
   return (
     <AssetTabBody
       kind="location"
@@ -191,19 +224,15 @@ function LocationsTab() {
       onToggleFavorite={(id, fav) => toggleFavorite.mutate({ id, is_favorite: fav })}
       onArchive={(id) => archiveLocation.mutate(id)}
       icon={MapPin}
-      emptyTitle="No locations yet"
-      emptyBody="Add your first location to lock atmosphere across scenes — wheat fields, neon alleys, modern offices."
+      emptyTitle="No environments yet"
+      emptyBody="Add your first environment to lock atmosphere across scenes — wheat fields, neon alleys, modern offices."
     />
   );
 }
 
-// ============================================================
-// Tab: Buildings
-// ============================================================
-function BuildingsTab() {
+function ArchitecturePane() {
   const { buildings, isLoading, createBuilding, toggleFavorite, archiveBuilding } =
     useBrandBuildings();
-
   return (
     <AssetTabBody
       kind="building"
@@ -214,8 +243,8 @@ function BuildingsTab() {
       onToggleFavorite={(id, fav) => toggleFavorite.mutate({ id, is_favorite: fav })}
       onArchive={(id) => archiveBuilding.mutate(id)}
       icon={Building2}
-      emptyTitle="No buildings yet"
-      emptyBody="Save churches, houses, castles, temples or modern architecture to drop them into any scene as a consistent backdrop."
+      emptyTitle="No architecture yet"
+      emptyBody="Save churches, houses, castles, temples, skyscrapers or bridges to drop them into any scene as a consistent backdrop."
     />
   );
 }
