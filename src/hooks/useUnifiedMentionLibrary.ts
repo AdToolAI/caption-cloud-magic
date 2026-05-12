@@ -17,6 +17,7 @@ import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
+import { useWorldCatalog } from '@/hooks/useWorldCatalog';
 import type {
   MotionStudioCharacter,
   MotionStudioLocation,
