@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
-import { Plus, Sparkles, Lock, Users, Wrench, Loader2 } from 'lucide-react';
+import { Plus, Sparkles, Lock, Users, Wrench, Loader2, ImageIcon } from 'lucide-react';
 import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { BrandCharacterCard } from '@/components/brand-characters/BrandCharacterCard';
 import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
@@ -18,6 +18,7 @@ const BrandCharacters = () => {
   const { characters, isLoading } = useBrandCharacters();
   const [addOpen, setAddOpen] = useState(false);
   const [repairing, setRepairing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const queryClient = useQueryClient();
 
   const handleRepair = async () => {
