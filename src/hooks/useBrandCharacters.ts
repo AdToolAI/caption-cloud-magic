@@ -57,6 +57,7 @@ export const useBrandCharacters = () => {
       name: string;
       description?: string;
       file: File;
+      gender?: 'male' | 'female' | 'neutral';
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
