@@ -1,97 +1,59 @@
-## Ziel
+## Problem
 
-Zwei zusammenhängende Erweiterungen der Avatar Library:
+1. **Wardrobe-Generierung schlägt fehl** mit `Edge Function returned a non-2xx status code`. Edge-Function-Logs zeigen wiederholt `error: Unauthorized`. Der User ist eingeloggt (Sidebar zeigt 22 Credits, Notifications aktiv) und ruft `supabase.functions.invoke('generate-avatar-wardrobe', …)` korrekt auf — der `Authorization`-Header wird also gesendet. Trotzdem schlägt `supabaseUser.auth.getUser()` in der Edge Function fehl.
 
-1. **Preset-Avatar-Bibliothek** — Eine kuratierte Auswahl an fertigen Avataren, die jeder Nutzer ohne Upload sofort verwenden kann.
-2. **Auto-Standard-Portrait beim Erstellen** — Beim Hochladen eines eigenen Charakterbildes wird automatisch ein "Default Outfit"-Portrait via Gemini erzeugt, das danach genauso wie eigene Fotos via Wardrobe umgezogen werden kann.
-
----
-
-## Teil 1 — Preset Avatar Library
-
-**Konzept:** 12 kuratierte System-Avatare (gemischt: Geschlecht, Alter, Ethnie, Stil — z.B. *Business Woman*, *Casual Guy*, *Creative Artist*, *Senior Mentor*, *Athletic Trainer*, *Tech Founder*, *Doctor*, *Teacher*, *Influencer*, *Chef*, *Designer*, *Speaker*).
-
-**UI** auf `/brand-characters`:
-- Neuer Tab/Sektion **"Preset Avatars"** über dem eigenen Grid (Carousel oder 3×4 Grid).
-- Jede Karte: Portrait + Name + Rolle + Button **"Use this Avatar"** → klont den Preset als persönlichen Avatar in `brand_characters` (mit eigenem `user_id`), inkl. portrait_url, identity_json, voice. Danach voll editierbar/wardrobe-fähig.
-- Solange der Nutzer noch keinen Avatar hat: Empty-State zeigt direkt die Presets statt nur "Create First".
-
-**Daten-Modell:**
-- Neue Tabelle `system_preset_avatars` (oder Reuse von `brand_characters` mit `user_id = NULL` + Flag `is_system_preset = true`). Empfehlung: **eigene Tabelle** `system_preset_avatars` für saubere Trennung.
-- Spalten: `id`, `name`, `role_label`, `gender`, `description`, `portrait_url`, `reference_image_url`, `visual_identity_json`, `default_voice_id`, `sort_order`, `is_active`.
-- RLS: `SELECT` für `authenticated` (alle dürfen lesen), `INSERT/UPDATE/DELETE` nur Admin.
-
-**Klon-Flow:**
-- Neue Edge Function `clone-preset-avatar` (nimmt `preset_id`):
-  1. Lädt Preset-Row.
-  2. Kopiert `portrait_url` + `reference_image_url` aus System-Bucket → `brand-characters/{user_id}/...` (RLS-konformer Pfad).
-  3. Insert in `brand_characters` mit `user_id = auth.uid()`, identity_json, default_voice_id, `cloned_from_preset = preset_id`.
-  4. Returnt neue `character_id`.
-- Frontend: neuer Hook `usePresetAvatars()` + `useClonePresetAvatar()`.
-
-**Seeding:**
-- 12 Portraits werden mit Gemini Image (premium) generiert, in `system-preset-avatars` Storage-Bucket (public read) abgelegt, dann via Migration als Rows seeded. Identity-Cards lassen wir vom bestehenden `extract-character-identity` Edge-Function generieren.
-
-**Marktplatz-Verhältnis:** Klar abgegrenzt — Presets sind **kostenlos und global**, der Marketplace bleibt für bezahlte Community-Charaktere. `useAccessibleCharacters` muss nicht angefasst werden, da Klone normale `brand_characters` werden.
+2. **Bestehende Avatare** (vor Stage 22 erstellt — z.B. Matthew & Sarah Dusatko im Screenshot) haben **kein** sauberes "default-outfit Portrait", weil das nur in `createCharacter` automatisch ausgelöst wird. Sie sehen entsprechend mit Originalbild aus, und die Wardrobe-Restyles erben Outfit/Lichtsetting des Originals statt der sauberen Studio-Base.
 
 ---
 
-## Teil 2 — Auto-Standard-Portrait beim Avatar-Upload
+## Lösung
 
-**Heute:** Bei `createCharacter` wird das Originalbild gespeichert + Identity-Card extrahiert. `portrait_url` bleibt leer, bis der Nutzer im Detail-View manuell auf "Generate Portrait" klickt.
+### Teil 1 — Auth-Fix in `generate-avatar-wardrobe`
 
-**Neu:** Direkt im Upload-Flow wird automatisch ein **"Standard Outfit"-Portrait** mitgeneriert.
+Den fragilen `supabaseUser.auth.getUser()`-Pfad (eigener anon-Client, der `/auth/v1/user` mit dem User-JWT aufruft) ersetzen durch das robuste Pattern, das wir in anderen kürzlich gefixten Functions nutzen: **Token aus dem Header extrahieren und direkt mit dem Service-Role-Client `supabaseAdmin.auth.getUser(token)` validieren**. Das umgeht potenzielle Edge-Cases mit Signing-Keys/legacy ANON_KEY-Mismatch.
 
-**Was bedeutet "Standard Outfit"?** Neutral, Studio-Look, weißer Hintergrund, schlichtes graues T-Shirt / dunkler Pullover (geschlechtsadaptiert), eye-level, frontal, schultern sichtbar — dieser dient als **kanonischer Base-Frame** für alle Wardrobe-Variants (genau wie bei Presets).
+```ts
+const token = authHeader.replace(/^Bearer\s+/i, '');
+const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+if (authErr || !user) throw new Error('Unauthorized');
+```
 
-**Implementierung:**
-1. **`generate-avatar-portrait` Edge Function erweitern:**
-   - Prompt-Variante `'default_outfit'` hinzufügen, die explizit "wearing a clean neutral grey t-shirt / dark sweater, plain white studio backdrop, soft key light" enthält (Identitäts-Lock bleibt).
-   - Akzeptiert optional `{ variant: 'hedra' | 'default_outfit' }`. Default bleibt 'hedra' für Rückwärtskompatibilität.
-   - Speichert in den bestehenden `portrait_url` und setzt `portrait_mode = 'auto_default_outfit'`.
-2. **`useBrandCharacters.createCharacter` erweitern:**
-   - Nach dem Insert: `await supabase.functions.invoke('generate-avatar-portrait', { body: { character_id: row.id, variant: 'default_outfit' }})`.
-   - Non-blocking visual: Toast "Avatar saved — generating standard portrait…", danach Refetch. Wenn der Portrait-Call fehlschlägt → soft-fail mit Hinweis-Toast, der Avatar bleibt nutzbar.
-3. **`AddBrandCharacterDialog`:** Loading-State zeigt jetzt 2 Steps:
-   - "Extracting identity…" (wie bisher)
-   - "Generating standard portrait…" (neu, ~10–20s)
-4. **Wardrobe:** Funktioniert automatisch — die existierende `generate-avatar-wardrobe` Function nutzt `portrait_url` als Identity-Lock-Source. Da das Standard-Outfit jetzt ein sauberer Studio-Frame ist, werden die Wardrobe-Outfits sogar konsistenter.
+Damit fällt der separate `supabaseUser`-Client komplett weg. Auth-Header wird trotzdem gefordert. Logging um den genauen Fehler erweitern (`authErr?.message`) damit künftige Auth-Probleme sofort sichtbar sind.
 
-**Kosten:** ~$0.005 zusätzlich pro Avatar-Erstellung (Gemini 3.1 Flash Image). Keine zusätzliche Credit-Verrechnung nötig (wie bei Wardrobe heute auch).
+### Teil 2 — "Generate Default Portrait" für bestehende Avatare
+
+Zwei Touchpoints, beide nutzen die **bereits existierende** `generate-avatar-portrait` Edge Function mit `variant: 'default_outfit'` (kostet ~$0.005 pro Avatar via Gemini 3.1 Flash Image):
+
+**A) Per-Avatar Button auf der Avatar-Karte**
+- Neuer kleiner Button "Generate Studio Portrait" (Sparkles-Icon) auf `BrandCharacterCard.tsx`, sichtbar wenn `portrait_mode !== 'auto_default_outfit'` oder wenn der User es erneuern will.
+- Nutzt den bestehenden `useAvatarPortrait`-Hook, ergänzt um optionalen `variant`-Parameter (`'hedra' | 'default_outfit'`, default `'default_outfit'`).
+- Spinner-State während Generierung, Toast bei Fertig.
+
+**B) Bulk-Backfill Aktion auf `/brand-characters`**
+- Neuer Outline-Button neben "Repair images" → **"Generate studio portraits"**.
+- Iteriert sequentiell über alle eigenen Charaktere, bei denen `portrait_mode !== 'auto_default_outfit'`, und ruft `generate-avatar-portrait` mit `variant: 'default_outfit'` auf.
+- Progress-Toast (`x / y abgeschlossen`), abschließend Invalidate von `['brand-characters']`.
+- Confirm-Dialog vorab mit Hinweis auf ungefähre Dauer (~10–20s pro Avatar) und dass das alte Portrait überschrieben wird.
+
+### Out of Scope
+- Kein zusätzliches DB-Migration nötig (`portrait_mode`-Spalte existiert seit Stage 22, `generate-avatar-portrait` schreibt sie bereits).
+- Keine Änderung an `generate-avatar-portrait` selbst.
+- Keine Änderung an `clone-preset-avatar` (Preset-Avatare haben bereits saubere Portraits aus dem Seeder).
 
 ---
 
 ## Geänderte Dateien
 
-**Teil 1 (Preset Library):**
-- *Migration:* `system_preset_avatars` Tabelle + RLS + `system-preset-avatars` Storage-Bucket (public read)
-- *Migration:* `brand_characters.cloned_from_preset` Spalte (uuid, nullable)
-- *Edge Function (neu):* `supabase/functions/clone-preset-avatar/index.ts`
-- *Edge Function (neu, einmalig):* `seed-preset-avatars` (generiert Portraits + Identity-Cards für die 12 Presets)
-- *Hook (neu):* `src/hooks/usePresetAvatars.ts`
-- *Component (neu):* `src/components/brand-characters/PresetAvatarGallery.tsx`
-- *Edit:* `src/pages/BrandCharacters.tsx` (Tab + Empty-State integration)
-
-**Teil 2 (Auto-Portrait):**
-- *Edit:* `supabase/functions/generate-avatar-portrait/index.ts` (variant param + default_outfit prompt)
-- *Edit:* `src/hooks/useBrandCharacters.ts` (auto-invoke nach Insert)
-- *Edit:* `src/components/brand-characters/AddBrandCharacterDialog.tsx` (2-Step-Loading)
-
-**Memory:** Update `mem://features/avatars/avatar-library` (Preset Library + Auto Default-Outfit Portrait).
+- **edited** `supabase/functions/generate-avatar-wardrobe/index.ts` — Auth-Pattern auf Service-Role-validate-Token umgestellt + besseres Error-Logging.
+- **edited** `src/hooks/useAvatarPortrait.ts` — optionaler `variant`-Parameter.
+- **edited** `src/components/brand-characters/BrandCharacterCard.tsx` — "Generate Studio Portrait"-Button.
+- **edited** `src/pages/BrandCharacters.tsx` — "Generate studio portraits"-Bulk-Button mit Progress-Toast.
 
 ---
 
-## Out of Scope
+## Validierung
 
-- Mehrere Portrait-Varianten (Hedra-Frontal **und** Default-Outfit nebeneinander) — wir überschreiben bewusst das eine `portrait_url`-Feld. Wenn später gewünscht: separate Spalte `default_outfit_url` ergänzen.
-- Preset-Marktplatz / Premium-Presets / User-shared Presets — bleibt im Marketplace-Modul.
-- Auto-Wardrobe-Vorgenerierung beim Klonen eines Presets — bleibt on-demand wie heute (~$0.02 pro Sub-Pack).
-
----
-
-## Offene Frage (1)
-
-Wieviele Preset-Avatare sollen wir launchen?
-- **A) 6 Stück** — schnell, fokussiert (3♀ / 3♂, Mix aus Business/Casual/Creative)
-- **B) 12 Stück** *(empfohlen)* — solide Auswahl mit Diversität in Geschlecht/Alter/Stil
-- **C) 24 Stück** — breite Bibliothek inkl. Nischenrollen (Doctor, Chef, Athlete, Speaker, …)
+1. Edge Function `generate-avatar-wardrobe` redeployen, einmal aus dem UI triggern, Logs prüfen → erwarten: `start … done`, kein `Unauthorized`.
+2. Auf einem Bestands-Avatar (z.B. Matthew Dusatko) per Karten-Button "Generate Studio Portrait" klicken → neue saubere Portrait-URL erscheint.
+3. Bulk-Button auf `/brand-characters` einmal laufen lassen → alle Bestands-Avatare bekommen das default-outfit Portrait.
+4. Anschließend Wardrobe-Sheet → "Generate Wardrobe Sheet" für Medieval testen → 4 Outfits werden erfolgreich generiert.
