@@ -33,6 +33,7 @@ import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
+import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
 
 type TabKey = 'people' | 'locations' | 'buildings' | 'props';
 
@@ -259,6 +260,7 @@ interface AssetTabBodyProps {
 }
 
 function AssetTabBody({
+  kind,
   label,
   items,
   isLoading,
@@ -300,6 +302,8 @@ function AssetTabBody({
           <Plus className="h-4 w-4 mr-2" /> New {label}
         </Button>
       </div>
+
+      <CatalogBrowser kind={kind} />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
