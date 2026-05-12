@@ -12,7 +12,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { User, MapPin, AtSign } from 'lucide-react';
+import { User, MapPin, AtSign, Building2, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
 import {
@@ -34,7 +34,7 @@ interface PromptMentionEditorProps {
 }
 
 interface Suggestion {
-  kind: 'character' | 'location';
+  kind: 'character' | 'location' | 'building' | 'prop';
   id: string;
   name: string;
   description: string;
@@ -43,9 +43,20 @@ interface Suggestion {
 
 const MAX_SUGGESTIONS = 8;
 
-/** Convert a free-form name into a valid `@token` (no spaces, no punctuation). */
+/** Convert a free-form name into a valid `@token`: lowercase, hyphenated, no punctuation. */
 function nameToToken(name: string): string {
-  return name.trim().replace(/\s+/g, '_').replace(/[^A-Za-z0-9_\-]/g, '');
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '');
+}
+
+function subKindOf(tags: string[] | undefined): 'building' | 'prop' | 'location' {
+  if (!tags) return 'location';
+  if (tags.includes('building')) return 'building';
+  if (tags.includes('prop')) return 'prop';
+  return 'location';
 }
 
 function buildSuggestions(
@@ -66,7 +77,7 @@ function buildSuggestions(
   const locSugg: Suggestion[] = locations
     .filter((l) => l.name && (q === '' || l.name.toLowerCase().includes(q)))
     .map((l) => ({
-      kind: 'location' as const,
+      kind: subKindOf((l as any).tags),
       id: l.id,
       name: l.name,
       description: l.description || l.lighting_notes || '',
@@ -210,8 +221,23 @@ export default function PromptMentionEditor({
             Library — {suggestions.length} match{suggestions.length === 1 ? '' : 'es'}
           </div>
           {suggestions.map((s, i) => {
-            const Icon = s.kind === 'character' ? User : MapPin;
+            const Icon =
+              s.kind === 'character'
+                ? User
+                : s.kind === 'building'
+                  ? Building2
+                  : s.kind === 'prop'
+                    ? Package
+                    : MapPin;
             const isActive = i === activeIndex;
+            const badgeTone =
+              s.kind === 'character'
+                ? 'text-primary border-primary/30'
+                : s.kind === 'building'
+                  ? 'text-amber-400 border-amber-400/30'
+                  : s.kind === 'prop'
+                    ? 'text-emerald-400 border-emerald-400/30'
+                    : 'text-accent border-accent/30';
             return (
               <button
                 key={`${s.kind}-${s.id}`}
@@ -241,12 +267,7 @@ export default function PromptMentionEditor({
                     <span className="font-medium truncate">{s.name}</span>
                     <Badge
                       variant="outline"
-                      className={cn(
-                        'text-[8px] h-3 px-1 border-border/40',
-                        s.kind === 'character'
-                          ? 'text-primary border-primary/30'
-                          : 'text-accent border-accent/30'
-                      )}
+                      className={cn('text-[8px] h-3 px-1 border-border/40', badgeTone)}
                     >
                       {s.kind}
                     </Badge>
@@ -269,8 +290,9 @@ export default function PromptMentionEditor({
           className="absolute left-0 right-0 mt-1 z-50 rounded-md border border-dashed border-border/60 bg-popover/95 px-3 py-2 text-[10px] text-muted-foreground"
           onMouseDown={(e) => e.preventDefault()}
         >
-          Keine Library-Treffer für „@{trigger.query}". Lege Charaktere &
-          Locations unter <span className="text-primary">/motion-studio/library</span> an.
+          Keine Library-Treffer für „@{trigger.query}". Lege Charaktere,
+          Locations, Buildings & Props unter{' '}
+          <span className="text-primary">/library</span> an.
         </div>
       )}
     </div>

@@ -45,10 +45,27 @@ export interface ResolvedPrompt {
  * Names are matched case-insensitive and accept hyphens / underscores
  * inside the @-tag (e.g. `@Sarah_Kim`, `@coffee-shop`).
  */
+/** Slugify a name to match `@token` form: lowercase, spaces→`-`, strip punctuation. */
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9\-]/g, '');
+}
+
 function buildIndex<T extends { name: string }>(items: T[]): Map<string, T> {
   const map = new Map<string, T>();
   for (const item of items) {
-    if (item?.name) map.set(item.name.toLowerCase(), item);
+    if (!item?.name) continue;
+    const lower = item.name.toLowerCase();
+    map.set(lower, item);
+    // Also accept slugified form so `@gothic-cathedral` resolves "Gothic Cathedral".
+    const slug = slugify(item.name);
+    if (slug && !map.has(slug)) map.set(slug, item);
+    // And underscore-normalized form.
+    const under = slug.replace(/-/g, '_');
+    if (under && !map.has(under)) map.set(under, item);
   }
   return map;
 }
@@ -132,6 +149,8 @@ export function resolveMentions(
   const seenLocs = new Set<string>();
   const charLines: string[] = [];
   const locLines: string[] = [];
+  const buildingLines: string[] = [];
+  const propLines: string[] = [];
 
   for (const m of matches) {
     if (m.kind === 'character' && !seenChars.has(m.id)) {
@@ -151,7 +170,11 @@ export function resolveMentions(
         const lighting = l.lighting_notes?.trim();
         const desc = l.description?.trim();
         const parts = [desc, lighting ? `Lighting: ${lighting}` : null].filter(Boolean);
-        locLines.push(`- ${l.name}: ${parts.join(' — ') || 'recurring location'}`);
+        const line = `- ${l.name}: ${parts.join(' — ') || 'recurring asset'}`;
+        const tags = (l.tags ?? []) as string[];
+        if (tags.includes('building')) buildingLines.push(line);
+        else if (tags.includes('prop')) propLines.push(line);
+        else locLines.push(line);
       }
     }
   }
@@ -162,6 +185,12 @@ export function resolveMentions(
   }
   if (locLines.length > 0) {
     blocks.push(`Setting:\n${locLines.join('\n')}`);
+  }
+  if (buildingLines.length > 0) {
+    blocks.push(`Architecture (keep landmarks consistent):\n${buildingLines.join('\n')}`);
+  }
+  if (propLines.length > 0) {
+    blocks.push(`Props (keep object designs consistent):\n${propLines.join('\n')}`);
   }
 
   // Pick a reference image: prefer single character, fallback to single location.
