@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Loader2, Sparkles, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
 /**
@@ -218,7 +217,6 @@ interface Props {
 
 export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout = 'sheet', initialPack }: Props) {
   const initial = parseInitial(initialPack);
-  const qc = useQueryClient();
   const [theme, setTheme] = useState<WardrobeTheme>(initial.theme);
   const [sub, setSub] = useState<string>(initial.sub);
 
@@ -231,8 +229,6 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   useEffect(() => {
     if (genderLocked) setGender(avatarGender as 'male' | 'female');
   }, [avatarGender, genderLocked]);
-
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // When theme changes, snap to the first sub-pack of that theme.
   useEffect(() => {
@@ -270,15 +266,18 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
       if (error) throw error;
       return (data || []) as Array<{ outfit_id: string; outfit_label: string; image_url: string; gender: string }>;
     },
+    refetchInterval: (q) => {
+      const rows = (q.state.data as any[] | undefined) ?? [];
+      // Auto-refetch while catalog is still being seeded for this combo
+      return rows.length < 4 ? 8000 : false;
+    },
   });
 
   const variantsBySlot = useMemo(() => {
     const map = new Map<string, VariantRecord & { isUser: boolean }>();
-    // Catalog first (placeholder previews)
     for (const c of catalog) {
       map.set(c.outfit_id, { variantId: '', label: c.outfit_label, imageUrl: c.image_url, isUser: false });
     }
-    // User overrides win
     for (const u of userOutfits) {
       map.set(u.outfit_id, { variantId: u.id, label: u.label, imageUrl: u.image_url, isUser: true });
     }
@@ -286,31 +285,6 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   }, [catalog, userOutfits]);
 
   const isLoading = loadingUser || loadingCatalog;
-  const hasUserOverrides = userOutfits.length > 0;
-  // Catalog still warming up for this combo (rare during rollout). Don't block — show skeletons.
-  const catalogPending = !isLoading && catalog.length === 0 && !hasUserOverrides;
-
-  const handleGenerate = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const { error } = await supabase.functions.invoke('generate-avatar-wardrobe', {
-        body: {
-          avatar_id: avatarId,
-          theme,
-          sub_pack: sub,
-          gender: genderLocked ? avatarGender : gender,
-        },
-      });
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, compositeKey] });
-      toast.success(`Generated 4 outfits — ${activeSub.label}`);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to generate outfits');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   return (
     <div className="space-y-3">
@@ -393,41 +367,12 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
         )}
       </div>
 
-      {/* Inline "Personalize with my avatar" — optional upgrade above the grid */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <p className="text-[10.5px] text-muted-foreground">
-          {hasUserOverrides
-            ? <>Showing <span className="text-primary font-semibold">your avatar</span> in {activeSub.label}.</>
-            : catalogPending
-              ? <>Catalog preview wird vorbereitet… Modelle erscheinen gleich.</>
-              : <>Generic model previews — outfits are locked, faces are neutral.</>}
-        </p>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary transition-all',
-            'hover:bg-primary/15 hover:border-primary/60 disabled:opacity-50',
-          )}
-          title="Render these 4 outfits with your avatar's face (~30s)"
-        >
-          {isGenerating ? (
-            <><Loader2 className="h-2.5 w-2.5 animate-spin" /> Personalizing…</>
-          ) : (
-            <><Sparkles className="h-2.5 w-2.5" /> {hasUserOverrides ? 'Re-render with my face' : 'Use my face (~30s)'}</>
-          )}
-        </button>
-      </div>
-
       <VariantPickerGrid
         axis="wardrobe"
         slots={activeSub.slots}
         variantsBySlot={variantsBySlot}
-        isLoading={isLoading || isGenerating}
-        isGenerating={isGenerating}
+        isLoading={isLoading}
         layout={layout}
-        onGenerate={handleGenerate}
         onSelect={(slotId, variant) => {
           onSelect?.({
             variantId: variant.variantId || null,
