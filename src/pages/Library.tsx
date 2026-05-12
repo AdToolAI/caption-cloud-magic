@@ -2,7 +2,7 @@
 // Buildings and Props in a single Hub. Replaces the standalone
 // /avatars and /locations pages while keeping their detail routes intact.
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
