@@ -81,6 +81,8 @@ export function useUnifiedMentionLibrary(): {
 } {
   const { data: brandChars = [], isLoading: charsLoading } = useAccessibleCharacters();
   const { locations: brandLocs = [], isLoading: locsLoading } = useBrandLocations();
+  const { buildings: brandBuildings = [], isLoading: buildingsLoading } = useBrandBuildings();
+  const { props: brandProps = [], isLoading: propsLoading } = useBrandProps();
   const { characters: msChars = [], locations: msLocs = [], loading: msLoading } =
     useMotionStudioLibrary();
 
@@ -122,14 +124,31 @@ export function useUnifiedMentionLibrary(): {
     () => [...outfitChars, ...dedupe(brandChars.map(adaptCharacter), msChars)],
     [outfitChars, brandChars, msChars],
   );
-  const locations = useMemo(
-    () => dedupe(brandLocs.map(adaptLocation), msLocs),
-    [brandLocs, msLocs],
-  );
+  // Locations slot also carries Buildings + Props as mentionable scene
+  // references — the resolver feeds them as extra reference URLs to Vidu /
+  // Hailuo / Nano Banana 2 anchor composition.
+  const locations = useMemo(() => {
+    const tagged = (rows: any[], tag: string) =>
+      rows.map((r) => ({ ...adaptLocation(r), tags: [...(r.tags ?? []), tag] }));
+    return dedupe(
+      [
+        ...brandLocs.map(adaptLocation),
+        ...tagged(brandBuildings, 'building'),
+        ...tagged(brandProps, 'prop'),
+      ],
+      msLocs,
+    );
+  }, [brandLocs, brandBuildings, brandProps, msLocs]);
 
   return {
     characters,
     locations,
-    loading: charsLoading || locsLoading || msLoading || looksLoading,
+    loading:
+      charsLoading ||
+      locsLoading ||
+      buildingsLoading ||
+      propsLoading ||
+      msLoading ||
+      looksLoading,
   };
 }
