@@ -4004,6 +4004,36 @@ export type Database = {
           },
         ]
       }
+      character_catalog_previews: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          label: string
+          prompt: string | null
+          storage_path: string | null
+          theme_pack: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url: string
+          label: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          label?: string
+          prompt?: string | null
+          storage_path?: string | null
+          theme_pack?: string
+        }
+        Relationships: []
+      }
       character_marketplace_consents: {
         Row: {
           character_id: string
