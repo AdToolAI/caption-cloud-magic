@@ -123,9 +123,31 @@ export function useUnifiedMentionLibrary(): {
     }));
   }, [outfitLooks, brandChars]);
 
+  // Cast Catalog rows surfaced as virtual mentionable characters with reference
+  // image — picked items inject the portrait into Vidu/Hailuo i2v / Nano Banana
+  // scene-anchor exactly like saved Brand Characters.
+  const catalogChars: MotionStudioCharacter[] = useMemo(
+    () => catalogCharacters.map((r: any) => ({
+      id: `catalog:character:${r.id}`,
+      user_id: null as any,
+      name: r.name,
+      description: r.theme_pack ? r.theme_pack.replace(':', ' / ') : '',
+      signature_items: '',
+      reference_image_url: r.reference_image_url,
+      reference_image_seed: null,
+      voice_id: null,
+      tags: ['catalog'],
+      usage_count: 0,
+      workspace_id: null,
+      created_at: '',
+      updated_at: '',
+    })),
+    [catalogCharacters],
+  );
+
   const characters = useMemo(
-    () => [...outfitChars, ...dedupe(brandChars.map(adaptCharacter), msChars)],
-    [outfitChars, brandChars, msChars],
+    () => [...outfitChars, ...dedupe(dedupe(brandChars.map(adaptCharacter), msChars), catalogChars)],
+    [outfitChars, brandChars, msChars, catalogChars],
   );
   // Locations slot also carries Buildings + Props as mentionable scene
   // references — the resolver feeds them as extra reference URLs to Vidu /
