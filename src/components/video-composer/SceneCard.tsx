@@ -197,6 +197,12 @@ export default function SceneCard({
   // Curated catalog (admin-seeded preview rows) — surfaced directly in the
   // picker so users can use real-image assets without saving to their library.
   const { catalogLocations, catalogBuildings, catalogProps } = useWorldCatalog();
+  // Library-first dedupe by lowercased name: a saved Brand asset always wins
+  // over a catalog row with the same label so user edits / identity cards stick.
+  const mergeWithCatalog = <T extends { name: string }>(saved: T[], catalog: T[]): T[] => {
+    const seen = new Set(saved.map((s) => s.name.trim().toLowerCase()));
+    return [...saved, ...catalog.filter((c) => !seen.has(c.name.trim().toLowerCase()))];
+  };
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
   const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
