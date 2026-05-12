@@ -84,7 +84,7 @@ export function useUnifiedMentionLibrary(): {
   const { locations: brandLocs = [], isLoading: locsLoading } = useBrandLocations();
   const { buildings: brandBuildings = [], isLoading: buildingsLoading } = useBrandBuildings();
   const { props: brandProps = [], isLoading: propsLoading } = useBrandProps();
-  const { catalogLocations, catalogBuildings, catalogProps, isLoading: catalogLoading } =
+  const { catalogLocations, catalogBuildings, catalogProps, catalogCharacters, isLoading: catalogLoading } =
     useWorldCatalog();
   const { characters: msChars = [], locations: msLocs = [], loading: msLoading } =
     useMotionStudioLibrary();
