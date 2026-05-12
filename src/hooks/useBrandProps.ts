@@ -1,0 +1,126 @@
+// Props library — twin of useBrandLocations for object/prop assets
+// (furniture, vehicles, tech, tools, food, instruments).
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface BrandProp {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  reference_image_url: string;
+  storage_path: string | null;
+  visual_identity_json: any;
+  tags: string[];
+  usage_count: number;
+  is_favorite: boolean;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const useBrandProps = () => {
+  const queryClient = useQueryClient();
+
+  const propsQuery = useQuery({
+    queryKey: ['brand-props'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('brand_props')
+        .select('*')
+        .is('archived_at', null)
+        .order('is_favorite', { ascending: false })
+        .order('updated_at', { ascending: false });
+      if (error) throw error;
+      return ((data as any[]) || []) as BrandProp[];
+    },
+    staleTime: 30_000,
+  });
+
+  const createProp = useMutation({
+    mutationFn: async (input: { name: string; description?: string; file: File; tags?: string[] }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const ext = input.file.name.split('.').pop() || 'png';
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from('brand-locations')
+        .upload(path, input.file, { contentType: input.file.type, upsert: false });
+      if (upErr) throw upErr;
+
+      const { data: signed } = await supabase.storage
+        .from('brand-locations')
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+      const imageUrl = signed?.signedUrl;
+      if (!imageUrl) throw new Error('Could not create signed URL');
+
+      let identity: any = {};
+      try {
+        const { data: extracted } = await supabase.functions.invoke(
+          'extract-location-identity',
+          { body: { image_url: imageUrl } },
+        );
+        if ((extracted as any)?.identity) identity = (extracted as any).identity;
+      } catch (e) {
+        console.warn('Prop identity extraction failed:', e);
+      }
+
+      const { data: row, error } = await (supabase as any)
+        .from('brand_props')
+        .insert({
+          user_id: user.id,
+          name: input.name,
+          description: input.description ?? null,
+          reference_image_url: imageUrl,
+          storage_path: path,
+          visual_identity_json: identity,
+          tags: input.tags ?? [],
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return row as unknown as BrandProp;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brand-props'] });
+      toast.success('Prop saved');
+    },
+    onError: (e: any) => toast.error(e.message || 'Failed to save prop'),
+  });
+
+  const toggleFavorite = useMutation({
+    mutationFn: async (input: { id: string; is_favorite: boolean }) => {
+      const { error } = await (supabase as any)
+        .from('brand_props')
+        .update({ is_favorite: input.is_favorite })
+        .eq('id', input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['brand-props'] }),
+  });
+
+  const archiveProp = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await (supabase as any)
+        .from('brand_props')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['brand-props'] });
+      toast.success('Prop archived');
+    },
+  });
+
+  return {
+    props: propsQuery.data ?? [],
+    isLoading: propsQuery.isLoading,
+    createProp,
+    toggleFavorite,
+    archiveProp,
+  };
+};
