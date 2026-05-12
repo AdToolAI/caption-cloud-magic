@@ -3,8 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Loader2, Sparkles, Lock } from 'lucide-react';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
@@ -288,7 +286,9 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   }, [catalog, userOutfits]);
 
   const isLoading = loadingUser || loadingCatalog;
-  const isEmpty = !isLoading && variantsBySlot.size === 0;
+  const hasUserOverrides = userOutfits.length > 0;
+  // Catalog still warming up for this combo (rare during rollout). Don't block — show skeletons.
+  const catalogPending = !isLoading && catalog.length === 0 && !hasUserOverrides;
 
   const handleGenerate = async () => {
     if (isGenerating) return;
@@ -393,52 +393,51 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
         )}
       </div>
 
-      {isEmpty ? (
-        <Card className="p-6 bg-card/40 border-dashed border-primary/30 flex flex-col items-center justify-center text-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <p className="font-serif text-base">Generate 4 outfits — {activeSub.label}</p>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              Renders your avatar in 4 locked-identity outfits. ~30s.
-            </p>
-          </div>
-          <Button
-            size="sm"
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            {isGenerating ? (
-              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating…</>
-            ) : (
-              <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate 4 outfits</>
-            )}
-          </Button>
-        </Card>
-      ) : (
-        <>
-          <VariantPickerGrid
-            axis="wardrobe"
-            slots={activeSub.slots}
-            variantsBySlot={variantsBySlot}
-            isLoading={isLoading || isGenerating}
-            isGenerating={isGenerating}
-            layout={layout}
-            onGenerate={handleGenerate}
-            onSelect={(slotId, variant) => {
-              onSelect?.({
-                variantId: variant.variantId || null,
-                outfitId: slotId,
-                label: variant.label,
-                imageUrl: variant.imageUrl,
-                themePack: compositeKey,
-              });
-            }}
-          />
-        </>
-      )}
+      {/* Inline "Personalize with my avatar" — optional upgrade above the grid */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <p className="text-[10.5px] text-muted-foreground">
+          {hasUserOverrides
+            ? <>Showing <span className="text-primary font-semibold">your avatar</span> in {activeSub.label}.</>
+            : catalogPending
+              ? <>Catalog preview wird vorbereitet… Modelle erscheinen gleich.</>
+              : <>Generic model previews — outfits are locked, faces are neutral.</>}
+        </p>
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+          className={cn(
+            'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary transition-all',
+            'hover:bg-primary/15 hover:border-primary/60 disabled:opacity-50',
+          )}
+          title="Render these 4 outfits with your avatar's face (~30s)"
+        >
+          {isGenerating ? (
+            <><Loader2 className="h-2.5 w-2.5 animate-spin" /> Personalizing…</>
+          ) : (
+            <><Sparkles className="h-2.5 w-2.5" /> {hasUserOverrides ? 'Re-render with my face' : 'Use my face (~30s)'}</>
+          )}
+        </button>
+      </div>
+
+      <VariantPickerGrid
+        axis="wardrobe"
+        slots={activeSub.slots}
+        variantsBySlot={variantsBySlot}
+        isLoading={isLoading || isGenerating}
+        isGenerating={isGenerating}
+        layout={layout}
+        onGenerate={handleGenerate}
+        onSelect={(slotId, variant) => {
+          onSelect?.({
+            variantId: variant.variantId || null,
+            outfitId: slotId,
+            label: variant.label,
+            imageUrl: variant.imageUrl,
+            themePack: compositeKey,
+          });
+        }}
+      />
     </div>
   );
 }

@@ -1,45 +1,42 @@
-## Problem (laut Screenshot)
+## Stage 28 — Pre-rendered Wardrobe Catalog (no manual generate step)
 
-1. **Alle 4 Outfit-Tiles zeigen "Not generated"** — die `wardrobe_catalog_previews`-Tabelle ist fast leer (nur 12 von ~184 möglichen Slots gefüllt). Für `fantasy:light/female` gibt es 0 Einträge → leeres Grid.
-2. **Geschlechts-Toggle ist verwirrend** — User muss bei jedem Avatar manuell zwischen ♀/♂ wechseln. Aktuell ist `brand_characters.gender` für ALLE bestehenden Avatare `null`, daher fällt der Toggle immer auf "female" zurück.
-3. Auto-Generierung wäre teuer und intransparent — User möchte expliziten Button (siehe vorheriges Feedback).
+### Diagnose
+- The infrastructure already exists (`wardrobe_catalog_previews` table + `seed-wardrobe-catalog` edge function with a generic male/female fashion model + identity-neutral STYLE_LOCK).
+- The table is just under-seeded: **only 5 of ~192 expected rows** exist (lifestyle:everyday/formal/seasonal partials). That's why every other sub-pack and the entire female side falls through to the "Generate 4 outfits" empty state.
 
-## Lösung
+### Goal
+For every Theme → Sub-Pack the user opens (Business → Creative, Historical → Medieval, Fantasy → Light, Sport → Combat, …), instantly show **4 outfits on a generic model** for both ♀ and ♂. No "Generate" CTA required. The user's own avatar render becomes an *optional upgrade*.
 
-### A) Geschlecht beim Avatar-Erstellen festlegen
-- **`AddBrandCharacterDialog.tsx`** — neue Pflicht-Auswahl **Female / Male / Neutral** (3 Pills, Default Neutral). Wert wird in `brand_characters.gender` geschrieben.
-- **`AvatarDetail.tsx`** — wenn ein bestehender Avatar `gender = null` hat, oben im Portrait-Card ein dezenter Hinweis-Streifen *"Set gender to lock outfit previews"* mit 3 Mini-Pills → schreibt `gender` in DB (One-Time-Backfill für Bestandsavatare).
+### Plan
 
-### B) Wardrobe Sheet sperrt sich auf Avatar-Geschlecht
-- In `AvatarWardrobeSheet.tsx`:
-  - Wenn `avatarGender ∈ {male, female}` → **Toggle ausblenden** und State hart auf das Avatar-Geschlecht setzen.
-  - Wenn `avatarGender = neutral | null` → Toggle bleibt sichtbar (heutiges Verhalten).
-- Ergebnis: Kunde sieht ausschließlich passende Outfits, kein irreführender ♀/♂-Mix mehr.
+**1. Backfill the catalog (one-time, server-side)**
+- Trigger `seed-wardrobe-catalog` (already admin-gated, idempotent, runs as background job via `EdgeRuntime.waitUntil`) over the full slot list.
+- Coverage target = 6 themes × ~23 sub-packs × 4 outfits × 2 genders = **~192 images**.
+- Throttled at BATCH_SIZE=6 → ~5–10 min total wall-clock; progress visible in `wardrobe_catalog_seed_jobs`.
+- Generic model + neutral face is already enforced in `STYLE_LOCK` (the brief: "outfits are important, not the face") — exactly what you asked for.
 
-### C) "Generate 4 Outfits" Button statt leerer Catalog-Tiles
-- Wenn für die aktive Sub-Pack-Kombination **0 user-Variants UND 0 Catalog-Previews** existieren (oder weniger als 4), zeigt das Grid statt "Not generated"-Platzhalter eine **zentrale Card** mit:
-  - Titel: *"Generate 4 outfits for {Avatar} — {Sub-Pack-Label}"*
-  - Sub-Text: ~30s, kostet X Credits
-  - Button **"Generate"** → ruft existierende Edge-Function `generate-avatar-wardrobe` mit `{ avatarId, theme, sub_pack, gender: avatarGender }`.
-- Ergebnis-Variants landen in `avatar_wardrobe_variants` und erscheinen sofort (React-Query invalidate).
-- Während Generierung: 4 Skeleton-Tiles mit Pulse-Animation, Lock-Icon auf den Sub-Pack-Pills.
-- Catalog-Previews (`wardrobe_catalog_previews`) bleiben als Fallback erhalten — wenn vorhanden, wird kein Generate-Button gezeigt, sondern die Catalog-Bilder + ein kleiner *"Personalize this pack"*-Link unten.
+**2. Replace the "Generate 4 outfits" empty state in `AvatarWardrobeSheet.tsx`**
+- Remove the full-card empty state.
+- While catalog rows are still loading: show 4 shimmer/skeleton tiles (not a CTA) — they'll fill in within seconds.
+- If catalog still has 0 rows for that combo after load (rare race during rollout): tiny inline hint "Preview wird vorbereitet…" instead of forcing the user to click.
+- Keep the existing "Personalize with my avatar" path, but demote it to a small ghost button **above** the grid: *"Use my face for these 4 outfits (~30s)"*. So generation stays available, just no longer mandatory.
 
-### D) (Optional, kein Blocker) Catalog-Backfill
-- `seed-wardrobe-catalog` existiert bereits — kann später per Admin-Skript für alle 92 Sub-Packs × 2 Genders einmalig laufen, um sofortige Previews ohne Generierung zu zeigen. **Nicht Teil dieses Stages**, da User Generate-Button bevorzugt.
+**3. Send-to-Studio still works on catalog tiles**
+- Catalog variants already flow through `variantsBySlot` with `variantId: ''` and a real `imageUrl`.
+- The existing `onSelect` handoff in `AvatarDetail` → `WardrobePerspectiveCard` works the same way — the catalog image is used as the outfit reference; the avatar's face is locked separately via the saved character identity.
 
-## Files
+### Files affected
+- `supabase/functions/seed-wardrobe-catalog/index.ts` — no code change, just **invoke** with `{}` (full sweep) once.
+- `src/components/brand-characters/AvatarWardrobeSheet.tsx` — drop the empty-state card, demote `handleGenerate` to a small inline "Personalize" link above the grid.
 
-- **Edit** `src/components/brand-characters/AddBrandCharacterDialog.tsx` — Gender-Picker
-- **Edit** `src/pages/AvatarDetail.tsx` — Backfill-Hinweis für `gender = null`
-- **Edit** `src/components/brand-characters/AvatarWardrobeSheet.tsx` — Toggle locken, Generate-Card statt leerem Grid
-- **Edit** `src/components/library-hubs/VariantPickerGrid.tsx` *(falls nötig)* — neuer `emptyState`-Prop für Generate-Card
-- **Reuse** Edge-Function `generate-avatar-wardrobe` (keine Änderung nötig)
+### Validation
+1. Open Avatars → any avatar → Wardrobe → Business → Creative → see 4 outfits on the generic ♂ model.
+2. Toggle ♀ (or open a female-locked avatar) → see 4 outfits on the generic ♀ model.
+3. Same for Historical → Medieval, Fantasy → Light, Sport → Combat, Sci-Fi → Cyber.
+4. "Personalize with my avatar" still triggers `generate-avatar-wardrobe` for users who want their own face on the outfits.
+5. Send-to-Studio mention copy still resolves to a usable reference image.
 
-## Validierung
-
-1. Neuer Avatar → Gender-Pflichtauswahl im Create-Dialog, in DB persistiert.
-2. Bestandsavatar ohne Gender → Hinweis-Streifen mit 3 Pills, einmalig setzbar.
-3. Wardrobe Sheet bei Avatar mit `gender=female` → kein ♂-Toggle mehr sichtbar, nur weibliche Catalog-Previews.
-4. Leerer Sub-Pack (z.B. fantasy:light) → "Generate 4 outfits"-Button statt 4× "Not generated"; Klick generiert echte Outfits auf dem Avatar.
-5. Existierende Save/Lightbox/Send-to-Studio-Workflows unverändert.
+### Out of scope
+- No DB schema migration (table + RLS already correct).
+- No new UI components — only the empty-state branch in one file changes.
+- Wardrobe perspectives, saved looks, lightbox, gender lock — all unchanged.
