@@ -412,12 +412,18 @@ export interface ComposerScene {
    * for now — the image url is used as the avatar-stage display image and as
    * the optional reference image for downstream renders.
    */
+  /**
+   * Stage 21 — Hierarchical wardrobe theme packs.
+   * `themePack` is a composite string `${theme}:${subPack}` (e.g. "historical:medieval",
+   * "business:startup"). Plain theme strings ("historical") are accepted for
+   * backwards-compat with Stage 19/20 data.
+   */
   selectedOutfit?: {
     variantId: string;
     outfitId: string;
     label: string;
     imageUrl: string;
-    themePack: 'lifestyle' | 'historical' | 'fantasy' | 'scifi' | 'sport' | 'business';
+    themePack: string;
   };
 }
 
