@@ -1,0 +1,282 @@
+// scene-director — natural-language scene builder
+// Input: a free-text description (any language) + duration + the user's library
+// Output: render-ready English aiPrompt, optional localized dialogScript,
+//         matched library asset IDs, dropped actions, follow-up suggestions.
+//
+// The function never auto-creates assets — when the description mentions
+// something the user doesn't own, we surface it as a `missingAssets` hint so
+// the UI can show a one-click "Generate with AI" affordance into the existing
+// generate-world-asset flow.
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
+import { SCENE_NEGATIVE_CLAUSE, SCENE_HARD_RULES_EN } from '../_shared/scene-director-rules.ts';
+
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+interface AssetEntry {
+  id: string;
+  name: string;
+  slug?: string;
+  descriptor?: string | null;
+}
+
+interface DirectorRequest {
+  description: string;
+  durationSeconds: number;
+  language?: 'en' | 'de' | 'es';
+  brandKitContext?: string;
+  library: {
+    characters?: AssetEntry[];
+    locations?: AssetEntry[];
+    buildings?: AssetEntry[];
+    props?: AssetEntry[];
+  };
+}
+
+const BUDGETS = [
+  { upTo: 4,  maxActions: 1, maxCameraMoves: 1, maxScriptWords: 9,  maxAssets: 2 },
+  { upTo: 6,  maxActions: 2, maxCameraMoves: 1, maxScriptWords: 14, maxAssets: 3 },
+  { upTo: 9,  maxActions: 2, maxCameraMoves: 2, maxScriptWords: 20, maxAssets: 4 },
+  { upTo: 12, maxActions: 3, maxCameraMoves: 2, maxScriptWords: 28, maxAssets: 5 },
+  { upTo: 15, maxActions: 3, maxCameraMoves: 3, maxScriptWords: 35, maxAssets: 6 },
+];
+
+function pickBudget(d: number) {
+  const dur = Math.max(3, Math.min(15, Math.round(d || 5)));
+  const row = BUDGETS.find((r) => dur <= r.upTo) ?? BUDGETS[BUDGETS.length - 1];
+  return { ...row, durationSeconds: dur };
+}
+
+async function sha1(s: string): Promise<string> {
+  const buf = new TextEncoder().encode(s);
+  const hash = await crypto.subtle.digest('SHA-1', buf);
+  return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function libraryFingerprint(lib: DirectorRequest['library']): string {
+  const ids = (arr?: AssetEntry[]) => (arr || []).map((a) => a.id).sort().join(',');
+  return `c:${ids(lib.characters)}|l:${ids(lib.locations)}|b:${ids(lib.buildings)}|p:${ids(lib.props)}`;
+}
+
+function buildSystemPrompt(req: DirectorRequest): string {
+  const b = pickBudget(req.durationSeconds);
+  const lang = req.language ?? 'en';
+  const fmt = (label: string, items?: AssetEntry[]) => {
+    const list = (items || []).slice(0, 60);
+    if (list.length === 0) return `${label}: (none)`;
+    return `${label}:\n` + list.map((a) => `  • id="${a.id}" name="${a.name}"${a.descriptor ? ` — ${a.descriptor.slice(0, 140)}` : ''}`).join('\n');
+  };
+
+  return `You are Scene Director — a cinematographer that turns ONE free-text scene description into ONE render-ready video prompt.
+
+DURATION: ${b.durationSeconds} seconds. BUDGET (hard limits — do NOT exceed):
+- max ${b.maxActions} distinct visual actions
+- max ${b.maxCameraMoves} camera movement(s)
+- max ${b.maxScriptWords} spoken words (≈ 2.3 words/sec)
+- max ${b.maxAssets} distinct on-screen subjects (people + objects + setting elements combined)
+
+If the description has more than the budget allows, KEEP the most cinematic / most narratively important beat for THIS scene and put the rest into "droppedActions" + "followupSceneSuggestions" (one full description string per follow-up scene). Do NOT cram everything in.
+
+${SCENE_HARD_RULES_EN}
+
+LIBRARY MATCHING:
+For every person, place, building or object the user mentions, find the best match in the library below by name + descriptor. Rules:
+- Match generously (e.g. "Leopard tank" → a prop named "Leopard 2" or "Main Battle Tank"; "gothic cathedral" → a building named "Cathedral of Notre-Dame"). Use IDs from the library.
+- If no good match exists, list the missing item under "missingAssets" with a one-line description so the UI can offer "Generate with AI".
+- Set confidence: high = every named entity matched cleanly; medium = some matched + 1-2 missing; low = mostly missing or ambiguous.
+
+OUTPUT LANGUAGES:
+- aiPrompt: English ALWAYS (visual model performance).
+- dialogScript: ${lang} (the user's UI language). Empty string if no spoken line is needed.
+
+${fmt('CHARACTERS', req.library.characters)}
+
+${fmt('LOCATIONS', req.library.locations)}
+
+${fmt('BUILDINGS', req.library.buildings)}
+
+${fmt('PROPS', req.library.props)}
+
+${req.brandKitContext ? `BRAND CONTEXT: ${req.brandKitContext}\n` : ''}
+You MUST call the tool \`emitScene\` exactly once with the final result. Do not return prose.`;
+}
+
+const TOOL_DEFINITION = {
+  type: 'function',
+  function: {
+    name: 'emitScene',
+    description: 'Finalize the scene with a render-ready prompt and matched assets.',
+    parameters: {
+      type: 'object',
+      properties: {
+        aiPrompt: { type: 'string', description: 'English render-ready prompt, 50–80 words, ending with the mandatory negative clause.' },
+        dialogScript: { type: 'string', description: 'Optional spoken line in the user UI language. Empty string if none.' },
+        matchedAssets: {
+          type: 'object',
+          properties: {
+            characterIds: { type: 'array', items: { type: 'string' } },
+            locationIds: { type: 'array', items: { type: 'string' } },
+            buildingIds: { type: 'array', items: { type: 'string' } },
+            propIds: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['characterIds', 'locationIds', 'buildingIds', 'propIds'],
+        },
+        droppedActions: { type: 'array', items: { type: 'string' }, description: 'Beats from the user description that did not fit this scene\'s duration budget.' },
+        followupSceneSuggestions: { type: 'array', items: { type: 'string' }, description: '0–2 ready-to-use scene descriptions for follow-up scenes, in the user language.' },
+        missingAssets: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string', enum: ['character', 'location', 'building', 'prop'] },
+              name: { type: 'string' },
+              suggestedPrompt: { type: 'string' },
+            },
+            required: ['kind', 'name', 'suggestedPrompt'],
+          },
+        },
+        confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+      },
+      required: ['aiPrompt', 'matchedAssets', 'droppedActions', 'followupSceneSuggestions', 'missingAssets', 'confidence'],
+    },
+  },
+};
+
+async function callGateway(model: string, system: string, userMsg: string) {
+  const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userMsg },
+      ],
+      tools: [TOOL_DEFINITION],
+      tool_choice: { type: 'function', function: { name: 'emitScene' } },
+      max_tokens: 1500,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    const err: any = new Error(`gateway ${res.status}: ${text.slice(0, 300)}`);
+    err.status = res.status;
+    throw err;
+  }
+  const json = await res.json();
+  const call = json?.choices?.[0]?.message?.tool_calls?.[0];
+  if (!call?.function?.arguments) throw new Error('no tool call returned');
+  return JSON.parse(call.function.arguments);
+}
+
+function ensureNegativeClause(prompt: string): string {
+  const trimmed = (prompt || '').trim().replace(/[\s,]+$/, '');
+  // remove any partial duplicate of the clause keywords at the end
+  const stripped = trimmed.replace(/,?\s*no on-screen text[\s\S]*$/i, '');
+  return stripped.replace(/[\s,]+$/, '') + SCENE_NEGATIVE_CLAUSE;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  try {
+    const authHeader = req.headers.get('Authorization') ?? '';
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData?.user?.id;
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const body = (await req.json()) as DirectorRequest;
+    if (!body?.description?.trim()) {
+      return new Response(JSON.stringify({ error: 'description is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const dur = pickBudget(body.durationSeconds).durationSeconds;
+    const lang = body.language ?? 'en';
+
+    const cacheKey = await sha1(`${dur}|${lang}|${body.description.trim()}|${libraryFingerprint(body.library || {})}|${body.brandKitContext || ''}`);
+
+    // 1) Try cache
+    const { data: cached } = await supabase
+      .from('scene_director_cache')
+      .select('payload')
+      .eq('user_id', userId)
+      .eq('cache_key', cacheKey)
+      .maybeSingle();
+    if (cached?.payload) {
+      return new Response(JSON.stringify({ ...cached.payload, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // 2) Call gateway with retry
+    const system = buildSystemPrompt(body);
+    const userMsg = `Scene description (any language; translate as needed):\n\n${body.description.trim()}`;
+
+    let result: any;
+    try {
+      result = await callGateway('google/gemini-3-flash-preview', system, userMsg);
+    } catch (e: any) {
+      if (e.status === 429 || e.status === 402) {
+        return new Response(JSON.stringify({ error: e.status === 402 ? 'AI credits exhausted — please add credits.' : 'Rate limited — please retry shortly.' }), {
+          status: e.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.warn('[scene-director] primary failed, retrying flash:', e.message);
+      result = await callGateway('google/gemini-2.5-flash', system, userMsg);
+    }
+
+    // 3) Server-side guarantees
+    result.aiPrompt = ensureNegativeClause(String(result.aiPrompt || ''));
+    result.matchedAssets ??= { characterIds: [], locationIds: [], buildingIds: [], propIds: [] };
+    result.droppedActions ??= [];
+    result.followupSceneSuggestions ??= [];
+    result.missingAssets ??= [];
+    result.confidence ??= 'medium';
+
+    // Validate matched IDs actually exist in the supplied library
+    const validIds = (kind: 'characters' | 'locations' | 'buildings' | 'props') =>
+      new Set((body.library?.[kind] || []).map((a) => a.id));
+    const cIds = validIds('characters');
+    const lIds = validIds('locations');
+    const bIds = validIds('buildings');
+    const pIds = validIds('props');
+    result.matchedAssets.characterIds = (result.matchedAssets.characterIds || []).filter((id: string) => cIds.has(id));
+    result.matchedAssets.locationIds = (result.matchedAssets.locationIds || []).filter((id: string) => lIds.has(id));
+    result.matchedAssets.buildingIds = (result.matchedAssets.buildingIds || []).filter((id: string) => bIds.has(id));
+    result.matchedAssets.propIds = (result.matchedAssets.propIds || []).filter((id: string) => pIds.has(id));
+
+    result.budget = pickBudget(dur);
+
+    // 4) Persist cache (best-effort)
+    await supabase
+      .from('scene_director_cache')
+      .upsert({ user_id: userId, cache_key: cacheKey, payload: result }, { onConflict: 'user_id,cache_key' });
+
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (e: any) {
+    console.error('[scene-director] error', e?.message ?? e);
+    return new Response(JSON.stringify({ error: e?.message ?? 'unknown error' }), {
+      status: 502,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
