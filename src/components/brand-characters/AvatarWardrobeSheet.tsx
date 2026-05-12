@@ -367,41 +367,12 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
         )}
       </div>
 
-      {/* Inline "Personalize with my avatar" — optional upgrade above the grid */}
-      <div className="flex items-center justify-between gap-2 px-1">
-        <p className="text-[10.5px] text-muted-foreground">
-          {hasUserOverrides
-            ? <>Showing <span className="text-primary font-semibold">your avatar</span> in {activeSub.label}.</>
-            : catalogPending
-              ? <>Catalog preview wird vorbereitet… Modelle erscheinen gleich.</>
-              : <>Generic model previews — outfits are locked, faces are neutral.</>}
-        </p>
-        <button
-          type="button"
-          onClick={handleGenerate}
-          disabled={isGenerating}
-          className={cn(
-            'inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 py-0.5 text-[10px] font-semibold text-primary transition-all',
-            'hover:bg-primary/15 hover:border-primary/60 disabled:opacity-50',
-          )}
-          title="Render these 4 outfits with your avatar's face (~30s)"
-        >
-          {isGenerating ? (
-            <><Loader2 className="h-2.5 w-2.5 animate-spin" /> Personalizing…</>
-          ) : (
-            <><Sparkles className="h-2.5 w-2.5" /> {hasUserOverrides ? 'Re-render with my face' : 'Use my face (~30s)'}</>
-          )}
-        </button>
-      </div>
-
       <VariantPickerGrid
         axis="wardrobe"
         slots={activeSub.slots}
         variantsBySlot={variantsBySlot}
-        isLoading={isLoading || isGenerating}
-        isGenerating={isGenerating}
+        isLoading={isLoading}
         layout={layout}
-        onGenerate={handleGenerate}
         onSelect={(slotId, variant) => {
           onSelect?.({
             variantId: variant.variantId || null,
