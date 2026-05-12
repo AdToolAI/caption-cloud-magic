@@ -221,8 +221,23 @@ export default function PromptMentionEditor({
             Library — {suggestions.length} match{suggestions.length === 1 ? '' : 'es'}
           </div>
           {suggestions.map((s, i) => {
-            const Icon = s.kind === 'character' ? User : MapPin;
+            const Icon =
+              s.kind === 'character'
+                ? User
+                : s.kind === 'building'
+                  ? Building2
+                  : s.kind === 'prop'
+                    ? Package
+                    : MapPin;
             const isActive = i === activeIndex;
+            const badgeTone =
+              s.kind === 'character'
+                ? 'text-primary border-primary/30'
+                : s.kind === 'building'
+                  ? 'text-amber-400 border-amber-400/30'
+                  : s.kind === 'prop'
+                    ? 'text-emerald-400 border-emerald-400/30'
+                    : 'text-accent border-accent/30';
             return (
               <button
                 key={`${s.kind}-${s.id}`}
@@ -252,12 +267,7 @@ export default function PromptMentionEditor({
                     <span className="font-medium truncate">{s.name}</span>
                     <Badge
                       variant="outline"
-                      className={cn(
-                        'text-[8px] h-3 px-1 border-border/40',
-                        s.kind === 'character'
-                          ? 'text-primary border-primary/30'
-                          : 'text-accent border-accent/30'
-                      )}
+                      className={cn('text-[8px] h-3 px-1 border-border/40', badgeTone)}
                     >
                       {s.kind}
                     </Badge>
