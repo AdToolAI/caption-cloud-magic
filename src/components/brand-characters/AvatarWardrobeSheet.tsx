@@ -217,7 +217,6 @@ interface Props {
 
 export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout = 'sheet', initialPack }: Props) {
   const initial = parseInitial(initialPack);
-  const qc = useQueryClient();
   const [theme, setTheme] = useState<WardrobeTheme>(initial.theme);
   const [sub, setSub] = useState<string>(initial.sub);
 
@@ -230,8 +229,6 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   useEffect(() => {
     if (genderLocked) setGender(avatarGender as 'male' | 'female');
   }, [avatarGender, genderLocked]);
-
-  const [isGenerating, setIsGenerating] = useState(false);
 
   // When theme changes, snap to the first sub-pack of that theme.
   useEffect(() => {
@@ -269,15 +266,18 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
       if (error) throw error;
       return (data || []) as Array<{ outfit_id: string; outfit_label: string; image_url: string; gender: string }>;
     },
+    refetchInterval: (q) => {
+      const rows = (q.state.data as any[] | undefined) ?? [];
+      // Auto-refetch while catalog is still being seeded for this combo
+      return rows.length < 4 ? 8000 : false;
+    },
   });
 
   const variantsBySlot = useMemo(() => {
     const map = new Map<string, VariantRecord & { isUser: boolean }>();
-    // Catalog first (placeholder previews)
     for (const c of catalog) {
       map.set(c.outfit_id, { variantId: '', label: c.outfit_label, imageUrl: c.image_url, isUser: false });
     }
-    // User overrides win
     for (const u of userOutfits) {
       map.set(u.outfit_id, { variantId: u.id, label: u.label, imageUrl: u.image_url, isUser: true });
     }
@@ -285,31 +285,6 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   }, [catalog, userOutfits]);
 
   const isLoading = loadingUser || loadingCatalog;
-  const hasUserOverrides = userOutfits.length > 0;
-  // Catalog still warming up for this combo (rare during rollout). Don't block — show skeletons.
-  const catalogPending = !isLoading && catalog.length === 0 && !hasUserOverrides;
-
-  const handleGenerate = async () => {
-    if (isGenerating) return;
-    setIsGenerating(true);
-    try {
-      const { error } = await supabase.functions.invoke('generate-avatar-wardrobe', {
-        body: {
-          avatar_id: avatarId,
-          theme,
-          sub_pack: sub,
-          gender: genderLocked ? avatarGender : gender,
-        },
-      });
-      if (error) throw error;
-      await qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, compositeKey] });
-      toast.success(`Generated 4 outfits — ${activeSub.label}`);
-    } catch (e: any) {
-      toast.error(e?.message || 'Failed to generate outfits');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   return (
     <div className="space-y-3">
