@@ -82,9 +82,43 @@ export function useUnifiedMentionLibrary(): {
   const { characters: msChars = [], locations: msLocs = [], loading: msLoading } =
     useMotionStudioLibrary();
 
+  // Saved Outfits — each look becomes a mentionable "character variant"
+  // with the front render as the reference image, so picking it injects the
+  // exact identity + outfit into prompts/i2v.
+  const { data: outfitLooks = [], isLoading: looksLoading } = useQuery({
+    queryKey: ['mention-library:outfit-looks'],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from('avatar_outfit_looks')
+        .select('id, user_id, avatar_id, name, front_url, cover_url, created_at')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const outfitChars: MotionStudioCharacter[] = useMemo(() => {
+    const byAvatar = new Map(brandChars.map((c: any) => [c.id, c.name]));
+    return outfitLooks.map((l: any) => ({
+      id: `outfit:${l.id}`,
+      user_id: l.user_id,
+      name: `${byAvatar.get(l.avatar_id) ?? 'Avatar'} — ${l.name}`,
+      description: `Saved outfit: ${l.name}`,
+      signature_items: '',
+      reference_image_url: l.front_url ?? l.cover_url,
+      reference_image_seed: null,
+      voice_id: null,
+      tags: ['outfit'],
+      usage_count: 0,
+      workspace_id: null,
+      created_at: l.created_at,
+      updated_at: l.created_at,
+    }));
+  }, [outfitLooks, brandChars]);
+
   const characters = useMemo(
-    () => dedupe(brandChars.map(adaptCharacter), msChars),
-    [brandChars, msChars],
+    () => [...outfitChars, ...dedupe(brandChars.map(adaptCharacter), msChars)],
+    [outfitChars, brandChars, msChars],
   );
   const locations = useMemo(
     () => dedupe(brandLocs.map(adaptLocation), msLocs),
@@ -94,6 +128,6 @@ export function useUnifiedMentionLibrary(): {
   return {
     characters,
     locations,
-    loading: charsLoading || locsLoading || msLoading,
+    loading: charsLoading || locsLoading || msLoading || looksLoading,
   };
 }
