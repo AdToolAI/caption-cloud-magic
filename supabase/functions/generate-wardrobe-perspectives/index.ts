@@ -129,65 +129,42 @@ Deno.serve(async (req) => {
       ?? `outfit described as: ${outfit_label ?? outfit_id}`;
     const resolvedLabel = outfit?.label ?? outfit_label ?? outfit_id;
 
-    console.log('[generate-wardrobe-perspectives] start', { avatar_id, theme_pack, outfit_id });
+    console.log('[generate-wardrobe-perspectives] phase A: front anchor', { avatar_id, theme_pack, outfit_id });
 
-    const results = await Promise.allSettled(PERSPECTIVES.map(async (p) => {
-      const prompt =
+    // Phase A — generate FRONT first as outfit anchor
+    let frontUrl: string;
+    try {
+      const frontPrompt =
         `Render the SAME person from the reference photo, now wearing ${outfitModifier}. ` +
-        `Camera: ${p.modifier}. ${IDENTITY_LOCK} 3:4 portrait framing.`;
-      const aiResp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'google/gemini-3.1-flash-image-preview',
-          messages: [{ role: 'user', content: [
-            { type: 'text', text: prompt },
-            { type: 'image_url', image_url: { url: identityUrl } },
-          ]}],
-          modalities: ['image', 'text'],
-        }),
-      });
-      if (!aiResp.ok) {
-        const txt = await aiResp.text();
-        throw new Error(`Gemini ${aiResp.status}: ${txt.slice(0, 120)}`);
-      }
-      const aiData = await aiResp.json();
-      const dataUri: string | undefined = aiData?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-      if (!dataUri?.startsWith('data:image/')) throw new Error('No image returned');
+        `Camera: ${FRONT_MODIFIER}. ${IDENTITY_LOCK} 3:4 portrait framing.`;
+      const frontDataUri = await callGemini(frontPrompt, [identityUrl], LOVABLE_API_KEY);
+      frontUrl = await uploadAndStore(
+        supabaseAdmin, user.id, avatar_id, theme_pack, outfit_id, resolvedLabel, 'front', frontDataUri,
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[generate-wardrobe-perspectives] front failed:', msg);
+      throw new Error(`Front render failed (outfit anchor): ${msg}`);
+    }
 
-      const base64 = dataUri.split(',')[1];
-      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-      const path = `${user.id}/wardrobe-perspectives/${avatar_id}/${theme_pack}/${outfit_id}/${p.id}-${crypto.randomUUID()}.png`;
-      const { error: upErr } = await supabaseAdmin.storage
-        .from('brand-characters')
-        .upload(path, bytes, { contentType: 'image/png', upsert: false });
-      if (upErr) throw new Error(`Upload: ${upErr.message}`);
-
-      const { data: signedNew } = await supabaseAdmin.storage
-        .from('brand-characters')
-        .createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
-      const url = signedNew?.signedUrl;
-      if (!url) throw new Error('Sign URL failed');
-
-      await supabaseAdmin.from('wardrobe_perspective_renders').upsert({
-        user_id: user.id,
-        avatar_id,
-        theme_pack,
-        outfit_id,
-        outfit_label: resolvedLabel,
-        perspective: p.id,
-        image_url: url,
-        storage_path: path,
-      }, { onConflict: 'avatar_id,theme_pack,outfit_id,perspective' });
-
+    // Phase B — back/side/top use BOTH portrait (face) + front (outfit)
+    console.log('[generate-wardrobe-perspectives] phase B: 3 angles with outfit lock');
+    const results = await Promise.allSettled(SECONDARY_PERSPECTIVES.map(async (p) => {
+      const prompt =
+        `Render the SAME person from reference image #1, wearing the EXACT same outfit shown in reference image #2. ` +
+        `Camera: ${p.modifier}. ${IDENTITY_LOCK} ${OUTFIT_LOCK} 3:4 portrait framing.`;
+      const dataUri = await callGemini(prompt, [identityUrl, frontUrl], LOVABLE_API_KEY);
+      const url = await uploadAndStore(
+        supabaseAdmin, user.id, avatar_id, theme_pack, outfit_id, resolvedLabel, p.id, dataUri,
+      );
       return { perspective: p.id, url };
     }));
 
-    const ok = results.filter(r => r.status === 'fulfilled').length;
+    const ok = 1 + results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').map((r: any) => String(r.reason));
     console.log('[generate-wardrobe-perspectives] done', { ok, failed: failed.length });
 
-    return new Response(JSON.stringify({ success: true, generated: ok, failed }), {
+    return new Response(JSON.stringify({ success: true, generated: ok, failed, front_url: frontUrl }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (e) {
