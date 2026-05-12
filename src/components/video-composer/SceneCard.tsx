@@ -958,15 +958,18 @@ export default function SceneCard({
                     }
                     onUpdate(updates);
                   }}
-                  locations={brandLocations.map((l) => ({
-                    id: l.id, name: l.name, reference_image_url: l.reference_image_url,
-                  }))}
-                  buildings={brandBuildings.map((b) => ({
-                    id: b.id, name: b.name, reference_image_url: b.reference_image_url,
-                  }))}
-                  props={brandProps.map((p) => ({
-                    id: p.id, name: p.name, reference_image_url: p.reference_image_url,
-                  }))}
+                  locations={mergeWithCatalog(
+                    brandLocations.map((l) => ({ id: l.id, name: l.name, reference_image_url: l.reference_image_url })),
+                    catalogLocations.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
+                  buildings={mergeWithCatalog(
+                    brandBuildings.map((b) => ({ id: b.id, name: b.name, reference_image_url: b.reference_image_url })),
+                    catalogBuildings.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
+                  props={mergeWithCatalog(
+                    brandProps.map((p) => ({ id: p.id, name: p.name, reference_image_url: p.reference_image_url })),
+                    catalogProps.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
+                  )}
                   prompt={
                     promptMode === 'structured'
                       ? ((promptSlots.subject as string) || '')
