@@ -290,8 +290,9 @@ export default function PromptMentionEditor({
           className="absolute left-0 right-0 mt-1 z-50 rounded-md border border-dashed border-border/60 bg-popover/95 px-3 py-2 text-[10px] text-muted-foreground"
           onMouseDown={(e) => e.preventDefault()}
         >
-          Keine Library-Treffer für „@{trigger.query}". Lege Charaktere &
-          Locations unter <span className="text-primary">/motion-studio/library</span> an.
+          Keine Library-Treffer für „@{trigger.query}". Lege Charaktere,
+          Locations, Buildings & Props unter{' '}
+          <span className="text-primary">/library</span> an.
         </div>
       )}
     </div>
