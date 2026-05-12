@@ -35,9 +35,37 @@ interface Props {
 
 export function CatalogBrowser({ kind, onPick }: Props) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const { isAdmin } = useUserRoles();
   const [seeding, setSeeding] = useState(false);
   const [activeTheme, setActiveTheme] = useState<string | 'all'>('all');
+
+  // Default pick handler: handoff to the Composer via sessionStorage so the
+  // user can drop a catalog tile straight into their next scene without saving
+  // it to their personal library first. Receiver lives in VideoComposer/index.
+  const handlePick = (row: Row) => {
+    if (onPick) return onPick(row);
+    const payload = {
+      kind,
+      catalog_id: row.id,
+      label: row.label,
+      image_url: row.image_url,
+      theme_pack: row.theme_pack,
+      ts: Date.now(),
+    };
+    try {
+      sessionStorage.setItem('composer:incoming-asset', JSON.stringify(payload));
+    } catch {
+      // ignore quota issues
+    }
+    toast.success(`${row.label} → ready for next scene`, {
+      description: 'Open the Motion Studio to drop it in.',
+      action: {
+        label: 'Open',
+        onClick: () => navigate('/video-composer'),
+      },
+    });
+  };
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['world-catalog', kind],
