@@ -161,22 +161,30 @@ export function WardrobePerspectiveCard({
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            {PERSPECTIVES.map((p) => {
+            {PERSPECTIVES.map((p, pIdx) => {
               const url = byPerspective.get(p.id);
+              const clickable = !!url;
               return (
                 <div
                   key={p.id}
+                  onClick={() => { if (clickable) setLightboxIdx(pIdx); }}
                   className={cn(
-                    'relative aspect-[3/4] rounded-md overflow-hidden border border-border/40 bg-muted/20',
+                    'relative aspect-[3/4] rounded-md overflow-hidden border border-border/40 bg-muted/20 group',
+                    clickable && 'cursor-zoom-in hover:border-primary/60 transition',
                   )}
                 >
                   {url ? (
-                    <img
-                      src={url}
-                      alt={`${outfitLabel} — ${p.label}`}
-                      loading="lazy"
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={url}
+                        alt={`${outfitLabel} — ${p.label}`}
+                        loading="lazy"
+                        className="absolute inset-0 w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <ZoomIn className="h-5 w-5 text-white drop-shadow" />
+                      </div>
+                    </>
                   ) : (
                     <>
                       <img
@@ -200,6 +208,19 @@ export function WardrobePerspectiveCard({
               );
             })}
           </div>
+
+          <OutfitLightbox
+            open={lightboxIdx !== null}
+            onClose={() => setLightboxIdx(null)}
+            initialIndex={lightboxIdx ?? 0}
+            title={outfitLabel}
+            frames={PERSPECTIVES
+              .map<LightboxFrame | null>((p) => {
+                const u = byPerspective.get(p.id);
+                return u ? { url: u, label: p.label } : null;
+              })
+              .filter((f): f is LightboxFrame => !!f)}
+          />
 
           {isBusy && (
             <p className="text-[11px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
