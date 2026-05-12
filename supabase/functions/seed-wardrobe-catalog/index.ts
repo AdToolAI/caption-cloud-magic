@@ -131,47 +131,37 @@ Deno.serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Synchronous chunked processing — runs to completion within this invocation
-    let completed = 0, failed = 0;
-    const errors: any[] = [];
-    for (let i = 0; i < todo.length; i += BATCH_SIZE) {
-      const batch = todo.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(batch.map((t) =>
-        generateOne({
-          supabaseAdmin,
-          apiKey: LOVABLE_API_KEY,
-          theme_pack: t.theme_pack,
-          outfit_id: t.outfit.id,
-          outfit_label: t.outfit.label,
-          modifier: t.outfit.modifier,
-          gender: t.gender,
-        }),
-      ));
-      for (let k = 0; k < results.length; k++) {
-        const r = results[k];
-        if (r.status === 'fulfilled') {
-          completed++;
-        } else {
-          failed++;
-          errors.push({
-            theme_pack: batch[k].theme_pack,
-            outfit_id: batch[k].outfit.id,
-            gender: batch[k].gender,
-            error: String((r as any).reason).slice(0, 220),
-          });
+    // Run chunk in background — return immediately so the caller is not bound by client timeouts.
+    const work = (async () => {
+      let completed = 0, failed = 0;
+      for (let i = 0; i < todo.length; i += BATCH_SIZE) {
+        const batch = todo.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(batch.map((t) =>
+          generateOne({
+            supabaseAdmin,
+            apiKey: LOVABLE_API_KEY,
+            theme_pack: t.theme_pack,
+            outfit_id: t.outfit.id,
+            outfit_label: t.outfit.label,
+            modifier: t.outfit.modifier,
+            gender: t.gender,
+          }),
+        ));
+        for (const r of results) {
+          if (r.status === 'fulfilled') completed++; else failed++;
         }
       }
-    }
+      console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
+    })().catch((err) => console.error('[seed-wardrobe-catalog] chunk failed', err));
 
-    console.log('[seed-wardrobe-catalog] chunk done', { completed, failed, remainingAfter });
+    // @ts-ignore — Deno deploy runtime
+    EdgeRuntime.waitUntil(work);
 
     return new Response(JSON.stringify({
       success: true,
       done: remainingAfter === 0,
-      processed: completed,
-      failed,
+      queued: todo.length,
       remaining: remainingAfter,
-      errors: errors.slice(-10),
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
