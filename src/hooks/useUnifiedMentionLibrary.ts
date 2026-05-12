@@ -14,6 +14,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
+import { useBrandBuildings } from '@/hooks/useBrandBuildings';
+import { useBrandProps } from '@/hooks/useBrandProps';
 import { useMotionStudioLibrary } from '@/hooks/useMotionStudioLibrary';
 import type {
   MotionStudioCharacter,
