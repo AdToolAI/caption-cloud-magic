@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Loader2, Sparkles, Lock } from 'lucide-react';
 import { VariantPickerGrid, type VariantRecord } from '@/components/library-hubs/VariantPickerGrid';
 
 /**
@@ -216,11 +220,21 @@ interface Props {
 
 export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout = 'sheet', initialPack }: Props) {
   const initial = parseInitial(initialPack);
+  const qc = useQueryClient();
   const [theme, setTheme] = useState<WardrobeTheme>(initial.theme);
   const [sub, setSub] = useState<string>(initial.sub);
+
+  // If avatar has a fixed gender → lock the toggle entirely.
+  const genderLocked = avatarGender === 'male' || avatarGender === 'female';
   const [gender, setGender] = useState<'male' | 'female'>(
     avatarGender === 'male' ? 'male' : 'female',
   );
+  // Keep gender in sync if avatarGender changes after mount (e.g. after backfill)
+  useEffect(() => {
+    if (genderLocked) setGender(avatarGender as 'male' | 'female');
+  }, [avatarGender, genderLocked]);
+
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // When theme changes, snap to the first sub-pack of that theme.
   useEffect(() => {
@@ -274,6 +288,29 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
   }, [catalog, userOutfits]);
 
   const isLoading = loadingUser || loadingCatalog;
+  const isEmpty = !isLoading && variantsBySlot.size === 0;
+
+  const handleGenerate = async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const { error } = await supabase.functions.invoke('generate-avatar-wardrobe', {
+        body: {
+          avatar_id: avatarId,
+          theme,
+          sub_pack: sub,
+          gender: genderLocked ? avatarGender : gender,
+        },
+      });
+      if (error) throw error;
+      await qc.invalidateQueries({ queryKey: ['avatar-wardrobe', avatarId, compositeKey] });
+      toast.success(`Generated 4 outfits — ${activeSub.label}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to generate outfits');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -325,44 +362,83 @@ export function AvatarWardrobeSheet({ avatarId, avatarGender, onSelect, layout =
           })}
         </div>
 
-        {/* Gender toggle for catalog previews */}
-        <div className="inline-flex items-center rounded-full border border-border/40 bg-card/30 p-0.5 text-[11px] font-semibold shrink-0">
-          {(['female', 'male'] as const).map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => setGender(g)}
-              className={cn(
-                'rounded-full px-2.5 py-0.5 transition-all',
-                gender === g
-                  ? 'bg-primary/20 text-primary'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              aria-pressed={gender === g}
-              title={g === 'female' ? 'Female model preview' : 'Male model preview'}
-            >
-              {g === 'female' ? '♀' : '♂'}
-            </button>
-          ))}
-        </div>
+        {/* Gender toggle — hidden when avatar has fixed gender */}
+        {genderLocked ? (
+          <div
+            className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold text-primary shrink-0"
+            title={`Locked to ${avatarGender} — set on the avatar itself`}
+          >
+            <Lock className="h-2.5 w-2.5" />
+            <span aria-hidden>{avatarGender === 'female' ? '♀' : '♂'}</span>
+            <span className="capitalize">{avatarGender}</span>
+          </div>
+        ) : (
+          <div className="inline-flex items-center rounded-full border border-border/40 bg-card/30 p-0.5 text-[11px] font-semibold shrink-0">
+            {(['female', 'male'] as const).map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGender(g)}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 transition-all',
+                  gender === g ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground',
+                )}
+                aria-pressed={gender === g}
+                title={g === 'female' ? 'Female model preview' : 'Male model preview'}
+              >
+                {g === 'female' ? '♀' : '♂'}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <VariantPickerGrid
-        axis="wardrobe"
-        slots={activeSub.slots}
-        variantsBySlot={variantsBySlot}
-        isLoading={isLoading}
-        layout={layout}
-        onSelect={(slotId, variant) => {
-          onSelect?.({
-            variantId: variant.variantId || null,
-            outfitId: slotId,
-            label: variant.label,
-            imageUrl: variant.imageUrl,
-            themePack: compositeKey,
-          });
-        }}
-      />
+      {isEmpty ? (
+        <Card className="p-6 bg-card/40 border-dashed border-primary/30 flex flex-col items-center justify-center text-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center">
+            <Sparkles className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <p className="font-serif text-base">Generate 4 outfits — {activeSub.label}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Renders your avatar in 4 locked-identity outfits. ~30s.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            {isGenerating ? (
+              <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Generating…</>
+            ) : (
+              <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate 4 outfits</>
+            )}
+          </Button>
+        </Card>
+      ) : (
+        <>
+          <VariantPickerGrid
+            axis="wardrobe"
+            slots={activeSub.slots}
+            variantsBySlot={variantsBySlot}
+            isLoading={isLoading || isGenerating}
+            isGenerating={isGenerating}
+            layout={layout}
+            onGenerate={handleGenerate}
+            onSelect={(slotId, variant) => {
+              onSelect?.({
+                variantId: variant.variantId || null,
+                outfitId: slotId,
+                label: variant.label,
+                imageUrl: variant.imageUrl,
+                themePack: compositeKey,
+              });
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
