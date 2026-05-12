@@ -105,6 +105,20 @@ export const BUILDING_THEMES: ThemePacks = {
       { id: 'stone-bridge', label: 'Stone Bridge', modifier: 'arched stone bridge over misty river, autumn forest, soft morning light, romantic landscape' },
     ],
   },
+  fortified: {
+    castles: [
+      { id: 'crusader-fortress', label: 'Crusader Fortress', modifier: 'massive crusader stone fortress on a desert hilltop, thick walls, square towers, golden hour' },
+      { id: 'bavarian-castle', label: 'Bavarian Castle', modifier: 'fairytale bavarian castle with white walls and blue spires, surrounded by alpine forest, mist' },
+      { id: 'highland-keep', label: 'Highland Keep', modifier: 'rugged scottish highland castle keep on a loch, moody overcast sky, heather hills' },
+      { id: 'desert-citadel', label: 'Desert Citadel', modifier: 'sandstone desert citadel with crenellated walls, palm grove, warm sunset light' },
+    ],
+    bridges: [
+      { id: 'roman-aqueduct', label: 'Roman Aqueduct', modifier: 'monumental roman stone aqueduct with tiered arches over a green valley, golden hour' },
+      { id: 'covered-bridge', label: 'Covered Bridge', modifier: 'red wooden covered bridge over a mountain stream, autumn forest, crisp daylight' },
+      { id: 'suspension-bridge', label: 'Suspension Bridge', modifier: 'iconic red suspension bridge crossing a foggy bay, dramatic cinematic wide shot' },
+      { id: 'glass-skybridge', label: 'Glass Skybridge', modifier: 'futuristic glass-floor skybridge between two skyscrapers at dusk, glowing city below' },
+    ],
+  },
   modern: {
     skyline: [
       { id: 'glass-skyscraper', label: 'Glass Skyscraper', modifier: 'sleek modern glass skyscraper reflecting sky, wide low-angle view, dramatic clouds, urban grandeur' },
