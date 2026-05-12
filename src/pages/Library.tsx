@@ -498,3 +498,100 @@ function Section({
     </div>
   );
 }
+
+// ============================================================
+// "Generate your own" — prompt → Nano Banana 2 → identity card → row
+// ============================================================
+function GenerateAssetButton({
+  kind,
+  label,
+}: {
+  kind: 'location' | 'building' | 'prop';
+  label: string;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const placeholder =
+    kind === 'location'
+      ? 'A misty Norwegian fjord at sunrise, dramatic cliffs, soft golden light…'
+      : kind === 'building'
+        ? 'A baroque cathedral with twin spires, weathered stone, overcast sky…'
+        : 'A vintage brass telescope on a leather-bound astronomy book…';
+
+  const reset = () => { setName(''); setPrompt(''); };
+
+  const submit = async () => {
+    if (!name.trim() || !prompt.trim()) return;
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-world-asset', {
+        body: { kind, name: name.trim(), prompt: prompt.trim() },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      toast.success(`${label} generated and saved`);
+      const queryKey =
+        kind === 'location' ? 'brand-locations' : kind === 'building' ? 'brand-buildings' : 'brand-props';
+      qc.invalidateQueries({ queryKey: [queryKey] });
+      reset();
+      setOpen(false);
+    } catch (e: any) {
+      toast.error(e.message ?? 'Generation failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)} className="gap-2">
+        <Sparkles className="h-4 w-4" />
+        Generate {label} with AI
+      </Button>
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" /> Generate {label}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={`My AI ${label.toLowerCase()}`}
+                disabled={busy}
+              />
+            </div>
+            <div>
+              <Label>Prompt (English works best)</Label>
+              <Textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={4}
+                placeholder={placeholder}
+                disabled={busy}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Rendered with Nano Banana 2. We auto-extract a visual identity card so this {label.toLowerCase()} can be reused as a reference in the Toolkit, Composer and image-to-video (Vidu / Hailuo).
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
+            <Button onClick={submit} disabled={!name.trim() || !prompt.trim() || busy}>
+              {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Generate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
