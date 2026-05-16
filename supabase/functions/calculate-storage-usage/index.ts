@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,11 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { user_id } = await req.json();
+    const body = await req.json().catch(() => ({} as any));
+    const auth = await authenticateInternalRequest(req, { bodyUserId: body.user_id, corsHeaders });
+    if (!auth.ok) return auth.response;
+    // For user-JWT callers, force user_id to the verified caller. Service role keeps body.user_id (or null for all).
+    const user_id = auth.isService ? (body.user_id ?? null) : auth.userId;
 
     console.log(`📊 Calculating storage usage for user: ${user_id || 'all users'}`);
 
