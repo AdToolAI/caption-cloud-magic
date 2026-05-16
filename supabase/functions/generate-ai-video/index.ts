@@ -187,7 +187,7 @@ serve(async (req) => {
 
     // Get webhook URL
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     console.log(`[generate-ai-video] Preparing Replicate API call...`);
     console.log(`[generate-ai-video] Model: ${modelName}`);

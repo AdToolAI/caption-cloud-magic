@@ -256,7 +256,7 @@ serve(async (req) => {
     // ✅ CREATE RENDER RECORD
     // ============================================
     const pendingRenderId = `pending-${crypto.randomUUID()}`;
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     const bucketName = DEFAULT_BUCKET_NAME;
 
     const { error: insertError } = await supabase

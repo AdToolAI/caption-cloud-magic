@@ -163,7 +163,7 @@ serve(async (req) => {
 
     // Webhook URL
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     // Build Seedance input
     const replicateInput: Record<string, any> = {

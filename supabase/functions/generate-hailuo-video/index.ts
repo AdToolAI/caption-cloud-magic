@@ -166,7 +166,7 @@ serve(async (req) => {
 
     // Webhook URL
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     // Build Replicate input for minimax/hailuo-2.3
     const replicateInput: Record<string, any> = {

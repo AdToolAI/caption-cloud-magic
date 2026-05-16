@@ -357,7 +357,7 @@ serve(async (req) => {
     // ============================================
     
     const pendingRenderId = `pending-${crypto.randomUUID()}`;
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     
     console.log('🆔 Generated pendingRenderId:', pendingRenderId);
     console.log('🔔 Webhook URL:', webhookUrl);

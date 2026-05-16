@@ -154,7 +154,7 @@ serve(async (req) => {
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/replicate-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/replicate-webhook`);
 
     const replicateModel = REPLICATE_MODELS[model];
     const size = ASPECT_RATIO_TO_SIZE[aspectRatio] || ASPECT_RATIO_TO_SIZE['16:9'];

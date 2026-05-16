@@ -231,7 +231,7 @@ serve(async (req) => {
 
     const replicate = new Replicate({ auth: Deno.env.get("REPLICATE_API_KEY") });
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const webhookUrl = `${supabaseUrl}/functions/v1/compose-clip-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/compose-clip-webhook`);
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
     // Diffusion video models (Hailuo, Kling) treat words like "text", "captions",

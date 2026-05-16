@@ -65,7 +65,7 @@ serve(async (req) => {
 
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`);
     console.log('[RemoveBurnedSubs] Creating prediction with webhook:', webhookUrl);
 
     const prediction = await replicate.predictions.create({

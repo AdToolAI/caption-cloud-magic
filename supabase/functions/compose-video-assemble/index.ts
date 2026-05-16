@@ -538,7 +538,7 @@ serve(async (req) => {
       .eq('id', projectId);
 
     // 9. Build webhook with customData so remotion-webhook can match it
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
 
     // Load per-scene audio clips (ambient/sfx/foley) so the webhook can mux them
     // into the final stitched video alongside the voiceover and music.
