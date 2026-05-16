@@ -88,8 +88,12 @@ export function htmlToText(html: string): string {
 
 /** Generate HMAC token for safe one-click unsubscribe links. */
 export async function generateUnsubscribeToken(email: string): Promise<string> {
-  const secret = Deno.env.get("UNSUBSCRIBE_SECRET") ||
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "fallback-dev-secret";
+  const secret = Deno.env.get("UNSUBSCRIBE_SECRET");
+  if (!secret || secret.length < 16) {
+    throw new Error(
+      "UNSUBSCRIBE_SECRET is not configured. Set a dedicated random 32-byte hex secret in the Edge Function secrets panel.",
+    );
+  }
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
