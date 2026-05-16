@@ -415,6 +415,18 @@ export const ConnectionsTab = () => {
       const csrf = crypto.randomUUID();
       const timestamp = Date.now();
 
+      // Generate PKCE (S256) for OAuth 2.0 providers that require it (X/Twitter)
+      let pkceVerifier: string | null = null;
+      let pkceChallenge: string | null = null;
+      if (providerId === 'x') {
+        const randomBytes = crypto.getRandomValues(new Uint8Array(48));
+        pkceVerifier = btoa(String.fromCharCode(...randomBytes))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pkceVerifier));
+        pkceChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuf)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      }
+
       // Store state in oauth_states table for verification
       const { error: stateError } = await supabase
         .from('oauth_states')
@@ -422,7 +434,12 @@ export const ConnectionsTab = () => {
           user_id: user.id,
           provider: providerId,
           csrf_token: csrf,
-          expires_at: new Date(Date.now() + 300000).toISOString() // 5 minutes
+          expires_at: new Date(Date.now() + 300000).toISOString(), // 5 minutes
+          ...(pkceVerifier ? {
+            code_verifier: pkceVerifier,
+            code_challenge: pkceChallenge,
+            code_challenge_method: 'S256',
+          } : {}),
         });
 
       if (stateError) {
@@ -459,7 +476,7 @@ export const ConnectionsTab = () => {
         x: (() => {
           const fullRedirectUri = `${redirectUri}?provider=x`;
           const scopes = 'tweet.read users.read offline.access';
-          return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&code_challenge=challenge&code_challenge_method=plain`;
+          return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${import.meta.env.VITE_X_CLIENT_ID}&redirect_uri=${encodeURIComponent(fullRedirectUri)}&scope=${encodeURIComponent(scopes)}&state=${encodeURIComponent(state)}&code_challenge=${pkceChallenge}&code_challenge_method=S256`;
         })(),
         youtube: (() => {
           const fullRedirectUri = `${redirectUri}?provider=youtube`;
