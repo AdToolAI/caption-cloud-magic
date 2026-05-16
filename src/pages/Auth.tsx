@@ -14,6 +14,7 @@ import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { TwoFactorChallenge } from "@/components/account/TwoFactorChallenge";
 import { motion } from "framer-motion";
 import { AuthStatusIndicator } from "@/components/system-status/AuthStatusIndicator";
+import { SEO } from "@/components/SEO";
 
 const Auth = () => {
   const { t } = useTranslation();
@@ -101,6 +102,12 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
+      <SEO
+        title="Sign In or Create Account"
+        description="Sign in to AdTool AI or create a free account to generate AI-powered social media captions, schedule posts, and grow your audience across every platform."
+        canonical="/auth"
+        noindex
+      />
       {/* Premium Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-muted/20" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,hsl(var(--primary)/0.08),transparent_50%)]" />
