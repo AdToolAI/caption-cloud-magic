@@ -70,7 +70,31 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, user_id, file_url, file_name, mime_type, drive_file_id } = await req.json();
+    // SECURITY: require an authenticated caller; ignore any client-supplied user_id.
+    const authHeader = req.headers.get('authorization') || '';
+    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const callerId = userData.user.id;
+
+    const reqBody = await req.json();
+    const { action, file_url, file_name, mime_type, drive_file_id } = reqBody;
+
+    if (reqBody.user_id && reqBody.user_id !== callerId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const user_id = callerId;
 
     const accessToken = await getValidAccessToken(supabase, user_id);
 
