@@ -16,10 +16,19 @@ interface Body {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    // SECURITY: server-to-server only. Reject anything that doesn't carry the
+    // SUPABASE_SERVICE_ROLE_KEY in the Authorization header.
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const auth = req.headers.get("authorization") || "";
+    const token = auth.replace(/^Bearer\s+/i, "").trim();
+    if (!serviceKey || token !== serviceKey) {
+      return json({ ok: false, error: "unauthorized" }, 401);
+    }
+
     const { user_id, reason, evidence } = (await req.json()) as Body;
     if (!user_id || !reason) return json({ ok: false, error: "missing params" }, 400);
 
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey);
 
     // Idempotency — skip if already terminated
     const { data: prof } = await admin.from("profiles").select("terminated_at, email").eq("id", user_id).maybeSingle();
