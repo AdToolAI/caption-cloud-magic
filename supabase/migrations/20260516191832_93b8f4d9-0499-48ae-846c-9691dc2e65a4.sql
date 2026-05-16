@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Public can validate promo codes" ON public.promo_codes;

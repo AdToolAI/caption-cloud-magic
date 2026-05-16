@@ -44,7 +44,7 @@ serve(async (req) => {
     // Get approval
     const { data: approval, error: approvalError } = await supabaseClient
       .from('calendar_approvals')
-      .select('*, calendar_events(title)')
+      .select('*, calendar_events(title, workspace_id)')
       .eq('id', approval_id)
       .single();
 
@@ -52,6 +52,30 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Approval not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Authorization: caller must be the designated approver or a workspace member.
+    const isDesignatedApprover =
+      (approval.approver_id && approval.approver_id === user.id) ||
+      (approval.approver_email && user.email &&
+        approval.approver_email.toLowerCase() === user.email.toLowerCase());
+
+    let isWorkspaceMember = false;
+    if (!isDesignatedApprover && approval.calendar_events?.workspace_id) {
+      const { data: membership } = await supabaseClient
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', approval.calendar_events.workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      isWorkspaceMember = !!membership;
+    }
+
+    if (!isDesignatedApprover && !isWorkspaceMember) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: not authorized to act on this approval' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
