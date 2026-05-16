@@ -177,15 +177,30 @@ serve(async (req) => {
   }
 
   try {
-    const { query, perPage = 30, force_refresh = false } = await req.json();
-    if (!query || typeof query !== 'string') throw new Error('Search query is required');
-
-    const cacheKey = `image:${query.toLowerCase().trim()}:${perPage}`;
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const supabase = supabaseUrl && serviceKey
       ? createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
       : null;
+
+    // Require authenticated caller — protects paid Pexels/Pixabay quota and cache.
+    const authHeader = req.headers.get('Authorization');
+    if (!supabase || !authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { query, perPage = 30, force_refresh = false } = await req.json();
+    if (!query || typeof query !== 'string') throw new Error('Search query is required');
+
+    const cacheKey = `image:${query.toLowerCase().trim()}:${perPage}`;
 
     if (supabase && !force_refresh) {
       const { data: cached } = await supabase
