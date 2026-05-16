@@ -291,8 +291,12 @@ export default function EmailDirector() {
                           </div>
                           <Badge>Variant {vi + 1}</Badge>
                         </div>
-                        <div className="border border-border rounded-md p-3 max-h-[280px] overflow-y-auto bg-background"
-                             dangerouslySetInnerHTML={{ __html: v.html }} />
+                        <iframe
+                          title={`Email preview variant ${vi + 1}`}
+                          srcDoc={v.html || ''}
+                          sandbox=""
+                          className="w-full h-[280px] border border-border rounded-md bg-background"
+                        />
                         <div className="mt-3 pt-3 border-t border-border">
                           <Label className="text-xs mb-2 block">Test-Send mit Subject:</Label>
                           <div className="flex flex-wrap gap-2">
