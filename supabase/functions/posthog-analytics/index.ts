@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { getRedisCache } from '../_shared/redis-cache.ts';
 
 const corsHeaders = {
@@ -10,13 +11,57 @@ const POSTHOG_PROJECT_ID = Deno.env.get('POSTHOG_PROJECT_ID');
 const POSTHOG_API_KEY = Deno.env.get('POSTHOG_PERSONAL_API_KEY');
 const redis = getRedisCache();
 
+// Allowlists for HogQL filter values to prevent query injection
+const ALLOWED_PLAN_TYPES = new Set(['free', 'basic', 'pro', 'business', 'enterprise', 'trial']);
+const ALLOWED_SIGNUP_METHODS = new Set(['email', 'google', 'apple', 'github', 'sso']);
+const ALLOWED_USER_STATUS = new Set(['new', 'active', 'churned']);
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, startDate, endDate, compareEnabled, filters, forceRefresh } = await req.json();
+    // Require authenticated admin caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    const { data: { user }, error: authError } = await adminClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const { data: isAdmin } = await adminClient.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: admin role required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, startDate, endDate, compareEnabled, filters: rawFilters, forceRefresh } = await req.json();
+    const filters: any = {};
+    if (rawFilters?.planTypes && Array.isArray(rawFilters.planTypes)) {
+      filters.planTypes = rawFilters.planTypes.filter((v: unknown) => typeof v === 'string' && ALLOWED_PLAN_TYPES.has(v));
+    }
+    if (rawFilters?.signupMethods && Array.isArray(rawFilters.signupMethods)) {
+      filters.signupMethods = rawFilters.signupMethods.filter((v: unknown) => typeof v === 'string' && ALLOWED_SIGNUP_METHODS.has(v));
+    }
+    if (rawFilters?.userStatus && Array.isArray(rawFilters.userStatus)) {
+      filters.userStatus = rawFilters.userStatus.filter((v: unknown) => typeof v === 'string' && ALLOWED_USER_STATUS.has(v));
+    }
 
     if (action === 'getMetrics') {
       console.log('[PostHog Analytics] Fetching metrics from PostHog API');
