@@ -302,7 +302,11 @@ serve(async (req) => {
       );
     }
 
-    const { language, platform, category, force } = validation.data;
+    let { language, platform, category, force } = validation.data;
+    if (force) {
+      const { data: isAdmin } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+      if (!isAdmin) force = false; // silently downgrade for non-admins
+    }
     console.log(`[trends] lang=${language} force=${force} platform=${platform} category=${category}`);
 
     // ─── Cache Check ───
