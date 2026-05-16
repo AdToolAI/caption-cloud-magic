@@ -15,6 +15,16 @@ interface CheckResult {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Service-role-only: cron/internal callers must provide SUPABASE_SERVICE_ROLE_KEY as Bearer
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const provided = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!provided || provided !== serviceKey) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
