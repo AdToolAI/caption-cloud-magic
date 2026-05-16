@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 const AUTO_GEN_BUILD_TAG = "r73-i18n-pipeline-2026-04-12";
 import { generateScriptInline } from "../_shared/generate-script-inline.ts";
 import { msg as i18n } from "../_shared/pipeline-i18n.ts";

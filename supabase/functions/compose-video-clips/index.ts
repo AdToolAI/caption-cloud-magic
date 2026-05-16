@@ -1,5 +1,6 @@
 // compose-video-clips v2.3.0 — duration snap for Luma/Wan/Seedance
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 
 /** Snap an arbitrary duration (seconds) to the nearest provider-allowed discrete value. */
 function snapDuration(seconds: number, allowed: number[]): number {
