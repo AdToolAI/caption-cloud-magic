@@ -16,13 +16,6 @@ const ComingSoon = () => {
         canonical="/coming-soon"
         noindex
       />
-
-
-const ComingSoon = () => {
-  const { t } = useTranslation();
-
-  return (
-    <div className="min-h-screen bg-background p-6">
       <div className="max-w-4xl mx-auto">
         <Breadcrumbs feature={t("common.comingSoon")} />
         
