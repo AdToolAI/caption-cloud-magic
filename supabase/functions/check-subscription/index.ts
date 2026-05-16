@@ -79,14 +79,17 @@ serve(withTelemetry("check-subscription", async (req) => {
       );
     }
 
-    // Check if user has a plan set in profiles (for non-Stripe enterprise users)
-    if (profile?.plan && profile.plan !== 'free') {
+    // NOTE: profiles.plan is NOT a source of truth — it can only be set server-side
+    // via service-role edge functions (the prevent_profile_privileged_updates trigger
+    // blocks client writes). For non-Stripe enterprise users we still honor it, but
+    // only when there is no stripe_customer_id (i.e. truly an out-of-band plan).
+    if (profile?.plan && profile.plan !== 'free' && !profile?.stripe_customer_id) {
       const planToProductId: Record<string, string> = {
         'basic': 'prod_TIRSoTyzmRpbpT',
-        'pro': 'prod_TIRWOmhxlzFCwW', 
+        'pro': 'prod_TIRWOmhxlzFCwW',
         'enterprise': 'prod_TIRYBu4fdR2BEw'
       };
-      
+
       return new Response(
         JSON.stringify({
           subscribed: true,
@@ -94,7 +97,7 @@ serve(withTelemetry("check-subscription", async (req) => {
           subscription_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
           plan_based: true
         }),
-        { 
+        {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         }
