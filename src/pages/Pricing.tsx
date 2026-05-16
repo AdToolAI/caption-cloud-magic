@@ -187,7 +187,7 @@ const Pricing = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <SEO
-        title="Pricing — AdTool AI Pro €14.99/month (Launch promo)"
+        title="Pricing — Pro €14.99/mo Launch"
         description="One simple plan. Captions, images, Director's Cut, posting & AI video credits. 14-day free trial. Cancel anytime."
         canonical="/pricing"
         lang={language}

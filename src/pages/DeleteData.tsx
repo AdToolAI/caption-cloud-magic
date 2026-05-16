@@ -62,7 +62,7 @@ const DeleteData = () => {
     <>
       <SEO
         title={`${langContent.title} | AdTool AI`}
-        description={langContent.subtitle}
+        description={`${langContent.subtitle}. ${langContent.intro} ${langContent.timeline}`.slice(0, 158)}
         canonical="https://useadtool.ai/delete-data"
       />
       <div className="min-h-screen flex flex-col">
