@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.39.3";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +17,32 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { project_id, video_url, user_id } = await req.json();
+    const body = await req.json().catch(() => ({} as any));
+    const { project_id, video_url } = body;
+    const auth = await authenticateInternalRequest(req, { bodyUserId: body.user_id, corsHeaders });
+    if (!auth.ok) return auth.response;
+
+    if (!project_id) {
+      return new Response(JSON.stringify({ error: 'project_id required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // For user-JWT callers, verify ownership of the project before any update.
+    if (!auth.isService) {
+      const { data: proj } = await supabase
+        .from('content_projects')
+        .select('user_id')
+        .eq('id', project_id)
+        .maybeSingle();
+      if (!proj || proj.user_id !== auth.userId) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    const user_id = auth.isService ? body.user_id : auth.userId;
 
     console.log(`📸 Generating thumbnail for project: ${project_id}`);
 

@@ -40,6 +40,13 @@ Antworte NUR via Tool-Call.`;
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    // Service-role only (called from autopilot-generate-slot edge function).
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!serviceKey || token !== serviceKey) {
+      return json({ allowed: false, error: "Unauthorized" }, 401);
+    }
+
     const body = (await req.json()) as Body;
     if (!body.prompt) return json({ allowed: false, error: "missing prompt" }, 400);
 

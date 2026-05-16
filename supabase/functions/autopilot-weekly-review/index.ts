@@ -1,6 +1,7 @@
 // Session H — Wochen-Review (Samstag 10:00 UTC)
 // Aggregiert die letzten 7 Tage und schlägt eine neue Strategie + Budget für die kommende Woche vor.
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,9 +18,14 @@ Deno.serve(async (req) => {
     let body: { user_id?: string } = {};
     try { body = await req.json(); } catch { /* cron */ }
 
+    const auth = await authenticateInternalRequest(req, { bodyUserId: body.user_id, corsHeaders });
+    if (!auth.ok) return auth.response;
+    // User callers can only review their own briefs; service role can target one user or all.
+    const targetUserId = auth.isService ? (body.user_id ?? null) : auth.userId;
+
     // Either review for one user (manual trigger) or all active briefs (cron)
-    const briefs = body.user_id
-      ? await admin.from("autopilot_briefs").select("*").eq("user_id", body.user_id)
+    const briefs = targetUserId
+      ? await admin.from("autopilot_briefs").select("*").eq("user_id", targetUserId)
       : await admin.from("autopilot_briefs").select("*").eq("is_active", true);
 
     const briefList = (briefs.data ?? []) as Array<Record<string, unknown>>;
