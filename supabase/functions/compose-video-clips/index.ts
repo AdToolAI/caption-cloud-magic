@@ -834,7 +834,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "minimax/hailuo-2.3",
             input: hailuoInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -881,7 +881,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "kwaivgi/kling-v3-omni-video",
             input: klingInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -970,7 +970,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: wanModel,
             input: wanInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1012,7 +1012,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: 'bytedance/seedance-1-lite',
             input: seedInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1057,7 +1057,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: 'luma/ray-2-720p',
             input: lumaInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1103,7 +1103,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: veoModel,
             input: veoInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1136,7 +1136,7 @@ serve(async (req) => {
                 duration: fallbackDuration,
                 resolution: '768p',
               },
-              webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+              webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
               webhook_events_filter: ["completed"],
             });
             await supabaseAdmin
@@ -1279,7 +1279,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "alibaba/happyhorse-1.0",
             input: hhInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
