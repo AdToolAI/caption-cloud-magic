@@ -70,6 +70,19 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // AuthN: require service-role OR a valid user JWT whose sub === userId.
+    const authResult = await authenticateInternalRequest(req, {
+      bodyUserId: userId,
+      corsHeaders,
+    });
+    if (!authResult.ok) return authResult.response;
+    if (!authResult.isService && authResult.userId !== userId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     console.log(`[send-verification-email] Sending verification to: ${email}`);
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
