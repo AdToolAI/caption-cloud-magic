@@ -14,6 +14,12 @@ serve(async (req) => {
 
   const auth = await authenticateInternalRequest(req, { corsHeaders });
   if (!auth.ok) return auth.response;
+  if (!auth.isService) {
+    return new Response(JSON.stringify({ error: 'Forbidden: service role required' }), {
+      status: 403,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   const supabaseClient = getSupabaseClient();
 
