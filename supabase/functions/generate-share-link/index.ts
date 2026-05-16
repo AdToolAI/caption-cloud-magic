@@ -60,14 +60,26 @@ serve(async (req) => {
     // Calculate expiry
     const expires_at = new Date(Date.now() + expires_in_seconds * 1000).toISOString();
 
-    // Hash password if provided
+    // Hash password if provided (PBKDF2-SHA256 with random salt)
     let password_hash = null;
     if (require_password && password) {
       const encoder = new TextEncoder();
-      const data = encoder.encode(password);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      password_hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(String(password)),
+        'PBKDF2',
+        false,
+        ['deriveBits']
+      );
+      const iterations = 100_000;
+      const derived = await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+        keyMaterial,
+        256
+      );
+      const b64 = (buf: Uint8Array) => btoa(String.fromCharCode(...buf));
+      password_hash = `pbkdf2$${iterations}$${b64(salt)}$${b64(new Uint8Array(derived))}`;
     }
 
     // Create share link
