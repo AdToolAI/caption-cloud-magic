@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 const AUTO_GEN_BUILD_TAG = "r73-i18n-pipeline-2026-04-12";
 import { generateScriptInline } from "../_shared/generate-script-inline.ts";
 import { msg as i18n } from "../_shared/pipeline-i18n.ts";
@@ -526,7 +527,7 @@ async function runGenerationPipeline(
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
       const pendingRenderId = generateRemotionCompatibleId();
-      const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+      const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
 
       await supabase.from('video_renders').insert({
         render_id: pendingRenderId,
@@ -607,7 +608,7 @@ async function runGenerationPipeline(
 
       const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL') || '';
       const pendingRenderId = generateRemotionCompatibleId();
-      const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+      const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
 
       await supabase.from('video_renders').insert({
         render_id: pendingRenderId,
@@ -1629,7 +1630,7 @@ async function runGenerationPipeline(
     console.log(`💰 Deducted ${credits_required} credits`);
 
     const pendingRenderId = generateRemotionCompatibleId();
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
 
     await supabase.from('video_renders').insert({
       render_id: pendingRenderId,
@@ -1786,7 +1787,7 @@ async function runRenderOnlyPipeline(
     const oldPayload = existingResultData.lambdaPayload;
     const newRenderId = generateRemotionCompatibleId();
     const newOutName = `universal-video-${newRenderId}.mp4`;
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     
     // Credit check & deduction for render-only (cheaper)
     const RENDER_ONLY_CREDITS = 5;

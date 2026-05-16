@@ -1,5 +1,6 @@
 // compose-video-clips v2.3.0 — duration snap for Luma/Wan/Seedance
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 
 /** Snap an arbitrary duration (seconds) to the nearest provider-allowed discrete value. */
 function snapDuration(seconds: number, allowed: number[]): number {
@@ -230,7 +231,7 @@ serve(async (req) => {
 
     const replicate = new Replicate({ auth: Deno.env.get("REPLICATE_API_KEY") });
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const webhookUrl = `${supabaseUrl}/functions/v1/compose-clip-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/compose-clip-webhook`);
 
     // IMPORTANT: We do NOT append negative words to the positive prompt.
     // Diffusion video models (Hailuo, Kling) treat words like "text", "captions",
@@ -833,7 +834,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "minimax/hailuo-2.3",
             input: hailuoInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -880,7 +881,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "kwaivgi/kling-v3-omni-video",
             input: klingInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -969,7 +970,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: wanModel,
             input: wanInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1011,7 +1012,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: 'bytedance/seedance-1-lite',
             input: seedInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1056,7 +1057,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: 'luma/ray-2-720p',
             input: lumaInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1102,7 +1103,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: veoModel,
             input: veoInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 
@@ -1135,7 +1136,7 @@ serve(async (req) => {
                 duration: fallbackDuration,
                 resolution: '768p',
               },
-              webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+              webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
               webhook_events_filter: ["completed"],
             });
             await supabaseAdmin
@@ -1278,7 +1279,7 @@ serve(async (req) => {
           const prediction = await replicate.predictions.create({
             model: "alibaba/happyhorse-1.0",
             input: hhInput,
-            webhook: `${webhookUrl}?scene_id=${scene.id}&project_id=${projectId}`,
+            webhook: `${webhookUrl}&scene_id=${scene.id}&project_id=${projectId}`,
             webhook_events_filter: ["completed"],
           });
 

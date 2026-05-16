@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 import { detectQaServiceAuth } from "../_shared/qaServiceAuth.ts";
@@ -537,7 +538,7 @@ serve(async (req) => {
       .eq('id', projectId);
 
     // 9. Build webhook with customData so remotion-webhook can match it
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
 
     // Load per-scene audio clips (ambient/sfx/foley) so the webhook can mux them
     // into the final stitched video alongside the voiceover and music.

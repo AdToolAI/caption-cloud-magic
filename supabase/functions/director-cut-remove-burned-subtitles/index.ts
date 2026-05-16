@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import Replicate from "npm:replicate@0.25.2";
 
@@ -64,7 +65,7 @@ serve(async (req) => {
 
     const replicate = new Replicate({ auth: REPLICATE_API_KEY });
 
-    const webhookUrl = `${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`;
+    const webhookUrl = appendWebhookToken(`${SUPABASE_URL}/functions/v1/director-cut-burned-subtitles-webhook`);
     console.log('[RemoveBurnedSubs] Creating prediction with webhook:', webhookUrl);
 
     const prediction = await replicate.predictions.create({

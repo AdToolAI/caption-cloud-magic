@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
@@ -356,7 +357,7 @@ serve(async (req) => {
     // ============================================
     
     const pendingRenderId = `pending-${crypto.randomUUID()}`;
-    const webhookUrl = `${supabaseUrl}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     
     console.log('🆔 Generated pendingRenderId:', pendingRenderId);
     console.log('🔔 Webhook URL:', webhookUrl);
@@ -393,7 +394,7 @@ serve(async (req) => {
       // Webhook
       webhook: {
         url: webhookUrl,
-        secret: 'remotion-webhook-secret-adtool-2024',
+        secret: Deno.env.get('REMOTION_WEBHOOK_SECRET') ?? '',
         customData: {
           pending_render_id: pendingRenderId,
           user_id: userId,

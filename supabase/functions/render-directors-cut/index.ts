@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
@@ -472,7 +473,7 @@ serve(async (req) => {
     }
     console.log(`[RenderDirectorsCut] 🔖 Bundle version verified: ${bundleVersionOk} (expected: ${EXPECTED_BUNDLE_VERSION})`);
 
-    const webhookUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`;
+    const webhookUrl = appendWebhookToken(`${Deno.env.get('SUPABASE_URL')}/functions/v1/remotion-webhook`);
     const fps = 30;
     const durationInFrames = Math.max(Math.ceil(duration * fps), 1);
 
