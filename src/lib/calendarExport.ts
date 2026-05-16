@@ -80,16 +80,18 @@ export async function exportToPDF(options: ExportOptions): Promise<void> {
     throw new Error('NO_HTML_GENERATED');
   }
 
-  // Open HTML in new window for printing/saving as PDF
-  const printWindow = window.open('', '_blank');
+  // Open HTML in a unique blob: origin so injected scripts cannot access window.opener
+  const blob = new Blob([data.html], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  const printWindow = window.open(blobUrl, '_blank', 'noopener,noreferrer');
   if (printWindow) {
-    printWindow.document.write(data.html);
-    printWindow.document.close();
-    
-    // Auto-trigger print dialog
     setTimeout(() => {
-      printWindow.print();
-    }, 250);
+      try { printWindow.print(); } catch { /* ignore */ }
+      // Revoke after a delay so the popup has time to load
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+    }, 500);
+  } else {
+    URL.revokeObjectURL(blobUrl);
   }
 }
 

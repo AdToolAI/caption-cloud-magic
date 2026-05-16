@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const ADMIN_SECRET = Deno.env.get("ADMIN_DELETE_USER_SECRET") || "rotate-after-use-8F42B1C3";
+const ADMIN_SECRET = Deno.env.get("ADMIN_DELETE_USER_SECRET");
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -16,9 +16,17 @@ serve(async (req) => {
   }
 
   try {
+    if (!ADMIN_SECRET || ADMIN_SECRET.length < 16) {
+      console.error("[admin-delete-user] ADMIN_DELETE_USER_SECRET is not configured");
+      return new Response(
+        JSON.stringify({ error: "Server misconfigured: admin secret missing" }),
+        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const { email, secret } = await req.json();
 
-    if (secret !== ADMIN_SECRET) {
+    if (typeof secret !== "string" || secret !== ADMIN_SECRET) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders },
