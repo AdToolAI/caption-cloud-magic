@@ -33,10 +33,11 @@ serve(async (req) => {
     }
     const callerId = userData.user.id;
 
-    const { action, code, user_id, redirect_uri } = await req.json();
+    const reqBody = await req.json();
+    const { action, code, redirect_uri } = reqBody;
 
-    // Force user_id to be the caller — never trust the client-supplied value.
-    if (user_id && user_id !== callerId) {
+    // SECURITY: ignore client-supplied user_id; always use the verified caller id.
+    if (reqBody.user_id && reqBody.user_id !== callerId) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
