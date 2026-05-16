@@ -6,6 +6,7 @@ import {
   renderVerificationEmail,
 } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -66,6 +67,19 @@ const handler = async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Email and userId are required" }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // AuthN: require service-role OR a valid user JWT whose sub === userId.
+    const authResult = await authenticateInternalRequest(req, {
+      bodyUserId: userId,
+      corsHeaders,
+    });
+    if (!authResult.ok) return authResult.response;
+    if (!authResult.isService && authResult.userId !== userId) {
+      return new Response(
+        JSON.stringify({ error: "Forbidden" }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
 

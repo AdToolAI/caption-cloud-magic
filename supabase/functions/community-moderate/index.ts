@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,17 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Service-role only: this function bypasses RLS to write moderation state.
+  // Must be invoked from a DB trigger or another trusted edge function.
+  const authResult = await authenticateInternalRequest(req, { corsHeaders });
+  if (!authResult.ok) return authResult.response;
+  if (!authResult.isService) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden: service-role required" }),
+      { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
   }
 
   try {
