@@ -3,6 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { Rocket, ArrowLeft } from "lucide-react";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { SEO } from "@/components/SEO";
+
+const ComingSoon = () => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <SEO
+        title="Coming Soon"
+        description="This AdTool AI feature is on the way. Check back soon for the launch and start creating smarter social content with our AI marketing platform."
+        canonical="/coming-soon"
+        noindex
+      />
+
 
 const ComingSoon = () => {
   const { t } = useTranslation();
