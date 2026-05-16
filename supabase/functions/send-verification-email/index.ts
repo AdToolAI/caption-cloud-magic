@@ -6,6 +6,7 @@ import {
   renderVerificationEmail,
 } from "./templates.ts";
 import { sendEmail } from "../_shared/email-send.ts";
+import { authenticateInternalRequest } from "../_shared/internal-auth.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
