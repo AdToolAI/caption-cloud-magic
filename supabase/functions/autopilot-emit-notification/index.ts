@@ -37,6 +37,16 @@ const HIGH_PRIORITY: AutopilotNotificationType[] = [
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
+    // SECURITY: server-to-server only. The Authorization header must carry the
+    // SUPABASE_SERVICE_ROLE_KEY, otherwise any internet caller could inject
+    // arbitrary system notifications (including push) into any user's queue.
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!serviceKey || token !== serviceKey) {
+      return json({ ok: false, error: "unauthorized" }, 401);
+    }
+
     const body = (await req.json()) as Body;
     if (!body.user_id || !body.type || !body.title) {
       return json({ ok: false, error: "user_id, type, title required" }, 400);
@@ -44,7 +54,7 @@ Deno.serve(async (req) => {
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      serviceKey,
     );
 
     // Dedup: skip if same type+title was created in last 30 minutes for this user

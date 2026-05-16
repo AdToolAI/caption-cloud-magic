@@ -17,7 +17,32 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { action, code, user_id, redirect_uri } = await req.json();
+    // SECURITY: require an authenticated caller and enforce caller_id == user_id.
+    const authHeader = req.headers.get('authorization') || '';
+    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const callerId = userData.user.id;
+
+    const reqBody = await req.json();
+    const { action, code, redirect_uri } = reqBody;
+
+    // SECURITY: ignore client-supplied user_id; always use the verified caller id.
+    if (reqBody.user_id && reqBody.user_id !== callerId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const user_id = callerId;
 
     // ── ACTION: get_auth_url ──
     if (action === 'get_auth_url') {
