@@ -37,7 +37,11 @@ function recipientFrom(ev: ResendEvent): string | null {
 
 async function verifySvix(req: Request, body: string): Promise<boolean> {
   const secret = Deno.env.get("RESEND_WEBHOOK_SECRET");
-  if (!secret) return true; // verification optional
+  if (!secret) {
+    // Fail closed: never accept unverified webhooks.
+    console.error("[resend-webhook] RESEND_WEBHOOK_SECRET not configured — rejecting request");
+    return false;
+  }
 
   const id = req.headers.get("svix-id");
   const ts = req.headers.get("svix-timestamp");
