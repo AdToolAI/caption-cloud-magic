@@ -23,12 +23,22 @@ serve(async (req) => {
   try {
     const payload: PushPayload = await req.json();
 
-    // Return VAPID public key for client subscription
+    // Return VAPID public key for client subscription (public, no auth needed)
     if (payload.action === "get_vapid_key") {
       const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") || "";
       return new Response(
         JSON.stringify({ vapid_public_key: vapidPublicKey }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sending pushes is server-to-server only — require service-role bearer token
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!serviceKey || token !== serviceKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
