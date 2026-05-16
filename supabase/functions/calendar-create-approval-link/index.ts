@@ -18,6 +18,24 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Require an authenticated caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { event_id, approver_email, message } = await req.json();
 
     if (!event_id || !approver_email) {
@@ -27,10 +45,10 @@ serve(async (req) => {
       );
     }
 
-    // Verify event exists
+    // Verify event exists and load workspace
     const { data: event, error: eventError } = await supabaseClient
       .from('calendar_events')
-      .select('id, title')
+      .select('id, title, workspace_id, user_id')
       .eq('id', event_id)
       .single();
 
@@ -39,6 +57,24 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Event not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Authorization: caller must own the event OR be a member of its workspace
+    let authorized = (event as any).user_id === user.id;
+    if (!authorized && (event as any).workspace_id) {
+      const { data: membership } = await supabaseClient
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', (event as any).workspace_id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      authorized = !!membership;
+    }
+    if (!authorized) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: not authorized for this event' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
