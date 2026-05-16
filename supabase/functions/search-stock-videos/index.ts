@@ -201,6 +201,24 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const sb = createClient(supabaseUrl, serviceKey);
+
+    // Require authenticated caller — protects paid Pexels/Pixabay quota and cache.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const { data: { user }, error: authError } = await sb.auth.getUser(authHeader.replace("Bearer ", ""));
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json().catch(() => ({}));
     const query: string = (body.query ?? "").toString().trim().slice(0, 120);
     const limit: number = Math.min(60, Math.max(6, Number(body.limit ?? 30)));
@@ -212,10 +230,6 @@ Deno.serve(async (req) => {
 
     const filters = { orientation, min_quality, min_fps, max_duration, min_duration };
     const cacheKey = await hashKey(JSON.stringify({ q: query, limit, ...filters }));
-
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
 
     // Try cache
     const { data: cached } = await sb

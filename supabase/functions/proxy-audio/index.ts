@@ -1,7 +1,39 @@
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock, range',
 };
+
+// SSRF protection: only allow audio from known CDNs / storage providers.
+const ALLOWED_HOSTS = [
+  'lbunafpxuskwmsrraqxl.supabase.co',
+  's3.eu-central-1.amazonaws.com',
+  's3.amazonaws.com',
+  'replicate.delivery',
+  'replicate.com',
+  'cdn.jamendo.com',
+  'prod-1.storage.jamendo.com',
+  'mp3l.jamendo.com',
+  'mp3d.jamendo.com',
+  'freesound.org',
+  'cdn.freesound.org',
+  'cdn.pixabay.com',
+  'pixabay.com',
+  'cdn.pexels.com',
+  'videos.pexels.com',
+  'storage.googleapis.com',
+  'd1tvpdh5jtnqzo.cloudfront.net',
+];
+
+function isAllowedUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'https:') return false;
+    const host = u.hostname.toLowerCase();
+    return ALLOWED_HOSTS.some((h) => host === h || host.endsWith('.' + h));
+  } catch {
+    return false;
+  }
+}
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -18,6 +50,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing url parameter' }), { 
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!isAllowedUrl(audioUrl)) {
+      console.warn('[proxy-audio] Blocked disallowed URL:', audioUrl);
+      return new Response(JSON.stringify({ error: 'invalid_or_disallowed_url' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
