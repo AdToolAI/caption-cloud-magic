@@ -203,7 +203,7 @@ serve(async (req) => {
         accountInfo = await getLinkedInAccountInfo(tokenData.access_token);
         break;
       case 'x':
-        tokenData = await exchangeXToken(code);
+        tokenData = await exchangeXToken(code, (storedState as any).code_verifier);
         accountInfo = await getXAccountInfo(tokenData.access_token);
         break;
       case 'youtube':
@@ -666,10 +666,14 @@ async function getLinkedInAccountInfo(accessToken: string) {
   };
 }
 
-async function exchangeXToken(code: string) {
+async function exchangeXToken(code: string, codeVerifier?: string | null) {
   const clientId = Deno.env.get('X_CLIENT_ID');
   const clientSecret = Deno.env.get('X_CLIENT_SECRET');
   const redirectUri = Deno.env.get('X_REDIRECT_URI');
+
+  if (!codeVerifier) {
+    throw new Error('Missing PKCE code_verifier for X OAuth exchange');
+  }
 
   const response = await fetch('https://api.twitter.com/2/oauth2/token', {
     method: 'POST',
@@ -681,7 +685,7 @@ async function exchangeXToken(code: string) {
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri!,
-      code_verifier: 'challenge'
+      code_verifier: codeVerifier
     })
   });
 

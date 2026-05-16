@@ -17,9 +17,18 @@ serve(async (req) => {
   }
 
   try {
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const provided = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "").trim();
+    if (!serviceKey || provided !== serviceKey) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      serviceKey
     );
 
     const { data, error } = await supabase.rpc("cleanup_expired_ai_cache");

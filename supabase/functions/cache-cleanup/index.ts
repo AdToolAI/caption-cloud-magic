@@ -14,6 +14,16 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Service-role-only: cron/internal callers must provide service role key as Bearer
+    const provided = (req.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '').trim();
+    if (!provided || provided !== supabaseKey) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('🧹 Starting cache cleanup...');
