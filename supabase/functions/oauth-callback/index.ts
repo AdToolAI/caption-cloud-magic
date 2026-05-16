@@ -203,7 +203,7 @@ serve(async (req) => {
         accountInfo = await getLinkedInAccountInfo(tokenData.access_token);
         break;
       case 'x':
-        tokenData = await exchangeXToken(code);
+        tokenData = await exchangeXToken(code, (storedState as any).code_verifier);
         accountInfo = await getXAccountInfo(tokenData.access_token);
         break;
       case 'youtube':
