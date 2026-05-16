@@ -17,7 +17,31 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // SECURITY: require an authenticated caller and enforce caller_id == user_id.
+    const authHeader = req.headers.get('authorization') || '';
+    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { data: userData, error: userErr } = await supabase.auth.getUser(jwt);
+    if (userErr || !userData?.user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const callerId = userData.user.id;
+
     const { action, code, user_id, redirect_uri } = await req.json();
+
+    // Force user_id to be the caller — never trust the client-supplied value.
+    if (user_id && user_id !== callerId) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const effectiveUserId = callerId;
 
     // ── ACTION: get_auth_url ──
     if (action === 'get_auth_url') {
