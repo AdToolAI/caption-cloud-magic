@@ -17,7 +17,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // SECURITY: require an authenticated caller and enforce caller_id == user_id.
+    // SECURITY: require an authenticated caller and enforce caller_id == effectiveUserId.
     const authHeader = req.headers.get('authorization') || '';
     const jwt = authHeader.replace(/^Bearer\s+/i, '').trim();
     if (!jwt) {
@@ -35,8 +35,8 @@ serve(async (req) => {
 
     const { action, code, user_id, redirect_uri } = await req.json();
 
-    // Force user_id to be the caller — never trust the client-supplied value.
-    if (user_id && user_id !== callerId) {
+    // Force effectiveUserId to be the caller — never trust the client-supplied value.
+    if (effectiveUserId && effectiveUserId !== callerId) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -52,7 +52,7 @@ serve(async (req) => {
         });
       }
 
-      const state = btoa(JSON.stringify({ user_id, provider: 'google_drive' }));
+      const state = btoa(JSON.stringify({ effectiveUserId, provider: 'google_drive' }));
       const scopes = [
         'https://www.googleapis.com/auth/drive.file',
         'https://www.googleapis.com/auth/userinfo.email',
@@ -137,7 +137,7 @@ serve(async (req) => {
       const { data: connection, error } = await supabase
         .from('cloud_storage_connections')
         .upsert({
-          user_id,
+          effectiveUserId,
           provider: 'google_drive',
           access_token_encrypted: encryptedAccess,
           refresh_token_encrypted: encryptedRefresh,
@@ -149,7 +149,7 @@ serve(async (req) => {
           account_name: userInfo.name,
           quota_bytes: parseInt(aboutData.storageQuota?.limit || '0'),
           used_bytes: parseInt(aboutData.storageQuota?.usage || '0'),
-        }, { onConflict: 'user_id,provider' })
+        }, { onConflict: 'effectiveUserId,provider' })
         .select()
         .single();
 
@@ -158,7 +158,7 @@ serve(async (req) => {
         throw error;
       }
 
-      console.log(`✅ Google Drive connected for user ${user_id} (${userInfo.email})`);
+      console.log(`✅ Google Drive connected for user ${effectiveUserId} (${userInfo.email})`);
 
       return new Response(JSON.stringify({
         success: true,
@@ -181,7 +181,7 @@ serve(async (req) => {
       const { error } = await supabase
         .from('cloud_storage_connections')
         .delete()
-        .eq('user_id', user_id)
+        .eq('effectiveUserId', effectiveUserId)
         .eq('provider', 'google_drive');
 
       if (error) throw error;
@@ -196,7 +196,7 @@ serve(async (req) => {
       const { data: conn } = await supabase
         .from('cloud_storage_connections')
         .select('*')
-        .eq('user_id', user_id)
+        .eq('effectiveUserId', effectiveUserId)
         .eq('provider', 'google_drive')
         .single();
 
@@ -239,7 +239,7 @@ serve(async (req) => {
           access_token_encrypted: encryptedAccess,
           token_expires_at: expiresAt,
         })
-        .eq('user_id', user_id)
+        .eq('effectiveUserId', effectiveUserId)
         .eq('provider', 'google_drive');
 
       return new Response(JSON.stringify({ success: true, access_token: tokenData.access_token }), {
