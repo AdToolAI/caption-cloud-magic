@@ -1204,6 +1204,11 @@ export default function SceneCard({
                           FAILED
                         </span>
                       )}
+                      {scene.lipSyncStatus === 'no_voiceover' && (
+                        <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold">
+                          VO FEHLT
+                        </span>
+                      )}
                     </span>
                     <span className="text-[9px] text-muted-foreground">
                       {scene.lipSyncAppliedAt
@@ -1226,7 +1231,7 @@ export default function SceneCard({
                     {scene.lipSyncWithVoiceover ? 'AN' : 'AUS'}
                   </button>
                 </div>
-                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed') && scene.clipUrl && (
+                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed' || scene.lipSyncStatus === 'no_voiceover') && scene.clipUrl && (
                   <button
                     type="button"
                     disabled={scene.lipSyncStatus === 'running'}
