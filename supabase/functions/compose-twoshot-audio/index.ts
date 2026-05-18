@@ -7,7 +7,7 @@
  * per-character padded WAV track for sequential lipsync passes.
  *
  * Sample-accurate pipeline (Artlist parity): we synthesize each utterance
- * straight to Int16 PCM @ 44.1 kHz mono (ElevenLabs `pcm_44100` / Hume
+ * straight to Int16 PCM @ 44.1 kHz mono (ElevenLabs `pcm_24000` + linear
  * `wav` + resample), concatenate samples directly, and write a single WAV
  * file at the end. No MP3 byte-stitching, no ID3 inflation, no 26 ms
  * silence-frame quantization — drift between merged playback audio and
@@ -261,9 +261,13 @@ async function elevenlabsPcm(
   voiceId: string,
   text: string,
 ): Promise<Int16Array> {
-  // Raw headerless Int16LE mono @ 44.1 kHz — no ID3, no Xing/LAME info frame,
-  // so byte count maps 1:1 to samples and timing is sample-accurate.
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_44100`;
+  // Raw headerless Int16LE mono. We request pcm_24000 (available on Starter
+  // tier and above — pcm_44100 is Pro-only and 403's on most accounts) and
+  // resample linearly to SAMPLE_RATE so the sample-accurate timeline stays
+  // intact. Resampling error << 1 sample after the merged-track is hard
+  // trimmed to round(sceneDur * 44.1 kHz) downstream.
+  const SOURCE_RATE = 24000;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_${SOURCE_RATE}`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -287,7 +291,8 @@ async function elevenlabsPcm(
     const errText = await res.text().catch(() => "");
     throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
   }
-  return pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
+  const raw = pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
+  return SOURCE_RATE === SAMPLE_RATE ? raw : resampleLinear(raw, SOURCE_RATE, SAMPLE_RATE);
 }
 
 async function humePcm(

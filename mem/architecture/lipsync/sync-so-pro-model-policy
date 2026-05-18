@@ -6,7 +6,7 @@ type: feature
 Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
 
 **Sample-Accurate Audio Pipeline (Drift-Fix Mai 2026):**
-- `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching mehr. ElevenLabs liefert `output_format=pcm_44100` (headerless Int16LE), Hume liefert `format.type=wav` → decode + resample auf 44.1 kHz mono.
+- `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching mehr. ElevenLabs liefert `output_format=pcm_24000` (Starter-Tier-kompatibel; `pcm_44100` wäre Pro-only und wirft 403 `output_format_not_allowed`) → linear resampled auf 44.1 kHz; Hume liefert `format.type=wav` → decode + resample auf 44.1 kHz mono.
 - Konkatenation und Stille-Padding sample-genau (≈22 µs Auflösung), kein 26-ms-Frame-Quantisierungsfehler.
 - Merged track wird **hart auf `totalSamples = round(sceneDur * 44100)` getrimmt**, niemals länger.
 - Per-Speaker-Tracks werden aus derselben Sample-Timeline gebaut (`Int16Array(totalSamples)` mit den Samples des Sprechers bei `_startSample`, Rest = 0). Damit ist Sprecher-Position byte-identisch zwischen Merged- und Per-Speaker-Spur → kein Versatz zwischen Lipsync-Output und Playback.
