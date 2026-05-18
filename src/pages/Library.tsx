@@ -28,7 +28,7 @@ import {
   Star,
   Trash2,
   Sparkles,
-  Library as LibraryIcon,
+  
 } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
