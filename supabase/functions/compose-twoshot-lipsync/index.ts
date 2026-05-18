@@ -36,6 +36,7 @@ const corsHeaders = {
 const COST = 28;
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 const PASS_TIMEOUT_MS = 180_000;
+const POLL_INTERVAL_MS = 5_000;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -63,6 +64,72 @@ async function setStage(
     .from("composer_scenes")
     .update({ twoshot_stage: stage, ...extra })
     .eq("id", sceneId);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractOutputUrl(output: unknown): string | null {
+  if (typeof output === "string") return output;
+  if (Array.isArray(output) && output.length) return output[0] as string;
+  if (output && typeof output === "object") {
+    const o = output as Record<string, unknown>;
+    return ((o.video || o.output || o.url) as string) ?? null;
+  }
+  return null;
+}
+
+async function runLipsyncPrediction(
+  replicate: any,
+  supabase: any,
+  sceneId: string,
+  input: Record<string, unknown>,
+  label: string,
+): Promise<string> {
+  const prediction = await replicate.predictions.create({
+    model: LIPSYNC_MODEL,
+    input,
+  });
+  const predictionId = prediction?.id;
+  if (!predictionId) throw new Error(`${label}_missing_prediction_id`);
+
+  await supabase
+    .from("composer_scenes")
+    .update({
+      replicate_prediction_id: predictionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sceneId);
+
+  const started = Date.now();
+  let current = prediction;
+  while (Date.now() - started < PASS_TIMEOUT_MS) {
+    const status = String(current?.status ?? "");
+    if (status === "succeeded") {
+      const url = extractOutputUrl(current?.output);
+      if (!url) throw new Error(`${label}_no_output`);
+      return url;
+    }
+    if (["failed", "canceled"].includes(status)) {
+      const detail = typeof current?.error === "string"
+        ? current.error
+        : JSON.stringify(current?.error ?? {}).slice(0, 300);
+      throw new Error(`${label}_${status}: ${detail}`);
+    }
+
+    await sleep(POLL_INTERVAL_MS);
+    current = await replicate.predictions.get(predictionId);
+    await supabase
+      .from("composer_scenes")
+      .update({
+        replicate_prediction_id: predictionId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sceneId);
+  }
+
+  throw new Error(`${label}_timeout_${Math.round(PASS_TIMEOUT_MS / 1000)}s`);
 }
 
 serve(async (req) => {
@@ -112,13 +179,6 @@ serve(async (req) => {
       // short-circuited here. Take over instead of returning 202.
       const hasRealProgress = !!hb || (stage && stage !== "master_clip" && stage !== "audio" && stage !== "anchor");
       if (hasRealProgress && ageMs < 10 * 60 * 1000) {
-        return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
-      }
-      if (!hasRealProgress && ageMs < 90 * 1000) {
-        // Very recent invocation that did set status=running but hasn't
-        // recorded progress yet — still allow takeover after 90s to avoid
-        // forever-stuck rows. Below 90s, assume a concurrent worker is
-        // genuinely just starting.
         return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
       }
       console.warn(
@@ -361,37 +421,27 @@ serve(async (req) => {
           // We send both `face_index` AND `speaker` so we work regardless of
           // which field the current Replicate schema honors; unknown fields
           // are silently ignored by Replicate.
-          let passOutput: unknown;
+          let stepUrl: string | null = null;
           try {
-            passOutput = await withTimeout(
-              replicate.run(
-                LIPSYNC_MODEL,
-                {
-                  input: {
-                    video: currentVideo,
-                    audio: pass.track_url,
-                    sync_mode: "loop",
-                    active_speaker: true,
-                    temperature: 0.5,
-                    output_format: "mp4",
-                    face_index: p,
-                    speaker: p,
-                  },
-                },
-              ),
-              PASS_TIMEOUT_MS,
+            stepUrl = await runLipsyncPrediction(
+              replicate,
+              supabase,
+              scene_id,
+              {
+                video: currentVideo,
+                audio: pass.track_url,
+                sync_mode: "loop",
+                active_speaker: true,
+                temperature: 0.5,
+                output_format: "mp4",
+                face_index: p,
+                speaker: p,
+              },
               `lipsync_pass_${p + 1}`,
             );
           } catch (e) {
             await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
             return;
-          }
-          let stepUrl: string | null = null;
-          if (typeof passOutput === "string") stepUrl = passOutput;
-          else if (Array.isArray(passOutput) && passOutput.length) stepUrl = passOutput[0] as string;
-          else if (passOutput && typeof passOutput === "object") {
-            const o = passOutput as Record<string, unknown>;
-            stepUrl = (o.video || o.output || o.url) as string ?? null;
           }
           if (!stepUrl) {
             await refund(`pass_${p + 1}_no_output`);
@@ -403,23 +453,20 @@ serve(async (req) => {
       } else {
         // Fallback: legacy single merged-audio pass.
         const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
-        let output: unknown;
+        let outputUrl: string | null = null;
         try {
-          output = await withTimeout(
-            replicate.run(
-              LIPSYNC_MODEL,
-              {
-                input: {
-                  video: sourceClipUrl,
-                  audio: mergedVo.url,
-                  sync_mode: syncMode,
-                  temperature: 0.5,
-                  active_speaker: true,
-                  output_format: "mp4",
-                },
-              },
-            ),
-            PASS_TIMEOUT_MS,
+          outputUrl = await runLipsyncPrediction(
+            replicate,
+            supabase,
+            scene_id,
+            {
+              video: sourceClipUrl,
+              audio: mergedVo.url,
+              sync_mode: syncMode,
+              temperature: 0.5,
+              active_speaker: true,
+              output_format: "mp4",
+            },
             "lipsync_single_pass",
           );
         } catch (e) {
@@ -427,12 +474,7 @@ serve(async (req) => {
           return;
         }
         await setStage(supabase, scene_id, "lipsync_2");
-        if (typeof output === "string") outUrl = output;
-        else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
-        else if (output && typeof output === "object") {
-          const o = output as Record<string, unknown>;
-          outUrl = (o.video || o.output || o.url) as string ?? null;
-        }
+        outUrl = outputUrl;
       }
 
       if (!outUrl) {
