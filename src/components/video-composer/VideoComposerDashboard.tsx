@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from '@/hooks/useTranslation';
 import BriefingTab from './BriefingTab';
 import StoryboardTab from './StoryboardTab';
+import { ComposerTabErrorBoundary } from './ComposerTabErrorBoundary';
 import ClipsTab from './ClipsTab';
 import VoiceSubtitlesTab from './VoiceSubtitlesTab';
 import AudioTab from './AudioTab';
