@@ -1,66 +1,82 @@
 ## Problem
 
-Im Dialog-Studio zeigt der Stimmen-Dropdown zwei zusammengeklebte Namen an, z. B. **„DiegoMarkus"** und **„GeorgeMateo"**.
+Im Two-Shot Lip-Sync (compose-twoshot-lipsync) wird derzeit nur **ein** Gesicht animiert — der zweite Sprecher bleibt stumm/lippenlos. Wir senden zwei sequentielle Sync.so-Passes mit unterschiedlichen Audiospuren, **aber beide Passes landen auf demselben Gesicht** (dem prominenteren).
 
 ## Ursache
 
-In `supabase/functions/_shared/premium-voices.ts` ist dieselbe ElevenLabs-Voice-ID mehrfach als verschiedene Persona pro Sprache eingetragen:
-
-| ElevenLabs Voice ID | Aliase |
-|---|---|
-| `onwK4e9ZLuTAKqWW03F9` (Daniel) | **Markus** (de) + **Diego** (es) |
-| `JBFqnCBsd6RMkjVDRZzb` (George) | **George** (en) + **Mateo** (es) |
-| (weitere mehrsprachige Stimmen analog) |
-
-`list-voices` gibt beide Einträge zurück. Im Frontend (`SceneDialogStudio.tsx`, Voice-`<Select>`) wird `v.id` als Item-Value benutzt. Radix Select rendert im Trigger die `children` **aller** `SelectItem` mit passendem Value — also beide Namen hintereinander → „DiegoMarkus".
-
-## Fix
-
-Stimmen serverseitig in `supabase/functions/list-voices/index.ts` per `id` deduplizieren, bevor die Liste ausgeliefert wird. Das hält ID = ElevenLabs-Voice-ID (wichtig für TTS), zeigt aber pro Stimme nur noch einen Eintrag.
-
-Strategie pro doppeltem ID:
-- **Name**: Name der Variante nehmen, die zur aktuellen UI-Sprache passt (`language === requestedLanguage`), sonst den ersten Eintrag.
-- **supportedLanguages**: Union aller Aliase (z. B. Daniel → `['de','es']`).
-- **accent / description**: vom gewählten Eintrag.
-- **tier/recommended_model/settings**: vom gewählten Eintrag (bevorzugt premium).
-
-Implementierung in `list-voices/index.ts` direkt nach Schritt 1 (`premiumMapped`):
+Wir senden derzeit:
 
 ```ts
-// Dedupe premium voices that share the same ElevenLabs ID across languages
-const byId = new Map<string, any>();
-for (const v of premiumMapped) {
-  const existing = byId.get(v.id);
-  if (!existing) {
-    byId.set(v.id, { ...v, supportedLanguages: [...v.supportedLanguages] });
-    continue;
-  }
-  // merge languages
-  for (const lang of v.supportedLanguages) {
-    if (!existing.supportedLanguages.includes(lang)) existing.supportedLanguages.push(lang);
-  }
-  // prefer the variant that matches the requested UI language
-  if (language && language !== 'all' && v.language === language && existing.language !== language) {
-    existing.name = v.name;
-    existing.language = v.language;
-    existing.accent = v.accent;
-    existing.description = v.description;
-    existing.recommended_settings = v.recommended_settings;
-  }
-}
-const premiumDeduped = Array.from(byId.values());
+{ video, audio, sync_mode: "cut_off", active_speaker: true,
+  face_index: p, speaker: p }
 ```
 
-Danach `premiumDeduped` statt `premiumMapped` in den Schritten 3 + Logging benutzen.
+`face_index` und `speaker` sind **keine gültigen Sync.so-Parameter** — sie werden von Replicate stillschweigend ignoriert. Mit `active_speaker: true` greift dann automatic-speaker-detection, und die wählt in **beiden Passes** dasselbe (prominenteste) Gesicht → Pass 2 überschreibt Pass 1 auf demselben Mund.
 
-## Touched files
+So macht es Artlist: Sync.so bietet `options.active_speaker_detection` mit **`frame_number` + `coordinates`** (oder `bounding_boxes`) für deterministische Face-Auswahl. Damit pinnt man pro Pass das **exakte Zielgesicht**.
 
-- `supabase/functions/list-voices/index.ts` — Dedupe-Schritt einfügen.
+## Lösung
 
-Keine Frontend-Änderung nötig. Kein DB-Migrationsbedarf. Bestehende gespeicherte `dialogVoices` bleiben gültig, weil die Voice-ID stabil bleibt.
+### 1. Face-Detection einmalig pro Szene
+Vor den Lipsync-Passes Gemini Vision (`google/gemini-2.5-flash`) mit dem ersten Frame/Video-URL des Master-Clips aufrufen. Strict-JSON-Antwort:
 
-## Validation
+```json
+{ "faces": [
+    { "center": [x, y], "side": "left",  "bbox": [x1,y1,x2,y2] },
+    { "center": [x, y], "side": "right", "bbox": [x1,y1,x2,y2] }
+] }
+```
 
-1. Picker im Dialog-Studio öffnen → jede Stimme erscheint genau einmal, Trigger zeigt nur **einen** Namen (z. B. „Markus" bei DE-UI, „Diego" bei ES-UI).
-2. Preview-Button → spielt die korrekte Stimme.
-3. Voiceover-Generierung → unverändert, da Voice-ID dieselbe ist.
+Koordinaten in Pixeln der Video-Auflösung (Hailuo two-shot ist 1280×720 oder 1920×1080 — wir senden die Original-Auflösung im Prompt mit, oder lassen Gemini sie schätzen und normieren später).
+
+Cache das Ergebnis in `composer_scenes.audio_plan.twoshot.faceMap` damit Retries nicht erneut detektieren.
+
+### 2. Pro Pass deterministisches Face-Targeting
+Aus `character_shots[i].position` (`left`/`right` oder Index 0/1) → passendes Face aus der Detection mappen.
+
+Pass-Input wird zu:
+
+```ts
+{
+  video: currentVideo,
+  audio: pass.track_url,
+  sync_mode: "cut_off",
+  temperature: 0.5,
+  output_format: "mp4",
+  active_speaker: false,                  // Auto-Detect aus
+  active_speaker_detection: {
+    auto_detect: false,
+    frame_number: 0,
+    coordinates: [faceX, faceY],          // Mittelpunkt des Ziel-Gesichts
+  },
+}
+```
+
+`face_index`/`speaker` (Bogus-Felder) entfernen.
+
+### 3. Fallback
+- Wenn Gemini Detection fehlschlägt oder nicht 2 Gesichter liefert: **Heuristik** — Annahme links/rechts auf Drittel-Position (z. B. links = [W*0.3, H*0.5], rechts = [W*0.7, H*0.5]). Auflösung kommt aus `scene.metadata.master_width/height` (falls vorhanden) oder Default 1280×720.
+- Wenn auch das nicht geht: aktuelles Verhalten (silent failover auf `active_speaker: true`) mit Warnung im Log.
+
+### 4. Logging & Sichtbarkeit
+- `console.log` pro Pass: `target_face=left|right coords=[x,y]`
+- In `audio_plan.twoshot.heartbeat` zusätzlich `targetFace` mitschreiben — das Studio-UI kann später eine kleine "👤 links / 👤 rechts" Anzeige im Progress-Strip rendern.
+
+## Geänderte Dateien
+
+1. **`supabase/functions/compose-twoshot-lipsync/index.ts`**
+   - Neue Helper-Funktion `detectFacesInMaster(supabase, sceneId, videoUrl, lovableKey)` → ruft Gemini, cached Ergebnis in `audio_plan.twoshot.faceMap`.
+   - Neue Helper-Funktion `pickTargetCoordinates(faceMap, charShot, fallbackDims)` → liefert `[x, y]` für den aktuellen Sprecher.
+   - Multi-Pass-Loop (Zeilen ~392–452): Eingabe-Objekt umbauen wie oben. Aufruf der Detection einmal vor dem Loop.
+
+2. **`mem/architecture/lipsync/sync-so-pro-model-policy`**
+   - Notiz ergänzen: `active_speaker_detection.coordinates` ist der **richtige** Weg für Two-Shot. `face_index`/`speaker` waren no-ops.
+
+Keine UI-Änderungen, kein DB-Migration. `audio_plan.twoshot.faceMap` ist nur ein neues optionales Feld im bestehenden JSONB.
+
+## Validierung
+
+1. Neue Two-Shot-Szene mit zwei Sprechern triggern (`/video-composer`).
+2. Edge-Logs prüfen: `target_face=left coords=[…]` für Pass 1, `target_face=right` für Pass 2.
+3. Visuell: Pass 1 animiert linkes Gesicht beim ersten VO-Segment, Pass 2 animiert rechtes Gesicht beim zweiten — beide Münder bewegen sich zur richtigen Zeit.
+4. Continuity-Drift sollte < 0.3 bleiben (kein Identitäts-Bleed).
