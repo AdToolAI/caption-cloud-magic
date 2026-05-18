@@ -1,31 +1,62 @@
-## Diagnose
+## Befund
 
-Der aktuelle Job hängt nicht in der Cloud selbst; der Backend-Status ist gesund. In der betroffenen Szene ist `lip_sync_status = 'running'`, `twoshot_stage = 'master_clip'`, aber die Lip-Sync-Funktion loggt nur `shutdown` und keine `pass 1/2`-Logs. Das zeigt: Der Request wird zwar gestartet/abgebrochen, aber die Pipeline kommt gar nicht stabil bis zu den eigentlichen Sync.so-Passes.
+Der Backend-Status ist gesund. Die aktuell hängende Szene `4e2d57fe-78e0-4852-9fb6-2e1a48899034` steht auf:
 
-Zusätzlich gibt es noch einen alten Auto-Trigger in `ClipsTab.tsx`, der vor dem Funktionsaufruf wieder optimistisch `lip_sync_status='running'` setzt. Genau diese Race Condition wurde im neuen Hook bereits entfernt, existiert dort aber weiterhin und kann die Duplicate-Run-Sperre der Backend-Funktion blockieren.
+```text
+lip_sync_status = running
+twoshot_stage = master_clip
+replicate_prediction_id = 2azkx3x7tdrmr0cy7jk8d3rrbm
+heartbeat = null
+```
+
+Für `compose-twoshot-lipsync` gibt es dabei keine echten Request-/Pass-Logs, nur `shutdown`. Das heißt: der Two-Shot-LipSync läuft nicht wirklich. Der Status wird blockiert, bevor die Two-Shot-Pipeline startet.
+
+## Root Cause
+
+Es gibt noch einen zweiten Auto-Trigger im Backend-Webhook:
+
+- `compose-clip-webhook` startet nach fertigem Clip weiterhin pauschal `compose-lipsync-scene`.
+- Für Cinematic-Sync mit zwei Sprechern ist aber `compose-twoshot-lipsync` zuständig.
+- `compose-lipsync-scene` setzt `lip_sync_status='running'`, läuft dann in die falsche/zu lange Sync-Strecke oder wird beendet.
+- Danach blockiert `useTwoShotAutoTrigger`, weil die Szene bereits `running` ist.
+- Ergebnis: UI lädt ewig, `twoshot_stage` bleibt auf `master_clip`, und es entstehen keine `pass 1/2` / `pass 2/2` Logs.
+
+Zusätzlich ist `compose-twoshot-lipsync` noch immer auf `replicate.run(...)` aufgebaut. Das ist für lange Medienjobs zu fragil, weil Edge Functions abgebrochen werden können, bevor die zwei Sync.so-Passes fertig sind.
 
 ## Plan
 
-1. **Doppelten Frontend-Trigger entfernen**
-   - In `src/components/video-composer/ClipsTab.tsx` den alten state-based Cinematic-Sync Auto-Trigger deaktivieren/entfernen.
-   - `useTwoShotAutoTrigger.ts` bleibt die einzige Quelle für Auto-Starts.
-   - Wichtig: Kein Frontend-Code setzt mehr `lip_sync_status='running'`; nur die Backend-Funktion reserviert Credits und setzt den Status.
+1. **Webhook-Auto-Trigger korrigieren**
+   - In `supabase/functions/compose-clip-webhook/index.ts` Cinematic-Sync erkennen.
+   - Bei `engine_override='cinematic-sync'` und mehreren Sprechern nicht mehr `compose-lipsync-scene`, sondern `compose-twoshot-lipsync` aufrufen.
+   - Bei Cinematic-Sync mit einem Sprecher weiterhin `compose-lipsync-scene` erlauben.
+   - Der Webhook darf keinen falschen `running`-Status mehr erzeugen.
 
-2. **Backend-Start robuster machen**
-   - In `compose-twoshot-lipsync` den Startstatus atomar reservieren: pending/null/failed darf starten, frisches running wird ignoriert, stale running wird sauber übernommen.
-   - `twoshot_stage` soll nach Reservierung direkt auf `lipsync_1` wechseln, damit die UI nicht ewig bei `master_clip` steht.
-   - Bei früheren Fehlern vor der Background-Pipeline wird kein endloser Running-State zurückgelassen.
+2. **Two-Shot-Pipeline auf echtes Prediction-Polling umbauen**
+   - In `compose-twoshot-lipsync` `replicate.run(...)` durch `replicate.predictions.create(...)` + `predictions.get(...)` Polling ersetzen.
+   - Pro Pass sofort `replicate_prediction_id` und Heartbeat in `composer_scenes` speichern.
+   - Status sichtbar durchlaufen lassen:
 
-3. **Sync.so nicht mehr als langen blocking `replicate.run` ausführen**
-   - Replicate-Aufrufe für die Lipsync-Passes auf Prediction-Polling umstellen: Prediction erstellen, `replicate_prediction_id` sofort speichern, Status in Intervallen poll’en, harte Max-Laufzeit erzwingen.
-   - Dadurch sieht man jederzeit, ob Sync.so wirklich läuft, failed oder timed out.
-   - Bei Timeout/Failure: `lip_sync_status='failed'`, `twoshot_stage='failed'`, Fehlertext setzen, Credits idempotent zurückgeben.
+```text
+lipsync_1 -> lipsync_2 -> continuity -> done
+```
 
-4. **Watchdog/Recovery anpassen**
-   - Der Watchdog soll stuck Jobs nicht nur nach `updated_at`, sondern auch nach `audio_plan.twoshot.heartbeat.started_at` bzw. `replicate_prediction_id` bewerten.
-   - Aktuelle Running-Szenen, die noch auf `master_clip` hängen, werden sauber auf `failed` gesetzt und erstattet, damit der Auto-Trigger danach neu starten kann.
+   - Harte Timeouts je Pass behalten; bei `failed`, `canceled` oder Timeout: `lip_sync_status='failed'`, `twoshot_stage='failed'`, Fehlertext setzen und Credits refundieren.
 
-5. **Validierung**
-   - Funktionen deployen.
-   - Den aktuell hängenden Scene-Status prüfen/resetten.
-   - Danach muss ein neuer Versuch in der DB sichtbar durchlaufen: `lipsync_1` → `lipsync_2` → `continuity` → `done`, mit `pass 1/2` und `pass 2/2` in den Logs statt nur `shutdown`.
+3. **Single-LipSync sicherer machen**
+   - `compose-lipsync-scene` darf bei Multi-Speaker/Cinematic-Sync nicht erst `running` setzen und dann hängen.
+   - Es soll früh und sichtbar mit `multi_speaker_not_supported` / `failed` abbrechen, falls es versehentlich falsch aufgerufen wird.
+
+4. **Watchdog-Recovery schärfen**
+   - `qa-watchdog` soll `master_clip + running + heartbeat null` schneller als stuck erkennen.
+   - `replicate_prediction_id`/Heartbeat in die Diagnose aufnehmen.
+   - Stale Jobs sauber auf `failed` setzen und Credits erstatten.
+
+5. **Aktuell hängende Szene reparieren**
+   - Szene `4e2d57fe-78e0-4852-9fb6-2e1a48899034` auf `pending` zurücksetzen.
+   - `twoshot_stage` auf `master_clip` oder `null` zurücksetzen, `clip_error` mit Reset-Grund setzen, `replicate_prediction_id` leeren.
+   - Credits für den fehlgeschlagenen Versuch erstatten, falls sie abgezogen wurden.
+
+6. **Validieren**
+   - Geänderte Edge Functions deployen.
+   - `compose-twoshot-lipsync` direkt für die Szene testen.
+   - In DB/Logs prüfen, dass wirklich `pass 1/2` und `pass 2/2` starten und `twoshot_stage` nicht mehr bei `master_clip` hängen bleibt.
