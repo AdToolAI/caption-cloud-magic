@@ -557,6 +557,7 @@ serve(async (req) => {
         console.warn("[compose-twoshot-audio] per-character build error", (e as Error).message);
       }
     }
+    const publicSpeakerTracks = speakerTracks.map(({ items: _items, ...track }) => track);
 
     // Wipe any prior voiceover rows for this scene so compose-lipsync-scene
     // sees exactly ONE merged track and doesn't trip its multi-speaker guard.
@@ -583,7 +584,7 @@ serve(async (req) => {
         spoken_seconds: Math.round(spokenSec * 100) / 100,
         scene_duration_seconds: sceneDur,
         segments,
-        speakers: speakerTracks,
+        speakers: publicSpeakerTracks,
       },
     });
     if (insertRes.error) {
@@ -604,7 +605,7 @@ serve(async (req) => {
           ...(scene as any).audio_plan,
           twoshot: {
             segments,
-            speakers: speakerTracks,
+            speakers: publicSpeakerTracks,
             spokenSec: Math.round(spokenSec * 100) / 100,
             totalSec: Math.round(totalSec * 100) / 100,
             url: publicUrl,
@@ -621,7 +622,7 @@ serve(async (req) => {
       success: true,
       url: publicUrl,
       duration: Math.round(totalSec * 100) / 100,
-      speakers: speakerTracks,
+      speakers: publicSpeakerTracks,
       segments,
     });
   } catch (e) {
