@@ -1160,16 +1160,17 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
                     <div className="space-y-2 text-sm">
                       {isMultiSpeaker ? (
                         <>
-                          <p className="text-destructive font-semibold">
-                            ⚠️ Diese Szene hat {speakerCount} Sprecher.
+                          <p className="text-emerald-300 font-semibold">
+                            🎭 Two-Shot Lip-Sync: {speakerCount} Sprecher
                           </p>
                           <p>
-                            Sync.so kann nur <span className="font-semibold">einen Charakter</span> pro Clip lip-syncen — sonst würde eine Person den
-                            ganzen Dialog für beide sprechen. Zerlege die Szene zuerst in <span className="font-semibold">eine Szene pro Sprecher</span>{' '}
-                            (Shot-Reverse-Shot) im Storyboard, dann kannst du Cinematic-Sync pro Cut starten.
+                            Cinematic-Sync rendert die Szene als echten Two-Shot und legt anschließend{' '}
+                            <span className="font-semibold">einen Sync.so-Pass pro Sprecher</span> über den Clip —
+                            jeder Pass wird per Gemini-Face-Lock auf das korrekte Gesicht (links/rechts) gepinnt.
+                            Die gemischte Dialog-Tonspur läuft als externe WAV synchron mit (Artlist-Pipeline).
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Tipp: Im Storyboard-Tab → Szene duplizieren → Dialog-Skript pro Szene auf einen Sprecher kürzen.
+                            Kostet ca. {Math.round(14 * speakerCount)} Credits (~{speakerCount}× Sync.so lipsync-2-pro).
                           </p>
                         </>
                       ) : (
