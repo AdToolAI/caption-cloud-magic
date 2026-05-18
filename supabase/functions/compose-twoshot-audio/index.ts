@@ -255,18 +255,20 @@ function resolveVoice(
   return null;
 }
 
-async function elevenlabsMp3(
+async function elevenlabsPcm(
   apiKey: string,
   voiceId: string,
   text: string,
-): Promise<Uint8Array> {
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`;
+): Promise<Int16Array> {
+  // Raw headerless Int16LE mono @ 44.1 kHz — no ID3, no Xing/LAME info frame,
+  // so byte count maps 1:1 to samples and timing is sample-accurate.
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=pcm_44100`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "xi-api-key": apiKey,
       "Content-Type": "application/json",
-      "Accept": "audio/mpeg",
+      "Accept": "audio/basic",
     },
     body: JSON.stringify({
       text,
@@ -284,52 +286,37 @@ async function elevenlabsMp3(
     const errText = await res.text().catch(() => "");
     throw new Error(`ElevenLabs ${voiceId} failed (${res.status}): ${errText.slice(0, 200)}`);
   }
-  return new Uint8Array(await res.arrayBuffer());
+  return pcmBytesToSamples(new Uint8Array(await res.arrayBuffer()));
 }
 
-async function humeMp3(
+async function humePcm(
   apiKey: string,
   voiceName: string,
   provider: "HUME_AI" | "CUSTOM_VOICE",
   text: string,
-): Promise<Uint8Array> {
+): Promise<Int16Array> {
+  // Hume returns WAV with a header; we decode + resample to 44.1 kHz mono.
   const res = await fetch("https://api.hume.ai/v0/tts/file", {
     method: "POST",
     headers: {
       "X-Hume-Api-Key": apiKey,
       "Content-Type": "application/json",
-      Accept: "audio/mpeg",
+      Accept: "audio/wav",
     },
     body: JSON.stringify({
       utterances: [
         { text, voice: { name: voiceName, provider } },
       ],
-      format: { type: "mp3" },
+      format: { type: "wav" },
     }),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
     throw new Error(`Hume "${voiceName}" failed (${res.status}): ${errText.slice(0, 200)}`);
   }
-  return new Uint8Array(await res.arrayBuffer());
+  return decodeWavToSamples(new Uint8Array(await res.arrayBuffer()));
 }
 
-/** Concatenate MP3 byte buffers directly. Works with CBR streams from EL/Hume. */
-function concatMp3(buffers: Uint8Array[]): Uint8Array {
-  const total = buffers.reduce((s, b) => s + b.length, 0);
-  const out = new Uint8Array(total);
-  let off = 0;
-  for (const b of buffers) {
-    out.set(b, off);
-    off += b.length;
-  }
-  return out;
-}
-
-/** Estimate duration of a CBR MP3 buffer at MP3_BITRATE bits/s. */
-function mp3DurationSec(buf: Uint8Array): number {
-  return (buf.length * 8) / MP3_BITRATE;
-}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
