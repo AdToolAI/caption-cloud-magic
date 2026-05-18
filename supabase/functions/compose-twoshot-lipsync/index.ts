@@ -24,6 +24,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -52,7 +54,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 async function setStage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   sceneId: string,
   stage: string,
   extra: Record<string, unknown> = {},
@@ -112,7 +114,7 @@ serve(async (req) => {
       .eq("kind", "voiceover")
       .order("duration", { ascending: false });
 
-    let mergedVo = voClips?.find((c: any) =>
+    let mergedVo: any = voClips?.find((c: any) =>
       String(c.url ?? "").includes("/twoshot-vo/")
     ) ?? voClips?.[0];
 
