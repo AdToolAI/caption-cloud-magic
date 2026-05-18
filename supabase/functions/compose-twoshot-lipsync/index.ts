@@ -566,10 +566,16 @@ serve(async (req) => {
         // `active_speaker_detection.coordinates` (Artlist-style).
         const cachedFaceMap = ((scene as any)?.audio_plan?.twoshot?.faceMap) ?? null;
         const anchorUrl = (scene as any).lock_reference_url as string | undefined;
+        // Fallback chain for face detection sources: cached → anchor image →
+        // the silent two-shot clip itself (Gemini ingests the MP4 first frame).
+        // The original silent master is preferable to the lipsynced output
+        // because the latter is mutated by each pass.
+        const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
         const faceMap = await detectFacesInMaster(
           supabase,
           scene_id,
           anchorUrl,
+          detectionClipUrl,
           cachedFaceMap,
           LOVABLE_API_KEY,
         );
@@ -580,8 +586,8 @@ serve(async (req) => {
         console.log(
           `[compose-twoshot-lipsync ${scene_id}] faceMap`,
           faceMap
-            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: cachedFaceMap ? "cache" : "gemini" }
-            : { faces: 0, source: "heuristic-fallback" },
+            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: faceMap.source }
+            : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrl, clip: !!detectionClipUrl },
         );
 
         let currentVideo = sourceClipUrl;
