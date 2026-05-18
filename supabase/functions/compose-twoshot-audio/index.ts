@@ -429,12 +429,17 @@ serve(async (req) => {
         .order("duration", { ascending: false })
         .limit(1);
       if (existing && existing.length === 1 && existing[0].url) {
-        // Validate it was produced by us — by URL prefix.
-        if (String(existing[0].url).includes("/twoshot-vo/")) {
+        const url = String(existing[0].url);
+        // Validate it was produced by the current PCM/WAV pipeline. Legacy
+        // MP3 outputs at this same path prefix are stale (they used the
+        // byte-based CBR math that caused lip-sync drift) — fall through to
+        // regenerate as WAV.
+        const isCurrentPipeline = url.includes("/twoshot-vo/") && url.endsWith(".wav");
+        if (isCurrentPipeline) {
           return json({
             success: true,
             already: true,
-            url: existing[0].url,
+            url,
             duration: existing[0].duration,
             speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
               ? (existing[0] as any).metadata.speakers
