@@ -403,7 +403,7 @@ export default function ComposerSequencePreview({
       const standbyEl = getVideoForSlot(toSlot);
       if (standbyEl) {
         try { standbyEl.currentTime = 0; } catch { /* noop */ }
-        standbyEl.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
+        standbyEl.muted = resolveVideoMuted(nextScene);
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade
