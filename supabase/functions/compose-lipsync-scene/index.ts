@@ -341,9 +341,14 @@ serve(async (req) => {
 
     try {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
-      // If the VO is longer than the source clip, use `cut_off` so Sync.so
-      // truncates instead of looping the audio (which produces double-speak
-      // artefacts). Default to `loop` for short VOs that need to fill the clip.
+      // Sample-accurate WAV pipeline (compose-twoshot-audio) guarantees the
+      // voiceover is exactly scene-length; legacy `loop` mode was a
+      // workaround for byte-stitched MP3 tracks that came out slightly
+      // shorter than the scene and would loop a tail of silence into the
+      // next pass, causing subtle lip-sync drift. With WAV we always
+      // request `cut_off` — Sync.so will trim audio that overruns the video
+      // and leave anything shorter as-is (silence at end), with zero
+      // looping artefacts.
       const sceneDuration = (scene as any).duration_seconds ?? 0;
       const voDuration = vo.duration ?? 0;
       if (voDuration > 0 && voDuration < MIN_VO_DURATION) {
@@ -353,14 +358,14 @@ serve(async (req) => {
           message: `Voiceover ist nur ${voDuration.toFixed(2)}s lang. Lipsync-2-Pro benötigt mindestens ${MIN_VO_DURATION}s Sprachsignal.`,
         }, 422);
       }
-      const syncMode = voDuration > sceneDuration + 0.2 ? 'cut_off' : 'loop';
+      void sceneDuration; // kept for log/debug visibility
       const output = await replicate.run(
         LIPSYNC_MODEL,
         {
           input: {
             video: sourceClipUrl,
             audio: vo.url,
-            sync_mode: syncMode,
+            sync_mode: 'cut_off',
             temperature: 0.5,
             active_speaker: true,
             output_format: 'mp4',
