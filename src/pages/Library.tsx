@@ -149,29 +149,29 @@ export default Library;
 // ============================================================
 // Tab: People (read-only summary, deep-links to /avatars/:id and /avatars)
 // ============================================================
-function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
+function PeopleTab({
+  onOpenAvatar,
+  addOpen,
+  setAddOpen,
+}: {
+  onOpenAvatar: (id: string) => void;
+  addOpen: boolean;
+  setAddOpen: (v: boolean) => void;
+}) {
   const { data: chars = [], isLoading } = useAccessibleCharacters();
-  const [addOpen, setAddOpen] = useState(false);
 
+  const useSimpleGrid = chars.length <= 6;
   const feature = chars[0];
   const rest = chars.slice(1);
 
   return (
     <>
-      {/* Top action row: catalog filter pills + gold CTA */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex-1 min-w-0">
-          <CatalogBrowser kind="character" hideAllFilter />
-        </div>
-        <Button
-          onClick={() => setAddOpen(true)}
-          className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 md:px-8 py-5 md:py-6 shadow-[0_0_20px_hsl(var(--primary)/0.2)] hover:shadow-[0_0_35px_hsl(var(--primary)/0.4)] transition-all duration-500"
-        >
-          <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
-          <span className="tracking-tight">New Avatar</span>
-        </Button>
+      {/* Catalog full-width */}
+      <div className="mb-14">
+        <CatalogBrowser kind="character" hideAllFilter />
       </div>
 
+      {/* Your cast section */}
       <Section
         icon={Users}
         empty={{
@@ -182,84 +182,147 @@ function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
         loading={isLoading}
         items={chars}
       >
-        {/* Cinematic Bento Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-12 gap-4 md:gap-5 auto-rows-[180px] md:auto-rows-[220px]">
-          {feature && (
-            <button
-              onClick={() => onOpenAvatar(feature.id)}
-              className="col-span-2 md:col-span-5 md:row-span-2 group relative overflow-hidden rounded-[2rem] border border-border/40 bg-gradient-to-br from-foreground/10 to-transparent transition-all duration-700 hover:border-primary/40 text-left"
-            >
-              {(feature.portrait_url || feature.reference_image_url) && (
-                <img
-                  src={feature.portrait_url || feature.reference_image_url}
-                  alt={feature.name}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
-                  loading="lazy"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 transition-opacity group-hover:opacity-60" />
-              <div className="absolute bottom-0 p-6 md:p-10 w-full">
-                <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full bg-foreground/10 border border-border/40 backdrop-blur-md">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-[10px] uppercase font-bold tracking-widest">
-                    Primary Cast
-                  </span>
-                </div>
-                <h3 className="font-serif text-3xl md:text-4xl mb-2 leading-tight">{feature.name}</h3>
-                {feature.description && (
-                  <p className="text-sm text-foreground/60 max-w-xs font-light leading-relaxed line-clamp-2">
-                    {feature.description}
-                  </p>
-                )}
-              </div>
-            </button>
-          )}
-
-          {rest.map((c: any) => (
-            <button
-              key={c.id}
-              onClick={() => onOpenAvatar(c.id)}
-              className="col-span-1 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-border/40 transition-all duration-500 hover:border-primary/30 bg-muted text-left"
-            >
-              {(c.portrait_url || c.reference_image_url) && (
-                <img
-                  src={c.portrait_url || c.reference_image_url}
-                  alt={c.name}
-                  className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-110 transition-all duration-1000"
-                  loading="lazy"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
-              <div className="absolute bottom-4 left-5 right-5">
-                <p className="text-primary text-[9px] uppercase font-black tracking-[0.2em] mb-1">
-                  Cast Member
-                </p>
-                <h4 className="font-serif text-lg md:text-xl truncate">{c.name}</h4>
-              </div>
-            </button>
-          ))}
-
-          {/* Action cell — always present */}
-          <button
-            onClick={() => setAddOpen(true)}
-            className="col-span-2 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-500 flex items-center justify-center min-h-[180px]"
-          >
-            <div className="text-center space-y-3 relative z-10">
-              <div className="w-14 h-14 rounded-full border border-primary flex items-center justify-center mx-auto transition-transform duration-500 group-hover:scale-110">
-                <Plus className="h-6 w-6 text-primary" strokeWidth={2} />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
-                  New Avatar
-                </p>
-                <p className="text-[10px] text-primary/60 mt-1 uppercase font-medium">
-                  Add to your cast
-                </p>
-              </div>
+        <div className="flex items-end justify-between gap-4 mb-6">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-primary">
+              <span className="h-px w-6 bg-primary" />
+              <span className="tracking-[0.3em] uppercase text-[10px] font-bold">Your cast</span>
             </div>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.1)_0%,transparent_70%)]" />
-          </button>
+            <h2 className="font-serif text-2xl md:text-3xl leading-tight">
+              Saved characters
+            </h2>
+          </div>
+          <span className="text-xs text-muted-foreground font-medium tabular-nums">
+            {chars.length} {chars.length === 1 ? 'character' : 'characters'}
+          </span>
         </div>
+
+        {useSimpleGrid ? (
+          // Calmer 3-column grid for small casts
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            {chars.map((c: any) => (
+              <button
+                key={c.id}
+                onClick={() => onOpenAvatar(c.id)}
+                className="group relative overflow-hidden rounded-[2rem] border border-border/40 transition-all duration-500 hover:border-primary/40 hover:shadow-[0_0_40px_-10px_hsl(var(--primary)/0.4)] bg-muted text-left aspect-[4/5]"
+              >
+                {(c.portrait_url || c.reference_image_url) && (
+                  <img
+                    src={c.portrait_url || c.reference_image_url}
+                    alt={c.name}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+                <div className="absolute bottom-0 p-6 w-full">
+                  <div className="h-px w-8 bg-primary mb-3" />
+                  <h4 className="font-serif text-2xl leading-tight truncate">{c.name}</h4>
+                  {c.description && (
+                    <p className="text-xs text-foreground/60 mt-2 line-clamp-2 font-light">
+                      {c.description}
+                    </p>
+                  )}
+                </div>
+              </button>
+            ))}
+
+            {/* Add tile */}
+            <button
+              onClick={() => setAddOpen(true)}
+              className="group relative overflow-hidden rounded-[2rem] border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-all duration-500 flex items-center justify-center aspect-[4/5]"
+            >
+              <div className="text-center space-y-4 relative z-10">
+                <div className="w-16 h-16 rounded-full border border-primary flex items-center justify-center mx-auto transition-transform duration-500 group-hover:scale-110">
+                  <Plus className="h-7 w-7 text-primary" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">
+                    New Avatar
+                  </p>
+                  <p className="text-[10px] text-primary/60 mt-1.5 font-medium">
+                    Add to your cast
+                  </p>
+                </div>
+              </div>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.08)_0%,transparent_70%)]" />
+            </button>
+          </div>
+        ) : (
+          // Bento for larger casts
+          <div className="grid grid-cols-2 md:grid-cols-12 gap-6 md:gap-8 auto-rows-[220px] md:auto-rows-[260px]">
+            {feature && (
+              <button
+                onClick={() => onOpenAvatar(feature.id)}
+                className="col-span-2 md:col-span-6 md:row-span-2 group relative overflow-hidden rounded-[2rem] border border-border/40 bg-gradient-to-br from-foreground/10 to-transparent transition-all duration-700 hover:border-primary/40 hover:shadow-[0_0_50px_-10px_hsl(var(--primary)/0.45)] text-left"
+              >
+                {(feature.portrait_url || feature.reference_image_url) && (
+                  <img
+                    src={feature.portrait_url || feature.reference_image_url}
+                    alt={feature.name}
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 transition-opacity group-hover:opacity-60" />
+                <div className="absolute bottom-0 p-8 md:p-10 w-full">
+                  <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full bg-foreground/10 border border-border/40 backdrop-blur-md">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="text-[10px] uppercase font-bold tracking-widest">
+                      Primary Cast
+                    </span>
+                  </div>
+                  <h3 className="font-serif text-3xl md:text-4xl mb-2 leading-tight">{feature.name}</h3>
+                  {feature.description && (
+                    <p className="text-sm text-foreground/60 max-w-xs font-light leading-relaxed line-clamp-2">
+                      {feature.description}
+                    </p>
+                  )}
+                </div>
+              </button>
+            )}
+
+            {rest.map((c: any) => (
+              <button
+                key={c.id}
+                onClick={() => onOpenAvatar(c.id)}
+                className="col-span-1 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-border/40 transition-all duration-500 hover:border-primary/40 hover:shadow-[0_0_35px_-10px_hsl(var(--primary)/0.35)] bg-muted text-left"
+              >
+                {(c.portrait_url || c.reference_image_url) && (
+                  <img
+                    src={c.portrait_url || c.reference_image_url}
+                    alt={c.name}
+                    className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-1000"
+                    loading="lazy"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/30 to-transparent" />
+                <div className="absolute bottom-0 p-5 w-full">
+                  <div className="h-px w-6 bg-primary mb-2" />
+                  <h4 className="font-serif text-lg md:text-xl truncate">{c.name}</h4>
+                </div>
+              </button>
+            ))}
+
+            {/* Action cell */}
+            <button
+              onClick={() => setAddOpen(true)}
+              className="col-span-2 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 transition-all duration-500 flex items-center justify-center"
+            >
+              <div className="text-center space-y-3 relative z-10">
+                <div className="w-14 h-14 rounded-full border border-primary flex items-center justify-center mx-auto transition-transform duration-500 group-hover:scale-110">
+                  <Plus className="h-6 w-6 text-primary" strokeWidth={2} />
+                </div>
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
+                    New Avatar
+                  </p>
+                </div>
+              </div>
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.1)_0%,transparent_70%)]" />
+            </button>
+          </div>
+        )}
       </Section>
       <AddBrandCharacterDialog open={addOpen} onOpenChange={setAddOpen} />
     </>
