@@ -76,10 +76,6 @@ function pickStrategy(
   if (source === 'cast-name-match' || source === 'brand-name-match') {
     return 'first-frame-composed';
   }
-  // No explicit shot (cast-name match or unspecified) → safest is text-only,
-  // so the prompt fully drives composition. The identity card in the prompt
-  // keeps the model on the right person; no face-lock.
-  if (source === 'cast-name-match' || source === 'brand-name-match') return 'text-only';
   // Explicit shot present but unknown shotType → compose.
   return 'first-frame-composed';
 }
