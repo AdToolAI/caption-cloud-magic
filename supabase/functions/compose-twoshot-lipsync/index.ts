@@ -140,18 +140,18 @@ async function runLipsyncPrediction(
  * resolution). Result is cached in audio_plan.twoshot.faceMap so retries skip
  * the Gemini call.
  */
-async function detectFacesInMaster(
-  supabase: any,
-  sceneId: string,
-  anchorUrl: string | null | undefined,
-  cached: any,
-  lovableKey: string | undefined,
-): Promise<{ faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number] }>; width: number; height: number } | null> {
-  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2) {
-    return cached;
-  }
-  if (!anchorUrl || !lovableKey) return null;
+type FaceMap = {
+  faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number] }>;
+  width: number;
+  height: number;
+  source: "cache" | "anchor" | "clip-frame" | "heuristic-fallback";
+};
 
+async function askGeminiForFaces(
+  url: string,
+  lovableKey: string,
+  kind: "image" | "video",
+): Promise<{ faces: any[]; width: number; height: number } | null> {
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -168,19 +168,21 @@ async function detectFacesInMaster(
               {
                 type: "text",
                 text:
-                  "You see a two-shot frame with TWO human faces. " +
+                  (kind === "video"
+                    ? "You see the FIRST FRAME of a two-shot dialogue video with TWO human faces. "
+                    : "You see a two-shot frame with TWO human faces. ") +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
                   "Schema: {\"width\": <imgPixelW>, \"height\": <imgPixelH>, \"faces\": [{\"side\": \"left\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}, {\"side\": \"right\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}]}. " +
-                  "Coordinates in PIXELS of the source image. " +
+                  "Coordinates in PIXELS of the source frame (1280x720 if uncertain). " +
                   "'left' = the face whose center has the SMALLER x value. 'right' = the larger x. " +
                   "If only one face is visible, return one entry. If none, return empty faces.",
               },
-              { type: "image_url", image_url: { url: anchorUrl } },
+              { type: "image_url", image_url: { url } },
             ],
           },
         ],
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(25_000),
     });
     if (!resp.ok) return null;
     const j = await resp.json();
@@ -188,27 +190,68 @@ async function detectFacesInMaster(
     const m = String(txt).match(/\{[\s\S]*\}/);
     if (!m) return null;
     const parsed = JSON.parse(m[0]);
-    const faces = Array.isArray(parsed?.faces) ? parsed.faces : [];
-    const width = Number(parsed?.width) || 1280;
-    const height = Number(parsed?.height) || 720;
-    // Normalize: sort by center x, assign side deterministically.
-    const valid = faces
-      .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
-      .map((f: any) => ({
-        center: [Number(f.center[0]), Number(f.center[1])] as [number, number],
-        bbox: Array.isArray(f.bbox) && f.bbox.length === 4
-          ? (f.bbox.map(Number) as [number, number, number, number])
-          : undefined,
-      }))
-      .sort((a: any, b: any) => a.center[0] - b.center[0])
-      .map((f: any, idx: number, arr: any[]) => ({
-        ...f,
-        side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
-      }));
+    return {
+      faces: Array.isArray(parsed?.faces) ? parsed.faces : [],
+      width: Number(parsed?.width) || 1280,
+      height: Number(parsed?.height) || 720,
+    };
+  } catch {
+    return null;
+  }
+}
 
-    const result = { faces: valid, width, height };
+function normalizeFaces(
+  raw: { faces: any[]; width: number; height: number },
+): { faces: FaceMap["faces"]; width: number; height: number } {
+  const valid = raw.faces
+    .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
+    .map((f: any) => ({
+      center: [Number(f.center[0]), Number(f.center[1])] as [number, number],
+      bbox: Array.isArray(f.bbox) && f.bbox.length === 4
+        ? (f.bbox.map(Number) as [number, number, number, number])
+        : undefined,
+    }))
+    .sort((a: any, b: any) => a.center[0] - b.center[0])
+    .map((f: any, idx: number, arr: any[]) => ({
+      ...f,
+      side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
+    }));
+  return { faces: valid, width: raw.width, height: raw.height };
+}
 
-    // Cache into audio_plan.twoshot.faceMap.
+/**
+ * Detect face centers using a fallback chain:
+ *  1) cached faceMap with ≥2 faces
+ *  2) Gemini Vision on `lock_reference_url` (anchor image)
+ *  3) Gemini Vision on the video URL itself (Gemini ingests MP4 first frame)
+ * Result is cached in audio_plan.twoshot.faceMap so retries skip the call.
+ * Returns null when no source produced ≥2 faces — caller must fall back to
+ * heuristic thirds.
+ */
+async function detectFacesInMaster(
+  supabase: any,
+  sceneId: string,
+  anchorUrl: string | null | undefined,
+  clipUrl: string | null | undefined,
+  cached: any,
+  lovableKey: string | undefined,
+): Promise<FaceMap | null> {
+  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2) {
+    return { ...cached, source: "cache" } as FaceMap;
+  }
+  if (!lovableKey) return null;
+
+  // Try anchor first (still image — most reliable).
+  const attempts: Array<{ url: string; kind: "image" | "video"; source: FaceMap["source"] }> = [];
+  if (anchorUrl) attempts.push({ url: anchorUrl, kind: "image", source: "anchor" });
+  if (clipUrl) attempts.push({ url: clipUrl, kind: "video", source: "clip-frame" });
+
+  for (const a of attempts) {
+    const raw = await askGeminiForFaces(a.url, lovableKey, a.kind);
+    if (!raw) continue;
+    const norm = normalizeFaces(raw);
+    if (norm.faces.length < 2) continue;
+    const result: FaceMap = { ...norm, source: a.source };
     try {
       const { data: row } = await supabase
         .from("composer_scenes")
@@ -222,18 +265,16 @@ async function detectFacesInMaster(
         .update({
           audio_plan: {
             ...prevPlan,
-            twoshot: { ...prevTwoshot, faceMap: result },
+            twoshot: { ...prevTwoshot, faceMap: { faces: result.faces, width: result.width, height: result.height, source: result.source } },
           },
         })
         .eq("id", sceneId);
     } catch {
       // cache-write is best-effort
     }
-
     return result;
-  } catch {
-    return null;
   }
+  return null;
 }
 
 /**
@@ -525,10 +566,16 @@ serve(async (req) => {
         // `active_speaker_detection.coordinates` (Artlist-style).
         const cachedFaceMap = ((scene as any)?.audio_plan?.twoshot?.faceMap) ?? null;
         const anchorUrl = (scene as any).lock_reference_url as string | undefined;
+        // Fallback chain for face detection sources: cached → anchor image →
+        // the silent two-shot clip itself (Gemini ingests the MP4 first frame).
+        // The original silent master is preferable to the lipsynced output
+        // because the latter is mutated by each pass.
+        const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
         const faceMap = await detectFacesInMaster(
           supabase,
           scene_id,
           anchorUrl,
+          detectionClipUrl,
           cachedFaceMap,
           LOVABLE_API_KEY,
         );
@@ -539,8 +586,8 @@ serve(async (req) => {
         console.log(
           `[compose-twoshot-lipsync ${scene_id}] faceMap`,
           faceMap
-            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: cachedFaceMap ? "cache" : "gemini" }
-            : { faces: 0, source: "heuristic-fallback" },
+            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: faceMap.source }
+            : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrl, clip: !!detectionClipUrl },
         );
 
         let currentVideo = sourceClipUrl;
@@ -593,6 +640,11 @@ serve(async (req) => {
               sync_mode: "cut_off",
               temperature: 0.5,
               output_format: "mp4",
+              // Belt-and-suspenders: some sync.so model revisions accept
+              // these top-level keys, others ignore them silently. They
+              // never hurt and double-pin the target face.
+              face_index: p,
+              speaker: target?.side ?? (p === 0 ? "left" : "right"),
             };
             if (target) {
               input.active_speaker = false;
@@ -620,6 +672,10 @@ serve(async (req) => {
             await refund(`pass_${p + 1}_no_output`);
             return;
           }
+          console.log(
+            `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length} DONE`,
+            { speaker: pass.speaker, targetFace: target?.side, output: stepUrl },
+          );
           currentVideo = stepUrl;
           outUrl = stepUrl;
         }
