@@ -30,7 +30,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-const COST = 16; // 2× normal lip-sync cost (multi-pass two-shot)
+// 2× lipsync-2-pro per pass (multi-pass two-shot) — Artlist parity
+const COST = 28;
+const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -227,13 +229,15 @@ serve(async (req) => {
           );
           await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2");
           const passOutput = await replicate.run(
-            "sync/lipsync-2" as `${string}/${string}`,
+            LIPSYNC_MODEL,
             {
               input: {
                 video: currentVideo,
                 audio: pass.track_url,
                 sync_mode: "loop",
                 active_speaker: true,
+                temperature: 0.5,
+                output_format: "mp4",
               },
             },
           );
@@ -255,12 +259,15 @@ serve(async (req) => {
         // Fallback: legacy single merged-audio pass.
         const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
         const output = await replicate.run(
-          "sync/lipsync-2" as `${string}/${string}`,
+          LIPSYNC_MODEL,
           {
             input: {
               video: sourceClipUrl,
               audio: mergedVo.url,
               sync_mode: syncMode,
+              temperature: 0.5,
+              active_speaker: true,
+              output_format: "mp4",
             },
           },
         );

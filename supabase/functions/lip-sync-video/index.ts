@@ -8,7 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-const COST = 8;
+// Artlist-grade lip-sync via Sync.so lipsync-2-pro
+const COST = 14;
+const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 // Idempotency namespace for deterministic refund UUIDs
 const REFUND_NS = 'b3f4c1a8-1d4e-4cf7-9b1c-a4b9d77ef111';
 
@@ -71,9 +73,16 @@ serve(async (req) => {
 
     try {
       const replicate = new Replicate({ auth: REPLICATE });
-      // sync-labs/lipsync-2 is the current production lip-sync model
-      const output = await replicate.run("sync/lipsync-2" as `${string}/${string}`, {
-        input: { video: video_url, audio: audio_url, sync_mode: "loop" },
+      // Sync.so lipsync-2-pro — identity-locked, Artlist-grade fidelity
+      const output = await replicate.run(LIPSYNC_MODEL, {
+        input: {
+          video: video_url,
+          audio: audio_url,
+          sync_mode: "loop",
+          temperature: 0.5,
+          active_speaker: true,
+          output_format: "mp4",
+        },
       });
 
       let outUrl: string | null = null;
