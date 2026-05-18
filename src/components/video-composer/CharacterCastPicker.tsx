@@ -81,13 +81,14 @@ function findCharacter(
   if (!slotId || !pool.length) return undefined;
   const exact = pool.find((c) => c.id === slotId);
   if (exact) return exact;
-  const lower = slotId.toLowerCase();
+  const lower = safeLower(slotId);
+  if (!lower) return undefined;
   const byNameInId = pool.find((c) => {
-    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    const first = safeFirstNameLower(c.name);
     return !!first && first.length >= 3 && lower.includes(first);
   });
   if (byNameInId) return byNameInId;
-  return pool.find((c) => c.name?.trim().toLowerCase() === lower);
+  return pool.find((c) => safeLower(c.name) === lower);
 }
 
 export function CharacterCastPicker({
