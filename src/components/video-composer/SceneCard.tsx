@@ -1231,7 +1231,7 @@ export default function SceneCard({
                     {scene.lipSyncWithVoiceover ? 'AN' : 'AUS'}
                   </button>
                 </div>
-                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed') && scene.clipUrl && (
+                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed' || scene.lipSyncStatus === 'no_voiceover') && scene.clipUrl && (
                   <button
                     type="button"
                     disabled={scene.lipSyncStatus === 'running'}
