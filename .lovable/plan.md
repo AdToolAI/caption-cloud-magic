@@ -1,30 +1,36 @@
 ## Was du gemeldet hast
 
-1. **"New Avatar" Button macht nichts** — der Button verlinkt aktuell auf `/avatars`, was in `App.tsx` direkt auf `/library` redirected wird (Kreisverweis). Klick = nichts passiert.
-2. **Ansicht wirkt unprofessionell** — die Library-Seite (Cast & World) soll ein hochwertigeres Layout bekommen.
-3. **"Alle"-Tab im Charakter-Katalog entfernen** — der `CatalogBrowser` zeigt neben den Theme-Pills (anime/shonen, bollywood/classic, …) als Default einen `All`-Filter. Soll für die Characters weg.
+Der People-Tab wirkt eingequetscht: Catalog-Karte, ~20 Theme-Pills und der "New Avatar"-Button kämpfen in einer Zeile um Platz, darunter sechs gleich große Charakter-Kacheln in einer engen Reihe. Wirkt dicht und unruhig.
 
-## Plan
+## Plan (rein visuell, James-Bond-2028-Tokens bleiben gelockt)
 
-### 1) Avatar-Erstellung reparieren (Bug-Fix)
-- In `src/pages/Library.tsx` den `<Link to="/avatars">` Button durch einen echten Klick-Handler ersetzen, der den bestehenden `AddBrandCharacterDialog` (`src/components/brand-characters/AddBrandCharacterDialog.tsx`) öffnet.
-- Gleiche Anpassung für den Empty-State-CTA ("Open Avatar Studio" → "New Avatar" mit Dialog).
-- Nach erfolgreichem Anlegen invalidiert der Dialog bereits die `brand-characters` Query → Liste füllt sich automatisch.
+### 1) Header-Zeile aufräumen
+- "New Avatar" raus aus der Catalog-Zeile, rauf in den Page-Header rechts neben den Titel "Cast & World" (großzügiger Gold-CTA, klare Hierarchie).
+- Catalog bekommt damit die volle Breite — kein Quetschen mehr.
 
-### 2) "All"-Tab im Character-Katalog entfernen
-- `src/components/library-hubs/CatalogBrowser.tsx`: Neues Prop `hideAllFilter?: boolean`. Wenn gesetzt, beginnt die Pill-Leiste direkt mit dem ersten Theme und der Default-`activeTheme` ist die erste verfügbare Kategorie statt `'all'`.
-- Aufruf in `PeopleTab` (`<CatalogBrowser kind="character" hideAllFilter />`). Locations / Buildings / Props bleiben wie sie sind.
+### 2) Catalog-Karte modernisieren (`CatalogBrowser` nur für `kind="character"`)
+- Theme-Pills von wrappendem 3-Zeilen-Block → **horizontale Scroll-Leiste** mit weichem Fade-Edge links/rechts. Aktive Pill in Gold, ruhiger Hover.
+- Mehr Padding (`p-6 md:p-8`), klare Sektions-Überschrift ("Browse curated cast") + Sub-Label ("Pick a theme to filter the catalog"), Seed-Button als Icon-Button rechts oben.
+- "CATALOG"-Eyebrow und Pills bekommen `space-y-5` statt `space-y-3`.
 
-### 3) Library-Redesign (professioneller Look)
-Da das eine rein visuelle Verfeinerung ist, generiere ich **3 gerenderte Design-Richtungen** für die Library-Seite und du wählst eine aus. Das James-Bond-2028-Designsystem (Deep Black, Gold #F5C76A, Playfair + Inter, Glassmorphism) bleibt gelockt; variiert werden Komposition, Kartendichte, Pill-Treatment, Header-Hierarchie und Hover-States.
+### 3) Charakter-Grid atmen lassen
+- Aktuelles 6er-Bento bleibt strukturell, aber:
+  - `gap-4` → `gap-6 md:gap-8`
+  - `auto-rows-[180px]` → `auto-rows-[220px] md:auto-rows-[260px]`
+  - Bei ≤6 Items: 3-Spalten-Raster statt 12er-Bento (gleichmäßiger, weniger "wirr").
+  - Titel-Overlay bekommt mehr Padding (`p-6`) und einen feinen Goldakzent-Strich über dem Namen statt Volltext-Badge.
+- Hover: Sanfter Goldglow (`shadow-[0_0_40px_-10px_hsl(var(--primary)/0.4)]`) statt nur Border-Color-Change.
 
-Drei Richtungen, die ich anpeile:
-- **Editorial Magazine** — großzügiger Whitespace, große Serif-Headline mit Kicker, Tab-Bar als Underline-Nav, Charakter-Karten im Polaroid-Stil mit feinem Goldrahmen.
-- **Cinematic Gallery** — dichteres Bento-Grid, dunkle Glas-Karten mit subtilem Gold-Glow on hover, Theme-Pills als ruhige Chip-Bar, "New Avatar" als prominenter Gold-CTA oben rechts.
-- **Dossier / Cast Sheet** — Sektionen pro Theme-Pack mit dezenten Trennlinien, Charaktere als horizontale Reihen mit Meta-Daten rechts (Voice, Outfits, Marketplace-Status), wirkt wie ein Casting-Dossier.
+### 4) Vertikale Rhythmik
+- Section-Abstände `mb-6` → `mb-12` zwischen Catalog-Karte und Charakter-Grid.
+- Kleine Sektions-Überschrift "Your cast" über dem Grid mit Count-Badge rechts (z.B. "6 characters") — gibt Orientierung.
 
-Nach deiner Auswahl baue ich die gewählte Richtung 1:1 in `Library.tsx` ein.
+### Technisch betroffene Dateien
+- `src/pages/Library.tsx` — Header-CTA verschieben, PeopleTab-Layout umbauen, Section-Header über Grid.
+- `src/components/library-hubs/CatalogBrowser.tsx` — Pill-Leiste auf horizontal scroll mit Fade-Edges, Padding/Typografie aufgewertet (nur visuell, API bleibt gleich).
+
+Locations- und Props-Tab erben automatisch die ruhigere Catalog-Karte — keine Funktionsänderung.
 
 ## Reihenfolge
-1. Bug-Fix (Avatar-Button öffnet Dialog) + "All"-Pill entfernen → sofort umsetzen.
-2. Design-Richtungen für (3) generieren → du wählst → Redesign einbauen.
+1. CatalogBrowser visuell modernisieren (scroll-Pills, mehr Padding).
+2. Library.tsx PeopleTab neu komponieren (CTA in Header, Section-Header, größere Bento-Abstände).
