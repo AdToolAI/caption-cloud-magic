@@ -287,6 +287,21 @@ export default function ComposerSequencePreview({
     );
   };
 
+  /** True iff the scene's video MUST be muted regardless of the user's mute
+   *  toggle — because its audio is mixed into an external linear track that
+   *  the timeline plays separately. Currently only two-shot scenes flagged
+   *  with audioPlan.twoshot.useExternalAudio. Without this guard, the
+   *  embedded last-pass voice plays simultaneously with the merged track
+   *  → echo + "both speakers at once" bug. */
+  const sceneShouldForceMute = (s: ComposerScene | undefined): boolean =>
+    !!s && s.audioPlan?.twoshot?.useExternalAudio === true;
+
+  const resolveVideoMuted = (s: ComposerScene | undefined): boolean => {
+    if (sceneShouldForceMute(s)) return true;
+    if (sceneHasEmbeddedAudio(s)) return false;
+    return mutedRef.current;
+  };
+
   // ── Active video play/pause sync ───────────────────────────────
   useEffect(() => {
     if (isImage) {
@@ -297,7 +312,7 @@ export default function ComposerSequencePreview({
     if (!v) return;
     if (playing) {
       const cur = playableRef.current[sceneIdxRef.current];
-      v.muted = sceneHasEmbeddedAudio(cur) ? false : mutedRef.current;
+      v.muted = resolveVideoMuted(cur);
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -311,7 +326,13 @@ export default function ComposerSequencePreview({
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
     const cur = playableRef.current[sceneIdxRef.current];
-    if (va && !isImage) va.muted = sceneHasEmbeddedAudio(cur) ? false : muted;
+    if (va && !isImage) {
+      // For force-mute scenes, ignore the user's mute toggle — the external
+      // merged track owns the dialogue. For everything else, honour `muted`.
+      va.muted = sceneShouldForceMute(cur)
+        ? true
+        : (sceneHasEmbeddedAudio(cur) ? false : muted);
+    }
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
