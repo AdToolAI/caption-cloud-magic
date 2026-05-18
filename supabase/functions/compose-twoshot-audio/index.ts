@@ -26,40 +26,131 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// MP3 pipeline @ 44.1 kHz / 128 kbps CBR — both ElevenLabs and Hume can deliver
-// this format, so we can concatenate buffers byte-wise and let downstream
-// (Sync.so / ffmpeg) decode the stitched stream. Duration is derived from
-// CBR math (bytes * 8 / bitrate). A natural pause between speakers is
-// produced by appending " ... " to each non-final block's text — the TTS
-// engine handles the prosody, no synthetic silence frames needed.
-const MP3_BITRATE = 128_000; // bits per second
+// ── PCM/WAV pipeline @ 44.1 kHz / 16-bit / mono ─────────────────────────
+// Artlist-grade audio prep: we operate on raw Int16 samples end-to-end so
+// every position is sample-accurate (≈22 µs). MP3 byte-stitching was the
+// drift source — ID3 tags inflate CBR duration math by 30–80 ms per
+// utterance, and silence frames quantize to 26 ms. Working in PCM removes
+// both classes of error. We upload a single WAV at the end; Sync.so/ffmpeg
+// decodes WAV cleanly.
+const SAMPLE_RATE = 44100;
+const CHANNELS = 1;
+const BYTES_PER_SAMPLE = 2;
 const FALLBACK_ELEVEN_VOICE = "EXAVITQu4vr4xnSDxMaL"; // Sarah — neutral female fallback
 
-// ── Silence MP3 generator ────────────────────────────────────────────────
-// One MPEG1 Layer III frame @ 44.1 kHz / 128 kbps stereo = 417 bytes,
-// representing 1152 / 44100 ≈ 26.122 ms of audio. We construct a single
-// silent frame (valid 4-byte header + zero-filled side info + zero payload)
-// and repeat it to reach the desired silence duration. ffmpeg-based decoders
-// (which sync.so uses internally) accept these zero-data frames and output
-// silence, allowing us to pad per-speaker tracks so each speaker's audio
-// sits at its real timestamp within the scene.
-const SILENCE_FRAME_BYTES = 417;
-const SILENCE_FRAME_SEC = 1152 / 44100;
-function buildSilenceFrame(): Uint8Array {
-  const f = new Uint8Array(SILENCE_FRAME_BYTES);
-  f[0] = 0xff;
-  f[1] = 0xfb; // MPEG1, Layer III, no CRC
-  f[2] = 0x90; // 128 kbps, 44.1 kHz, no padding
-  f[3] = 0x04; // stereo, original
-  return f;
+function silenceSamples(durationSec: number): Int16Array {
+  if (!Number.isFinite(durationSec) || durationSec <= 0) return new Int16Array(0);
+  return new Int16Array(Math.max(0, Math.round(durationSec * SAMPLE_RATE)));
 }
-const SILENCE_FRAME = buildSilenceFrame();
-function silenceMp3(durationSec: number): Uint8Array {
-  if (!Number.isFinite(durationSec) || durationSec <= 0) return new Uint8Array(0);
-  const nFrames = Math.max(1, Math.round(durationSec / SILENCE_FRAME_SEC));
-  const out = new Uint8Array(nFrames * SILENCE_FRAME_BYTES);
-  for (let i = 0; i < nFrames; i++) out.set(SILENCE_FRAME, i * SILENCE_FRAME_BYTES);
+
+function concatSamples(parts: Int16Array[]): Int16Array {
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Int16Array(total);
+  let off = 0;
+  for (const p of parts) {
+    out.set(p, off);
+    off += p.length;
+  }
   return out;
+}
+
+function samplesToWav(samples: Int16Array): Uint8Array {
+  const dataBytes = samples.byteLength;
+  const buf = new ArrayBuffer(44 + dataBytes);
+  const v = new DataView(buf);
+  v.setUint32(0, 0x52494646, false); // "RIFF"
+  v.setUint32(4, 36 + dataBytes, true);
+  v.setUint32(8, 0x57415645, false); // "WAVE"
+  v.setUint32(12, 0x666d7420, false); // "fmt "
+  v.setUint32(16, 16, true); // PCM fmt chunk size
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, CHANNELS, true);
+  v.setUint32(24, SAMPLE_RATE, true);
+  v.setUint32(28, SAMPLE_RATE * CHANNELS * BYTES_PER_SAMPLE, true);
+  v.setUint16(32, CHANNELS * BYTES_PER_SAMPLE, true);
+  v.setUint16(34, 16, true);
+  v.setUint32(36, 0x64617461, false); // "data"
+  v.setUint32(40, dataBytes, true);
+  new Uint8Array(buf, 44).set(
+    new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
+  );
+  return new Uint8Array(buf);
+}
+
+function pcmBytesToSamples(bytes: Uint8Array): Int16Array {
+  // ElevenLabs PCM is headerless Int16LE. Copy to a fresh aligned buffer
+  // because Int16Array requires byteOffset to be a multiple of 2 and the
+  // incoming Uint8Array may not satisfy that.
+  const evenLen = bytes.byteLength - (bytes.byteLength % 2);
+  const copy = new Uint8Array(evenLen);
+  copy.set(bytes.subarray(0, evenLen));
+  return new Int16Array(copy.buffer);
+}
+
+function resampleLinear(input: Int16Array, fromRate: number, toRate: number): Int16Array {
+  if (fromRate === toRate) return input;
+  const ratio = toRate / fromRate;
+  const outLen = Math.round(input.length * ratio);
+  const out = new Int16Array(outLen);
+  const last = input.length - 1;
+  for (let i = 0; i < outLen; i++) {
+    const srcPos = i / ratio;
+    const i0 = Math.floor(srcPos);
+    const i1 = Math.min(i0 + 1, last);
+    const frac = srcPos - i0;
+    const v = input[i0] * (1 - frac) + input[i1] * frac;
+    out[i] = Math.max(-32768, Math.min(32767, Math.round(v)));
+  }
+  return out;
+}
+
+function decodeWavToSamples(wav: Uint8Array): Int16Array {
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) {
+    throw new Error("Not a RIFF/WAVE file");
+  }
+  let off = 12;
+  let audioFormat = 1, channels = 1, sampleRate = SAMPLE_RATE, bitsPerSample = 16;
+  let dataOff = -1, dataLen = 0;
+  while (off + 8 <= wav.byteLength) {
+    const id = dv.getUint32(off, false);
+    const size = dv.getUint32(off + 4, true);
+    if (id === 0x666d7420) {
+      audioFormat = dv.getUint16(off + 8, true);
+      channels = dv.getUint16(off + 10, true);
+      sampleRate = dv.getUint32(off + 12, true);
+      bitsPerSample = dv.getUint16(off + 22, true);
+    } else if (id === 0x64617461) {
+      dataOff = off + 8;
+      dataLen = size;
+      break;
+    }
+    off += 8 + size + (size & 1);
+  }
+  if (dataOff < 0) throw new Error("WAV missing data chunk");
+  if (audioFormat !== 1 || bitsPerSample !== 16) {
+    throw new Error(`Unsupported WAV: format=${audioFormat} bits=${bitsPerSample}`);
+  }
+  const raw = wav.subarray(dataOff, dataOff + dataLen);
+  const aligned = new Uint8Array(raw.byteLength - (raw.byteLength % 2));
+  aligned.set(raw.subarray(0, aligned.byteLength));
+  let samples = new Int16Array(aligned.buffer);
+  if (channels > 1) {
+    const monoLen = Math.floor(samples.length / channels);
+    const mono = new Int16Array(monoLen);
+    for (let i = 0; i < monoLen; i++) {
+      let sum = 0;
+      for (let c = 0; c < channels; c++) sum += samples[i * channels + c];
+      mono[i] = Math.max(-32768, Math.min(32767, Math.round(sum / channels)));
+    }
+    samples = mono;
+  }
+  if (sampleRate !== SAMPLE_RATE) samples = resampleLinear(samples, sampleRate, SAMPLE_RATE);
+  return samples;
+}
+
+function samplesDurationSec(n: number): number {
+  return n / SAMPLE_RATE;
 }
 
 function json(body: unknown, status = 200) {
