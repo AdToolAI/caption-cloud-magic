@@ -36,6 +36,7 @@ const corsHeaders = {
 const COST = 28;
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 const PASS_TIMEOUT_MS = 180_000;
+const POLL_INTERVAL_MS = 5_000;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -63,6 +64,72 @@ async function setStage(
     .from("composer_scenes")
     .update({ twoshot_stage: stage, ...extra })
     .eq("id", sceneId);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractOutputUrl(output: unknown): string | null {
+  if (typeof output === "string") return output;
+  if (Array.isArray(output) && output.length) return output[0] as string;
+  if (output && typeof output === "object") {
+    const o = output as Record<string, unknown>;
+    return ((o.video || o.output || o.url) as string) ?? null;
+  }
+  return null;
+}
+
+async function runLipsyncPrediction(
+  replicate: any,
+  supabase: any,
+  sceneId: string,
+  input: Record<string, unknown>,
+  label: string,
+): Promise<string> {
+  const prediction = await replicate.predictions.create({
+    model: LIPSYNC_MODEL,
+    input,
+  });
+  const predictionId = prediction?.id;
+  if (!predictionId) throw new Error(`${label}_missing_prediction_id`);
+
+  await supabase
+    .from("composer_scenes")
+    .update({
+      replicate_prediction_id: predictionId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sceneId);
+
+  const started = Date.now();
+  let current = prediction;
+  while (Date.now() - started < PASS_TIMEOUT_MS) {
+    const status = String(current?.status ?? "");
+    if (status === "succeeded") {
+      const url = extractOutputUrl(current?.output);
+      if (!url) throw new Error(`${label}_no_output`);
+      return url;
+    }
+    if (["failed", "canceled"].includes(status)) {
+      const detail = typeof current?.error === "string"
+        ? current.error
+        : JSON.stringify(current?.error ?? {}).slice(0, 300);
+      throw new Error(`${label}_${status}: ${detail}`);
+    }
+
+    await sleep(POLL_INTERVAL_MS);
+    current = await replicate.predictions.get(predictionId);
+    await supabase
+      .from("composer_scenes")
+      .update({
+        replicate_prediction_id: predictionId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sceneId);
+  }
+
+  throw new Error(`${label}_timeout_${Math.round(PASS_TIMEOUT_MS / 1000)}s`);
 }
 
 serve(async (req) => {
