@@ -5,13 +5,17 @@ type: feature
 ---
 Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
 
-**Two-Shot Face-Targeting (Mai 2026, Artlist-Parität):**
-- Sync.so's `face_index`/`speaker`-Felder existieren **nicht** — silently ignored, beide Passes landen sonst auf dem prominentesten Gesicht (Speaker 2 bleibt stumm).
+**Two-Shot Face-Targeting (Mai 2026, Artlist-Parität, gehärtet):**
+- Sync.so's `face_index`/`speaker`-Felder existieren **nicht** offiziell — werden defensiv mitgesendet, sind aber **nicht** das Primärsignal.
 - Korrektes Targeting via `active_speaker_detection: { auto_detect: false, frame_number: 0, coordinates: [x, y] }`. `active_speaker: false` setzen, sonst überschreibt Auto-Detect.
-- `compose-twoshot-lipsync` ruft einmal pro Szene Gemini Vision (`google/gemini-2.5-flash`) auf `scene.lock_reference_url` (two-shot Anchor-Bild) auf → liefert `{ faces:[{side:'left'|'right', center:[x,y]}], width, height }`. Cache in `audio_plan.twoshot.faceMap`.
+- `compose-twoshot-lipsync` ruft einmal pro Szene Gemini Vision (`google/gemini-2.5-flash`) mit einer **Fallback-Kette** auf: (1) Cache (`audio_plan.twoshot.faceMap` mit ≥2 Faces), (2) `scene.lock_reference_url` (Anchor-Bild), (3) `lip_sync_source_clip_url`/`clip_url` als Video — Gemini ingestiert den MP4-First-Frame. Liefert `{ faces:[{side:'left'|'right', center:[x,y]}], width, height, source }`. Quelle wird in `faceMap.source` (`anchor`|`clip-frame`|`cache`) protokolliert.
 - Pass-Index → Face: Pass 0 = left, Pass 1 = right (Passes sind nach `character_shots`-Reihenfolge sortiert).
 - Fallback ohne Gemini: Heuristik [W*0.3, H*0.5] / [W*0.7, H*0.5] mit 1280×720 als Default-Dimension.
-- `audio_plan.twoshot.heartbeat.targetFace` + `targetSource` ('gemini'|'heuristic') werden pro Pass geschrieben (UI-Sichtbarkeit).
+- `audio_plan.twoshot.heartbeat.targetFace` + `targetSource` ('gemini'|'heuristic') werden pro Pass geschrieben (UI-Sichtbarkeit). Pass-End wird mit `DONE`-Log inklusive Output-URL gemarkert.
+
+**Export-Audio Two-Shot (Mai 2026):**
+- Der finale Sync.so-Multi-Pass-Clip enthält in seiner eingebetteten Audiospur nur die **letzte** Pass-Stimme — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV).
+- `compose-video-assemble` filtert daher Voiceover-Clips für lip-synced Szenen NUR dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat. Two-Shot-Szenen behalten ihre externe gemischte VO als zusätzliche Tonspur im finalen Mux, sonst hört man im Export nur einen Sprecher.
 
 **No-Burned-In-Text Policy (Mai 2026):**
 - Das Dialogskript (`Name: line`) darf **niemals** als Visual-Prompt an `compose-scene-anchor` oder ein i2v-Modell weitergegeben werden — Nano Banana 2 würde die Sätze als Captions / Shirt-Labels in das First-Frame brennen.
