@@ -86,8 +86,17 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
   const themes = useMemo(() => {
     const s = new Set<string>();
     rows.forEach((r) => s.add(r.theme_pack));
-    return ['all', ...Array.from(s).sort()];
-  }, [rows]);
+    const sorted = Array.from(s).sort();
+    return hideAllFilter ? sorted : ['all', ...sorted];
+  }, [rows, hideAllFilter]);
+
+  // When the "All" filter is hidden, snap the default activeTheme to the
+  // first available theme as soon as rows arrive.
+  useEffect(() => {
+    if (hideAllFilter && activeTheme === 'all' && themes.length > 0) {
+      setActiveTheme(themes[0]);
+    }
+  }, [hideAllFilter, activeTheme, themes]);
 
   const visible = useMemo(
     () => (activeTheme === 'all' ? rows : rows.filter((r) => r.theme_pack === activeTheme)),
