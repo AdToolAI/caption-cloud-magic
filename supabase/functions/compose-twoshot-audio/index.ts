@@ -445,9 +445,9 @@ serve(async (req) => {
     }
 
     // Per-speaker TTS in script order. We append " ... " to each non-final
-    // block so the TTS engine produces a natural pause between speakers,
-    // avoiding the need to inject silence between MP3 frames.
-    const mp3Buffers: Uint8Array[] = [];
+    // block so the TTS engine produces a natural pause between speakers — no
+    // synthetic silence injection between utterances.
+    const sampleBuffers: Int16Array[] = [];
     const segments: Array<{
       speaker: string;
       speaker_slug: string;
@@ -456,9 +456,11 @@ serve(async (req) => {
       voice: string;
       startSec: number;
       endSec: number;
+      _startSample: number; // internal — stripped from public output
+      _endSample: number;
       track_url?: string;
     }> = [];
-    let cursor = 0;
+    let cursorSamples = 0;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const voice = resolveVoice(block, dialogVoices, charByName);
@@ -471,16 +473,21 @@ serve(async (req) => {
       }
       const isLast = i === blocks.length - 1;
       const utterance = isLast ? block.text : `${block.text} ...`;
-      let mp3: Uint8Array;
+      let pcm: Int16Array;
       try {
         if (voice.engine === "hume") {
           if (!humeKey) throw new Error("HUME_API_KEY not configured");
-          mp3 = await humeMp3(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
+          pcm = await humePcm(humeKey, voice.voiceId, voice.provider ?? "HUME_AI", utterance);
         } else {
           if (!elevenKey) throw new Error("ELEVENLABS_API_KEY not configured");
-          mp3 = await elevenlabsMp3(elevenKey, voice.voiceId, utterance);
+          pcm = await elevenlabsPcm(elevenKey, voice.voiceId, utterance);
         }
-        console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, { speaker: block.rawSpeaker, voice: voice.voiceId, bytes: mp3.length });
+        console.log(`[compose-twoshot-audio] ${voice.engine} voice ok`, {
+          speaker: block.rawSpeaker,
+          voice: voice.voiceId,
+          samples: pcm.length,
+          seconds: Math.round(samplesDurationSec(pcm.length) * 1000) / 1000,
+        });
       } catch (primaryErr) {
         const errMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
         console.warn(`[compose-twoshot-audio] ${voice.engine} failed, falling back to ElevenLabs:`, errMsg);
@@ -494,7 +501,7 @@ serve(async (req) => {
           }, 400);
         }
         try {
-          mp3 = await elevenlabsMp3(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
+          pcm = await elevenlabsPcm(elevenKey, FALLBACK_ELEVEN_VOICE, utterance);
         } catch (fbErr) {
           return json({
             error: "tts_failed",
@@ -506,8 +513,8 @@ serve(async (req) => {
           }, 400);
         }
       }
-      const dur = mp3DurationSec(mp3);
-      // Resolve character id via charByName for downstream face-mapping.
+      const startSample = cursorSamples;
+      const endSample = cursorSamples + pcm.length;
       const slug = block.speakerName;
       const charEntry = charByName.get(slug) ?? charByName.get(slug.split("-")[0]);
       segments.push({
@@ -516,15 +523,19 @@ serve(async (req) => {
         character_id: charEntry?.id ?? null,
         engine: voice.engine,
         voice: voice.voiceId,
-        startSec: Math.round(cursor * 100) / 100,
-        endSec: Math.round((cursor + dur) * 100) / 100,
+        // Public timestamps in seconds (3-decimal precision = ~1 ms).
+        startSec: Math.round((startSample / SAMPLE_RATE) * 1000) / 1000,
+        endSec: Math.round((endSample / SAMPLE_RATE) * 1000) / 1000,
+        // Internal sample-exact positions used for per-speaker track placement.
+        _startSample: startSample,
+        _endSample: endSample,
       });
-      cursor += dur;
-      mp3Buffers.push(mp3);
+      cursorSamples = endSample;
+      sampleBuffers.push(pcm);
     }
 
-    const spokenMp3 = concatMp3(mp3Buffers);
-    const spokenSec = mp3DurationSec(spokenMp3);
+    const spokenSamples = concatSamples(sampleBuffers);
+    const spokenSec = samplesDurationSec(spokenSamples.length);
 
     // Pad merged track to scene.duration_seconds with trailing silence so the
     // downstream lipsync output matches the full scene length (avoids the
@@ -536,10 +547,6 @@ serve(async (req) => {
     //   2. scene.audio_plan.duration       (planner-locked)
     //   3. scene.audio_plan.targetDuration (legacy)
     //   4. 10s fallback                    (Hailuo two-shot default)
-    // Without this fallback, per-speaker padded tracks collapse to spokenSec
-    // (~7s) → Sync.so produces a 7s lipsync output that doesn't match the
-    // 10s silent two-shot master, and the user sees a "duplicate scene"
-    // (10s silent original + 7s short lipsync).
     const planTotal =
       Number((scene as any)?.audio_plan?.duration) ||
       Number((scene as any)?.audio_plan?.targetDuration) ||
@@ -552,26 +559,35 @@ serve(async (req) => {
         `[compose-twoshot-audio] scene ${scene_id} has no duration_seconds — falling back to 10s (Hailuo two-shot default).`,
       );
     }
-    const totalSec = Math.max(spokenSec, sceneDur);
-    const tailSec = Math.max(0, totalSec - spokenSec);
-    const mergedMp3 = tailSec > 0 ? concatMp3([spokenMp3, silenceMp3(tailSec)]) : spokenMp3;
+    const sceneSamples = Math.round(sceneDur * SAMPLE_RATE);
+    const totalSamples = Math.max(spokenSamples.length, sceneSamples);
+    const totalSec = totalSamples / SAMPLE_RATE;
+    const tailSamples = Math.max(0, totalSamples - spokenSamples.length);
+    let mergedSamples = tailSamples > 0
+      ? concatSamples([spokenSamples, new Int16Array(tailSamples)])
+      : spokenSamples;
+    // Hard-trim to exactly totalSamples — never longer than the scene needs.
+    if (mergedSamples.length > totalSamples) {
+      mergedSamples = mergedSamples.subarray(0, totalSamples);
+    }
+    const mergedWav = samplesToWav(mergedSamples);
 
     // Upload merged track to user-scoped path in voiceover-audio bucket.
     const stamp = Date.now();
-    const fileName = `${userId}/twoshot-vo/${scene_id}-${stamp}.mp3`;
+    const fileName = `${userId}/twoshot-vo/${scene_id}-${stamp}.wav`;
     const { error: upErr } = await supabase.storage
       .from("voiceover-audio")
-      .upload(fileName, mergedMp3, { contentType: "audio/mpeg", upsert: false });
+      .upload(fileName, mergedWav, { contentType: "audio/wav", upsert: false });
     if (upErr) return json({ error: `upload failed: ${upErr.message}` }, 500);
     const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(fileName);
     const publicUrl = pub.publicUrl;
 
     // ── Build & upload per-character padded tracks ──────────────────────
-    // Important: we run ONE Sync.so pass per character, not per dialogue turn.
-    // A/B/A/B dialogue must therefore produce 2 tracks (A and B), where each
-    // track contains that speaker's segments at their original timestamps and
-    // silence everywhere else. This keeps the lipsync worker within runtime
-    // limits while preserving sequential speech timing.
+    // ONE Sync.so pass per character. Each per-speaker track is the SAME
+    // length as the merged track and places each utterance at its exact
+    // sample offset — zeros elsewhere. Because positions are sample-accurate
+    // and derived from the same timeline as the merged track, the lipsync
+    // output aligns with the merged audio with zero drift.
     const groups = new Map<string, {
       speaker: string;
       speaker_slug: string;
@@ -581,7 +597,7 @@ serve(async (req) => {
       startSec: number;
       endSec: number;
       turns: Array<{ startSec: number; endSec: number; text_index: number }>;
-      items: Array<{ segment: typeof segments[number]; mp3: Uint8Array; index: number }>;
+      items: Array<{ segment: typeof segments[number]; samples: Int16Array; index: number }>;
       track_url?: string;
     }>();
     for (let i = 0; i < segments.length; i++) {
@@ -592,7 +608,7 @@ serve(async (req) => {
         existing.startSec = Math.min(existing.startSec, seg.startSec);
         existing.endSec = Math.max(existing.endSec, seg.endSec);
         existing.turns.push({ startSec: seg.startSec, endSec: seg.endSec, text_index: i });
-        existing.items.push({ segment: seg, mp3: mp3Buffers[i], index: i });
+        existing.items.push({ segment: seg, samples: sampleBuffers[i], index: i });
       } else {
         groups.set(key, {
           speaker: seg.speaker,
@@ -603,7 +619,7 @@ serve(async (req) => {
           startSec: seg.startSec,
           endSec: seg.endSec,
           turns: [{ startSec: seg.startSec, endSec: seg.endSec, text_index: i }],
-          items: [{ segment: seg, mp3: mp3Buffers[i], index: i }],
+          items: [{ segment: seg, samples: sampleBuffers[i], index: i }],
         });
       }
     }
@@ -612,19 +628,20 @@ serve(async (req) => {
     for (let i = 0; i < speakerTracks.length; i++) {
       try {
         const group = speakerTracks[i];
-        const pieces: Uint8Array[] = [];
-        let t = 0;
-        for (const item of group.items.sort((a, b) => a.segment.startSec - b.segment.startSec)) {
-          pieces.push(silenceMp3(Math.max(0, item.segment.startSec - t)));
-          pieces.push(item.mp3);
-          t = item.segment.endSec;
+        // Pre-allocate zeros = silence everywhere.
+        const track = new Int16Array(totalSamples);
+        for (const item of group.items) {
+          const startSample = item.segment._startSample;
+          const maxCopy = Math.max(0, Math.min(item.samples.length, totalSamples - startSample));
+          if (maxCopy > 0) {
+            track.set(item.samples.subarray(0, maxCopy), startSample);
+          }
         }
-        pieces.push(silenceMp3(Math.max(0, totalSec - t)));
-        const track = concatMp3(pieces);
-        const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-char${i}-${group.speaker_slug}.mp3`;
+        const trackWav = samplesToWav(track);
+        const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-char${i}-${group.speaker_slug}.wav`;
         const { error: tErr } = await supabase.storage
           .from("voiceover-audio")
-          .upload(trackPath, track, { contentType: "audio/mpeg", upsert: false });
+          .upload(trackPath, trackWav, { contentType: "audio/wav", upsert: false });
         if (tErr) {
           console.warn("[compose-twoshot-audio] per-speaker upload failed:", tErr.message);
           continue;
@@ -635,7 +652,11 @@ serve(async (req) => {
         console.warn("[compose-twoshot-audio] per-character build error", (e as Error).message);
       }
     }
+    // Strip internal `items` AND internal `_startSample`/`_endSample` fields
+    // from the public metadata so downstream consumers see only the public
+    // shape.
     const publicSpeakerTracks = speakerTracks.map(({ items: _items, ...track }) => track);
+    const publicSegments = segments.map(({ _startSample: _s, _endSample: _e, ...seg }) => seg);
 
     // Wipe any prior voiceover rows for this scene so compose-lipsync-scene
     // sees exactly ONE merged track and doesn't trip its multi-speaker guard.
@@ -648,7 +669,7 @@ serve(async (req) => {
       kind: "voiceover",
       source: "ai",
       url: publicUrl,
-      duration: Math.round(totalSec * 100) / 100,
+      duration: Math.round(totalSec * 1000) / 1000,
       start_offset: 0,
       volume: 1,
       ducking_enabled: false,
@@ -657,11 +678,14 @@ serve(async (req) => {
       metadata: {
         source: "compose-twoshot-audio",
         kind: "twoshot_merged",
-        format: "mp3",
-        bitrate: MP3_BITRATE,
-        spoken_seconds: Math.round(spokenSec * 100) / 100,
+        format: "wav",
+        sample_rate: SAMPLE_RATE,
+        channels: CHANNELS,
+        bits_per_sample: 16,
+        spoken_seconds: Math.round(spokenSec * 1000) / 1000,
         scene_duration_seconds: sceneDur,
-        segments,
+        total_samples: totalSamples,
+        segments: publicSegments,
         speakers: publicSpeakerTracks,
       },
     });
