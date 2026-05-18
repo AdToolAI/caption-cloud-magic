@@ -121,6 +121,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
           const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+
+          // For retry-candidates (previously 'failed'), clear the failure
+          // markers first so the edge function's running-takeover guard sees a
+          // clean slate instead of stale 'failed'/twoshot_stage='failed'.
+          if (d.lip_sync_status === 'failed') {
+            await supabase
+              .from('composer_scenes')
+              .update({
+                lip_sync_status: 'pending',
+                twoshot_stage: null,
+                clip_error: `auto-retry: ${d.clip_error ?? 'failed'}`,
+                replicate_prediction_id: null,
+              })
+              .eq('id', d.id);
+          }
+
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
           );
