@@ -103,9 +103,27 @@ serve(async (req) => {
 
     if ((scene as any).lip_sync_status === "running") {
       const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
-      if (ageMs < 10 * 60 * 1000) {
+      const stage = String((scene as any).twoshot_stage ?? "");
+      const hb = (scene as any)?.audio_plan?.twoshot?.heartbeat ?? null;
+      // Real progress markers: pipeline either set a heartbeat or advanced
+      // stage past 'master_clip'. Without those, the row is stuck before
+      // the background worker ever started — usually because the caller
+      // pre-set lip_sync_status='running' and the previous invocation got
+      // short-circuited here. Take over instead of returning 202.
+      const hasRealProgress = !!hb || (stage && stage !== "master_clip" && stage !== "audio" && stage !== "anchor");
+      if (hasRealProgress && ageMs < 10 * 60 * 1000) {
         return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
       }
+      if (!hasRealProgress && ageMs < 90 * 1000) {
+        // Very recent invocation that did set status=running but hasn't
+        // recorded progress yet — still allow takeover after 90s to avoid
+        // forever-stuck rows. Below 90s, assume a concurrent worker is
+        // genuinely just starting.
+        return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
+      }
+      console.warn(
+        `[compose-twoshot-lipsync ${scene_id}] taking over stuck running row (ageMs=${ageMs}, stage=${stage}, heartbeat=${!!hb})`,
+      );
     }
     if ((scene as any).lip_sync_status === "done" && (scene as any).lip_sync_applied_at) {
       return json({ accepted: true, scene_id, status: "already_done", credits_reserved: 0 }, 200);
