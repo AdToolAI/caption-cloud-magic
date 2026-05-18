@@ -66,7 +66,7 @@ serve(async (req) => {
     // Load scene + verify ownership via project
     const { data: scene, error: sErr } = await supabase
       .from('composer_scenes')
-      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds, dialog_script, dialog_voices, audio_plan, character_audio_url')
+      .select('id, project_id, clip_url, lip_sync_source_clip_url, lip_sync_with_voiceover, duration_seconds, dialog_script, dialog_voices, audio_plan, character_audio_url, engine_override')
       .eq('id', scene_id)
       .single();
     if (sErr || !scene) return json({ error: 'scene not found' }, 404);
@@ -85,6 +85,29 @@ serve(async (req) => {
     const sourceClipUrl =
       (scene as any).lip_sync_source_clip_url || scene.clip_url || null;
     if (!sourceClipUrl) return json({ error: 'no source clip' }, 400);
+
+    const scriptSpeakerSet = new Set<string>();
+    for (const line of String((scene as any).dialog_script ?? '').split('\n')) {
+      const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+      if (m) scriptSpeakerSet.add(m[1].trim().toLowerCase());
+    }
+    const planSpeakers = Array.isArray((scene as any).audio_plan?.speakers)
+      ? (scene as any).audio_plan.speakers.length
+      : 0;
+    if ((scene as any).engine_override === 'cinematic-sync' && Math.max(scriptSpeakerSet.size, planSpeakers) > 1) {
+      await supabase
+        .from('composer_scenes')
+        .update({
+          lip_sync_status: 'failed',
+          twoshot_stage: 'failed',
+          clip_error: 'multi_speaker_scene_routed_to_single_lipsync',
+        })
+        .eq('id', scene_id);
+      return json({
+        error: 'multi_speaker_not_supported',
+        message: 'Cinematic-Sync scenes with multiple speakers must use the Two-Shot lip-sync pipeline.',
+      }, 409);
+    }
 
     // Find the voiceover clip(s) for this scene.
     // SAFETY: if multiple distinct voiceover clips exist (multi-speaker dialog
