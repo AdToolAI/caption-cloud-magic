@@ -1,82 +1,57 @@
-## Problem
+# Burned-in Dialog-Captions im Two-Shot fixen
 
-Im Two-Shot Lip-Sync (compose-twoshot-lipsync) wird derzeit nur **ein** Gesicht animiert — der zweite Sprecher bleibt stumm/lippenlos. Wir senden zwei sequentielle Sync.so-Passes mit unterschiedlichen Audiospuren, **aber beide Passes landen auf demselben Gesicht** (dem prominenteren).
+## Problem
+Im neuen Two-Shot-Render werden die Voiceover-Sätze als **echte Pixel** in die Szene gerendert (auf T-Shirts / als Captions sichtbar). Das ist kein Subtitle-Overlay aus Director's Cut — der Text steckt im Master-Clip selbst.
 
 ## Ursache
+`SceneDialogStudio.tsx` (Zeile 945 + 998) baut den `dialogScriptText` als
 
-Wir senden derzeit:
-
-```ts
-{ video, audio, sync_mode: "cut_off", active_speaker: true,
-  face_index: p, speaker: p }
+```
+Alex: Das ist ein Traum!
+Ben: Absolut. Der Weinberg ist wunderschön.
 ```
 
-`face_index` und `speaker` sind **keine gültigen Sync.so-Parameter** — sie werden von Replicate stillschweigend ignoriert. Mit `active_speaker: true` greift dann automatic-speaker-detection, und die wählt in **beiden Passes** dasselbe (prominenteste) Gesicht → Pass 2 überschreibt Pass 1 auf demselben Mund.
+und übergibt ihn als **visuellen Prompt** an `compose-scene-anchor`, wenn `scene.aiPrompt` leer ist:
 
-So macht es Artlist: Sync.so bietet `options.active_speaker_detection` mit **`frame_number` + `coordinates`** (oder `bounding_boxes`) für deterministische Face-Auswahl. Damit pinnt man pro Pass das **exakte Zielgesicht**.
-
-## Lösung
-
-### 1. Face-Detection einmalig pro Szene
-Vor den Lipsync-Passes Gemini Vision (`google/gemini-2.5-flash`) mit dem ersten Frame/Video-URL des Master-Clips aufrufen. Strict-JSON-Antwort:
-
-```json
-{ "faces": [
-    { "center": [x, y], "side": "left",  "bbox": [x1,y1,x2,y2] },
-    { "center": [x, y], "side": "right", "bbox": [x1,y1,x2,y2] }
-] }
+```
+scene.aiPrompt || dialogScriptText
 ```
 
-Koordinaten in Pixeln der Video-Auflösung (Hailuo two-shot ist 1280×720 oder 1920×1080 — wir senden die Original-Auflösung im Prompt mit, oder lassen Gemini sie schätzen und normieren später).
+Nano Banana 2 interpretiert die Anführungs-/Doppelpunkt-Struktur als Render-Auftrag und schreibt die Sätze als Text in das First-Frame-Bild. Hailuo i2v übernimmt das Bild und animiert es — der Text bleibt eingebrannt.
 
-Cache das Ergebnis in `composer_scenes.audio_plan.twoshot.faceMap` damit Retries nicht erneut detektieren.
+Der Anchor-Prompt enthält zwar bereits `no text, no captions, no watermark`, das wird aber von der expliziten Speech-Notation überstimmt. In `ClipsTab.tsx` (Zeilen 588, 747, 919) gibt es dieselben Aufrufe — die müssen ebenfalls geprüft werden, falls dort dialogartige Texte als Prompt fließen.
 
-### 2. Pro Pass deterministisches Face-Targeting
-Aus `character_shots[i].position` (`left`/`right` oder Index 0/1) → passendes Face aus der Detection mappen.
+## Lösung (2 Layer)
 
-Pass-Input wird zu:
+### Layer 1 — Client: nie das Skript als Visual-Prompt benutzen
+In `SceneDialogStudio.tsx`:
+- Neuen Helper `buildVisualSceneDescription(scene, characters)` einführen, der eine rein **visuelle** Beschreibung liefert (Setting, Anzahl/Position der Charaktere, Stimmung), **ohne** jegliche Dialogzeilen.
+- Aufrufe an `prepareSceneAnchor` und `compose-twoshot-lipsync` nicht mehr mit `dialogScriptText` als Fallback füttern — stattdessen `scene.aiPrompt || buildVisualSceneDescription(...)`.
+- `dialogScript`-Feld bleibt im Payload (wird ja für TTS gebraucht), nur die **visuellen** Prompts werden bereinigt.
 
-```ts
-{
-  video: currentVideo,
-  audio: pass.track_url,
-  sync_mode: "cut_off",
-  temperature: 0.5,
-  output_format: "mp4",
-  active_speaker: false,                  // Auto-Detect aus
-  active_speaker_detection: {
-    auto_detect: false,
-    frame_number: 0,
-    coordinates: [faceX, faceY],          // Mittelpunkt des Ziel-Gesichts
-  },
-}
-```
+### Layer 2 — Server: defensiver Sanitizer in compose-scene-anchor
+Als Safety-Net direkt in `supabase/functions/compose-scene-anchor/index.ts`:
+- Vor dem Prompt-Build `scenePrompt` durch `stripSpokenDialog()` schicken:
+  - Zeilen, die dem Muster `^[A-ZÄÖÜ][\w\s]{0,30}:\s` folgen, droppen
+  - Inhalte in geraden/typographischen Quotes (`"..."`, `„…"`, `«…»`) droppen
+  - Mehrfach-Linebreaks normalisieren
+- Negativ-Suffix verstärken:
+  > `Absolutely NO rendered text, NO captions, NO subtitles, NO speech bubbles, NO words on clothing, NO signs, NO watermarks. The image must contain zero typography.`
 
-`face_index`/`speaker` (Bogus-Felder) entfernen.
+### Layer 3 — Cache-Invalidate
+`promptHash` in `compose-scene-anchor` von `v4|…` auf `v5|…` heben, damit alte Anchor-Bilder mit eingebranntem Text **nicht** aus dem Cache zurückkommen. Bereits gerenderte Szenen mit `superseded: true` werden ohnehin neu gebaut, sobald der User Lipsync re-triggert.
 
-### 3. Fallback
-- Wenn Gemini Detection fehlschlägt oder nicht 2 Gesichter liefert: **Heuristik** — Annahme links/rechts auf Drittel-Position (z. B. links = [W*0.3, H*0.5], rechts = [W*0.7, H*0.5]). Auflösung kommt aus `scene.metadata.master_width/height` (falls vorhanden) oder Default 1280×720.
-- Wenn auch das nicht geht: aktuelles Verhalten (silent failover auf `active_speaker: true`) mit Warnung im Log.
+## Files
+- `src/components/video-composer/SceneDialogStudio.tsx` — Helper + 2 Anchor-Aufrufe
+- `src/components/video-composer/ClipsTab.tsx` — gleiche Fallback-Hygiene an Zeilen 588 / 747 / 919 prüfen und ggf. fixen
+- `supabase/functions/compose-scene-anchor/index.ts` — `stripSpokenDialog`, Prompt-Suffix, `promptHash`-Bump
+- `mem/architecture/lipsync/sync-so-pro-model-policy` — Notiz: "Dialogskript niemals als Visual-Prompt, Anchor sanitized Speech-Patterns serverseitig"
 
-### 4. Logging & Sichtbarkeit
-- `console.log` pro Pass: `target_face=left|right coords=[x,y]`
-- In `audio_plan.twoshot.heartbeat` zusätzlich `targetFace` mitschreiben — das Studio-UI kann später eine kleine "👤 links / 👤 rechts" Anzeige im Progress-Strip rendern.
+## Verifikation
+1. Bestehende Szene neu rendern → Anchor-Bild darf keinerlei Text mehr enthalten.
+2. Lipsync-Pass starten → Master-Clip ist textfrei, nur Lippen bewegen sich korrekt für beide Speaker (das funktioniert ja schon).
+3. Edge-Function-Log prüfen: `stripSpokenDialog` Treffer sollten geloggt werden (für Debug).
 
-## Geänderte Dateien
-
-1. **`supabase/functions/compose-twoshot-lipsync/index.ts`**
-   - Neue Helper-Funktion `detectFacesInMaster(supabase, sceneId, videoUrl, lovableKey)` → ruft Gemini, cached Ergebnis in `audio_plan.twoshot.faceMap`.
-   - Neue Helper-Funktion `pickTargetCoordinates(faceMap, charShot, fallbackDims)` → liefert `[x, y]` für den aktuellen Sprecher.
-   - Multi-Pass-Loop (Zeilen ~392–452): Eingabe-Objekt umbauen wie oben. Aufruf der Detection einmal vor dem Loop.
-
-2. **`mem/architecture/lipsync/sync-so-pro-model-policy`**
-   - Notiz ergänzen: `active_speaker_detection.coordinates` ist der **richtige** Weg für Two-Shot. `face_index`/`speaker` waren no-ops.
-
-Keine UI-Änderungen, kein DB-Migration. `audio_plan.twoshot.faceMap` ist nur ein neues optionales Feld im bestehenden JSONB.
-
-## Validierung
-
-1. Neue Two-Shot-Szene mit zwei Sprechern triggern (`/video-composer`).
-2. Edge-Logs prüfen: `target_face=left coords=[…]` für Pass 1, `target_face=right` für Pass 2.
-3. Visuell: Pass 1 animiert linkes Gesicht beim ersten VO-Segment, Pass 2 animiert rechtes Gesicht beim zweiten — beide Münder bewegen sich zur richtigen Zeit.
-4. Continuity-Drift sollte < 0.3 bleiben (kein Identitäts-Bleed).
+## Nicht-Ziele
+- Keine Änderung an der Audio-Pipeline oder Face-Targeting — die funktionieren bereits.
+- Keine Änderung an Director's-Cut-Subtitle-Overlays (separates System, hier nicht betroffen).
