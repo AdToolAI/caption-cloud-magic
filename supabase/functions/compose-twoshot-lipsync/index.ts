@@ -519,12 +519,44 @@ serve(async (req) => {
       let outUrl: string | null = null;
 
       if (useMultiPass) {
+        // ── Face detection ONCE before the pass loop ───────────────────
+        // Sync.so's auto active-speaker detection collapses every pass onto
+        // the most-prominent face. We pin each pass to a specific face via
+        // `active_speaker_detection.coordinates` (Artlist-style).
+        const cachedFaceMap = ((scene as any)?.audio_plan?.twoshot?.faceMap) ?? null;
+        const anchorUrl = (scene as any).lock_reference_url as string | undefined;
+        const faceMap = await detectFacesInMaster(
+          supabase,
+          scene_id,
+          anchorUrl,
+          cachedFaceMap,
+          LOVABLE_API_KEY,
+        );
+        const fallbackDims = {
+          width: Number(faceMap?.width) || 1280,
+          height: Number(faceMap?.height) || 720,
+        };
+        console.log(
+          `[compose-twoshot-lipsync ${scene_id}] faceMap`,
+          faceMap
+            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: cachedFaceMap ? "cache" : "gemini" }
+            : { faces: 0, source: "heuristic-fallback" },
+        );
+
         let currentVideo = sourceClipUrl;
         for (let p = 0; p < passes.length; p++) {
           const pass = passes[p];
+          const target = pickTargetCoordinates(p, faceMap, fallbackDims);
           console.log(
             `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length}`,
-            { speaker: pass.speaker, character_id: pass.character_id, audio: pass.track_url },
+            {
+              speaker: pass.speaker,
+              character_id: pass.character_id,
+              audio: pass.track_url,
+              target_face: target?.side,
+              coords: target?.coords,
+              source: target?.source,
+            },
           );
           const passStartedAt = new Date().toISOString();
           const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
@@ -535,37 +567,49 @@ serve(async (req) => {
               twoshot: {
                 ...prevTwoshot,
                 speakers: publicPasses,
+                faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
                 heartbeat: {
                   pass: p + 1,
                   total_passes: passes.length,
                   started_at: passStartedAt,
                   speaker: pass.speaker,
+                  targetFace: target?.side ?? null,
+                  targetSource: target?.source ?? null,
                 },
               },
             },
           });
-          // Deterministic face targeting per pass — without this, Sync.so's
-          // active_speaker auto-detect collapses both passes onto the same
-          // (most prominent) face, leaving speaker 2's mouth unanimated.
-          // We send both `face_index` AND `speaker` so we work regardless of
-          // which field the current Replicate schema honors; unknown fields
-          // are silently ignored by Replicate.
+
+          // Deterministic face targeting per pass via Sync.so's documented
+          // `active_speaker_detection` option. With `auto_detect:false` and
+          // explicit `frame_number`+`coordinates`, the model lipsyncs the
+          // SPECIFIC face whose center is closest to the given point — no
+          // more both-passes-onto-same-face bug.
           let stepUrl: string | null = null;
           try {
+            const input: Record<string, unknown> = {
+              video: currentVideo,
+              audio: pass.track_url,
+              sync_mode: "cut_off",
+              temperature: 0.5,
+              output_format: "mp4",
+            };
+            if (target) {
+              input.active_speaker = false;
+              input.active_speaker_detection = {
+                auto_detect: false,
+                frame_number: 0,
+                coordinates: target.coords,
+              };
+            } else {
+              // Last-resort: let auto-detect run if we have nothing to pin.
+              input.active_speaker = true;
+            }
             stepUrl = await runLipsyncPrediction(
               replicate,
               supabase,
               scene_id,
-              {
-                video: currentVideo,
-                audio: pass.track_url,
-                sync_mode: "cut_off",
-                active_speaker: true,
-                temperature: 0.5,
-                output_format: "mp4",
-                face_index: p,
-                speaker: p,
-              },
+              input,
               `lipsync_pass_${p + 1}`,
             );
           } catch (e) {
