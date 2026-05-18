@@ -31,7 +31,11 @@ const corsHeaders = {
     'authorization, x-client-info, apikey, content-type, x-qa-mock',
 };
 
-const COST = 8;
+// Artlist-grade lip-sync via Sync.so lipsync-2-pro (≈2× pricier than lipsync-2,
+// but identity-locked, no face morph). See mem://architecture/lipsync/sync-so-pro-model-policy
+const COST = 14;
+const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
+const MIN_VO_DURATION = 0.4; // lipsync-2-pro needs minimum speech signal
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -316,14 +320,24 @@ serve(async (req) => {
       // artefacts). Default to `loop` for short VOs that need to fill the clip.
       const sceneDuration = (scene as any).duration_seconds ?? 0;
       const voDuration = vo.duration ?? 0;
+      if (voDuration > 0 && voDuration < MIN_VO_DURATION) {
+        await refund(`vo too short (${voDuration}s)`);
+        return json({
+          error: 'vo_too_short',
+          message: `Voiceover ist nur ${voDuration.toFixed(2)}s lang. Lipsync-2-Pro benötigt mindestens ${MIN_VO_DURATION}s Sprachsignal.`,
+        }, 422);
+      }
       const syncMode = voDuration > sceneDuration + 0.2 ? 'cut_off' : 'loop';
       const output = await replicate.run(
-        "sync/lipsync-2" as `${string}/${string}`,
+        LIPSYNC_MODEL,
         {
           input: {
             video: sourceClipUrl,
             audio: vo.url,
             sync_mode: syncMode,
+            temperature: 0.5,
+            active_speaker: true,
+            output_format: 'mp4',
           },
         },
       );
