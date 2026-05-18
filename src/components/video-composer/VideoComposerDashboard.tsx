@@ -1290,28 +1290,30 @@ export default function VideoComposerDashboard() {
           </TabsContent>
 
           <TabsContent value="storyboard">
-            <StoryboardTab
-              scenes={project.scenes}
-              onUpdateScenes={setScenes}
-              onAddScene={addSceneToProject}
-              onInsertScenesAfter={insertScenesAfter}
-              onGoToClips={persistAndGoToClips}
-              language={project.language}
-              projectId={project.id}
-              characters={project.briefing?.characters}
-              onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
-              preferredAspect={project.briefing?.aspectRatio}
-              onRefetchScenes={refetchScenesFromDb}
-              onEnsurePersisted={async () => {
-                const result = await ensureProjectPersisted(project);
-                // Sync ref BEFORE setState so any callback that fires inside
-                // the same click handler (e.g. insertScenesAfter) sees the
-                // freshly persisted UUID without waiting for a re-render.
-                projectIdRef.current = result.projectId;
-                setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
-                return result;
-              }}
-            />
+            <ComposerTabErrorBoundary label="Storyboard">
+              <StoryboardTab
+                scenes={project.scenes}
+                onUpdateScenes={setScenes}
+                onAddScene={addSceneToProject}
+                onInsertScenesAfter={insertScenesAfter}
+                onGoToClips={persistAndGoToClips}
+                language={project.language}
+                projectId={project.id}
+                characters={project.briefing?.characters}
+                onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
+                preferredAspect={project.briefing?.aspectRatio}
+                onRefetchScenes={refetchScenesFromDb}
+                onEnsurePersisted={async () => {
+                  const result = await ensureProjectPersisted(project);
+                  // Sync ref BEFORE setState so any callback that fires inside
+                  // the same click handler (e.g. insertScenesAfter) sees the
+                  // freshly persisted UUID without waiting for a re-render.
+                  projectIdRef.current = result.projectId;
+                  setProject(prev => ({ ...prev, id: result.projectId, scenes: result.scenes }));
+                  return result;
+                }}
+              />
+            </ComposerTabErrorBoundary>
           </TabsContent>
 
           <TabsContent value="clips">
