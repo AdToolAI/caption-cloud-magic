@@ -991,11 +991,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               durationSeconds: masterDuration,
               dialogScript: dialogScriptText,
             } as typeof scene;
+            // IMPORTANT: never feed the dialog script as a visual prompt —
+            // Nano Banana 2 would render the spoken lines as burned-in text
+            // (captions on shirts / floating subtitles). Use the explicit
+            // visual prompt only; fall back to a neutral visual description
+            // of the cast.
+            const visualSceneDescription =
+              (scene.aiPrompt && scene.aiPrompt.trim()) ||
+              `Two-shot conversation between ${synthed.length} people facing each other in a natural setting, photorealistic, cinematic lighting`;
             const prepared = await prepareSceneAnchor(
               sceneForAnchor,
               characters,
               activeBrandChar,
-              scene.aiPrompt || dialogScriptText,
+              visualSceneDescription,
               '16:9',
               { forceCompose: true },
             );

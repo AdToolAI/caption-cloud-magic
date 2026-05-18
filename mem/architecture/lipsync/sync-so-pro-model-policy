@@ -13,6 +13,13 @@ Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, l
 - Fallback ohne Gemini: Heuristik [W*0.3, H*0.5] / [W*0.7, H*0.5] mit 1280×720 als Default-Dimension.
 - `audio_plan.twoshot.heartbeat.targetFace` + `targetSource` ('gemini'|'heuristic') werden pro Pass geschrieben (UI-Sichtbarkeit).
 
+**No-Burned-In-Text Policy (Mai 2026):**
+- Das Dialogskript (`Name: line`) darf **niemals** als Visual-Prompt an `compose-scene-anchor` oder ein i2v-Modell weitergegeben werden — Nano Banana 2 würde die Sätze als Captions / Shirt-Labels in das First-Frame brennen.
+- `SceneDialogStudio` benutzt ausschließlich `scene.aiPrompt` oder einen neutralen Fallback ("Two-shot conversation…"), nie `dialogScriptText`.
+- `compose-scene-anchor` sanitized den eingehenden `scenePrompt` zusätzlich serverseitig (`stripSpokenDialog`): entfernt `Name:`-Zeilen und Inhalte in Quotes; ergänzt ein hartes `NO_TYPOGRAPHY_SUFFIX`. Cache-Key auf `v5|…` gebumpt.
+
+
+
 **Sample-Accurate Audio Pipeline (Drift-Fix Mai 2026):**
 - `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching mehr. ElevenLabs liefert `output_format=pcm_24000` (Starter-Tier-kompatibel; `pcm_44100` wäre Pro-only und wirft 403 `output_format_not_allowed`) → linear resampled auf 44.1 kHz; Hume liefert `format.type=wav` → decode + resample auf 44.1 kHz mono.
 - Konkatenation und Stille-Padding sample-genau (≈22 µs Auflösung), kein 26-ms-Frame-Quantisierungsfehler.
