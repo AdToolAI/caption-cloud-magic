@@ -54,7 +54,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at')
+          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at, clip_error, twoshot_stage')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -85,16 +85,32 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
-        const candidates = (data as any[]).filter(
-          (d) =>
-            d.engine_override === 'cinematic-sync' &&
-            typeof d.clip_url === 'string' &&
-            d.clip_url.length > 0 &&
-            (d.lip_sync_status === 'pending' || d.lip_sync_status == null) &&
-            !d.lip_sync_applied_at &&
-            !inflight.current.has(d.id),
-        );
+        // Recoverable failure reasons we auto-retry exactly once per mount.
+        // (Hard refusals like 'no_voiceover' must NOT be retried — they need
+        // the user to add a VO first.)
+        const RETRYABLE_ERRORS = new Set([
+          'multi_speaker_scene_routed_to_single_lipsync',
+          'watchdog_stuck_lipsync_refunded',
+        ]);
+
+        const candidates = (data as any[]).filter((d) => {
+          if (d.engine_override !== 'cinematic-sync') return false;
+          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          if (d.lip_sync_applied_at) return false;
+          if (inflight.current.has(d.id)) return false;
+          if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
+          if (
+            d.lip_sync_status === 'failed' &&
+            typeof d.clip_error === 'string' &&
+            (RETRYABLE_ERRORS.has(d.clip_error) ||
+              /^lipsync_pass_\d+_failed/.test(d.clip_error))
+          ) {
+            return true;
+          }
+          return false;
+        });
         if (candidates.length === 0) return;
+
 
         // Optimistischer Client-Lock — verhindert Doppel-Trigger im selben Tick.
         // Wichtig: den DB-Status NICHT hier auf 'running' setzen. Die Edge-
@@ -105,6 +121,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
           const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+
+          // For retry-candidates (previously 'failed'), clear the failure
+          // markers first so the edge function's running-takeover guard sees a
+          // clean slate instead of stale 'failed'/twoshot_stage='failed'.
+          if (d.lip_sync_status === 'failed') {
+            await supabase
+              .from('composer_scenes')
+              .update({
+                lip_sync_status: 'pending',
+                twoshot_stage: null,
+                clip_error: `auto-retry: ${d.clip_error ?? 'failed'}`,
+                replicate_prediction_id: null,
+              })
+              .eq('id', d.id);
+          }
+
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
           );

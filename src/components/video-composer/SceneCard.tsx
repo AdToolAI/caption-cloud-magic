@@ -1241,10 +1241,30 @@ export default function SceneCard({
                     disabled={scene.lipSyncStatus === 'running'}
                     onClick={async () => {
                       try {
-                        const { error } = await supabase.functions.invoke(
-                          'compose-lipsync-scene',
-                          { body: { scene_id: scene.id } },
-                        );
+                        // Multi-speaker Cinematic-Sync MUST use the two-shot
+                        // pipeline; single-speaker scenes use the legacy one.
+                        // compose-lipsync-scene short-circuits multi-speaker
+                        // with `multi_speaker_scene_routed_to_single_lipsync`.
+                        const dialogScript = String((scene as any).dialogScript ?? '');
+                        const scriptSpeakers = new Set<string>();
+                        for (const line of dialogScript.split('\n')) {
+                          const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+                          if (m) scriptSpeakers.add(m[1].trim().toLowerCase());
+                        }
+                        const planSpeakers = Array.isArray(scene.audioPlan?.speakers)
+                          ? scene.audioPlan!.speakers!.length
+                          : 0;
+                        const twoshotSpeakers = Array.isArray((scene.audioPlan as any)?.twoshot?.speakers)
+                          ? (scene.audioPlan as any).twoshot.speakers.length
+                          : 0;
+                        const speakerCount = Math.max(scriptSpeakers.size, planSpeakers, twoshotSpeakers);
+                        const fnName =
+                          scene.engineOverride === 'cinematic-sync' && speakerCount >= 2
+                            ? 'compose-twoshot-lipsync'
+                            : 'compose-lipsync-scene';
+                        const { error } = await supabase.functions.invoke(fnName, {
+                          body: { scene_id: scene.id },
+                        });
                         if (error) throw error;
                         onUpdate({ lipSyncStatus: 'running' });
                       } catch (e) {
