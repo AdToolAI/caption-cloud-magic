@@ -33,12 +33,22 @@ const corsHeaders = {
 // 2× lipsync-2-pro per pass (multi-pass two-shot) — Artlist parity
 const COST = 28;
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
+const PASS_TIMEOUT_MS = 180_000;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label}_timeout_${Math.round(ms / 1000)}s`)), ms),
+    ),
+  ]);
 }
 
 async function setStage(
