@@ -471,7 +471,7 @@ function Section({
   loading: boolean;
   items: any[];
   action?: React.ReactNode;
-  empty: { title: string; body: string; cta: { label: string; to: string } };
+  empty: { title: string; body: string; cta: { label: string; to?: string; onClick?: () => void } };
   icon: typeof Users;
   children: React.ReactNode;
 }) {
@@ -488,9 +488,13 @@ function Section({
       <Card className="p-12 text-center bg-card/40 border-primary/15">
         <h3 className="font-serif text-2xl mb-2">{empty.title}</h3>
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">{empty.body}</p>
-        <Button asChild>
-          <Link to={empty.cta.to}>{empty.cta.label}</Link>
-        </Button>
+        {empty.cta.onClick ? (
+          <Button onClick={empty.cta.onClick}>{empty.cta.label}</Button>
+        ) : (
+          <Button asChild>
+            <Link to={empty.cta.to ?? '#'}>{empty.cta.label}</Link>
+          </Button>
+        )}
       </Card>
     );
   }
