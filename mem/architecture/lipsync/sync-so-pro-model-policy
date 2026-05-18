@@ -1,16 +1,27 @@
 ---
 name: Lipsync Pro Policy
-description: Sync.so lipsync-2-pro policy for all 3 lipsync edge functions, two-shot audio padding, and preview muting rules
+description: Sync.so lipsync-2-pro policy, sample-accurate PCM/WAV audio pipeline, two-shot padding, cut_off sync_mode, preview muting rules
 type: feature
 ---
 Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
 
+**Sample-Accurate Audio Pipeline (Drift-Fix Mai 2026):**
+- `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching mehr. ElevenLabs liefert `output_format=pcm_44100` (headerless Int16LE), Hume liefert `format.type=wav` → decode + resample auf 44.1 kHz mono.
+- Konkatenation und Stille-Padding sample-genau (≈22 µs Auflösung), kein 26-ms-Frame-Quantisierungsfehler.
+- Merged track wird **hart auf `totalSamples = round(sceneDur * 44100)` getrimmt**, niemals länger.
+- Per-Speaker-Tracks werden aus derselben Sample-Timeline gebaut (`Int16Array(totalSamples)` mit den Samples des Sprechers bei `_startSample`, Rest = 0). Damit ist Sprecher-Position byte-identisch zwischen Merged- und Per-Speaker-Spur → kein Versatz zwischen Lipsync-Output und Playback.
+- Upload als WAV (`.wav`, `audio/wav`). Idempotenz-Check verlangt `.wav`-Suffix, sodass alte MP3-Outputs automatisch einmalig regeneriert werden.
+- `scene_audio_clips.metadata.format = 'wav'`, `sample_rate`, `total_samples`, plus Public-Segments ohne `_startSample`/`_endSample`.
+
+**sync_mode immer `cut_off`:**
+- Da die WAV-Spur exakt scene-lang ist, ist `loop` obsolet und gefährlich (loopt Tail-Silence in nächsten Pass). Beide Funktionen senden hartcodiert `sync_mode: 'cut_off'` an Sync.so.
+
 **Two-Shot Multi-Pass Rules (Stage 2+):**
 - Pro Pass `face_index` + `speaker` an Replicate mitgeben (deterministic face targeting), sonst kollabieren beide Passes auf dasselbe Gesicht.
-- compose-twoshot-audio paddet alle Per-Speaker-Tracks auf `totalSec = max(spokenSec, sceneDur)`; wenn `scene.duration_seconds` 0/null ist, Fallback-Kette: `audio_plan.duration` → `audio_plan.targetDuration` → 10s (Hailuo-Default). Sonst entstehen 7s-Lipsync-Outputs neben 10s stillem Master.
+- compose-twoshot-audio paddet alle Per-Speaker-Tracks auf `totalSamples = round(sceneDur * 44100)`; wenn `scene.duration_seconds` 0/null ist, Fallback-Kette: `audio_plan.duration` → `audio_plan.targetDuration` → 10s (Hailuo-Default).
 - compose-twoshot-lipsync prüft vor Pass 1 ob `mergedVo.duration < sceneDuration - 0.5` und ruft compose-twoshot-audio mit `force_regenerate: true` neu auf.
 - Nach Erfolg `audio_plan.speakers[*].audioUrl = null` + `mergedInto: 'twoshot'` setzen (verhindert dass useSceneAudioClips virtuelle Per-Speaker-Clips synthetisiert).
-- Alle prior `video_creations` Rows mit `metadata.scene_id = scene_id` werden mit `superseded: true` markiert (sonst zeigt Media Library 10s silent original + neuen lipsynced Clip nebeneinander).
+- Alle prior `video_creations` Rows mit `metadata.scene_id = scene_id` werden mit `superseded: true` markiert.
 
 **Preview Mute Policy (ComposerSequencePreview):**
 - Wenn `scene.audioPlan.twoshot.useExternalAudio === true` → Video-Element wird HART gemutet (`el.muted = true`), unabhängig von `mutedRef.current`. Andernfalls plays embedded last-pass audio simultaneously mit merged external track = Echo.
