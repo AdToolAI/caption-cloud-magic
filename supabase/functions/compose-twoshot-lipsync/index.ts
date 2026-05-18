@@ -640,6 +640,11 @@ serve(async (req) => {
               sync_mode: "cut_off",
               temperature: 0.5,
               output_format: "mp4",
+              // Belt-and-suspenders: some sync.so model revisions accept
+              // these top-level keys, others ignore them silently. They
+              // never hurt and double-pin the target face.
+              face_index: p,
+              speaker: target?.side ?? (p === 0 ? "left" : "right"),
             };
             if (target) {
               input.active_speaker = false;
@@ -667,6 +672,10 @@ serve(async (req) => {
             await refund(`pass_${p + 1}_no_output`);
             return;
           }
+          console.log(
+            `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length} DONE`,
+            { speaker: pass.speaker, targetFace: target?.side, output: stepUrl },
+          );
           currentVideo = stepUrl;
           outUrl = stepUrl;
         }
