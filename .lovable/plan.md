@@ -1,65 +1,56 @@
-## Two-Shot Fix: Echo + 7s/10s Duplikat-Szene
+## Diagnose
 
-### Was tatsächlich passiert
+Aktuelle hängende Szene (`1eb25cfb…`, order 0): `lip_sync_status='running'`, `twoshot_stage='lipsync_2'`, `audio_plan.twoshot.speakers` enthält **4 Einträge** (A,B,A,B — pro Wechsel ein eigener padded Track). `compose-twoshot-lipsync` führt deshalb **4 sequentielle Sync.so-Passes** aus (jeweils ~60–120s). Edge-Function-Log zeigt `pass 4/4` um 18:34 und Sekunden später `shutdown` — Pass 4 hat die Edge-Runtime gesprengt (Worker-CPU/Memory-Limit unter `EdgeRuntime.waitUntil`). Resultat: Szene bleibt für immer auf `running`, ohne Refund.
 
-Es ist **eine** Szene, aber sie wird an zwei Stellen unterschiedlich angezeigt, weil **zwei verschiedene Video-URLs** existieren:
+Sync.so `lipsync-2-pro` ist außerdem **per Pass auf das gesamte Source-Video** angewendet — jeder zusätzliche Pass kostet 14 Credits und ~1–2 min. Bei 4 Dialog-Turns = 56 Credits + 4–8 min Laufzeit = unbrauchbar.
 
-1. **`scene.clip_url`** = lipsynced Output von Sync.so (= **7s**, weil Sync.so die Output-Länge auf die Audio-Länge clamped, sobald `sync_mode = "cut_off"` greift bzw. die Per-Speaker-Tracks zu kurz sind)
-2. **`scene.lip_sync_source_clip_url`** = original silent Hailuo-Clip (**10s**)
+## Plan (3 Edits, kein DB-Schema-Change)
 
-Beide URLs werden parallel geladen → in der App tauchen quasi „zwei Versionen" derselben Szene auf. Die 7s-Version hat das Echo (eingebettetes Video-Audio + externer Merged-VO-Track gleichzeitig). Die 10s-Version ist der stumme Original-Clip.
+### 1. `supabase/functions/compose-twoshot-audio/index.ts` — Per-Character statt Per-Turn
 
-### Root Causes — drei zusammenhängende Bugs
+Aktuell wird pro Turn ein Track erzeugt (`spk0`, `spk1`, `spk2`, `spk3`). Stattdessen:
+- Turns nach `character_id` gruppieren.
+- Pro Charakter **einen** padded Track erzeugen: alle Segmente dieses Sprechers an ihren Originalzeitpunkten, Rest = Silence, gepaddet auf `sceneDur`.
+- `metadata.speakers` enthält danach **N = Anzahl unique Charaktere** Einträge (typischerweise 2), nicht mehr 4–8.
 
-**Bug 1 — Per-Speaker-Tracks sind zu kurz**
-`compose-twoshot-audio` berechnet `totalSec = max(spokenSec, sceneDur)`. Wenn `scene.duration_seconds` zum Zeitpunkt des Aufrufs `null/0` ist (häufig — Hailuo-Render setzt es erst nach Webhook), wird `totalSec = 7s` statt `10s`. Die Per-Speaker-Padded-Tracks sind dann nur 7s lang → Sync.so produziert 7s Output. Die volle 10s-Szene fehlt.
+Effekt: Sync.so-Passes sinken von 4 → 2, Laufzeit halbiert, Kosten halbiert, kein Runtime-Kill mehr.
 
-**Bug 2 — Sync.so muxt Audio in den Output → Echo**
-Beim Multi-Pass werden die einzelnen Per-Speaker-Tracks in den Output gemuxt. Der finale Clip enthält im embedded Audio die Stimme des letzten Passes. Im Preview-Player wird `el.muted` aus `mutedRef.current` abgeleitet, sobald `audioPlan.twoshot.useExternalAudio === true`. Sobald der User auf „Unmute" klickt, läuft Video-Audio + externer Merged-VO **gleichzeitig** → Echo + scheinbares „beide reden zur selben Zeit".
+### 2. `supabase/functions/compose-twoshot-lipsync/index.ts` — Watchdog & Refund-Sicherung
 
-**Bug 3 — Source-Clip leakt in die Anzeige**
-Sobald `lip_sync_source_clip_url` gesetzt ist, taucht der 10s-Original an einer zweiten Stelle auf (vermutlich Media-Library / Scene-Card-Preview). Die Logik prüft nicht, ob es ein nicht-finaler Lipsync-Source ist.
+- **Heartbeat**: vor jedem Pass `lip_sync_started_pass_at` in `audio_plan.twoshot.heartbeat` schreiben (nur In-Memory ok, aber besser persistieren via UPDATE).
+- **Hard-Timeout pro Pass**: `Promise.race([replicate.run(...), timeout(180_000)])`. Bei Timeout → Refund + `lip_sync_status='failed'`, `clip_error='lipsync_pass_N_timeout'`.
+- **Sicherheits-Refund** im finalen `catch`: bereits vorhanden, aber sicherstellen, dass `lip_sync_status` immer auf `failed` oder `completed` landet, nie auf `running` ohne Promise.
 
-### Fix-Plan (3 Edits, 1 Edge-Function-Tweak)
+### 3. Neuer Cron-Job — `qa-watchdog`-ähnlich für stuck Lipsync
 
-**1. `supabase/functions/compose-twoshot-audio/index.ts`** — Scene-Duration robust auflösen
-
-Vor `const sceneDur = …`: Wenn `scene.duration_seconds` ≤ 0, aus dem Source-Clip die tatsächliche Dauer ableiten — entweder über `lip_sync_source_clip_url || clip_url` per HEAD-Request auf Range-Probe-Bytes, oder vereinfachter Fallback: `Math.max(spokenSec, 10)` als Default für Two-Shot (Hailuo-Standard). Sauberer: `metadata.requested_duration` mitlesen, falls vorhanden, sonst auf `10` defaulten und Console-Warn loggen.
-
-Damit sind alle Per-Speaker-Padded-Tracks garantiert ≥ Szenenlänge → Sync.so Output bleibt 10s.
-
-**2. `src/components/video-composer/ComposerSequencePreview.tsx`** — Video bei `useExternalAudio` hart muten
-
-An den 5 Stellen, die aktuell `el.muted = hasEmbeddedAudio ? false : mutedRef.current` setzen (Zeilen ~237, 295, 309, 347, 380), die Regel erweitern:
-
-```ts
-const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
-el.muted = twoshotExternal
-  ? true                                   // immer stumm — Audio kommt aus externem Merged-Track
-  : (hasEmbeddedAudio ? false : mutedRef.current);
+Bestehender Watchdog (`mem://infrastructure/observability/heartbeat-watchdog-architecture`) erweitern:
+```sql
+-- composer_scenes mit lip_sync_status='running' UND updated_at < now() - interval '10 minutes'
+-- → lip_sync_status='failed', clip_error='watchdog_stuck_lipsync', Refund via credit_transactions
 ```
+Wenn Watchdog-Function bereits existiert: nur den neuen Check als zusätzlichen Block einfügen.
 
-Helper `sceneShouldForceMute(s)` einführen, der dasselbe für die `play()`-Loops nutzt. Beseitigt das Echo unabhängig vom Mute-Toggle des Users.
+### 4. Manueller Reset der hängenden Szene
 
-**3. `src/components/video-composer/SceneCard.tsx` (oder wo die Mini-Preview den 10s-Source zeigt)** — Source-Clip nur fallback-rendern
+Nach Deploy:
+```sql
+UPDATE composer_scenes
+SET lip_sync_status = NULL, twoshot_stage = NULL, replicate_prediction_id = NULL
+WHERE id = '1eb25cfb-a4ec-419f-a110-e0c3f3bdfffc';
+```
++ Credits-Refund für die 28 Credits (manuell oder via Watchdog beim ersten Lauf).
 
-Wenn `lip_sync_applied_at` gesetzt UND `clip_url` vorhanden → nur `clip_url` rendern, niemals `lip_sync_source_clip_url`. Letzteres ist ein interner Audit-Anker, kein User-facing Asset. Konkret: in der Mini-Player-Quelle nur `clip_url` verwenden, `lip_sync_source_clip_url` nur in einem optionalen „Rohaufnahme anzeigen"-Debug-Toggle.
+## Verifikation
 
-**4. (Optional) `compose-twoshot-lipsync/index.ts`** — Defensive Validierung
+1. Erneut Lipsync starten → Log zeigt nur noch **`pass 1/2` und `pass 2/2`** (statt 4 Passes).
+2. Gesamtdauer < 3 min, Edge-Function bleibt am Leben.
+3. Watchdog läuft alle 2 min und resetted alle Szenen die >10 min in `running` hängen.
+4. Credits werden bei Timeout automatisch zurückerstattet.
 
-Vor dem ersten Pass prüfen, ob `mergedVo.duration < sceneDuration - 0.5`. Falls ja, einmal `compose-twoshot-audio` mit `force_regenerate=true` neu aufrufen, damit garantiert die volle Szenenlänge gepaddet wird. Verhindert das Symptom auch bei Altdaten/Race-Conditions.
+## Out of Scope
 
-### Verifikation
-
-1. Bestehende Two-Shot-Szene erneut lipsyncen.
-2. DB: `composer_scenes.duration_seconds = 10` UND `scene_audio_clips.duration = 10` UND `clip_url`-Video ist 10s.
-3. Preview: Nur ein Video sichtbar, 10s lang, beide Sprecher sequenziell synchron, **keine doppelte Stimme** auch nach „Unmute".
-4. `lip_sync_source_clip_url` bleibt in der DB als Audit-Anker, taucht aber nirgends mehr im UI auf.
-
-### Out-of-Scope
-
-- `face_index`-Logik bleibt wie vorher (war Teil des vorherigen Fixes).
-- Keine Änderung am finalen Render/Stitch-Pfad (`compose-clip-webhook`); dort wird die Merged-VO bereits korrekt gemuxt.
-- Kein DB-Schema-Change.
+- Kein Wechsel zu sync.so async/webhook (eigene API, größerer Umbau).
+- Keine UI-Änderung — `lip_sync_status='failed'` rendert bereits korrekt.
+- Bestehender Echo-Fix (Preview-Mute) bleibt unverändert.
 
 OK so umsetzen?

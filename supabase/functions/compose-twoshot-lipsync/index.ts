@@ -24,6 +24,8 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -33,6 +35,7 @@ const corsHeaders = {
 // 2× lipsync-2-pro per pass (multi-pass two-shot) — Artlist parity
 const COST = 28;
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
+const PASS_TIMEOUT_MS = 180_000;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -41,8 +44,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label}_timeout_${Math.round(ms / 1000)}s`)), ms),
+    ),
+  ]);
+}
+
 async function setStage(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   sceneId: string,
   stage: string,
   extra: Record<string, unknown> = {},
@@ -76,7 +88,7 @@ serve(async (req) => {
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, lock_reference_url, character_shots",
+        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, updated_at",
       )
       .eq("id", scene_id)
       .single();
@@ -88,6 +100,16 @@ serve(async (req) => {
       .eq("id", scene.project_id)
       .single();
     if (!project || project.user_id !== user.id) return json({ error: "Forbidden" }, 403);
+
+    if ((scene as any).lip_sync_status === "running") {
+      const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
+      if (ageMs < 10 * 60 * 1000) {
+        return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
+      }
+    }
+    if ((scene as any).lip_sync_status === "done" && (scene as any).lip_sync_applied_at) {
+      return json({ accepted: true, scene_id, status: "already_done", credits_reserved: 0 }, 200);
+    }
 
     // Source clip = original silent two-shot from Hailuo.
     const sourceClipUrl =
@@ -102,7 +124,7 @@ serve(async (req) => {
       .eq("kind", "voiceover")
       .order("duration", { ascending: false });
 
-    let mergedVo = voClips?.find((c: any) =>
+    let mergedVo: any = voClips?.find((c: any) =>
       String(c.url ?? "").includes("/twoshot-vo/")
     ) ?? voClips?.[0];
 
@@ -223,6 +245,38 @@ serve(async (req) => {
         }
       }
 
+      const existingSpeakerMeta = Array.isArray((mergedVo as any)?.metadata?.speakers)
+        ? ((mergedVo as any).metadata.speakers as Array<any>)
+        : [];
+      const uniqueSpeakerKeys = new Set(
+        existingSpeakerMeta.map((s) => String(s?.character_id || s?.speaker_slug || s?.speaker || "").toLowerCase()).filter(Boolean),
+      );
+      if (existingSpeakerMeta.length > 2 && uniqueSpeakerKeys.size > 0 && existingSpeakerMeta.length > uniqueSpeakerKeys.size) {
+        console.warn(
+          `[compose-twoshot-lipsync ${scene_id}] legacy per-turn tracks detected (${existingSpeakerMeta.length} tracks/${uniqueSpeakerKeys.size} speakers) — regenerating per-character tracks`,
+        );
+        const r = await fetch(`${supabaseUrl}/functions/v1/compose-twoshot-audio`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": auth,
+          },
+          body: JSON.stringify({ scene_id, force_regenerate: true }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.url) {
+          mergedVo = {
+            url: j.url,
+            duration: j.duration,
+            metadata: { speakers: j.speakers },
+          } as any;
+          voDuration = Number(j.duration ?? voDuration);
+        } else {
+          await refund(`twoshot_audio_regen_failed: ${JSON.stringify(j).slice(0, 300)}`);
+          return;
+        }
+      }
+
 
       // ── Per-speaker sequential lip-sync ─────────────────────────────
       // If compose-twoshot-audio produced per-speaker padded tracks
@@ -254,6 +308,7 @@ serve(async (req) => {
         .sort((a, b) => a._shotIdx - b._shotIdx);
 
       const useMultiPass = passes.length >= 2;
+      const publicPasses = passes.map(({ _shotIdx: _shotIdx, ...p }) => p);
       let outUrl: string | null = null;
 
       if (useMultiPass) {
@@ -264,28 +319,55 @@ serve(async (req) => {
             `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length}`,
             { speaker: pass.speaker, character_id: pass.character_id, audio: pass.track_url },
           );
-          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2");
+          const passStartedAt = new Date().toISOString();
+          const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
+          const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2", {
+            audio_plan: {
+              ...prevPlan,
+              twoshot: {
+                ...prevTwoshot,
+                speakers: publicPasses,
+                heartbeat: {
+                  pass: p + 1,
+                  total_passes: passes.length,
+                  started_at: passStartedAt,
+                  speaker: pass.speaker,
+                },
+              },
+            },
+          });
           // Deterministic face targeting per pass — without this, Sync.so's
           // active_speaker auto-detect collapses both passes onto the same
           // (most prominent) face, leaving speaker 2's mouth unanimated.
           // We send both `face_index` AND `speaker` so we work regardless of
           // which field the current Replicate schema honors; unknown fields
           // are silently ignored by Replicate.
-          const passOutput = await replicate.run(
-            LIPSYNC_MODEL,
-            {
-              input: {
-                video: currentVideo,
-                audio: pass.track_url,
-                sync_mode: "loop",
-                active_speaker: true,
-                temperature: 0.5,
-                output_format: "mp4",
-                face_index: p,
-                speaker: p,
-              },
-            },
-          );
+          let passOutput: unknown;
+          try {
+            passOutput = await withTimeout(
+              replicate.run(
+                LIPSYNC_MODEL,
+                {
+                  input: {
+                    video: currentVideo,
+                    audio: pass.track_url,
+                    sync_mode: "loop",
+                    active_speaker: true,
+                    temperature: 0.5,
+                    output_format: "mp4",
+                    face_index: p,
+                    speaker: p,
+                  },
+                },
+              ),
+              PASS_TIMEOUT_MS,
+              `lipsync_pass_${p + 1}`,
+            );
+          } catch (e) {
+            await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
+            return;
+          }
           let stepUrl: string | null = null;
           if (typeof passOutput === "string") stepUrl = passOutput;
           else if (Array.isArray(passOutput) && passOutput.length) stepUrl = passOutput[0] as string;
@@ -303,19 +385,29 @@ serve(async (req) => {
       } else {
         // Fallback: legacy single merged-audio pass.
         const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
-        const output = await replicate.run(
-          LIPSYNC_MODEL,
-          {
-            input: {
-              video: sourceClipUrl,
-              audio: mergedVo.url,
-              sync_mode: syncMode,
-              temperature: 0.5,
-              active_speaker: true,
-              output_format: "mp4",
-            },
-          },
-        );
+        let output: unknown;
+        try {
+          output = await withTimeout(
+            replicate.run(
+              LIPSYNC_MODEL,
+              {
+                input: {
+                  video: sourceClipUrl,
+                  audio: mergedVo.url,
+                  sync_mode: syncMode,
+                  temperature: 0.5,
+                  active_speaker: true,
+                  output_format: "mp4",
+                },
+              },
+            ),
+            PASS_TIMEOUT_MS,
+            "lipsync_single_pass",
+          );
+        } catch (e) {
+          await refund(`lipsync_single_pass_failed: ${(e as Error).message}`);
+          return;
+        }
         await setStage(supabase, scene_id, "lipsync_2");
         if (typeof output === "string") outUrl = output;
         else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
@@ -448,6 +540,7 @@ serve(async (req) => {
           speakers: mergedSpeakers,
           twoshot: {
             ...prevTwoshot,
+            speakers: publicPasses,
             url: mergedVo.url,
             useExternalAudio: true,
             embeddedAudio: false,

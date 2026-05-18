@@ -85,16 +85,11 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         );
         if (candidates.length === 0) return;
 
-        // Optimistisch lock — verhindert Doppel-Trigger im selben Tick.
+        // Optimistischer Client-Lock — verhindert Doppel-Trigger im selben Tick.
+        // Wichtig: den DB-Status NICHT hier auf 'running' setzen. Die Edge-
+        // Function reserviert Credits und setzt den Status atomar selbst;
+        // sonst blockiert ihre Duplicate-Run-Sperre den frisch gestarteten Job.
         candidates.forEach((d) => inflight.current.add(d.id));
-        await Promise.all(
-          candidates.map((d) =>
-            supabase
-              .from('composer_scenes')
-              .update({ lip_sync_status: 'running' })
-              .eq('id', d.id),
-          ),
-        );
 
         for (const d of candidates) {
           const speakers = detectSpeakerCount(d.dialog_script ?? '');
