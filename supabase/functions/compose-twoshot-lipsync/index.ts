@@ -228,6 +228,12 @@ serve(async (req) => {
             { speaker: pass.speaker, character_id: pass.character_id, audio: pass.track_url },
           );
           await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2");
+          // Deterministic face targeting per pass — without this, Sync.so's
+          // active_speaker auto-detect collapses both passes onto the same
+          // (most prominent) face, leaving speaker 2's mouth unanimated.
+          // We send both `face_index` AND `speaker` so we work regardless of
+          // which field the current Replicate schema honors; unknown fields
+          // are silently ignored by Replicate.
           const passOutput = await replicate.run(
             LIPSYNC_MODEL,
             {
@@ -238,6 +244,8 @@ serve(async (req) => {
                 active_speaker: true,
                 temperature: 0.5,
                 output_format: "mp4",
+                face_index: p,
+                speaker: p,
               },
             },
           );
@@ -386,8 +394,21 @@ serve(async (req) => {
       if (isMultiPassTwoshot && mergedVo?.url) {
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+        // Strip per-speaker audioUrls — they're already mixed into the
+        // merged twoshot track. Leaving them in causes downstream consumers
+        // (preview hook, render export) to play them again on top of the
+        // merged track = audible echo.
+        const prevSpeakers = Array.isArray(prevPlan.speakers)
+          ? (prevPlan.speakers as Array<Record<string, unknown>>)
+          : [];
+        const mergedSpeakers = prevSpeakers.map((sp) => ({
+          ...sp,
+          audioUrl: null,
+          mergedInto: "twoshot",
+        }));
         updates.audio_plan = {
           ...prevPlan,
+          speakers: mergedSpeakers,
           twoshot: {
             ...prevTwoshot,
             url: mergedVo.url,

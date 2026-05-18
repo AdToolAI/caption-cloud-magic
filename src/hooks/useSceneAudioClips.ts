@@ -29,7 +29,13 @@ function synthesizeAudioPlanClips(
   let sceneStart = 0;
   for (const scene of scenes) {
     const plan = scene.audioPlan;
-    if (plan?.speakers?.length) {
+    // Two-shot scenes: the merged VO (saved as a real scene_audio_clips row)
+    // is the single source of truth. Per-speaker tracks in audioPlan.speakers
+    // are already mixed into that merged track — synthesizing virtual clips
+    // for them would cause an audible echo / doubled dialogue.
+    const twoshotExternal =
+      (plan as any)?.twoshot?.useExternalAudio === true;
+    if (!twoshotExternal && plan?.speakers?.length) {
       for (let i = 0; i < plan.speakers.length; i++) {
         const sp = plan.speakers[i];
         if (!sp.audioUrl || seenUrls.has(sp.audioUrl)) continue;
