@@ -151,13 +151,25 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       });
     }
 
-    // ─── 4. Stale two-shot lipsync (>10min running) ───
-    const { data: staleLipsync } = await sb
+    // ─── 4. Stale two-shot lipsync (>10min running, or pre-pass master_clip >2min) ───
+    const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: runningLipsync } = await sb
       .from("composer_scenes")
-      .select("id, project_id, lip_sync_status, twoshot_stage, updated_at, clip_error")
+      .select("id, project_id, engine_override, lip_sync_status, twoshot_stage, updated_at, clip_error, replicate_prediction_id, audio_plan")
       .eq("lip_sync_status", "running")
-      .lt("updated_at", tenMinAgo)
-      .limit(50);
+      .limit(100);
+
+    const staleLipsync = (runningLipsync ?? []).filter((s: any) => {
+      const stage = String(s.twoshot_stage ?? "");
+      const heartbeat = s?.audio_plan?.twoshot?.heartbeat ?? null;
+      const oldEnough = String(s.updated_at ?? "") < tenMinAgo;
+      const stuckBeforePass =
+        s.engine_override === "cinematic-sync" &&
+        stage === "master_clip" &&
+        !heartbeat &&
+        String(s.updated_at ?? "") < twoMinAgo;
+      return oldEnough || stuckBeforePass;
+    });
 
     if (staleLipsync && staleLipsync.length > 0) {
       const ids = staleLipsync.map((s: any) => s.id);
@@ -195,7 +207,9 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
         kind: "workflow",
         severity: "high",
         title: `Watchdog: ${ids.length} two-shot lipsync jobs stuck >10min`,
-        description: `Auto-failed and refunded stale lipsync scene ids:\n${ids.join("\n")}`,
+        description: `Auto-failed and refunded stale lipsync scene ids:\n${staleLipsync
+          .map((s: any) => `- ${s.id} stage=${s.twoshot_stage ?? "null"} prediction=${s.replicate_prediction_id ?? "null"} updated=${s.updated_at}`)
+          .join("\n")}`,
         fingerprint: "twoshot-lipsync-stale",
       });
     }
