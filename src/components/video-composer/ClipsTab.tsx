@@ -320,8 +320,28 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           // (or audio plan / character audio) exists.
           // SAFETY: never run for multi-speaker scenes — Sync.so would pick a
           // single voiceover clip and apply it to the whole video, which is
-          // exactly the "one face speaks for both" failure mode.
-          const speakerCount = (scene.audioPlan?.speakers?.length ?? 0);
+          // exactly the "one face speaks for both" failure mode. We derive
+          // the speaker count from the most authoritative DB fields so a
+          // stale local audioPlan can't cause mis-routing.
+          const dbPlanSpeakers = Array.isArray((dbScene as any)?.audio_plan?.speakers)
+            ? (dbScene as any).audio_plan.speakers.length
+            : 0;
+          const dbTwoshotSpeakers = Array.isArray((dbScene as any)?.audio_plan?.twoshot?.speakers)
+            ? (dbScene as any).audio_plan.twoshot.speakers.length
+            : 0;
+          const dbDialogScript = String((dbScene as any)?.dialog_script ?? '');
+          const dbDialogSpeakers = new Set<string>();
+          for (const line of dbDialogScript.split('\n')) {
+            const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+            if (m) dbDialogSpeakers.add(m[1].trim().toLowerCase());
+          }
+          const localPlanSpeakers = (scene.audioPlan?.speakers?.length ?? 0);
+          const speakerCount = Math.max(
+            localPlanSpeakers,
+            dbPlanSpeakers,
+            dbTwoshotSpeakers,
+            dbDialogSpeakers.size,
+          );
           const isCinematicSync = (dbScene as any).engine_override === 'cinematic-sync';
           if (
             ((dbScene as any).lip_sync_with_voiceover === true || isCinematicSync) &&
