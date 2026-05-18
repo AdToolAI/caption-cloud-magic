@@ -223,6 +223,54 @@ serve(async (req) => {
         console.error('[compose-clip-webhook] continuity chain error:', chainErr);
       }
 
+      // 🎤 Auto Lip-Sync — if the scene has dialog (script OR rendered VO) and
+      // wasn't already lip-synced, fire compose-lipsync-scene as a background
+      // task. Skip HeyGen scenes (their TTS path already produces synced video).
+      try {
+        const { data: lsScene } = await supabase
+          .from('composer_scenes')
+          .select('clip_source, engine_override, dialog_script, character_audio_url, lip_sync_status, auto_lipsync')
+          .eq('id', sceneId)
+          .maybeSingle();
+
+        const engine = (lsScene as any)?.engine_override ?? 'auto';
+        const src = String((lsScene as any)?.clip_source ?? '');
+        const isI2V = src.startsWith('ai-') && src !== 'ai-vidu';
+        const isHeygen = engine === 'heygen';
+        const alreadyDone = ['done', 'running'].includes(String((lsScene as any)?.lip_sync_status ?? ''));
+        const optedOut = (lsScene as any)?.auto_lipsync === false;
+
+        // Check if there's any voiceover signal worth syncing against.
+        let hasVoSignal = !!(lsScene as any)?.character_audio_url || !!(lsScene as any)?.dialog_script;
+        if (!hasVoSignal) {
+          const { count } = await supabase
+            .from('scene_audio_clips')
+            .select('id', { count: 'exact', head: true })
+            .eq('scene_id', sceneId)
+            .eq('kind', 'voiceover');
+          hasVoSignal = (count ?? 0) > 0;
+        }
+
+        if (isI2V && !isHeygen && !alreadyDone && !optedOut && hasVoSignal) {
+          console.log(`[compose-clip-webhook] 🎤 Auto-triggering lip-sync for scene ${sceneId}`);
+          const lsPromise = supabase.functions.invoke('compose-lipsync-scene', {
+            body: { scene_id: sceneId },
+          }).then(({ error }) => {
+            if (error) console.error(`[compose-clip-webhook] auto lip-sync failed for ${sceneId}:`, error);
+            else console.log(`[compose-clip-webhook] auto lip-sync invoked for ${sceneId}`);
+          }).catch((e) => {
+            console.error(`[compose-clip-webhook] auto lip-sync threw for ${sceneId}:`, e);
+          });
+          // @ts-ignore — Deno Deploy / Supabase edge runtime API
+          if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+            // @ts-ignore
+            EdgeRuntime.waitUntil(lsPromise);
+          }
+        }
+      } catch (lsErr) {
+        console.error('[compose-clip-webhook] auto lip-sync outer error:', lsErr);
+      }
+
     } else if (status === 'failed') {
       console.error(`[compose-clip-webhook] Clip failed:`, predError);
 
