@@ -451,8 +451,10 @@ serve(async (req) => {
           outUrl = stepUrl;
         }
       } else {
-        // Fallback: legacy single merged-audio pass.
-        const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
+        // Fallback: legacy single merged-audio pass. With the sample-accurate
+        // WAV pipeline the merged track is exactly scene-length, so always
+        // request `cut_off` (no loop artefacts).
+        const syncMode = "cut_off";
         let outputUrl: string | null = null;
         try {
           outputUrl = await runLipsyncPrediction(
