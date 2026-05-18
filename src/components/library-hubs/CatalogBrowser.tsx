@@ -3,7 +3,7 @@
 // them by theme_pack. Admins see a "Seed more" button that polls the
 // seed-world-catalog edge function until done.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,9 +32,11 @@ interface Row {
 interface Props {
   kind: Kind;
   onPick?: (row: Row) => void;
+  /** When true, hides the "All" filter pill and defaults to the first theme. */
+  hideAllFilter?: boolean;
 }
 
-export function CatalogBrowser({ kind, onPick }: Props) {
+export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { isAdmin } = useUserRoles();
@@ -84,8 +86,17 @@ export function CatalogBrowser({ kind, onPick }: Props) {
   const themes = useMemo(() => {
     const s = new Set<string>();
     rows.forEach((r) => s.add(r.theme_pack));
-    return ['all', ...Array.from(s).sort()];
-  }, [rows]);
+    const sorted = Array.from(s).sort();
+    return hideAllFilter ? sorted : ['all', ...sorted];
+  }, [rows, hideAllFilter]);
+
+  // When the "All" filter is hidden, snap the default activeTheme to the
+  // first available theme as soon as rows arrive.
+  useEffect(() => {
+    if (hideAllFilter && activeTheme === 'all' && themes.length > 0) {
+      setActiveTheme(themes[0]);
+    }
+  }, [hideAllFilter, activeTheme, themes]);
 
   const visible = useMemo(
     () => (activeTheme === 'all' ? rows : rows.filter((r) => r.theme_pack === activeTheme)),
