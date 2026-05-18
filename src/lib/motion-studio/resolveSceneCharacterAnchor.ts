@@ -70,6 +70,12 @@ function pickStrategy(
   if (shotType === 'full' || shotType === 'profile' || shotType === 'back' || shotType === 'silhouette') {
     return 'first-frame-composed';
   }
+  // Name-match (LLM mentioned the character by name but didn't set an explicit
+  // shot slot): we DO have a portrait, so compose it into the scene — text-only
+  // would let the provider invent a stranger's face.
+  if (source === 'cast-name-match' || source === 'brand-name-match') {
+    return 'first-frame-composed';
+  }
   // No explicit shot (cast-name match or unspecified) → safest is text-only,
   // so the prompt fully drives composition. The identity card in the prompt
   // keeps the model on the right person; no face-lock.
