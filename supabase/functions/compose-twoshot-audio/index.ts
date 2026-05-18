@@ -345,7 +345,7 @@ serve(async (req) => {
     if (!force_regenerate) {
       const { data: existing } = await supabase
         .from("scene_audio_clips")
-        .select("id, url, duration")
+        .select("id, url, duration, metadata")
         .eq("scene_id", scene_id)
         .eq("kind", "voiceover")
         .order("duration", { ascending: false })
@@ -358,7 +358,9 @@ serve(async (req) => {
             already: true,
             url: existing[0].url,
             duration: existing[0].duration,
-            speakers: blocks.length,
+            speakers: Array.isArray((existing[0] as any)?.metadata?.speakers)
+              ? (existing[0] as any).metadata.speakers
+              : blocks.length,
           });
         }
       }
@@ -486,20 +488,62 @@ serve(async (req) => {
     const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(fileName);
     const publicUrl = pub.publicUrl;
 
-    // ── Build & upload per-speaker padded tracks ────────────────────────
-    // For each speaker, we build a track that contains silence before their
-    // segment, their own MP3, then silence padding to reach `totalSec` (=
-    // scene length). The lipsync function uses these tracks to run one
-    // Sync.so pass per speaker, deterministically assigning each voice to
-    // one face. Trailing silence guarantees the output matches scene length.
+    // ── Build & upload per-character padded tracks ──────────────────────
+    // Important: we run ONE Sync.so pass per character, not per dialogue turn.
+    // A/B/A/B dialogue must therefore produce 2 tracks (A and B), where each
+    // track contains that speaker's segments at their original timestamps and
+    // silence everywhere else. This keeps the lipsync worker within runtime
+    // limits while preserving sequential speech timing.
+    const groups = new Map<string, {
+      speaker: string;
+      speaker_slug: string;
+      character_id: string | null;
+      engine: string;
+      voice: string;
+      startSec: number;
+      endSec: number;
+      turns: Array<{ startSec: number; endSec: number; text_index: number }>;
+      items: Array<{ segment: typeof segments[number]; mp3: Uint8Array; index: number }>;
+      track_url?: string;
+    }>();
     for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      const key = String(seg.character_id || seg.speaker_slug || seg.speaker).toLowerCase();
+      const existing = groups.get(key);
+      if (existing) {
+        existing.startSec = Math.min(existing.startSec, seg.startSec);
+        existing.endSec = Math.max(existing.endSec, seg.endSec);
+        existing.turns.push({ startSec: seg.startSec, endSec: seg.endSec, text_index: i });
+        existing.items.push({ segment: seg, mp3: mp3Buffers[i], index: i });
+      } else {
+        groups.set(key, {
+          speaker: seg.speaker,
+          speaker_slug: seg.speaker_slug,
+          character_id: seg.character_id,
+          engine: seg.engine,
+          voice: seg.voice,
+          startSec: seg.startSec,
+          endSec: seg.endSec,
+          turns: [{ startSec: seg.startSec, endSec: seg.endSec, text_index: i }],
+          items: [{ segment: seg, mp3: mp3Buffers[i], index: i }],
+        });
+      }
+    }
+    const speakerTracks = Array.from(groups.values()).sort((a, b) => a.startSec - b.startSec);
+
+    for (let i = 0; i < speakerTracks.length; i++) {
       try {
-        const seg = segments[i];
-        const ownMp3 = mp3Buffers[i];
-        const preSec = seg.startSec;
-        const postSec = Math.max(0, totalSec - seg.endSec);
-        const track = concatMp3([silenceMp3(preSec), ownMp3, silenceMp3(postSec)]);
-        const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-spk${i}-${seg.speaker_slug}.mp3`;
+        const group = speakerTracks[i];
+        const pieces: Uint8Array[] = [];
+        let t = 0;
+        for (const item of group.items.sort((a, b) => a.segment.startSec - b.segment.startSec)) {
+          pieces.push(silenceMp3(Math.max(0, item.segment.startSec - t)));
+          pieces.push(item.mp3);
+          t = item.segment.endSec;
+        }
+        pieces.push(silenceMp3(Math.max(0, totalSec - t)));
+        const track = concatMp3(pieces);
+        const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-char${i}-${group.speaker_slug}.mp3`;
         const { error: tErr } = await supabase.storage
           .from("voiceover-audio")
           .upload(trackPath, track, { contentType: "audio/mpeg", upsert: false });
@@ -508,9 +552,9 @@ serve(async (req) => {
           continue;
         }
         const { data: tp } = supabase.storage.from("voiceover-audio").getPublicUrl(trackPath);
-        seg.track_url = tp.publicUrl;
+        group.track_url = tp.publicUrl;
       } catch (e) {
-        console.warn("[compose-twoshot-audio] per-speaker build error", (e as Error).message);
+        console.warn("[compose-twoshot-audio] per-character build error", (e as Error).message);
       }
     }
 
