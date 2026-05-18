@@ -132,6 +132,135 @@ async function runLipsyncPrediction(
   throw new Error(`${label}_timeout_${Math.round(PASS_TIMEOUT_MS / 1000)}s`);
 }
 
+/**
+ * Detect face centers in the two-shot anchor image via Gemini Vision.
+ * Returns coordinates normalized to the image's natural pixel space.
+ * Sync.so honors these coordinates relative to the input video frame size,
+ * which matches the anchor (Hailuo uses the anchor as first frame at 1:1
+ * resolution). Result is cached in audio_plan.twoshot.faceMap so retries skip
+ * the Gemini call.
+ */
+async function detectFacesInMaster(
+  supabase: any,
+  sceneId: string,
+  anchorUrl: string | null | undefined,
+  cached: any,
+  lovableKey: string | undefined,
+): Promise<{ faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number] }>; width: number; height: number } | null> {
+  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2) {
+    return cached;
+  }
+  if (!anchorUrl || !lovableKey) return null;
+
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  "You see a two-shot frame with TWO human faces. " +
+                  "Return STRICT JSON only — no prose, no markdown fences. " +
+                  "Schema: {\"width\": <imgPixelW>, \"height\": <imgPixelH>, \"faces\": [{\"side\": \"left\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}, {\"side\": \"right\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}]}. " +
+                  "Coordinates in PIXELS of the source image. " +
+                  "'left' = the face whose center has the SMALLER x value. 'right' = the larger x. " +
+                  "If only one face is visible, return one entry. If none, return empty faces.",
+              },
+              { type: "image_url", image_url: { url: anchorUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const faces = Array.isArray(parsed?.faces) ? parsed.faces : [];
+    const width = Number(parsed?.width) || 1280;
+    const height = Number(parsed?.height) || 720;
+    // Normalize: sort by center x, assign side deterministically.
+    const valid = faces
+      .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
+      .map((f: any) => ({
+        center: [Number(f.center[0]), Number(f.center[1])] as [number, number],
+        bbox: Array.isArray(f.bbox) && f.bbox.length === 4
+          ? (f.bbox.map(Number) as [number, number, number, number])
+          : undefined,
+      }))
+      .sort((a: any, b: any) => a.center[0] - b.center[0])
+      .map((f: any, idx: number, arr: any[]) => ({
+        ...f,
+        side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
+      }));
+
+    const result = { faces: valid, width, height };
+
+    // Cache into audio_plan.twoshot.faceMap.
+    try {
+      const { data: row } = await supabase
+        .from("composer_scenes")
+        .select("audio_plan")
+        .eq("id", sceneId)
+        .single();
+      const prevPlan = (row?.audio_plan ?? {}) as Record<string, unknown>;
+      const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          audio_plan: {
+            ...prevPlan,
+            twoshot: { ...prevTwoshot, faceMap: result },
+          },
+        })
+        .eq("id", sceneId);
+    } catch {
+      // cache-write is best-effort
+    }
+
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
+ * Order: faceMap (Gemini) → heuristic thirds of the master frame. Pass index
+ * 0 → left face, 1 → right face. Returns null if even the heuristic isn't
+ * resolvable (no dimensions known).
+ */
+function pickTargetCoordinates(
+  passIndex: number,
+  faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number] }>; width: number; height: number } | null,
+  fallbackDims: { width: number; height: number },
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } | null {
+  const side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  if (faceMap?.faces?.length) {
+    const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
+    if (match?.center) {
+      return { coords: [Math.round(match.center[0]), Math.round(match.center[1])], side, source: "gemini" };
+    }
+  }
+  const W = fallbackDims.width || 1280;
+  const H = fallbackDims.height || 720;
+  const x = side === "left" ? Math.round(W * 0.3) : Math.round(W * 0.7);
+  const y = Math.round(H * 0.5);
+  return { coords: [x, y], side, source: "heuristic" };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (isQaMockRequest(req)) return qaMockResponse({ corsHeaders, kind: "video" });
