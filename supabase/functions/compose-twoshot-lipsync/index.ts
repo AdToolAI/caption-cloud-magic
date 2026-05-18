@@ -181,13 +181,6 @@ serve(async (req) => {
       if (hasRealProgress && ageMs < 10 * 60 * 1000) {
         return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
       }
-      if (!hasRealProgress && ageMs < 90 * 1000) {
-        // Very recent invocation that did set status=running but hasn't
-        // recorded progress yet — still allow takeover after 90s to avoid
-        // forever-stuck rows. Below 90s, assume a concurrent worker is
-        // genuinely just starting.
-        return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
-      }
       console.warn(
         `[compose-twoshot-lipsync ${scene_id}] taking over stuck running row (ageMs=${ageMs}, stage=${stage}, heartbeat=${!!hb})`,
       );
