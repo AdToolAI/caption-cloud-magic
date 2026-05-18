@@ -121,10 +121,14 @@ export function resolveSceneCharacterAnchorsAll(
       if (seen.has(slot.characterId)) continue;
       const cm = characters.find((c) => c.id === slot.characterId);
       if (!cm?.referenceImageUrl) continue;
+      // Outfit override: when the scene picked a saved outfit look for this
+      // character, swap the portrait URL for the outfit cover. The caller
+      // (compose-scene-anchor) treats it as just another portrait URL.
+      const outfitUrl = (slot as any).__outfitImageUrl as string | undefined;
       out.push({
         characterId: cm.id,
         name: cm.name,
-        referenceImageUrl: cm.referenceImageUrl,
+        referenceImageUrl: outfitUrl || cm.referenceImageUrl,
         source: out.length === 0 ? 'explicit-shot' : 'cast-slot',
         strategy: 'first-frame-direct', // recomputed below
       });

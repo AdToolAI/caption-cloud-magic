@@ -4,7 +4,7 @@
 // (= the first/primary slot) so older pipeline code keeps working.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { Plus, X, Users, UserPlus, AlertCircle } from 'lucide-react';
+import { Plus, X, Users, UserPlus, AlertCircle, Shirt } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -24,6 +24,8 @@ import type {
   CharacterShotType,
   ComposerCharacter,
 } from '@/types/video-composer';
+import { safeLower, safeFirstNameLower } from '@/lib/motion-studio/strings';
+import { useSavedOutfits } from '@/hooks/useSavedOutfits';
 
 const MAX_CAST = 4;
 const SHOT_ORDER: CharacterShotType[] = ['full', 'profile', 'back', 'detail', 'pov', 'silhouette'];
@@ -45,6 +47,9 @@ const LABELS = {
   librarySection:  { en: 'From your avatar library', de: 'Aus deiner Avatar-Bibliothek', es: 'De tu biblioteca de avatares' },
   createNew:       { en: 'Create new avatar…', de: 'Neuen Avatar erstellen…', es: 'Crear nuevo avatar…' },
   unknown:         { en: 'Unknown — remove?', de: 'Unbekannt – entfernen?', es: 'Desconocido – ¿quitar?' },
+  outfit:          { en: 'Outfit', de: 'Outfit', es: 'Atuendo' },
+  outfitDefault:   { en: 'Default look', de: 'Standard-Look', es: 'Look estándar' },
+  manageOutfits:   { en: 'Manage outfits', de: 'Outfits verwalten', es: 'Gestionar atuendos' },
 } as const;
 
 interface Props {
@@ -80,13 +85,14 @@ function findCharacter(
   if (!slotId || !pool.length) return undefined;
   const exact = pool.find((c) => c.id === slotId);
   if (exact) return exact;
-  const lower = slotId.toLowerCase();
+  const lower = safeLower(slotId);
+  if (!lower) return undefined;
   const byNameInId = pool.find((c) => {
-    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    const first = safeFirstNameLower(c.name);
     return !!first && first.length >= 3 && lower.includes(first);
   });
   if (byNameInId) return byNameInId;
-  return pool.find((c) => c.name?.trim().toLowerCase() === lower);
+  return pool.find((c) => safeLower(c.name) === lower);
 }
 
 export function CharacterCastPicker({
@@ -346,9 +352,143 @@ export function CharacterCastPicker({
         )}
       </div>
 
+      {/* Per-character outfit picker rows. One row per cast member that maps
+          to a real Brand Character (only those have saved outfit looks). */}
+      {cast.map((slot) => {
+        const ch = findCharacter(slot.characterId, resolutionPool);
+        if (!ch) return null;
+        const avatarId = ch.brandCharacterId;
+        if (!avatarId) return null;
+        return (
+          <OutfitPickerRow
+            key={`outfit-${slot.characterId}`}
+            avatarId={avatarId}
+            characterName={ch.name}
+            characterAvatar={ch.referenceImageUrl}
+            value={slot.outfitLookId ?? null}
+            onChange={(outfitLookId) =>
+              updateSlot(slot.characterId, { outfitLookId })
+            }
+            lang={lang}
+          />
+        );
+      })}
+
       {cast.length >= 2 && (
         <p className="text-[10px] text-muted-foreground/80 leading-tight">{LABELS.hint[lang]}</p>
       )}
+    </div>
+  );
+}
+
+/* ============================================================== */
+/*  Per-character outfit picker (saved looks from /avatars/:id)    */
+/* ============================================================== */
+
+interface OutfitPickerRowProps {
+  avatarId: string;
+  characterName: string;
+  characterAvatar?: string;
+  value: string | null;
+  onChange: (outfitLookId: string | null) => void;
+  lang: Lang;
+}
+
+function OutfitPickerRow({
+  avatarId,
+  characterName,
+  characterAvatar,
+  value,
+  onChange,
+  lang,
+}: OutfitPickerRowProps) {
+  const { data: looks = [], isLoading } = useSavedOutfits(avatarId);
+
+  // No saved outfits → don't waste vertical space, just a one-line nudge.
+  if (!isLoading && looks.length === 0) {
+    return (
+      <div className="flex items-center gap-2 pl-1">
+        <Shirt className="h-3 w-3 text-muted-foreground/60 flex-shrink-0" />
+        <span className="text-[10px] text-muted-foreground/60 truncate">
+          <span className="text-muted-foreground/90 font-medium">{characterName}</span>
+          {' · '}
+          <a
+            href={`/avatars/${avatarId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary/80 hover:text-primary underline-offset-2 hover:underline"
+          >
+            {LABELS.manageOutfits[lang]}
+          </a>
+        </span>
+      </div>
+    );
+  }
+
+  // Auto-reset if the previously selected outfit was deleted in the meantime.
+  const stillExists = value === null || looks.some((l) => l.id === value);
+  if (!isLoading && !stillExists) {
+    onChange(null);
+  }
+
+  return (
+    <div className="flex items-start gap-2 pl-1">
+      {characterAvatar ? (
+        <img
+          src={characterAvatar}
+          alt={characterName}
+          className="h-5 w-5 rounded-full object-cover flex-shrink-0 mt-0.5"
+        />
+      ) : (
+        <Shirt className="h-3 w-3 text-muted-foreground/70 flex-shrink-0 mt-1" />
+      )}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1 mb-1">
+          <span className="text-[10px] font-medium text-muted-foreground/90">{characterName}</span>
+          <span className="text-[10px] text-muted-foreground/60">· {LABELS.outfit[lang]}:</span>
+        </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            className={
+              value === null
+                ? 'inline-flex items-center gap-1.5 rounded-full border border-primary/60 bg-primary/15 px-2 py-0.5 shadow-[0_0_18px_-6px_hsl(var(--primary)/0.55)] text-primary'
+                : 'inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/40 px-2 py-0.5 hover:border-border'
+            }
+            title={LABELS.outfitDefault[lang]}
+          >
+            <span className="text-[10px] font-medium">{LABELS.outfitDefault[lang]}</span>
+          </button>
+          {looks.map((look) => {
+            const active = value === look.id;
+            return (
+              <button
+                key={look.id}
+                type="button"
+                onClick={() => onChange(look.id)}
+                className={
+                  active
+                    ? 'inline-flex items-center gap-1.5 rounded-full border border-primary/60 bg-primary/15 pl-0.5 pr-2 py-0.5 shadow-[0_0_18px_-6px_hsl(var(--primary)/0.55)] text-primary'
+                    : 'inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-background/40 pl-0.5 pr-2 py-0.5 hover:border-border'
+                }
+                title={look.name}
+              >
+                {look.cover_url || look.front_url ? (
+                  <img
+                    src={look.cover_url || look.front_url || ''}
+                    alt={look.name}
+                    className="h-5 w-5 rounded-full object-cover"
+                  />
+                ) : (
+                  <Shirt className="h-3 w-3 mx-1" />
+                )}
+                <span className="text-[10px] font-medium max-w-[8rem] truncate">{look.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

@@ -200,8 +200,10 @@ export default function SceneCard({
   // Library-first dedupe by lowercased name: a saved Brand asset always wins
   // over a catalog row with the same label so user edits / identity cards stick.
   const mergeWithCatalog = <T extends { name: string }>(saved: T[], catalog: T[]): T[] => {
-    const seen = new Set(saved.map((s) => s.name.trim().toLowerCase()));
-    return [...saved, ...catalog.filter((c) => !seen.has(c.name.trim().toLowerCase()))];
+    const safeSaved = (saved ?? []).filter((s): s is T => !!s && typeof s.name === 'string' && s.name.trim().length > 0);
+    const safeCatalog = (catalog ?? []).filter((c): c is T => !!c && typeof c.name === 'string' && c.name.trim().length > 0);
+    const seen = new Set(safeSaved.map((s) => s.name.trim().toLowerCase()));
+    return [...safeSaved, ...safeCatalog.filter((c) => !seen.has(c.name.trim().toLowerCase()))];
   };
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
