@@ -7,7 +7,7 @@
  * per-character padded WAV track for sequential lipsync passes.
  *
  * Sample-accurate pipeline (Artlist parity): we synthesize each utterance
- * straight to Int16 PCM @ 44.1 kHz mono (ElevenLabs `pcm_44100` / Hume
+ * straight to Int16 PCM @ 44.1 kHz mono (ElevenLabs `pcm_24000` + linear
  * `wav` + resample), concatenate samples directly, and write a single WAV
  * file at the end. No MP3 byte-stitching, no ID3 inflation, no 26 ms
  * silence-frame quantization — drift between merged playback audio and
