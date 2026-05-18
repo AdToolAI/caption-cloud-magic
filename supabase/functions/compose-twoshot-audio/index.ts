@@ -706,10 +706,10 @@ serve(async (req) => {
         audio_plan: {
           ...(scene as any).audio_plan,
           twoshot: {
-            segments,
+            segments: publicSegments,
             speakers: publicSpeakerTracks,
-            spokenSec: Math.round(spokenSec * 100) / 100,
-            totalSec: Math.round(totalSec * 100) / 100,
+            spokenSec: Math.round(spokenSec * 1000) / 1000,
+            totalSec: Math.round(totalSec * 1000) / 1000,
             url: publicUrl,
             useExternalAudio: true,
             embeddedAudio: false,
@@ -723,9 +723,9 @@ serve(async (req) => {
     return json({
       success: true,
       url: publicUrl,
-      duration: Math.round(totalSec * 100) / 100,
+      duration: Math.round(totalSec * 1000) / 1000,
       speakers: publicSpeakerTracks,
-      segments,
+      segments: publicSegments,
     });
   } catch (e) {
     console.error("[compose-twoshot-audio] error", e);
