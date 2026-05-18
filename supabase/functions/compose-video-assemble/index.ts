@@ -559,9 +559,18 @@ serve(async (req) => {
     // Skip voiceover clips for scenes that already have an embedded lip-sync
     // (Sync.so post-step muxed the VO into the video itself — adding it as a
     // separate track would double the audio).
+    // EXCEPTION: Two-shot scenes with `audio_plan.twoshot.useExternalAudio`
+    // have the FINAL merged dialogue in a separate WAV — the lipsync MP4
+    // only carries the LAST pass's voice. We MUST keep the external track
+    // for those, otherwise only one speaker is audible in the export.
+    const twoshotExternalSceneIds = new Set(
+      (scenes || [])
+        .filter((s: any) => s?.audio_plan?.twoshot?.useExternalAudio === true)
+        .map((s: any) => s.id),
+    );
     const lipSyncedSceneIds = new Set(
       (scenes || [])
-        .filter((s: any) => !!s.lip_sync_applied_at)
+        .filter((s: any) => !!s.lip_sync_applied_at && !twoshotExternalSceneIds.has(s.id))
         .map((s: any) => s.id),
     );
     const sceneAudioClipsForMux = (audioClipRows || [])
@@ -569,7 +578,7 @@ serve(async (req) => {
       .map((r: any) => ({
         url: r.url,
         startOffset: (sceneStartOffset.get(r.scene_id) || 0) + (Number(r.start_offset) || 0),
-        volume: r.volume ?? 0.4,
+        volume: r.volume ?? (r.kind === 'voiceover' ? 1.0 : 0.4),
         kind: r.kind || 'sfx',
       }));
 
