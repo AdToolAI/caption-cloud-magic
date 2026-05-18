@@ -582,6 +582,82 @@ serve(async (req) => {
         }
       }
 
+      // ── Universal cast-anchor safety net (all i2v engines) ───────────────
+      // Even outside cinematic-sync, if the scene has cast portraits and no
+      // composed reference, Hailuo/Kling/Pika/Seedance/Luma/Wan/HappyHorse
+      // will invent strangers. We pre-compose ALL cast portraits into a
+      // scene-aware first frame via compose-scene-anchor and pin it as
+      // reference_image_url so the provider locks identities.
+      // Vidu uses subjectReferenceUrls[] instead → skip.
+      // HeyGen has its own portrait flow → skip.
+      // Skip if the user already pinned a reference manually.
+      try {
+        const engine = scene.engineOverride ?? 'auto';
+        const src = String(scene.clipSource ?? '');
+        const isI2V = src.startsWith('ai-') && src !== 'ai-vidu';
+        const isHeygenRoute = engine === 'heygen';
+        const isCinematicSync = engine === 'cinematic-sync'; // already handled above
+        const refUrl = String(scene.referenceImageUrl ?? '');
+        const looksComposed = refUrl.includes('/scene-anchors/') || refUrl.includes('/composer-anchors/');
+        if (isI2V && !isHeygenRoute && !isCinematicSync && !refUrl) {
+          const castShots = (scene.characterShots ?? []).filter(
+            (s) => s && s.shotType !== 'absent' && s.characterId,
+          );
+          // Also accept the legacy singular characterShot.
+          if (castShots.length === 0 && scene.characterShot && scene.characterShot.shotType !== 'absent') {
+            castShots.push(scene.characterShot);
+          }
+          if (castShots.length >= 1 && !looksComposed) {
+            const portraitUrls = castShots
+              .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
+              .filter((u): u is string => typeof u === 'string' && u.length > 0)
+              .slice(0, 4);
+            const characterNames = castShots
+              .map((cs) => charById.get(cs.characterId)?.name)
+              .filter((n): n is string => typeof n === 'string' && n.length > 0);
+            if (portraitUrls.length >= 1) {
+              console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s)`);
+              try {
+                const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  },
+                  body: JSON.stringify({
+                    sceneId: scene.id,
+                    portraitUrl: portraitUrls[0],
+                    portraitUrls,
+                    characterNames,
+                    scenePrompt: scene.aiPrompt || '',
+                    aspectRatio: '16:9',
+                    shotType: castShots[0]?.shotType,
+                  }),
+                });
+                if (anchorResp.ok) {
+                  const aj = await anchorResp.json().catch(() => ({}));
+                  if (aj?.composedUrl) {
+                    scene.referenceImageUrl = aj.composedUrl;
+                    await supabaseAdmin
+                      .from('composer_scenes')
+                      .update({ reference_image_url: aj.composedUrl, updated_at: new Date().toISOString() })
+                      .eq('id', scene.id);
+                    console.log(`[compose-video-clips] universal anchor scene ${scene.id}: composed → ${aj.composedUrl.slice(0, 80)}…`);
+                  }
+                } else {
+                  const errTxt = await anchorResp.text().catch(() => '');
+                  console.warn(`[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`);
+                }
+              } catch (anchorErr) {
+                console.warn(`[compose-video-clips] universal anchor scene ${scene.id} exception:`, anchorErr);
+              }
+            }
+          }
+        }
+      } catch (universalAnchorErr) {
+        console.warn(`[compose-video-clips] universal anchor outer failed for ${scene.id}:`, universalAnchorErr);
+      }
+
       // ── HeyGen routing branch ─────────────────────────────────────────────
       // Triggered when:
       //   • engineOverride === 'heygen'  OR
