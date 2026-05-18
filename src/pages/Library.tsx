@@ -35,6 +35,7 @@ import { useBrandLocations } from '@/hooks/useBrandLocations';
 import { useBrandBuildings } from '@/hooks/useBrandBuildings';
 import { useBrandProps } from '@/hooks/useBrandProps';
 import { CatalogBrowser } from '@/components/library-hubs/CatalogBrowser';
+import { AddBrandCharacterDialog } from '@/components/brand-characters/AddBrandCharacterDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
