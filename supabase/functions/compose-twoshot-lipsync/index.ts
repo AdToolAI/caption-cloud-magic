@@ -339,19 +339,29 @@ serve(async (req) => {
       } else {
         // Fallback: legacy single merged-audio pass.
         const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
-        const output = await replicate.run(
-          LIPSYNC_MODEL,
-          {
-            input: {
-              video: sourceClipUrl,
-              audio: mergedVo.url,
-              sync_mode: syncMode,
-              temperature: 0.5,
-              active_speaker: true,
-              output_format: "mp4",
-            },
-          },
-        );
+        let output: unknown;
+        try {
+          output = await withTimeout(
+            replicate.run(
+              LIPSYNC_MODEL,
+              {
+                input: {
+                  video: sourceClipUrl,
+                  audio: mergedVo.url,
+                  sync_mode: syncMode,
+                  temperature: 0.5,
+                  active_speaker: true,
+                  output_format: "mp4",
+                },
+              },
+            ),
+            PASS_TIMEOUT_MS,
+            "lipsync_single_pass",
+          );
+        } catch (e) {
+          await refund(`lipsync_single_pass_failed: ${(e as Error).message}`);
+          return;
+        }
         await setStage(supabase, scene_id, "lipsync_2");
         if (typeof output === "string") outUrl = output;
         else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
