@@ -8,8 +8,9 @@
  * 1. Stale qa_live_runs   (running >10min)  → auto-fail + bug report
  * 2. Stale autopilot slots (generating >15min) → auto-fail + bug report
  * 3. Stale lambda renders  (no completion >20min) → bug report
- * 4. Provider-quota outage (>50% failures last 10min) → bug report
- * 5. Stale cron heartbeats (job missed 2× expected interval) → bug report
+ * 4. Stale two-shot lipsync (running >10min) → auto-fail + refund + bug report
+ * 5. Provider-quota outage (>50% failures last 10min) → bug report
+ * 6. Stale cron heartbeats (job missed 2× expected interval) → bug report
  */
 import { createClient } from "npm:@supabase/supabase-js@2.49.4";
 import { recordHeartbeat } from "../_shared/heartbeat.ts";
@@ -150,7 +151,56 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       });
     }
 
-    // ─── 4. Provider quota outage (>50% fail rate, ≥10 calls in last 10min) ───
+    // ─── 4. Stale two-shot lipsync (>10min running) ───
+    const { data: staleLipsync } = await sb
+      .from("composer_scenes")
+      .select("id, project_id, lip_sync_status, twoshot_stage, updated_at, clip_error")
+      .eq("lip_sync_status", "running")
+      .lt("updated_at", tenMinAgo)
+      .limit(50);
+
+    if (staleLipsync && staleLipsync.length > 0) {
+      const ids = staleLipsync.map((s: any) => s.id);
+      const projectIds = [...new Set(staleLipsync.map((s: any) => s.project_id).filter(Boolean))];
+      const { data: projects } = projectIds.length
+        ? await sb.from("composer_projects").select("id, user_id").in("id", projectIds)
+        : { data: [] as any[] };
+      const userByProject = new Map((projects ?? []).map((p: any) => [p.id, p.user_id]));
+      const refundByUser = new Map<string, number>();
+      for (const scene of staleLipsync as any[]) {
+        const uid = userByProject.get(scene.project_id);
+        if (!uid) continue;
+        refundByUser.set(uid, (refundByUser.get(uid) ?? 0) + 28);
+      }
+      for (const [userId, amount] of refundByUser.entries()) {
+        const { data: wallet } = await sb.from("wallets").select("balance").eq("user_id", userId).single();
+        if (wallet) {
+          await sb.from("wallets").update({
+            balance: (Number(wallet.balance) || 0) + amount,
+            updated_at: new Date().toISOString(),
+          }).eq("user_id", userId);
+        }
+      }
+      await sb
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: "watchdog_stuck_lipsync_refunded",
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", ids);
+      rowsAutoFailed += ids.length;
+      anomalies.push({
+        kind: "workflow",
+        severity: "high",
+        title: `Watchdog: ${ids.length} two-shot lipsync jobs stuck >10min`,
+        description: `Auto-failed and refunded stale lipsync scene ids:\n${ids.join("\n")}`,
+        fingerprint: "twoshot-lipsync-stale",
+      });
+    }
+
+    // ─── 5. Provider quota outage (>50% fail rate, ≥10 calls in last 10min) ───
     const { data: recentCalls } = await sb
       .from("provider_quota_log")
       .select("provider, success")
@@ -180,7 +230,7 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
       }
     }
 
-    // ─── 5. Stale cron heartbeats (missed 2× expected interval) ───
+    // ─── 6. Stale cron heartbeats (missed 2× expected interval) ───
     const { data: heartbeats } = await sb
       .from("cron_heartbeats")
       .select("job_name, last_run_at, expected_interval_seconds, consecutive_failures, last_error");
