@@ -370,7 +370,7 @@ export default function ComposerSequencePreview({
           const v = videoARef.current;
           if (v) {
             try { v.currentTime = 0; } catch { /* noop */ }
-            v.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
+            v.muted = resolveVideoMuted(nextScene);
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
