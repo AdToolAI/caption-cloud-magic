@@ -298,6 +298,7 @@ serve(async (req) => {
         .sort((a, b) => a._shotIdx - b._shotIdx);
 
       const useMultiPass = passes.length >= 2;
+      const publicPasses = passes.map(({ _shotIdx: _shotIdx, ...p }) => p);
       let outUrl: string | null = null;
 
       if (useMultiPass) {
@@ -316,6 +317,7 @@ serve(async (req) => {
               ...prevPlan,
               twoshot: {
                 ...prevTwoshot,
+                speakers: publicPasses,
                 heartbeat: {
                   pass: p + 1,
                   total_passes: passes.length,
@@ -528,6 +530,7 @@ serve(async (req) => {
           speakers: mergedSpeakers,
           twoshot: {
             ...prevTwoshot,
+            speakers: publicPasses,
             url: mergedVo.url,
             useExternalAudio: true,
             embeddedAudio: false,
