@@ -32,9 +32,11 @@ interface Row {
 interface Props {
   kind: Kind;
   onPick?: (row: Row) => void;
+  /** When true, hides the "All" filter pill and defaults to the first theme. */
+  hideAllFilter?: boolean;
 }
 
-export function CatalogBrowser({ kind, onPick }: Props) {
+export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { isAdmin } = useUserRoles();
