@@ -7,6 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-token, x-qa-mock',
 };
 
+function detectSpeakerCount(dialogScript: string): number {
+  const set = new Set<string>();
+  for (const line of String(dialogScript ?? '').split('\n')) {
+    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+    if (m) set.add(m[1].trim().toLowerCase());
+  }
+  return set.size;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -224,12 +233,14 @@ serve(async (req) => {
       }
 
       // 🎤 Auto Lip-Sync — if the scene has dialog (script OR rendered VO) and
-      // wasn't already lip-synced, fire compose-lipsync-scene as a background
-      // task. Skip HeyGen scenes (their TTS path already produces synced video).
+      // wasn't already lip-synced, fire the correct background task. Cinematic-
+      // Sync multi-speaker scenes MUST use compose-twoshot-lipsync; sending
+      // them to compose-lipsync-scene pre-sets running and blocks the real
+      // two-shot pipeline.
       try {
         const { data: lsScene } = await supabase
           .from('composer_scenes')
-          .select('clip_source, engine_override, dialog_script, character_audio_url, lip_sync_status')
+          .select('clip_source, engine_override, dialog_script, audio_plan, character_audio_url, lip_sync_status')
           .eq('id', sceneId)
           .maybeSingle();
 
@@ -252,14 +263,23 @@ serve(async (req) => {
         }
 
         if (isI2V && !isHeygen && !alreadyDone && !optedOut && hasVoSignal) {
-          console.log(`[compose-clip-webhook] 🎤 Auto-triggering lip-sync for scene ${sceneId}`);
-          const lsPromise = supabase.functions.invoke('compose-lipsync-scene', {
+          const planSpeakers = Array.isArray((lsScene as any)?.audio_plan?.speakers)
+            ? (lsScene as any).audio_plan.speakers.length
+            : 0;
+          const dialogSpeakers = detectSpeakerCount((lsScene as any)?.dialog_script ?? '');
+          const speakerCount = Math.max(planSpeakers, dialogSpeakers);
+          const fnName = engine === 'cinematic-sync' && speakerCount >= 2
+            ? 'compose-twoshot-lipsync'
+            : 'compose-lipsync-scene';
+
+          console.log(`[compose-clip-webhook] 🎤 Auto-triggering ${fnName} for scene ${sceneId} (speakers=${speakerCount})`);
+          const lsPromise = supabase.functions.invoke(fnName, {
             body: { scene_id: sceneId },
           }).then(({ error }) => {
-            if (error) console.error(`[compose-clip-webhook] auto lip-sync failed for ${sceneId}:`, error);
-            else console.log(`[compose-clip-webhook] auto lip-sync invoked for ${sceneId}`);
+            if (error) console.error(`[compose-clip-webhook] auto ${fnName} failed for ${sceneId}:`, error);
+            else console.log(`[compose-clip-webhook] auto ${fnName} invoked for ${sceneId}`);
           }).catch((e) => {
-            console.error(`[compose-clip-webhook] auto lip-sync threw for ${sceneId}:`, e);
+            console.error(`[compose-clip-webhook] auto ${fnName} threw for ${sceneId}:`, e);
           });
           // @ts-ignore — Deno Deploy / Supabase edge runtime API
           if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
