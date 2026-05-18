@@ -52,6 +52,7 @@ const Library = () => {
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const tab = (params.get('tab') as TabKey) || 'people';
+  const [addAvatarOpen, setAddAvatarOpen] = useState(false);
 
   const setTab = (next: TabKey) => {
     setParams((p) => {
@@ -74,7 +75,7 @@ const Library = () => {
       <div className="min-h-screen bg-background text-foreground">
         <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
           {/* Cinematic header */}
-          <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 border-b border-border/40 pb-10">
+          <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 border-b border-border/40 pb-12">
             <div className="space-y-4 max-w-2xl">
               <div className="flex items-center gap-3">
                 <span className="h-px w-8 bg-primary" />
@@ -90,11 +91,20 @@ const Library = () => {
                 across every generated scene with persistent identity markers.
               </p>
             </div>
+            {tab === 'people' && (
+              <Button
+                onClick={() => setAddAvatarOpen(true)}
+                className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-8 py-6 shadow-[0_0_25px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_45px_hsl(var(--primary)/0.45)] transition-all duration-500 shrink-0 self-start md:self-end"
+              >
+                <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
+                <span className="tracking-tight">New Avatar</span>
+              </Button>
+            )}
           </header>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
             {/* Cinematic pill nav */}
-            <div className="mb-8">
+            <div className="mb-10">
               <TabsList className="flex bg-card/40 p-1 rounded-2xl border border-border/40 h-auto gap-1">
                 {TABS.map((t) => {
                   const Icon = t.icon;
@@ -113,7 +123,11 @@ const Library = () => {
             </div>
 
             <TabsContent value="people">
-              <PeopleTab onOpenAvatar={(id) => navigate(`/avatars/${id}`)} />
+              <PeopleTab
+                onOpenAvatar={(id) => navigate(`/avatars/${id}`)}
+                addOpen={addAvatarOpen}
+                setAddOpen={setAddAvatarOpen}
+              />
             </TabsContent>
 
             <TabsContent value="locations">
