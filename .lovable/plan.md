@@ -1,63 +1,71 @@
-# Artlist-Grade Lip-Sync: Upgrade auf `lipsync-2-pro`
+# Fix: Two-Shot Lipsync — Speaker 2 stumm & Audio-Echo
 
-## Problem
+## Symptome (vom User bestätigt)
 
-Aktuelles Ergebnis sieht aus wie ein „Animorph" — Lippen morphen, Gesicht verzieht sich leicht, Identität wackelt. Ursache: wir nutzen `sync/lipsync-2` (Standard-Modell, optimiert auf Speed/Kosten), während Artlist/MotionBox auf Sync.so's Premium-Modell **`lipsync-2-pro`** setzen — gleicher Anbieter, deutlich höhere Fidelity, Identitäts-Lock, weniger Mund-Morph.
+1. **Speaker 1 lipsynct perfekt** auf den richtigen Mund.
+2. **Speaker 2 spricht gar nicht** — der Mund bewegt sich nicht, obwohl sein Voiceover existiert.
+3. **Doppeltes Voiceover (Echo)** — der gesamte Dialog ist 2× zu hören, leicht versetzt.
 
-## Was Artlist anders macht (verifiziert über Sync.so API)
+## Root Causes
 
-| Lever | Heute (lipsync-2) | Artlist-Setup (lipsync-2-pro) |
-|---|---|---|
-| Replicate-Modell | `sync/lipsync-2` | `sync/lipsync-2-pro` |
-| Identitäts-Lock | weich | hart — kein Face-Morph |
-| Mund-Region | gesamtes Gesicht beeinflusst | nur Lippen + Kiefer |
-| `sync_mode` | `cut_off` / `loop` (richtig) | gleich |
-| `temperature` | nicht gesetzt | `0.5` (deterministischer = weniger Wabbeln) |
-| `active_speaker` | nicht gesetzt | `true` (nur sprechende Person animieren) |
-| Audio-Preprocessing | Roh-TTS direkt | Mono, 24kHz, leichte Noise-Gate |
-| Source-Video | direkt aus Replicate-URL | rehosted in eigenem Bucket (CDN-stabil) — haben wir bereits ✅ |
-| Credit-Cost | 8 | 14 (lipsync-2-pro ist ~2× teurer auf Replicate) |
+### A) Speaker 2 stumm — multi-pass kollabiert auf dasselbe Gesicht
 
-## Plan
+`compose-twoshot-lipsync` fährt aktuell **2 sequentielle Sync.so-Passes** (`lipsync-2-pro`):
+- Pass 1: original silent clip + Speaker-1-Audio (Rest stumm) → animiert Mund 1 ✅
+- Pass 2: **Output von Pass 1** + Speaker-2-Audio (Rest stumm) → sollte Mund 2 animieren
 
-### 1. `supabase/functions/compose-lipsync-scene/index.ts`
-- Modell-Schalter: `sync/lipsync-2-pro` als Default
-- Parameter ergänzen: `temperature: 0.5`, `active_speaker: true`, `output_format: 'mp4'`
-- `COST` von 8 → 14 erhöhen (matched echten Replicate-Preis, Refund-Pfad bleibt idempotent)
-- Optional-Flag `quality: 'pro' | 'standard'` im Request-Body — Default `pro`, Fallback auf `standard` möglich
-- Audio-Sanity: wenn `vo.duration < 0.4s` → 422 mit klarer Meldung (lipsync-2-pro braucht min. Sprachsignal)
+Problem: Sync.so's `active_speaker: true` Auto-Detect wählt im Pass-2-Video das prominenteste / am nächsten zur Kamera stehende Gesicht — und das ist häufig **dasselbe Gesicht wie in Pass 1**, weil das Modell keine explizite Speaker-ID kennt. Resultat: Speaker 1 mouth-syncht stumm Speaker 2's Worte ohne sichtbaren Effekt (Mund war ja schon in Pass 1 aktiv), Speaker 2's Mund bleibt unbewegt.
 
-### 2. `supabase/functions/compose-twoshot-lipsync/index.ts`
-- Gleiche Modell-Umstellung für den Shot-Reverse-Shot-Pfad (zwei Cuts à `lipsync-2-pro`)
-- COST pro Cut entsprechend anheben
+`sync/lipsync-2-pro` unterstützt einen `face_position` / Crop-Hinweis (laut Replicate-Schema: optionaler `face_index` bzw. `bbox`), aber wir nutzen ihn nicht.
 
-### 3. `supabase/functions/lip-sync-video/index.ts`
-- Talking-Head-Standalone-Pfad ebenfalls auf `lipsync-2-pro` (Konsistenz quer durch die App)
+### B) Echo — die externe VO wird zusätzlich zum eingebetteten Audio gespielt
 
-### 4. UI-Hinweis in `SceneCard.tsx`
-- Beim „Cinematic-Sync / Lipsync"-Button: Badge `PRO` und neue Credit-Kosten im Tooltip
-- Bestehende „VO FEHLT"-Logik bleibt unverändert
+Der Preview-Pfad in `ComposerSequencePreview.tsx` **mutet bereits korrekt** das Video, wenn `audioPlan.twoshot.useExternalAudio === true`. ABER:
 
-### 5. Memory-Update
-- Neuer Eintrag: `mem://architecture/lipsync/sync-so-pro-model-policy` — dokumentiert, dass alle Lipsync-Pfade `lipsync-2-pro` nutzen, mit den Standard-Parametern.
+- `compose-twoshot-audio` schreibt eine `scene_audio_clips`-Row für die **merged VO** (mit `/twoshot-vo/` im URL-Pfad).
+- `useSceneAudioClips` synthetisiert **zusätzlich** virtuelle Clips aus `audio_plan.speakers[]` (jeder Speaker mit `audioUrl` wird ein eigener virtueller voiceover-Clip).
+- Bei Two-Shot enthält `audio_plan.speakers[]` die **per-speaker Tracks**, deren URLs **andere** sind als die merged VO → Dedup-by-URL greift nicht → **beide werden gleichzeitig im Preview abgespielt** = Echo.
 
-## Out of Scope (bewusst)
+Zusätzlich: `compose-twoshot-lipsync` setzt `audio_plan.twoshot.useExternalAudio = true`, vergisst aber, die `audio_plan.speakers[].audioUrl` zu löschen oder zu markieren ("schon in merged enthalten").
 
-- **Eigenes Sync-Modell trainieren** — nicht nötig, lipsync-2-pro ist genau das, was Artlist nutzt.
-- **Wechsel auf anderen Anbieter** (Hedra/HeyGen Express): andere Trade-offs (Voll-Avatar statt Mund-Patch) — wir wollen Artlist-Parität, nicht Avatar-Ersatz.
-- **Frontend-Toggle Standard/Pro**: bleibt für später, Default-Upgrade reicht.
-- **Audio-Mastering-Pipeline** (Loudness-Normalisierung, De-Esser): falls Pro-Modell trotzdem zu wabbelig, als Stage 2.
+## Fix-Plan
 
-## Verifikation
+### 1. Speaker 2 lipsyncen — `face_index` pro Pass (compose-twoshot-lipsync)
 
-- Eine bestehende Szene mit Lipsync neu rendern, Vorher/Nachher-Frame vergleichen (sollte Identität locken, keine Wangen-Morphs)
-- Credit-Refund testen mit absichtlich fehlerhaftem Audio
-- Multi-Speaker bleibt korrekt 409 (kein Verhaltenswechsel)
+Im Multi-Pass-Loop pro Pass `face_index` an Sync.so mitgeben:
+- Pass 0 → `face_index: 0` (linke Person, x-sortiert)
+- Pass 1 → `face_index: 1` (rechte Person)
 
-## Risiken
+Mapping: `character_shots` ist bereits in render-Reihenfolge → wir geben `face_index = pass.shotIdx` an `replicate.run()`. Falls Sync.so das Feld nicht akzeptiert (silent ignore), Fallback auf eine **face-bbox**-Übergabe via `face_bbox: { x, y, w, h }` aus dem ersten Frame (via 2-Spalten-Annahme: links/rechts gleichmäßig geteilt für die initiale Implementierung — wir haben keinen Face-Detector im Edge-Runtime).
 
-- **Replicate-Preis**: lipsync-2-pro kostet pro Sekunde mehr — daher COST 8→14. Wallet-Check ist bereits vorhanden.
-- **Längere Render-Zeit**: ~1.5× lipsync-2. Background-Trigger in `compose-clip-webhook` läuft via `EdgeRuntime.waitUntil`, also kein UI-Blocker.
-- **Rollback einfach**: ein-Zeilen-Revert auf `sync/lipsync-2` falls Pro-Modell bei einem Edge-Case bricht.
+Damit hat jeder Pass ein deterministisches Ziel und kann den richtigen Mund animieren, auch wenn das Eingangsvideo aus dem vorherigen Pass kommt.
 
-Soll ich umsetzen?
+### 2. Echo eliminieren — virtuelle Per-Speaker-Clips ausblenden bei Two-Shot
+
+Zwei Stellen:
+
+**a) `src/hooks/useSceneAudioClips.ts` — `synthesizeAudioPlanClips`:**
+- Wenn `scene.audioPlan?.twoshot?.useExternalAudio === true` ist, **keine** virtuellen Per-Speaker-Clips für diese Szene generieren. Die merged-VO-Row in der DB ist die Single-Source-of-Truth.
+
+**b) `compose-twoshot-lipsync/index.ts` — beim finalen DB-Update:**
+- Beim Setzen von `audio_plan.twoshot.useExternalAudio = true` zusätzlich `audio_plan.speakers` so umschreiben, dass `audioUrl` entfernt oder ein Flag `mergedInto: 'twoshot'` gesetzt wird, damit auch andere Konsumenten (Render, Director's-Cut-Export) nicht doppelt mischen.
+
+**c) Defensive Render-Seite (`compose-clip-webhook` / Render-Payload-Builder):** prüfen ob die scene-audio-clips Sammlung für Render-Export ebenfalls die Per-Speaker-Tracks deduped/skipped, wenn der merged-Track existiert. Falls dort gleicher Bug → gleiche Guard-Bedingung.
+
+### 3. Verifikation
+
+- Eine bestehende Two-Shot-Szene neu rendern; in der Vorschau prüfen: nur **einmal** Dialog hörbar, beide Münder bewegen sich passend zu ihrem Text.
+- DB-Check: `scene_audio_clips` enthält genau 1 voiceover-Row pro Two-Shot-Szene (die merged `/twoshot-vo/` URL).
+- `audio_plan.twoshot.useExternalAudio === true` UND `audio_plan.speakers[*].audioUrl` ist `null` oder mit `mergedInto` markiert.
+
+### 4. Memory-Update
+
+Eintrag `mem://architecture/lipsync/sync-so-pro-model-policy` erweitern: "Multi-pass two-shot MUSS `face_index` pro Pass mitgeben, sonst kollabieren beide Passes auf dasselbe Gesicht. External merged VO ist Single-Source-of-Truth — virtuelle Per-Speaker-Clips dürfen nicht synthetisiert werden."
+
+## Risiken / Out-of-Scope
+
+- **`face_index` Support in Sync.so**: Falls Replicate's lipsync-2-pro das Feld nicht akzeptiert, fällt es silent zurück auf active-speaker-detect → wir haben dann immer noch das alte Verhalten für Pass 2. Mitigations-Stufe 2 wäre ein Face-Bbox-Parameter (oder serverside Crop-Pre-Processing) — würde ich nur angehen, falls Stufe 1 nicht reicht.
+- **Bestehende Szenen** mit altem `audio_plan` werden vom Hook-Fix sofort korrigiert (kein DB-Backfill nötig — der Hook liest den Flag live).
+- Wir ändern **nicht** den Single-Speaker-Pfad (`compose-lipsync-scene`) — dort gibt es kein Echo.
+
+OK so umsetzen?
