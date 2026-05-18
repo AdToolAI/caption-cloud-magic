@@ -72,7 +72,7 @@ export function BugReportsAdmin() {
     if (status === 'resolved') {
       updates.resolved_at = new Date().toISOString();
     }
-    const { error } = await supabase.from('bug_reports').update(updates).eq('id', id);
+    const { error } = await supabase.from('bug_reports').update(updates as any).eq('id', id);
     if (error) {
       toast.error(error.message);
     } else {

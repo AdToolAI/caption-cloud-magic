@@ -123,7 +123,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
 
     const { error } = await supabase
       .from("calendar_events")
-      .update({ [field]: value })
+      .update({ [field]: value } as any)
       .eq("id", eventId);
 
     if (error) {

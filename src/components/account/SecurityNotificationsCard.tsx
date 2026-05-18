@@ -50,7 +50,7 @@ export const SecurityNotificationsCard = () => {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ [field]: value })
+        .update({ [field]: value } as any)
         .eq("id", user.id);
 
       if (error) throw error;
