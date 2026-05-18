@@ -582,7 +582,8 @@ serve(async (req) => {
         bitrate: MP3_BITRATE,
         spoken_seconds: Math.round(spokenSec * 100) / 100,
         scene_duration_seconds: sceneDur,
-        speakers: segments,
+        segments,
+        speakers: speakerTracks,
       },
     });
     if (insertRes.error) {
@@ -602,7 +603,8 @@ serve(async (req) => {
         audio_plan: {
           ...(scene as any).audio_plan,
           twoshot: {
-            speakers: segments,
+            segments,
+            speakers: speakerTracks,
             spokenSec: Math.round(spokenSec * 100) / 100,
             totalSec: Math.round(totalSec * 100) / 100,
             url: publicUrl,
@@ -619,7 +621,8 @@ serve(async (req) => {
       success: true,
       url: publicUrl,
       duration: Math.round(totalSec * 100) / 100,
-      speakers: segments,
+      speakers: speakerTracks,
+      segments,
     });
   } catch (e) {
     console.error("[compose-twoshot-audio] error", e);
