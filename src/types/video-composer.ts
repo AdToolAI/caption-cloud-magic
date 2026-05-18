@@ -117,6 +117,13 @@ export type CharacterShotType = 'full' | 'profile' | 'back' | 'detail' | 'pov' |
 export interface CharacterShot {
   characterId: string;
   shotType: CharacterShotType;
+  /**
+   * Optional saved outfit look (`avatar_outfit_looks.id`) for this scene.
+   * When set, the anchor compositor uses the outfit cover image instead of the
+   * avatar's default portrait, and the identity-card prompt appends
+   * `Wearing: <outfit name>`. When null/undefined → default portrait.
+   */
+  outfitLookId?: string | null;
 }
 
 export interface TextOverlayConfig {
