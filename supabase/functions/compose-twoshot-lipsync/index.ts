@@ -88,7 +88,7 @@ serve(async (req) => {
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, lock_reference_url, character_shots",
+        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, updated_at",
       )
       .eq("id", scene_id)
       .single();
@@ -100,6 +100,16 @@ serve(async (req) => {
       .eq("id", scene.project_id)
       .single();
     if (!project || project.user_id !== user.id) return json({ error: "Forbidden" }, 403);
+
+    if ((scene as any).lip_sync_status === "running") {
+      const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
+      if (ageMs < 10 * 60 * 1000) {
+        return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
+      }
+    }
+    if ((scene as any).lip_sync_status === "done" && (scene as any).lip_sync_applied_at) {
+      return json({ accepted: true, scene_id, status: "already_done", credits_reserved: 0 }, 200);
+    }
 
     // Source clip = original silent two-shot from Hailuo.
     const sourceClipUrl =
