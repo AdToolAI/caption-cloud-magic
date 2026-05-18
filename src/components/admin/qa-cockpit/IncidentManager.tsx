@@ -168,7 +168,7 @@ export function IncidentManager() {
     mutationFn: async ({ id, status, resolve }: { id: string; status: string; resolve?: boolean }) => {
       const patch: Record<string, unknown> = { status };
       if (resolve) patch.resolved_at = new Date().toISOString();
-      const { error } = await supabase.from("status_incidents").update(patch).eq("id", id);
+      const { error } = await supabase.from("status_incidents").update(patch as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

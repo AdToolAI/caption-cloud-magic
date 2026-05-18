@@ -46,7 +46,7 @@ export const CookieSettings = () => {
     try {
       const { error } = await supabase
         .from("profiles")
-        .update({ [field]: value })
+        .update({ [field]: value } as any)
         .eq("id", user.id);
       if (error) throw error;
       if (field === "analytics_enabled") {

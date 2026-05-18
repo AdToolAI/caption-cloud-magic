@@ -154,7 +154,7 @@ export function ExportRenderStep({
           format: exportSettings.format,
           duration: videoDuration,
         }
-      });
+      } as any);
 
       if (!error) {
         toast.success('Video in Mediathek gespeichert');

@@ -212,7 +212,7 @@ export function useToggleAutopilot() {
       };
       const { error: updErr } = await supabase
         .from('autopilot_briefs')
-        .update(patch)
+        .update(patch as any)
         .eq('user_id', u.user.id);
       if (updErr) throw updErr;
 
@@ -514,7 +514,7 @@ export function useAcceptWeeklyReview() {
         if (rec.suggested_budget_eur) patch.weekly_budget_eur = Math.round(rec.suggested_budget_eur);
         if (rec.suggested_mix) patch.content_mix = rec.suggested_mix;
       }
-      await supabase.from('autopilot_briefs').update(patch).eq('id', r.brief_id);
+      await supabase.from('autopilot_briefs').update(patch as any).eq('id', r.brief_id);
 
       const { error } = await supabase
         .from('autopilot_weekly_reviews')

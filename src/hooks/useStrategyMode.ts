@@ -265,7 +265,7 @@ export function useStrategyMode() {
     mutationFn: async ({ id, patch }: { id: string; patch: Record<string, any> }) => {
       const { error } = await supabase
         .from("strategy_posts")
-        .update(patch)
+        .update(patch as any)
         .eq("id", id);
       if (error) throw error;
     },

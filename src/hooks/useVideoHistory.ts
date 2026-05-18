@@ -95,7 +95,7 @@ export const useVideoHistory = () => {
           user_id: user.id,
           event_type: 'video.downloaded',
           metadata: { timestamp: new Date().toISOString() }
-        });
+        } as any);
     }
   });
 
@@ -127,7 +127,7 @@ export const useVideoHistory = () => {
           user_id: user.id,
           platform,
           share_url: shareUrl
-        });
+        } as any);
 
       // Track analytics
       await supabase
@@ -137,7 +137,7 @@ export const useVideoHistory = () => {
           user_id: user.id,
           event_type: 'video.shared',
           metadata: { platform, timestamp: new Date().toISOString() }
-        });
+        } as any);
     }
   });
 
