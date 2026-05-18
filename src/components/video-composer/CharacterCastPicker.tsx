@@ -47,6 +47,9 @@ const LABELS = {
   librarySection:  { en: 'From your avatar library', de: 'Aus deiner Avatar-Bibliothek', es: 'De tu biblioteca de avatares' },
   createNew:       { en: 'Create new avatar…', de: 'Neuen Avatar erstellen…', es: 'Crear nuevo avatar…' },
   unknown:         { en: 'Unknown — remove?', de: 'Unbekannt – entfernen?', es: 'Desconocido – ¿quitar?' },
+  outfit:          { en: 'Outfit', de: 'Outfit', es: 'Atuendo' },
+  outfitDefault:   { en: 'Default look', de: 'Standard-Look', es: 'Look estándar' },
+  manageOutfits:   { en: 'Manage outfits', de: 'Outfits verwalten', es: 'Gestionar atuendos' },
 } as const;
 
 interface Props {
