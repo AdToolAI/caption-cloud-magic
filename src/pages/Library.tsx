@@ -71,32 +71,46 @@ const Library = () => {
         />
       </Helmet>
 
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <header className="mb-8">
-            <div className="flex items-center gap-2 text-primary text-sm mb-2">
-              <LibraryIcon className="h-4 w-4" />
-              <span className="tracking-widest uppercase">Cast & World</span>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
+          {/* Cinematic header */}
+          <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 border-b border-border/40 pb-10">
+            <div className="space-y-4 max-w-2xl">
+              <div className="flex items-center gap-3">
+                <span className="h-px w-8 bg-primary" />
+                <p className="text-primary tracking-[0.3em] text-[10px] font-bold uppercase">
+                  Asset Library
+                </p>
+              </div>
+              <h1 className="font-serif text-5xl md:text-6xl font-medium tracking-tight">
+                Cast &amp; World
+              </h1>
+              <p className="text-muted-foreground text-sm leading-relaxed font-light max-w-lg">
+                Manage your digital actors, environments and props. Maintain visual consistency
+                across every generated scene with persistent identity markers.
+              </p>
             </div>
-            <h1 className="font-serif text-4xl md:text-5xl">Your Asset Library</h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
-              People, places, architecture and props — all stored as reusable identities so
-              every scene you generate stays visually consistent.
-            </p>
           </header>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-            <TabsList className="mb-6">
-              {TABS.map((t) => {
-                const Icon = t.icon;
-                return (
-                  <TabsTrigger key={t.key} value={t.key} className="gap-1.5">
-                    <Icon className="h-3.5 w-3.5" />
-                    {t.label}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+            {/* Cinematic pill nav */}
+            <div className="mb-8">
+              <TabsList className="flex bg-card/40 p-1 rounded-2xl border border-border/40 h-auto gap-1">
+                {TABS.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <TabsTrigger
+                      key={t.key}
+                      value={t.key}
+                      className="px-6 md:px-8 py-2.5 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-xl transition gap-1.5"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {t.label}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
             <TabsContent value="people">
               <PeopleTab onOpenAvatar={(id) => navigate(`/avatars/${id}`)} />
