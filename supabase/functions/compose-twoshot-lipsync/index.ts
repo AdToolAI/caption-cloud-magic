@@ -185,7 +185,44 @@ serve(async (req) => {
     const runPipeline = async () => {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
-      const voDuration = Number(mergedVo.duration ?? 0);
+      let voDuration = Number(mergedVo.duration ?? 0);
+
+      // ── Defensive: re-regenerate merged VO if it's significantly shorter
+      // than the scene. Older runs of compose-twoshot-audio computed
+      // totalSec = max(spokenSec, scene.duration_seconds), so when the
+      // duration wasn't yet set (race with Hailuo webhook) the merged
+      // track collapsed to spokenSec (~7s) — and Sync.so produced a 7s
+      // lipsync clip that didn't match the 10s silent master. Force a
+      // refresh so all downstream passes use a properly padded track.
+      if (sceneDuration > 0 && voDuration > 0 && voDuration < sceneDuration - 0.5) {
+        console.warn(
+          `[compose-twoshot-lipsync ${scene_id}] merged VO ${voDuration}s < scene ${sceneDuration}s — regenerating with force_regenerate=true`,
+        );
+        try {
+          const r = await fetch(`${supabaseUrl}/functions/v1/compose-twoshot-audio`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": auth,
+            },
+            body: JSON.stringify({ scene_id, force_regenerate: true }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j?.url) {
+            mergedVo = {
+              url: j.url,
+              duration: j.duration,
+              metadata: { speakers: j.speakers },
+            } as any;
+            voDuration = Number(j.duration ?? voDuration);
+          } else {
+            console.warn(`[compose-twoshot-lipsync ${scene_id}] regen failed`, j);
+          }
+        } catch (e) {
+          console.warn(`[compose-twoshot-lipsync ${scene_id}] regen exception`, (e as Error).message);
+        }
+      }
+
 
       // ── Per-speaker sequential lip-sync ─────────────────────────────
       // If compose-twoshot-audio produced per-speaker padded tracks
@@ -428,10 +465,42 @@ serve(async (req) => {
         await refund(`db_update_failed: ${updErr.message}`);
         return;
       }
+
+      // Supersede the original silent Hailuo `video_creations` row for this
+      // scene so the Media Library doesn't keep showing two cards (10s
+      // silent original + new lipsynced clip). The lipsync output is the
+      // user-facing version; the silent master stays in DB as audit anchor
+      // via composer_scenes.lip_sync_source_clip_url but is hidden from the
+      // library by the `superseded` flag.
+      try {
+        const { data: prior } = await supabase
+          .from("video_creations")
+          .select("id, metadata")
+          .eq("user_id", user.id)
+          .contains("metadata", { source: "motion-studio-clip", scene_id });
+        if (prior && prior.length) {
+          const stamp = new Date().toISOString();
+          for (const row of prior) {
+            const md = (row.metadata || {}) as Record<string, unknown>;
+            if (md.superseded === true) continue;
+            await supabase
+              .from("video_creations")
+              .update({
+                metadata: { ...md, superseded: true, superseded_at: stamp, superseded_by: "twoshot_lipsync" },
+                updated_at: stamp,
+              })
+              .eq("id", row.id);
+          }
+        }
+      } catch (supErr) {
+        console.warn("[compose-twoshot-lipsync] supersede prior library entries failed (non-fatal):", (supErr as Error).message);
+      }
+
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] ✅ done — clip=${publicUrl} drift=${driftScore}`,
       );
     };
+
 
     // Fire-and-forget: keep worker alive but return 202 to client now.
     // Any throw inside runPipeline triggers a refund + status='failed'.

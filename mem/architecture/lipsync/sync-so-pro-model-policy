@@ -1,0 +1,17 @@
+---
+name: Lipsync Pro Policy
+description: Sync.so lipsync-2-pro policy for all 3 lipsync edge functions, two-shot audio padding, and preview muting rules
+type: feature
+---
+Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
+
+**Two-Shot Multi-Pass Rules (Stage 2+):**
+- Pro Pass `face_index` + `speaker` an Replicate mitgeben (deterministic face targeting), sonst kollabieren beide Passes auf dasselbe Gesicht.
+- compose-twoshot-audio paddet alle Per-Speaker-Tracks auf `totalSec = max(spokenSec, sceneDur)`; wenn `scene.duration_seconds` 0/null ist, Fallback-Kette: `audio_plan.duration` → `audio_plan.targetDuration` → 10s (Hailuo-Default). Sonst entstehen 7s-Lipsync-Outputs neben 10s stillem Master.
+- compose-twoshot-lipsync prüft vor Pass 1 ob `mergedVo.duration < sceneDuration - 0.5` und ruft compose-twoshot-audio mit `force_regenerate: true` neu auf.
+- Nach Erfolg `audio_plan.speakers[*].audioUrl = null` + `mergedInto: 'twoshot'` setzen (verhindert dass useSceneAudioClips virtuelle Per-Speaker-Clips synthetisiert).
+- Alle prior `video_creations` Rows mit `metadata.scene_id = scene_id` werden mit `superseded: true` markiert (sonst zeigt Media Library 10s silent original + neuen lipsynced Clip nebeneinander).
+
+**Preview Mute Policy (ComposerSequencePreview):**
+- Wenn `scene.audioPlan.twoshot.useExternalAudio === true` → Video-Element wird HART gemutet (`el.muted = true`), unabhängig von `mutedRef.current`. Andernfalls plays embedded last-pass audio simultaneously mit merged external track = Echo.
+- Helper `sceneShouldForceMute(scene)` + `resolveVideoMuted(scene)` an allen 5 mute-Stellen (preloadSlot, play-loop, mute-change effect, image-branch transition, crossfade transition).

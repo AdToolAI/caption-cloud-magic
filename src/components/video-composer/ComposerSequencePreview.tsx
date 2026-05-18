@@ -227,7 +227,10 @@ export default function ComposerSequencePreview({
       // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
       // useExternalAudio === true. The lipsync MP4 only embeds the LAST
       // speaker's voice; the merged dialogue lives on the external VO
-      // track. Mute the video so we don't hear half the dialogue twice.
+      // track. We FORCE mute regardless of mutedRef — if we honoured the
+      // user's unmute toggle here, the embedded last-speaker audio would
+      // play on top of the external merged track and the user hears the
+      // dialogue twice (= echo + "simultaneous speakers" bug).
       const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
       const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
@@ -235,7 +238,9 @@ export default function ComposerSequencePreview({
         target.clipSource === 'upload'
       );
       if (slot === activeSlotRef.current) {
-        el.muted = hasEmbeddedAudio ? false : mutedRef.current;
+        el.muted = twoshotExternal
+          ? true
+          : (hasEmbeddedAudio ? false : mutedRef.current);
       } else {
         el.muted = true;
       }
@@ -282,6 +287,21 @@ export default function ComposerSequencePreview({
     );
   };
 
+  /** True iff the scene's video MUST be muted regardless of the user's mute
+   *  toggle — because its audio is mixed into an external linear track that
+   *  the timeline plays separately. Currently only two-shot scenes flagged
+   *  with audioPlan.twoshot.useExternalAudio. Without this guard, the
+   *  embedded last-pass voice plays simultaneously with the merged track
+   *  → echo + "both speakers at once" bug. */
+  const sceneShouldForceMute = (s: ComposerScene | undefined): boolean =>
+    !!s && s.audioPlan?.twoshot?.useExternalAudio === true;
+
+  const resolveVideoMuted = (s: ComposerScene | undefined): boolean => {
+    if (sceneShouldForceMute(s)) return true;
+    if (sceneHasEmbeddedAudio(s)) return false;
+    return mutedRef.current;
+  };
+
   // ── Active video play/pause sync ───────────────────────────────
   useEffect(() => {
     if (isImage) {
@@ -292,7 +312,7 @@ export default function ComposerSequencePreview({
     if (!v) return;
     if (playing) {
       const cur = playableRef.current[sceneIdxRef.current];
-      v.muted = sceneHasEmbeddedAudio(cur) ? false : mutedRef.current;
+      v.muted = resolveVideoMuted(cur);
       v.play().catch(() => {});
     } else {
       v.pause();
@@ -306,7 +326,13 @@ export default function ComposerSequencePreview({
     const va = getVideoForSlot(active);
     const vb = getVideoForSlot(active === 'A' ? 'B' : 'A');
     const cur = playableRef.current[sceneIdxRef.current];
-    if (va && !isImage) va.muted = sceneHasEmbeddedAudio(cur) ? false : muted;
+    if (va && !isImage) {
+      // For force-mute scenes, ignore the user's mute toggle — the external
+      // merged track owns the dialogue. For everything else, honour `muted`.
+      va.muted = sceneShouldForceMute(cur)
+        ? true
+        : (sceneHasEmbeddedAudio(cur) ? false : muted);
+    }
     if (vb) vb.muted = true;
   }, [muted, isImage, sceneIdx]);
 
@@ -344,7 +370,7 @@ export default function ComposerSequencePreview({
           const v = videoARef.current;
           if (v) {
             try { v.currentTime = 0; } catch { /* noop */ }
-            v.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
+            v.muted = resolveVideoMuted(nextScene);
             if (playingRef.current) v.play().catch(() => {});
           }
         }, 30);
@@ -377,7 +403,7 @@ export default function ComposerSequencePreview({
       const standbyEl = getVideoForSlot(toSlot);
       if (standbyEl) {
         try { standbyEl.currentTime = 0; } catch { /* noop */ }
-        standbyEl.muted = sceneHasEmbeddedAudio(nextScene) ? false : mutedRef.current;
+        standbyEl.muted = resolveVideoMuted(nextScene);
         if (playingRef.current) standbyEl.play().catch(() => {});
       }
       // Crossfade

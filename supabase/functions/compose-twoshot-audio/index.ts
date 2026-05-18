@@ -450,7 +450,28 @@ serve(async (req) => {
     // downstream lipsync output matches the full scene length (avoids the
     // "video stops at 4s instead of 10s" bug). If scene duration is shorter
     // than the spoken audio, we keep the spoken length.
-    const sceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+    //
+    // Resolution order for the canonical scene length (in priority order):
+    //   1. scene.duration_seconds          (set after Hailuo webhook)
+    //   2. scene.audio_plan.duration       (planner-locked)
+    //   3. scene.audio_plan.targetDuration (legacy)
+    //   4. 10s fallback                    (Hailuo two-shot default)
+    // Without this fallback, per-speaker padded tracks collapse to spokenSec
+    // (~7s) → Sync.so produces a 7s lipsync output that doesn't match the
+    // 10s silent two-shot master, and the user sees a "duplicate scene"
+    // (10s silent original + 7s short lipsync).
+    const planTotal =
+      Number((scene as any)?.audio_plan?.duration) ||
+      Number((scene as any)?.audio_plan?.targetDuration) ||
+      0;
+    let sceneDur = Math.max(0, Number((scene as any).duration_seconds) || 0);
+    if (sceneDur <= 0) sceneDur = Math.max(0, planTotal);
+    if (sceneDur <= 0) {
+      sceneDur = 10;
+      console.warn(
+        `[compose-twoshot-audio] scene ${scene_id} has no duration_seconds — falling back to 10s (Hailuo two-shot default).`,
+      );
+    }
     const totalSec = Math.max(spokenSec, sceneDur);
     const tailSec = Math.max(0, totalSec - spokenSec);
     const mergedMp3 = tailSec > 0 ? concatMp3([spokenMp3, silenceMp3(tailSec)]) : spokenMp3;
