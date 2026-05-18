@@ -430,7 +430,7 @@ serve(async (req) => {
               {
                 video: currentVideo,
                 audio: pass.track_url,
-                sync_mode: "loop",
+                sync_mode: "cut_off",
                 active_speaker: true,
                 temperature: 0.5,
                 output_format: "mp4",
