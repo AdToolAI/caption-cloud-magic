@@ -1,71 +1,65 @@
-# Fix: Two-Shot Lipsync — Speaker 2 stumm & Audio-Echo
+## Two-Shot Fix: Echo + 7s/10s Duplikat-Szene
 
-## Symptome (vom User bestätigt)
+### Was tatsächlich passiert
 
-1. **Speaker 1 lipsynct perfekt** auf den richtigen Mund.
-2. **Speaker 2 spricht gar nicht** — der Mund bewegt sich nicht, obwohl sein Voiceover existiert.
-3. **Doppeltes Voiceover (Echo)** — der gesamte Dialog ist 2× zu hören, leicht versetzt.
+Es ist **eine** Szene, aber sie wird an zwei Stellen unterschiedlich angezeigt, weil **zwei verschiedene Video-URLs** existieren:
 
-## Root Causes
+1. **`scene.clip_url`** = lipsynced Output von Sync.so (= **7s**, weil Sync.so die Output-Länge auf die Audio-Länge clamped, sobald `sync_mode = "cut_off"` greift bzw. die Per-Speaker-Tracks zu kurz sind)
+2. **`scene.lip_sync_source_clip_url`** = original silent Hailuo-Clip (**10s**)
 
-### A) Speaker 2 stumm — multi-pass kollabiert auf dasselbe Gesicht
+Beide URLs werden parallel geladen → in der App tauchen quasi „zwei Versionen" derselben Szene auf. Die 7s-Version hat das Echo (eingebettetes Video-Audio + externer Merged-VO-Track gleichzeitig). Die 10s-Version ist der stumme Original-Clip.
 
-`compose-twoshot-lipsync` fährt aktuell **2 sequentielle Sync.so-Passes** (`lipsync-2-pro`):
-- Pass 1: original silent clip + Speaker-1-Audio (Rest stumm) → animiert Mund 1 ✅
-- Pass 2: **Output von Pass 1** + Speaker-2-Audio (Rest stumm) → sollte Mund 2 animieren
+### Root Causes — drei zusammenhängende Bugs
 
-Problem: Sync.so's `active_speaker: true` Auto-Detect wählt im Pass-2-Video das prominenteste / am nächsten zur Kamera stehende Gesicht — und das ist häufig **dasselbe Gesicht wie in Pass 1**, weil das Modell keine explizite Speaker-ID kennt. Resultat: Speaker 1 mouth-syncht stumm Speaker 2's Worte ohne sichtbaren Effekt (Mund war ja schon in Pass 1 aktiv), Speaker 2's Mund bleibt unbewegt.
+**Bug 1 — Per-Speaker-Tracks sind zu kurz**
+`compose-twoshot-audio` berechnet `totalSec = max(spokenSec, sceneDur)`. Wenn `scene.duration_seconds` zum Zeitpunkt des Aufrufs `null/0` ist (häufig — Hailuo-Render setzt es erst nach Webhook), wird `totalSec = 7s` statt `10s`. Die Per-Speaker-Padded-Tracks sind dann nur 7s lang → Sync.so produziert 7s Output. Die volle 10s-Szene fehlt.
 
-`sync/lipsync-2-pro` unterstützt einen `face_position` / Crop-Hinweis (laut Replicate-Schema: optionaler `face_index` bzw. `bbox`), aber wir nutzen ihn nicht.
+**Bug 2 — Sync.so muxt Audio in den Output → Echo**
+Beim Multi-Pass werden die einzelnen Per-Speaker-Tracks in den Output gemuxt. Der finale Clip enthält im embedded Audio die Stimme des letzten Passes. Im Preview-Player wird `el.muted` aus `mutedRef.current` abgeleitet, sobald `audioPlan.twoshot.useExternalAudio === true`. Sobald der User auf „Unmute" klickt, läuft Video-Audio + externer Merged-VO **gleichzeitig** → Echo + scheinbares „beide reden zur selben Zeit".
 
-### B) Echo — die externe VO wird zusätzlich zum eingebetteten Audio gespielt
+**Bug 3 — Source-Clip leakt in die Anzeige**
+Sobald `lip_sync_source_clip_url` gesetzt ist, taucht der 10s-Original an einer zweiten Stelle auf (vermutlich Media-Library / Scene-Card-Preview). Die Logik prüft nicht, ob es ein nicht-finaler Lipsync-Source ist.
 
-Der Preview-Pfad in `ComposerSequencePreview.tsx` **mutet bereits korrekt** das Video, wenn `audioPlan.twoshot.useExternalAudio === true`. ABER:
+### Fix-Plan (3 Edits, 1 Edge-Function-Tweak)
 
-- `compose-twoshot-audio` schreibt eine `scene_audio_clips`-Row für die **merged VO** (mit `/twoshot-vo/` im URL-Pfad).
-- `useSceneAudioClips` synthetisiert **zusätzlich** virtuelle Clips aus `audio_plan.speakers[]` (jeder Speaker mit `audioUrl` wird ein eigener virtueller voiceover-Clip).
-- Bei Two-Shot enthält `audio_plan.speakers[]` die **per-speaker Tracks**, deren URLs **andere** sind als die merged VO → Dedup-by-URL greift nicht → **beide werden gleichzeitig im Preview abgespielt** = Echo.
+**1. `supabase/functions/compose-twoshot-audio/index.ts`** — Scene-Duration robust auflösen
 
-Zusätzlich: `compose-twoshot-lipsync` setzt `audio_plan.twoshot.useExternalAudio = true`, vergisst aber, die `audio_plan.speakers[].audioUrl` zu löschen oder zu markieren ("schon in merged enthalten").
+Vor `const sceneDur = …`: Wenn `scene.duration_seconds` ≤ 0, aus dem Source-Clip die tatsächliche Dauer ableiten — entweder über `lip_sync_source_clip_url || clip_url` per HEAD-Request auf Range-Probe-Bytes, oder vereinfachter Fallback: `Math.max(spokenSec, 10)` als Default für Two-Shot (Hailuo-Standard). Sauberer: `metadata.requested_duration` mitlesen, falls vorhanden, sonst auf `10` defaulten und Console-Warn loggen.
 
-## Fix-Plan
+Damit sind alle Per-Speaker-Padded-Tracks garantiert ≥ Szenenlänge → Sync.so Output bleibt 10s.
 
-### 1. Speaker 2 lipsyncen — `face_index` pro Pass (compose-twoshot-lipsync)
+**2. `src/components/video-composer/ComposerSequencePreview.tsx`** — Video bei `useExternalAudio` hart muten
 
-Im Multi-Pass-Loop pro Pass `face_index` an Sync.so mitgeben:
-- Pass 0 → `face_index: 0` (linke Person, x-sortiert)
-- Pass 1 → `face_index: 1` (rechte Person)
+An den 5 Stellen, die aktuell `el.muted = hasEmbeddedAudio ? false : mutedRef.current` setzen (Zeilen ~237, 295, 309, 347, 380), die Regel erweitern:
 
-Mapping: `character_shots` ist bereits in render-Reihenfolge → wir geben `face_index = pass.shotIdx` an `replicate.run()`. Falls Sync.so das Feld nicht akzeptiert (silent ignore), Fallback auf eine **face-bbox**-Übergabe via `face_bbox: { x, y, w, h }` aus dem ersten Frame (via 2-Spalten-Annahme: links/rechts gleichmäßig geteilt für die initiale Implementierung — wir haben keinen Face-Detector im Edge-Runtime).
+```ts
+const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
+el.muted = twoshotExternal
+  ? true                                   // immer stumm — Audio kommt aus externem Merged-Track
+  : (hasEmbeddedAudio ? false : mutedRef.current);
+```
 
-Damit hat jeder Pass ein deterministisches Ziel und kann den richtigen Mund animieren, auch wenn das Eingangsvideo aus dem vorherigen Pass kommt.
+Helper `sceneShouldForceMute(s)` einführen, der dasselbe für die `play()`-Loops nutzt. Beseitigt das Echo unabhängig vom Mute-Toggle des Users.
 
-### 2. Echo eliminieren — virtuelle Per-Speaker-Clips ausblenden bei Two-Shot
+**3. `src/components/video-composer/SceneCard.tsx` (oder wo die Mini-Preview den 10s-Source zeigt)** — Source-Clip nur fallback-rendern
 
-Zwei Stellen:
+Wenn `lip_sync_applied_at` gesetzt UND `clip_url` vorhanden → nur `clip_url` rendern, niemals `lip_sync_source_clip_url`. Letzteres ist ein interner Audit-Anker, kein User-facing Asset. Konkret: in der Mini-Player-Quelle nur `clip_url` verwenden, `lip_sync_source_clip_url` nur in einem optionalen „Rohaufnahme anzeigen"-Debug-Toggle.
 
-**a) `src/hooks/useSceneAudioClips.ts` — `synthesizeAudioPlanClips`:**
-- Wenn `scene.audioPlan?.twoshot?.useExternalAudio === true` ist, **keine** virtuellen Per-Speaker-Clips für diese Szene generieren. Die merged-VO-Row in der DB ist die Single-Source-of-Truth.
+**4. (Optional) `compose-twoshot-lipsync/index.ts`** — Defensive Validierung
 
-**b) `compose-twoshot-lipsync/index.ts` — beim finalen DB-Update:**
-- Beim Setzen von `audio_plan.twoshot.useExternalAudio = true` zusätzlich `audio_plan.speakers` so umschreiben, dass `audioUrl` entfernt oder ein Flag `mergedInto: 'twoshot'` gesetzt wird, damit auch andere Konsumenten (Render, Director's-Cut-Export) nicht doppelt mischen.
+Vor dem ersten Pass prüfen, ob `mergedVo.duration < sceneDuration - 0.5`. Falls ja, einmal `compose-twoshot-audio` mit `force_regenerate=true` neu aufrufen, damit garantiert die volle Szenenlänge gepaddet wird. Verhindert das Symptom auch bei Altdaten/Race-Conditions.
 
-**c) Defensive Render-Seite (`compose-clip-webhook` / Render-Payload-Builder):** prüfen ob die scene-audio-clips Sammlung für Render-Export ebenfalls die Per-Speaker-Tracks deduped/skipped, wenn der merged-Track existiert. Falls dort gleicher Bug → gleiche Guard-Bedingung.
+### Verifikation
 
-### 3. Verifikation
+1. Bestehende Two-Shot-Szene erneut lipsyncen.
+2. DB: `composer_scenes.duration_seconds = 10` UND `scene_audio_clips.duration = 10` UND `clip_url`-Video ist 10s.
+3. Preview: Nur ein Video sichtbar, 10s lang, beide Sprecher sequenziell synchron, **keine doppelte Stimme** auch nach „Unmute".
+4. `lip_sync_source_clip_url` bleibt in der DB als Audit-Anker, taucht aber nirgends mehr im UI auf.
 
-- Eine bestehende Two-Shot-Szene neu rendern; in der Vorschau prüfen: nur **einmal** Dialog hörbar, beide Münder bewegen sich passend zu ihrem Text.
-- DB-Check: `scene_audio_clips` enthält genau 1 voiceover-Row pro Two-Shot-Szene (die merged `/twoshot-vo/` URL).
-- `audio_plan.twoshot.useExternalAudio === true` UND `audio_plan.speakers[*].audioUrl` ist `null` oder mit `mergedInto` markiert.
+### Out-of-Scope
 
-### 4. Memory-Update
-
-Eintrag `mem://architecture/lipsync/sync-so-pro-model-policy` erweitern: "Multi-pass two-shot MUSS `face_index` pro Pass mitgeben, sonst kollabieren beide Passes auf dasselbe Gesicht. External merged VO ist Single-Source-of-Truth — virtuelle Per-Speaker-Clips dürfen nicht synthetisiert werden."
-
-## Risiken / Out-of-Scope
-
-- **`face_index` Support in Sync.so**: Falls Replicate's lipsync-2-pro das Feld nicht akzeptiert, fällt es silent zurück auf active-speaker-detect → wir haben dann immer noch das alte Verhalten für Pass 2. Mitigations-Stufe 2 wäre ein Face-Bbox-Parameter (oder serverside Crop-Pre-Processing) — würde ich nur angehen, falls Stufe 1 nicht reicht.
-- **Bestehende Szenen** mit altem `audio_plan` werden vom Hook-Fix sofort korrigiert (kein DB-Backfill nötig — der Hook liest den Flag live).
-- Wir ändern **nicht** den Single-Speaker-Pfad (`compose-lipsync-scene`) — dort gibt es kein Echo.
+- `face_index`-Logik bleibt wie vorher (war Teil des vorherigen Fixes).
+- Keine Änderung am finalen Render/Stitch-Pfad (`compose-clip-webhook`); dort wird die Merged-VO bereits korrekt gemuxt.
+- Kein DB-Schema-Change.
 
 OK so umsetzen?
