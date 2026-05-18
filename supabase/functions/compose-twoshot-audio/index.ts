@@ -3,18 +3,19 @@
  *
  * Takes a scene with a multi-speaker dialog_script (e.g. "Matthew: Hi\nSarah: Hello")
  * and the per-speaker `dialog_voices` config, and produces ONE merged WAV
- * voiceover that contains every speaker in script order separated by a small
- * silence gap. Stored as a single `scene_audio_clips` row (kind='voiceover')
- * so the existing `compose-lipsync-scene` Sync.so flow can run on it
- * unchanged.
+ * voiceover that contains every speaker in script order — plus one
+ * per-character padded WAV track for sequential lipsync passes.
  *
- * Why merge in Deno instead of ffmpeg: edge runtime has no ffmpeg. We request
- * raw PCM (16-bit signed LE, 44.1 kHz, mono) from ElevenLabs, concatenate the
- * buffers with N bytes of zeros for the inter-speaker pause, then wrap the
- * final buffer with a WAV RIFF header. ~50 lines, no native deps.
+ * Sample-accurate pipeline (Artlist parity): we synthesize each utterance
+ * straight to Int16 PCM @ 44.1 kHz mono (ElevenLabs `pcm_44100` / Hume
+ * `wav` + resample), concatenate samples directly, and write a single WAV
+ * file at the end. No MP3 byte-stitching, no ID3 inflation, no 26 ms
+ * silence-frame quantization — drift between merged playback audio and
+ * per-speaker lipsync passes is zero by construction.
  *
- * Idempotent: if a merged voiceover for this scene already exists, returns
- * its URL without re-spending TTS credits unless `force_regenerate=true`.
+ * Idempotent: if a current-pipeline WAV voiceover for this scene already
+ * exists, returns its URL without re-spending TTS credits unless
+ * `force_regenerate=true`.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
