@@ -35,9 +35,9 @@ function stripExistingMarker(prompt: string): string {
 }
 
 function nameAlreadyInProse(prose: string, fullName: string): boolean {
-  const p = prose.toLowerCase();
-  const full = fullName.toLowerCase().trim();
-  if (!full) return false;
+  const p = safeLower(prose);
+  const full = safeLower(fullName);
+  if (!p || !full) return false;
   if (p.includes(full)) return true;
   const first = full.split(/\s+/)[0];
   return !!(first && first.length >= 3 && p.includes(first));
@@ -57,15 +57,16 @@ function findCharacter(
   // 1) exact id
   const exact = chars.find((c) => c.id === slot.characterId);
   if (exact) return exact;
-  const slotIdLower = slot.characterId.toLowerCase();
+  const slotIdLower = safeLower(slot.characterId);
+  if (!slotIdLower) return undefined;
   // 2) slot id contains first name (≥3 chars)
   const byNameInId = chars.find((c) => {
-    const first = c.name?.trim().toLowerCase().split(/\s+/)[0];
+    const first = safeFirstNameLower(c.name);
     return !!first && first.length >= 3 && slotIdLower.includes(first);
   });
   if (byNameInId) return byNameInId;
   // 3) slot id equals full name lowercased
-  return chars.find((c) => c.name?.trim().toLowerCase() === slotIdLower);
+  return chars.find((c) => safeLower(c.name) === slotIdLower);
 }
 
 export function applyCastToPrompt(
