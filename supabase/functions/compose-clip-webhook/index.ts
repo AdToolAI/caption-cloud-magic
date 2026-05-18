@@ -266,8 +266,11 @@ serve(async (req) => {
           const planSpeakers = Array.isArray((lsScene as any)?.audio_plan?.speakers)
             ? (lsScene as any).audio_plan.speakers.length
             : 0;
+          const twoshotSpeakers = Array.isArray((lsScene as any)?.audio_plan?.twoshot?.speakers)
+            ? (lsScene as any).audio_plan.twoshot.speakers.length
+            : 0;
           const dialogSpeakers = detectSpeakerCount((lsScene as any)?.dialog_script ?? '');
-          const speakerCount = Math.max(planSpeakers, dialogSpeakers);
+          const speakerCount = Math.max(planSpeakers, twoshotSpeakers, dialogSpeakers);
           const fnName = engine === 'cinematic-sync' && speakerCount >= 2
             ? 'compose-twoshot-lipsync'
             : 'compose-lipsync-scene';
