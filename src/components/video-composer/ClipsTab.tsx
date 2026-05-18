@@ -401,6 +401,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
           lipSyncStatus: (dbScene as any).lip_sync_status ?? null,
           lipSyncSourceClipUrl: (dbScene as any).lip_sync_source_clip_url ?? null,
           twoshotStage: ((dbScene as any).twoshot_stage as ComposerScene['twoshotStage']) ?? null,
+          clipError: (dbScene as any).clip_error ?? null,
           continuityDriftScore: typeof (dbScene as any).continuity_drift_score === 'number'
             ? (dbScene as any).continuity_drift_score
             : scene.continuityDriftScore,
