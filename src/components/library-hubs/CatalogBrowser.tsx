@@ -3,7 +3,7 @@
 // them by theme_pack. Admins see a "Seed more" button that polls the
 // seed-world-catalog edge function until done.
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
