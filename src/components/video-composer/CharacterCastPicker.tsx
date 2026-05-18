@@ -4,7 +4,7 @@
 // (= the first/primary slot) so older pipeline code keeps working.
 
 import { useEffect, useMemo, useRef } from 'react';
-import { Plus, X, Users, UserPlus, AlertCircle } from 'lucide-react';
+import { Plus, X, Users, UserPlus, AlertCircle, Shirt } from 'lucide-react';
 import {
   Select,
   SelectContent,
