@@ -1,62 +1,59 @@
 ## Befund
 
-Der Backend-Status ist gesund. Die aktuell hängende Szene `4e2d57fe-78e0-4852-9fb6-2e1a48899034` steht auf:
+Der Backend-Status ist gesund. Die aktuell sichtbare Szene ist nicht mehr „ewig laufend“, sondern korrekt als fehlgeschlagen markiert:
 
-```text
-lip_sync_status = running
-twoshot_stage = master_clip
-replicate_prediction_id = 2azkx3x7tdrmr0cy7jk8d3rrbm
-heartbeat = null
-```
+- Szene `bced5548-c277-487e-a7dc-536bfa8480c7`
+- `lip_sync_status = failed`
+- `twoshot_stage = failed`
+- `clip_error = multi_speaker_scene_routed_to_single_lipsync`
 
-Für `compose-twoshot-lipsync` gibt es dabei keine echten Request-/Pass-Logs, nur `shutdown`. Das heißt: der Two-Shot-LipSync läuft nicht wirklich. Der Status wird blockiert, bevor die Two-Shot-Pipeline startet.
+Das bedeutet: Eine Multi-Speaker-Cinematic-Sync-Szene wurde weiterhin durch die Single-Speaker-Funktion `compose-lipsync-scene` getroffen. Diese Funktion blockt Multi-Speaker inzwischen absichtlich, deshalb erscheint jetzt „Lip-Sync fehlgeschlagen“ statt endlosem Laden.
 
-## Root Cause
+Zusätzlich ist die rote Vorschau-Meldung irreführend: Sie sagt „wird neu angestoßen“, obwohl fehlgeschlagene Two-Shot-Szenen vom aktuellen Auto-Trigger nicht erneut gestartet werden.
 
-Es gibt noch einen zweiten Auto-Trigger im Backend-Webhook:
+## Problem
 
-- `compose-clip-webhook` startet nach fertigem Clip weiterhin pauschal `compose-lipsync-scene`.
-- Für Cinematic-Sync mit zwei Sprechern ist aber `compose-twoshot-lipsync` zuständig.
-- `compose-lipsync-scene` setzt `lip_sync_status='running'`, läuft dann in die falsche/zu lange Sync-Strecke oder wird beendet.
-- Danach blockiert `useTwoShotAutoTrigger`, weil die Szene bereits `running` ist.
-- Ergebnis: UI lädt ewig, `twoshot_stage` bleibt auf `master_clip`, und es entstehen keine `pass 1/2` / `pass 2/2` Logs.
+Es gibt noch zwei echte Restfehler:
 
-Zusätzlich ist `compose-twoshot-lipsync` noch immer auf `replicate.run(...)` aufgebaut. Das ist für lange Medienjobs zu fragil, weil Edge Functions abgebrochen werden können, bevor die zwei Sync.so-Passes fertig sind.
+1. **Falscher Retry-Button**
+   - In `SceneCard.tsx` ruft „Lip-Sync neu rendern“ immer `compose-lipsync-scene` auf.
+   - Für Cinematic-Sync mit mindestens zwei Sprechern muss aber `compose-twoshot-lipsync` aufgerufen werden.
+   - Dadurch entsteht exakt der Fehler `multi_speaker_scene_routed_to_single_lipsync`.
+
+2. **Fehlgeschlagene Two-Shot-Szenen werden nicht automatisch sauber wiederaufgenommen**
+   - `useTwoShotAutoTrigger` startet nur `pending` oder `null`, aber nicht `failed`.
+   - Die Preview zeigt trotzdem „wird neu angestoßen“.
+   - Das UI suggeriert also einen Neustart, der nicht stattfindet.
 
 ## Plan
 
-1. **Webhook-Auto-Trigger korrigieren**
-   - In `supabase/functions/compose-clip-webhook/index.ts` Cinematic-Sync erkennen.
-   - Bei `engine_override='cinematic-sync'` und mehreren Sprechern nicht mehr `compose-lipsync-scene`, sondern `compose-twoshot-lipsync` aufrufen.
-   - Bei Cinematic-Sync mit einem Sprecher weiterhin `compose-lipsync-scene` erlauben.
-   - Der Webhook darf keinen falschen `running`-Status mehr erzeugen.
+1. **Retry-Routing im UI korrigieren**
+   - In `SceneCard.tsx` beim Klick auf „Lip-Sync neu rendern“ Sprecherzahl erkennen.
+   - Für `engineOverride === 'cinematic-sync'` und ≥2 Sprecher `compose-twoshot-lipsync` aufrufen.
+   - Für Single-Speaker weiter `compose-lipsync-scene` verwenden.
+   - Den lokalen Status danach passend auf `running` setzen.
 
-2. **Two-Shot-Pipeline auf echtes Prediction-Polling umbauen**
-   - In `compose-twoshot-lipsync` `replicate.run(...)` durch `replicate.predictions.create(...)` + `predictions.get(...)` Polling ersetzen.
-   - Pro Pass sofort `replicate_prediction_id` und Heartbeat in `composer_scenes` speichern.
-   - Status sichtbar durchlaufen lassen:
+2. **Auto-Trigger für echte Retry-Fälle robust machen**
+   - `useTwoShotAutoTrigger.ts` so erweitern, dass es bestimmte fehlgeschlagene Two-Shot-Szenen wieder anstoßen kann.
+   - Erlaubte Retry-Gründe: falsches Single-LipSync-Routing, Watchdog-Stale, Timeout.
+   - Nicht blind alle `failed`-Szenen endlos neu versuchen.
+   - Pro Szene einen kurzen In-Memory-Retry-Lock setzen, damit keine Retry-Schleife entsteht.
 
-```text
-lipsync_1 -> lipsync_2 -> continuity -> done
-```
+3. **Irreführende Preview-Meldung korrigieren**
+   - In `ComposerSequencePreview.tsx` bei `lipSyncStatus === 'failed'` nicht mehr „wird neu angestoßen“ anzeigen.
+   - Stattdessen klar anzeigen: „Lip-Sync fehlgeschlagen — erneut rendern“ oder nur „fehlgeschlagen“, abhängig vom vorhandenen Retry-Status.
 
-   - Harte Timeouts je Pass behalten; bei `failed`, `canceled` oder Timeout: `lip_sync_status='failed'`, `twoshot_stage='failed'`, Fehlertext setzen und Credits refundieren.
+4. **Alten Single-Speaker-Auto-Trigger in `ClipsTab.tsx` endgültig entschärfen**
+   - Sicherstellen, dass `ClipsTab.tsx` Cinematic-Sync-Multi-Speaker niemals zu `compose-lipsync-scene` schickt, auch wenn lokale `audioPlan.speakers` noch nicht aktuell ist.
+   - Sprecherzahl aus DB-Feldern `audio_plan.twoshot.speakers`, `audio_plan.speakers` und `dialog_script` ableiten, nicht nur aus lokalem Scene-State.
 
-3. **Single-LipSync sicherer machen**
-   - `compose-lipsync-scene` darf bei Multi-Speaker/Cinematic-Sync nicht erst `running` setzen und dann hängen.
-   - Es soll früh und sichtbar mit `multi_speaker_not_supported` / `failed` abbrechen, falls es versehentlich falsch aufgerufen wird.
-
-4. **Watchdog-Recovery schärfen**
-   - `qa-watchdog` soll `master_clip + running + heartbeat null` schneller als stuck erkennen.
-   - `replicate_prediction_id`/Heartbeat in die Diagnose aufnehmen.
-   - Stale Jobs sauber auf `failed` setzen und Credits erstatten.
-
-5. **Aktuell hängende Szene reparieren**
-   - Szene `4e2d57fe-78e0-4852-9fb6-2e1a48899034` auf `pending` zurücksetzen.
-   - `twoshot_stage` auf `master_clip` oder `null` zurücksetzen, `clip_error` mit Reset-Grund setzen, `replicate_prediction_id` leeren.
-   - Credits für den fehlgeschlagenen Versuch erstatten, falls sie abgezogen wurden.
+5. **Aktuelle Szene reparieren**
+   - Szene `bced5548-c277-487e-a7dc-536bfa8480c7` von `failed` zurück auf `pending` setzen.
+   - `twoshot_stage` sinnvoll auf `master_clip` oder `null` zurücksetzen.
+   - `clip_error` leeren und `replicate_prediction_id` leeren.
+   - Credits nur dann zusätzlich erstatten, wenn für diesen fehlgeschlagenen Versuch noch keine Rückerstattung erfolgt ist.
 
 6. **Validieren**
-   - Geänderte Edge Functions deployen.
-   - `compose-twoshot-lipsync` direkt für die Szene testen.
-   - In DB/Logs prüfen, dass wirklich `pass 1/2` und `pass 2/2` starten und `twoshot_stage` nicht mehr bei `master_clip` hängen bleibt.
+   - Geänderte Edge-/Frontend-Logik deployen bzw. anwenden.
+   - Die aktuelle Szene direkt über `compose-twoshot-lipsync` testen.
+   - In Datenbank und Logs prüfen, dass die Szene nicht mehr in `multi_speaker_scene_routed_to_single_lipsync` landet und mindestens `lipsync_1` startet.
