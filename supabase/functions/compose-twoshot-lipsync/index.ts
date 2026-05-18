@@ -394,8 +394,21 @@ serve(async (req) => {
       if (isMultiPassTwoshot && mergedVo?.url) {
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+        // Strip per-speaker audioUrls — they're already mixed into the
+        // merged twoshot track. Leaving them in causes downstream consumers
+        // (preview hook, render export) to play them again on top of the
+        // merged track = audible echo.
+        const prevSpeakers = Array.isArray(prevPlan.speakers)
+          ? (prevPlan.speakers as Array<Record<string, unknown>>)
+          : [];
+        const mergedSpeakers = prevSpeakers.map((sp) => ({
+          ...sp,
+          audioUrl: null,
+          mergedInto: "twoshot",
+        }));
         updates.audio_plan = {
           ...prevPlan,
+          speakers: mergedSpeakers,
           twoshot: {
             ...prevTwoshot,
             url: mergedVo.url,
