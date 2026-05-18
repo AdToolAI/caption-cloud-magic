@@ -123,56 +123,58 @@ export default Library;
 // ============================================================
 function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
   const { data: chars = [], isLoading } = useAccessibleCharacters();
+  const [addOpen, setAddOpen] = useState(false);
 
   return (
-    <Section
-      icon={Users}
-      empty={{
-        title: 'No avatars yet',
-        body: 'Create your first avatar to lock visual + voice identity across every scene.',
-        cta: { label: 'Open Avatar Studio', to: '/avatars' },
-      }}
-      loading={isLoading}
-      items={chars}
-      action={
-        <Button asChild variant="outline">
-          <Link to="/avatars">
+    <>
+      <Section
+        icon={Users}
+        empty={{
+          title: 'No avatars yet',
+          body: 'Create your first avatar to lock visual + voice identity across every scene.',
+          cta: { label: 'New Avatar', onClick: () => setAddOpen(true) },
+        }}
+        loading={isLoading}
+        items={chars}
+        action={
+          <Button onClick={() => setAddOpen(true)} variant="outline">
             <Plus className="h-4 w-4 mr-2" />
             New Avatar
-          </Link>
-        </Button>
-      }
-    >
-      <CatalogBrowser kind="character" />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {chars.map((c: any) => (
-          <Card
-            key={c.id}
-            onClick={() => onOpenAvatar(c.id)}
-            className="overflow-hidden bg-card/60 border-border/60 backdrop-blur-xl group cursor-pointer hover:border-primary/50 transition"
-          >
-            <div className="aspect-[4/5] bg-muted relative">
-              {(c.portrait_url || c.reference_image_url) && (
-                <img
-                  src={c.portrait_url || c.reference_image_url}
-                  alt={c.name}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              )}
-            </div>
-            <div className="p-3">
-              <h4 className="font-medium text-sm truncate">{c.name}</h4>
-              {c.description && (
-                <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                  {c.description}
-                </p>
-              )}
-            </div>
-          </Card>
-        ))}
-      </div>
-    </Section>
+          </Button>
+        }
+      >
+        <CatalogBrowser kind="character" hideAllFilter />
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {chars.map((c: any) => (
+            <Card
+              key={c.id}
+              onClick={() => onOpenAvatar(c.id)}
+              className="overflow-hidden bg-card/60 border-border/60 backdrop-blur-xl group cursor-pointer hover:border-primary/50 transition"
+            >
+              <div className="aspect-[4/5] bg-muted relative">
+                {(c.portrait_url || c.reference_image_url) && (
+                  <img
+                    src={c.portrait_url || c.reference_image_url}
+                    alt={c.name}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+              <div className="p-3">
+                <h4 className="font-medium text-sm truncate">{c.name}</h4>
+                {c.description && (
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                    {c.description}
+                  </p>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      </Section>
+      <AddBrandCharacterDialog open={addOpen} onOpenChange={setAddOpen} />
+    </>
   );
 }
 
