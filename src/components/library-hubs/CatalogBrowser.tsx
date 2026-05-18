@@ -36,12 +36,20 @@ interface Props {
   hideAllFilter?: boolean;
 }
 
+const prettify = (s: string) =>
+  s
+    .replace(/_/g, ' ')
+    .replace(/\bfan\b/gi, '')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
 export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const { isAdmin } = useUserRoles();
   const [seeding, setSeeding] = useState(false);
-  const [activeTheme, setActiveTheme] = useState<string | 'all'>('all');
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeSub, setActiveSub] = useState<string | null>(null);
 
   // Default pick handler: handoff to the Composer via sessionStorage so the
   // user can drop a catalog tile straight into their next scene without saving
@@ -83,33 +91,46 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
     },
   });
 
-  const themes = useMemo(() => {
-    const s = new Set<string>();
-    rows.forEach((r) => s.add(r.theme_pack));
-    const sorted = Array.from(s).sort();
-    return hideAllFilter ? sorted : ['all', ...sorted];
-  }, [rows, hideAllFilter]);
+  // Group theme_packs by category prefix (split on ':').
+  // Items without ':' live under category = full theme_pack, sub = null.
+  const categoriesMap = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    rows.forEach((r) => {
+      const [cat, sub] = r.theme_pack.includes(':')
+        ? r.theme_pack.split(':', 2)
+        : [r.theme_pack, ''];
+      if (!map.has(cat)) map.set(cat, new Set());
+      if (sub) map.get(cat)!.add(sub);
+    });
+    const out: Array<{ category: string; subs: string[] }> = [];
+    Array.from(map.keys()).sort().forEach((cat) => {
+      out.push({ category: cat, subs: Array.from(map.get(cat)!).sort() });
+    });
+    return out;
+  }, [rows]);
 
-  // When the "All" filter is hidden, snap the default activeTheme to the
-  // first available theme as soon as rows arrive.
+  // Initialize default selection once rows load.
   useEffect(() => {
-    if (hideAllFilter && activeTheme === 'all' && themes.length > 0) {
-      setActiveTheme(themes[0]);
+    if (categoriesMap.length === 0) return;
+    if (!activeCategory || !categoriesMap.find((c) => c.category === activeCategory)) {
+      const first = categoriesMap[0];
+      setActiveCategory(first.category);
+      setActiveSub(first.subs[0] ?? null);
     }
-  }, [hideAllFilter, activeTheme, themes]);
+  }, [categoriesMap, activeCategory]);
 
-  const visible = useMemo(
-    () => (activeTheme === 'all' ? rows : rows.filter((r) => r.theme_pack === activeTheme)),
-    [rows, activeTheme],
-  );
+  const activeCategoryEntry = categoriesMap.find((c) => c.category === activeCategory) ?? null;
+
+  const visible = useMemo(() => {
+    if (!activeCategory) return rows;
+    const pack = activeSub ? `${activeCategory}:${activeSub}` : activeCategory;
+    return rows.filter((r) => r.theme_pack === pack);
+  }, [rows, activeCategory, activeSub]);
 
   const runSeeder = async () => {
     setSeeding(true);
     let totalProcessed = 0;
     try {
-      // Poll until done — server returns done:true when nothing remains.
-      // Each call processes up to 4 slots synchronously (~10–15s).
-      // Safety: cap at 80 invocations (~320 slots).
       for (let i = 0; i < 80; i++) {
         const { data, error } = await supabase.functions.invoke('seed-world-catalog', {
           body: { kind },
@@ -132,6 +153,9 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
       setSeeding(false);
     }
   };
+
+  const showCategoryRow = categoriesMap.length > 1;
+  const showSubRow = !!activeCategoryEntry && activeCategoryEntry.subs.length > 0;
 
   return (
     <Card className="p-6 md:p-8 bg-card/40 border-primary/15 space-y-6 rounded-2xl">
@@ -163,26 +187,62 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
         )}
       </div>
 
-      {themes.length > 1 && (
-        <div className="relative -mx-1">
-          {/* Fade edges */}
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-card/60 to-transparent z-10" />
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card/60 to-transparent z-10" />
-          <div className="flex gap-2 overflow-x-auto px-1 py-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {themes.map((t) => (
-              <button
-                key={t}
-                onClick={() => setActiveTheme(t)}
-                className={`shrink-0 text-[11px] px-3.5 py-1.5 rounded-full border transition whitespace-nowrap ${
-                  activeTheme === t
-                    ? 'bg-primary/15 border-primary/60 text-primary shadow-[0_0_18px_-6px_hsl(var(--primary)/0.55)]'
-                    : 'bg-background/40 border-border/40 text-muted-foreground hover:border-border hover:text-foreground'
-                }`}
-              >
-                {t === 'all' ? 'All' : t.replace(':', ' / ')}
-              </button>
-            ))}
-          </div>
+      {(showCategoryRow || showSubRow) && (
+        <div className="space-y-3">
+          {showCategoryRow && (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex flex-wrap gap-2">
+                {categoriesMap.map(({ category }) => {
+                  const isActive = category === activeCategory;
+                  return (
+                    <button
+                      key={category}
+                      onClick={() => {
+                        setActiveCategory(category);
+                        const entry = categoriesMap.find((c) => c.category === category);
+                        setActiveSub(entry?.subs[0] ?? null);
+                      }}
+                      className={`text-xs px-4 py-2 rounded-full border transition whitespace-nowrap ${
+                        isActive
+                          ? 'bg-primary/15 border-primary/60 text-primary shadow-[0_0_18px_-6px_hsl(var(--primary)/0.55)]'
+                          : 'bg-background/40 border-border/40 text-muted-foreground hover:border-border hover:text-foreground'
+                      }`}
+                    >
+                      {prettify(category)}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground/70">
+                {visible.length} preview{visible.length === 1 ? '' : 's'}
+              </span>
+            </div>
+          )}
+
+          {showCategoryRow && showSubRow && (
+            <div className="h-px w-6 bg-primary/40" aria-hidden="true" />
+          )}
+
+          {showSubRow && (
+            <div className="flex flex-wrap gap-1.5">
+              {activeCategoryEntry!.subs.map((sub) => {
+                const isActive = sub === activeSub;
+                return (
+                  <button
+                    key={sub}
+                    onClick={() => setActiveSub(sub)}
+                    className={`text-[10px] px-3 py-1 rounded-full border transition whitespace-nowrap ${
+                      isActive
+                        ? 'bg-primary/10 border-primary/50 text-primary'
+                        : 'bg-background/30 border-border/30 text-muted-foreground hover:border-border/60 hover:text-foreground'
+                    }`}
+                  >
+                    {prettify(sub)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
