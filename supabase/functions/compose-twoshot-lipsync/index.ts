@@ -185,7 +185,44 @@ serve(async (req) => {
     const runPipeline = async () => {
       const replicate = new Replicate({ auth: REPLICATE_KEY });
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
-      const voDuration = Number(mergedVo.duration ?? 0);
+      let voDuration = Number(mergedVo.duration ?? 0);
+
+      // ── Defensive: re-regenerate merged VO if it's significantly shorter
+      // than the scene. Older runs of compose-twoshot-audio computed
+      // totalSec = max(spokenSec, scene.duration_seconds), so when the
+      // duration wasn't yet set (race with Hailuo webhook) the merged
+      // track collapsed to spokenSec (~7s) — and Sync.so produced a 7s
+      // lipsync clip that didn't match the 10s silent master. Force a
+      // refresh so all downstream passes use a properly padded track.
+      if (sceneDuration > 0 && voDuration > 0 && voDuration < sceneDuration - 0.5) {
+        console.warn(
+          `[compose-twoshot-lipsync ${scene_id}] merged VO ${voDuration}s < scene ${sceneDuration}s — regenerating with force_regenerate=true`,
+        );
+        try {
+          const r = await fetch(`${supabaseUrl}/functions/v1/compose-twoshot-audio`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": auth,
+            },
+            body: JSON.stringify({ scene_id, force_regenerate: true }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (r.ok && j?.url) {
+            mergedVo = {
+              url: j.url,
+              duration: j.duration,
+              metadata: { speakers: j.speakers },
+            } as any;
+            voDuration = Number(j.duration ?? voDuration);
+          } else {
+            console.warn(`[compose-twoshot-lipsync ${scene_id}] regen failed`, j);
+          }
+        } catch (e) {
+          console.warn(`[compose-twoshot-lipsync ${scene_id}] regen exception`, (e as Error).message);
+        }
+      }
+
 
       // ── Per-speaker sequential lip-sync ─────────────────────────────
       // If compose-twoshot-audio produced per-speaker padded tracks
