@@ -1189,6 +1189,12 @@ export default function SceneCard({
                   <div className="flex flex-col">
                     <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
                       🎙️ Lip-Sync zum Voiceover
+                      <span
+                        className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
+                        title="Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph"
+                      >
+                        PRO
+                      </span>
                       {scene.lipSyncAppliedAt && (
                         <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-bold">
                           SYNCED
@@ -1212,10 +1218,8 @@ export default function SceneCard({
                     </span>
                     <span className="text-[9px] text-muted-foreground">
                       {scene.lipSyncAppliedAt
-                        ? 'Charakter spricht wortgenau in der Szene · ~8 Credits'
-                        : scene.clipSource === 'ai-hailuo'
-                        ? 'Auto: Sync.so Post-Step nach Generate (~8 Credits)'
-                        : 'Auto: Sync.so Post-Step nach Generate (~8 Credits)'}
+                        ? 'Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits'
+                        : 'Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)'}
                     </span>
                   </div>
                   <button
