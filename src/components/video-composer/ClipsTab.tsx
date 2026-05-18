@@ -273,66 +273,14 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       });
     }
 
-    // ── Cinematic-Sync Auto-Trigger (state-based, not transition-based) ───
-    // Wenn eine Cinematic-Sync-Szene clip_url hat und lip_sync_status noch
-    // 'pending' ist, starten wir den Lip-Sync — auch nach einem Page-Reload,
-    // wo es keinen generating→ready Übergang mehr gibt.
-    const lipSyncCandidates = (data as any[]).filter(
-      (d) =>
-        d.engine_override === 'cinematic-sync' &&
-        typeof d.clip_url === 'string' &&
-        d.clip_url.length > 0 &&
-        (d.lip_sync_status === 'pending' || d.lip_sync_status == null) &&
-        !d.lip_sync_applied_at,
-    );
-    if (lipSyncCandidates.length > 0) {
-      // Optimistisch auf 'running' setzen, damit derselbe Browser-Tick nicht
-      // mehrfach startet.
-      await Promise.all(
-        lipSyncCandidates.map((d) =>
-          supabase
-            .from('composer_scenes')
-            .update({ lip_sync_status: 'running' })
-            .eq('id', d.id),
-        ),
-      );
-      lipSyncCandidates.forEach((d) => {
-        // Multi-speaker (≥2) → Two-Shot lip-sync. Single-speaker → classic.
-        const speakerCount = (() => {
-          const dlg = String(d.dialog_script ?? '');
-          const set = new Set<string>();
-          for (const line of dlg.split('\n')) {
-            const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
-            if (m) set.add(m[1].trim().toLowerCase());
-          }
-          return set.size;
-        })();
-        const fnName = speakerCount >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
-        console.info(`[ClipsTab] State-based auto-triggering ${fnName} for ${d.id} (speakers=${speakerCount})`);
-        supabase.functions
-          .invoke(fnName, { body: { scene_id: d.id } })
-          .then(({ data: lsData, error: lsErr }) => {
-            // FunctionsHttpError carries the response body in `context`.
-            const errBody = (lsErr as any)?.context;
-            const reason = lsData?.error ?? errBody?.error;
-            const message = lsData?.message ?? errBody?.message;
-            if (reason === 'tts_failed' || reason === 'no_voiceover') {
-              toast({
-                title: 'Cinematic-Sync braucht ein Voiceover',
-                description: message || 'Bitte im Voiceover-Tab eine Stimme prüfen, dann erneut auf "In echte Szene einbauen" klicken.',
-                variant: 'destructive',
-              });
-            } else if (lsErr) {
-              toast({
-                title: 'Lip-Sync fehlgeschlagen',
-                description: message || (lsErr as Error).message || 'Unbekannter Fehler beim Lip-Sync.',
-                variant: 'destructive',
-              });
-              console.warn(`[ClipsTab] state-based lip-sync invoke failed for ${d.id}`, lsErr);
-            }
-          });
-      });
-    }
+    // ── Cinematic-Sync Auto-Trigger ───────────────────────────────────────
+    // Disabled here: `useTwoShotAutoTrigger` is now the single source of truth
+    // for Cinematic-Sync auto-starts (tab-independent, no optimistic
+    // lip_sync_status='running' before the function reserves credits). The
+    // old optimistic update here was racing the backend's duplicate-run
+    // guard and silently short-circuiting the pipeline with 202
+    // "already_running" before any sync.so pass ran — leaving scenes stuck
+    // at twoshot_stage='master_clip' until the watchdog refunded them.
 
     let changed = false;
     const newPrev: Record<string, string> = { ...previousStatuses };
