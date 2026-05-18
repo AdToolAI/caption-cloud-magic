@@ -24,6 +24,7 @@ import type {
   CharacterShotType,
   ComposerCharacter,
 } from '@/types/video-composer';
+import { safeLower, safeFirstNameLower } from '@/lib/motion-studio/strings';
 
 const MAX_CAST = 4;
 const SHOT_ORDER: CharacterShotType[] = ['full', 'profile', 'back', 'detail', 'pov', 'silhouette'];
