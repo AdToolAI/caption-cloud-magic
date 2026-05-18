@@ -118,11 +118,24 @@ serve(withTelemetry("check-subscription", async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    const subscriptions = await stripe.subscriptions.list({
-      customer: profile.stripe_customer_id,
-      status: "active",
-      limit: 1,
-    });
+    let subscriptions;
+    try {
+      subscriptions = await stripe.subscriptions.list({
+        customer: profile.stripe_customer_id,
+        status: "active",
+        limit: 1,
+      });
+    } catch (stripeErr: any) {
+      // Stale customer id (e.g. test-mode customer in live mode, or deleted customer)
+      if (stripeErr?.code === "resource_missing") {
+        console.warn("Stale stripe_customer_id, treating as unsubscribed:", profile.stripe_customer_id);
+        return new Response(
+          JSON.stringify({ subscribed: false, stale_customer: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+        );
+      }
+      throw stripeErr;
+    }
 
     const hasActiveSubscription = subscriptions.data.length > 0;
     const subscription = subscriptions.data[0];
