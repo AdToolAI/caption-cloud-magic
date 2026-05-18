@@ -465,10 +465,42 @@ serve(async (req) => {
         await refund(`db_update_failed: ${updErr.message}`);
         return;
       }
+
+      // Supersede the original silent Hailuo `video_creations` row for this
+      // scene so the Media Library doesn't keep showing two cards (10s
+      // silent original + new lipsynced clip). The lipsync output is the
+      // user-facing version; the silent master stays in DB as audit anchor
+      // via composer_scenes.lip_sync_source_clip_url but is hidden from the
+      // library by the `superseded` flag.
+      try {
+        const { data: prior } = await supabase
+          .from("video_creations")
+          .select("id, metadata")
+          .eq("user_id", user.id)
+          .contains("metadata", { source: "motion-studio-clip", scene_id });
+        if (prior && prior.length) {
+          const stamp = new Date().toISOString();
+          for (const row of prior) {
+            const md = (row.metadata || {}) as Record<string, unknown>;
+            if (md.superseded === true) continue;
+            await supabase
+              .from("video_creations")
+              .update({
+                metadata: { ...md, superseded: true, superseded_at: stamp, superseded_by: "twoshot_lipsync" },
+                updated_at: stamp,
+              })
+              .eq("id", row.id);
+          }
+        }
+      } catch (supErr) {
+        console.warn("[compose-twoshot-lipsync] supersede prior library entries failed (non-fatal):", (supErr as Error).message);
+      }
+
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] ✅ done — clip=${publicUrl} drift=${driftScore}`,
       );
     };
+
 
     // Fire-and-forget: keep worker alive but return 202 to client now.
     // Any throw inside runPipeline triggers a refund + status='failed'.
