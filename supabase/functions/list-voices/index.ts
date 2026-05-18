@@ -40,7 +40,7 @@ serve(async (req) => {
     const { language } = await req.json().catch(() => ({ language: 'all' }));
 
     // ----- 1. Build curated premium voices (always included) -----
-    const premiumMapped = PREMIUM_VOICES.map((v) => ({
+    const premiumRaw = PREMIUM_VOICES.map((v) => ({
       id: v.id,
       name: v.name,
       language: v.language,
@@ -53,6 +53,33 @@ serve(async (req) => {
       recommended_model: v.recommended_model,
       recommended_settings: v.recommended_settings,
     }));
+
+    // Dedupe by ElevenLabs voice id — several premium personas share the same
+    // underlying ElevenLabs voice across languages (e.g. Daniel = Markus/DE +
+    // Diego/ES, George = George/EN + Mateo/ES). Without this dedupe Radix
+    // Select renders the children of *all* matching SelectItems in the
+    // trigger, producing concatenated names like "DiegoMarkus" / "GeorgeMateo".
+    const byId = new Map<string, typeof premiumRaw[number]>();
+    for (const v of premiumRaw) {
+      const existing = byId.get(v.id);
+      if (!existing) {
+        byId.set(v.id, { ...v, supportedLanguages: [...v.supportedLanguages] });
+        continue;
+      }
+      for (const lang of v.supportedLanguages) {
+        if (!existing.supportedLanguages.includes(lang)) existing.supportedLanguages.push(lang);
+      }
+      // Prefer the variant whose language matches the requested UI language
+      // so e.g. a DE user sees "Markus" and an ES user sees "Diego".
+      if (language && language !== 'all' && v.language === language && existing.language !== language) {
+        existing.name = v.name;
+        existing.language = v.language;
+        existing.accent = v.accent;
+        existing.description = v.description;
+        existing.recommended_settings = v.recommended_settings;
+      }
+    }
+    const premiumMapped = Array.from(byId.values());
 
     // ----- 2. Fetch user's own ElevenLabs voices -----
     let accountVoices: any[] = [];
