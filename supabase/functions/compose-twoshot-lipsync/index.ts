@@ -428,37 +428,27 @@ serve(async (req) => {
           // We send both `face_index` AND `speaker` so we work regardless of
           // which field the current Replicate schema honors; unknown fields
           // are silently ignored by Replicate.
-          let passOutput: unknown;
+          let stepUrl: string | null = null;
           try {
-            passOutput = await withTimeout(
-              replicate.run(
-                LIPSYNC_MODEL,
-                {
-                  input: {
-                    video: currentVideo,
-                    audio: pass.track_url,
-                    sync_mode: "loop",
-                    active_speaker: true,
-                    temperature: 0.5,
-                    output_format: "mp4",
-                    face_index: p,
-                    speaker: p,
-                  },
-                },
-              ),
-              PASS_TIMEOUT_MS,
+            stepUrl = await runLipsyncPrediction(
+              replicate,
+              supabase,
+              scene_id,
+              {
+                video: currentVideo,
+                audio: pass.track_url,
+                sync_mode: "loop",
+                active_speaker: true,
+                temperature: 0.5,
+                output_format: "mp4",
+                face_index: p,
+                speaker: p,
+              },
               `lipsync_pass_${p + 1}`,
             );
           } catch (e) {
             await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
             return;
-          }
-          let stepUrl: string | null = null;
-          if (typeof passOutput === "string") stepUrl = passOutput;
-          else if (Array.isArray(passOutput) && passOutput.length) stepUrl = passOutput[0] as string;
-          else if (passOutput && typeof passOutput === "object") {
-            const o = passOutput as Record<string, unknown>;
-            stepUrl = (o.video || o.output || o.url) as string ?? null;
           }
           if (!stepUrl) {
             await refund(`pass_${p + 1}_no_output`);
@@ -470,23 +460,20 @@ serve(async (req) => {
       } else {
         // Fallback: legacy single merged-audio pass.
         const syncMode = voDuration > sceneDuration + 0.2 ? "cut_off" : "loop";
-        let output: unknown;
+        let outputUrl: string | null = null;
         try {
-          output = await withTimeout(
-            replicate.run(
-              LIPSYNC_MODEL,
-              {
-                input: {
-                  video: sourceClipUrl,
-                  audio: mergedVo.url,
-                  sync_mode: syncMode,
-                  temperature: 0.5,
-                  active_speaker: true,
-                  output_format: "mp4",
-                },
-              },
-            ),
-            PASS_TIMEOUT_MS,
+          outputUrl = await runLipsyncPrediction(
+            replicate,
+            supabase,
+            scene_id,
+            {
+              video: sourceClipUrl,
+              audio: mergedVo.url,
+              sync_mode: syncMode,
+              temperature: 0.5,
+              active_speaker: true,
+              output_format: "mp4",
+            },
             "lipsync_single_pass",
           );
         } catch (e) {
@@ -494,12 +481,7 @@ serve(async (req) => {
           return;
         }
         await setStage(supabase, scene_id, "lipsync_2");
-        if (typeof output === "string") outUrl = output;
-        else if (Array.isArray(output) && output.length) outUrl = output[0] as string;
-        else if (output && typeof output === "object") {
-          const o = output as Record<string, unknown>;
-          outUrl = (o.video || o.output || o.url) as string ?? null;
-        }
+        outUrl = outputUrl;
       }
 
       if (!outUrl) {
