@@ -28,7 +28,7 @@ import {
   Star,
   Trash2,
   Sparkles,
-  Library as LibraryIcon,
+  
 } from 'lucide-react';
 import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { useBrandLocations } from '@/hooks/useBrandLocations';
@@ -71,32 +71,46 @@ const Library = () => {
         />
       </Helmet>
 
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-6 py-10">
-          <header className="mb-8">
-            <div className="flex items-center gap-2 text-primary text-sm mb-2">
-              <LibraryIcon className="h-4 w-4" />
-              <span className="tracking-widest uppercase">Cast & World</span>
+      <div className="min-h-screen bg-background text-foreground">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 py-12">
+          {/* Cinematic header */}
+          <header className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12 border-b border-border/40 pb-10">
+            <div className="space-y-4 max-w-2xl">
+              <div className="flex items-center gap-3">
+                <span className="h-px w-8 bg-primary" />
+                <p className="text-primary tracking-[0.3em] text-[10px] font-bold uppercase">
+                  Asset Library
+                </p>
+              </div>
+              <h1 className="font-serif text-5xl md:text-6xl font-medium tracking-tight">
+                Cast &amp; World
+              </h1>
+              <p className="text-muted-foreground text-sm leading-relaxed font-light max-w-lg">
+                Manage your digital actors, environments and props. Maintain visual consistency
+                across every generated scene with persistent identity markers.
+              </p>
             </div>
-            <h1 className="font-serif text-4xl md:text-5xl">Your Asset Library</h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
-              People, places, architecture and props — all stored as reusable identities so
-              every scene you generate stays visually consistent.
-            </p>
           </header>
 
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
-            <TabsList className="mb-6">
-              {TABS.map((t) => {
-                const Icon = t.icon;
-                return (
-                  <TabsTrigger key={t.key} value={t.key} className="gap-1.5">
-                    <Icon className="h-3.5 w-3.5" />
-                    {t.label}
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
+            {/* Cinematic pill nav */}
+            <div className="mb-8">
+              <TabsList className="flex bg-card/40 p-1 rounded-2xl border border-border/40 h-auto gap-1">
+                {TABS.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <TabsTrigger
+                      key={t.key}
+                      value={t.key}
+                      className="px-6 md:px-8 py-2.5 rounded-xl text-sm font-medium text-muted-foreground data-[state=active]:bg-foreground/10 data-[state=active]:text-foreground data-[state=active]:font-semibold data-[state=active]:shadow-xl transition gap-1.5"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {t.label}
+                    </TabsTrigger>
+                  );
+                })}
+              </TabsList>
+            </div>
 
             <TabsContent value="people">
               <PeopleTab onOpenAvatar={(id) => navigate(`/avatars/${id}`)} />
@@ -125,8 +139,25 @@ function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
   const { data: chars = [], isLoading } = useAccessibleCharacters();
   const [addOpen, setAddOpen] = useState(false);
 
+  const feature = chars[0];
+  const rest = chars.slice(1);
+
   return (
     <>
+      {/* Top action row: catalog filter pills + gold CTA */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex-1 min-w-0">
+          <CatalogBrowser kind="character" hideAllFilter />
+        </div>
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 md:px-8 py-5 md:py-6 shadow-[0_0_20px_hsl(var(--primary)/0.2)] hover:shadow-[0_0_35px_hsl(var(--primary)/0.4)] transition-all duration-500"
+        >
+          <Plus className="h-4 w-4 mr-2" strokeWidth={3} />
+          <span className="tracking-tight">New Avatar</span>
+        </Button>
+      </div>
+
       <Section
         icon={Users}
         empty={{
@@ -136,41 +167,84 @@ function PeopleTab({ onOpenAvatar }: { onOpenAvatar: (id: string) => void }) {
         }}
         loading={isLoading}
         items={chars}
-        action={
-          <Button onClick={() => setAddOpen(true)} variant="outline">
-            <Plus className="h-4 w-4 mr-2" />
-            New Avatar
-          </Button>
-        }
       >
-        <CatalogBrowser kind="character" hideAllFilter />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {chars.map((c: any) => (
-            <Card
-              key={c.id}
-              onClick={() => onOpenAvatar(c.id)}
-              className="overflow-hidden bg-card/60 border-border/60 backdrop-blur-xl group cursor-pointer hover:border-primary/50 transition"
+        {/* Cinematic Bento Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-4 md:gap-5 auto-rows-[180px] md:auto-rows-[220px]">
+          {feature && (
+            <button
+              onClick={() => onOpenAvatar(feature.id)}
+              className="col-span-2 md:col-span-5 md:row-span-2 group relative overflow-hidden rounded-[2rem] border border-border/40 bg-gradient-to-br from-foreground/10 to-transparent transition-all duration-700 hover:border-primary/40 text-left"
             >
-              <div className="aspect-[4/5] bg-muted relative">
-                {(c.portrait_url || c.reference_image_url) && (
-                  <img
-                    src={c.portrait_url || c.reference_image_url}
-                    alt={c.name}
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
-                )}
-              </div>
-              <div className="p-3">
-                <h4 className="font-medium text-sm truncate">{c.name}</h4>
-                {c.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
-                    {c.description}
+              {(feature.portrait_url || feature.reference_image_url) && (
+                <img
+                  src={feature.portrait_url || feature.reference_image_url}
+                  alt={feature.name}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105"
+                  loading="lazy"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent opacity-80 transition-opacity group-hover:opacity-60" />
+              <div className="absolute bottom-0 p-6 md:p-10 w-full">
+                <div className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full bg-foreground/10 border border-border/40 backdrop-blur-md">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <span className="text-[10px] uppercase font-bold tracking-widest">
+                    Primary Cast
+                  </span>
+                </div>
+                <h3 className="font-serif text-3xl md:text-4xl mb-2 leading-tight">{feature.name}</h3>
+                {feature.description && (
+                  <p className="text-sm text-foreground/60 max-w-xs font-light leading-relaxed line-clamp-2">
+                    {feature.description}
                   </p>
                 )}
               </div>
-            </Card>
+            </button>
+          )}
+
+          {rest.map((c: any) => (
+            <button
+              key={c.id}
+              onClick={() => onOpenAvatar(c.id)}
+              className="col-span-1 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-border/40 transition-all duration-500 hover:border-primary/30 bg-muted text-left"
+            >
+              {(c.portrait_url || c.reference_image_url) && (
+                <img
+                  src={c.portrait_url || c.reference_image_url}
+                  alt={c.name}
+                  className="absolute inset-0 w-full h-full object-cover opacity-70 group-hover:opacity-90 group-hover:scale-110 transition-all duration-1000"
+                  loading="lazy"
+                />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-background/20 to-transparent" />
+              <div className="absolute bottom-4 left-5 right-5">
+                <p className="text-primary text-[9px] uppercase font-black tracking-[0.2em] mb-1">
+                  Cast Member
+                </p>
+                <h4 className="font-serif text-lg md:text-xl truncate">{c.name}</h4>
+              </div>
+            </button>
           ))}
+
+          {/* Action cell — always present */}
+          <button
+            onClick={() => setAddOpen(true)}
+            className="col-span-2 md:col-span-3 md:row-span-1 group relative overflow-hidden rounded-[2rem] border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all duration-500 flex items-center justify-center min-h-[180px]"
+          >
+            <div className="text-center space-y-3 relative z-10">
+              <div className="w-14 h-14 rounded-full border border-primary flex items-center justify-center mx-auto transition-transform duration-500 group-hover:scale-110">
+                <Plus className="h-6 w-6 text-primary" strokeWidth={2} />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-primary">
+                  New Avatar
+                </p>
+                <p className="text-[10px] text-primary/60 mt-1 uppercase font-medium">
+                  Add to your cast
+                </p>
+              </div>
+            </div>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,hsl(var(--primary)/0.1)_0%,transparent_70%)]" />
+          </button>
         </div>
       </Section>
       <AddBrandCharacterDialog open={addOpen} onOpenChange={setAddOpen} />
