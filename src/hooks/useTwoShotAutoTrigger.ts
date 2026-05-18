@@ -31,6 +31,17 @@ function detectSpeakerCount(dialogScript: string): number {
   return set.size;
 }
 
+function resolveSpeakerCount(scene: any): number {
+  const scriptCount = detectSpeakerCount(scene.dialog_script ?? '');
+  const planSpeakers = Array.isArray(scene.audio_plan?.speakers)
+    ? scene.audio_plan.speakers.length
+    : 0;
+  const twoshotSpeakers = Array.isArray(scene.audio_plan?.twoshot?.speakers)
+    ? scene.audio_plan.twoshot.speakers.length
+    : 0;
+  return Math.max(scriptCount, planSpeakers, twoshotSpeakers);
+}
+
 export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
 
@@ -43,7 +54,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, updated_at')
+          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -92,7 +103,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         candidates.forEach((d) => inflight.current.add(d.id));
 
         for (const d of candidates) {
-          const speakers = detectSpeakerCount(d.dialog_script ?? '');
+          const speakers = resolveSpeakerCount(d);
           const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
