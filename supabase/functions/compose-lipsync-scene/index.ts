@@ -94,7 +94,10 @@ serve(async (req) => {
     const planSpeakers = Array.isArray((scene as any).audio_plan?.speakers)
       ? (scene as any).audio_plan.speakers.length
       : 0;
-    if ((scene as any).engine_override === 'cinematic-sync' && Math.max(scriptSpeakerSet.size, planSpeakers) > 1) {
+    const twoshotSpeakers = Array.isArray((scene as any).audio_plan?.twoshot?.speakers)
+      ? (scene as any).audio_plan.twoshot.speakers.length
+      : 0;
+    if ((scene as any).engine_override === 'cinematic-sync' && Math.max(scriptSpeakerSet.size, planSpeakers, twoshotSpeakers) > 1) {
       await supabase
         .from('composer_scenes')
         .update({
