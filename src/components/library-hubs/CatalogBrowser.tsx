@@ -134,14 +134,19 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
   };
 
   return (
-    <Card className="p-4 bg-card/40 border-primary/15 space-y-3">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-sm text-primary">
-          <Sparkles className="h-4 w-4" />
-          <span className="tracking-widest uppercase text-xs">Catalog</span>
-          <span className="text-muted-foreground normal-case tracking-normal">
-            Pick a curated {kind} as a starting point
-          </span>
+    <Card className="p-6 md:p-8 bg-card/40 border-primary/15 space-y-6 rounded-2xl">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-primary">
+            <Sparkles className="h-3.5 w-3.5" />
+            <span className="tracking-[0.3em] uppercase text-[10px] font-bold">Catalog</span>
+          </div>
+          <h3 className="font-serif text-xl md:text-2xl leading-tight">
+            Browse curated {kind === 'character' ? 'cast' : `${kind}s`}
+          </h3>
+          <p className="text-xs text-muted-foreground font-light">
+            Pick a theme to filter — every preview is ready to drop into your next scene.
+          </p>
         </div>
         {isAdmin && (
           <Button
@@ -150,6 +155,7 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
             disabled={seeding}
             onClick={runSeeder}
             title="Admin: generate missing catalog previews"
+            className="rounded-full"
           >
             {seeding ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
             {seeding ? 'Seeding…' : 'Seed catalog'}
@@ -158,20 +164,25 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
       </div>
 
       {themes.length > 1 && (
-        <div className="flex gap-1.5 flex-wrap">
-          {themes.map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTheme(t)}
-              className={`text-[11px] px-2.5 py-1 rounded-full border transition ${
-                activeTheme === t
-                  ? 'bg-primary/15 border-primary/50 text-primary'
-                  : 'bg-background/40 border-border/40 text-muted-foreground hover:border-border'
-              }`}
-            >
-              {t === 'all' ? 'All' : t.replace(':', ' / ')}
-            </button>
-          ))}
+        <div className="relative -mx-1">
+          {/* Fade edges */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-card/60 to-transparent z-10" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card/60 to-transparent z-10" />
+          <div className="flex gap-2 overflow-x-auto px-1 py-1 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {themes.map((t) => (
+              <button
+                key={t}
+                onClick={() => setActiveTheme(t)}
+                className={`shrink-0 text-[11px] px-3.5 py-1.5 rounded-full border transition whitespace-nowrap ${
+                  activeTheme === t
+                    ? 'bg-primary/15 border-primary/60 text-primary shadow-[0_0_18px_-6px_hsl(var(--primary)/0.55)]'
+                    : 'bg-background/40 border-border/40 text-muted-foreground hover:border-border hover:text-foreground'
+                }`}
+              >
+                {t === 'all' ? 'All' : t.replace(':', ' / ')}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -184,7 +195,7 @@ export function CatalogBrowser({ kind, onPick, hideAllFilter = false }: Props) {
           No previews yet. {isAdmin ? 'Click "Seed catalog" to generate them.' : 'Check back soon.'}
         </p>
       ) : (
-        <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 md:gap-4">
           {visible.map((row) => (
             <button
               key={row.id}
