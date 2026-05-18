@@ -233,6 +233,38 @@ serve(async (req) => {
         }
       }
 
+      const existingSpeakerMeta = Array.isArray((mergedVo as any)?.metadata?.speakers)
+        ? ((mergedVo as any).metadata.speakers as Array<any>)
+        : [];
+      const uniqueSpeakerKeys = new Set(
+        existingSpeakerMeta.map((s) => String(s?.character_id || s?.speaker_slug || s?.speaker || "").toLowerCase()).filter(Boolean),
+      );
+      if (existingSpeakerMeta.length > 2 && uniqueSpeakerKeys.size > 0 && existingSpeakerMeta.length > uniqueSpeakerKeys.size) {
+        console.warn(
+          `[compose-twoshot-lipsync ${scene_id}] legacy per-turn tracks detected (${existingSpeakerMeta.length} tracks/${uniqueSpeakerKeys.size} speakers) — regenerating per-character tracks`,
+        );
+        const r = await fetch(`${supabaseUrl}/functions/v1/compose-twoshot-audio`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": auth,
+          },
+          body: JSON.stringify({ scene_id, force_regenerate: true }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j?.url) {
+          mergedVo = {
+            url: j.url,
+            duration: j.duration,
+            metadata: { speakers: j.speakers },
+          } as any;
+          voDuration = Number(j.duration ?? voDuration);
+        } else {
+          await refund(`twoshot_audio_regen_failed: ${JSON.stringify(j).slice(0, 300)}`);
+          return;
+        }
+      }
+
 
       // ── Per-speaker sequential lip-sync ─────────────────────────────
       // If compose-twoshot-audio produced per-speaker padded tracks
