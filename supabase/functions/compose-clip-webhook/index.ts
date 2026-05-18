@@ -229,7 +229,7 @@ serve(async (req) => {
       try {
         const { data: lsScene } = await supabase
           .from('composer_scenes')
-          .select('clip_source, engine_override, dialog_script, character_audio_url, lip_sync_status, auto_lipsync')
+          .select('clip_source, engine_override, dialog_script, character_audio_url, lip_sync_status')
           .eq('id', sceneId)
           .maybeSingle();
 
@@ -238,7 +238,7 @@ serve(async (req) => {
         const isI2V = src.startsWith('ai-') && src !== 'ai-vidu';
         const isHeygen = engine === 'heygen';
         const alreadyDone = ['done', 'running'].includes(String((lsScene as any)?.lip_sync_status ?? ''));
-        const optedOut = (lsScene as any)?.auto_lipsync === false;
+        const optedOut = false; // future: per-scene auto_lipsync toggle
 
         // Check if there's any voiceover signal worth syncing against.
         let hasVoSignal = !!(lsScene as any)?.character_audio_url || !!(lsScene as any)?.dialog_script;
