@@ -274,28 +274,54 @@ serve(async (req) => {
             `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length}`,
             { speaker: pass.speaker, character_id: pass.character_id, audio: pass.track_url },
           );
-          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2");
+          const passStartedAt = new Date().toISOString();
+          const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
+          const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2", {
+            audio_plan: {
+              ...prevPlan,
+              twoshot: {
+                ...prevTwoshot,
+                heartbeat: {
+                  pass: p + 1,
+                  total_passes: passes.length,
+                  started_at: passStartedAt,
+                  speaker: pass.speaker,
+                },
+              },
+            },
+          });
           // Deterministic face targeting per pass — without this, Sync.so's
           // active_speaker auto-detect collapses both passes onto the same
           // (most prominent) face, leaving speaker 2's mouth unanimated.
           // We send both `face_index` AND `speaker` so we work regardless of
           // which field the current Replicate schema honors; unknown fields
           // are silently ignored by Replicate.
-          const passOutput = await replicate.run(
-            LIPSYNC_MODEL,
-            {
-              input: {
-                video: currentVideo,
-                audio: pass.track_url,
-                sync_mode: "loop",
-                active_speaker: true,
-                temperature: 0.5,
-                output_format: "mp4",
-                face_index: p,
-                speaker: p,
-              },
-            },
-          );
+          let passOutput: unknown;
+          try {
+            passOutput = await withTimeout(
+              replicate.run(
+                LIPSYNC_MODEL,
+                {
+                  input: {
+                    video: currentVideo,
+                    audio: pass.track_url,
+                    sync_mode: "loop",
+                    active_speaker: true,
+                    temperature: 0.5,
+                    output_format: "mp4",
+                    face_index: p,
+                    speaker: p,
+                  },
+                },
+              ),
+              PASS_TIMEOUT_MS,
+              `lipsync_pass_${p + 1}`,
+            );
+          } catch (e) {
+            await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
+            return;
+          }
           let stepUrl: string | null = null;
           if (typeof passOutput === "string") stepUrl = passOutput;
           else if (Array.isArray(passOutput) && passOutput.length) stepUrl = passOutput[0] as string;
