@@ -227,7 +227,10 @@ export default function ComposerSequencePreview({
       // EXCEPTION 2: two-shot scenes flagged with audioPlan.twoshot.
       // useExternalAudio === true. The lipsync MP4 only embeds the LAST
       // speaker's voice; the merged dialogue lives on the external VO
-      // track. Mute the video so we don't hear half the dialogue twice.
+      // track. We FORCE mute regardless of mutedRef — if we honoured the
+      // user's unmute toggle here, the embedded last-speaker audio would
+      // play on top of the external merged track and the user hears the
+      // dialogue twice (= echo + "simultaneous speakers" bug).
       const twoshotExternal = target.audioPlan?.twoshot?.useExternalAudio === true;
       const hasEmbeddedAudio = !twoshotExternal && (
         !!target.lipSyncAppliedAt ||
@@ -235,7 +238,9 @@ export default function ComposerSequencePreview({
         target.clipSource === 'upload'
       );
       if (slot === activeSlotRef.current) {
-        el.muted = hasEmbeddedAudio ? false : mutedRef.current;
+        el.muted = twoshotExternal
+          ? true
+          : (hasEmbeddedAudio ? false : mutedRef.current);
       } else {
         el.muted = true;
       }
