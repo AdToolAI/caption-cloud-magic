@@ -1077,23 +1077,42 @@ export default function ComposerSequencePreview({
                 err === 'watchdog_stuck_lipsync_refunded' ||
                 /^lipsync_pass_\d+_failed/.test(err) ||
                 err.startsWith('auto-retry:');
+              const friendly =
+                err.startsWith('anchor_identity_clone_detected') ? 'Charakter wurde geklont — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('anchor_missing_speakers') ? 'Anchor zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('source_clip_missing_speakers') ? 'Video zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('syncso_') ? `Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken`
+                : willAutoRetry
+                  ? 'Lip-Sync fehlgeschlagen — wird neu angestoßen'
+                  : 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken';
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20">
                   <span>⚠️</span>
-                  <span>
-                    {willAutoRetry
-                      ? 'Lip-Sync fehlgeschlagen — wird neu angestoßen'
-                      : 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken'}
-                  </span>
+                  <span>{friendly}</span>
                 </div>
               );
             })()
+
           ) : (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
-              <span>🎬</span>
-              <span>Lip-Sync wird vorbereitet…</span>
-            </div>
+            (() => {
+              const stage = String((currentScene as any).twoshotStage ?? '');
+              const label =
+                stage === 'audio' ? 'Voiceover wird gebaut…'
+                : stage === 'anchor' ? 'Anchor wird komponiert…'
+                : stage === 'master_clip' ? 'Hailuo rendert die Szene…'
+                : stage === 'lipsync_1' ? 'Sync.so Pass 1 läuft…'
+                : stage === 'lipsync_2' ? 'Sync.so Pass 2 läuft…'
+                : stage === 'continuity' ? 'Continuity-Check…'
+                : 'Lip-Sync wird vorbereitet…';
+              return (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
+                  <span>🎬</span>
+                  <span>{label}</span>
+                </div>
+              );
+            })()
           )
+
         )}
 
         {/* Hidden voiceover audio — synced with the video timeline */}

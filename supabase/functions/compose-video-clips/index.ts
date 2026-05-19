@@ -22,6 +22,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage } from "../_shared/face-count.ts";
+import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -607,10 +609,37 @@ serve(async (req) => {
                   }
                 }
 
+                // Identity audit — catches Nano-Banana cloning two characters
+                // into one face (counts as "2 faces" but they're the same
+                // person). Runs only on the surviving composedUrl.
+                let identityClone = false;
+                let identityNotes = "";
+                if (composedUrl && LOVABLE_API_KEY && portraitUrls.length >= 2) {
+                  const audit = await auditAnchorIdentity(composedUrl, portraitUrls, characterNames, LOVABLE_API_KEY);
+                  if (audit && !audit.ok && audit.reason === "clone") {
+                    console.warn(`[compose-video-clips] anchor identity audit scene ${scene.id}: CLONE detected (${audit.detail ?? ""}) — invalidating cache + retry`);
+                    await supabaseAdmin.from('scene_anchor_cache').delete().eq('scene_id', scene.id);
+                    const retryUrl = await composeAnchor('identity-retry');
+                    if (retryUrl) {
+                      const retryAudit = await auditAnchorIdentity(retryUrl, portraitUrls, characterNames, LOVABLE_API_KEY);
+                      if (retryAudit && retryAudit.ok) {
+                        composedUrl = retryUrl;
+                      } else {
+                        composedUrl = retryUrl; // keep so user can inspect
+                        identityClone = true;
+                        identityNotes = retryAudit?.detail ?? audit.detail ?? "";
+                      }
+                    } else {
+                      identityClone = true;
+                      identityNotes = audit.detail ?? "";
+                    }
+                  }
+                }
+
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
                   const auditMeta = faceCount !== null
-                    ? { anchor_face_audit: { detected: faceCount, expected: expectedFaces, ok: faceCount >= expectedFaces, at: new Date().toISOString() } }
+                    ? { anchor_face_audit: { detected: faceCount, expected: expectedFaces, ok: faceCount >= expectedFaces, identityClone, at: new Date().toISOString() } }
                     : {};
                   await supabaseAdmin
                     .from('composer_scenes')
@@ -622,14 +651,16 @@ serve(async (req) => {
                         : {}),
                     })
                     .eq('id', scene.id);
-                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? '?'}/${expectedFaces}) → ${composedUrl.slice(0, 80)}…`);
+                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? '?'}/${expectedFaces}, clone=${identityClone}) → ${composedUrl.slice(0, 80)}…`);
 
-                  // If after 2 attempts the anchor still lacks faces, abort
-                  // BEFORE spending Hailuo credits. The user gets a clean
-                  // "anchor_missing_speakers" error and a re-roll button.
-                  // If after 2 attempts the anchor still lacks faces, abort
-                  // BEFORE spending Hailuo credits. The user gets a clean
-                  // "anchor_missing_speakers" error and a re-roll button.
+                  // Hard-abort BEFORE Hailuo spends credits when the anchor
+                  // either has too few faces or the identities are cloned.
+                  if (identityClone) {
+                    const msg = `anchor_identity_clone_detected: ${identityNotes || "two faces look identical / one reference rendered twice"} — re-roll the anchor or use distinct portraits.`;
+                    await supabaseAdmin.from('composer_scenes').update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() }).eq('id', scene.id);
+                    results.push({ sceneId: scene.id, status: 'failed', error: msg });
+                    continue;
+                  }
                   if (faceCount !== null && faceCount < expectedFaces) {
                     const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} faces visible after 2 compose attempts`;
                     console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — ${msg}`);
@@ -642,10 +673,10 @@ serve(async (req) => {
                       })
                       .eq('id', scene.id);
                     results.push({ sceneId: scene.id, status: 'failed', error: msg });
-                    // Skip this scene's clip generation entirely.
                     continue;
                   }
                 }
+
               }
             }
           } catch (anchorErr) {
