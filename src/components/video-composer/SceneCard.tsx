@@ -1236,45 +1236,111 @@ export default function SceneCard({
                   </button>
                 </div>
                 {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed' || scene.lipSyncStatus === 'no_voiceover') && scene.clipUrl && (
-                  <button
-                    type="button"
-                    disabled={scene.lipSyncStatus === 'running'}
-                    onClick={async () => {
-                      try {
-                        // Multi-speaker Cinematic-Sync MUST use the two-shot
-                        // pipeline; single-speaker scenes use the legacy one.
-                        // compose-lipsync-scene short-circuits multi-speaker
-                        // with `multi_speaker_scene_routed_to_single_lipsync`.
-                        const dialogScript = String((scene as any).dialogScript ?? '');
-                        const scriptSpeakers = new Set<string>();
-                        for (const line of dialogScript.split('\n')) {
-                          const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
-                          if (m) scriptSpeakers.add(m[1].trim().toLowerCase());
+                  <div className="flex flex-wrap items-center gap-2 self-end">
+                    <button
+                      type="button"
+                      disabled={scene.lipSyncStatus === 'running'}
+                      onClick={async () => {
+                        try {
+                          // Multi-speaker Cinematic-Sync MUST use the two-shot
+                          // pipeline; single-speaker scenes use the legacy one.
+                          // compose-lipsync-scene short-circuits multi-speaker
+                          // with `multi_speaker_scene_routed_to_single_lipsync`.
+                          const dialogScript = String((scene as any).dialogScript ?? '');
+                          const scriptSpeakers = new Set<string>();
+                          for (const line of dialogScript.split('\n')) {
+                            const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+                            if (m) scriptSpeakers.add(m[1].trim().toLowerCase());
+                          }
+                          const planSpeakers = Array.isArray(scene.audioPlan?.speakers)
+                            ? scene.audioPlan!.speakers!.length
+                            : 0;
+                          const twoshotSpeakers = Array.isArray((scene.audioPlan as any)?.twoshot?.speakers)
+                            ? (scene.audioPlan as any).twoshot.speakers.length
+                            : 0;
+                          const speakerCount = Math.max(scriptSpeakers.size, planSpeakers, twoshotSpeakers);
+                          const fnName =
+                            scene.engineOverride === 'cinematic-sync' && speakerCount >= 2
+                              ? 'compose-twoshot-lipsync'
+                              : 'compose-lipsync-scene';
+                          const { error } = await supabase.functions.invoke(fnName, {
+                            body: { scene_id: scene.id },
+                          });
+                          if (error) throw error;
+                          onUpdate({ lipSyncStatus: 'running' });
+                        } catch (e) {
+                          console.warn('[SceneCard] re-sync failed', e);
                         }
-                        const planSpeakers = Array.isArray(scene.audioPlan?.speakers)
-                          ? scene.audioPlan!.speakers!.length
-                          : 0;
-                        const twoshotSpeakers = Array.isArray((scene.audioPlan as any)?.twoshot?.speakers)
-                          ? (scene.audioPlan as any).twoshot.speakers.length
-                          : 0;
-                        const speakerCount = Math.max(scriptSpeakers.size, planSpeakers, twoshotSpeakers);
-                        const fnName =
-                          scene.engineOverride === 'cinematic-sync' && speakerCount >= 2
-                            ? 'compose-twoshot-lipsync'
-                            : 'compose-lipsync-scene';
-                        const { error } = await supabase.functions.invoke(fnName, {
-                          body: { scene_id: scene.id },
-                        });
-                        if (error) throw error;
-                        onUpdate({ lipSyncStatus: 'running' });
-                      } catch (e) {
-                        console.warn('[SceneCard] re-sync failed', e);
-                      }
-                    }}
-                    className="text-[9px] text-primary hover:underline self-end disabled:opacity-50"
-                  >
-                    🔁 Lip-Sync neu rendern
-                  </button>
+                      }}
+                      className="text-[9px] text-primary hover:underline disabled:opacity-50"
+                    >
+                      🔁 Lip-Sync neu rendern
+                    </button>
+                    {scene.engineOverride === 'cinematic-sync' && (
+                      <button
+                        type="button"
+                        disabled={scene.clipStatus === 'generating' || scene.lipSyncStatus === 'running'}
+                        title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
+                        onClick={async () => {
+                          try {
+                            // Hard reset: clear composed anchor, clip, and all
+                            // lipsync state so compose-video-clips re-runs the
+                            // full cinematic-sync pipeline (multi-cast anchor
+                            // with face audit → Hailuo i2v → auto-lipsync).
+                            await supabase
+                              .from('composer_scenes')
+                              .update({
+                                reference_image_url: null,
+                                clip_url: null,
+                                clip_status: null,
+                                clip_error: null,
+                                lip_sync_status: null,
+                                lip_sync_applied_at: null,
+                                lip_sync_source_clip_url: null,
+                                twoshot_stage: null,
+                                replicate_prediction_id: null,
+                                updated_at: new Date().toISOString(),
+                              })
+                              .eq('id', scene.id);
+                            // Optimistic local update.
+                            onUpdate({
+                              referenceImageUrl: undefined,
+                              clipUrl: undefined,
+                              clipStatus: 'generating',
+                              lipSyncStatus: null as any,
+                              lipSyncAppliedAt: null as any,
+                            });
+                            const { error } = await supabase.functions.invoke('compose-video-clips', {
+                              body: {
+                                projectId: scene.projectId,
+                                scenes: [{
+                                  id: scene.id,
+                                  clipSource: scene.clipSource,
+                                  clipQuality: scene.clipQuality || 'standard',
+                                  aiPrompt: scene.aiPrompt,
+                                  durationSeconds: scene.durationSeconds,
+                                  characterShot: scene.characterShot,
+                                  characterShots: scene.characterShots,
+                                  dialogScript: scene.dialogScript,
+                                  dialogVoices: scene.dialogVoices,
+                                  engineOverride: 'cinematic-sync',
+                                  withAudio: scene.withAudio !== false,
+                                }],
+                                characters,
+                              },
+                            });
+                            if (error) throw error;
+                          } catch (e) {
+                            console.warn('[SceneCard] re-roll clip + lipsync failed', e);
+                            onUpdate({ clipStatus: 'failed' as any });
+                          }
+                        }}
+                        className="text-[9px] text-amber-300 hover:underline disabled:opacity-50"
+                      >
+                        🎥 Clip + Lip-Sync neu rendern
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
