@@ -33,7 +33,11 @@ const corsHeaders = {
 
 // Artlist-grade lip-sync via Sync.so lipsync-2-pro (≈2× pricier than lipsync-2,
 // but identity-locked, no face morph). See mem://architecture/lipsync/sync-so-pro-model-policy
-const COST = 14;
+// Sync.so Creator plan = ~$0.08/s per pass → 9 credits/s = €0.09/s (~22% margin).
+const CREDITS_PER_SECOND = 9;
+const MIN_COST = 9; // floor for sub-1s clips / fallbacks
+const computeCost = (durationSec: number, passes = 1): number =>
+  Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND * passes);
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 const MIN_VO_DURATION = 0.4; // lipsync-2-pro needs minimum speech signal
 
