@@ -108,9 +108,9 @@ serve(async (req) => {
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
-    // v5 — bumped after dialog-text sanitizer + reinforced no-typography
-    // suffix (prevents burned-in speech captions in two-shot anchors).
-    const promptHash = await sha1(`v5|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
+    // v6 — bumped after two-shot framing enforcement (mandatory N-shot
+    // composition with equal screen share + anti-occlusion negatives).
+    const promptHash = await sha1(`v6|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
