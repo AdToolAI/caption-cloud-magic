@@ -1058,7 +1058,7 @@ serve(async (req) => {
       accepted: true,
       scene_id,
       status: "running",
-      credits_reserved: COST,
+      credits_reserved: cost,
     }, 202);
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
