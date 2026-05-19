@@ -177,6 +177,9 @@ export default function VideoComposerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  // True while the BriefingTab's AI mode is running compose-video-storyboard.
+  // Used to show a loading panel on the (already-active) Storyboard tab.
+  const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
@@ -1278,6 +1281,12 @@ export default function VideoComposerDashboard() {
                 setScenes(scenes);
                 setActiveTab('storyboard');
               }}
+              onGenerationStart={() => setIsGeneratingStoryboard(true)}
+              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
+              onGenerationFailed={() => {
+                setIsGeneratingStoryboard(false);
+                setActiveTab('briefing');
+              }}
               brandKitId={project.brandKitId ?? null}
               brandKitAutoSync={project.brandKitAutoSync ?? false}
               assemblyConfig={project.assemblyConfig}
@@ -1288,6 +1297,8 @@ export default function VideoComposerDashboard() {
               onUpdateScenes={setScenes}
             />
           </TabsContent>
+
+
 
           <TabsContent value="storyboard">
             <ComposerTabErrorBoundary label="Storyboard">
@@ -1303,6 +1314,7 @@ export default function VideoComposerDashboard() {
                 onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
                 preferredAspect={project.briefing?.aspectRatio}
                 onRefetchScenes={refetchScenesFromDb}
+                isGeneratingStoryboard={isGeneratingStoryboard}
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
