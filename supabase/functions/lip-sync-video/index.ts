@@ -9,7 +9,12 @@ const corsHeaders = {
 };
 
 // Artlist-grade lip-sync via Sync.so lipsync-2-pro
-const COST = 14;
+// Duration-based pricing (Sync.so Creator $0.08/s → 9 credits/s ≈ €0.09/s, ~22% margin).
+const CREDITS_PER_SECOND = 9;
+const MIN_COST = 9;
+const FALLBACK_DURATION_SEC = 10; // conservative cap when caller omits duration
+const computeCost = (durationSec: number): number =>
+  Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND);
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 // Idempotency namespace for deterministic refund UUIDs
 const REFUND_NS = 'b3f4c1a8-1d4e-4cf7-9b1c-a4b9d77ef111';
