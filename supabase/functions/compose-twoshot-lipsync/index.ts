@@ -260,6 +260,11 @@ async function askGeminiForFaces(
   lovableKey: string,
   kind: "image" | "video",
 ): Promise<{ faces: any[]; width: number; height: number } | null> {
+  // Lovable AI Gateway's `image_url` only decodes still images — passing an
+  // .mp4 URL here returns 0 faces silently. We don't attempt video-URL
+  // detection until a real first-frame extraction is wired up; the anchor
+  // image is the trusted source.
+  if (kind === "video") return null;
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
