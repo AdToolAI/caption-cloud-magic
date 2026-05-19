@@ -559,6 +559,10 @@ serve(async (req) => {
     const runPipeline = async () => {
       const replicate = REPLICATE_KEY ? new Replicate({ auth: REPLICATE_KEY }) : null;
       const useSyncSoDirect = !!SYNC_API_KEY;
+      console.log(
+        `[compose-twoshot-lipsync ${scene_id}] lipsync engine =`,
+        useSyncSoDirect ? "sync.so/v2 (direct)" : "replicate-wrapper",
+      );
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
       let voDuration = Number(mergedVo.duration ?? 0);
 
