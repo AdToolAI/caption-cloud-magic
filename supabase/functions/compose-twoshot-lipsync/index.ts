@@ -23,6 +23,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { probeImageDims } from "../_shared/image-dims.ts";
+
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 
