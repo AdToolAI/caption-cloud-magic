@@ -177,6 +177,9 @@ export default function VideoComposerDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
   const [showResetDialog, setShowResetDialog] = useState(false);
+  // True while the BriefingTab's AI mode is running compose-video-storyboard.
+  // Used to show a loading panel on the (already-active) Storyboard tab.
+  const [isGeneratingStoryboard, setIsGeneratingStoryboard] = useState(false);
   // Auto-open template picker when starting fresh (no draft on mount AND no URL project)
   const [showTemplatePicker, setShowTemplatePicker] = useState(() => !hasUrlProject && !loadDraft());
   const [showAutoDirector, setShowAutoDirector] = useState(false);
