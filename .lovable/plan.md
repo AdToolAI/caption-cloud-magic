@@ -1,68 +1,87 @@
 ## Befund
 
-Nein, wir sind noch nicht ganz auf Artlist-Niveau. Wir haben den richtigen Ansatz, aber aktuell fehlen noch zwei Artlist-typische Sicherheitsstufen:
+Pass 1 lipsynct sauber, Pass 2 trifft erneut Charakter A — typisches Multi-Speaker-Problem. Ursachen-Analyse anhand der offiziellen Sync.so-Doku (`/v2/generate`):
 
-1. **Face-Lock ist nicht zuverlässig genug**
-   - In der letzten Szene ist `lock_reference_url` leer.
-   - Dadurch konnte Gemini keine beiden Gesichter erkennen (`faceMap: faces: 0`) und die Pipeline fiel auf grobe Heuristik zurück: links = 30%, rechts = 70%.
-   - Wenn die Gesichter im echten Clip anders liegen, trifft ein Pass wieder nur einen Charakter oder denselben Charakter.
+1. **Wir benutzen Replicate's `sync/lipsync-2-pro` Wrapper, nicht die echte Sync.so-API.**
+   - Das offizielle Feld heisst `options.active_speaker_detection.{auto_detect, frame_number, coordinates, bounding_boxes, v3}` (verschachtelt unter `options`).
+   - Replicate flacht den Input zu Top-Level-Feldern ab und ignoriert unbekannte/verschachtelte Keys still. Unser `active_speaker_detection`-Objekt sowie `face_index`/`speaker` werden also vermutlich nie an das Modell weitergereicht → Sync.so läuft im Auto-Detect-Modus und pickt beide Male das prominenteste Gesicht (= Charakter A).
+   - Genau das deckt sich mit "ein Voiceover klappt, das zweite ist weiterhin fehlerhaft".
 
-2. **Der finale Sync.so-Clip enthält technisch nur die Audiospur des letzten Passes**
-   - Das ist bei Multi-Pass normal: Pass 1 rendert Sprecher A, Pass 2 rendert Sprecher B über den vorherigen Clip.
-   - Die vollständige Tonspur liegt separat als gemischtes Two-Shot-WAV vor.
-   - Preview/Export müssen deshalb den finalen MP4-Ton stumm schalten und immer die externe gemischte Two-Shot-Spur nutzen. In der Preview ist das größtenteils schon vorbereitet, beim Export gibt es aber noch eine Stelle, die Voiceover bei lip-synced Szenen rausfiltert.
+2. **Koordinaten werden im falschen Bezugssystem berechnet.**
+   - Wir lassen Gemini Faces im Anker-Bild (1:1, oft 1024×1024) erkennen und schicken die Pixel an Sync.so. Sync.so erwartet aber Koordinaten im Pixelraum des **Video-Frames** (z. B. 1280×720 von Hailuo) — bei abweichendem Seitenverhältnis liegen die Punkte falsch.
 
-## Plan
+3. **Pass 2 läuft auf dem Output von Pass 1.**
+   - Selbst mit korrekter ASD ist Charakter A's Mund jetzt animiert → erscheint als "aktiver Sprecher" → Auto-Detect snapt zurück auf A. Artlist macht stattdessen einen einzigen Call mit per-Frame-Speaker-Mapping.
 
-### 1. Face-Erkennung nicht mehr von `lock_reference_url` abhängig machen
-- `compose-twoshot-lipsync` bekommt eine robuste Source-Kette:
-  1. `lock_reference_url`
-  2. falls leer: erstes Frame / Poster aus `lip_sync_source_clip_url` oder `clip_url`
-  3. falls auch das scheitert: Heuristik als letzte Notlösung
-- Die erkannte `faceMap` wird wieder in `audio_plan.twoshot.faceMap` gespeichert, damit Retries deterministisch bleiben.
+## Plan (Artlist-Parität)
 
-### 2. Pass-Ziel nicht nur nach Pass-Index, sondern nach echter Charakterposition pinnen
-- `character_shots` + erkannte Face-Positionen werden zusammengeführt.
-- Pass 1/2 wird an die echte linke/rechte Face-Box gebunden, nicht nur an `[0.3W, 0.5H]` und `[0.7W, 0.5H]`.
-- Wenn nur ein Gesicht erkannt wird, bricht die Pipeline mit verständlichem Fehler ab, statt erfolgreich einen falschen One-Face-Lip-Sync zu erzeugen.
+### 1. Direkte Sync.so-API statt Replicate-Wrapper
+- Neuen Secret `SYNC_API_KEY` einführen (über `secrets--add_secret`, blocker bis Key da ist).
+- `compose-twoshot-lipsync` ruft `POST https://api.sync.so/v2/generate` direkt mit `model: 'lipsync-2-pro'` + `options.active_speaker_detection` auf. Polling via `GET /v2/generate/{id}` bis `COMPLETED`/`FAILED`.
+- Nur dieser Pfad garantiert, dass ASD-Parameter wirklich ankommen.
 
-### 3. Multi-Pass-Validierung einbauen
-- Nach jedem Pass speichern wir `audio_plan.twoshot.heartbeat` mit:
-  - Sprecher
-  - Zielgesicht
-  - Koordinaten
-  - Quelle der Koordinaten (`gemini-frame`, `anchor`, `heuristic`)
-- Zusätzlich wird geloggt, ob wirklich Pass 2 gestartet und beendet wurde.
-- Wenn Pass 2 fehlt oder fehlschlägt, bleibt die Szene nicht als `done` stehen.
+### 2. Ein Call statt zwei Passes (Artlist-Style)
+- Aus den per-speaker WAV-Tracks bauen wir ein **gemischtes Audio** + einen **Bounding-Box-Track** pro Frame:
+  - Für jedes Frame `f` (bei sceneFps): bestimme aus `metadata.speakers[*].segments` welcher Sprecher gerade spricht → setze `bounding_boxes[f] = bboxOfThatSpeaker`, sonst `null` (Stille = kein Lipsync).
+- Schicke ein einziges Sync.so-Request:
+  ```json
+  {
+    "model": "lipsync-2-pro",
+    "input": [
+      { "type": "video", "url": <silent master> },
+      { "type": "audio", "url": <merged twoshot wav> }
+    ],
+    "options": {
+      "sync_mode": "cut_off",
+      "active_speaker_detection": {
+        "auto_detect": false,
+        "v3": true,
+        "bounding_boxes": [ /* per-frame [x1,y1,x2,y2] | null */ ]
+      }
+    }
+  }
+  ```
+- Vorteil: Kein Pass-1-Mund-Artefakt mehr, ein deterministischer Render, Kosten 14 statt 28 Credits.
 
-### 4. Audio-Muxing für Two-Shot final korrigieren
-- In `compose-video-assemble` wird die bisherige Regel angepasst:
-  - Normale lip-synced Szenen: separate Voiceover-Spur weiterhin nicht doppelt muxen.
-  - Two-Shot mit `audio_plan.twoshot.useExternalAudio === true`: gemischte Two-Shot-WAV muss ausdrücklich als externe Szenen-Voiceover-Spur erhalten bleiben.
-- Dadurch ist auch im finalen Export nicht nur die letzte Sync.so-Pass-Audiospur hörbar.
+### 3. Face-Detection auf dem echten Video-Frame
+- `detectFacesInMaster` nutzt **zuerst** das `lip_sync_source_clip_url`-MP4 (Gemini ingestiert den First-Frame und liefert Pixel im Video-Koordinatensystem). Anker nur als Fallback.
+- Frame-Größe (`videoWidth`, `videoHeight`) wird mit dem Result gespeichert und als Bezugssystem für alle Bounding-Boxes verwendet.
+- Wenn Gemini nur 1 Gesicht findet → harter Fehler statt heimlich auf Heuristik zu fallen (verhindert "still nur ein Charakter").
 
-### 5. UI-Hinweis aktualisieren
-- Der alte Hinweis in `ClipsTab`, dass Sync.so nur einen Charakter pro Clip könne, ist für unsere neue Two-Shot-Pipeline veraltet.
-- Ich ersetze ihn durch einen realistischen Hinweis: Multi-Speaker funktioniert, aber nur mit erkanntem Two-Shot-Face-Lock.
+### 4. Bounding-Box-Track aus Speaker-Segmenten
+- Helper `buildBoundingBoxTrack({ fps, durationSec, speakers, faceMap })`:
+  - Für jeden Frame: prüfen, ob ein `speakers[i].segments[j]` (start..end in Sekunden) den Zeitstempel enthält. Erster Treffer gewinnt.
+  - Mappe `character_id`/`shotIdx` → `faceMap.faces[side]` → `[x1,y1,x2,y2]`.
+- `fps` wird aus dem Scene-Default (24) genommen oder optional via Gemini geschätzt.
+- Speichern in `audio_plan.twoshot.bboxTrack` (komprimiert: RLE-style) für Debug & Re-Render.
+
+### 5. Fallback & Heartbeat
+- Wenn `SYNC_API_KEY` fehlt: klarer 412-Fehler statt stiller Replicate-Fallback.
+- Heartbeat protokolliert `mode: 'single-call-bbox-track'`, `frames`, `framesWithSpeaker`, `faceMapSource` für UI-Sichtbarkeit.
+- Idempotenter Credit-Refund über deterministische UUID bleibt erhalten.
+
+### 6. UI / Audio-Mux unverändert
+- `audio_plan.twoshot.useExternalAudio = true` bleibt — das gemischte WAV bleibt die Master-Audio-Spur im Export.
+- `ClipsTab`-Hinweis aktualisieren: "Multi-Sprecher Two-Shot via Sync.so v2 ASD (Artlist-Parität)."
 
 ## Technische Dateien
 
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-- `supabase/functions/compose-video-assemble/index.ts`
-- `src/components/video-composer/ClipsTab.tsx`
-- `mem/architecture/lipsync/sync-so-pro-model-policy`
+- `supabase/functions/compose-twoshot-lipsync/index.ts` — Replicate raus, Sync.so direkt rein, Bounding-Box-Track-Builder, harter Fehler bei <2 Faces
+- `mem/architecture/lipsync/sync-so-pro-model-policy` — neue Pipeline dokumentieren
+- `src/components/video-composer/ClipsTab.tsx` — Hinweistext
+
+## Voraussetzung
+
+- Secret `SYNC_API_KEY` (Sync.so Dashboard → API Keys). Ohne diesen Key kann der Wechsel nicht aktiviert werden.
 
 ## Ergebnis
 
-Danach arbeitet die Pipeline näher an Artlist:
-
 ```text
-Two-shot master clip
-  -> Face detection from actual frame
-  -> Pass A pinned to character A face
-  -> Pass B pinned to character B face
-  -> final video muted
-  -> full merged dialogue WAV layered externally
+silent two-shot master
+  ├─ merged twoshot WAV (alle Sprecher gemischt)
+  └─ per-frame bounding-box track (A | B | null)
+        ↓ ein Sync.so /v2/generate Call mit ASD v3
+final lip-synced video (beide Charaktere am richtigen Punkt) + externe Master-Audio
 ```
 
-Das behebt sowohl den visuellen Fall „nur ein Charakter lip-synced“ als auch den Audio-Fall „nur ein Voiceover ist hörbar“.
+Das eliminiert beide Root-Causes: ASD-Parameter werden garantiert übernommen, und Pass-1-Mund kann Pass-2 nicht mehr "überstimmen".
