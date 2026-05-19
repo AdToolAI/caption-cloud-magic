@@ -557,7 +557,8 @@ serve(async (req) => {
     // result — no HTTP response needed.
     // ────────────────────────────────────────────────────────────────────
     const runPipeline = async () => {
-      const replicate = new Replicate({ auth: REPLICATE_KEY });
+      const replicate = REPLICATE_KEY ? new Replicate({ auth: REPLICATE_KEY }) : null;
+      const useSyncSoDirect = !!SYNC_API_KEY;
       const sceneDuration = Number((scene as any).duration_seconds ?? 0);
       let voDuration = Number(mergedVo.duration ?? 0);
 
