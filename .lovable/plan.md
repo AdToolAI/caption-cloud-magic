@@ -1,55 +1,71 @@
-# Two-Shot Lipsync auf Artlist-Niveau bringen
+## Was wirklich passiert ist
 
-## Warum es aktuell schiefgeht
+Die Szene `9c546015` hat einen **gültigen Anchor + Clip** (sichtbar im Screenshot, 3 Gesichter). Trotzdem wurde sie mit `source_clip_missing_speakers: 0/2 faces` abgebrochen. Edge-Function-Log:
 
-Ich habe die fehlgeschlagene Szene (`ab0b0a8e-…`) in der DB inspiziert. Zwei Befunde erklären beide Symptome (Lipsync versetzt + Samuel ist stumm):
+```
+faceMap { faces: 0, source: "heuristic-fallback", anchor: false, clip: true }
+```
 
-1. **Der Quellclip zeigt nur ein Gesicht.** `composer_scenes.reference_image_url` ist `NULL` — d. h. `compose-scene-anchor` wurde für diese Szene nie erfolgreich aufgerufen, bevor Hailuo das i2v-Video gerendert hat. Hailuo hatte also keinen komponierten Two-Shot-First-Frame und hat (wie üblich bei reinem Text-to-Video) nur **eine** Person gerendert.
-2. **Stiller Fallback auf Single-Pass.** Weil Gemini im fertigen Clip nur 1 Gesicht findet (`faceMap.faces.length = 1`), greift mein letzter Fix und schickt **eine** Pass mit der gemischten VO + Auto-Detect an Sync.so. Resultat: Matthews Mund bewegt sich zu beiden Stimmen, Samuels Stimme klingt versetzt, Samuel selbst ist nie zu sehen.
+Zwei Bugs in `compose-twoshot-lipsync` → `detectFacesInMaster`:
 
-So macht es **Artlist**: Sie generieren erst dann lippensynchron, wenn der Quellclip nachweislich N sichtbare Gesichter enthält (N = Anzahl Sprecher). Sonst rerollen sie den Clip — sie versuchen niemals 2 Stimmen auf 1 Mund zu mappen.
+### Bug 1 — Falsche Anchor-Spalte gelesen
+`anchorUrlForDetect = scene.lock_reference_url` — aber der Composer schreibt den Anchor in `reference_image_url`. `lock_reference_url` ist im Composer-Flow IMMER `NULL`, also wird der Image-Pass **komplett übersprungen**.
+
+### Bug 2 — MP4 als `image_url` an Gemini geschickt
+Weil Bug 1 den Anchor überspringt, fällt der Code auf den Clip zurück und sendet die `.mp4`-URL direkt als `image_url` an die Lovable-AI-Gateway. Gemini Vision dort akzeptiert **nur Bilder** (jpg/png/webp) — kein Video-Decoding aus MP4-URLs. Antwort = 0 Gesichter → falscher "Source-Clip missing speakers"-Fehlschlag, obwohl der Clip in Wirklichkeit alle Sprecher zeigt.
 
 ## Plan
 
-### 1. Garantierte Two-Shot-Komposition vor i2v
-In `compose-video-clips` (cinematic-sync-Zweig, Zeilen 520–575):
-- Nach `compose-scene-anchor` einen **Face-Count-Check** auf das zurückgegebene Frame laufen lassen (Gemini Vision, 1 Call).
-- Wenn `faces < character_shots.length` → Anchor mit verschärftem Prompt einmal neu komponieren ("wide two-shot, both faces fully visible at equal screen share, no occlusion, no back-of-head"). Max. 1 Retry.
-- Wenn auch der Retry scheitert → Szene auf `clip_error='anchor_missing_speakers'` setzen, Credits refunden, UI zeigt "Anchor zeigt nicht alle Sprecher — bitte Shot/Prompt anpassen".
-- Den verifizierten `faceMap` (mit Gesichts-Center-Koordinaten **aus dem Anchor**) direkt in `audio_plan.twoshot.faceMap` persistieren, damit Sync.so später nicht noch mal raten muss.
+### 1. `detectFacesInMaster` auf die richtige Anchor-Spalte mappen
+In `compose-twoshot-lipsync/index.ts` (Zeile 688):
+```ts
+const anchorUrlForDetect =
+  (scene as any).reference_image_url ||
+  (scene as any).lock_reference_url ||
+  null;
+```
+Damit nutzt der Audit den tatsächlich vorhandenen Anchor (Standbild = zuverlässigste Quelle) und Bug 1 ist weg.
 
-### 2. Stärkerer Anchor-Prompt für Multi-Char
-In `compose-scene-anchor`: Wenn `portraitUrls.length ≥ 2`, hartcodiert anhängen: *"Both subjects fully visible, equal frame share, both faces front-3/4 to camera, no occlusion between them, no single-character close-up."* + Negativ-Prompt `"single person, one face cropped, back of head, profile silhouette"`.
+### 2. MP4-Fallback durch echte First-Frame-Extraktion ersetzen
+Im `_shared/face-count.ts` und `askGeminiForFaces`: wenn `kind === 'video'`, **nicht** die MP4-URL an `image_url` durchreichen. Stattdessen:
+- Neuer Helper `extractFirstFrameToStorage(videoUrl)` in `_shared/extract-first-frame.ts` ruft die existierende `extract-video-frame`-Pipeline auf (gleicher Pattern wie Continuity-Guardian-Frame-Extraktion). Speichert das Frame als PNG im `composer-frames`-Bucket, gibt die Public-URL zurück.
+- Diese PNG-URL wird dann an Gemini `image_url` geschickt → funktioniert garantiert.
+- Cache: das extrahierte Frame in `audio_plan.twoshot.faceMap.frameUrl` ablegen, damit Retries nichts neu extrahieren.
 
-### 3. Post-Clip Face-Audit vor Lipsync
-In `compose-twoshot-lipsync` (Zeilen 680–715):
-- **Stillen Fallback entfernen.** Wenn `passes.length ≥ 2` und `faceMap.faces.length < 2`:
-  - Status auf `failed` mit `clip_error='source_clip_missing_speakers'`, Credits refunden, **UI-Button "Clip neu rendern"** anbieten.
-  - **Nicht** mehr single-pass mit merged VO laufen lassen — das ist genau die Misalignment-Quelle.
-- Beibehalten: bei genau 1 Sprecher → Single-Pass (das ist legitim).
+Falls die Frame-Extraktion fehlschlägt: Function gibt `null` zurück, Caller fällt auf heuristische Drittel zurück (alte Behavior) — aber **kein** Fail-Loudly mehr, wenn der Anchor schon ≥2 Gesichter geliefert hat.
 
-### 4. UI: "Clip + Lipsync neu rendern" Quick-Action
-In `ClipsTab.tsx` neben dem "Lipsync neu rendern"-Button: zweite Aktion **"Clip + Lipsync neu rendern"**, die zuerst `reference_image_url = NULL` setzt, dann den cinematic-sync Re-Roll-Flow (Pfad ab Zeile 828) triggert. Das ist der manuelle Notausgang, wenn die automatische Anchor-Verifizierung das Limit erreicht.
+### 3. Fail-Loudly nur bei wirklich fehlenden Gesichtern
+Im Block (Zeile 717): die Bedingung greift schon zu früh, sobald irgendeine Detection unklar ist. Logik anpassen:
+- Wenn der **Anchor** ≥2 Gesichter zeigt → `hasTwoRealFaces = true`, weiter mit Multi-Pass (auch wenn Clip-Frame nicht auswertbar war).
+- Nur wenn Anchor UND Clip-Frame jeweils <2 Gesichter haben → Refund + Fail mit klarer Message.
+- Wenn Gemini gar nicht erreichbar war (beide Quellen null) → heuristisches Targeting versuchen statt sofort zu failen.
 
-### 5. Optional, aber empfohlen: Multi-Ref i2v für ≥2 Charaktere
-Für cinematic-sync Szenen mit ≥2 `character_shots` automatisch auf **Vidu Q2 reference2v** routen statt Hailuo i2v. Vidu nimmt bis zu 7 Subject-Refs nativ entgegen und liefert deutlich zuverlässigere Two-Shots. Hailuo bleibt Fallback für Single-Char. (Gemäß Memory `vidu-q2-multi-reference-integration`.)
+### 4. Symmetrische Korrektur in `compose-video-clips`
+Der Pre-Flight-Audit ruft `countFacesInImage` mit `kind:'image'` auf der frisch komponierten Anchor-URL auf — dort gibt es das Problem nicht. **Keine Änderung nötig.** Nur dokumentieren, dass Video-Input für `countFacesInImage` weiterhin verboten ist, bis Frame-Extraktion vorgeschaltet ist.
+
+### 5. Memory-Update
+`mem://architecture/lipsync/sync-so-pro-model-policy`:
+- Neue Regel: "Anchor-Quelle ist `reference_image_url` (mit Fallback auf `lock_reference_url`). `lock_reference_url` ist im Composer fast immer NULL."
+- Neue Regel: "Gemini `image_url` darf NIE eine MP4-URL bekommen — immer vorher Frame-Extraktion."
 
 ### 6. Aktuelle Szene reparieren
-`ab0b0a8e-…` zurücksetzen: `reference_image_url=NULL`, `clip_url=NULL`, `lip_sync_status=NULL`, `clip_error=NULL`, `twoshot_stage=NULL`. Dann mit der neuen Pipeline einmal komplett re-rollen.
-
-## Technische Details
-
-- Gemini-Face-Count nutzt `google/gemini-2.5-flash` (bereits in `detectFacesInMaster`) — Wir extrahieren die Funktion in `_shared/face-count.ts` und teilen sie zwischen `compose-video-clips` (Pre-Check) und `compose-twoshot-lipsync` (Post-Check). Cache-Key: Bild-URL → Zähler.
-- Refund-Logik: vorhandener `refund-credits`-Pfad wird mit `reason='anchor_missing_speakers'` und `'source_clip_missing_speakers'` erweitert (idempotent über deterministische UUID aus `scene_id + reason`).
-- Datei-Änderungen:
-  - `supabase/functions/compose-scene-anchor/index.ts` — Two-Shot Prompt-Härtung
-  - `supabase/functions/compose-video-clips/index.ts` — Pre-Flight Face-Audit + Retry
-  - `supabase/functions/compose-twoshot-lipsync/index.ts` — stillen Single-Pass-Fallback entfernen, Fail-Loudly
-  - `supabase/functions/_shared/face-count.ts` — neu
-  - `src/components/video-composer/ClipsTab.tsx` — "Clip + Lipsync neu rendern" Button + Vidu-Routing für Multi-Char
-  - Memory-Update: `mem://architecture/lipsync/sync-so-pro-model-policy` (neue Pre-Flight + No-Silent-Fallback-Regel)
+`9c546015-21f1-4715-b484-ffe53f23c36f`:
+```sql
+UPDATE composer_scenes
+SET lip_sync_status='pending', twoshot_stage=NULL, clip_error=NULL,
+    replicate_prediction_id=NULL
+WHERE id='9c546015-21f1-4715-b484-ffe53f23c36f';
+```
+Anchor + Clip bleiben — sie sind in Ordnung. Der Auto-Trigger nimmt die Szene dann mit dem gefixten Audit-Pfad neu auf.
 
 ## Akzeptanzkriterien
-- Eine Szene mit 2 Sprechern wird nie lippensynchronisiert, wenn der Quellclip <2 Gesichter zeigt — stattdessen klare Fehlermeldung + Re-Roll-Button.
-- Re-Roll der aktuellen Szene produziert einen Two-Shot mit Matthew **und** Samuel, beide bewegen ihre Lippen synchron zu ihrer jeweiligen Stimme.
-- Credits werden bei jedem Fail automatisch refundiert.
+- Szene `9c546015` läuft nach Reset durch Multi-Pass-Lipsync ohne erneutes Clip-Re-Roll.
+- Edge-Log zeigt `faceMap { source: 'anchor', faces: ≥2 }` statt `heuristic-fallback`.
+- Künftige Two-Shot-Szenen mit gültigem Anchor werden nie wieder fälschlich wegen "0 faces in MP4" abgebrochen.
+
+## Geänderte Dateien
+- `supabase/functions/compose-twoshot-lipsync/index.ts` — Anchor-Spalte korrigieren + Fail-Logik weichzeichnen
+- `supabase/functions/_shared/face-count.ts` — Video-Input klar verbieten, Helper-Dokstring
+- `supabase/functions/_shared/extract-first-frame.ts` — neu (optional, für robustere Clip-Fallback-Detection)
+- Migration: Reset der fehlgeschlagenen Szene
+- `mem://architecture/lipsync/sync-so-pro-model-policy` — neue Anchor- + Frame-Extract-Regel
