@@ -303,14 +303,22 @@ serve(async (req) => {
       }, 422);
     }
 
+    // Compute duration-based cost (VO duration preferred, fallback to scene length)
+    const estDurationSec = Math.max(
+      vo.duration ?? 0,
+      (scene as any).duration_seconds ?? 0,
+      1,
+    );
+    const cost = computeCost(estDurationSec, 1);
+
     // Wallet check + reserve
     const { data: wallet } = await supabase
       .from('wallets')
       .select('balance')
       .eq('user_id', user.id)
       .single();
-    if (!wallet || wallet.balance < COST) {
-      return json({ error: 'INSUFFICIENT_CREDITS', required: COST }, 402);
+    if (!wallet || wallet.balance < cost) {
+      return json({ error: 'INSUFFICIENT_CREDITS', required: cost }, 402);
     }
 
     const REPLICATE_KEY = Deno.env.get('REPLICATE_API_KEY');
@@ -323,17 +331,17 @@ serve(async (req) => {
       .eq('id', scene_id);
 
     await supabase.from('wallets').update({
-      balance: wallet.balance - COST,
+      balance: wallet.balance - cost,
       updated_at: new Date().toISOString(),
     }).eq('user_id', user.id);
 
     const refund = async (reason: string) => {
-      console.warn(`[compose-lipsync-scene ${scene_id}] Refund ${COST}: ${reason}`);
+      console.warn(`[compose-lipsync-scene ${scene_id}] Refund ${cost}: ${reason}`);
       const { data: w2 } = await supabase
         .from('wallets').select('balance').eq('user_id', user.id).single();
       if (w2) {
         await supabase.from('wallets').update({
-          balance: w2.balance + COST,
+          balance: w2.balance + cost,
           updated_at: new Date().toISOString(),
         }).eq('user_id', user.id);
       }
