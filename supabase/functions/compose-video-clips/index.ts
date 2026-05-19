@@ -542,36 +542,104 @@ serve(async (req) => {
                 .map((cs) => charById.get(cs.characterId)?.name)
                 .filter((n): n is string => typeof n === 'string' && n.length > 0);
               if (portraitUrls.length >= 2) {
-                console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits)`);
-                const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                  },
-                  body: JSON.stringify({
-                    sceneId: scene.id,
-                    portraitUrl: portraitUrls[0],
-                    portraitUrls,
-                    characterNames,
-                    scenePrompt: scene.aiPrompt || '',
-                    aspectRatio: '16:9',
-                    shotType: scene.characterShot?.shotType,
-                  }),
-                });
-                if (anchorResp.ok) {
-                  const aj = await anchorResp.json().catch(() => ({}));
-                  if (aj?.composedUrl) {
-                    scene.referenceImageUrl = aj.composedUrl;
+                const expectedFaces = portraitUrls.length;
+                const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+                // composeAnchor — single attempt at compose-scene-anchor.
+                // Returns the composed URL on success, null on any failure.
+                const composeAnchor = async (label: string): Promise<string | null> => {
+                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits) [${label}]`);
+                  const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    },
+                    body: JSON.stringify({
+                      sceneId: scene.id,
+                      portraitUrl: portraitUrls[0],
+                      portraitUrls,
+                      characterNames,
+                      scenePrompt: scene.aiPrompt || '',
+                      aspectRatio: '16:9',
+                      shotType: scene.characterShot?.shotType,
+                    }),
+                  });
+                  if (!r.ok) {
+                    const errTxt = await r.text().catch(() => '');
+                    console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: compose-scene-anchor failed ${r.status} ${errTxt.slice(0, 200)}`);
+                    return null;
+                  }
+                  const aj = await r.json().catch(() => ({}));
+                  return typeof aj?.composedUrl === 'string' ? aj.composedUrl : null;
+                };
+
+                // Try once, then verify face count via Gemini. If the composed
+                // image has fewer faces than required speakers, invalidate the
+                // cache (so the next compose-scene-anchor call re-runs Nano
+                // Banana 2 with the v6 prompt) and retry once.
+                let composedUrl = await composeAnchor('attempt-1');
+                let faceCount: number | null = null;
+                if (composedUrl && LOVABLE_API_KEY) {
+                  faceCount = await countFacesInImage(composedUrl, LOVABLE_API_KEY, { kind: 'image' });
+                  console.log(`[compose-video-clips] anchor face-audit scene ${scene.id} attempt-1: faces=${faceCount}/${expectedFaces}`);
+                  if (faceCount !== null && faceCount < expectedFaces) {
+                    // Invalidate cache row so the retry actually re-renders.
+                    await supabaseAdmin
+                      .from('scene_anchor_cache')
+                      .delete()
+                      .eq('scene_id', scene.id);
+                    const retryUrl = await composeAnchor('attempt-2');
+                    if (retryUrl) {
+                      const retryCount = await countFacesInImage(retryUrl, LOVABLE_API_KEY, { kind: 'image' });
+                      console.log(`[compose-video-clips] anchor face-audit scene ${scene.id} attempt-2: faces=${retryCount}/${expectedFaces}`);
+                      if (retryCount !== null && retryCount >= expectedFaces) {
+                        composedUrl = retryUrl;
+                        faceCount = retryCount;
+                      } else if (retryCount !== null) {
+                        // Still short — keep best so we don't lose a half-good
+                        // frame, but mark the scene so downstream lipsync can
+                        // fail loud with a precise reason.
+                        composedUrl = retryUrl;
+                        faceCount = retryCount;
+                      }
+                    }
+                  }
+                }
+
+                if (composedUrl) {
+                  scene.referenceImageUrl = composedUrl;
+                  const auditMeta = faceCount !== null
+                    ? { anchor_face_audit: { detected: faceCount, expected: expectedFaces, ok: faceCount >= expectedFaces, at: new Date().toISOString() } }
+                    : {};
+                  await supabaseAdmin
+                    .from('composer_scenes')
+                    .update({
+                      reference_image_url: composedUrl,
+                      updated_at: new Date().toISOString(),
+                      ...(faceCount !== null
+                        ? { audio_plan: { ...((scene as any).audioPlan ?? {}), twoshot: { ...(((scene as any).audioPlan ?? {}).twoshot ?? {}), ...auditMeta } } }
+                        : {}),
+                    })
+                    .eq('id', scene.id);
+                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? '?'}/${expectedFaces}) → ${composedUrl.slice(0, 80)}…`);
+
+                  // If after 2 attempts the anchor still lacks faces, abort
+                  // BEFORE spending Hailuo credits. The user gets a clean
+                  // "anchor_missing_speakers" error and a re-roll button.
+                  if (faceCount !== null && faceCount < expectedFaces) {
+                    console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — anchor only shows ${faceCount}/${expectedFaces} faces after 2 attempts`);
                     await supabaseAdmin
                       .from('composer_scenes')
-                      .update({ reference_image_url: aj.composedUrl, updated_at: new Date().toISOString() })
+                      .update({
+                        clip_status: 'failed',
+                        clip_error: `anchor_missing_speakers: ${faceCount}/${expectedFaces} faces visible after 2 compose attempts`,
+                        updated_at: new Date().toISOString(),
+                      })
                       .eq('id', scene.id);
-                    console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor composed → ${aj.composedUrl.slice(0, 80)}…`);
+                    // Skip this scene's clip generation entirely.
+                    continue;
                   }
-                } else {
-                  const errTxt = await anchorResp.text().catch(() => '');
-                  console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`);
                 }
               }
             }
