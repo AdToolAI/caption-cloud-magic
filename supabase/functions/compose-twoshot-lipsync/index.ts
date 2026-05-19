@@ -133,6 +133,109 @@ async function runLipsyncPrediction(
 }
 
 /**
+ * Direct Sync.so v2 API call — bypasses the Replicate wrapper which silently
+ * drops the nested `options.active_speaker_detection` object. This is the
+ * ONLY way to deterministically pin each pass to a specific face (Artlist
+ * parity). Falls back to Replicate when SYNC_API_KEY is not configured.
+ *
+ * Docs: https://docs.sync.so/api-reference/endpoint/generate
+ */
+async function runSyncSoDirectPrediction(
+  syncApiKey: string,
+  supabase: any,
+  sceneId: string,
+  params: {
+    videoUrl: string;
+    audioUrl: string;
+    syncMode?: "cut_off" | "loop" | "bounce";
+    temperature?: number;
+    targetCoords?: [number, number] | null;
+    frameNumber?: number;
+  },
+  label: string,
+): Promise<string> {
+  const inputArr: Array<Record<string, unknown>> = [
+    { type: "video", url: params.videoUrl },
+    { type: "audio", url: params.audioUrl },
+  ];
+
+  const options: Record<string, unknown> = {
+    sync_mode: params.syncMode ?? "cut_off",
+    output_format: "mp4",
+    temperature: params.temperature ?? 0.5,
+  };
+
+  if (params.targetCoords) {
+    options.active_speaker_detection = {
+      auto_detect: false,
+      frame_number: params.frameNumber ?? 0,
+      coordinates: params.targetCoords,
+    };
+  } else {
+    options.active_speaker_detection = { auto_detect: true };
+  }
+
+  const createResp = await fetch("https://api.sync.so/v2/generate", {
+    method: "POST",
+    headers: {
+      "x-api-key": syncApiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "lipsync-2-pro",
+      input: inputArr,
+      options,
+    }),
+  });
+
+  if (!createResp.ok) {
+    const txt = await createResp.text().catch(() => "");
+    throw new Error(`${label}_create_${createResp.status}: ${txt.slice(0, 400)}`);
+  }
+  const created = await createResp.json();
+  const jobId = created?.id;
+  if (!jobId) throw new Error(`${label}_missing_job_id: ${JSON.stringify(created).slice(0, 200)}`);
+
+  await supabase
+    .from("composer_scenes")
+    .update({
+      replicate_prediction_id: `sync:${jobId}`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sceneId);
+
+  const started = Date.now();
+  while (Date.now() - started < PASS_TIMEOUT_MS) {
+    await sleep(POLL_INTERVAL_MS);
+    const pollResp = await fetch(`https://api.sync.so/v2/generate/${jobId}`, {
+      headers: { "x-api-key": syncApiKey },
+    });
+    if (!pollResp.ok) {
+      const txt = await pollResp.text().catch(() => "");
+      console.warn(`[sync.so poll ${jobId}] ${pollResp.status}: ${txt.slice(0, 200)}`);
+      continue;
+    }
+    const poll = await pollResp.json();
+    const status = String(poll?.status ?? "").toUpperCase();
+    if (status === "COMPLETED") {
+      const url = poll?.outputUrl || poll?.output_url || poll?.output;
+      if (!url || typeof url !== "string") throw new Error(`${label}_no_output_url`);
+      return url;
+    }
+    if (status === "FAILED" || status === "CANCELED" || status === "REJECTED") {
+      const errMsg = poll?.error || poll?.errorMessage || poll?.message || JSON.stringify(poll).slice(0, 300);
+      throw new Error(`${label}_${status.toLowerCase()}: ${errMsg}`);
+    }
+    await supabase
+      .from("composer_scenes")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", sceneId);
+  }
+
+  throw new Error(`${label}_timeout_${Math.round(PASS_TIMEOUT_MS / 1000)}s`);
+}
+
+/**
  * Detect face centers in the two-shot anchor image via Gemini Vision.
  * Returns coordinates normalized to the image's natural pixel space.
  * Sync.so honors these coordinates relative to the input video frame size,
