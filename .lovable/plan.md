@@ -1,87 +1,75 @@
-## Befund
 
-Pass 1 lipsynct sauber, Pass 2 trifft erneut Charakter A — typisches Multi-Speaker-Problem. Ursachen-Analyse anhand der offiziellen Sync.so-Doku (`/v2/generate`):
+## Hintergrund: Sync.so Creator Pricing
 
-1. **Wir benutzen Replicate's `sync/lipsync-2-pro` Wrapper, nicht die echte Sync.so-API.**
-   - Das offizielle Feld heisst `options.active_speaker_detection.{auto_detect, frame_number, coordinates, bounding_boxes, v3}` (verschachtelt unter `options`).
-   - Replicate flacht den Input zu Top-Level-Feldern ab und ignoriert unbekannte/verschachtelte Keys still. Unser `active_speaker_detection`-Objekt sowie `face_index`/`speaker` werden also vermutlich nie an das Modell weitergereicht → Sync.so läuft im Auto-Detect-Modus und pickt beide Male das prominenteste Gesicht (= Charakter A).
-   - Genau das deckt sich mit "ein Voiceover klappt, das zweite ist weiterhin fehlerhaft".
+Auf dem **Creator $19/mo** Plan kostet `sync/lipsync-2-pro`:
+- **~$0.08 / Sekunde** (entspricht $0.40 für 5s @ 24fps, $0.80 für 10s, $1.20 für 15s)
+- ≈ **€0.074 / Sekunde** echte Kosten an Sync.so
 
-2. **Koordinaten werden im falschen Bezugssystem berechnet.**
-   - Wir lassen Gemini Faces im Anker-Bild (1:1, oft 1024×1024) erkennen und schicken die Pixel an Sync.so. Sync.so erwartet aber Koordinaten im Pixelraum des **Video-Frames** (z. B. 1280×720 von Hailuo) — bei abweichendem Seitenverhältnis liegen die Punkte falsch.
+Unser aktueller Flatrate-Preis (14 / 28 Credits) deckt das nur für ≤2s-Clips und macht bei 5-15s-Szenen **Verlust**.
 
-3. **Pass 2 läuft auf dem Output von Pass 1.**
-   - Selbst mit korrekter ASD ist Charakter A's Mund jetzt animiert → erscheint als "aktiver Sprecher" → Auto-Detect snapt zurück auf A. Artlist macht stattdessen einen einzigen Call mit per-Frame-Speaker-Mapping.
+(Reminder: 1 Credit = €0.01 — bestätigt durch `featureCosts.ts: composer_clip_ai: 30 // €0.30`.)
 
-## Plan (Artlist-Parität)
+## Ziel: Duration-basiertes Pricing, max. 10-20% Marge
 
-### 1. Direkte Sync.so-API statt Replicate-Wrapper
-- Neuen Secret `SYNC_API_KEY` einführen (über `secrets--add_secret`, blocker bis Key da ist).
-- `compose-twoshot-lipsync` ruft `POST https://api.sync.so/v2/generate` direkt mit `model: 'lipsync-2-pro'` + `options.active_speaker_detection` auf. Polling via `GET /v2/generate/{id}` bis `COMPLETED`/`FAILED`.
-- Nur dieser Pfad garantiert, dass ASD-Parameter wirklich ankommen.
+Neue Formel: **9 Credits pro Sekunde Lipsync-Output**
+- €0.09/s an User → €0.074/s an Sync.so = **~22% Bruttomarge** (deckt Edge-Function-Overhead + leichte Schwankung)
+- Alternativ **8 Credits/s** = €0.08/s = **~8% Marge** (Break-even-nah, sicherer Polster)
 
-### 2. Ein Call statt zwei Passes (Artlist-Style)
-- Aus den per-speaker WAV-Tracks bauen wir ein **gemischtes Audio** + einen **Bounding-Box-Track** pro Frame:
-  - Für jedes Frame `f` (bei sceneFps): bestimme aus `metadata.speakers[*].segments` welcher Sprecher gerade spricht → setze `bounding_boxes[f] = bboxOfThatSpeaker`, sonst `null` (Stille = kein Lipsync).
-- Schicke ein einziges Sync.so-Request:
-  ```json
-  {
-    "model": "lipsync-2-pro",
-    "input": [
-      { "type": "video", "url": <silent master> },
-      { "type": "audio", "url": <merged twoshot wav> }
-    ],
-    "options": {
-      "sync_mode": "cut_off",
-      "active_speaker_detection": {
-        "auto_detect": false,
-        "v3": true,
-        "bounding_boxes": [ /* per-frame [x1,y1,x2,y2] | null */ ]
-      }
-    }
-  }
-  ```
-- Vorteil: Kein Pass-1-Mund-Artefakt mehr, ein deterministischer Render, Kosten 14 statt 28 Credits.
+Empfehlung: **9 Credits/s** als sauberer Mittelweg. Aufrunden auf ganze Sekunden (`Math.ceil`).
 
-### 3. Face-Detection auf dem echten Video-Frame
-- `detectFacesInMaster` nutzt **zuerst** das `lip_sync_source_clip_url`-MP4 (Gemini ingestiert den First-Frame und liefert Pixel im Video-Koordinatensystem). Anker nur als Fallback.
-- Frame-Größe (`videoWidth`, `videoHeight`) wird mit dem Result gespeichert und als Bezugssystem für alle Bounding-Boxes verwendet.
-- Wenn Gemini nur 1 Gesicht findet → harter Fehler statt heimlich auf Heuristik zu fallen (verhindert "still nur ein Charakter").
+## Beispiel-Kosten (User-Sicht)
 
-### 4. Bounding-Box-Track aus Speaker-Segmenten
-- Helper `buildBoundingBoxTrack({ fps, durationSec, speakers, faceMap })`:
-  - Für jeden Frame: prüfen, ob ein `speakers[i].segments[j]` (start..end in Sekunden) den Zeitstempel enthält. Erster Treffer gewinnt.
-  - Mappe `character_id`/`shotIdx` → `faceMap.faces[side]` → `[x1,y1,x2,y2]`.
-- `fps` wird aus dem Scene-Default (24) genommen oder optional via Gemini geschätzt.
-- Speichern in `audio_plan.twoshot.bboxTrack` (komprimiert: RLE-style) für Debug & Re-Render.
+| Szene-Dauer | Single Lipsync | Two-Shot (2 Passes) |
+|---|---|---|
+| 3s | 27 Credits (€0.27) | 54 Credits (€0.54) |
+| 5s | 45 Credits (€0.45) | 90 Credits (€0.90) |
+| 8s | 72 Credits (€0.72) | 144 Credits (€1.44) |
+| 10s | 90 Credits (€0.90) | 180 Credits (€1.80) |
+| 15s | 135 Credits (€1.35) | 270 Credits (€2.70) |
 
-### 5. Fallback & Heartbeat
-- Wenn `SYNC_API_KEY` fehlt: klarer 412-Fehler statt stiller Replicate-Fallback.
-- Heartbeat protokolliert `mode: 'single-call-bbox-track'`, `frames`, `framesWithSpeaker`, `faceMapSource` für UI-Sichtbarkeit.
-- Idempotenter Credit-Refund über deterministische UUID bleibt erhalten.
+Single bisher: 14 → ~3-10× höher. Two-shot bisher: 28 → ~2-10× höher. Reflektiert die echten Provider-Kosten.
 
-### 6. UI / Audio-Mux unverändert
-- `audio_plan.twoshot.useExternalAudio = true` bleibt — das gemischte WAV bleibt die Master-Audio-Spur im Export.
-- `ClipsTab`-Hinweis aktualisieren: "Multi-Sprecher Two-Shot via Sync.so v2 ASD (Artlist-Parität)."
+## Änderungen
 
-## Technische Dateien
+### 1. `supabase/functions/compose-lipsync-scene/index.ts`
+- Konstante `COST = 14` ersetzen durch Funktion `computeCost(durationSec)` → `Math.max(9, Math.ceil(durationSec) * 9)` (Min-Floor 9 Credits für Edge-Cases)
+- VO-Dauer ist in der Scene bereits bekannt (oder via `ffprobe`/audio-meta) — bestehende Logik nutzen, sonst `scene.vo_duration_seconds` lesen
+- Alle 4 Stellen wo `COST` referenziert wird (Reserve, Insufficient-Check, Refund x2) auf berechneten Wert umstellen
+- Response `credits_used` = berechneter Wert
 
-- `supabase/functions/compose-twoshot-lipsync/index.ts` — Replicate raus, Sync.so direkt rein, Bounding-Box-Track-Builder, harter Fehler bei <2 Faces
-- `mem/architecture/lipsync/sync-so-pro-model-policy` — neue Pipeline dokumentieren
-- `src/components/video-composer/ClipsTab.tsx` — Hinweistext
+### 2. `supabase/functions/compose-twoshot-lipsync/index.ts`
+- Konstante `COST = 28` ersetzen durch `computeCost(durationSec) = Math.max(18, Math.ceil(durationSec) * 9 * 2)`
+- Gleiche Stellen anpassen (Reserve, Check, Refunds, `credits_reserved` in Response)
+- Two-Shot rendert 2 Passes → daher × 2
 
-## Voraussetzung
+### 3. `supabase/functions/lip-sync-video/index.ts`
+- `COST = 14` → gleiche `computeCost(durationSec)` Logik
+- Duration aus Input-Audio ableiten (existiert bereits oder via head-fetch + duration extract)
 
-- Secret `SYNC_API_KEY` (Sync.so Dashboard → API Keys). Ohne diesen Key kann der Wechsel nicht aktiviert werden.
+### 4. UI: Preis-Anzeige aktualisieren
+- `src/components/composer/lipsync/*` oder wo Lipsync-Buttons sitzen → Tooltip / Confirm-Modal zeigt dynamisch berechnete Credits statt hardcoded "14"
+- Suche nach `14` / `28` als hardcoded Kostenanzeige und ersetzen durch `Math.ceil(duration * 9)`
 
-## Ergebnis
+### 5. Optional: 429-Quota-Hinweis verfeinern
+- Bei `429`-Response von Sync.so im `compose-twoshot-lipsync` einen klareren Toast: "Sync.so Creator-Kontingent erreicht — bitte Top-up im Sync.so Dashboard oder warte 60s."
+- Bereits in vorheriger Iteration angekündigt, kann mit reingebaut werden.
 
-```text
-silent two-shot master
-  ├─ merged twoshot WAV (alle Sprecher gemischt)
-  └─ per-frame bounding-box track (A | B | null)
-        ↓ ein Sync.so /v2/generate Call mit ASD v3
-final lip-synced video (beide Charaktere am richtigen Punkt) + externe Master-Audio
-```
+## Memory-Update
 
-Das eliminiert beide Root-Causes: ASD-Parameter werden garantiert übernommen, und Pass-1-Mund kann Pass-2 nicht mehr "überstimmen".
+`mem://architecture/lipsync/sync-so-pro-model-policy` aktualisieren:
+- Alte Zeile: `COST 14 (single) / 28 (two-shot)`
+- Neu: `COST = ceil(duration_sec) × 9 credits per pass (Single = 1 pass, Two-shot = 2 passes); reflects Sync.so Creator pricing $0.08/s with ~22% margin`
+
+## Was nicht geändert wird
+
+- Model bleibt `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`
+- Refund-Logik bleibt idempotent
+- MIN_VO_DURATION 0.4s bleibt
+- Keine Plan-Gating-Änderungen (Free-User können weiterhin nutzen, Wallet-Balance entscheidet)
+
+## Verifikation nach Build
+
+1. `compose-lipsync-scene` mit 5s VO → erwartet 45 Credits Abzug
+2. `compose-twoshot-lipsync` mit 8s VO → erwartet 144 Credits Abzug
+3. Insufficient-credits-Check triggert korrekt bei niedrigem Balance
+4. UI-Tooltip zeigt vor Klick die korrekte Credit-Schätzung

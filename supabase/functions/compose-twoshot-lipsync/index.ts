@@ -32,8 +32,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// 2× lipsync-2-pro per pass (multi-pass two-shot) — Artlist parity
-const COST = 28;
+// Duration-based pricing: Sync.so Creator plan ≈ $0.08/s per pass.
+// Two-shot = 2 sequential passes → 18 credits/s = €0.18/s (~22% margin).
+const CREDITS_PER_SECOND = 9;
+const PASSES = 2;
+const MIN_COST = 18; // floor (1s × 9 × 2 passes)
+const computeCost = (durationSec: number): number =>
+  Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND * PASSES);
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 const PASS_TIMEOUT_MS = 180_000;
 const POLL_INTERVAL_MS = 5_000;
@@ -504,14 +509,22 @@ serve(async (req) => {
       }
     }
 
+    // Compute duration-based cost from merged VO (twoshot_audio just produced it).
+    const estDurationSec = Math.max(
+      mergedVo?.duration ?? 0,
+      (scene as any).duration_seconds ?? 0,
+      1,
+    );
+    const cost = computeCost(estDurationSec);
+
     // Wallet check
     const { data: wallet } = await supabase
       .from("wallets")
       .select("balance")
       .eq("user_id", user.id)
       .single();
-    if (!wallet || wallet.balance < COST) {
-      return json({ error: "INSUFFICIENT_CREDITS", required: COST }, 402);
+    if (!wallet || wallet.balance < cost) {
+      return json({ error: "INSUFFICIENT_CREDITS", required: cost }, 402);
     }
 
     const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY");
@@ -520,7 +533,7 @@ serve(async (req) => {
 
     // Reserve credits + mark stage.
     await supabase.from("wallets").update({
-      balance: wallet.balance - COST,
+      balance: wallet.balance - cost,
       updated_at: new Date().toISOString(),
     }).eq("user_id", user.id);
 
@@ -533,12 +546,12 @@ serve(async (req) => {
     const refund = async (reason: string) => {
       if (refunded) return;
       refunded = true;
-      console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${COST}: ${reason}`);
+      console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${cost}: ${reason}`);
       const { data: w2 } = await supabase
         .from("wallets").select("balance").eq("user_id", user.id).single();
       if (w2) {
         await supabase.from("wallets").update({
-          balance: w2.balance + COST,
+          balance: w2.balance + cost,
           updated_at: new Date().toISOString(),
         }).eq("user_id", user.id);
       }
@@ -1045,7 +1058,7 @@ serve(async (req) => {
       accepted: true,
       scene_id,
       status: "running",
-      credits_reserved: COST,
+      credits_reserved: cost,
     }, 202);
   } catch (e) {
     return json({ error: (e as Error).message }, 500);

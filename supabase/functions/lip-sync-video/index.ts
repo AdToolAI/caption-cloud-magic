@@ -9,7 +9,12 @@ const corsHeaders = {
 };
 
 // Artlist-grade lip-sync via Sync.so lipsync-2-pro
-const COST = 14;
+// Duration-based pricing (Sync.so Creator $0.08/s → 9 credits/s ≈ €0.09/s, ~22% margin).
+const CREDITS_PER_SECOND = 9;
+const MIN_COST = 9;
+const FALLBACK_DURATION_SEC = 10; // conservative cap when caller omits duration
+const computeCost = (durationSec: number): number =>
+  Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND);
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 // Idempotency namespace for deterministic refund UUIDs
 const REFUND_NS = 'b3f4c1a8-1d4e-4cf7-9b1c-a4b9d77ef111';
@@ -30,7 +35,7 @@ serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     const body = await req.json();
-    const { video_url, audio_url, scene_id = null, project_id = null, user_id: bodyUserId } = body || {};
+    const { video_url, audio_url, scene_id = null, project_id = null, user_id: bodyUserId, duration_seconds } = body || {};
 
     // Allow service-role calls (e.g. from remotion-webhook) to pass user_id
     // explicitly instead of a user JWT.
@@ -45,27 +50,32 @@ serve(async (req) => {
 
     if (!video_url || !audio_url) return json({ error: 'video_url and audio_url required' }, 400);
 
+    const durSec = Number.isFinite(Number(duration_seconds)) && Number(duration_seconds) > 0
+      ? Number(duration_seconds)
+      : FALLBACK_DURATION_SEC;
+    const cost = computeCost(durSec);
+
     const { data: wallet } = await supabase
       .from('wallets').select('balance').eq('user_id', userId).single();
-    if (!wallet || wallet.balance < COST) {
-      return json({ error: 'INSUFFICIENT_CREDITS', required: COST }, 402);
+    if (!wallet || wallet.balance < cost) {
+      return json({ error: 'INSUFFICIENT_CREDITS', required: cost }, 402);
     }
 
     const REPLICATE = Deno.env.get('REPLICATE_API_KEY');
     if (!REPLICATE) return json({ error: 'REPLICATE_API_KEY missing' }, 500);
 
     await supabase.from('wallets').update({
-      balance: wallet.balance - COST,
+      balance: wallet.balance - cost,
       updated_at: new Date().toISOString(),
     }).eq('user_id', userId);
 
     const refund = async (reason: string) => {
-      console.warn(`[lip-sync-video] Refund ${COST}: ${reason}`);
+      console.warn(`[lip-sync-video] Refund ${cost}: ${reason}`);
       const { data: w2 } = await supabase
         .from('wallets').select('balance').eq('user_id', userId).single();
       if (w2) {
         await supabase.from('wallets').update({
-          balance: w2.balance + COST,
+          balance: w2.balance + cost,
           updated_at: new Date().toISOString(),
         }).eq('user_id', userId);
       }
@@ -97,7 +107,7 @@ serve(async (req) => {
         return json({ error: 'no output' }, 502);
       }
 
-      return json({ success: true, video_url: outUrl, scene_id, project_id, credits_used: COST });
+      return json({ success: true, video_url: outUrl, scene_id, project_id, credits_used: cost });
     } catch (e) {
       await refund(`replicate error: ${(e as Error).message}`);
       return json({ error: (e as Error).message }, 502);
