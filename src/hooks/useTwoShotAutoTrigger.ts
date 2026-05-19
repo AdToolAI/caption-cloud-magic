@@ -54,12 +54,32 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at, clip_error, twoshot_stage')
+          .select('id, clip_url, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
           .eq('project_id', projectId);
         if (error || !data) return;
 
         const now = Date.now();
         const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
+
+        const hasSyncSoJob = (d: any) =>
+          typeof d.replicate_prediction_id === 'string' &&
+          d.replicate_prediction_id.startsWith('sync:');
+
+        const runningSyncJobs = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            hasSyncSoJob(d) &&
+            !inflight.current.has(`poll:${d.id}`),
+        );
+        for (const d of runningSyncJobs) {
+          inflight.current.add(`poll:${d.id}`);
+          supabase.functions
+            .invoke('poll-twoshot-lipsync', { body: { scene_id: d.id } })
+            .catch((err) => console.warn('[useTwoShotAutoTrigger] poll failed', d.id, err))
+            .finally(() => setTimeout(() => inflight.current.delete(`poll:${d.id}`), 12_000));
+        }
 
         // Stale-recovery: 'running' >6min ohne lip_sync_applied_at → reset
         const stale = (data as any[]).filter(
@@ -67,6 +87,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             d.engine_override === 'cinematic-sync' &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
+            !hasSyncSoJob(d) &&
             d.updated_at &&
             now - new Date(d.updated_at).getTime() > STALE_MS,
         );
