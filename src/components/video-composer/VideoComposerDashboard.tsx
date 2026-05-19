@@ -1314,6 +1314,7 @@ export default function VideoComposerDashboard() {
                 onAddCharacter={(c) => updateBriefing({ characters: [...(project.briefing?.characters ?? []), c] })}
                 preferredAspect={project.briefing?.aspectRatio}
                 onRefetchScenes={refetchScenesFromDb}
+                isGeneratingStoryboard={isGeneratingStoryboard}
                 onEnsurePersisted={async () => {
                   const result = await ensureProjectPersisted(project);
                   // Sync ref BEFORE setState so any callback that fires inside
