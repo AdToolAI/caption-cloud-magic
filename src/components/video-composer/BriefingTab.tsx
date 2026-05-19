@@ -54,6 +54,15 @@ interface BriefingTabProps {
   onUpdateProject: (p: Record<string, any>) => void;
   onGoToStoryboard: () => void;
   onScenesGenerated: (scenes: ComposerScene[]) => void;
+  /** Fired the moment AI generation kicks off, so the dashboard can flip a
+   *  global flag and show a loading panel on the Storyboard tab. */
+  onGenerationStart?: () => void;
+  /** Fired when AI generation ends (success OR failure) so the loading
+   *  panel can be hidden. */
+  onGenerationEnd?: () => void;
+  /** Fired when AI generation fails or returns 0 scenes — dashboard
+   *  should bring the user back to Briefing so they can retry. */
+  onGenerationFailed?: () => void;
   brandKitId?: string | null;
   brandKitAutoSync?: boolean;
   assemblyConfig?: AssemblyConfig;
