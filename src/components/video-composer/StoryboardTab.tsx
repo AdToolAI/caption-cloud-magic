@@ -60,6 +60,9 @@ interface StoryboardTabProps {
   onRefetchScenes?: () => void | Promise<void>;
   /** Auto-persist hook — saves the project to DB and returns the fresh projectId + scene rows. */
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  /** True while the AI is generating the initial storyboard from the
+   *  briefing. Shows a loading panel instead of the empty-state. */
+  isGeneratingStoryboard?: boolean;
 }
 
 export default function StoryboardTab({
