@@ -230,35 +230,58 @@ export default function BriefingTab({
       return;
     }
 
+    // Switch to the Storyboard tab IMMEDIATELY so the user sees the
+    // loading panel instead of staring at the Briefing form for 10–20s.
     setIsGenerating(true);
+    onGenerationStart?.();
+    onUpdateProject({ status: 'storyboard' });
+    onGoToStoryboard();
+
+    let hadScenes = false;
     try {
       const { data, error } = await supabase.functions.invoke('compose-video-storyboard', {
         body: { briefing, category, language },
       });
 
-      if (error) throw error;
-      if (data?.scenes) {
-        // Apply default quality to all generated scenes
-        const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
-        const scenesWithQuality = data.scenes.map((s: ComposerScene) => ({
-          ...s,
-          clipQuality: s.clipQuality || defaultQ,
-        }));
-        onScenesGenerated(scenesWithQuality);
-        onUpdateProject({ status: 'storyboard' });
-        toast({ title: t('videoComposer.storyboardGenerated'), description: `${data.scenes.length} ${t('videoComposer.scenesCreated')}` });
+      if (error) {
+        console.warn('[BriefingTab] storyboard invoke error:', error, 'data:', data);
+        throw error;
       }
+      const rawScenes = Array.isArray(data?.scenes) ? data.scenes : null;
+      if (!rawScenes || rawScenes.length === 0) {
+        console.warn('[BriefingTab] storyboard returned no scenes. payload:', data);
+        throw new Error(data?.error || t('videoComposer.storyboardError'));
+      }
+
+      // Apply default quality to all generated scenes
+      const defaultQ: ClipQuality = briefing.defaultQuality || 'standard';
+      const scenesWithQuality = rawScenes.map((s: ComposerScene) => ({
+        ...s,
+        clipQuality: s.clipQuality || defaultQ,
+      }));
+      onScenesGenerated(scenesWithQuality);
+      hadScenes = true;
+      toast({ title: t('videoComposer.storyboardGenerated'), description: `${rawScenes.length} ${t('videoComposer.scenesCreated')}` });
     } catch (err: any) {
       console.error('Storyboard generation error:', err);
       toast({
         title: t('videoComposer.storyboardError'),
-        description: err.message || t('videoComposer.tryAgain'),
+        description: err?.message || t('videoComposer.tryAgain'),
         variant: 'destructive',
       });
+      // Bring the user back to Briefing so they can fix inputs and retry.
+      onGenerationFailed?.();
     } finally {
       setIsGenerating(false);
+      onGenerationEnd?.();
+      if (!hadScenes) {
+        // No scenes ever made it into state — keep project.status consistent.
+        onUpdateProject({ status: 'briefing' });
+      }
     }
   };
+
+
 
   const canProceed = briefing.productName.trim().length > 0;
 
