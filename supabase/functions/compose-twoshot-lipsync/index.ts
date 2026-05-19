@@ -159,6 +159,31 @@ async function runSyncSoDirectPrediction(
   },
   label: string,
 ): Promise<string> {
+  const jobId = await startSyncSoDirectGeneration(syncApiKey, params, label);
+
+  await supabase
+    .from("composer_scenes")
+    .update({
+      replicate_prediction_id: `sync:${jobId}`,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sceneId);
+
+  return await pollSyncSoDirectPrediction(syncApiKey, supabase, sceneId, jobId, label);
+}
+
+async function startSyncSoDirectGeneration(
+  syncApiKey: string,
+  params: {
+    videoUrl: string;
+    audioUrl: string;
+    syncMode?: "cut_off" | "loop" | "bounce";
+    temperature?: number;
+    targetCoords?: [number, number] | null;
+    frameNumber?: number;
+  },
+  label: string,
+): Promise<string> {
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
     { type: "audio", url: params.audioUrl },
@@ -200,15 +225,16 @@ async function runSyncSoDirectPrediction(
   const created = await createResp.json();
   const jobId = created?.id;
   if (!jobId) throw new Error(`${label}_missing_job_id: ${JSON.stringify(created).slice(0, 200)}`);
+  return String(jobId);
+}
 
-  await supabase
-    .from("composer_scenes")
-    .update({
-      replicate_prediction_id: `sync:${jobId}`,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", sceneId);
-
+async function pollSyncSoDirectPrediction(
+  syncApiKey: string,
+  supabase: any,
+  sceneId: string,
+  jobId: string,
+  label: string,
+): Promise<string> {
   const started = Date.now();
   while (Date.now() - started < PASS_TIMEOUT_MS) {
     await sleep(POLL_INTERVAL_MS);
