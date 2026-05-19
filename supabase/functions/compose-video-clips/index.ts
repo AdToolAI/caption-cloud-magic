@@ -627,16 +627,21 @@ serve(async (req) => {
                   // If after 2 attempts the anchor still lacks faces, abort
                   // BEFORE spending Hailuo credits. The user gets a clean
                   // "anchor_missing_speakers" error and a re-roll button.
+                  // If after 2 attempts the anchor still lacks faces, abort
+                  // BEFORE spending Hailuo credits. The user gets a clean
+                  // "anchor_missing_speakers" error and a re-roll button.
                   if (faceCount !== null && faceCount < expectedFaces) {
-                    console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — anchor only shows ${faceCount}/${expectedFaces} faces after 2 attempts`);
+                    const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} faces visible after 2 compose attempts`;
+                    console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — ${msg}`);
                     await supabaseAdmin
                       .from('composer_scenes')
                       .update({
                         clip_status: 'failed',
-                        clip_error: `anchor_missing_speakers: ${faceCount}/${expectedFaces} faces visible after 2 compose attempts`,
+                        clip_error: msg,
                         updated_at: new Date().toISOString(),
                       })
                       .eq('id', scene.id);
+                    results.push({ sceneId: scene.id, status: 'failed', error: msg });
                     // Skip this scene's clip generation entirely.
                     continue;
                   }
