@@ -22,6 +22,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage } from "../_shared/face-count.ts";
+import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
