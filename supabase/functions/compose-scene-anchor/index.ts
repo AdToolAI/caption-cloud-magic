@@ -152,8 +152,19 @@ serve(async (req) => {
     // any spoken dialog, captions, or labels into the composed first frame.
     const NO_TYPOGRAPHY_SUFFIX =
       ` ABSOLUTELY NO rendered text of any kind: no captions, no subtitles, no speech bubbles, no spoken words rendered as text, no words on clothing or shirts, no signs, no labels, no logos with text, no watermarks, no on-screen titles. The image must contain ZERO typography. Treat any dialog quoted in the scene description as audio-only context — do NOT visualize it as text.`;
+    // Two-shot framing enforcement — when ≥2 portraits, the downstream
+    // lipsync pipeline REQUIRES that all N faces are clearly visible and
+    // separable in the first frame. Without this, Hailuo i2v often crops
+    // to a single character or stacks faces and the multi-pass face-target
+    // lipsync collapses to one speaker. This rule is Artlist-parity.
+    const TWO_SHOT_FRAMING_SUFFIX = isMulti
+      ? ` MANDATORY TWO-SHOT FRAMING: a wide ${portraits.length}-shot where ALL ${portraits.length} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${portraits.length} distinct faces.`
+      : "";
+    const TWO_SHOT_NEGATIVE = isMulti
+      ? ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping.`
+      : "";
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
