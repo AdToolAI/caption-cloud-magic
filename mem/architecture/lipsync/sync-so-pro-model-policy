@@ -5,6 +5,10 @@ type: feature
 ---
 Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
 
+**Pre-Flight Anchor Face-Audit (Mai 2026):** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert das Ergebnis via `_shared/face-count.ts` (Gemini 2.5 Flash). Bei `faces < expectedFaces` wird der Cache invalidiert und genau 1× neu komponiert. Wenn auch der Retry zu wenig Gesichter zeigt → Szene wird mit `clip_error='anchor_missing_speakers: N/M …'` abgebrochen BEVOR Hailuo Credits brennt. compose-scene-anchor enthält ab v6 `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces) + Negativ-Prompt gegen Solo-Close-ups.
+
+**No-Silent-Fallback (Mai 2026):** Wenn `compose-twoshot-lipsync` 2+ Sprecher hat, aber im fertigen Clip <2 Gesichter findet, **failt es laut** mit `clip_error='source_clip_missing_speakers: …'` und refundet Credits — kein single-pass merged-VO Fallback mehr (das war die Quelle für "beide Stimmen kommen aus einem Mund"). Der User triggert dann **"🎥 Clip + Lip-Sync neu rendern"** in `SceneCard` (clears reference_image_url/clip_url/lip_sync_*, re-invokes compose-video-clips), damit ein echter Two-Shot-Quellclip entsteht.
+
 **Two-Shot Face-Targeting (Mai 2026, Artlist-Parität, gehärtet):**
 - Sync.so's `face_index`/`speaker`-Felder existieren **nicht** offiziell — werden defensiv mitgesendet, sind aber **nicht** das Primärsignal.
 - Korrektes Targeting via `active_speaker_detection: { auto_detect: false, frame_number: 0, coordinates: [x, y] }`. `active_speaker: false` setzen, sonst überschreibt Auto-Detect.

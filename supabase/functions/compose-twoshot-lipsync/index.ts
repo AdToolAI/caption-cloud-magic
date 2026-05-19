@@ -707,12 +707,19 @@ serve(async (req) => {
       );
 
       const hasTwoRealFaces = !!faceMap && Array.isArray(faceMap.faces) && faceMap.faces.length >= 2;
-      const useMultiPass = passes.length >= 2 && hasTwoRealFaces;
+      // Artlist-parity policy: when the script has 2+ speakers but the
+      // rendered clip only shows 1 visible face, NEVER fall back to a single
+      // merged-VO pass on one mouth — that is exactly the "all dialogue
+      // coming out of one character" failure mode the user is reporting.
+      // Instead refund credits, mark the scene failed with a precise reason,
+      // and let the user re-roll the source clip (via the "Clip + Lipsync
+      // neu rendern" action) so we get a real two-shot to lipsync.
       if (passes.length >= 2 && !hasTwoRealFaces) {
-        console.warn(
-          `[compose-twoshot-lipsync ${scene_id}] Only ${faceMap?.faces?.length ?? 0} face(s) detected — falling back to single-pass with merged VO + auto-detect.`,
-        );
+        const detected = faceMap?.faces?.length ?? 0;
+        await refund(`source_clip_missing_speakers: detected ${detected}/${passes.length} faces in the rendered clip — the source video does not show all speakers, so multi-pass face-targeted lip-sync is impossible. Re-roll the clip (Clip + Lipsync neu rendern) to get a real two-shot.`);
+        return;
       }
+      const useMultiPass = passes.length >= 2 && hasTwoRealFaces;
       const publicPasses = passes.map(({ _shotIdx: _shotIdx, ...p }) => p);
       let outUrl: string | null = null;
 
