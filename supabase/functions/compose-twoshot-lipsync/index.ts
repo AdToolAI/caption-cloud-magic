@@ -515,7 +515,8 @@ serve(async (req) => {
     }
 
     const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY");
-    if (!REPLICATE_KEY) return json({ error: "REPLICATE_API_KEY missing" }, 500);
+    const SYNC_API_KEY = Deno.env.get("SYNC_API_KEY");
+    if (!REPLICATE_KEY && !SYNC_API_KEY) return json({ error: "REPLICATE_API_KEY or SYNC_API_KEY missing" }, 500);
 
     // Reserve credits + mark stage.
     await supabase.from("wallets").update({
