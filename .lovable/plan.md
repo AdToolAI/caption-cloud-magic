@@ -1,67 +1,102 @@
 ## Diagnose
 
-Der Backend-Status ist normal. Die Voiceover-Erzeugung läuft ebenfalls normal: Beide Sprecher wurden von ElevenLabs erzeugt.
+Du hast recht: 10–15 Minuten sind kein normaler kurzer Sync.so-Wartezustand. Die Logs zeigen, dass die Szene nicht mehr beim Voiceover oder Anchor scheitert, sondern in einer Retry-/Polling-Schleife rund um Sync.so hängt.
 
-Der aktuelle Fehler passiert vor dem eigentlichen Sync.so-Lip-Sync:
+Aktuelle Szene:
 
-```text
-lipsync engine = sync.so/v2 (direct)
-faceMap { faces: 0, source: "heuristic-fallback", anchor: false, clip: true }
-Refund ... source_clip_missing_speakers: detected 0/2 faces
-```
+- `lip_sync_status = running`
+- `twoshot_stage = lipsync_1`
+- Sync.so Direct API wird wirklich genutzt: `sync.so/v2 (direct)`
+- Face-Audit findet Gesichter: `faceMap { faces: 3, source: "cache" }`
+- Pass 1 wird gestartet, aber mehrfach nach 180 Sekunden als Timeout behandelt und erneut gestartet.
 
-Das bedeutet: Die Funktion erkennt keinen Anchor und ruft Sync.so gar nicht erst für die Face-Passes auf. Sie refundet vorher.
+Das erklärt die UI: Sie bleibt auf „Lip-Sync wird vorbereitet…“, weil die Szene immer wieder im ersten Sync.so-Pass landet, statt sauber in `failed` oder `done` zu wechseln.
+
+Das zweite Problem — ein Charakter wird geklont — passt zur aktuellen Anchor-Logik: `compose-scene-anchor` sendet mehrere Portraits gleichzeitig an das Bildmodell und zählt danach nur, ob genug Gesichter sichtbar sind. Es prüft aber nicht sicher, ob es wirklich zwei unterschiedliche Personen sind. Dadurch kann das Modell eine Person doppeln, und unser Face-Audit akzeptiert das trotzdem, solange 2+ Gesichter erkannt werden.
 
 ## Root Cause
 
-In `compose-twoshot-lipsync/index.ts` wurde zwar die richtige Anchor-Logik eingebaut:
+1. **Sync.so ist asynchron, unsere Funktion behandelt es noch zu synchron**
+   - `compose-twoshot-lipsync` pollt Sync.so innerhalb derselben Edge Function.
+   - Der Pass hat ein hartes 180s-Limit.
+   - Sync.so-Jobs können real länger als 3 Minuten dauern.
+   - Danach wird refunded und der Auto-Trigger startet neu: Endlos-Schleife.
 
-```ts
-scene.reference_image_url || scene.lock_reference_url
-```
+2. **Face-Targeting ist noch nicht identitätsbasiert**
+   - Der Code nimmt Pass 1 = linkes Gesicht, Pass 2 = rechtes Gesicht.
+   - Wenn das generierte Bild 3 Gesichter enthält oder eine Person geklont wurde, kann Sync.so auf das falsche Gesicht zielen.
+   - Die Prüfung `faces >= 2` reicht für Artlist-Parität nicht aus; wir brauchen `2 unterschiedliche Sprecheridentitäten`.
 
-Aber die Datenbankabfrage lädt `reference_image_url` nicht mit:
+3. **Anchor-Generation kann mehrere Portraits vermischen**
+   - Das Bildmodell bekommt mehrere Referenzen, aber kein harter maschineller Identity-Audit folgt.
+   - Ein geklonter/vermischter Charakter wird aktuell nicht zuverlässig verworfen.
 
-```ts
-.select("id, project_id, clip_url, ..., lock_reference_url, ...")
-```
+## Plan
 
-Dadurch ist `scene.reference_image_url` in der Edge Function immer `undefined`, obwohl die Datenbank zeigt:
+1. **Sync.so-Job dauerhaft statt zeitlich kurz pollbar machen**
+   - `compose-twoshot-lipsync` startet Sync.so Pass 1 und speichert:
+     - Sync.so Job-ID
+     - aktueller Pass
+     - Zielsprecher
+     - Zielkoordinate
+     - Ausgangsvideo
+     - Audio-Track
+   - Die Funktion gibt sofort `202 accepted` zurück und bleibt nicht minutenlang im Polling hängen.
 
-```text
-has_anchor: true
-has_lock_anchor: false
-```
+2. **Poller für laufende Sync.so-Jobs ergänzen**
+   - Neue Edge Function `poll-twoshot-lipsync`.
+   - Sie ruft Sync.so über `GET /v2/generate/{id}` ab.
+   - Wenn Pass 1 fertig ist:
+     - Output von Pass 1 wird als Input für Pass 2 verwendet.
+     - Pass 2 wird gestartet und gespeichert.
+   - Wenn Pass 2 fertig ist:
+     - finales MP4 wird in `composer-clips` rehosted.
+     - `lip_sync_status = done`, `twoshot_stage = done`.
+     - externe gemischte Dialogspur bleibt aktiv, damit beide Stimmen hörbar sind.
+   - Bei echtem Sync.so-Fehler:
+     - idempotenter Refund.
+     - klare Fehlermeldung in `clip_error`.
 
-Also fällt die Funktion wieder in den alten kaputten Zustand zurück: kein Anchor, MP4-Clip als Detection-Quelle, Gemini-Video-Detection deaktiviert, Ergebnis `faces: 0`, Abbruch vor Sync.so.
+3. **Auto-Trigger gegen Endlos-Retry härten**
+   - `useTwoShotAutoTrigger` darf Szenen mit laufender Sync.so Job-ID nicht alle paar Minuten zurücksetzen.
+   - Wenn `lip_sync_status = running` und `replicate_prediction_id` mit `sync:` beginnt, wird nicht neu gestartet, sondern der Poller angestoßen.
+   - Stale-Recovery bleibt erhalten, aber nur für Jobs ohne echte Sync.so Job-ID oder mit eindeutig totem Status.
 
-## Plan zur Behebung
+4. **Charakter-Klonen blockieren**
+   - Nach `compose-scene-anchor` wird nicht mehr nur die Anzahl der Gesichter geprüft.
+   - Es kommt ein Identity-Audit dazu:
+     - Referenzportrait A muss zu Gesicht A passen.
+     - Referenzportrait B muss zu Gesicht B passen.
+     - A und B müssen klar unterschiedliche Personen bleiben.
+   - Wenn das Modell eine Person klont oder Gesichter vermischt:
+     - Cache invalidieren.
+     - Anchor einmal mit strengerem Prompt neu generieren.
+     - Wenn es wieder klont: Szene laut mit `anchor_identity_clone_detected` abbrechen, bevor Hailuo/Sync.so Credits verbrannt werden.
 
-1. **Szenenabfrage korrigieren**
-   - In `compose-twoshot-lipsync/index.ts` `reference_image_url` zur `.select(...)`-Liste hinzufügen.
-   - Damit nutzt der Face-Audit endlich den vorhandenen Anchor aus dem Composer.
+5. **Face-Targeting von links/rechts auf Identität umstellen**
+   - Die Zielkoordinaten für Sync.so werden anhand des Identity-Audits gespeichert:
+     - Sprecher Matthew → konkretes Gesichtszentrum
+     - Sprecher 2 → konkretes Gesichtszentrum
+   - Zusatzgesichter oder Nicht-Sprecher im Bild werden ignoriert.
+   - Falls 3 Gesichter sichtbar sind, werden nicht blind links/rechts gewählt, sondern die zwei Gesichter, die zu den zwei Sprecher-Referenzen passen.
 
-2. **Fail-Logik robuster machen**
-   - Wenn `reference_image_url` in der DB existiert, aber im geladenen Scene-Objekt fehlt, soll ein klarer Log erscheinen.
-   - Die Fehlermeldung soll unterscheiden zwischen:
-     - kein Anchor vorhanden
-     - Anchor vorhanden, aber Gesichtserkennung fehlgeschlagen
-     - echter Sync.so-Providerfehler
+6. **Aktuelle hängende Szene retten**
+   - Bestehende Sync.so Job-ID übernehmen statt neu zu rendern.
+   - Poller einmal manuell anstoßen.
+   - Wenn der bestehende Sync.so Job fertig ist, wird mit Pass 2 fortgesetzt.
+   - Wenn er bei Sync.so wirklich fehlgeschlagen ist, wird der echte Providerfehler sichtbar gemacht und nicht erneut endlos gestartet.
 
-3. **MP4-Fallback sauber lassen**
-   - MP4s weiterhin nicht direkt an Gemini `image_url` senden.
-   - Optional später First-Frame-Extraktion ergänzen; für den aktuellen Bug reicht der Anchor-Fix, weil der Anchor vorhanden ist.
-
-4. **Betroffene Szenen zurücksetzen**
-   - Die fehlgeschlagenen Cinematic-Sync-Szenen mit vorhandenem Anchor/Clip zurück auf `pending` setzen.
-   - `twoshot_stage`, `clip_error` und alte Prediction-ID löschen.
-   - Anchor und Clip bleiben erhalten, damit kein unnötiger Re-Render passiert.
-
-5. **Deploy und Validierung**
-   - `compose-twoshot-lipsync` deployen.
-   - Danach Logs prüfen: Erwartet wird `faceMap { source: 'anchor', faces: 2+ }`.
-   - Erst danach darf der Sync.so-Pass starten; falls Sync.so dann scheitert, sehen wir den echten Providerfehler statt des falschen Preflight-Abbruchs.
+7. **UI-Status klarer machen**
+   - Statt dauerhaft „Lip-Sync wird vorbereitet…“ zeigen:
+     - `Sync.so Pass 1 läuft`
+     - `Sync.so Pass 2 läuft`
+     - `Warte auf Sync.so`
+     - `Identitätsprüfung fehlgeschlagen: Charakter wurde geklont`
+   - So ist sichtbar, ob der Job arbeitet, pollt oder sauber gestoppt wurde.
 
 ## Erwartetes Ergebnis
 
-Die Szene bricht nicht mehr mit `source_clip_missing_speakers: 0/2` ab, sondern läuft in den eigentlichen Sync.so-Multi-Pass. Der zweite Charakter bekommt dadurch wieder seinen eigenen Face-Targeting-Pass.
+- Kein 10–15-Minuten-Endloszustand mehr.
+- Sync.so kann so lange laufen, wie der externe Job real braucht, ohne dass unsere Edge Function abbricht.
+- Zwei Sprecher werden über echte Identität und Koordinaten gemappt, nicht mehr nur über links/rechts.
+- Geklonte Charaktere werden vor dem teuren Video-/Lip-Sync-Schritt erkannt und automatisch neu versucht oder klar abgebrochen.
