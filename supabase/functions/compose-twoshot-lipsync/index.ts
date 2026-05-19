@@ -335,8 +335,10 @@ function normalizeFaces(
 /**
  * Detect face centers using a fallback chain:
  *  1) cached faceMap with ≥2 faces
- *  2) Gemini Vision on `lock_reference_url` (anchor image)
- *  3) Gemini Vision on the video URL itself (Gemini ingests MP4 first frame)
+ *  2) Gemini Vision on `reference_image_url` (Composer anchor image),
+ *     falling back to legacy `lock_reference_url`
+ *  3) Clip URL is only usable after explicit first-frame extraction; MP4 URLs
+ *     must not be sent directly to Gemini `image_url`.
  * Result is cached in audio_plan.twoshot.faceMap so retries skip the call.
  * Returns null when no source produced ≥2 faces — caller must fall back to
  * heuristic thirds.
@@ -718,6 +720,12 @@ serve(async (req) => {
           ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: faceMap.source }
           : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrlForDetect, clip: !!detectionClipUrl },
       );
+      if (!faceMap) {
+        console.warn(
+          `[compose-twoshot-lipsync ${scene_id}] face detection did not produce 2 faces`,
+          { hasAnchor: !!anchorUrlForDetect, hasClip: !!detectionClipUrl, reason: anchorUrlForDetect ? "anchor_detection_failed" : "missing_anchor" },
+        );
+      }
 
       const hasTwoRealFaces = !!faceMap && Array.isArray(faceMap.faces) && faceMap.faces.length >= 2;
       // Artlist-parity policy: when the script has 2+ speakers but the
@@ -922,7 +930,9 @@ serve(async (req) => {
       let driftScore: number | null = null;
       let driftNotes: any = null;
       try {
-        const anchorUrl = (scene as any).lock_reference_url as string | undefined;
+        const anchorUrl =
+          ((scene as any).reference_image_url as string | undefined) ||
+          ((scene as any).lock_reference_url as string | undefined);
         if (anchorUrl && LOVABLE_API_KEY) {
           // Use a video poster URL via a thumbnail param (composer-clips bucket
           // serves MP4 — Gemini can ingest the MP4 directly for short clips).
