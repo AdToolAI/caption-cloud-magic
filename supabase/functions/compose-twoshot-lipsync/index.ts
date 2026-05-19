@@ -32,8 +32,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-qa-mock",
 };
 
-// 2× lipsync-2-pro per pass (multi-pass two-shot) — Artlist parity
-const COST = 28;
+// Duration-based pricing: Sync.so Creator plan ≈ $0.08/s per pass.
+// Two-shot = 2 sequential passes → 18 credits/s = €0.18/s (~22% margin).
+const CREDITS_PER_SECOND = 9;
+const PASSES = 2;
+const MIN_COST = 18; // floor (1s × 9 × 2 passes)
+const computeCost = (durationSec: number): number =>
+  Math.max(MIN_COST, Math.ceil(Math.max(0, durationSec)) * CREDITS_PER_SECOND * PASSES);
 const LIPSYNC_MODEL = "sync/lipsync-2-pro" as `${string}/${string}`;
 const PASS_TIMEOUT_MS = 180_000;
 const POLL_INTERVAL_MS = 5_000;
