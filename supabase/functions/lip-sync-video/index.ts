@@ -107,7 +107,7 @@ serve(async (req) => {
         return json({ error: 'no output' }, 502);
       }
 
-      return json({ success: true, video_url: outUrl, scene_id, project_id, credits_used: COST });
+      return json({ success: true, video_url: outUrl, scene_id, project_id, credits_used: cost });
     } catch (e) {
       await refund(`replicate error: ${(e as Error).message}`);
       return json({ error: (e as Error).message }, 502);
