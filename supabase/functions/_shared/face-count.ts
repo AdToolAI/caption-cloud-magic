@@ -20,6 +20,10 @@ export async function countFacesInImage(
 ): Promise<number | null> {
   const kind = opts.kind ?? "image";
   const timeoutMs = opts.timeoutMs ?? 20_000;
+  // Lovable AI Gateway's `image_url` cannot decode MP4 URLs — calling Gemini
+  // with a video URL returns 0 silently. Callers must extract a first frame
+  // before invoking this helper for video sources.
+  if (kind === "video") return null;
   try {
     const resp = await fetch(GATEWAY, {
       method: "POST",

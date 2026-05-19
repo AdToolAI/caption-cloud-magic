@@ -260,6 +260,11 @@ async function askGeminiForFaces(
   lovableKey: string,
   kind: "image" | "video",
 ): Promise<{ faces: any[]; width: number; height: number } | null> {
+  // Lovable AI Gateway's `image_url` only decodes still images — passing an
+  // .mp4 URL here returns 0 faces silently. We don't attempt video-URL
+  // detection until a real first-frame extraction is wired up; the anchor
+  // image is the trusted source.
+  if (kind === "video") return null;
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -685,7 +690,15 @@ serve(async (req) => {
       // generation pipeline`). The safe behaviour is: no real 2nd face →
       // single-pass with merged dialogue + auto-detect.
       const cachedFaceMap = ((scene as any)?.audio_plan?.twoshot?.faceMap) ?? null;
-      const anchorUrlForDetect = (scene as any).lock_reference_url as string | undefined;
+      // The composer writes the composed two-shot anchor into
+      // `reference_image_url`. `lock_reference_url` is a legacy Director's-Cut
+      // column that is almost always NULL in the composer flow — using only
+      // that one caused the audit to skip the (reliable) image-based detection
+      // and fall straight to the (broken) MP4 → Gemini path.
+      const anchorUrlForDetect =
+        ((scene as any).reference_image_url as string | undefined) ||
+        ((scene as any).lock_reference_url as string | undefined) ||
+        undefined;
       const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
       const faceMap = await detectFacesInMaster(
         supabase,
