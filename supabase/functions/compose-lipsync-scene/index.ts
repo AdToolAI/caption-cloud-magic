@@ -444,7 +444,7 @@ serve(async (req) => {
         success: true,
         scene_id,
         clip_url: publicUrl,
-        credits_used: COST,
+        credits_used: cost,
       });
     } catch (e) {
       await refund(`replicate error: ${(e as Error).message}`);
