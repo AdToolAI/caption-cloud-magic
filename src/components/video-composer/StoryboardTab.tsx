@@ -78,6 +78,7 @@ export default function StoryboardTab({
   preferredAspect,
   onRefetchScenes,
   onEnsurePersisted,
+  isGeneratingStoryboard = false,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
