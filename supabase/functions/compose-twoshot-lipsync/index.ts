@@ -821,10 +821,8 @@ serve(async (req) => {
           let stepUrl: string | null = null;
           try {
             if (useSyncSoDirect) {
-              stepUrl = await runSyncSoDirectPrediction(
+              const jobId = await startSyncSoDirectGeneration(
                 SYNC_API_KEY!,
-                supabase,
-                scene_id,
                 {
                   videoUrl: currentVideo,
                   audioUrl: pass.track_url,
@@ -835,6 +833,51 @@ serve(async (req) => {
                 },
                 `lipsync_pass_${p + 1}`,
               );
+              await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2", {
+                replicate_prediction_id: `sync:${jobId}`,
+                audio_plan: {
+                  ...prevPlan,
+                  twoshot: {
+                    ...prevTwoshot,
+                    speakers: publicPasses,
+                    faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
+                    syncJobs: {
+                      provider: "sync.so",
+                      mode: "poller",
+                      currentPass: p + 1,
+                      totalPasses: passes.length,
+                      sourceVideoUrl,
+                      mergedAudioUrl: mergedVo.url,
+                      costCredits: cost,
+                      jobs: [
+                        {
+                          pass: p + 1,
+                          jobId,
+                          status: "PROCESSING",
+                          videoUrl: currentVideo,
+                          audioUrl: pass.track_url,
+                          speaker: pass.speaker,
+                          character_id: pass.character_id ?? null,
+                          targetFace: target?.side ?? null,
+                          targetCoords: target?.coords ?? null,
+                          startedAt: passStartedAt,
+                        },
+                      ],
+                    },
+                    heartbeat: {
+                      pass: p + 1,
+                      total_passes: passes.length,
+                      started_at: passStartedAt,
+                      speaker: pass.speaker,
+                      targetFace: target?.side ?? null,
+                      targetSource: target?.source ?? null,
+                      syncJobId: jobId,
+                    },
+                  },
+                },
+              });
+              console.log(`[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length} queued on Sync.so`, { jobId });
+              return;
             } else {
               const input: Record<string, unknown> = {
                 video: currentVideo,
