@@ -737,38 +737,56 @@ serve(async (req) => {
           // explicit `frame_number`+`coordinates`, the model lipsyncs the
           // SPECIFIC face whose center is closest to the given point — no
           // more both-passes-onto-same-face bug.
+          //
+          // PRIMARY PATH: direct Sync.so v2 API (SYNC_API_KEY). Replicate's
+          // wrapper flattens `input` and silently drops the nested
+          // `options.active_speaker_detection` object, so face pinning never
+          // reached the model. Direct API guarantees Artlist-grade parity.
           let stepUrl: string | null = null;
           try {
-            const input: Record<string, unknown> = {
-              video: currentVideo,
-              audio: pass.track_url,
-              sync_mode: "cut_off",
-              temperature: 0.5,
-              output_format: "mp4",
-              // Belt-and-suspenders: some sync.so model revisions accept
-              // these top-level keys, others ignore them silently. They
-              // never hurt and double-pin the target face.
-              face_index: p,
-              speaker: target?.side ?? (p === 0 ? "left" : "right"),
-            };
-            if (target) {
-              input.active_speaker = false;
-              input.active_speaker_detection = {
-                auto_detect: false,
-                frame_number: 0,
-                coordinates: target.coords,
-              };
+            if (useSyncSoDirect) {
+              stepUrl = await runSyncSoDirectPrediction(
+                SYNC_API_KEY!,
+                supabase,
+                scene_id,
+                {
+                  videoUrl: currentVideo,
+                  audioUrl: pass.track_url,
+                  syncMode: "cut_off",
+                  temperature: 0.5,
+                  targetCoords: target?.coords ?? null,
+                  frameNumber: 0,
+                },
+                `lipsync_pass_${p + 1}`,
+              );
             } else {
-              // Last-resort: let auto-detect run if we have nothing to pin.
-              input.active_speaker = true;
+              const input: Record<string, unknown> = {
+                video: currentVideo,
+                audio: pass.track_url,
+                sync_mode: "cut_off",
+                temperature: 0.5,
+                output_format: "mp4",
+                face_index: p,
+                speaker: target?.side ?? (p === 0 ? "left" : "right"),
+              };
+              if (target) {
+                input.active_speaker = false;
+                input.active_speaker_detection = {
+                  auto_detect: false,
+                  frame_number: 0,
+                  coordinates: target.coords,
+                };
+              } else {
+                input.active_speaker = true;
+              }
+              stepUrl = await runLipsyncPrediction(
+                replicate,
+                supabase,
+                scene_id,
+                input,
+                `lipsync_pass_${p + 1}`,
+              );
             }
-            stepUrl = await runLipsyncPrediction(
-              replicate,
-              supabase,
-              scene_id,
-              input,
-              `lipsync_pass_${p + 1}`,
-            );
           } catch (e) {
             await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
             return;
