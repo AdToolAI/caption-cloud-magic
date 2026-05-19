@@ -846,7 +846,7 @@ serve(async (req) => {
                       mode: "poller",
                       currentPass: p + 1,
                       totalPasses: passes.length,
-                      sourceVideoUrl,
+                      sourceVideoUrl: sourceClipUrl,
                       mergedAudioUrl: mergedVo.url,
                       costCredits: cost,
                       jobs: [
