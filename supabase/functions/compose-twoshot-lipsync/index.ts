@@ -509,14 +509,22 @@ serve(async (req) => {
       }
     }
 
+    // Compute duration-based cost from merged VO (twoshot_audio just produced it).
+    const estDurationSec = Math.max(
+      mergedVo?.duration ?? 0,
+      (scene as any).duration_seconds ?? 0,
+      1,
+    );
+    const cost = computeCost(estDurationSec);
+
     // Wallet check
     const { data: wallet } = await supabase
       .from("wallets")
       .select("balance")
       .eq("user_id", user.id)
       .single();
-    if (!wallet || wallet.balance < COST) {
-      return json({ error: "INSUFFICIENT_CREDITS", required: COST }, 402);
+    if (!wallet || wallet.balance < cost) {
+      return json({ error: "INSUFFICIENT_CREDITS", required: cost }, 402);
     }
 
     const REPLICATE_KEY = Deno.env.get("REPLICATE_API_KEY");
@@ -525,7 +533,7 @@ serve(async (req) => {
 
     // Reserve credits + mark stage.
     await supabase.from("wallets").update({
-      balance: wallet.balance - COST,
+      balance: wallet.balance - cost,
       updated_at: new Date().toISOString(),
     }).eq("user_id", user.id);
 
@@ -538,12 +546,12 @@ serve(async (req) => {
     const refund = async (reason: string) => {
       if (refunded) return;
       refunded = true;
-      console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${COST}: ${reason}`);
+      console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${cost}: ${reason}`);
       const { data: w2 } = await supabase
         .from("wallets").select("balance").eq("user_id", user.id).single();
       if (w2) {
         await supabase.from("wallets").update({
-          balance: w2.balance + COST,
+          balance: w2.balance + cost,
           updated_at: new Date().toISOString(),
         }).eq("user_id", user.id);
       }
