@@ -1089,11 +1089,25 @@ export default function ComposerSequencePreview({
               );
             })()
           ) : (
-            <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
-              <span>🎬</span>
-              <span>Lip-Sync wird vorbereitet…</span>
-            </div>
+            (() => {
+              const stage = String((currentScene as any).twoshotStage ?? '');
+              const label =
+                stage === 'audio' ? 'Voiceover wird gebaut…'
+                : stage === 'anchor' ? 'Anchor wird komponiert…'
+                : stage === 'master_clip' ? 'Hailuo rendert die Szene…'
+                : stage === 'lipsync_1' ? 'Sync.so Pass 1 läuft…'
+                : stage === 'lipsync_2' ? 'Sync.so Pass 2 läuft…'
+                : stage === 'continuity' ? 'Continuity-Check…'
+                : 'Lip-Sync wird vorbereitet…';
+              return (
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-amber-500/90 backdrop-blur text-[11px] text-black font-semibold flex items-center gap-1.5 z-20 animate-pulse">
+                  <span>🎬</span>
+                  <span>{label}</span>
+                </div>
+              );
+            })()
           )
+
         )}
 
         {/* Hidden voiceover audio — synced with the video timeline */}
