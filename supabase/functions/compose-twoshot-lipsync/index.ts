@@ -809,20 +809,36 @@ serve(async (req) => {
         const syncMode = "cut_off";
         let outputUrl: string | null = null;
         try {
-          outputUrl = await runLipsyncPrediction(
-            replicate,
-            supabase,
-            scene_id,
-            {
-              video: sourceClipUrl,
-              audio: mergedVo.url,
-              sync_mode: syncMode,
-              temperature: 0.5,
-              active_speaker: true,
-              output_format: "mp4",
-            },
-            "lipsync_single_pass",
-          );
+          if (useSyncSoDirect) {
+            outputUrl = await runSyncSoDirectPrediction(
+              SYNC_API_KEY!,
+              supabase,
+              scene_id,
+              {
+                videoUrl: sourceClipUrl,
+                audioUrl: mergedVo.url,
+                syncMode,
+                temperature: 0.5,
+                targetCoords: null, // auto-detect for single-speaker
+              },
+              "lipsync_single_pass",
+            );
+          } else {
+            outputUrl = await runLipsyncPrediction(
+              replicate,
+              supabase,
+              scene_id,
+              {
+                video: sourceClipUrl,
+                audio: mergedVo.url,
+                sync_mode: syncMode,
+                temperature: 0.5,
+                active_speaker: true,
+                output_format: "mp4",
+              },
+              "lipsync_single_pass",
+            );
+          }
         } catch (e) {
           await refund(`lipsync_single_pass_failed: ${(e as Error).message}`);
           return;
