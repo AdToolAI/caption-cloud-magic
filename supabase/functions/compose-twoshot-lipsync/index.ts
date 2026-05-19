@@ -277,7 +277,7 @@ async function pollSyncSoDirectPrediction(
  * the Gemini call.
  */
 type FaceMap = {
-  faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number] }>;
+  faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
   width: number;
   height: number;
   source: "cache" | "anchor" | "clip-frame" | "heuristic-fallback";
@@ -287,11 +287,9 @@ async function askGeminiForFaces(
   url: string,
   lovableKey: string,
   kind: "image" | "video",
-): Promise<{ faces: any[]; width: number; height: number } | null> {
+): Promise<{ faces: any[] } | null> {
   // Lovable AI Gateway's `image_url` only decodes still images — passing an
-  // .mp4 URL here returns 0 faces silently. We don't attempt video-URL
-  // detection until a real first-frame extraction is wired up; the anchor
-  // image is the trusted source.
+  // .mp4 URL here returns 0 faces silently. Anchor-only path.
   if (kind === "video") return null;
   try {
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -309,13 +307,12 @@ async function askGeminiForFaces(
               {
                 type: "text",
                 text:
-                  (kind === "video"
-                    ? "You see the FIRST FRAME of a two-shot dialogue video with TWO human faces. "
-                    : "You see a two-shot frame with TWO human faces. ") +
+                  "You see a two-shot frame with TWO human faces. " +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
-                  "Schema: {\"width\": <imgPixelW>, \"height\": <imgPixelH>, \"faces\": [{\"side\": \"left\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}, {\"side\": \"right\", \"center\": [x,y], \"bbox\": [x1,y1,x2,y2]}]}. " +
-                  "Coordinates in PIXELS of the source frame (1280x720 if uncertain). " +
-                  "'left' = the face whose center has the SMALLER x value. 'right' = the larger x. " +
+                  "Schema: {\"faces\": [{\"side\": \"left\", \"center\": [nx,ny], \"bbox\": [nx1,ny1,nx2,ny2]}, {\"side\": \"right\", \"center\": [nx,ny], \"bbox\": [nx1,ny1,nx2,ny2]}]}. " +
+                  "Coordinates MUST be NORMALIZED to the range 0..1 (relative to the image — 0,0 = top-left, 1,1 = bottom-right). " +
+                  "Do NOT return pixel coordinates and do NOT guess the image resolution. " +
+                  "'left' = the face whose center has the SMALLER normalized x. 'right' = the larger x. " +
                   "If only one face is visible, return one entry. If none, return empty faces.",
               },
               { type: "image_url", image_url: { url } },
@@ -331,46 +328,49 @@ async function askGeminiForFaces(
     const m = String(txt).match(/\{[\s\S]*\}/);
     if (!m) return null;
     const parsed = JSON.parse(m[0]);
-    return {
-      faces: Array.isArray(parsed?.faces) ? parsed.faces : [],
-      width: Number(parsed?.width) || 1280,
-      height: Number(parsed?.height) || 720,
-    };
+    return { faces: Array.isArray(parsed?.faces) ? parsed.faces : [] };
   } catch {
     return null;
   }
 }
 
 function normalizeFaces(
-  raw: { faces: any[]; width: number; height: number },
+  raw: { faces: any[] },
+  realDims: { width: number; height: number },
 ): { faces: FaceMap["faces"]; width: number; height: number } {
+  const W = realDims.width;
+  const H = realDims.height;
+  const toPx = (n: number, axis: "x" | "y") => {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return 0;
+    // Accept either normalized (<=1.5) or legacy pixel values from older callers
+    const isNorm = Math.abs(v) <= 1.5;
+    const scaled = isNorm ? v * (axis === "x" ? W : H) : v;
+    const max = axis === "x" ? W : H;
+    return Math.round(Math.max(1, Math.min(max - 1, scaled)));
+  };
   const valid = raw.faces
     .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
-    .map((f: any) => ({
-      center: [Number(f.center[0]), Number(f.center[1])] as [number, number],
-      bbox: Array.isArray(f.bbox) && f.bbox.length === 4
-        ? (f.bbox.map(Number) as [number, number, number, number])
-        : undefined,
-    }))
-    .sort((a: any, b: any) => a.center[0] - b.center[0])
-    .map((f: any, idx: number, arr: any[]) => ({
+    .map((f: any) => {
+      const cx = toPx(f.center[0], "x");
+      const cy = toPx(f.center[1], "y");
+      const bb = Array.isArray(f.bbox) && f.bbox.length === 4
+        ? [toPx(f.bbox[0], "x"), toPx(f.bbox[1], "y"), toPx(f.bbox[2], "x"), toPx(f.bbox[3], "y")] as [number, number, number, number]
+        : undefined;
+      return {
+        center: [cx, cy] as [number, number],
+        bbox: bb,
+        normCenter: [Number(f.center[0]) || 0, Number(f.center[1]) || 0] as [number, number],
+      };
+    })
+    .sort((a, b) => a.center[0] - b.center[0])
+    .map((f, idx, arr) => ({
       ...f,
       side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
     }));
-  return { faces: valid, width: raw.width, height: raw.height };
+  return { faces: valid, width: W, height: H };
 }
 
-/**
- * Detect face centers using a fallback chain:
- *  1) cached faceMap with ≥2 faces
- *  2) Gemini Vision on `reference_image_url` (Composer anchor image),
- *     falling back to legacy `lock_reference_url`
- *  3) Clip URL is only usable after explicit first-frame extraction; MP4 URLs
- *     must not be sent directly to Gemini `image_url`.
- * Result is cached in audio_plan.twoshot.faceMap so retries skip the call.
- * Returns null when no source produced ≥2 faces — caller must fall back to
- * heuristic thirds.
- */
 async function detectFacesInMaster(
   supabase: any,
   sceneId: string,
@@ -379,46 +379,51 @@ async function detectFacesInMaster(
   cached: any,
   lovableKey: string | undefined,
 ): Promise<FaceMap | null> {
-  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2) {
+  // Reject cached entries with bogus dims (legacy rows pre normalization fix).
+  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2 && Number(cached.width) > 0 && Number(cached.height) > 0 && cached.faces.every((f: any) => Array.isArray(f?.normCenter))) {
     return { ...cached, source: "cache" } as FaceMap;
   }
-  if (!lovableKey) return null;
+  if (!lovableKey || !anchorUrl) return null;
 
-  // Try anchor first (still image — most reliable).
-  const attempts: Array<{ url: string; kind: "image" | "video"; source: FaceMap["source"] }> = [];
-  if (anchorUrl) attempts.push({ url: anchorUrl, kind: "image", source: "anchor" });
-  if (clipUrl) attempts.push({ url: clipUrl, kind: "video", source: "clip-frame" });
-
-  for (const a of attempts) {
-    const raw = await askGeminiForFaces(a.url, lovableKey, a.kind);
-    if (!raw) continue;
-    const norm = normalizeFaces(raw);
-    if (norm.faces.length < 2) continue;
-    const result: FaceMap = { ...norm, source: a.source };
-    try {
-      const { data: row } = await supabase
-        .from("composer_scenes")
-        .select("audio_plan")
-        .eq("id", sceneId)
-        .single();
-      const prevPlan = (row?.audio_plan ?? {}) as Record<string, unknown>;
-      const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
-      await supabase
-        .from("composer_scenes")
-        .update({
-          audio_plan: {
-            ...prevPlan,
-            twoshot: { ...prevTwoshot, faceMap: { faces: result.faces, width: result.width, height: result.height, source: result.source } },
-          },
-        })
-        .eq("id", sceneId);
-    } catch {
-      // cache-write is best-effort
-    }
-    return result;
+  // Probe REAL anchor dimensions so coordinates we hand to Sync.so actually
+  // land on the face (Hailuo uses the anchor as first frame, so video dims
+  // == anchor dims). Gemini was hallucinating 1920x1080 for 1376x768 frames
+  // which moved the left-face target up-and-left into empty space and made
+  // Sync.so reject the job with `generation_pipeline_failed`.
+  const dims = await probeImageDims(anchorUrl);
+  if (!dims) {
+    console.warn(`[compose-twoshot-lipsync ${sceneId}] could not probe anchor dims — Sync.so coords may be off`);
   }
-  return null;
+  const realDims = dims ?? { width: 1280, height: 720 };
+
+  const raw = await askGeminiForFaces(anchorUrl, lovableKey, "image");
+  if (!raw) return null;
+  const norm = normalizeFaces(raw, realDims);
+  if (norm.faces.length < 2) return null;
+  const result: FaceMap = { ...norm, source: "anchor" };
+  try {
+    const { data: row } = await supabase
+      .from("composer_scenes")
+      .select("audio_plan")
+      .eq("id", sceneId)
+      .single();
+    const prevPlan = (row?.audio_plan ?? {}) as Record<string, unknown>;
+    const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+    await supabase
+      .from("composer_scenes")
+      .update({
+        audio_plan: {
+          ...prevPlan,
+          twoshot: { ...prevTwoshot, faceMap: { faces: result.faces, width: result.width, height: result.height, source: result.source } },
+        },
+      })
+      .eq("id", sceneId);
+  } catch {
+    // cache-write is best-effort
+  }
+  return result;
 }
+
 
 /**
  * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
