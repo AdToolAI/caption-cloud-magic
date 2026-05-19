@@ -1281,6 +1281,12 @@ export default function VideoComposerDashboard() {
                 setScenes(scenes);
                 setActiveTab('storyboard');
               }}
+              onGenerationStart={() => setIsGeneratingStoryboard(true)}
+              onGenerationEnd={() => setIsGeneratingStoryboard(false)}
+              onGenerationFailed={() => {
+                setIsGeneratingStoryboard(false);
+                setActiveTab('briefing');
+              }}
               brandKitId={project.brandKitId ?? null}
               brandKitAutoSync={project.brandKitAutoSync ?? false}
               assemblyConfig={project.assemblyConfig}
@@ -1291,6 +1297,8 @@ export default function VideoComposerDashboard() {
               onUpdateScenes={setScenes}
             />
           </TabsContent>
+
+
 
           <TabsContent value="storyboard">
             <ComposerTabErrorBoundary label="Storyboard">
