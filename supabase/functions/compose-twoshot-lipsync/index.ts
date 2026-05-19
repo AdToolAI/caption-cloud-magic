@@ -717,36 +717,6 @@ serve(async (req) => {
       let outUrl: string | null = null;
 
       if (useMultiPass) {
-        // ── Face detection ONCE before the pass loop ───────────────────
-        // Sync.so's auto active-speaker detection collapses every pass onto
-        // the most-prominent face. We pin each pass to a specific face via
-        // `active_speaker_detection.coordinates` (Artlist-style).
-        const cachedFaceMap = ((scene as any)?.audio_plan?.twoshot?.faceMap) ?? null;
-        const anchorUrl = (scene as any).lock_reference_url as string | undefined;
-        // Fallback chain for face detection sources: cached → anchor image →
-        // the silent two-shot clip itself (Gemini ingests the MP4 first frame).
-        // The original silent master is preferable to the lipsynced output
-        // because the latter is mutated by each pass.
-        const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
-        const faceMap = await detectFacesInMaster(
-          supabase,
-          scene_id,
-          anchorUrl,
-          detectionClipUrl,
-          cachedFaceMap,
-          LOVABLE_API_KEY,
-        );
-        const fallbackDims = {
-          width: Number(faceMap?.width) || 1280,
-          height: Number(faceMap?.height) || 720,
-        };
-        console.log(
-          `[compose-twoshot-lipsync ${scene_id}] faceMap`,
-          faceMap
-            ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: faceMap.source }
-            : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrl, clip: !!detectionClipUrl },
-        );
-
         let currentVideo = sourceClipUrl;
         for (let p = 0; p < passes.length; p++) {
           const pass = passes[p];
