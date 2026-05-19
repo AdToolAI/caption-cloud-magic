@@ -1,40 +1,64 @@
-Ich habe die Logs geprüft: Der Backend-Status ist gesund, der Fehler kommt aus `compose-twoshot-lipsync` bei Szene `ab0b0a8e-...`.
+## Problem
 
-Befund:
-- Es ist ein Two-Shot/Dialog mit 2 Sprechern konfiguriert.
-- Das gerenderte Video zeigt aber offenbar nur eine erkennbare Person bzw. keine zuverlässig erkannten 2 Gesichter.
-- Die Funktion fällt dann aktuell auf Heuristik-Koordinaten zurück (`[384, 360]`), schickt diese an Sync.so als festes Gesichtsziel, und Sync.so bricht mit `An error occurred in the generation pipeline` ab.
-- Die reservierten 126 Credits wurden bereits automatisch erstattet.
+Im Motion Studio passiert beim Klick auf „Storyboard generieren" (KI-Modus) Folgendes:
 
-Plan zur Behebung:
+1. Der Button zeigt „Generiert…", aber die Ansicht bleibt auf **Briefing** stehen.
+2. Wenn man dann manuell auf den **Storyboard**-Tab klickt, ist er leer („0 Szenen / Erste Szene hinzufügen") — sieht aus wie der Manuell-Modus, obwohl KI-gestützt gewählt war.
 
-1. Two-Shot-Lip-Sync robuster machen
-   - In `compose-twoshot-lipsync` bei fehlender/ungenügender Face-Detection keine künstlichen Heuristik-Koordinaten mehr an Sync.so senden.
-   - Stattdessen für diesen Fall auf Auto-Detect oder Single-Face-Lip-Sync umschalten.
-   - Konkret: Wenn keine `faceMap` mit mindestens 2 Gesichtern vorhanden ist, wird nicht mehr Multi-Pass mit festem `active_speaker_detection.coordinates` ausgeführt.
+### Ursache
 
-2. Sicheren Fallback für „2 Sprecher, aber 1 sichtbares Gesicht“ einbauen
-   - Wenn das Video nur eine Person zeigt, soll der Lip-Sync trotzdem funktionieren.
-   - Dann wird die gemischte Dialogspur in einem Single-Pass mit `auto_detect: true` verarbeitet, statt zwei einzelne Gesichter erzwingen zu wollen.
-   - Ergebnis: Der sichtbare Sprecher bekommt Lip-Sync; es crasht nicht mehr.
+In `src/components/video-composer/BriefingTab.tsx` (`handleGenerateStoryboard`):
 
-3. Fehlerdetails verbessern
-   - Sync.so-Fehler werden detaillierter gespeichert, damit wir künftig unterscheiden können zwischen:
-     - kein Gesicht erkannt
-     - ungültige Zielkoordinaten
-     - Provider-Pipelinefehler
-     - Timeout
+- Der Tab-Wechsel passiert **nur** im `onScenesGenerated`-Callback, also **nach** der vollständigen Edge-Function-Antwort (5–15 s).
+- Wenn die Edge Function einen Fehler wirft, eine leere `scenes`-Antwort liefert oder das Netzwerk abbricht, wird weder `onGoToStoryboard()` noch `onScenesGenerated()` aufgerufen → der User bleibt auf Briefing.
+- Es gibt kein Skeleton/Feedback auf dem Storyboard-Tab während der Generierung, deshalb wirkt der leere Tab wie der Manuell-Modus.
+- Fehler werden im Toast oft übersehen, weil der Button-Spinner sich gleichzeitig zurücksetzt.
 
-4. Bestehende Szene neu triggerbar machen
-   - Nach dem Fix kann die aktuelle fehlgeschlagene Szene erneut über „Lip-Sync neu rendern“ laufen.
-   - Die Funktion setzt `lip_sync_status` sauber zurück und erstattet weiterhin automatisch bei externen Fehlern.
+## Fix
 
-5. Validierung
-   - Die betroffene Szene mit derselben `scene_id` erneut testen.
-   - Prüfen, dass kein erneuter `lipsync_pass_1_failed` Log entsteht.
-   - Prüfen, dass `clip_url`, `lip_sync_status='done'` und `twoshot_stage='done'` gesetzt werden oder bei Provider-Ausfall weiterhin korrekt refundet wird.
+### 1. Sofortiger Tab-Wechsel im KI-Modus
 
-Technische Kurzfassung:
-- Ursache ist nicht das neue Credit-Pricing.
-- Ursache ist der neue deterministische Face-Pinning-Pfad bei einem Video ohne zwei zuverlässig erkennbare Gesichter.
-- Fix: Face-Pinning nur verwenden, wenn echte Face-Koordinaten vorhanden sind; sonst Single/Auto-Detect-Fallback.
+In `BriefingTab.tsx` → `handleGenerateStoryboard`:
+- Direkt nach dem `productName`-Check und vor dem `invoke` einmal `onGoToStoryboard()` aufrufen, damit der User sofort auf dem Storyboard-Tab landet.
+- `setIsGenerating(true)` weiter setzen, damit der Status nach oben durchgereicht werden kann.
+
+### 2. Generierungs-Status auf dem Storyboard-Tab
+
+- Neuen optionalen Prop `isGeneratingStoryboard: boolean` an `StoryboardTab` durchreichen.
+- Wenn `isGeneratingStoryboard === true` **und** `scenes.length === 0`: statt der „Erste Szene hinzufügen"-Empty-State ein klares Lade-Panel anzeigen („Storyboard wird generiert…" + Spinner + Hinweis „Das kann 10–20 Sekunden dauern").
+- Während des Generierens den `+ Szene` / `Frame-First` / `Talking-Head` / `Clips generieren`-Header optisch dimmen (disabled), damit klar ist, dass die KI gerade arbeitet.
+
+### 3. Status nach oben heben
+
+In `VideoComposerDashboard.tsx`:
+- Neuen State `isGeneratingStoryboard` einführen.
+- `BriefingTab` bekommt `onGenerationStart` / `onGenerationEnd`-Callbacks, die den State setzen.
+- `StoryboardTab` bekommt `isGeneratingStoryboard` weitergereicht.
+
+### 4. Sichtbare Fehlerbehandlung
+
+In `BriefingTab.handleGenerateStoryboard`:
+- Bei Fehler oder leerer `scenes`-Antwort: zusätzlich zum Toast den User zurück auf den Briefing-Tab schicken (`setActiveTab('briefing')` via neuem Callback `onGenerationFailed`), damit klar wird, dass der Schritt nicht erfolgreich war.
+- Wenn `data?.scenes` leer ist (`Array.isArray(data.scenes) && data.scenes.length === 0`): als Fehler behandeln, nicht stillschweigend `onScenesGenerated([])` aufrufen (das wäre der Fall, der „leerer Storyboard"-Eindruck erzeugt hat).
+- Zusätzliches `console.warn` mit dem rohen `data`/`error`-Payload, damit zukünftige Reports leichter debuggbar sind.
+
+### 5. Race-Schutz gegen Realtime-Wipe
+
+Verifizieren (kein Code-Change nötig, falls bereits ok): Die KI-generierten Szenen tragen IDs `scene_${Date.now()}_${index}` (kein UUID) und werden in `refetchScenesFromDb` über `localOnly`-Filter erhalten. Das ist bereits korrekt — nur dokumentieren, damit zukünftige Edits es nicht brechen.
+
+## Dateien
+
+- `src/components/video-composer/BriefingTab.tsx` — sofortiger Tab-Wechsel, Lift-up von Generierungsstatus, harte Fehlerbehandlung bei leerer Antwort.
+- `src/components/video-composer/VideoComposerDashboard.tsx` — `isGeneratingStoryboard`-State + Props an Briefing/Storyboard durchreichen, `onGenerationFailed` → zurück zu Briefing.
+- `src/components/video-composer/StoryboardTab.tsx` — Lade-Panel statt Empty-State, wenn Generierung läuft und Szenen leer.
+
+## Validierung
+
+1. KI-Modus + gefülltes Briefing → Klick „Generieren": Tab wechselt sofort auf Storyboard, Lade-Panel sichtbar, nach Edge-Function-Antwort erscheinen die Szenen.
+2. KI-Modus + Netzwerk-Fehler simulieren (Edge Function 500): Toast erscheint, Tab springt zurück auf Briefing, kein leeres Storyboard.
+3. Manuell-Modus: weiterhin direkter Wechsel zu Storyboard (unverändert).
+4. Refresh während Generierung: Storyboard zeigt entweder Lade-Panel (wenn Status noch true) oder die persistierten Szenen.
+
+## Keine Backend-Änderung nötig
+
+Die Edge Function `compose-video-storyboard` funktioniert laut Logs korrekt — die Ursache liegt rein im Frontend-Flow.
