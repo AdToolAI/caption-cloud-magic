@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon } from 'lucide-react';
+import { Plus, ArrowRight, Sparkles, ChevronDown, ChevronUp, Mic, Library, Image as ImageIcon, Loader2 } from 'lucide-react';
 import SceneCard from './SceneCard';
 import SceneCutDriftIndicator from './SceneCutDriftIndicator';
 import HybridExtendDialog from './HybridExtendDialog';
