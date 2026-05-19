@@ -162,6 +162,16 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
     const staleLipsync = (runningLipsync ?? []).filter((s: any) => {
       const stage = String(s.twoshot_stage ?? "");
       const heartbeat = s?.audio_plan?.twoshot?.heartbeat ?? null;
+      const predictionId = String(s.replicate_prediction_id ?? "");
+      // Sync.so jobs may legitimately run >10min (Pro plan, two passes). The
+      // async poller (`poll-twoshot-lipsync`) watches them — don't auto-fail
+      // here. Only kill those when stuck >30min AND no recent heartbeat poll.
+      const isAsyncSyncJob = predictionId.startsWith("sync:");
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+      const lastPolledAt = String(heartbeat?.lastPolledAt ?? heartbeat?.started_at ?? s.updated_at ?? "");
+      if (isAsyncSyncJob) {
+        return lastPolledAt < thirtyMinAgo;
+      }
       const oldEnough = String(s.updated_at ?? "") < tenMinAgo;
       const stuckBeforePass =
         s.engine_override === "cinematic-sync" &&
@@ -170,6 +180,7 @@ Deno.serve(withSentryCron("qa-watchdog", { schedule: "*/2 * * * *", maxRuntime: 
         String(s.updated_at ?? "") < twoMinAgo;
       return oldEnough || stuckBeforePass;
     });
+
 
     if (staleLipsync && staleLipsync.length > 0) {
       const ids = staleLipsync.map((s: any) => s.id);
