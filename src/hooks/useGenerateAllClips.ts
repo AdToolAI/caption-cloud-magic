@@ -114,9 +114,26 @@ export function useGenerateAllClips({
   const generateAll = useCallback(async () => {
     if (isGeneratingAll) return;
     setIsGeneratingAll(true);
-    // Notify pipeline progress bar IMMEDIATELY so the user sees motion
-    // before the (slow) ensureProject / Nano-Banana compose calls return.
+    // ── INSTANT FEEDBACK (0s) ────────────────────────────────────────
+    // Fire BEFORE ensureProject / Nano-Banana so the bar moves on the
+    // very next frame. Also flip every pending AI scene to 'generating'
+    // locally so the per-scene shimmer appears instantly.
     emitPipelineEvent({ type: 'clips:start' });
+    const pendingNow = scenes.filter(
+      (s) =>
+        s.clipStatus !== 'ready' &&
+        !(s.clipSource === 'upload' && s.uploadUrl) &&
+        s.clipSource?.startsWith('ai-'),
+    );
+    if (pendingNow.length > 0) {
+      onUpdateScenes(
+        scenes.map((s) =>
+          pendingNow.some((p) => p.id === s.id)
+            ? { ...s, clipStatus: 'generating' as const }
+            : s,
+        ),
+      );
+    }
     try {
       // 1. ensureProject
       let persisted: { projectId: string; scenes: ComposerScene[] } | null = null;
