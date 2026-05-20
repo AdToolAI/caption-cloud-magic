@@ -93,6 +93,20 @@ serve(async (req) => {
       if (!raw) return { clean: "", stripped: false };
       const before = raw;
       let s = raw
+        // Drop ENTIRE [Dialog] ... [/Dialog] blocks (case-insensitive, multiline).
+        // The composer's storyboard layer embeds a `[Dialog]` block with one
+        // bullet per speaker turn — if that leaks into the image prompt, Nano
+        // Banana renders the same speaker twice (because they appear twice in
+        // the script). This MUST be stripped before the prompt reaches the
+        // image model.
+        .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, "")
+        // Drop bullet/dash speaker lines like "- Samuel Dusatko says: ..."
+        // or "* Matthew Dusatko speaks: ..." or "• Sarah: ..."
+        .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, "")
+        .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, "")
+        // Drop dialog-meta sentences ("speak to camera in turns", "lip-sync mouth movement",
+        // "timing must follow speaker order", "speaker order", "in turns", "dialogue:").
+        .replace(/^.*\b(speak\s+to\s+camera\s+in\s+turns|lip[- ]?sync\s+mouth\s+movement|timing\s+must\s+follow|speaker\s+order|in\s+turns|dialogue\s*:|conversation\s+script).*$/gim, "")
         // Drop lines like "Alex: Das ist ein Traum!" or "BEN — Hello"
         .replace(/^[\p{Lu}][\p{L}\s'\-]{0,40}\s*[:\-—]\s.*$/gmu, "")
         // Drop content in straight or typographic quotes
@@ -108,7 +122,16 @@ serve(async (req) => {
     if (dialogStripped) {
       console.log(`[compose-scene-anchor] stripped spoken-dialog patterns from scenePrompt (scene=${body.sceneId})`);
     }
-    const safeScenePrompt = cleanedPrompt || "natural cinematic scene, no rendered text";
+    // Neutral fallback when very little visual content remains after stripping
+    // dialog. For multi-portrait scenes we explicitly emphasise the exact
+    // headcount so the model does not invent extras.
+    const portraitsForFallback = portraits.length;
+    const meaningful = cleanedPrompt && cleanedPrompt.replace(/[\s.\-,;:!?]/g, "").length >= 10;
+    const safeScenePrompt = meaningful
+      ? cleanedPrompt
+      : (portraitsForFallback >= 2
+        ? `Exactly ${portraitsForFallback} distinct people in a modern office meeting, both visible once, seated together in conversation. No rendered text.`
+        : "Natural cinematic scene, photorealistic, no rendered text.");
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));

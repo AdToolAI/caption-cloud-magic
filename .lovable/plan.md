@@ -1,49 +1,77 @@
 ## Befund
 
-Die "kleine Sidebar" rechts neben dem `40 %`-Fortschrittsbalken ist keine UI-Komponente, sondern eine native vertikale Windows-Scrollbar mit den klassischen ▲ ● ▼ Buttons. Sie stammt vom Top-Stepper im Motion Studio.
+Du hast sehr wahrscheinlich recht. Der aktuelle DB-Datensatz zeigt:
 
-In `src/components/video-composer/MotionStudioTopStepper.tsx` (Zeile 49) steht:
+- `character_shots` enthält korrekt nur 2 Charaktere: Matthew + Samuel.
+- `dialog_script` enthält 3 Zeilen: Samuel, Matthew, Samuel.
+- `ai_prompt` enthält zusätzlich einen kompletten `[Dialog]`-Block mit den Sprecherzeilen:
+  - Samuel sagt Zeile 1
+  - Matthew sagt Zeile 2
+  - Samuel sagt Zeile 3
+- `compose-scene-anchor` bekommt aktuell `scenePrompt: scene.aiPrompt || ''`.
 
-```tsx
-<div className="... flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar">
+Damit landet die Dialogstruktur im Bildprompt. Das Modell interpretiert „Samuel spricht zweimal“ offenbar visuell als zusätzliche Samuel-Instanz. Genau deshalb zeigt der Screenshot 3 Personen: Samuel, Matthew, Samuel.
+
+Der bisherige Sanitizer entfernt zwar `NAME: Text`-Zeilen, aber nicht den neueren `[Dialog] ... [/Dialog]`-Block mit Bullet-Zeilen wie `- Samuel Dusatko says: ...`. Dadurch bleibt der dialogische Speaker-Order-Kontext im visuellen Anchor-Prompt erhalten.
+
+## Lösung
+
+### 1. Dialog-Blöcke vollständig aus visuellen Prompts entfernen
+
+In `supabase/functions/compose-scene-anchor/index.ts` wird `stripSpokenDialog()` erweitert:
+
+- Entferne komplette `[Dialog] ... [/Dialog]`-Blöcke.
+- Entferne Bullet-Zeilen wie `- Samuel Dusatko says: ...`.
+- Entferne Sätze wie `Samuel and Matthew speak to camera in turns...`, `Timing must follow speaker order`, `lip-sync mouth movement`, usw.
+- Entferne „says:“/„speaks:“/„dialogue:“ Muster unabhängig von Großschreibung.
+
+Ziel: Der Bildgenerator sieht nur noch eine neutrale visuelle Szene, niemals Speaker-Reihenfolge oder mehrfaches Auftreten eines Sprechers.
+
+### 2. Neutralen visuellen Fallback erzwingen
+
+Wenn nach dem Strippen kaum noch visueller Kontext übrig bleibt, nutzt `compose-scene-anchor` einen sauberen Fallback:
+
+```text
+Two distinct business partners in a modern office meeting, seated together in conversation, photorealistic, no text.
 ```
 
-Zwei Probleme:
+Bei 2 Portraits wird daraus explizit:
 
-1. **`no-scrollbar` ist nirgendwo definiert** (weder in `src/index.css` noch in `tailwind.config.ts`). Die Klasse wirkt nicht, der Browser zeigt die Default-Scrollbar.
-2. **`overflow-x: auto` macht laut CSS-Spec aus `overflow-y: visible` automatisch `overflow-y: auto`.** Sobald ein inneres Element minimal vertikal überläuft (z. B. die Pulse/Shadow-Animation des aktiven Steps oder die `h-1`-Progress-Bar im Flex-Kontext), erscheint zusätzlich eine **vertikale** Scrollbar — exakt das, was im Screenshot zu sehen ist.
-
-## Plan
-
-### 1. Globales `.no-scrollbar`-Utility ergänzen
-In `src/index.css` (im `@layer utilities`-Block) einmalig hinzufügen, damit die bereits an mehreren Stellen verwendete Klasse tatsächlich wirkt:
-
-```css
-@layer utilities {
-  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-}
+```text
+Exactly 2 distinct people in a modern office meeting, both visible once, seated together in conversation.
 ```
 
-### 2. Vertikalen Overflow im Top-Stepper explizit unterdrücken
-In `MotionStudioTopStepper.tsx` Zeile 49 die Klasse erweitern auf:
+### 3. Anchor-Cache invalidieren
 
-```tsx
-overflow-x-auto overflow-y-hidden no-scrollbar
-```
+Cache-Key in `compose-scene-anchor` hochsetzen (`v8` → `v9`), damit kein alter Anchor mit Dialog-Prompt weiterverwendet wird.
 
-Damit kann auch dann keine vertikale Scrollbar mehr aufpoppen, wenn die Pulse-Animation des aktiven Steps kurzzeitig minimal über die Container-Höhe hinauswächst. Horizontales Scrollen (für sehr schmale Viewports mit allen 5 Steps) bleibt erhalten, ist aber dank Utility unsichtbar.
+### 4. Zusätzlicher Guard in `compose-video-clips`
 
-### 3. (Optional) Pulse-Container fix-höhig halten
-Falls die vertikale Über­dehnung tatsächlich von der `motion.span`-Pulse stammt, reicht `overflow-y-hidden` am Container; die Animation selbst bleibt sichtbar, weil sie nur im 7×7-Kreis pulsiert.
+Beim Aufruf von `compose-scene-anchor` nicht mehr blind `scene.aiPrompt` weiterreichen, sondern vorab einen serverseitig bereinigten `visualScenePrompt` bilden:
+
+- Entferne `[Dialog] ... [/Dialog]` auch dort.
+- Falls leer: neutraler Meeting-/Conversation-Prompt.
+
+Das ist doppelte Absicherung: selbst wenn künftig eine andere Funktion Dialogtext in `ai_prompt` schreibt, bekommt der Anchor-Renderer keinen Speaker-Order-Text mehr.
+
+### 5. Betroffene Szene resetten
+
+Einmalig für Szene `6d89affc-f926-466b-b0f8-12b11f3863b5`:
+
+- `reference_image_url = null`
+- `clip_url = null`
+- Lip-sync Felder leeren
+- `clip_status`/Fehler zurücksetzen
+- `scene_anchor_cache` für diese Szene löschen
+
+Danach muss „Generieren“ bzw. „Clip + Lip-Sync neu rendern“ einen neuen Anchor ohne Dialog-Leak erzeugen.
 
 ## Erwartetes Ergebnis
 
-- Die ▲ ● ▼-Mini-Sidebar verschwindet komplett.
-- Der Stepper bleibt auf schmalen Viewports horizontal scrollbar, aber ohne sichtbare Scrollbar.
-- Alle anderen Stellen im Code, die bereits `no-scrollbar` benutzen (z. B. horizontale Picker-Reihen), profitieren ebenfalls.
+Der Anchor-Prompt kennt künftig nur noch: „2 distinkte Personen in einer Meeting-Szene“. Er kennt nicht mehr: „Samuel spricht zweimal“. Damit sollte das Modell nicht länger Samuel zweimal als dritte Person visualisieren.
 
-## Betroffene Dateien
+## Dateien
 
-- `src/index.css` — `.no-scrollbar`-Utility ergänzen
-- `src/components/video-composer/MotionStudioTopStepper.tsx` — `overflow-y-hidden` hinzufügen
+- `supabase/functions/compose-scene-anchor/index.ts`
+- `supabase/functions/compose-video-clips/index.ts`
+- neue Migration zum Reset der betroffenen Szene
