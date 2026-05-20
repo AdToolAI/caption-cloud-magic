@@ -133,7 +133,7 @@ export function usePipelineProgress({
       (s) =>
         (s as any).twoshotStage ||
         s.engineOverride === 'cinematic-sync' ||
-        ((s.dialogVoices?.length ?? 0) > 1),
+        dialogVoiceCount(s) > 1,
     );
     const done = targets.filter(
       (s) =>
