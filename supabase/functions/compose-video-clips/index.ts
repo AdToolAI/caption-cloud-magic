@@ -269,6 +269,11 @@ serve(async (req) => {
       if (!raw) return '';
       const cleaned = raw
         .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, '')
+        // Drop server-injected "Featuring NAME (shotType): ..." / "Featuring NAME and NAME: ..." prefixes —
+        // they often pair a slot NAME with a DIFFERENT character description in the
+        // following sentence, which the image model interprets as "render Slot-Name
+        // visually as Other-Name", producing wrong/duplicated faces.
+        .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, '')
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, '')
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, '')
         .replace(/^.*\b(speak\s+to\s+camera\s+in\s+turns|lip[- ]?sync\s+mouth\s+movement|timing\s+must\s+follow|speaker\s+order|in\s+turns|dialogue\s*:|conversation\s+script).*$/gim, '')
@@ -281,6 +286,58 @@ serve(async (req) => {
         .trim();
       const meaningful = cleaned.replace(/[\s.\-,;:!?]/g, '').length >= 10;
       return meaningful ? cleaned : '';
+    };
+
+    /**
+     * Parse a dialog script ("NAME: text" per line) and return the unique
+     * speaker slugs in first-appearance order. Used to override the visual
+     * cast for anchor composition: even if `character_shots` lists more
+     * slots than the script actually uses, the anchor should only render
+     * the people who actually speak (and each exactly ONCE).
+     */
+    const uniqueSpeakerSlugsFromScript = (script?: string | null): string[] => {
+      const s = (script ?? '').trim();
+      if (!s) return [];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const line of s.split('\n')) {
+        const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+        if (!m) continue;
+        const slug = m[1].trim().toLowerCase().replace(/\s+/g, '-');
+        if (slug && !seen.has(slug)) {
+          seen.add(slug);
+          out.push(slug);
+        }
+      }
+      return out;
+    };
+
+    /**
+     * Resolve a speaker slug ("matthew-dusatko" or "matthew") to the matching
+     * cast member in `character_shots` (preferred — has the portrait) so we
+     * can build a clean portraitUrls[] / characterNames[] pair from the
+     * dialog script alone.
+     */
+    const resolveSpeakerToShot = (
+      slug: string,
+      shots: Array<{ characterId: string; shotType: CharacterShotType }>,
+    ): { characterId: string; shotType: CharacterShotType } | undefined => {
+      if (!slug || shots.length === 0) return undefined;
+      const lower = slug.toLowerCase();
+      const first = lower.split('-')[0];
+      // 1) exact match
+      let hit = shots.find((s) => String(s.characterId).toLowerCase() === lower);
+      if (hit) return hit;
+      // 2) first-name match against characterId
+      hit = shots.find((s) => String(s.characterId).toLowerCase().split('-')[0] === first);
+      if (hit) return hit;
+      // 3) match via brand character name
+      hit = shots.find((s) => {
+        const c = charById.get(s.characterId);
+        const cn = (c?.name || '').toLowerCase();
+        return cn === lower || cn.split(/\s+/)[0] === first;
+      });
+      return hit;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
@@ -558,12 +615,25 @@ serve(async (req) => {
             const castShots = (scene.characterShots ?? []).filter(
               (s) => s && s.shotType !== 'absent' && s.characterId,
             );
-            if (castShots.length >= 2) {
-              const portraitUrls = castShots
+            // Speaker-list override: when a dialog script is present, the
+            // visual cast MUST equal the deduplicated set of actual speakers,
+            // in script order. This prevents the "Samuel speaks twice → 3
+            // people in frame" failure mode by only sending portraits of
+            // people who actually speak.
+            const scriptSpeakers = uniqueSpeakerSlugsFromScript(scene.dialogScript);
+            let effectiveShots = castShots;
+            if (scriptSpeakers.length > 0) {
+              const remapped = scriptSpeakers
+                .map((slug) => resolveSpeakerToShot(slug, castShots))
+                .filter((x): x is { characterId: string; shotType: CharacterShotType } => !!x);
+              if (remapped.length >= 1) effectiveShots = remapped;
+            }
+            if (effectiveShots.length >= 2) {
+              const portraitUrls = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
                 .filter((u): u is string => typeof u === 'string' && u.length > 0)
                 .slice(0, 4);
-              const characterNames = castShots
+              const characterNames = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.name)
                 .filter((n): n is string => typeof n === 'string' && n.length > 0);
               if (portraitUrls.length >= 2) {
@@ -595,7 +665,7 @@ serve(async (req) => {
                       portraitUrl: portraitUrls[0],
                       portraitUrls,
                       characterNames,
-                      scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || `Exactly ${portraitUrls.length} distinct people in a modern setting, each visible exactly once, natural conversation framing. No rendered text.`,
+                      scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`,
                       aspectRatio: '16:9',
                       shotType: scene.characterShot?.shotType,
                       strictNoDuplicates: strict,
@@ -791,12 +861,23 @@ serve(async (req) => {
         const refUrl = String(scene.referenceImageUrl ?? '');
         const looksComposed = refUrl.includes('/scene-anchors/') || refUrl.includes('/composer-anchors/');
         if (isI2V && !isHeygenRoute && !isCinematicSync && !refUrl) {
-          const castShots = (scene.characterShots ?? []).filter(
+          const castShotsRaw = (scene.characterShots ?? []).filter(
             (s) => s && s.shotType !== 'absent' && s.characterId,
           );
           // Also accept the legacy singular characterShot.
-          if (castShots.length === 0 && scene.characterShot && scene.characterShot.shotType !== 'absent') {
-            castShots.push(scene.characterShot);
+          if (castShotsRaw.length === 0 && scene.characterShot && scene.characterShot.shotType !== 'absent') {
+            castShotsRaw.push(scene.characterShot);
+          }
+          // Speaker-list override (same logic as cinematic-sync above): when
+          // a dialog script is present, only the people who actually speak
+          // get a portrait slot in the anchor.
+          const scriptSpeakers = uniqueSpeakerSlugsFromScript(scene.dialogScript);
+          let castShots = castShotsRaw;
+          if (scriptSpeakers.length > 0) {
+            const remapped = scriptSpeakers
+              .map((slug) => resolveSpeakerToShot(slug, castShotsRaw))
+              .filter((x): x is { characterId: string; shotType: CharacterShotType } => !!x);
+            if (remapped.length >= 1) castShots = remapped;
           }
           if (castShots.length >= 1 && !looksComposed) {
             const portraitUrls = castShots
@@ -807,7 +888,11 @@ serve(async (req) => {
               .map((cs) => charById.get(cs.characterId)?.name)
               .filter((n): n is string => typeof n === 'string' && n.length > 0);
             if (portraitUrls.length >= 1) {
-              console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s)`);
+              const neutralFallback =
+                portraitUrls.length >= 2
+                  ? `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`
+                  : 'Natural cinematic scene, photorealistic, no rendered text.';
+              console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length})`);
               try {
                 const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
                   method: 'POST',
@@ -820,7 +905,7 @@ serve(async (req) => {
                     portraitUrl: portraitUrls[0],
                     portraitUrls,
                     characterNames,
-                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || (portraitUrls.length >= 2 ? `Exactly ${portraitUrls.length} distinct people in a modern setting, each visible exactly once, natural conversation framing. No rendered text.` : 'Natural cinematic scene, photorealistic, no rendered text.'),
+                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback,
                     aspectRatio: '16:9',
                     shotType: castShots[0]?.shotType,
                   }),

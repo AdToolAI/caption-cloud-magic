@@ -1,77 +1,93 @@
 ## Befund
 
-Du hast sehr wahrscheinlich recht. Der aktuelle DB-Datensatz zeigt:
+Du hast recht: Der Fehler hängt weiterhin am Skript-/Charakter-Mapping, nicht nur am `[Dialog]`-Block.
 
-- `character_shots` enthält korrekt nur 2 Charaktere: Matthew + Samuel.
-- `dialog_script` enthält 3 Zeilen: Samuel, Matthew, Samuel.
-- `ai_prompt` enthält zusätzlich einen kompletten `[Dialog]`-Block mit den Sprecherzeilen:
-  - Samuel sagt Zeile 1
-  - Matthew sagt Zeile 2
-  - Samuel sagt Zeile 3
-- `compose-scene-anchor` bekommt aktuell `scenePrompt: scene.aiPrompt || ''`.
+In den aktuellen DB-Daten ist sichtbar:
 
-Damit landet die Dialogstruktur im Bildprompt. Das Modell interpretiert „Samuel spricht zweimal“ offenbar visuell als zusätzliche Samuel-Instanz. Genau deshalb zeigt der Screenshot 3 Personen: Samuel, Matthew, Samuel.
+- Das Skript hat 3 Dialogzeilen, aber nur 2 eindeutige Sprecher: Matthew, Samuel, Matthew.
+- `character_shots` ist korrekt: Matthew + Samuel.
+- Der generierte visuelle Prompt ist aber widersprüchlich, z. B.:
+  - `Featuring Samuel Dusatko (profile): Close-up profile shot of Matthew Dusatko...`
+  - oder `Featuring Matthew Dusatko (profile): ... Samuel Dusatko...`
+- Dadurch bekommt das Bildmodell gleichzeitig falsche Identitäts-Hinweise: Slot A sagt Samuel, der Prompt beschreibt aber Matthew. Das erklärt, warum trotz Matthew als Wiederholungs-Sprecher der andere Charakter doppelt/verkehrt auftaucht.
+- Zusätzlich ordnet der Lip-Sync aktuell Pass 1 immer dem linken Gesicht und Pass 2 immer dem rechten Gesicht zu. Das ist nur korrekt, wenn die Anchor-Komposition dieselbe Links/Rechts-Reihenfolge wie `character_shots` erzeugt. Wenn das Bildmodell Matthew rechts und Samuel links platziert, werden Stimmen/Passes vertauscht.
 
-Der bisherige Sanitizer entfernt zwar `NAME: Text`-Zeilen, aber nicht den neueren `[Dialog] ... [/Dialog]`-Block mit Bullet-Zeilen wie `- Samuel Dusatko says: ...`. Dadurch bleibt der dialogische Speaker-Order-Kontext im visuellen Anchor-Prompt erhalten.
+## Plan
 
-## Lösung
+### 1. Sprecher statt Dialogzeilen als visuelle Cast-Liste verwenden
 
-### 1. Dialog-Blöcke vollständig aus visuellen Prompts entfernen
-
-In `supabase/functions/compose-scene-anchor/index.ts` wird `stripSpokenDialog()` erweitert:
-
-- Entferne komplette `[Dialog] ... [/Dialog]`-Blöcke.
-- Entferne Bullet-Zeilen wie `- Samuel Dusatko says: ...`.
-- Entferne Sätze wie `Samuel and Matthew speak to camera in turns...`, `Timing must follow speaker order`, `lip-sync mouth movement`, usw.
-- Entferne „says:“/„speaks:“/„dialogue:“ Muster unabhängig von Großschreibung.
-
-Ziel: Der Bildgenerator sieht nur noch eine neutrale visuelle Szene, niemals Speaker-Reihenfolge oder mehrfaches Auftreten eines Sprechers.
-
-### 2. Neutralen visuellen Fallback erzwingen
-
-Wenn nach dem Strippen kaum noch visueller Kontext übrig bleibt, nutzt `compose-scene-anchor` einen sauberen Fallback:
+In `compose-video-clips` wird vor dem Anchor-Aufruf aus `dialogScript` eine deduplizierte Sprecherliste gebaut:
 
 ```text
-Two distinct business partners in a modern office meeting, seated together in conversation, photorealistic, no text.
+Matthew, Samuel, Matthew -> [Matthew, Samuel]
+Samuel, Matthew, Samuel -> [Samuel, Matthew]
 ```
 
-Bei 2 Portraits wird daraus explizit:
+Die Anchor-Portraits werden dann bevorzugt aus dieser Sprecherliste gebildet, nicht blind aus `character_shots` oder aus Prompt-Text.
+
+### 2. Widersprüchliche `Featuring ...`-Promptteile entfernen
+
+Der Sanitizer für den visuellen Anchor-Prompt wird erweitert:
+
+- Entferne `Featuring X: ...` / `Featuring X (profile): ...` Prefixe.
+- Entferne besonders problematische Sätze, in denen zwei verschiedene Charakternamen in einem Slot vermischt werden.
+- Fallback für Multi-Speaker-Szenen wird bewusst neutral:
 
 ```text
-Exactly 2 distinct people in a modern office meeting, both visible once, seated together in conversation.
+Exactly 2 distinct people in a modern office conversation scene, one is Matthew Dusatko and one is Samuel Dusatko, each visible exactly once. No rendered text.
 ```
 
-### 3. Anchor-Cache invalidieren
+Damit sieht der Bildgenerator nicht mehr „Samuel-Slot mit Matthew-Beschreibung“.
 
-Cache-Key in `compose-scene-anchor` hochsetzen (`v8` → `v9`), damit kein alter Anchor mit Dialog-Prompt weiterverwendet wird.
+### 3. Anchor-Cache erneut invalidieren
 
-### 4. Zusätzlicher Guard in `compose-video-clips`
+`compose-scene-anchor` bekommt eine neue Cache-Version (`v9` → `v10`), damit bereits erzeugte, fehlerhafte Anchors nicht wiederverwendet werden.
 
-Beim Aufruf von `compose-scene-anchor` nicht mehr blind `scene.aiPrompt` weiterreichen, sondern vorab einen serverseitig bereinigten `visualScenePrompt` bilden:
+### 4. Sprecher/Portrait-Reihenfolge hart an den Anchor übergeben
 
-- Entferne `[Dialog] ... [/Dialog]` auch dort.
-- Falls leer: neutraler Meeting-/Conversation-Prompt.
+Beim Anchor-Aufruf wird `characterNames` exakt in derselben Reihenfolge wie `portraitUrls` gesetzt. Bei Script-basierten Two-Shots also z. B.:
 
-Das ist doppelte Absicherung: selbst wenn künftig eine andere Funktion Dialogtext in `ai_prompt` schreibt, bekommt der Anchor-Renderer keinen Speaker-Order-Text mehr.
+```text
+portraitUrls[0] = Matthew portrait
+characterNames[0] = Matthew Dusatko
+portraitUrls[1] = Samuel portrait
+characterNames[1] = Samuel Dusatko
+```
 
-### 5. Betroffene Szene resetten
+Nicht mehr aus gemischten Prompt-Texten ableiten.
 
-Einmalig für Szene `6d89affc-f926-466b-b0f8-12b11f3863b5`:
+### 5. Lip-Sync-Face-Mapping gegen Links/Rechts-Vertauschung absichern
 
-- `reference_image_url = null`
-- `clip_url = null`
-- Lip-sync Felder leeren
-- `clip_status`/Fehler zurücksetzen
-- `scene_anchor_cache` für diese Szene löschen
+In `compose-twoshot-lipsync` wird das Face-Targeting nicht mehr nur nach Pass-Index gemacht (`Pass 1 -> links`, `Pass 2 -> rechts`). Stattdessen wird die Sprecher-/Shot-Reihenfolge mit der gespeicherten Anchor-Reihenfolge abgeglichen.
 
-Danach muss „Generieren“ bzw. „Clip + Lip-Sync neu rendern“ einen neuen Anchor ohne Dialog-Leak erzeugen.
+Praktisch:
 
-## Erwartetes Ergebnis
+- `audio_plan.twoshot.anchorCharacters` speichert die Reihenfolge der Anchor-Portraits.
+- Lip-Sync-Passes targeten das Gesicht passend zum jeweiligen `character_id`.
+- Wenn keine sichere Zuordnung möglich ist, bleibt die bestehende Fallback-Logik aktiv, aber mit präzisem Fehler statt stiller Vertauschung.
 
-Der Anchor-Prompt kennt künftig nur noch: „2 distinkte Personen in einer Meeting-Szene“. Er kennt nicht mehr: „Samuel spricht zweimal“. Damit sollte das Modell nicht länger Samuel zweimal als dritte Person visualisieren.
+### 6. Betroffene Szenen resetten
+
+Für die betroffenen aktuellen Szenen mit diesem Muster werden alte Artefakte gelöscht/zurückgesetzt:
+
+- `reference_image_url`
+- `clip_url`
+- Lip-Sync-Felder
+- `audio_plan.twoshot.faceMap`
+- `scene_anchor_cache`
+
+Danach muss der Clip neu gerendert werden, damit der neue saubere Anchor und das neue Face-Mapping greifen.
 
 ## Dateien
 
-- `supabase/functions/compose-scene-anchor/index.ts`
 - `supabase/functions/compose-video-clips/index.ts`
-- neue Migration zum Reset der betroffenen Szene
+- `supabase/functions/compose-scene-anchor/index.ts`
+- `supabase/functions/compose-twoshot-lipsync/index.ts`
+- optional Migration/Datencleanup für die betroffenen Szenen
+
+## Erwartetes Ergebnis
+
+- Bei 3 Dialogzeilen mit 2 eindeutigen Sprechern werden visuell nur 2 Personen erzeugt.
+- Der Charakter, der zweimal spricht, wird nicht zweimal visualisiert.
+- Matthew/Samuel werden nicht mehr durch widersprüchliche `Featuring`-Prompts vertauscht.
+- Lip-Sync spricht gezielt den korrekten sichtbaren Charakter an, statt pauschal links/rechts zu verwenden.
