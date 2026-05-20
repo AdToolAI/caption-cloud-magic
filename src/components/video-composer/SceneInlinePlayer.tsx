@@ -59,9 +59,36 @@ export default function SceneInlinePlayer({
     scene.lockReferenceUrl ||
     undefined;
   const status = scene.clipStatus;
-  const isReady = status === 'ready' && !!clipUrl;
-  const isFailed = status === 'failed';
-  const isWorking = isGenerating || status === 'generating';
+
+  // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
+  // ist der Clip erst dann "wirklich fertig", wenn auch der Lip-Sync sauber
+  // durchgelaufen ist. Sonst zeigen wir keinen grünen Haken.
+  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const needsLipsync =
+    scene.engineOverride === 'cinematic-sync' ||
+    !!(scene as any).twoshotStage ||
+    dialogVoiceCount > 1;
+  const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
+  const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
+  const lipsyncDone =
+    !needsLipsync ||
+    lipSyncStatus === 'done' ||
+    lipSyncStatus === 'ready' ||
+    lipSyncStatus === 'no_voiceover' ||
+    twoshotStage === 'done' ||
+    twoshotStage === 'complete';
+  const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
+  const lipsyncRunning =
+    needsLipsync &&
+    !lipsyncDone &&
+    !lipsyncFailed &&
+    (lipSyncStatus === 'running' ||
+      (twoshotStage && twoshotStage !== 'failed') ||
+      status === 'ready'); // clip ready, lip-sync still pending
+
+  const isReady = status === 'ready' && !!clipUrl && lipsyncDone && !lipsyncFailed;
+  const isFailed = status === 'failed' || lipsyncFailed;
+  const isWorking = isGenerating || status === 'generating' || lipsyncRunning;
 
   const handleMouseEnter = () => {
     setHovering(true);
@@ -116,7 +143,7 @@ export default function SceneInlinePlayer({
           {isWorking && (
             <span className="px-1.5 py-0.5 rounded-md bg-primary/15 backdrop-blur text-[9px] font-semibold text-primary border border-primary/40 flex items-center gap-1">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              Baut
+              {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : 'Baut'}
             </span>
           )}
           {!isReady && !isWorking && !isFailed && (

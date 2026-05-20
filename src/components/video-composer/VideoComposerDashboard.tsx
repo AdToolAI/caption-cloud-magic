@@ -1249,10 +1249,8 @@ export default function VideoComposerDashboard() {
         />
       </div>
 
-      <PipelineProgressBar
-        scenes={project.scenes}
-        assemblyConfig={project.assemblyConfig}
-      />
+      {/* Pipeline-Progress-Bar wird ausschließlich im Storyboard angezeigt,
+          damit kein doppelter Ladebalken erscheint. */}
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">

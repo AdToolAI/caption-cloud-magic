@@ -1,74 +1,47 @@
-## Ziel
-Der Kunde soll direkt nach dem Klick auf „Clip generieren“ einen sichtbaren, glaubwürdigen Ladebereich sehen — nicht erst nach ~30 Sekunden. Die bestehende Backend-/Render-Pipeline bleibt unverändert.
+## Plan
 
-## Ursache
-Der Fortschrittsbalken hängt aktuell nur global unter dem Top-Stepper. Beim Klick in der Szenen-/Storyboard-Fläche wird zwar teilweise ein Event ausgelöst, aber:
+1. **Doppelten Ladebalken entfernen**
+   - Den globalen `PipelineProgressBar` unter dem Top-Stepper aus `VideoComposerDashboard.tsx` entfernen.
+   - Nur der Ladebalken im Storyboard bleibt sichtbar.
 
-- Der sichtbare Bereich des Kunden ist unten im Storyboard; der globale Balken liegt außerhalb des aktuellen Scroll-Fokus.
-- `useGenerateAllClips` beendet das `clips:start` Event im `finally` sofort wieder, obwohl die eigentliche Clip-/Lip-Sync-Generierung danach noch mehrere Minuten serverseitig weiterläuft.
-- Beim Einzelclip ist der Optimistic-Status erst nach `ensureProject()` sichtbar; genau das verursacht die wahrgenommenen ~30 Sekunden „nichts passiert“.
-- Der Progress sollte nicht an die erste Serverantwort gekoppelt sein, sondern an den Klick selbst.
+2. **Progress bei 0% starten und nicht bei 60%**
+   - `usePipelineProgress.ts` so anpassen, dass ein neuer Lauf seine Floors/Startzeiten sauber zurücksetzt.
+   - Bereits fertige alte Clips dürfen den neuen Lauf nicht auf 60%+ springen lassen.
+   - Für den Storyboard-Balken wird der aktive Generierungsprozess als eigener Lauf betrachtet: Start direkt nach Klick, dann simuliert über ca. 7–8 Minuten, echte Fertig-/Fehlerzustände dürfen ihn beenden oder korrigieren.
 
-## Umsetzung
+3. **Abgeschlossene Steps grün markieren**
+   - `PipelineProgressBar.tsx` optisch verbessern: fertige Phasen bekommen grünen Glow/Check, laufende Phasen gold/cyan, ausstehende Phasen gedimmt.
+   - Kein „fertig“-Signal, solange Lip-Sync noch läuft oder fehlgeschlagen ist.
 
-### 1. Lokaler Ladebereich direkt im Storyboard
-In `StoryboardTab.tsx` wird über der Szenenliste ein klarer Pipeline-Ladebereich eingebaut, der ab Klick sofort erscheint:
+4. **Grünen „Generiert“-Haken erst nach vollständiger Pipeline zeigen**
+   - `SceneInlinePlayer.tsx` korrigieren: `✓ Generiert` nur anzeigen, wenn der Clip wirklich final ist.
+   - Bei Cinematic-Sync/Talking-Head/Lip-Sync-Szenen zählt `clipStatus === 'ready'` allein nicht mehr; zusätzlich muss `lipSyncStatus === 'done'` oder `twoshotStage === 'done'` erfüllt sein.
+   - Solange Lip-Sync `pending`/`running` ist, bleibt der Status „Baut“ bzw. „Lip-Sync läuft“.
+   - Bei `lipSyncStatus === 'failed'` wird kein grüner Haken gezeigt, sondern ein Fehlerstatus.
 
-- Titel: „Clip wird generiert…“ bzw. „Clips werden generiert…“
-- Untertitel: „VO & Lip-Sync inklusive“ wenn ein Skript vorhanden ist
-- Fortschrittsbalken mit 7–8 Minuten ETA
-- Live-Zeit: „0:12 / ~7:45 min“
-- Status-Pills: Clips, Voiceover, Lip-Sync, Export
+5. **Lip-Sync-Ausfall absichern, ohne die Pipeline umzubauen**
+   - Die Ursache ist sehr wahrscheinlich ein Trigger-Konflikt/Auth-Konflikt: `compose-clip-webhook` versucht Auto-Lip-Sync aus einem Backend-Kontext zu starten, aber `compose-lipsync-scene` und `compose-twoshot-lipsync` erwarten aktuell User-JWT.
+   - Ich stabilisiere das, indem der Webhook nicht mehr fälschlich einen geschützten Lip-Sync-Call auslöst, sondern die bestehende clientseitige `useTwoShotAutoTrigger`-Logik sauber übernehmen lässt.
+   - Dadurch wird die vorher funktionierende Pipeline nicht ersetzt, sondern der doppelte/fehleranfällige Auto-Trigger entfernt.
 
-Damit sieht der Kunde Fortschritt genau dort, wo er arbeitet — nicht nur oben außerhalb des Blickfelds.
+6. **Statuslogik für Progress und Szenen synchronisieren**
+   - `usePipelineProgress.ts` soll Lip-Sync-Failure als roten/fehlgeschlagenen Zustand berücksichtigen und nicht weiter „alles läuft gut“ vortäuschen.
+   - `readyCount/allReady` im Storyboard darf für Lip-Sync-Szenen nur „bereit“ zählen, wenn der finale Lip-Sync abgeschlossen ist.
 
-### 2. Klick triggert sofort sichtbaren Status
-In `useSceneGenerate.ts` und `useGenerateAllClips.ts` wird vor allen langsamen Operationen sofort ein lokaler Optimistic-State gesetzt:
+## Betroffene Dateien
 
-- Einzelclip: Szene sofort auf `clipStatus: 'generating'`
-- Alle Clips: alle relevanten Szenen sofort auf `clipStatus: 'generating'`
-- Event `clips:start` direkt beim Klick
+- `src/components/video-composer/VideoComposerDashboard.tsx`
+- `src/components/video-composer/StoryboardTab.tsx`
+- `src/components/video-composer/PipelineProgressBar.tsx`
+- `src/components/video-composer/SceneInlinePlayer.tsx`
+- `src/hooks/usePipelineProgress.ts`
+- `src/hooks/useGenerateAllClips.ts`
+- `supabase/functions/compose-clip-webhook/index.ts`
 
-Das passiert vor `ensureProject()`, vor Frame-Anchor-Erstellung und vor Edge-Function-Aufrufen.
+## Ergebnis
 
-### 3. Progress nicht zu früh beenden
-`clips:end` wird nicht mehr direkt im `finally` ausgelöst, wenn die Serverfunktion nur die Generierung gestartet hat. Stattdessen bleibt der Ladebereich aktiv, solange Szenen noch `generating` sind oder der lokale Pipeline-Timer läuft.
-
-Fehlerfälle beenden den Progress weiterhin sofort.
-
-### 4. 7–8 Minuten Ladeillusion stabil halten
-`usePipelineProgress.ts` wird so angepasst, dass ein gestarteter Clip-Prozess nicht nach kurzer Zeit verschwindet:
-
-- Mindestlaufzeit für sichtbaren Progress: ca. 7:45 min
-- Soft-Floor steigt kontinuierlich
-- Realer Ready-Status gewinnt: wenn alle Szenen vorher fertig sind, springt es sauber auf fertig
-- Wenn Backend länger braucht, bleibt „wird generiert“ sichtbar statt leerem Zustand
-
-### 5. Grün bestätigter Fertig-Zustand
-Sobald eine Szene fertig ist:
-
-- Auf der Szenenkarte/Player-Kachel erscheint „✓ Generiert“
-- Generating-Overlay verschwindet erst bei `clipStatus === 'ready'`
-- Der Kunde sieht pro Clip klar, was bereits abgeschlossen ist
-
-## Dateien
-
-```text
-src/components/video-composer/StoryboardTab.tsx
-src/hooks/useGenerateAllClips.ts
-src/hooks/useSceneGenerate.ts
-src/hooks/usePipelineProgress.ts
-src/components/video-composer/SceneInlinePlayer.tsx
-```
-
-## Nicht anfassen
-
-```text
-supabase/functions/*
-Datenbank-Schema
-Realtime-Subscriptions
-Two-Shot / Lip-Sync Edge-Functions
-Render-Pipeline
-```
-
-Die funktionierende Pipeline bleibt technisch unverändert; wir reparieren nur die sofortige UI-Rückmeldung und den sichtbaren Ladezustand.
+- Nur noch ein Ladebalken im Szenenboard.
+- Der Balken startet sichtbar bei 0%.
+- Fertige Schritte leuchten grün.
+- `✓ Generiert` erscheint erst, wenn Clip plus Lip-Sync wirklich fertig sind.
+- Lip-Sync wird nicht mehr durch konkurrierende Trigger/geschützte Backend-Aufrufe blockiert.
