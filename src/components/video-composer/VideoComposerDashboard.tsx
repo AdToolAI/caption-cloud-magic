@@ -638,7 +638,8 @@ export default function VideoComposerDashboard() {
       }
     }
 
-    if (next !== 'clips' || !project.id) return;
+    if (next !== 'clips' && next !== 'storyboard') return;
+    if (!project.id) return;
     try {
       const { data } = await supabase
         .from('composer_scenes')
@@ -1250,7 +1251,7 @@ export default function VideoComposerDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="min-w-0">
           <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabId)}>
-            <TabsList className="lg:hidden grid grid-cols-6 w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40">
+            <TabsList className={`lg:hidden grid w-full max-w-3xl mx-auto mb-6 bg-card border border-border/40 ${showCampaignTab ? 'grid-cols-6' : 'grid-cols-5'}`}>
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
                   const isAccessible = i === 0 ||
