@@ -504,8 +504,14 @@ serve(async (req) => {
   try {
     const auth = req.headers.get("Authorization");
     if (!auth) return json({ error: "Unauthorized" }, 401);
-    const { data: { user } } = await supabase.auth.getUser(auth.replace("Bearer ", ""));
-    if (!user) return json({ error: "Unauthorized" }, 401);
+    const token = auth.replace("Bearer ", "").trim();
+    const isServiceCall = token === serviceKey;
+    let user: { id: string } | null = null;
+    if (!isServiceCall) {
+      const { data: { user: authUser } } = await supabase.auth.getUser(token);
+      if (!authUser) return json({ error: "Unauthorized" }, 401);
+      user = { id: authUser.id };
+    }
 
     const body = await req.json().catch(() => ({}));
     const { scene_id } = body || {};
@@ -526,7 +532,9 @@ serve(async (req) => {
       .select("id, user_id")
       .eq("id", scene.project_id)
       .single();
-    if (!project || project.user_id !== user.id) return json({ error: "Forbidden" }, 403);
+    if (!project) return json({ error: "project not found" }, 404);
+    if (!isServiceCall && project.user_id !== user?.id) return json({ error: "Forbidden" }, 403);
+    if (isServiceCall) user = { id: project.user_id };
 
     if ((scene as any).lip_sync_status === "running") {
       const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
