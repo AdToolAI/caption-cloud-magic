@@ -53,6 +53,37 @@ function nameMatchesPrompt(name: string | undefined, prompt: string): boolean {
   return !!first && first.length >= 3 && prompt.includes(first);
 }
 
+function personKey(value: string | undefined): string {
+  return (value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function dialogSpeakerKeys(script: string | undefined): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const line of String(script || '').split('\n')) {
+    const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,60}?)\]?\s*[:：]/);
+    const key = personKey(m?.[1]);
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      out.push(key);
+    }
+  }
+  return out;
+}
+
+function speakerMatchesCharacter(speakerKey: string, character: ComposerCharacter | undefined): boolean {
+  if (!speakerKey || !character) return false;
+  const idKey = personKey(character.id);
+  const nameKey = personKey(character.name);
+  const speakerFirst = speakerKey.split(' ')[0];
+  return idKey === speakerKey || nameKey === speakerKey || idKey.split(' ')[0] === speakerFirst || nameKey.split(' ')[0] === speakerFirst;
+}
+
 function pickStrategy(
   shotType: string | undefined,
   clipSource: string | undefined,
@@ -102,7 +133,7 @@ export function resolveSceneCharacterAnchor(
  * composer can place ALL of them in one frame.
  */
 export function resolveSceneCharacterAnchorsAll(
-  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'characterShots' | 'clipSource'> & {
+  scene: Pick<ComposerScene, 'aiPrompt' | 'characterShot' | 'characterShots' | 'clipSource' | 'dialogScript'> & {
     forcePortraitAsFirstFrame?: boolean;
   },
   characters: ComposerCharacter[] | undefined,
@@ -110,19 +141,34 @@ export function resolveSceneCharacterAnchorsAll(
 ): SceneAnchor[] {
   const forceDirect = scene.forcePortraitAsFirstFrame === true;
   const seen = new Set<string>();
+  const seenPeople = new Set<string>();
   const out: SceneAnchor[] = [];
 
   // 1) Explicit cast slots (multi-character UI). Falls back to legacy
   //    `characterShot` (singular) when `characterShots` is not yet populated.
-  const slots = (scene.characterShots && scene.characterShots.length > 0)
+  const rawSlots = (scene.characterShots && scene.characterShots.length > 0)
     ? scene.characterShots
     : (scene.characterShot ? [scene.characterShot] : []);
+  const speakers = dialogSpeakerKeys(scene.dialogScript);
+  const slots = speakers.length > 0 && characters && rawSlots.length > 0
+    ? rawSlots
+        .map((slot) => {
+          const cm = characters.find((c) => c.id === slot.characterId);
+          const order = speakers.findIndex((key) => speakerMatchesCharacter(key, cm));
+          return { slot, order };
+        })
+        .filter((x) => x.order >= 0)
+        .sort((a, b) => a.order - b.order)
+        .map((x) => x.slot)
+    : rawSlots;
   if (characters && slots.length > 0) {
     for (const slot of slots) {
       if (!slot || !slot.shotType || slot.shotType === 'absent') continue;
       if (seen.has(slot.characterId)) continue;
       const cm = characters.find((c) => c.id === slot.characterId);
       if (!cm?.referenceImageUrl) continue;
+      const key = personKey(cm.name) || personKey(cm.id);
+      if (key && seenPeople.has(key)) continue;
       // Outfit override: when the scene picked a saved outfit look for this
       // character, swap the portrait URL for the outfit cover. The caller
       // (compose-scene-anchor) treats it as just another portrait URL.
@@ -135,6 +181,7 @@ export function resolveSceneCharacterAnchorsAll(
         strategy: 'first-frame-direct', // recomputed below
       });
       seen.add(cm.id);
+      if (key) seenPeople.add(key);
     }
   }
 
@@ -145,6 +192,8 @@ export function resolveSceneCharacterAnchorsAll(
     for (const cm of characters) {
       if (seen.has(cm.id)) continue;
       if (!cm.referenceImageUrl) continue;
+      const key = personKey(cm.name) || personKey(cm.id);
+      if (key && seenPeople.has(key)) continue;
       if (nameMatchesPrompt(cm.name, prompt)) {
         out.push({
           characterId: cm.id,
@@ -154,6 +203,7 @@ export function resolveSceneCharacterAnchorsAll(
           strategy: 'text-only', // recomputed below
         });
         seen.add(cm.id);
+        if (key) seenPeople.add(key);
       }
     }
   }
@@ -163,7 +213,8 @@ export function resolveSceneCharacterAnchorsAll(
     prompt &&
     brandChar?.reference_image_url &&
     nameMatchesPrompt(brandChar.name, prompt) &&
-    !seen.has(brandChar.id || `brand:${brandChar.name}`)
+    !seen.has(brandChar.id || `brand:${brandChar.name}`) &&
+    !seenPeople.has(personKey(brandChar.name))
   ) {
     out.push({
       characterId: brandChar.id || `brand:${brandChar.name}`,
