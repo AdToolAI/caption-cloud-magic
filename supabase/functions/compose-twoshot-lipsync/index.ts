@@ -1095,7 +1095,7 @@ serve(async (req) => {
         });
         console.log(
           `[compose-twoshot-lipsync ${scene_id}] segments job queued on Sync.so`,
-          { jobId, segments: segmentsPayload.length, model: "sync-3" },
+          { jobId, segments: segmentsPayload.length, model: bodyMeta.model ?? "sync-3", fallback_from: bodyMeta.fallback_from ?? null },
         );
         return;
       } else {
