@@ -220,7 +220,10 @@ serve(async (req) => {
 
     const updatedJobs = jobs.map((j: any) => j.jobId === jobId ? { ...j, status: "COMPLETED", outputUrl: polled.outputUrl, completedAt: now } : j);
 
-    if (currentPass < totalPasses) {
+    // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
+    // (mode != 'segments') still chain to the next pass for backward compat.
+    const isSegments = String(syncJobs.mode ?? "") === "segments";
+    if (!isSegments && currentPass < totalPasses) {
       const speakers = Array.isArray(twoshot.speakers) ? twoshot.speakers : [];
       const nextIdx = currentPass;
       const nextSpeaker = speakers[nextIdx];
