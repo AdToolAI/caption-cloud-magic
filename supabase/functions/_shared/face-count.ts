@@ -69,3 +69,58 @@ export async function countFacesInImage(
     return null;
   }
 }
+
+/**
+ * Counts visible HUMAN BODIES (not just frontal faces). Catches the
+ * "2 frontal faces but a third person in profile/background" failure mode
+ * that `countFacesInImage` misses. Returns null on transport failure.
+ */
+export async function countHumansInImage(
+  url: string,
+  lovableKey: string,
+  opts: { timeoutMs?: number } = {},
+): Promise<number | null> {
+  const timeoutMs = opts.timeoutMs ?? 20_000;
+  try {
+    const resp = await fetch(GATEWAY, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  "Count the total number of DISTINCT HUMAN BEINGS visible in this image. " +
+                  "Include people in profile, partially visible people, people in the background, " +
+                  "people whose face is turned away — anyone whose body/silhouette is recognizable as human. " +
+                  "Also include posters, photos, mirrors, screens, mannequins, or statues that depict a person — " +
+                  "count each depicted person once. Do NOT count hands or arms without a body. " +
+                  "Return STRICT JSON only, no prose: {\"humans\": <integer>}.",
+              },
+              { type: "image_url", image_url: { url } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*?\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const n = Number(parsed?.humans);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return Math.round(n);
+  } catch {
+    return null;
+  }
+}
