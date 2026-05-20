@@ -269,6 +269,60 @@ async function pollSyncSoDirectPrediction(
 }
 
 /**
+ * Sync.so v2 Segments API — single job, multi-speaker.
+ *
+ * Docs: https://sync.so/docs/developer-guides/segments
+ * Avoids the fragile sequential 2-pass approach (which kept failing with
+ * `generation_pipeline_failed` on stiller AI two-shots). Sync.so handles
+ * speaker selection per segment internally — no manual coordinates needed.
+ */
+async function startSyncSoSegmentsJob(
+  syncApiKey: string,
+  params: {
+    videoUrl: string;
+    speakers: Array<{ refId: string; audioUrl: string }>;
+    segments: Array<{ startSec: number; endSec: number; refId: string; cropStart?: number; cropEnd?: number }>;
+    model?: string;
+  },
+  label: string,
+): Promise<string> {
+  const inputArr: Array<Record<string, unknown>> = [
+    { type: "video", url: params.videoUrl },
+    ...params.speakers.map((s) => ({ type: "audio", url: s.audioUrl, refId: s.refId })),
+  ];
+  const segments = params.segments.map((s) => {
+    const audioInput: Record<string, unknown> = { refId: s.refId };
+    if (typeof s.cropStart === "number" && typeof s.cropEnd === "number") {
+      audioInput.startTime = s.cropStart;
+      audioInput.endTime = s.cropEnd;
+    }
+    return { startTime: s.startSec, endTime: s.endSec, audioInput };
+  });
+  const body = {
+    model: params.model ?? "lipsync-2-pro",
+    input: inputArr,
+    segments,
+    options: {
+      sync_mode: "cut_off",
+      output_format: "mp4",
+      temperature: 0.5,
+    },
+  };
+  const resp = await fetch("https://api.sync.so/v2/generate", {
+    method: "POST",
+    headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`${label}_create_${resp.status}: ${txt.slice(0, 500)}`);
+  }
+  const data = await resp.json();
+  if (!data?.id) throw new Error(`${label}_missing_job_id: ${JSON.stringify(data).slice(0, 240)}`);
+  return String(data.id);
+}
+
+/**
  * Detect face centers in the two-shot anchor image via Gemini Vision.
  * Returns coordinates normalized to the image's natural pixel space.
  * Sync.so honors these coordinates relative to the input video frame size,
@@ -807,156 +861,130 @@ serve(async (req) => {
       let outUrl: string | null = null;
 
       if (useMultiPass) {
-        let currentVideo = sourceClipUrl;
-        for (let p = 0; p < passes.length; p++) {
-          const pass = passes[p];
-          const target = pickTargetCoordinates(p, faceMap, fallbackDims);
-          console.log(
-            `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length}`,
-            {
-              speaker: pass.speaker,
-              character_id: pass.character_id,
-              audio: pass.track_url,
-              target_face: target?.side,
-              coords: target?.coords,
-              source: target?.source,
-            },
-          );
-          const passStartedAt = new Date().toISOString();
-          const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
-          const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
-          await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2", {
-            audio_plan: {
-              ...prevPlan,
-              twoshot: {
-                ...prevTwoshot,
-                speakers: publicPasses,
-                faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
-                heartbeat: {
-                  pass: p + 1,
-                  total_passes: passes.length,
-                  started_at: passStartedAt,
-                  speaker: pass.speaker,
-                  targetFace: target?.side ?? null,
-                  targetSource: target?.source ?? null,
-                },
+        // ── Sync.so Segments API — ONE job, multi-speaker ──────────────
+        // The previous sequential 2-pass strategy kept failing with
+        // `generation_pipeline_failed` on stiller AI two-shots because each
+        // pass fed Sync.so an 8s clip with one near-silent voice track.
+        // Sync.so's documented multi-speaker path is the Segments API:
+        // one video + per-speaker audio refs + a segments[] array mapping
+        // each dialog turn (video time range) to the right speaker ref.
+        // Sync.so picks the speaking face per segment internally.
+        const turns = Array.isArray((scene as any).audio_plan?.twoshot?.segments)
+          ? ((scene as any).audio_plan.twoshot.segments as Array<any>)
+          : [];
+        const speakerRefMap = new Map<string, { refId: string; audioUrl: string; speaker: string; character_id: string | null }>();
+        for (let i = 0; i < passes.length; i++) {
+          const pass = passes[i];
+          const key = String(pass.character_id || pass.speaker_slug || pass.speaker || `spk${i}`).toLowerCase();
+          const refId = `spk_${i}`;
+          speakerRefMap.set(key, {
+            refId,
+            audioUrl: pass.track_url,
+            speaker: pass.speaker,
+            character_id: pass.character_id ?? null,
+          });
+        }
+        const segmentsPayload: Array<{ startSec: number; endSec: number; refId: string; cropStart: number; cropEnd: number }> = [];
+        for (const t of turns) {
+          const tKey = String(t.character_id || t.speaker_slug || t.speaker || "").toLowerCase();
+          const ref = speakerRefMap.get(tKey) ?? speakerRefMap.get(tKey.split("-")[0]);
+          if (!ref) continue;
+          const s = Number(t.startSec);
+          const e = Number(t.endSec);
+          if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+          segmentsPayload.push({
+            startSec: Math.max(0, s),
+            endSec: Math.max(s + 0.05, e),
+            refId: ref.refId,
+            cropStart: Math.max(0, s),
+            cropEnd: Math.max(s + 0.05, e),
+          });
+        }
+        if (segmentsPayload.length === 0 || speakerRefMap.size === 0) {
+          await refund(`segments_build_failed: turns=${turns.length} speakers=${speakerRefMap.size}`);
+          return;
+        }
+
+        const startedAt = new Date().toISOString();
+        const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
+        const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
+        await setStage(supabase, scene_id, "lipsync_1", {
+          audio_plan: {
+            ...prevPlan,
+            twoshot: {
+              ...prevTwoshot,
+              speakers: publicPasses,
+              faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
+              heartbeat: {
+                mode: "segments",
+                started_at: startedAt,
+                segments_count: segmentsPayload.length,
+                speakers_count: speakerRefMap.size,
               },
             },
-          });
+          },
+        });
 
-          // Deterministic face targeting per pass via Sync.so's documented
-          // `active_speaker_detection` option. With `auto_detect:false` and
-          // explicit `frame_number`+`coordinates`, the model lipsyncs the
-          // SPECIFIC face whose center is closest to the given point — no
-          // more both-passes-onto-same-face bug.
-          //
-          // PRIMARY PATH: direct Sync.so v2 API (SYNC_API_KEY). Replicate's
-          // wrapper flattens `input` and silently drops the nested
-          // `options.active_speaker_detection` object, so face pinning never
-          // reached the model. Direct API guarantees Artlist-grade parity.
-          let stepUrl: string | null = null;
-          try {
-            if (useSyncSoDirect) {
-              const jobId = await startSyncSoDirectGeneration(
-                SYNC_API_KEY!,
-                {
-                  videoUrl: currentVideo,
-                  audioUrl: pass.track_url,
-                  syncMode: "cut_off",
-                  temperature: 0.5,
-                  targetCoords: target?.coords ?? null,
-                  frameNumber: 0,
-                },
-                `lipsync_pass_${p + 1}`,
-              );
-              await setStage(supabase, scene_id, p === 0 ? "lipsync_1" : "lipsync_2", {
-                replicate_prediction_id: `sync:${jobId}`,
-                audio_plan: {
-                  ...prevPlan,
-                  twoshot: {
-                    ...prevTwoshot,
-                    speakers: publicPasses,
-                    faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
-                    syncJobs: {
-                      provider: "sync.so",
-                      mode: "poller",
-                      currentPass: p + 1,
-                      totalPasses: passes.length,
-                      sourceVideoUrl: sourceClipUrl,
-                      mergedAudioUrl: mergedVo.url,
-                      costCredits: cost,
-                      jobs: [
-                        {
-                          pass: p + 1,
-                          jobId,
-                          status: "PROCESSING",
-                          videoUrl: currentVideo,
-                          audioUrl: pass.track_url,
-                          speaker: pass.speaker,
-                          character_id: pass.character_id ?? null,
-                          targetFace: target?.side ?? null,
-                          targetCoords: target?.coords ?? null,
-                          startedAt: passStartedAt,
-                        },
-                      ],
-                    },
-                    heartbeat: {
-                      pass: p + 1,
-                      total_passes: passes.length,
-                      started_at: passStartedAt,
-                      speaker: pass.speaker,
-                      targetFace: target?.side ?? null,
-                      targetSource: target?.source ?? null,
-                      syncJobId: jobId,
-                    },
-                  },
-                },
-              });
-              console.log(`[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length} queued on Sync.so`, { jobId });
-              return;
-            } else {
-              const input: Record<string, unknown> = {
-                video: currentVideo,
-                audio: pass.track_url,
-                sync_mode: "cut_off",
-                temperature: 0.5,
-                output_format: "mp4",
-                face_index: p,
-                speaker: target?.side ?? (p === 0 ? "left" : "right"),
-              };
-              if (target) {
-                input.active_speaker = false;
-                input.active_speaker_detection = {
-                  auto_detect: false,
-                  frame_number: 0,
-                  coordinates: target.coords,
-                };
-              } else {
-                input.active_speaker = true;
-              }
-              stepUrl = await runLipsyncPrediction(
-                replicate,
-                supabase,
-                scene_id,
-                input,
-                `lipsync_pass_${p + 1}`,
-              );
-            }
-          } catch (e) {
-            await refund(`lipsync_pass_${p + 1}_failed: ${(e as Error).message}`);
-            return;
-          }
-          if (!stepUrl) {
-            await refund(`pass_${p + 1}_no_output`);
-            return;
-          }
-          console.log(
-            `[compose-twoshot-lipsync ${scene_id}] pass ${p + 1}/${passes.length} DONE`,
-            { speaker: pass.speaker, targetFace: target?.side, output: stepUrl },
-          );
-          currentVideo = stepUrl;
-          outUrl = stepUrl;
+        if (!useSyncSoDirect) {
+          await refund("sync_segments_requires_direct_api_key");
+          return;
         }
+
+        let jobId: string;
+        try {
+          jobId = await startSyncSoSegmentsJob(
+            SYNC_API_KEY!,
+            {
+              videoUrl: sourceClipUrl,
+              speakers: Array.from(speakerRefMap.values()).map((s) => ({ refId: s.refId, audioUrl: s.audioUrl })),
+              segments: segmentsPayload,
+              model: "lipsync-2-pro",
+            },
+            "lipsync_segments",
+          );
+        } catch (e) {
+          await refund(`lipsync_segments_failed: ${(e as Error).message}`);
+          return;
+        }
+
+        await setStage(supabase, scene_id, "lipsync_1", {
+          replicate_prediction_id: `sync:${jobId}`,
+          audio_plan: {
+            ...prevPlan,
+            twoshot: {
+              ...prevTwoshot,
+              speakers: publicPasses,
+              faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
+              syncJobs: {
+                provider: "sync.so",
+                mode: "segments",
+                sourceVideoUrl: sourceClipUrl,
+                mergedAudioUrl: mergedVo.url,
+                costCredits: cost,
+                jobs: [{
+                  jobId,
+                  status: "PROCESSING",
+                  videoUrl: sourceClipUrl,
+                  speakers: Array.from(speakerRefMap.values()),
+                  segments: segmentsPayload,
+                  startedAt,
+                }],
+              },
+              heartbeat: {
+                mode: "segments",
+                started_at: startedAt,
+                segments_count: segmentsPayload.length,
+                speakers_count: speakerRefMap.size,
+                syncJobId: jobId,
+              },
+            },
+          },
+        });
+        console.log(
+          `[compose-twoshot-lipsync ${scene_id}] segments job queued on Sync.so`,
+          { jobId, segments: segmentsPayload.length, speakers: speakerRefMap.size },
+        );
+        return;
       } else {
         // Fallback: legacy single merged-audio pass. With the sample-accurate
         // WAV pipeline the merged track is exactly scene-length, so always

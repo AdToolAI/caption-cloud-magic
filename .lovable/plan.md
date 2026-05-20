@@ -1,142 +1,86 @@
 ## Befund
 
-Ja, der Fehler ist noch nicht behoben. Ich habe jetzt die konkrete Kette gefunden:
+Der 3-Charakter-Fehler ist behoben: Der neue Clip/Anchor hat exakt 2 sichtbare Personen und das Server-Audit meldet `faces=2/2`, `humans=2/2`, `identity=ok`.
 
-1. **Der falsche Anchor kommt vom Client, nicht vom Server-Fix.**
-   - Log: `compose-scene-anchor ok sceneId=scene_1779283998318_0 portraits=3`
-   - Die aktuelle Szene `95200c0b-f032-4c71-bfe8-601ebd076fa4` nutzt genau diesen Anchor als `reference_image_url`.
-   - Deshalb sind weiterhin **3 Personen** im Bild.
+Der aktuelle Lip-Sync-Fehler ist jetzt eine andere Ursache:
 
-2. **Warum sendet der Client 3 Portraits?**
-   - `prepareSceneAnchor()` ruft `resolveSceneCharacterAnchorsAll()` auf.
-   - Diese Funktion nimmt:
-     - die 2 expliziten `characterShots` Matthew + Samuel,
-     - plus zusätzlich einen `brand-name-match` / `cast-name-match` aus dem Prompt, wenn der Name nochmal im Text vorkommt.
-   - Dadurch kann derselbe echte Charakter nochmal als dritter Anchor-Slot dazukommen, besonders wenn Cast-ID und Brand-Character-ID unterschiedlich sind.
-   - Es fehlt dort eine harte Regel: **bei Dialogszenen zählt die deduplizierte Sprecherliste, nicht Prompt-Namensmatches.**
+- Sync.so bricht schon bei Pass 1 mit `generation_pipeline_failed` ab.
+- Unsere aktuelle Pipeline macht 2 sequenzielle Sync.so-Jobs:
+  - Pass 1: komplettes 8s-Audio mit nur Matthew-Spur + Stille an Sync.so
+  - Pass 2: danach komplettes 8s-Audio mit nur Samuel-Spur auf das Ergebnis von Pass 1
+- Das ist für Sync.so fragil, weil `lipsync-2/lipsync-2-pro` laut Doku natürlich sprechende Mundbewegung im Input erwartet. Der Hailuo-Quellclip ist aber ein stiller/nicht sprechender Two-Shot. Sync.so empfiehlt für Multi-Speaker stattdessen die **Segments API** in einem einzigen Job.
+- Zusätzlich ist der erste Target-Punkt aktuell zu hoch im Gesicht (`[414,219]`, nahe Augen/Stirn), weil wir Face-Center statt Mund-/untere-Gesichtsregion nutzen. Das kann die Speaker Selection zusätzlich destabilisieren.
 
-3. **Der Server-Sicherheitsanker hätte das korrigieren sollen, konnte aber nicht.**
-   - Log: `compose-video-clips ... composing multi-cast anchor (2 portraits)`
-   - Direkt danach: `compose-scene-anchor failed 401 {"error":"unauthorized"}`
-   - Ursache: `compose-video-clips` ruft `compose-scene-anchor` intern mit Service-Key im `Authorization` Header auf, aber `compose-scene-anchor` akzeptiert aktuell nur einen echten User-JWT via `auth.getUser()`.
-   - Ergebnis: Der geprüfte 2-Personen-Anchor wird **nie** erzeugt, und Hailuo rendert weiter mit dem falschen 3-Personen-Anchor.
+## Plan
 
-4. **Der Lip-Sync ist danach aus einem zweiten Grund fehlgeschlagen.**
-   - Sync.so wurde mit Face-Koordinaten aus dem Anchor-Bildraum `1024x1024` gestartet.
-   - Das echte Hailuo-Video ist aber `768x768`.
-   - Gesendet wurde z. B. `[109,417]`; korrekt skaliert wäre ungefähr `[82,313]`.
-   - Dadurch landet der Target-Punkt nicht sauber auf dem Gesicht, was zu `generation_pipeline_failed` passt.
+### 1. Sync.so-Aufruf auf Segments API umstellen
 
-5. **Der Prompt bleibt zusätzlich gefährlich.**
-   - In der DB steht noch ein widersprüchlicher Prompt:
-     - `[Dialog] ... Matthew ... Samuel ... Matthew ...`
-     - `Featuring Matthew ... Samuel Dusatko ...`
-   - Der Sanitizer entfernt zwar den Dialogblock und den `Featuring`-Prefix, aber nicht zuverlässig die komplette widersprüchliche `Featuring ...`-Beschreibung. Für Two-Shots sollte der visuelle Prompt deshalb neutral aus der Sprecherliste gebaut werden.
+In `compose-twoshot-lipsync` wird für echte Two-Shots nicht mehr die sequenzielle 2-Pass-Strategie verwendet.
 
-## Plan zur echten Behebung
+Stattdessen:
 
-### 1. Client darf bei Cinematic-Sync keine ungeprüften Anchors mehr einfrieren
+- Ein einziger Sync.so-Job pro Szene.
+- `input` enthält:
+  - das Quellvideo
+  - pro Sprecher eine eigene Audio-Referenz mit `refId`
+- `segments` enthält die tatsächlichen Dialog-Turns aus `audio_plan.twoshot.segments`:
+  - Matthew: 0.000–1.440
+  - Samuel: 1.440–3.390
+  - Matthew: 3.390–4.087
+- Damit bekommt Sync.so die Sprecherwechsel offiziell und zeitgenau, statt zwei vollständige Silent-Pass-Audios verarbeiten zu müssen.
 
-In diesen Stellen wird die clientseitige Pre-Composition für `engineOverride === 'cinematic-sync'` deaktiviert bzw. umgestellt:
+### 2. Modell auf `sync-3` für diesen Fall wechseln
 
-- `src/components/video-composer/SceneDialogStudio.tsx`
-- `src/components/video-composer/ClipsTab.tsx`
+Für Cinematic-Sync/Two-Shot nutzen wir Sync.so `sync-3`, weil die Doku explizit sagt:
 
-Änderung:
-- Bei Two-Shot/Cinematic-Sync wird **kein** `prepareSceneAnchor()` mehr vorab ausgeführt.
-- `referenceImageUrl` wird nicht mehr mit einem clientseitigen 3-Portrait-Anchor befüllt.
-- Der Server `compose-video-clips` ist allein verantwortlich für Anchor-Erzeugung, Audit und Retry.
+- `lipsync-2/lipsync-2-pro` haben eine Still-Frame-/Silent-Mouth-Limitation.
+- `sync-3` kann stille Lippen öffnen und ist robuster für stillere AI-Video-Inputs.
 
-### 2. `prepareSceneAnchor()` trotzdem robust machen
+Die bestehende Policy für Single-Speaker/andere Pfade bleibt unberührt.
 
-Für andere Renderpfade bleibt `prepareSceneAnchor()` nötig, wird aber gehärtet:
+### 3. Speaker-Targeting stabilisieren
 
-- Dialog-Script parsen: `Matthew, Samuel, Matthew -> Matthew, Samuel`
-- Anchors nach dieser Sprecherliste filtern.
-- Namen-basiert deduplizieren, nicht nur per ID.
-- `activeBrandChar` nicht nochmal hinzufügen, wenn derselbe Name bereits über `characterShots` vorhanden ist.
+Die FaceMap bleibt erhalten, aber der Zielpunkt wird für Sync.so von Face-Center auf Mund-/untere-Gesichtsregion verschoben:
 
-Betroffene Dateien:
+- Wenn `bbox` vorhanden ist: x = Mitte der Box, y = ca. 68–72% der Boxhöhe.
+- Wenn nur `normCenter` vorhanden ist: y leicht nach unten verschieben.
 
-- `src/lib/motion-studio/prepareSceneAnchor.ts`
-- `src/lib/motion-studio/resolveSceneCharacterAnchor.ts`
+Das verhindert, dass Sync.so einen Punkt nahe Augen/Stirn bekommt.
 
-### 3. Server-interner Anchor-Aufruf mit korrekter Auth
+### 4. Poller und Statusmodell vereinfachen
 
-In `compose-video-clips`:
+`poll-twoshot-lipsync` wird angepasst:
 
-- Interner Aufruf von `compose-scene-anchor` verwendet den echten User-Authorization-Header (`authHeader`) statt Service-Key als Bearer Token.
-- Das betrifft den Cinematic-Sync-Anchor und den Universal-Anchor.
+- Es erwartet nur noch einen Segments-Job.
+- Bei Erfolg wird der Output gehostet und als finaler `clip_url` gesetzt.
+- `audio_plan.twoshot.useExternalAudio` bleibt `true`, damit der finale Export weiterhin die saubere gemischte WAV-Spur nutzt.
+- Alte `currentPass/pass 1/pass 2`-Logik bleibt nur als Legacy-Fallback lesbar, wird aber für neue Runs nicht mehr erzeugt.
 
-Betroffene Datei:
+### 5. Stale Failed-State der aktuellen Szene bereinigen
 
-- `supabase/functions/compose-video-clips/index.ts`
+Die konkrete Szene `faf20fee-2b80-4bec-8af8-88c3662b53a7` wird zurückgesetzt:
 
-### 4. Two-Shot-Visualprompt neutralisieren
+- `lip_sync_status` wieder leer/pending
+- `twoshot_stage` zurück auf `master_clip`
+- `clip_error` löschen
+- alte `syncJobs`/`heartbeat` aus `audio_plan.twoshot` entfernen
+- Quellvideo und 2-Personen-Anchor bleiben erhalten, damit keine erneuten Hailuo-Kosten entstehen
 
-In `compose-video-clips` und `compose-scene-anchor`:
+### 6. Neu auslösen und validieren
 
-- Wenn `dialogScript` mit 2+ eindeutigen Sprechern vorhanden ist, wird der Anchor-Prompt aus der Sprecherliste gebaut:
+Nach der Codeänderung:
 
-```text
-Exactly 2 distinct people: Matthew Dusatko and Samuel Dusatko, each visible exactly once, in a modern office conversation scene. No other humans. No rendered text.
-```
-
-- Widersprüchliche `Featuring ...`-Abschnitte werden nicht mehr als Restprompt weiterverwendet.
-- Cache-Version erneut erhöhen, damit alte fehlerhafte Anchors nicht recycelt werden.
-
-Betroffene Dateien:
-
-- `supabase/functions/compose-scene-anchor/index.ts`
-- `supabase/functions/compose-video-clips/index.ts`
-
-### 5. Anchor-Audit darf bei Extras nicht weiter rendern
-
-Die Server-Pipeline bricht ab, wenn der Anchor nach Retry nicht exakt passt:
-
-- Erwartet 2 Sprecher, aber 3 Menschen sichtbar -> kein Hailuo-Render
-- Erwartet Matthew + Samuel, aber Matthew/Samuel doppelt/vertauscht -> kein Hailuo-Render
-- Fehler wird konkret in `clip_error` geschrieben, statt später bei Lip-Sync zu scheitern.
-
-### 6. Sync.so-Koordinaten auf echte Videoabmessungen skalieren
-
-In `compose-twoshot-lipsync` und `poll-twoshot-lipsync`:
-
-- `faceMap` speichert zusätzlich `normCenter`.
-- Vor jedem Sync.so-Job werden Zielkoordinaten auf die tatsächliche Videoauflösung skaliert.
-- Für die aktuelle Fehlerart wäre das z. B. `1024x1024 -> 768x768`.
-- Falls Video-Dims nicht verfügbar sind, wird proportional aus Anchor-Dims skaliert.
-
-Betroffene Dateien:
-
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-- `supabase/functions/poll-twoshot-lipsync/index.ts`
-
-### 7. Betroffene Szene zurücksetzen
-
-Für die konkrete Szene wird der alte fehlerhafte Stand entfernt:
-
-- `reference_image_url` mit dem `scene_1779283998318_0`-3-Portrait-Anchor löschen
-- `clip_url` / `lip_sync_source_clip_url` löschen
-- `lip_sync_status`, `twoshot_stage`, `clip_error` zurücksetzen
-- `audio_plan.twoshot.faceMap`, `syncJobs`, `heartbeat`, alte Auditdaten entfernen
-- `scene_anchor_cache` für diese Szene leeren
-
-Danach erzeugt der nächste Renderlauf einen neuen geprüften 2-Personen-Anchor.
+- Edge Functions deployen/testen
+- Szene neu mit Lip-Sync starten
+- Logs prüfen:
+  - Sync.so Job wird mit `segments` gestartet
+  - kein `generation_pipeline_failed`
+  - finale Szene bekommt `lip_sync_status='done'`
 
 ## Erwartetes Ergebnis
 
-- Dialogzeilen dürfen weiterhin 3 sein.
-- Visuell werden aber nur **2 eindeutige Sprecher** gerendert.
-- Matthew wird nicht doppelt visualisiert, nur weil er zweimal spricht.
-- Samuel/Matthew werden nicht durch Prompt-Namensmischung vertauscht.
-- Lip-Sync startet erst, wenn ein sauberer 2-Personen-Anchor vorhanden ist.
-- Sync.so bekommt Koordinaten im richtigen Video-Koordinatensystem.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- Es bleiben exakt 2 sichtbare Charaktere.
+- Lip-Sync nutzt die offizielle Multi-Speaker-Segments-Pipeline statt fragiler Mehrfach-Pässe.
+- Matthew kann zweimal sprechen, ohne als dritter Charakter gerendert zu werden.
+- Sync.so bekommt realistische Mund-Zielpunkte statt Face-Center-Punkte.
+- Der aktuelle Clip muss nicht komplett neu erzeugt werden; nur Lip-Sync wird neu versucht.
