@@ -24,7 +24,7 @@ import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 3;
+const ANCHOR_AUDIT_VERSION = 4;
 
 
 const corsHeaders = {
@@ -486,13 +486,14 @@ serve(async (req) => {
       try {
         const { data: dbRow } = await supabaseAdmin
           .from('composer_scenes')
-          .select('cinematic_preset_slug, clip_status, clip_url, character_audio_url')
+          .select('cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url')
           .eq('id', scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
+        const dbEngine = (dbRow as any)?.engine_override as string | null;
         const status = (dbRow as any)?.clip_status as string | null;
         const hasAudio = !!(dbRow as any)?.character_audio_url;
-        if (slug && slug.startsWith('dialog-srs:') && (hasAudio || status === 'generating' || status === 'ready')) {
+        if (dbEngine !== 'cinematic-sync' && slug && slug.startsWith('dialog-srs:') && (hasAudio || status === 'generating' || status === 'ready')) {
           console.log(`[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`);
           results.push({ sceneId: scene.id, status: status === 'ready' ? 'ready' : 'generating' });
           continue;
@@ -738,10 +739,14 @@ serve(async (req) => {
                   skipAuditPersist = true;
                 } else {
                   // 2) Stale or missing anchor → invalidate cache and re-compose.
+                  // Always delete cache for cinematic-sync before composing: older
+                  // client-side anchors used the same scene/cache key while carrying
+                  // 3 portrait/person prompts, so a null DB reference alone is not
+                  // enough to guarantee a fresh 2-speaker anchor.
                   if (existingLooksComposed) {
                     console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: pinned anchor missing audit v${ANCHOR_AUDIT_VERSION} → re-composing`);
-                    await invalidateCache();
                   }
+                  await invalidateCache();
                   composedUrl = await composeAnchor('attempt-1');
 
                   if (composedUrl && LOVABLE_API_KEY) {
@@ -790,12 +795,25 @@ serve(async (req) => {
                         at: new Date().toISOString(),
                       },
                     };
+                    const { data: currentPlanRow } = await supabaseAdmin
+                      .from('composer_scenes')
+                      .select('audio_plan')
+                      .eq('id', scene.id)
+                      .maybeSingle();
+                    const baseAudioPlan = ((currentPlanRow as any)?.audio_plan ?? (scene as any).audioPlan ?? {}) as Record<string, any>;
+                    const {
+                      faceMap: _staleFaceMap,
+                      syncJobs: _staleSyncJobs,
+                      heartbeat: _staleHeartbeat,
+                      anchor_face_audit: _oldAnchorAudit,
+                      ...twoshotWithoutAnchorDerivedState
+                    } = ((baseAudioPlan.twoshot ?? {}) as Record<string, any>);
                     await supabaseAdmin
                       .from('composer_scenes')
                       .update({
                         reference_image_url: composedUrl,
                         updated_at: new Date().toISOString(),
-                        audio_plan: { ...((scene as any).audioPlan ?? {}), twoshot: { ...(((scene as any).audioPlan ?? {}).twoshot ?? {}), ...auditMeta } },
+                        audio_plan: { ...baseAudioPlan, twoshot: { ...twoshotWithoutAnchorDerivedState, ...auditMeta } },
                       })
                       .eq('id', scene.id);
                   }
@@ -1172,12 +1190,14 @@ serve(async (req) => {
           const duration = scene.durationSeconds >= 8 ? 10 : 6;
           const resolution = quality === 'pro' ? '1080p' : '768p';
           const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncScene = (scene.engineOverride ?? 'auto') === 'cinematic-sync';
 
           await supabaseAdmin
             .from('composer_scenes')
             .update({
               clip_status: 'generating',
               clip_quality: quality,
+              ...(isCinematicSyncScene ? { lip_sync_source_clip_url: null, lip_sync_status: 'pending', twoshot_stage: 'master_clip' } : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim('ai-hailuo', isI2V),
               updated_at: new Date().toISOString(),
             })
@@ -1205,7 +1225,7 @@ serve(async (req) => {
 
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ replicate_prediction_id: prediction.id })
+            .update({ replicate_prediction_id: prediction.id, ...(isCinematicSyncScene ? { twoshot_stage: 'master_clip' } : {}) })
             .eq('id', scene.id);
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });

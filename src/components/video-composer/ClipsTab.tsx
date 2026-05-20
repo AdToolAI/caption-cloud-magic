@@ -747,7 +747,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         language: directorLanguage,
       });
 
-      const preparedSingle = targetScene.clipSource.startsWith('ai-')
+      const preparedSingle = targetScene.clipSource.startsWith('ai-') && targetScene.engineOverride !== 'cinematic-sync'
         ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt)
         : undefined;
       if (preparedSingle?.anchor) {
