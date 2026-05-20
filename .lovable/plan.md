@@ -1,47 +1,68 @@
+## Problem
+
+Der aktuelle Zustand hat zwei getrennte Fehlerquellen:
+
+1. **Der Ladebalken startet zu hoch**
+   - `usePipelineProgress` berechnet den Gesamtfortschritt aus allen sichtbaren Phasen.
+   - Wenn nur Lip-Sync läuft, sind die Clip-Phasen durch alte/fertige Szenen praktisch schon „voll“, dadurch springt der Balken direkt auf ca. 60–77%.
+   - Zusätzlich läuft der Soft-Floor monoton weiter und kann alte Läufe in den neuen Lauf hineintragen.
+
+2. **Lip-Sync bleibt hängen**
+   - Es gibt Szenen mit `twoshot_stage = master_clip` und `lip_sync_status = pending/null`, die nicht sauber weiterkommen.
+   - Der Webhook-Auto-Trigger wurde deaktiviert, aber der clientseitige Trigger allein ist zu fragil: wenn der User den Tab verlässt, Realtime nicht sauber feuert oder der Poll nicht läuft, bleibt die Szene stehen.
+   - Bei echten Sync.so-Jobs gibt es zwar `poll-twoshot-lipsync`, aber die UI behandelt lange Zwischenstände zu optimistisch und zeigt keinen klaren Fehler/Timeout.
+
 ## Plan
 
-1. **Doppelten Ladebalken entfernen**
-   - Den globalen `PipelineProgressBar` unter dem Top-Stepper aus `VideoComposerDashboard.tsx` entfernen.
-   - Nur der Ladebalken im Storyboard bleibt sichtbar.
+### 1. Progress-Balken nur für den aktuellen Lauf berechnen
+- `usePipelineProgress.ts` so umbauen, dass ein neuer `clips:start`-Lauf bei **0%** beginnt.
+- Bereits fertige Clips/alte Lip-Sync-Ergebnisse werden nur als Baseline behandelt und nicht in den neuen Fortschritt eingerechnet.
+- Wenn der aktuelle Lauf nur Lip-Sync betrifft, darf die Anzeige nicht bei 60% starten, sondern ebenfalls bei 0% der aktuellen sichtbaren Operation.
 
-2. **Progress bei 0% starten und nicht bei 60%**
-   - `usePipelineProgress.ts` so anpassen, dass ein neuer Lauf seine Floors/Startzeiten sauber zurücksetzt.
-   - Bereits fertige alte Clips dürfen den neuen Lauf nicht auf 60%+ springen lassen.
-   - Für den Storyboard-Balken wird der aktive Generierungsprozess als eigener Lauf betrachtet: Start direkt nach Klick, dann simuliert über ca. 7–8 Minuten, echte Fertig-/Fehlerzustände dürfen ihn beenden oder korrigieren.
+### 2. Schritte erst bei echter Fertigstellung grün machen
+- `PipelineProgressBar.tsx`/Hook-Status so synchronisieren:
+  - „Clips“ grün nur, wenn alle im aktuellen Lauf betroffenen Clips fertig sind.
+  - „Lipsync“ grün nur, wenn `lip_sync_status = done` und `lip_sync_applied_at` gesetzt ist oder `twoshot_stage = done`.
+  - Bei `failed` kein grüner Zustand, sondern klarer Fehlerzustand.
 
-3. **Abgeschlossene Steps grün markieren**
-   - `PipelineProgressBar.tsx` optisch verbessern: fertige Phasen bekommen grünen Glow/Check, laufende Phasen gold/cyan, ausstehende Phasen gedimmt.
-   - Kein „fertig“-Signal, solange Lip-Sync noch läuft oder fehlgeschlagen ist.
+### 3. Lip-Sync zuverlässig starten
+- `useTwoShotAutoTrigger.ts` härten:
+  - Szenen mit `twoshot_stage = master_clip` und `lip_sync_status = pending/null` werden sicher als Kandidaten erkannt.
+  - Beim Trigger wird ein `lipsync:start` Event emittiert, damit der Storyboard-Balken sofort reagiert.
+  - Der Kandidat wird nicht durch alte `twoshotStage`-Werte blockiert.
 
-4. **Grünen „Generiert“-Haken erst nach vollständiger Pipeline zeigen**
-   - `SceneInlinePlayer.tsx` korrigieren: `✓ Generiert` nur anzeigen, wenn der Clip wirklich final ist.
-   - Bei Cinematic-Sync/Talking-Head/Lip-Sync-Szenen zählt `clipStatus === 'ready'` allein nicht mehr; zusätzlich muss `lipSyncStatus === 'done'` oder `twoshotStage === 'done'` erfüllt sein.
-   - Solange Lip-Sync `pending`/`running` ist, bleibt der Status „Baut“ bzw. „Lip-Sync läuft“.
-   - Bei `lipSyncStatus === 'failed'` wird kein grüner Haken gezeigt, sondern ein Fehlerstatus.
+### 4. Backend-Webhook wieder sicher als Fallback nutzen
+- `compose-clip-webhook` nicht einfach blind deaktiviert lassen, sondern als sicheren Fallback ausbauen:
+  - Nach fertigem Cinematic-Sync-Clip wird Lip-Sync serverseitig angestoßen, wenn genug Daten vorhanden sind.
+  - Die Lip-Sync-Funktion bekommt dafür einen internen, sicheren Aufrufpfad über Service-Kontext/Projekt-Owner statt User-JWT-Zwang.
+  - Keine doppelten Jobs: wenn bereits `running`, `done` oder ein `sync:` Job existiert, wird nicht erneut gestartet.
 
-5. **Lip-Sync-Ausfall absichern, ohne die Pipeline umzubauen**
-   - Die Ursache ist sehr wahrscheinlich ein Trigger-Konflikt/Auth-Konflikt: `compose-clip-webhook` versucht Auto-Lip-Sync aus einem Backend-Kontext zu starten, aber `compose-lipsync-scene` und `compose-twoshot-lipsync` erwarten aktuell User-JWT.
-   - Ich stabilisiere das, indem der Webhook nicht mehr fälschlich einen geschützten Lip-Sync-Call auslöst, sondern die bestehende clientseitige `useTwoShotAutoTrigger`-Logik sauber übernehmen lässt.
-   - Dadurch wird die vorher funktionierende Pipeline nicht ersetzt, sondern der doppelte/fehleranfällige Auto-Trigger entfernt.
+### 5. Hängende Jobs sauber beenden oder wieder aufnehmen
+- `useTwoShotAutoTrigger.ts` und `poll-twoshot-lipsync` so abstimmen:
+  - `running + sync:<jobId>` wird weiter gepollt.
+  - `running ohne sync:<jobId>` nach definierter Zeit wird auf `pending` zurückgesetzt und neu gestartet.
+  - Provider-Fehler landen in `failed` mit sichtbarer Meldung statt endlosem Spinner.
 
-6. **Statuslogik für Progress und Szenen synchronisieren**
-   - `usePipelineProgress.ts` soll Lip-Sync-Failure als roten/fehlgeschlagenen Zustand berücksichtigen und nicht weiter „alles läuft gut“ vortäuschen.
-   - `readyCount/allReady` im Storyboard darf für Lip-Sync-Szenen nur „bereit“ zählen, wenn der finale Lip-Sync abgeschlossen ist.
+### 6. Statusanzeigen im Szenenboard korrekt halten
+- `SceneInlinePlayer.tsx` bleibt streng:
+  - „Generiert“ nur nach finalem Clip plus fertigem Lip-Sync.
+  - Während Clip fertig, aber Lip-Sync noch läuft: „Lip-Sync läuft“.
+  - Bei Lip-Sync-Fehler: Fehlerbadge und kein grüner Haken.
 
 ## Betroffene Dateien
 
-- `src/components/video-composer/VideoComposerDashboard.tsx`
-- `src/components/video-composer/StoryboardTab.tsx`
-- `src/components/video-composer/PipelineProgressBar.tsx`
-- `src/components/video-composer/SceneInlinePlayer.tsx`
 - `src/hooks/usePipelineProgress.ts`
-- `src/hooks/useGenerateAllClips.ts`
+- `src/components/video-composer/PipelineProgressBar.tsx`
+- `src/hooks/useTwoShotAutoTrigger.ts`
+- `src/components/video-composer/SceneInlinePlayer.tsx`
 - `supabase/functions/compose-clip-webhook/index.ts`
+- `supabase/functions/compose-twoshot-lipsync/index.ts`
+- ggf. `supabase/functions/compose-lipsync-scene/index.ts`
 
-## Ergebnis
+## Erwartetes Ergebnis
 
-- Nur noch ein Ladebalken im Szenenboard.
-- Der Balken startet sichtbar bei 0%.
-- Fertige Schritte leuchten grün.
-- `✓ Generiert` erscheint erst, wenn Clip plus Lip-Sync wirklich fertig sind.
-- Lip-Sync wird nicht mehr durch konkurrierende Trigger/geschützte Backend-Aufrufe blockiert.
+- Der Ladebalken startet sichtbar bei **0%**, nicht bei 60–77%.
+- Der Balken zeigt eine realistische 7–8-Minuten-Illusion, ohne alte fertige Arbeit einzurechnen.
+- Fertige Steps leuchten erst dann grün, wenn sie wirklich abgeschlossen sind.
+- Lip-Sync startet zuverlässig nach der Clip-Erstellung, auch wenn der Client-Poll kurz nicht greift.
+- Hängende Lip-Sync-Jobs werden nicht endlos geladen, sondern weitergepollt, neu gestartet oder als Fehler markiert.
