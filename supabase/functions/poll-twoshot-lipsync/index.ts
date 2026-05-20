@@ -15,20 +15,48 @@ function json(body: unknown, status = 200) {
 }
 
 type FaceMap = {
-  faces?: Array<{ side?: "left" | "right"; center?: [number, number] }>;
+  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; normCenter?: [number, number] }>;
   width?: number;
   height?: number;
 };
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } {
+async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
+  if (!url) return null;
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!resp.ok) return null;
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const textAt = (i: number, n: number) => String.fromCharCode(...buf.slice(i, i + n));
+    const readU32 = (i: number) => ((buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3]) >>> 0;
+    for (let i = 0; i < buf.length - 32; i++) {
+      if (textAt(i, 4) !== "tkhd") continue;
+      const version = buf[Math.max(0, i + 4)];
+      const base = i + (version === 1 ? 96 : 84);
+      if (base + 7 >= buf.length) continue;
+      const width = readU32(base) / 65536;
+      const height = readU32(base + 4) / 65536;
+      if (width > 0 && height > 0 && width < 10000 && height < 10000) return { width: Math.round(width), height: Math.round(height) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } {
   const side: "left" | "right" = passIndex === 0 ? "left" : "right";
   const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
   const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
   if (Array.isArray(match?.center) && match.center.length === 2) {
-    return { coords: [Math.round(Number(match.center[0])), Math.round(Number(match.center[1]))], side, source: "gemini" };
+    const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
+    const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
+    const coords: [number, number] = Array.isArray(match.normCenter)
+      ? [Math.round(Number(match.normCenter[0]) * W), Math.round(Number(match.normCenter[1]) * H)]
+      : [Math.round(Number(match.center[0]) * (W / (Number(faceMap?.width) || W))), Math.round(Number(match.center[1]) * (H / (Number(faceMap?.height) || H)))];
+    return { coords, side, source: "gemini" };
   }
-  const W = Number(faceMap?.width) || 1280;
-  const H = Number(faceMap?.height) || 720;
+  const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
+  const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
   return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic" };
 }
 
@@ -197,7 +225,8 @@ serve(async (req) => {
       const nextIdx = currentPass;
       const nextSpeaker = speakers[nextIdx];
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
-      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null);
+      const videoDims = await probeMp4Dims(polled.outputUrl);
+      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,

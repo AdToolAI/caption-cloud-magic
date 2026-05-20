@@ -24,7 +24,7 @@ import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 2;
+const ANCHOR_AUDIT_VERSION = 3;
 
 
 const corsHeaders = {
@@ -338,6 +338,13 @@ serve(async (req) => {
         return cn === lower || cn.split(/\s+/)[0] === first;
       });
       return hit;
+    };
+
+    const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
+      const cleanNames = names.filter(Boolean);
+      const n = Math.max(cleanNames.length, fallbackCount, 2);
+      const named = cleanNames.length > 0 ? `: ${cleanNames.join(' and ')}` : '';
+      return `Exactly ${n} distinct people${named}, each visible exactly once, in a modern office conversation scene. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
@@ -654,18 +661,21 @@ serve(async (req) => {
                 // composeAnchor — single attempt at compose-scene-anchor.
                 const composeAnchor = async (label: string, strict = false): Promise<string | null> => {
                   console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits) [${label}${strict ? ', strict' : ''}]`);
+                  const anchorPrompt = scriptSpeakers.length >= 2
+                    ? neutralTwoShotPrompt(characterNames, portraitUrls.length)
+                    : (stripDialogForAnchor(scene.aiPrompt || '') || neutralTwoShotPrompt(characterNames, portraitUrls.length));
                   const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
                     method: 'POST',
                     headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                      'Authorization': authHeader,
                     },
                     body: JSON.stringify({
                       sceneId: scene.id,
                       portraitUrl: portraitUrls[0],
                       portraitUrls,
                       characterNames,
-                      scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`,
+                      scenePrompt: anchorPrompt,
                       aspectRatio: '16:9',
                       shotType: scene.characterShot?.shotType,
                       strictNoDuplicates: strict,
@@ -890,22 +900,25 @@ serve(async (req) => {
             if (portraitUrls.length >= 1) {
               const neutralFallback =
                 portraitUrls.length >= 2
-                  ? `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`
+                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length)
                   : 'Natural cinematic scene, photorealistic, no rendered text.';
+              const anchorPrompt = scriptSpeakers.length >= 2
+                ? neutralFallback
+                : (stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback);
               console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length})`);
               try {
                 const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Authorization': authHeader,
                   },
                   body: JSON.stringify({
                     sceneId: scene.id,
                     portraitUrl: portraitUrls[0],
                     portraitUrls,
                     characterNames,
-                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback,
+                    scenePrompt: anchorPrompt,
                     aspectRatio: '16:9',
                     shotType: castShots[0]?.shotType,
                   }),

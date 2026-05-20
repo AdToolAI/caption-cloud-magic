@@ -37,8 +37,6 @@ import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
-import { prepareSceneAnchor } from '@/lib/motion-studio/prepareSceneAnchor';
-import { useBrandCharacters } from '@/hooks/useBrandCharacters';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
@@ -209,8 +207,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
-  const { characters: brandChars } = useBrandCharacters();
-  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
@@ -979,49 +975,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             });
             return;
           }
-          // Scene-Aware Multi-Character Anchor — compose all selected cast
-          // portraits into ONE first frame via Nano Banana 2 so Hailuo i2v
-          // renders the actual chosen people (not a generic close-up). Without
-          // this, Sync.so/lipsync-2 also can't switch active speakers because
-          // there's only one face in the master clip.
-          let composedFirstFrame: string | undefined = scene.referenceImageUrl;
-          try {
-            const sceneForAnchor = {
-              ...scene,
-              durationSeconds: masterDuration,
-              dialogScript: dialogScriptText,
-            } as typeof scene;
-            // IMPORTANT: never feed the dialog script as a visual prompt —
-            // Nano Banana 2 would render the spoken lines as burned-in text
-            // (captions on shirts / floating subtitles). Use the explicit
-            // visual prompt only; fall back to a neutral visual description
-            // of the cast.
-            const visualSceneDescription =
-              (scene.aiPrompt && scene.aiPrompt.trim()) ||
-              `Two-shot conversation between ${synthed.length} people facing each other in a natural setting, photorealistic, cinematic lighting`;
-            const prepared = await prepareSceneAnchor(
-              sceneForAnchor,
-              characters,
-              activeBrandChar,
-              visualSceneDescription,
-              '16:9',
-              { forceCompose: true },
-            );
-            if (prepared.firstFrameUrl) {
-              composedFirstFrame = prepared.firstFrameUrl;
-              if (prepared.composed) {
-                await supabase
-                  .from('composer_scenes')
-                  .update({ reference_image_url: composedFirstFrame })
-                  .eq('id', sceneIdFinal);
-              }
-              console.log(
-                `[SceneDialogStudio] two-shot anchor ready (composed=${prepared.composed}, multi=${prepared.isMulti ?? false})`,
-              );
-            }
-          } catch (anchorErr) {
-            console.warn('[SceneDialogStudio] two-shot prepareSceneAnchor failed (continuing without composed anchor)', anchorErr);
-          }
+          // Cinematic-Sync anchors are server-only. Client-side pre-compose can
+          // add prompt/name-match duplicates before the server audit runs.
+          const composedFirstFrame: string | undefined = undefined;
 
           const scenePayload = {
             id: sceneIdFinal,
