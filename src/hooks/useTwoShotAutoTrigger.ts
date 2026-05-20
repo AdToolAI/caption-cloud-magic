@@ -45,6 +45,7 @@ function resolveSpeakerCount(scene: any): number {
 
 export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
+  const autoRetried = useRef<Set<string>>(new Set());
   const progressActive = useRef(false);
 
   useEffect(() => {
