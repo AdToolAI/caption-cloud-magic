@@ -100,6 +100,12 @@ serve(async (req) => {
         // the script). This MUST be stripped before the prompt reaches the
         // image model.
         .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, "")
+        // Drop server-injected "Featuring NAME (shot): ..." / "Featuring NAME and NAME: ..."
+        // prefixes — they often label a slot with ONE name while the trailing
+        // sentence describes a DIFFERENT character, which the image model
+        // resolves visually as "render slot-name as other-name" (the source of
+        // the wrong-face / duplicated-character failure).
+        .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, "")
         // Drop bullet/dash speaker lines like "- Samuel Dusatko says: ..."
         // or "* Matthew Dusatko speaks: ..." or "• Sarah: ..."
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, "")
