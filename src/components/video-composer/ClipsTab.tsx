@@ -584,6 +584,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
         eligibleScenes
           .filter(s => s.clipSource.startsWith('ai-'))
           .map(async (s) => {
+            if (s.engineOverride === 'cinematic-sync') {
+              anchorByScene.set(s.id, { composed: false });
+              return;
+            }
             const composed = composedByScene.get(s.id);
             const prepared = await prepareSceneAnchor(
               s,
@@ -914,31 +918,10 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       //    the requested scene composition via Nano Banana 2 (compose-scene-anchor).
       //    Without this, Hailuo i2v has no anchor for multi-character ensembles
       //    and falls back to a generic close-up of one person.
-      let composedFirstFrame: string | undefined = dbScene.referenceImageUrl;
-      try {
-        const prepared = await prepareSceneAnchor(
-          dbScene,
-          characters,
-          activeBrandChar,
-          composed.finalPrompt,
-        );
-        if (prepared.firstFrameUrl) {
-          composedFirstFrame = prepared.firstFrameUrl;
-          if (prepared.composed) {
-            // Freeze composed anchor on the row so subsequent re-rolls reuse it
-            // deterministically (no Nano-Banana drift).
-            await supabase
-              .from('composer_scenes')
-              .update({ reference_image_url: composedFirstFrame })
-              .eq('id', targetSceneId);
-          }
-          console.log(
-            `[ClipsTab] cinematic-sync anchor → ${prepared.anchor?.strategy ?? 'n/a'} (composed=${prepared.composed}, multi=${prepared.isMulti ?? false})`,
-          );
-        }
-      } catch (anchorErr) {
-        console.warn('[ClipsTab] cinematic-sync prepareSceneAnchor failed (continuing without composed anchor)', anchorErr);
-      }
+      // Cinematic-Sync must not freeze a client-side anchor: the server creates
+      // and audits the exact 2-speaker frame, otherwise prompt-name matches can
+      // leak a third portrait before the safety audit runs.
+      let composedFirstFrame: string | undefined = undefined;
 
       // 5. Fire compose-video-clips with explicit cinematic-sync payload.
       const { data, error } = await supabase.functions.invoke('compose-video-clips', {
