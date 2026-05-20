@@ -232,67 +232,22 @@ serve(async (req) => {
         console.error('[compose-clip-webhook] continuity chain error:', chainErr);
       }
 
-      // 🎤 Auto Lip-Sync — if the scene has dialog (script OR rendered VO) and
-      // wasn't already lip-synced, fire the correct background task. Cinematic-
-      // Sync multi-speaker scenes MUST use compose-twoshot-lipsync; sending
-      // them to compose-lipsync-scene pre-sets running and blocks the real
-      // two-shot pipeline.
-      try {
-        const { data: lsScene } = await supabase
-          .from('composer_scenes')
-          .select('clip_source, engine_override, dialog_script, audio_plan, character_audio_url, lip_sync_status')
-          .eq('id', sceneId)
-          .maybeSingle();
+      // 🎤 Auto Lip-Sync — DISABLED for webhook context.
+      //
+      // Both `compose-lipsync-scene` and `compose-twoshot-lipsync` require a
+      // valid user JWT (they call `supabase.auth.getUser(token)` before doing
+      // anything). This webhook runs with the service role and therefore
+      // cannot satisfy that auth check; previous attempts here returned
+      // 401 and left the scene in an unrecoverable state where Lip-Sync
+      // appeared "failed" although the silent clip rendered fine.
+      //
+      // The client-side `useTwoShotAutoTrigger` polls every 8 s while the
+      // composer dashboard is mounted and triggers the correct function
+      // with the real user session — that's the supported path.
+      //
+      // Kept here intentionally as a no-op so future contributors don't
+      // re-introduce the broken backend trigger.
 
-        const engine = (lsScene as any)?.engine_override ?? 'auto';
-        const src = String((lsScene as any)?.clip_source ?? '');
-        const isI2V = src.startsWith('ai-') && src !== 'ai-vidu';
-        const isHeygen = engine === 'heygen';
-        const alreadyDone = ['done', 'running'].includes(String((lsScene as any)?.lip_sync_status ?? ''));
-        const optedOut = false; // future: per-scene auto_lipsync toggle
-
-        // Check if there's any voiceover signal worth syncing against.
-        let hasVoSignal = !!(lsScene as any)?.character_audio_url || !!(lsScene as any)?.dialog_script;
-        if (!hasVoSignal) {
-          const { count } = await supabase
-            .from('scene_audio_clips')
-            .select('id', { count: 'exact', head: true })
-            .eq('scene_id', sceneId)
-            .eq('kind', 'voiceover');
-          hasVoSignal = (count ?? 0) > 0;
-        }
-
-        if (isI2V && !isHeygen && !alreadyDone && !optedOut && hasVoSignal) {
-          const planSpeakers = Array.isArray((lsScene as any)?.audio_plan?.speakers)
-            ? (lsScene as any).audio_plan.speakers.length
-            : 0;
-          const twoshotSpeakers = Array.isArray((lsScene as any)?.audio_plan?.twoshot?.speakers)
-            ? (lsScene as any).audio_plan.twoshot.speakers.length
-            : 0;
-          const dialogSpeakers = detectSpeakerCount((lsScene as any)?.dialog_script ?? '');
-          const speakerCount = Math.max(planSpeakers, twoshotSpeakers, dialogSpeakers);
-          const fnName = engine === 'cinematic-sync' && speakerCount >= 2
-            ? 'compose-twoshot-lipsync'
-            : 'compose-lipsync-scene';
-
-          console.log(`[compose-clip-webhook] 🎤 Auto-triggering ${fnName} for scene ${sceneId} (speakers=${speakerCount})`);
-          const lsPromise = supabase.functions.invoke(fnName, {
-            body: { scene_id: sceneId },
-          }).then(({ error }) => {
-            if (error) console.error(`[compose-clip-webhook] auto ${fnName} failed for ${sceneId}:`, error);
-            else console.log(`[compose-clip-webhook] auto ${fnName} invoked for ${sceneId}`);
-          }).catch((e) => {
-            console.error(`[compose-clip-webhook] auto ${fnName} threw for ${sceneId}:`, e);
-          });
-          // @ts-ignore — Deno Deploy / Supabase edge runtime API
-          if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-            // @ts-ignore
-            EdgeRuntime.waitUntil(lsPromise);
-          }
-        }
-      } catch (lsErr) {
-        console.error('[compose-clip-webhook] auto lip-sync outer error:', lsErr);
-      }
 
     } else if (status === 'failed') {
       console.error(`[compose-clip-webhook] Clip failed:`, predError);
