@@ -24,7 +24,7 @@ import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 2;
+const ANCHOR_AUDIT_VERSION = 3;
 
 
 const corsHeaders = {
