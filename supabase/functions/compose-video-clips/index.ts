@@ -900,22 +900,25 @@ serve(async (req) => {
             if (portraitUrls.length >= 1) {
               const neutralFallback =
                 portraitUrls.length >= 2
-                  ? `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`
+                  ? neutralTwoShotPrompt(characterNames, portraitUrls.length)
                   : 'Natural cinematic scene, photorealistic, no rendered text.';
+              const anchorPrompt = scriptSpeakers.length >= 2
+                ? neutralFallback
+                : (stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback);
               console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length})`);
               try {
                 const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                    'Authorization': authHeader,
                   },
                   body: JSON.stringify({
                     sceneId: scene.id,
                     portraitUrl: portraitUrls[0],
                     portraitUrls,
                     characterNames,
-                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback,
+                    scenePrompt: anchorPrompt,
                     aspectRatio: '16:9',
                     shotType: castShots[0]?.shotType,
                   }),
