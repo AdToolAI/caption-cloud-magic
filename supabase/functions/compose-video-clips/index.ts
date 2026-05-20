@@ -24,7 +24,7 @@ import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
 import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 3;
+const ANCHOR_AUDIT_VERSION = 4;
 
 
 const corsHeaders = {
@@ -738,10 +738,14 @@ serve(async (req) => {
                   skipAuditPersist = true;
                 } else {
                   // 2) Stale or missing anchor → invalidate cache and re-compose.
+                  // Always delete cache for cinematic-sync before composing: older
+                  // client-side anchors used the same scene/cache key while carrying
+                  // 3 portrait/person prompts, so a null DB reference alone is not
+                  // enough to guarantee a fresh 2-speaker anchor.
                   if (existingLooksComposed) {
                     console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: pinned anchor missing audit v${ANCHOR_AUDIT_VERSION} → re-composing`);
-                    await invalidateCache();
                   }
+                  await invalidateCache();
                   composedUrl = await composeAnchor('attempt-1');
 
                   if (composedUrl && LOVABLE_API_KEY) {
@@ -790,12 +794,18 @@ serve(async (req) => {
                         at: new Date().toISOString(),
                       },
                     };
+                    const { data: currentPlanRow } = await supabaseAdmin
+                      .from('composer_scenes')
+                      .select('audio_plan')
+                      .eq('id', scene.id)
+                      .maybeSingle();
+                    const baseAudioPlan = ((currentPlanRow as any)?.audio_plan ?? (scene as any).audioPlan ?? {}) as Record<string, any>;
                     await supabaseAdmin
                       .from('composer_scenes')
                       .update({
                         reference_image_url: composedUrl,
                         updated_at: new Date().toISOString(),
-                        audio_plan: { ...((scene as any).audioPlan ?? {}), twoshot: { ...(((scene as any).audioPlan ?? {}).twoshot ?? {}), ...auditMeta } },
+                        audio_plan: { ...baseAudioPlan, twoshot: { ...(baseAudioPlan.twoshot ?? {}), ...auditMeta } },
                       })
                       .eq('id', scene.id);
                   }
