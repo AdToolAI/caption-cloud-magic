@@ -251,6 +251,9 @@ serve(async (req) => {
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
       const videoDims = await probeMp4Dims(polled.outputUrl);
       const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
+      if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
+        return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
+      }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
@@ -268,6 +271,10 @@ serve(async (req) => {
         targetFace: target.side,
         targetCoords: target.coords,
         targetSource: target.source,
+        faceCenter: target.faceCenter ?? null,
+        faceBbox: target.bbox ?? null,
+        anchorDims: target.anchorDims ?? null,
+        videoDims: target.videoDims ?? null,
         startedAt: now,
       };
       await supabase.from("composer_scenes").update({
