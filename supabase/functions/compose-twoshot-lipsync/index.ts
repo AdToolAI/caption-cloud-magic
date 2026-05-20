@@ -297,9 +297,7 @@ async function startSyncSoSegmentsJob(
   const model = params.model ?? "sync-3";
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
-    // The REST schema documents `refId`; some SDK examples use `ref_id`.
-    // Supplying both keeps this resilient across Sync.so parser variants.
-    { type: "audio", url: params.mergedAudioUrl, refId: REF, ref_id: REF },
+    { type: "audio", url: params.mergedAudioUrl, refId: REF },
   ];
   const maxTimeline = Math.max(
     0.1,
@@ -333,11 +331,9 @@ async function startSyncSoSegmentsJob(
       endTime: end,
       audioInput: {
         refId: REF,
-        ref_id: REF,
         startTime: start,
         endTime: end,
       },
-      metadata: { kind: s.kind },
     };
   });
   const body = {
@@ -370,7 +366,8 @@ async function startSyncSoSegmentsJob(
       merged_audio_url: params.mergedAudioUrl,
       audio_duration_sec: params.audioDurationSec ?? null,
       video_duration_sec: params.videoDurationSec ?? null,
-      ref_keys: ["refId", "ref_id"],
+      ref_keys: ["refId"],
+      segment_kinds: normalized.map((s) => s.kind),
       segments,
       create_response: JSON.stringify(data).slice(0, 1000),
     },
