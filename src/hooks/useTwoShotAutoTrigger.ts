@@ -62,10 +62,31 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const now = Date.now();
         const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
+        const STALE_SYNC_MS = 12 * 60 * 1000; // Sync.so should settle well before this; avoid endless spinner
 
         const hasSyncSoJob = (d: any) =>
           typeof d.replicate_prediction_id === 'string' &&
           d.replicate_prediction_id.startsWith('sync:');
+
+        const staleSyncJobs = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            hasSyncSoJob(d) &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > STALE_SYNC_MS,
+        );
+        if (staleSyncJobs.length > 0) {
+          await Promise.all(
+            staleSyncJobs.map((d) =>
+              supabase
+                .from('composer_scenes')
+                .update({ lip_sync_status: 'failed', twoshot_stage: 'failed', clip_error: 'syncso_poll_timeout' })
+                .eq('id', d.id),
+            ),
+          );
+        }
 
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
@@ -73,6 +94,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
+            !staleSyncJobs.some((s) => s.id === d.id) &&
             !inflight.current.has(`poll:${d.id}`),
         );
         if (runningSyncJobs.length > 0 && !progressActive.current) {
