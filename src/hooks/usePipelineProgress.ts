@@ -303,7 +303,7 @@ export function usePipelineProgress({
           weight: PHASE_WEIGHTS[p.id],
           progress: floorRef.current[p.id],
           status: ((p.real as any).failed
-            ? 'idle'
+            ? 'failed'
             : p.real.done
             ? 'done'
             : running
@@ -316,16 +316,13 @@ export function usePipelineProgress({
     eventFlags, floorTick,
   ]);
 
-  const totalWeight = phases.reduce((sum, p) => sum + p.weight, 0) || 1;
-  const overallPercent = Math.round(
-    (phases.reduce((sum, p) => sum + p.weight * p.progress, 0) / totalWeight) * 100,
-  );
+  const phaseOverall = (() => {
+    const totalWeight = phases.reduce((sum, p) => sum + p.weight, 0) || 1;
+    return (phases.reduce((sum, p) => sum + p.weight * p.progress, 0) / totalWeight) * 100;
+  })();
 
   const activePhase = phases.find((p) => p.status === 'running');
   const isActive = phases.some((p) => p.status === 'running');
-
-
-
   // ETA across remaining + active phases
   const etaSeconds = useMemo(() => {
     if (!isActive) return 0;
@@ -337,10 +334,10 @@ export function usePipelineProgress({
   }, [phases, isActive]);
 
   // Pipeline start time = first time anything went "running"
-  const pipelineStartRef = useRef<number | null>(null);
   useEffect(() => {
     if (isActive && pipelineStartRef.current === null) {
       pipelineStartRef.current = Date.now();
+      runFloorRef.current = 0;
     }
     if (!isActive && phases.every((p) => p.status !== 'running')) {
       // keep last value briefly; reset 5s after everything settles
@@ -356,6 +353,15 @@ export function usePipelineProgress({
   const elapsedSeconds = pipelineStartRef.current
     ? Math.round((Date.now() - pipelineStartRef.current) / 1000)
     : 0;
+
+  const runSoftPercent = isActive && pipelineStartRef.current
+    ? Math.min(95, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95)
+    : 0;
+  const hasFailure = phases.some((p) => p.status === 'failed');
+  const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
+  const currentOverall = allDone ? 100 : hasFailure ? phaseOverall : Math.min(99, Math.max(runSoftPercent, phaseOverall));
+  runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
+  const overallPercent = Math.round(allDone ? 100 : Math.min(99, runFloorRef.current));
 
   return {
     phases,
