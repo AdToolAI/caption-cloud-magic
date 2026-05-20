@@ -820,7 +820,7 @@ serve(async (req) => {
                     portraitUrl: portraitUrls[0],
                     portraitUrls,
                     characterNames,
-                    scenePrompt: scene.aiPrompt || '',
+                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || (portraitUrls.length >= 2 ? `Exactly ${portraitUrls.length} distinct people in a modern setting, each visible exactly once, natural conversation framing. No rendered text.` : 'Natural cinematic scene, photorealistic, no rendered text.'),
                     aspectRatio: '16:9',
                     shotType: castShots[0]?.shotType,
                   }),
