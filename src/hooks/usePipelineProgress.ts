@@ -217,7 +217,7 @@ export function usePipelineProgress({
     ];
 
     return list
-      .filter((p) => p.real.applicable !== false)
+      .filter((p) => p.real.applicable !== false || eventFlags[p.id])
       .map((p) => {
         const eventRunning = eventFlags[p.id];
         const running = eventRunning || p.real.running;
