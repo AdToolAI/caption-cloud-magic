@@ -971,21 +971,69 @@ serve(async (req) => {
         let jobId: string;
         let bodyMeta: Record<string, unknown> = {};
         try {
-          const result = await startSyncSoSegmentsJob(
+          let result = await startSyncSoSegmentsJob(
             SYNC_API_KEY!,
             {
               videoUrl: sourceClipUrl,
               mergedAudioUrl: mergedVo.url,
               segments: segmentsPayload,
               model: "sync-3",
+              audioDurationSec: voDuration || sceneDurForClamp,
+              videoDurationSec: sceneDurForClamp,
             },
             "lipsync_segments",
           );
+          result.bodyMeta.fallback_from = null;
           jobId = result.jobId;
           bodyMeta = result.bodyMeta;
         } catch (e) {
+          const firstErrMsg = (e as Error).message;
+          if (/segments configuration is invalid/i.test(firstErrMsg)) {
+            try {
+              const fallback = await startSyncSoSegmentsJob(
+                SYNC_API_KEY!,
+                {
+                  videoUrl: sourceClipUrl,
+                  mergedAudioUrl: mergedVo.url,
+                  segments: segmentsPayload,
+                  model: "lipsync-2",
+                  audioDurationSec: voDuration || sceneDurForClamp,
+                  videoDurationSec: sceneDurForClamp,
+                },
+                "lipsync_segments_fallback",
+              );
+              jobId = fallback.jobId;
+              bodyMeta = { ...fallback.bodyMeta, fallback_from: "sync-3", fallback_reason: firstErrMsg.slice(0, 500) };
+            } catch (fallbackErr) {
+              const errMsg = `${firstErrMsg} | fallback_lipsync-2_failed: ${(fallbackErr as Error).message}`;
+              const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
+              const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
+              const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
+              await supabase.from("composer_scenes").update({
+                audio_plan: {
+                  ...latestPlan,
+                  twoshot: {
+                    ...latestTwoshot,
+                    syncJobs: {
+                      ...(latestTwoshot.syncJobs ?? {}),
+                      provider: "sync.so",
+                      mode: "segments",
+                      lastError: errMsg.slice(0, 1000),
+                      lastErrorAt: new Date().toISOString(),
+                      attemptedModel: "sync-3+lipsync-2",
+                      attemptedSegments: segmentsPayload.length,
+                      mergedAudioUrl: mergedVo.url,
+                      sourceVideoUrl: sourceClipUrl,
+                    },
+                  },
+                },
+              }).eq("id", scene_id);
+              await refund(`lipsync_segments_failed: ${errMsg}`);
+              return;
+            }
+          } else {
           // Persist the provider error verbatim so we don't have to guess on retry.
-          const errMsg = (e as Error).message;
+          const errMsg = firstErrMsg;
           const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
           const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
           const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
@@ -1010,6 +1058,7 @@ serve(async (req) => {
           }).eq("id", scene_id);
           await refund(`lipsync_segments_failed: ${errMsg}`);
           return;
+          }
         }
 
         await setStage(supabase, scene_id, "lipsync_1", {
@@ -1032,6 +1081,7 @@ serve(async (req) => {
                   status: "PROCESSING",
                   videoUrl: sourceClipUrl,
                   segments: segmentsPayload,
+                  model: bodyMeta.model ?? "sync-3",
                   startedAt,
                 }],
               },
