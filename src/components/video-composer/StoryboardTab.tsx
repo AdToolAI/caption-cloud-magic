@@ -466,6 +466,23 @@ export default function StoryboardTab({
         </div>
       </div>
 
+      {/* Inline Pipeline Progress — visible directly in the workspace,
+          not just at the top of the page. Appears the instant the user
+          clicks "Generieren" and stays for the full ~7–8 min pipeline. */}
+      <PipelineProgressBar
+        scenes={scenes}
+        assemblyConfig={{
+          colorGrading: 'none',
+          transitionStyle: 'crossfade',
+          kineticText: false,
+          voiceover: null,
+          music: null,
+          beatSync: false,
+        }}
+        className="!sticky !top-2 !mx-0 !px-3 rounded-xl border border-gold/20 bg-card/70"
+      />
+
+
       {/* AI Generation Tips (gold) */}
       <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-gold/20 shadow-soft">
         <div
