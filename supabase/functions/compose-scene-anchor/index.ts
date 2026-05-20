@@ -113,9 +113,9 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v7 — bumped after exact-count enforcement (no extra people, no clones).
+    // v8 — bumped after exact-human-count enforcement + isolation retry.
     const promptHash = await sha1(
-      `v7|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}`,
+      `v8|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}`,
     );
 
     const { data: cached } = await admin
