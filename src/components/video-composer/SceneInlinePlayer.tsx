@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Play, RefreshCw, Sparkles, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 import type { ComposerScene } from '@/types/video-composer';
 
 interface Props {
@@ -47,6 +48,7 @@ export default function SceneInlinePlayer({
   onSelect,
   onGenerate,
 }: Props) {
+  const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hovering, setHovering] = useState(false);
 
@@ -108,7 +110,7 @@ export default function SceneInlinePlayer({
         <div className="absolute top-1.5 right-1.5 z-20">
           {isReady && (
             <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 backdrop-blur text-[9px] font-semibold text-emerald-300 border border-emerald-500/40">
-              ✓ Fertig
+              ✓ {t('videoComposer.clipReadyBadge')}
             </span>
           )}
           {isWorking && (

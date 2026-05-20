@@ -1,133 +1,97 @@
+# Pipeline-Feedback fixen — was bisher nicht angekommen ist
 
-## Ziel
+Beim Durchgehen des Codes zeigt sich: die in der letzten Runde gebauten Stücke (`PipelineProgressBar`, `usePipelineProgress`, `pipelineEvents`, dynamisches Label) existieren — aber **die Progress-Bar wird nirgendwo gemountet**, und der "Voiceover generieren"-Button im Screenshot kommt aus einer **anderen Komponente** (`SceneDialogStudio`), die wir letztes Mal nicht angefasst haben. Dazu kommt: beim Klick wird zwar `generatingVo` gesetzt, aber **kein `pipeline:*-start`-Event** emittiert — d. h. die Bar würde auch dann nichts zeigen, wenn sie gemountet wäre.
 
-Den Composer-Flow von **5 sichtbaren Schritten** auf **4** reduzieren, indem der „Clips generieren"-Tab komplett entfällt und seine Funktionen ins **Storyboard** wandern. Gleichzeitig bekommt der Nutzer ab dem ersten Klick auf einen Generieren-Button **immer** sichtbares Feedback (realistischer Progress über die gesamten ~7–8 min). Voiceover-Button wird kontextuell umbenannt.
-
-**Wichtig:** Reine UI-/Orchestrierungs-Änderungen. Edge-Functions (`compose-video-clips`, `generate-voiceover`, `compose-twoshot-lipsync`, `poll-twoshot-lipsync`, `render-directors-cut`) bleiben unangetastet — die gerade frisch funktionierende Pipeline wird **nicht** verändert.
+Dieser Plan korrigiert **genau diese vier Lücken** und fasst nichts anderes an. Edge-Functions, DB, Realtime-Hooks bleiben unverändert.
 
 ---
 
-## 1. Schritt „Clips generieren" entfernen
+## 1. PipelineProgressBar wirklich rendern
 
-### 1.1 Stepper & Tabs
 `src/components/video-composer/VideoComposerDashboard.tsx`
-- `TabId`-Union: `'clips'` bleibt intern als Route-Fallback (für Deep-Links `?tab=clips`), wird aber aus `TAB_ORDER`, `TABS` und damit aus `STEPS` (Top-Stepper) entfernt.
-- Auto-Navigation `setActiveTab('clips')` (Zeile 535, 1452) wird auf `'storyboard'` umgeleitet.
-- `onGoToClips` in `StoryboardTab` wird nicht mehr gebraucht → entfällt aus Props.
-- Deep-Link `?tab=clips` redirected automatisch auf `storyboard` (Backward-Compat).
+- Direkt **unter** `<MotionStudioTopStepper>` (Zeile ~1247) und **über** der Tab-Liste die Komponente einsetzen:
+  ```tsx
+  <PipelineProgressBar
+    scenes={project.scenes}
+    assemblyConfig={project.assemblyConfig}
+    renderPercent={renderProgress?.percent}
+    renderRunning={renderProgress?.running}
+  />
+  ```
+- Importe ergänzen.
+- Bar erscheint automatisch nur, wenn mindestens eine Phase läuft (siehe `usePipelineProgress.isActive`), bleibt 3 s nach Abschluss noch sichtbar.
 
-### 1.2 Storyboard-Header: neuer Master-Button
-`src/components/video-composer/StoryboardTab.tsx` (Zeile 415–422)
-- Aktuellen „Clips generieren →"-Button ersetzen durch **„Alle Clips generieren (N • €X.XX)"** mit derselben Logik wie aktuell in `ClipsTab.handleGenerateAll`:
-  - Filtert `pendingScenes` (Status ≠ `ready` und Source startet mit `ai-`).
-  - Ruft `compose-video-clips` **gebündelt** für alle Pending-Szenen auf (genau wie bisher in ClipsTab — Code dorthin extrahieren in einen kleinen Hook `useGenerateAllClips`).
-  - Disabled-States, Kosten-Anzeige und „Alle Clips bereit"-State werden 1:1 übernommen.
-- Daneben kompakter Status-Chip: „K/N Clips fertig · M wird generiert…" (gleiche Werte wie bisher in ClipsTab).
-- Per-Szene-Generieren-Button im `SceneInlinePlayer` bleibt unverändert (Nutzer kann weiterhin einzelne Szenen neu rollen).
+## 2. Storyboard-Dialog-Button (SceneDialogStudio) kontextuell umbenennen
 
-### 1.3 ClipsTab erhalten, aber versteckt
-- `ClipsTab.tsx` wird **nicht gelöscht** — Power-User-Features (Frame-Anchor, Snapshot-History, Cinematic-Sync) bleiben über Deep-Link `?tab=clips&advanced=1` erreichbar.
-- Im normalen Tab-Wechsel ist er aber nicht mehr sichtbar (kein Eintrag in `STEPS`).
+Der Button auf dem Screenshot (`Voiceover generieren`, gelb) kommt aus `src/components/video-composer/SceneDialogStudio.tsx` — nicht aus `VoiceSubtitlesTab`. Deshalb hat die letzte Änderung dort nichts bewirkt.
 
----
+`SceneDialogStudio.tsx` (Zeilen 121, 146, 171):
+- `genBtn` umbenennen zu kontextueller Variante:
+  - Skript leer → bisheriges Label (disabled).
+  - Skript vorhanden → "Clip generieren mit Voiceover" (DE) / "Generate Clip with Voiceover" (EN) / "Generar Clip con Locución" (ES).
+  - Two-Shot/SRS-Modus (`genBtnSrs`) bleibt für Mehr-Sprecher-Lipsync, wird aber zu "Clip mit Lip-Sync generieren" geschärft.
+- Label am Render-Punkt dynamisch wählen (analog `VoiceSubtitlesTab`).
 
-## 2. Realistischer Progress über die gesamte Pipeline
+## 3. Sofort-Feedback ab dem ersten Klick (0 s statt 30 s)
 
-Heutiger Zustand: Beim Klick auf „Voiceover generieren" passiert ~30–90 s lang sichtbar **nichts** (Spinner nur am Button). Bei „Alle Clips generieren" sieht man pro Szene einen Status, aber keine **globale** Pipeline-Sicht.
+Aktuell sieht der Nutzer 30 s lang nichts, weil die Bar erst aktiv wird, wenn der Server zurückmeldet. Lösung: **vor** dem `await` `emitPipelineEvent` feuern.
 
-### 2.1 Neue Komponente `PipelineProgressBar`
-`src/components/video-composer/PipelineProgressBar.tsx` (neu)
-- Sticky direkt unter dem Top-Stepper (über dem Content, unter `MotionStudioTopStepper`).
-- Erscheint **nur** wenn mindestens eine Phase aktiv ist; verschwindet 3 s nach Abschluss.
-- Zeigt:
-  - Phasen-Pills: **Briefing → Clips → Voiceover → Lipsync → Musik → Export** (Lipsync nur falls Dialog-Szenen vorhanden).
-  - Aktive Phase pulst (gold), abgeschlossene Phasen sind grün gecheckt.
-  - Darunter ein dünner Progressbalken mit **gewichtetem Gesamtfortschritt** (siehe 2.3).
-  - Rechts: laufende Zeit „⏱ 02:14 / ~07:30" — verbleibende Zeit aus rolling-average der laufenden Phase, **nie rückwärts**.
-- Komplett Frontend — keine DB-Calls.
+`VoiceSubtitlesTab.handleGenerateVoiceover` (Zeile 270):
+- Direkt nach `setGeneratingVo(true)`:
+  ```ts
+  emitPipelineEvent({ type: 'voiceover:start' });
+  ```
+- Im `finally`: `emitPipelineEvent({ type: 'voiceover:end' })`.
 
-### 2.2 Zentraler Hook `usePipelineProgress`
-`src/hooks/usePipelineProgress.ts` (neu)
-- Konsumiert vorhandene State-Quellen (keine neuen Tabellen):
-  - `project.scenes[].clipStatus` für die Clip-Phase (M/N ready).
-  - `assemblyConfig.voiceover.audioUrl` + lokales `generatingVo`-Flag aus `VoiceSubtitlesTab` (über Context lifted).
-  - `lipSyncStatus` aus Realtime-Subscription (existiert bereits via `useComposerScenesRealtime`).
-  - `render-directors-cut`-Polling (bereits in `RenderPipelinePanel`).
-- Liefert: `{ phases: Phase[], activePhase, overallPercent, etaSeconds, startedAt }`.
+`SceneDialogStudio` Generate-Handler (analog):
+- Bei normalem Skript → `voiceover:start`.
+- Bei SRS/Mehr-Sprecher → zusätzlich `lipsync:start`.
+- Jeweils im `finally` das passende `:end`.
 
-### 2.3 Gewichtung (für realistische ETA, basierend auf den vom Nutzer genannten 7–8 min)
-| Phase     | Anteil | Begründung                          |
-|-----------|--------|-------------------------------------|
-| Clips     | 55 %   | längster Block (~4 min für 5 Szenen)|
-| Voiceover | 10 %   | ~45 s                                |
-| Lipsync   | 20 %   | ~90 s pro Two-Shot-Szene             |
-| Musik     | 5 %    | Auswahl/Match                        |
-| Export    | 10 %   | Remotion-Lambda                      |
+`StoryboardTab` Master-Button "Alle Clips generieren" (verwendet `useGenerateAllClips`):
+- Vor dem ersten `invoke`: `emitPipelineEvent({ type: 'clips:start' })`.
+- Nach Abschluss aller Szenen-Calls: `clips:end`.
 
-Innerhalb jeder Phase: linearer Fortschritt aus den echten Sub-Zählern (z. B. Clip-Phase = `readyCount / totalAiScenes`), kombiniert mit einem **monoton wachsenden Soft-Floor** (langsame künstliche Bewegung +0.3 %/s solange `inProgress`), damit der Balken auch bei „stillem" Server-Polling weiter wandert. Floor wird gecapped bei 95 %, sodass der echte Abschluss-Tick auf 100 % springt.
+Damit wandert der Balken ab Klick **sofort** mit Soft-Floor (~0.3 %/s), die User-Wahrnehmung „nichts passiert" verschwindet.
 
-### 2.4 Sofortiges Feedback beim Klick
-`VoiceSubtitlesTab.handleGenerateVoiceover` (Zeile 270 ff.)
-- Direkt nach Klick: `setGeneratingVo(true)` (bereits da) **plus** Emit eines `pipeline:voiceover-start` Events → `usePipelineProgress` aktiviert die Voiceover-Phase mit Floor-Animation, noch bevor die erste Server-Antwort kommt.
-- Gleiches Pattern beim Master-„Alle Clips generieren"-Button.
+## 4. 7–8 min ETA realistisch kalibrieren
 
----
+`usePipelineProgress.PHASE_NOMINAL_SECONDS` korrigieren auf die tatsächliche Wall-Clock (Nutzer: ~7–8 min gesamt):
 
-## 3. Voiceover-Button kontextuell umbenennen
+| Phase     | aktuell | neu  | Begründung                              |
+|-----------|---------|------|-----------------------------------------|
+| clips     | 240 s   | 240 s| 4 min für 5 Szenen — bleibt              |
+| voiceover | 45 s    | 30 s | reale Messung                            |
+| lipsync   | 90 s    | 120 s| pro Two-Shot-Szene länger                |
+| music     | 20 s    | 15 s | Auswahl, kein Render                     |
+| export    | 70 s    | 90 s | Remotion-Lambda Stitch                   |
+| **Σ**     | **465 s ≈ 7:45 min** | gewünschtes Fenster |
 
-`src/components/video-composer/VoiceSubtitlesTab.tsx` (Zeile 783–786)
+Soft-Floor wird ebenfalls an diesen Werten ausgerichtet (`(elapsed / PHASE_NOMINAL_SECONDS) * 0.95`) — er ist bereits relativ, also kein zusätzlicher Code, nur die Konstanten ändern.
 
-Label-Logik:
-- Skript vorhanden + nicht leer → **„Clip generieren mit Voiceover"**
-- Skript leer → Button bleibt disabled wie heute, Hinweistext: „Ohne Skript wird das Video ohne Voiceover gebaut."
-- Multi-Speaker-Skript → **„Clip generieren mit Voiceover · Multi-Speaker"**
+## 5. „✓ Generiert"-Häkchen auf jeder Szene-Karte
 
-Lokalisierung: neue Keys `videoComposer.generateClipWithVo` / `…WithVoMulti` in `src/i18n` (EN/DE/ES), wie in den Memory-Regeln vorgegeben.
-
-Funktional ändert sich am Voiceover-Call **nichts** — nur das Label.
+Existiert bereits in `SceneInlinePlayer.tsx` (Zeile 109–113, grünes Badge „✓ Fertig" rechts oben, sobald `clipStatus === 'ready'`). **Nur das Label** auf den vom Nutzer gewünschten Wortlaut angleichen: „✓ Generiert" (DE) / „✓ Generated" (EN) / „✓ Generado" (ES) via `t('videoComposer.clipReadyBadge')`.
 
 ---
 
-## 4. „Komprimieren ohne Pipeline zu beschädigen" — Sicherheits-Constraints
+## Was bewusst NICHT angefasst wird
 
-- Edge-Functions: **keine** Änderungen.
-- DB-Schema: **keine** Änderungen.
-- `ClipsTab.tsx`: bleibt im Repo, nur aus dem normalen Tab-Order entfernt.
-- Realtime-Hooks (`useComposerScenesRealtime`, Lipsync-Polling): unangetastet.
-- Backward-Compat: alte `?tab=clips`-Links redirected weich auf Storyboard.
-- Keine neuen Globals; Pipeline-State wird über bereits existierende React-Query-Caches & Context gelesen.
+- Edge-Functions (`compose-video-clips`, `generate-voiceover`, `compose-twoshot-lipsync`, `poll-twoshot-lipsync`, `render-directors-cut`) — die frisch funktionierende Pipeline bleibt unverändert.
+- DB-Schema, Realtime-Subscriptions, Render-Polling.
+- Tab-Struktur (Clips-Tab ist bereits entfernt — Stage 19 ist erledigt).
+- `ClipsTab.tsx` (versteckt, Power-User-Deep-Link bleibt).
 
----
-
-## Technische Zusammenfassung (für die Implementierung)
+## Geänderte Dateien
 
 ```text
-NEU:
-  src/components/video-composer/PipelineProgressBar.tsx
-  src/hooks/usePipelineProgress.ts
-  src/hooks/useGenerateAllClips.ts        (extrahiert aus ClipsTab.handleGenerateAll)
-
-GEÄNDERT:
-  src/components/video-composer/VideoComposerDashboard.tsx
-    - TAB_ORDER / TABS / STEPS: 'clips' entfernt
-    - <PipelineProgressBar /> unter dem Stepper rendern
-    - setActiveTab('clips') -> 'storyboard'
-    - ?tab=clips -> Redirect auf 'storyboard' (außer ?advanced=1)
-  src/components/video-composer/StoryboardTab.tsx
-    - "Clips generieren →" Button ersetzt durch "Alle Clips generieren (N • €X)"
-    - Status-Chip "K/N fertig"
-    - onGoToClips Prop entfernt
-  src/components/video-composer/VoiceSubtitlesTab.tsx
-    - Button-Label dynamisch ("Clip generieren mit Voiceover")
-    - Phase-Start-Event emittieren
-  src/i18n/{en,de,es}.ts
-    - Neue Keys: generateClipWithVo, generateClipWithVoMulti,
-      pipelinePhase.*, pipelineEta
-
-UNVERÄNDERT (kritisch):
-  supabase/functions/**  (gesamte Pipeline)
-  src/components/video-composer/ClipsTab.tsx (nur versteckt)
-  Realtime / Polling / DB-Schema
+src/components/video-composer/VideoComposerDashboard.tsx   # mount PipelineProgressBar
+src/components/video-composer/SceneDialogStudio.tsx        # dynamisches Button-Label
+src/components/video-composer/VoiceSubtitlesTab.tsx        # emit voiceover:start/:end
+src/components/video-composer/StoryboardTab.tsx            # emit clips:start/:end im Master-Button
+src/components/video-composer/SceneInlinePlayer.tsx        # Badge-Label "✓ Generiert"
+src/hooks/usePipelineProgress.ts                           # PHASE_NOMINAL_SECONDS auf 7–8 min
+src/lib/translations.ts                                    # clipReadyBadge (de/en/es)
 ```
 
-Nach Approval baue ich das in dieser Reihenfolge: (a) `usePipelineProgress` + `PipelineProgressBar`, (b) Storyboard-Master-Button + `useGenerateAllClips`-Extraktion, (c) Tab/Stepper-Entfernung + Redirect, (d) VO-Button-Label, (e) i18n.
+Reihenfolge der Implementierung: (1) Mount der Bar, (2) Event-Emits beim Klick, (3) SceneDialogStudio-Label, (4) ETA-Konstanten, (5) Badge-i18n.

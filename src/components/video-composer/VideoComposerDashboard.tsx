@@ -39,6 +39,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
+import PipelineProgressBar from './PipelineProgressBar';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
@@ -79,7 +80,7 @@ interface LocalProject {
 
 const STORAGE_KEY = 'video-composer-draft';
 const TAB_STORAGE_KEY = 'video-composer-draft-tab';
-const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export', 'campaign'];
+const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
@@ -109,6 +110,7 @@ function clearDraft() {
 function restoreActiveTab(): TabId {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+    if (stored === 'clips') return 'storyboard';
     if (stored && TAB_ORDER.includes(stored)) return stored;
     return 'briefing';
   } catch {
@@ -1246,6 +1248,11 @@ export default function VideoComposerDashboard() {
           onSelect={(id) => handleTabChange(id as TabId)}
         />
       </div>
+
+      <PipelineProgressBar
+        scenes={project.scenes}
+        assemblyConfig={project.assemblyConfig}
+      />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">

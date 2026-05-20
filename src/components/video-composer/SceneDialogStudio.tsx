@@ -37,6 +37,7 @@ import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/
 import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
+import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
@@ -118,8 +119,8 @@ const T = {
     voices: 'Stimme pro Sprecher',
     pickVoice: 'Stimme wählen',
     aiBtn: 'Skript via AI',
-    genBtn: 'Voiceover generieren',
-    genBtnSrs: 'Lip-Sync-Clips generieren',
+    genBtn: 'Clip generieren mit Voiceover',
+    genBtnSrs: 'Clip mit Lip-Sync generieren',
     generating: 'Generiere…',
     blocks: (n: number) => `${n} Block${n === 1 ? '' : 'e'}`,
     speakers: (n: number) => `${n} Sprecher`,
@@ -143,8 +144,8 @@ const T = {
     voices: 'Voice per speaker',
     pickVoice: 'Pick voice',
     aiBtn: 'AI Script',
-    genBtn: 'Generate voiceover',
-    genBtnSrs: 'Generate lip-sync clips',
+    genBtn: 'Generate Clip with Voiceover',
+    genBtnSrs: 'Generate Clip with Lip-Sync',
     generating: 'Generating…',
     blocks: (n: number) => `${n} block${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} speaker${n === 1 ? '' : 's'}`,
@@ -168,8 +169,8 @@ const T = {
     voices: 'Voz por hablante',
     pickVoice: 'Elegir voz',
     aiBtn: 'Guion con IA',
-    genBtn: 'Generar voz en off',
-    genBtnSrs: 'Generar clips lip-sync',
+    genBtn: 'Generar Clip con Locución',
+    genBtnSrs: 'Generar Clip con Lip-Sync',
     generating: 'Generando…',
     blocks: (n: number) => `${n} bloque${n === 1 ? '' : 's'}`,
     speakers: (n: number) => `${n} hablante${n === 1 ? '' : 's'}`,
@@ -449,6 +450,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const handleGenerateInline = async () => {
     let pid = '';
     let sceneId = scene.id;
+    setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
     try {
       const ids = await resolvePersistedIds();
       if (!ids) {
@@ -457,12 +460,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           description: PROJECT_REQUIRED[language],
           variant: 'destructive',
         });
+        emitPipelineEvent({ type: 'voiceover:end' });
+        setGenerating(false);
         return;
       }
       pid = ids.pid;
       sceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
+      emitPipelineEvent({ type: 'voiceover:end' });
+      setGenerating(false);
       return;
     }
     // Pin dialog into the visible AI prompt immediately so the user sees the
@@ -473,7 +480,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
       }
     } catch (_) { /* noop — non-fatal */ }
-    setGenerating(true);
     let okCount = 0;
     let cumulativeOffset = 0;
     const timedBlocks: typeof blocks = [];
@@ -635,6 +641,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         variant: 'destructive',
       });
     } finally {
+      emitPipelineEvent({ type: 'voiceover:end' });
       setGenerating(false);
     }
   };
@@ -736,6 +743,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
+    emitPipelineEvent({ type: 'lipsync:start' });
     // Ensure the project is persisted before spawning sub-scenes (otherwise
     // onAddScene would write to a non-existent project_id).
     let pidForSrs = (projectId || scene.projectId || '').trim();
@@ -748,15 +758,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const ids = await resolvePersistedIds();
       if (!ids) {
         toast({ title: t.failed, description: PROJECT_REQUIRED[language], variant: 'destructive' });
+        emitPipelineEvent({ type: 'voiceover:end' });
+        emitPipelineEvent({ type: 'lipsync:end' });
+        setGenerating(false);
         return;
       }
       pidForSrs = ids.pid;
       resolvedParentSceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
+      emitPipelineEvent({ type: 'voiceover:end' });
+      emitPipelineEvent({ type: 'lipsync:end' });
+      setGenerating(false);
       return;
     }
-    setGenerating(true);
     let okCount = 0;
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
@@ -1052,6 +1067,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         variant: 'destructive',
       });
     } finally {
+      emitPipelineEvent({ type: 'voiceover:end' });
+      emitPipelineEvent({ type: 'lipsync:end' });
       setGenerating(false);
       setGenStage(null);
     }

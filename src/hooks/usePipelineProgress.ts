@@ -50,10 +50,10 @@ const PHASE_LABELS_DE: Record<PipelinePhaseId, string> = {
 // Approximate total wall-clock seconds per phase (used for ETA only).
 const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   clips: 240, // 4 min for 5 scenes
-  voiceover: 45,
-  lipsync: 90,
-  music: 20,
-  export: 70,
+  voiceover: 30,
+  lipsync: 120,
+  music: 15,
+  export: 90,
 };
 
 export function usePipelineProgress({
@@ -217,7 +217,7 @@ export function usePipelineProgress({
     ];
 
     return list
-      .filter((p) => p.real.applicable !== false)
+      .filter((p) => p.real.applicable !== false || eventFlags[p.id])
       .map((p) => {
         const eventRunning = eventFlags[p.id];
         const running = eventRunning || p.real.running;
