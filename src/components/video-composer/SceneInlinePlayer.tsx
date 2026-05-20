@@ -74,8 +74,6 @@ export default function SceneInlinePlayer({
   const lipsyncDone =
     !needsLipsync ||
     (lipSyncStatus === 'done' && !!lipSyncAppliedAt) ||
-    lipSyncStatus === 'ready' ||
-    lipSyncStatus === 'no_voiceover' ||
     twoshotStage === 'done' ||
     twoshotStage === 'complete';
   const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
