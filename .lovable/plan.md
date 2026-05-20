@@ -1,97 +1,74 @@
-# Pipeline-Feedback fixen — was bisher nicht angekommen ist
+## Ziel
+Der Kunde soll direkt nach dem Klick auf „Clip generieren“ einen sichtbaren, glaubwürdigen Ladebereich sehen — nicht erst nach ~30 Sekunden. Die bestehende Backend-/Render-Pipeline bleibt unverändert.
 
-Beim Durchgehen des Codes zeigt sich: die in der letzten Runde gebauten Stücke (`PipelineProgressBar`, `usePipelineProgress`, `pipelineEvents`, dynamisches Label) existieren — aber **die Progress-Bar wird nirgendwo gemountet**, und der "Voiceover generieren"-Button im Screenshot kommt aus einer **anderen Komponente** (`SceneDialogStudio`), die wir letztes Mal nicht angefasst haben. Dazu kommt: beim Klick wird zwar `generatingVo` gesetzt, aber **kein `pipeline:*-start`-Event** emittiert — d. h. die Bar würde auch dann nichts zeigen, wenn sie gemountet wäre.
+## Ursache
+Der Fortschrittsbalken hängt aktuell nur global unter dem Top-Stepper. Beim Klick in der Szenen-/Storyboard-Fläche wird zwar teilweise ein Event ausgelöst, aber:
 
-Dieser Plan korrigiert **genau diese vier Lücken** und fasst nichts anderes an. Edge-Functions, DB, Realtime-Hooks bleiben unverändert.
+- Der sichtbare Bereich des Kunden ist unten im Storyboard; der globale Balken liegt außerhalb des aktuellen Scroll-Fokus.
+- `useGenerateAllClips` beendet das `clips:start` Event im `finally` sofort wieder, obwohl die eigentliche Clip-/Lip-Sync-Generierung danach noch mehrere Minuten serverseitig weiterläuft.
+- Beim Einzelclip ist der Optimistic-Status erst nach `ensureProject()` sichtbar; genau das verursacht die wahrgenommenen ~30 Sekunden „nichts passiert“.
+- Der Progress sollte nicht an die erste Serverantwort gekoppelt sein, sondern an den Klick selbst.
 
----
+## Umsetzung
 
-## 1. PipelineProgressBar wirklich rendern
+### 1. Lokaler Ladebereich direkt im Storyboard
+In `StoryboardTab.tsx` wird über der Szenenliste ein klarer Pipeline-Ladebereich eingebaut, der ab Klick sofort erscheint:
 
-`src/components/video-composer/VideoComposerDashboard.tsx`
-- Direkt **unter** `<MotionStudioTopStepper>` (Zeile ~1247) und **über** der Tab-Liste die Komponente einsetzen:
-  ```tsx
-  <PipelineProgressBar
-    scenes={project.scenes}
-    assemblyConfig={project.assemblyConfig}
-    renderPercent={renderProgress?.percent}
-    renderRunning={renderProgress?.running}
-  />
-  ```
-- Importe ergänzen.
-- Bar erscheint automatisch nur, wenn mindestens eine Phase läuft (siehe `usePipelineProgress.isActive`), bleibt 3 s nach Abschluss noch sichtbar.
+- Titel: „Clip wird generiert…“ bzw. „Clips werden generiert…“
+- Untertitel: „VO & Lip-Sync inklusive“ wenn ein Skript vorhanden ist
+- Fortschrittsbalken mit 7–8 Minuten ETA
+- Live-Zeit: „0:12 / ~7:45 min“
+- Status-Pills: Clips, Voiceover, Lip-Sync, Export
 
-## 2. Storyboard-Dialog-Button (SceneDialogStudio) kontextuell umbenennen
+Damit sieht der Kunde Fortschritt genau dort, wo er arbeitet — nicht nur oben außerhalb des Blickfelds.
 
-Der Button auf dem Screenshot (`Voiceover generieren`, gelb) kommt aus `src/components/video-composer/SceneDialogStudio.tsx` — nicht aus `VoiceSubtitlesTab`. Deshalb hat die letzte Änderung dort nichts bewirkt.
+### 2. Klick triggert sofort sichtbaren Status
+In `useSceneGenerate.ts` und `useGenerateAllClips.ts` wird vor allen langsamen Operationen sofort ein lokaler Optimistic-State gesetzt:
 
-`SceneDialogStudio.tsx` (Zeilen 121, 146, 171):
-- `genBtn` umbenennen zu kontextueller Variante:
-  - Skript leer → bisheriges Label (disabled).
-  - Skript vorhanden → "Clip generieren mit Voiceover" (DE) / "Generate Clip with Voiceover" (EN) / "Generar Clip con Locución" (ES).
-  - Two-Shot/SRS-Modus (`genBtnSrs`) bleibt für Mehr-Sprecher-Lipsync, wird aber zu "Clip mit Lip-Sync generieren" geschärft.
-- Label am Render-Punkt dynamisch wählen (analog `VoiceSubtitlesTab`).
+- Einzelclip: Szene sofort auf `clipStatus: 'generating'`
+- Alle Clips: alle relevanten Szenen sofort auf `clipStatus: 'generating'`
+- Event `clips:start` direkt beim Klick
 
-## 3. Sofort-Feedback ab dem ersten Klick (0 s statt 30 s)
+Das passiert vor `ensureProject()`, vor Frame-Anchor-Erstellung und vor Edge-Function-Aufrufen.
 
-Aktuell sieht der Nutzer 30 s lang nichts, weil die Bar erst aktiv wird, wenn der Server zurückmeldet. Lösung: **vor** dem `await` `emitPipelineEvent` feuern.
+### 3. Progress nicht zu früh beenden
+`clips:end` wird nicht mehr direkt im `finally` ausgelöst, wenn die Serverfunktion nur die Generierung gestartet hat. Stattdessen bleibt der Ladebereich aktiv, solange Szenen noch `generating` sind oder der lokale Pipeline-Timer läuft.
 
-`VoiceSubtitlesTab.handleGenerateVoiceover` (Zeile 270):
-- Direkt nach `setGeneratingVo(true)`:
-  ```ts
-  emitPipelineEvent({ type: 'voiceover:start' });
-  ```
-- Im `finally`: `emitPipelineEvent({ type: 'voiceover:end' })`.
+Fehlerfälle beenden den Progress weiterhin sofort.
 
-`SceneDialogStudio` Generate-Handler (analog):
-- Bei normalem Skript → `voiceover:start`.
-- Bei SRS/Mehr-Sprecher → zusätzlich `lipsync:start`.
-- Jeweils im `finally` das passende `:end`.
+### 4. 7–8 Minuten Ladeillusion stabil halten
+`usePipelineProgress.ts` wird so angepasst, dass ein gestarteter Clip-Prozess nicht nach kurzer Zeit verschwindet:
 
-`StoryboardTab` Master-Button "Alle Clips generieren" (verwendet `useGenerateAllClips`):
-- Vor dem ersten `invoke`: `emitPipelineEvent({ type: 'clips:start' })`.
-- Nach Abschluss aller Szenen-Calls: `clips:end`.
+- Mindestlaufzeit für sichtbaren Progress: ca. 7:45 min
+- Soft-Floor steigt kontinuierlich
+- Realer Ready-Status gewinnt: wenn alle Szenen vorher fertig sind, springt es sauber auf fertig
+- Wenn Backend länger braucht, bleibt „wird generiert“ sichtbar statt leerem Zustand
 
-Damit wandert der Balken ab Klick **sofort** mit Soft-Floor (~0.3 %/s), die User-Wahrnehmung „nichts passiert" verschwindet.
+### 5. Grün bestätigter Fertig-Zustand
+Sobald eine Szene fertig ist:
 
-## 4. 7–8 min ETA realistisch kalibrieren
+- Auf der Szenenkarte/Player-Kachel erscheint „✓ Generiert“
+- Generating-Overlay verschwindet erst bei `clipStatus === 'ready'`
+- Der Kunde sieht pro Clip klar, was bereits abgeschlossen ist
 
-`usePipelineProgress.PHASE_NOMINAL_SECONDS` korrigieren auf die tatsächliche Wall-Clock (Nutzer: ~7–8 min gesamt):
-
-| Phase     | aktuell | neu  | Begründung                              |
-|-----------|---------|------|-----------------------------------------|
-| clips     | 240 s   | 240 s| 4 min für 5 Szenen — bleibt              |
-| voiceover | 45 s    | 30 s | reale Messung                            |
-| lipsync   | 90 s    | 120 s| pro Two-Shot-Szene länger                |
-| music     | 20 s    | 15 s | Auswahl, kein Render                     |
-| export    | 70 s    | 90 s | Remotion-Lambda Stitch                   |
-| **Σ**     | **465 s ≈ 7:45 min** | gewünschtes Fenster |
-
-Soft-Floor wird ebenfalls an diesen Werten ausgerichtet (`(elapsed / PHASE_NOMINAL_SECONDS) * 0.95`) — er ist bereits relativ, also kein zusätzlicher Code, nur die Konstanten ändern.
-
-## 5. „✓ Generiert"-Häkchen auf jeder Szene-Karte
-
-Existiert bereits in `SceneInlinePlayer.tsx` (Zeile 109–113, grünes Badge „✓ Fertig" rechts oben, sobald `clipStatus === 'ready'`). **Nur das Label** auf den vom Nutzer gewünschten Wortlaut angleichen: „✓ Generiert" (DE) / „✓ Generated" (EN) / „✓ Generado" (ES) via `t('videoComposer.clipReadyBadge')`.
-
----
-
-## Was bewusst NICHT angefasst wird
-
-- Edge-Functions (`compose-video-clips`, `generate-voiceover`, `compose-twoshot-lipsync`, `poll-twoshot-lipsync`, `render-directors-cut`) — die frisch funktionierende Pipeline bleibt unverändert.
-- DB-Schema, Realtime-Subscriptions, Render-Polling.
-- Tab-Struktur (Clips-Tab ist bereits entfernt — Stage 19 ist erledigt).
-- `ClipsTab.tsx` (versteckt, Power-User-Deep-Link bleibt).
-
-## Geänderte Dateien
+## Dateien
 
 ```text
-src/components/video-composer/VideoComposerDashboard.tsx   # mount PipelineProgressBar
-src/components/video-composer/SceneDialogStudio.tsx        # dynamisches Button-Label
-src/components/video-composer/VoiceSubtitlesTab.tsx        # emit voiceover:start/:end
-src/components/video-composer/StoryboardTab.tsx            # emit clips:start/:end im Master-Button
-src/components/video-composer/SceneInlinePlayer.tsx        # Badge-Label "✓ Generiert"
-src/hooks/usePipelineProgress.ts                           # PHASE_NOMINAL_SECONDS auf 7–8 min
-src/lib/translations.ts                                    # clipReadyBadge (de/en/es)
+src/components/video-composer/StoryboardTab.tsx
+src/hooks/useGenerateAllClips.ts
+src/hooks/useSceneGenerate.ts
+src/hooks/usePipelineProgress.ts
+src/components/video-composer/SceneInlinePlayer.tsx
 ```
 
-Reihenfolge der Implementierung: (1) Mount der Bar, (2) Event-Emits beim Klick, (3) SceneDialogStudio-Label, (4) ETA-Konstanten, (5) Badge-i18n.
+## Nicht anfassen
+
+```text
+supabase/functions/*
+Datenbank-Schema
+Realtime-Subscriptions
+Two-Shot / Lip-Sync Edge-Functions
+Render-Pipeline
+```
+
+Die funktionierende Pipeline bleibt technisch unverändert; wir reparieren nur die sofortige UI-Rückmeldung und den sichtbaren Ladezustand.
