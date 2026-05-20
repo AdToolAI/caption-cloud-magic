@@ -83,6 +83,24 @@ export default function StoryboardTab({
   isGeneratingStoryboard = false,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
+  // Master "Alle Clips generieren" — replaces the old "→ Clips generieren" tab
+  // navigation. Uses the same proven pipeline as ClipsTab (extracted hook).
+  const {
+    generateAll,
+    isGeneratingAll,
+    pendingScenes,
+    readyCount,
+    generatingCount,
+    remainingCost,
+    allReady,
+  } = useGenerateAllClips({
+    scenes,
+    projectId,
+    characters,
+    onUpdateScenes,
+    onEnsurePersisted,
+    language,
+  });
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(TIPS_KEY) === '1'; } catch { return false; }
