@@ -535,6 +535,7 @@ serve(async (req) => {
     if (!project) return json({ error: "project not found" }, 404);
     if (!isServiceCall && project.user_id !== user?.id) return json({ error: "Forbidden" }, 403);
     if (isServiceCall) user = { id: project.user_id };
+    if (!user) return json({ error: "Unauthorized" }, 401);
 
     if ((scene as any).lip_sync_status === "running") {
       const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
