@@ -104,7 +104,7 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
   return String(data.id);
 }
 
-async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string }> {
+async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string; providerResponse?: Record<string, unknown> }> {
   const resp = await fetch(`https://api.sync.so/v2/generate/${jobId}`, {
     headers: { "x-api-key": syncApiKey },
   });
@@ -116,7 +116,7 @@ async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status:
   const status = String(data?.status ?? "").toUpperCase();
   const outputUrl = data?.outputUrl || data?.output_url || data?.output;
   const error = data?.error || data?.errorMessage || data?.message || data?.error_code;
-  return { status, outputUrl: typeof outputUrl === "string" ? outputUrl : undefined, error: typeof error === "string" ? error : undefined };
+  return { status, outputUrl: typeof outputUrl === "string" ? outputUrl : undefined, error: typeof error === "string" ? error : undefined, providerResponse: data };
 }
 
 async function rehostVideo(supabase: any, userId: string, sceneId: string, url: string): Promise<string> {
@@ -194,14 +194,14 @@ serve(async (req) => {
     const polled = await pollSyncJob(syncApiKey, jobId);
     const now = new Date().toISOString();
 
-    if (["PENDING", "PROCESSING"].includes(polled.status)) {
+    if (["PENDING", "PROCESSING", "RUNNING", "QUEUED"].includes(polled.status)) {
       await supabase.from("composer_scenes").update({
         updated_at: now,
         audio_plan: {
           ...plan,
           twoshot: {
             ...twoshot,
-            syncJobs: { ...syncJobs, currentPass, totalPasses, jobs: jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, lastPolledAt: now } : j) },
+            syncJobs: { ...syncJobs, currentPass, totalPasses, jobs: jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, lastPolledAt: now, providerResponse: polled.providerResponse } : j) },
             heartbeat: { ...(twoshot.heartbeat ?? {}), pass: currentPass, total_passes: totalPasses, syncJobId: jobId, lastPolledAt: now },
           },
         },
@@ -231,7 +231,7 @@ serve(async (req) => {
         twoshot_stage: "failed",
         clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}`,
         updated_at: now,
-        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now } } },
+        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: (Array.isArray(latestSyncJobs.jobs) ? latestSyncJobs.jobs : jobs).map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
       }).eq("id", sceneId);
       return json({ ok: false, status: polled.status, error: polled.error ?? polled.status }, 200);
     }
@@ -240,7 +240,7 @@ serve(async (req) => {
       return json({ error: "unexpected_sync_status", status: polled.status }, 502);
     }
 
-    const updatedJobs = jobs.map((j: any) => j.jobId === jobId ? { ...j, status: "COMPLETED", outputUrl: polled.outputUrl, completedAt: now } : j);
+    const updatedJobs = jobs.map((j: any) => j.jobId === jobId ? { ...j, status: "COMPLETED", outputUrl: polled.outputUrl, completedAt: now, providerResponse: polled.providerResponse } : j);
 
     // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
     // (mode != 'segments') still chain to the next pass for backward compat.
