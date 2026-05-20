@@ -214,9 +214,79 @@ serve(async (req) => {
       const latestPlan = (latest.data?.audio_plan ?? plan) as Record<string, any>;
       const latestTwoshot = (latestPlan.twoshot ?? {}) as Record<string, any>;
       const latestSyncJobs = (latestTwoshot.syncJobs ?? syncJobs) as Record<string, any>;
+      const latestJobs = Array.isArray(latestSyncJobs.jobs) ? latestSyncJobs.jobs : jobs;
+      const latestCurrentJob = latestJobs.find((j: any) => j.jobId === jobId) ?? currentJob;
+
       if (isSegments && /segments configuration is invalid/i.test(String(polled.error ?? ""))) {
         polled.error = `${polled.error ?? polled.status} | segment_mode_disabled_retry_with_two_pass`;
       }
+
+      // ── Auto-retry transient provider failures ────────────────────────
+      // Sync.so sporadically returns generic "generation pipeline" errors
+      // that succeed on retry. Re-submit the SAME pass up to MAX_RETRIES
+      // times before declaring a real failure. Credits stay reserved.
+      const TRANSIENT_REGEX = /(generation pipeline|internal|timeout|temporarily|rate.?limit|503|502|504)/i;
+      const MAX_RETRIES = 2;
+      const retryAttempts = Number(latestCurrentJob?.retryAttempts ?? 0);
+      const errMsg = String(polled.error ?? polled.status);
+      const isTransient = TRANSIENT_REGEX.test(errMsg);
+
+      if (isTransient && retryAttempts < MAX_RETRIES && latestCurrentJob) {
+        try {
+          // 5s backoff for first retry, 15s for second
+          await new Promise((r) => setTimeout(r, retryAttempts === 0 ? 5_000 : 15_000));
+          const newJobId = await startSyncJob(syncApiKey, {
+            videoUrl: String(latestCurrentJob.videoUrl),
+            audioUrl: String(latestCurrentJob.audioUrl),
+            targetCoords: Array.isArray(latestCurrentJob.targetCoords) ? latestCurrentJob.targetCoords as [number, number] : null,
+          });
+          const patchedJobs = latestJobs.map((j: any) =>
+            j.jobId === jobId
+              ? {
+                  ...j,
+                  jobId: newJobId,
+                  status: "PROCESSING",
+                  startedAt: now,
+                  retryAttempts: retryAttempts + 1,
+                  previousJobId: jobId,
+                  previousFailedAt: now,
+                  previousError: errMsg.slice(0, 400),
+                }
+              : j,
+          );
+          await supabase.from("composer_scenes").update({
+            replicate_prediction_id: `sync:${newJobId}`,
+            clip_error: `auto-retry: sync.so transient fail (attempt ${retryAttempts + 1}/${MAX_RETRIES}) — ${errMsg.slice(0, 120)}`,
+            updated_at: now,
+            audio_plan: {
+              ...latestPlan,
+              twoshot: {
+                ...latestTwoshot,
+                syncJobs: {
+                  ...latestSyncJobs,
+                  jobs: patchedJobs,
+                  lastTransientError: errMsg.slice(0, 400),
+                  lastTransientAt: now,
+                  retryCount: Number(latestSyncJobs.retryCount ?? 0) + 1,
+                },
+                heartbeat: {
+                  ...(latestTwoshot.heartbeat ?? {}),
+                  pass: currentPass,
+                  total_passes: totalPasses,
+                  syncJobId: newJobId,
+                  retriedAt: now,
+                  retryAttempts: retryAttempts + 1,
+                },
+              },
+            },
+          }).eq("id", sceneId);
+          return json({ ok: true, status: "RETRIED", scene_id: sceneId, pass: currentPass, jobId: newJobId, retryAttempts: retryAttempts + 1 });
+        } catch (retryErr) {
+          // Fall through to real failure below
+          console.warn(`[poll-twoshot-lipsync ${sceneId}] retry submit failed`, (retryErr as Error).message);
+        }
+      }
+
       if (!latestSyncJobs.refunded) {
         const cost = Number(latestSyncJobs.costCredits ?? 0);
         if (cost > 0) {
@@ -229,12 +299,13 @@ serve(async (req) => {
       await supabase.from("composer_scenes").update({
         lip_sync_status: "failed",
         twoshot_stage: "failed",
-        clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}`,
+        clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}${retryAttempts > 0 ? ` (after ${retryAttempts} retries)` : ""}`,
         updated_at: now,
-        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: (Array.isArray(latestSyncJobs.jobs) ? latestSyncJobs.jobs : jobs).map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
+        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: latestJobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
       }).eq("id", sceneId);
-      return json({ ok: false, status: polled.status, error: polled.error ?? polled.status }, 200);
+      return json({ ok: false, status: polled.status, error: polled.error ?? polled.status, retried: retryAttempts }, 200);
     }
+
 
     if (polled.status !== "COMPLETED" || !polled.outputUrl) {
       return json({ error: "unexpected_sync_status", status: polled.status }, 502);

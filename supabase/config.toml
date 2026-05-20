@@ -798,3 +798,7 @@ timeout_sec = 60
 
 [functions.ingest-e2e-results]
 verify_jwt = false
+
+[functions.twoshot-lipsync-watchdog]
+verify_jwt = false
+timeout_sec = 120
