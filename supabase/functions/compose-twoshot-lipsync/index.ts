@@ -283,6 +283,29 @@ type FaceMap = {
   source: "cache" | "anchor" | "clip-frame" | "heuristic-fallback";
 };
 
+async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
+  if (!url) return null;
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    if (!resp.ok) return null;
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const textAt = (i: number, n: number) => String.fromCharCode(...buf.slice(i, i + n));
+    const readU32 = (i: number) => ((buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3]) >>> 0;
+    for (let i = 0; i < buf.length - 32; i++) {
+      if (textAt(i, 4) !== "tkhd") continue;
+      const version = buf[Math.max(0, i + 4)];
+      const base = i + (version === 1 ? 96 : 84);
+      if (base + 7 >= buf.length) continue;
+      const width = readU32(base) / 65536;
+      const height = readU32(base + 4) / 65536;
+      if (width > 0 && height > 0 && width < 10000 && height < 10000) return { width: Math.round(width), height: Math.round(height) };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function askGeminiForFaces(
   url: string,
   lovableKey: string,
@@ -433,14 +456,19 @@ async function detectFacesInMaster(
  */
 function pickTargetCoordinates(
   passIndex: number,
-  faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number] }>; width: number; height: number } | null,
+  faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number]; normCenter?: [number, number] }>; width: number; height: number } | null,
   fallbackDims: { width: number; height: number },
 ): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } | null {
   const side: "left" | "right" = passIndex === 0 ? "left" : "right";
   if (faceMap?.faces?.length) {
     const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
     if (match?.center) {
-      return { coords: [Math.round(match.center[0]), Math.round(match.center[1])], side, source: "gemini" };
+      const W = fallbackDims.width || faceMap.width || 1280;
+      const H = fallbackDims.height || faceMap.height || 720;
+      const coords: [number, number] = Array.isArray(match.normCenter)
+        ? [Math.round(Number(match.normCenter[0]) * W), Math.round(Number(match.normCenter[1]) * H)]
+        : [Math.round(Number(match.center[0]) * (W / (faceMap.width || W))), Math.round(Number(match.center[1]) * (H / (faceMap.height || H)))];
+      return { coords, side, source: "gemini" };
     }
   }
   const W = fallbackDims.width || 1280;
