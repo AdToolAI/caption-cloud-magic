@@ -800,12 +800,19 @@ serve(async (req) => {
                       .eq('id', scene.id)
                       .maybeSingle();
                     const baseAudioPlan = ((currentPlanRow as any)?.audio_plan ?? (scene as any).audioPlan ?? {}) as Record<string, any>;
+                    const {
+                      faceMap: _staleFaceMap,
+                      syncJobs: _staleSyncJobs,
+                      heartbeat: _staleHeartbeat,
+                      anchor_face_audit: _oldAnchorAudit,
+                      ...twoshotWithoutAnchorDerivedState
+                    } = ((baseAudioPlan.twoshot ?? {}) as Record<string, any>);
                     await supabaseAdmin
                       .from('composer_scenes')
                       .update({
                         reference_image_url: composedUrl,
                         updated_at: new Date().toISOString(),
-                        audio_plan: { ...baseAudioPlan, twoshot: { ...(baseAudioPlan.twoshot ?? {}), ...auditMeta } },
+                        audio_plan: { ...baseAudioPlan, twoshot: { ...twoshotWithoutAnchorDerivedState, ...auditMeta } },
                       })
                       .eq('id', scene.id);
                   }
