@@ -19,6 +19,8 @@ import StoryboardScenePlayerList from './StoryboardScenePlayerList';
 import SceneStyleMode from './SceneStyleMode';
 import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
+import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
+import { Play, CheckCircle2 } from 'lucide-react';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
@@ -81,6 +83,24 @@ export default function StoryboardTab({
   isGeneratingStoryboard = false,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
+  // Master "Alle Clips generieren" — replaces the old "→ Clips generieren" tab
+  // navigation. Uses the same proven pipeline as ClipsTab (extracted hook).
+  const {
+    generateAll,
+    isGeneratingAll,
+    pendingScenes,
+    readyCount,
+    generatingCount,
+    remainingCost,
+    allReady,
+  } = useGenerateAllClips({
+    scenes,
+    projectId,
+    characters,
+    onUpdateScenes,
+    onEnsurePersisted,
+    language,
+  });
   const TIPS_KEY = 'video-composer-storyboard-tips-collapsed';
   const [tipsCollapsed, setTipsCollapsed] = useState<boolean>(() => {
     try { return localStorage.getItem(TIPS_KEY) === '1'; } catch { return false; }
@@ -412,13 +432,35 @@ export default function StoryboardTab({
           >
             <Mic className="h-3.5 w-3.5" /> Talking-Head
           </Button>
+          {/* Status-Chip + Master-Generate-Button (ersetzt den alten "→ Clips" Tab-Wechsel) */}
+          {scenes.length > 0 && (
+            <div className="flex items-center gap-1.5 rounded-full border border-border/40 bg-background/50 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+              {allReady ? (
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+              ) : generatingCount > 0 ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              ) : null}
+              <span className="tabular-nums">
+                {readyCount}/{scenes.length} Clips
+                {generatingCount > 0 ? ` · ${generatingCount} läuft` : ''}
+              </span>
+            </div>
+          )}
           <Button
             size="sm"
-            onClick={onGoToClips}
-            disabled={scenes.length === 0}
+            onClick={generateAll}
+            disabled={isGeneratingAll || scenes.length === 0 || pendingScenes.length === 0}
             className="gap-1 text-xs"
+            title="Alle ausstehenden KI-Clips parallel generieren"
           >
-            Clips generieren <ArrowRight className="h-3.5 w-3.5" />
+            {isGeneratingAll ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Play className="h-3.5 w-3.5" />
+            )}
+            {pendingScenes.length === 0
+              ? 'Alle Clips bereit'
+              : `Alle generieren (${pendingScenes.length} · €${remainingCost.toFixed(2)})`}
           </Button>
         </div>
       </div>
