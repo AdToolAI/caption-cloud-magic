@@ -171,8 +171,11 @@ export default function VideoComposerDashboard() {
     return loadDraft() || defaultProject;
   });
   const [activeTab, setActiveTab] = useState<TabId>(() => {
+    // Stage 19: Clips-Tab ist konsolidiert ins Storyboard — alte Deep-Links umleiten.
+    if (urlTab === 'clips') return 'storyboard';
     if (urlTab && TAB_ORDER.includes(urlTab)) return urlTab;
-    return restoreActiveTab();
+    const restored = restoreActiveTab();
+    return restored === 'clips' ? 'storyboard' : restored;
   });
   const [error, setError] = useState<string | null>(null);
   const [isPersisting, setIsPersisting] = useState(false);
@@ -532,7 +535,7 @@ export default function VideoComposerDashboard() {
       if (project.adMeta) {
         persistAdMeta(result.projectId, project.adMeta).catch(() => {});
       }
-      setActiveTab('clips');
+      setActiveTab('storyboard');
     } catch (err: any) {
       console.error('[VideoComposerDashboard] persist failed:', err);
       const msg = err?.message || 'Projekt konnte nicht gespeichert werden';
@@ -671,7 +674,8 @@ export default function VideoComposerDashboard() {
   const TABS = [
     { id: 'briefing' as TabId, label: t('videoComposer.briefing'), icon: FileText },
     { id: 'storyboard' as TabId, label: t('videoComposer.storyboard'), icon: LayoutGrid },
-    { id: 'clips' as TabId, label: t('videoComposer.clips'), icon: Film },
+    // Stage 19: 'clips' tab removed from visible navigation — clip generation
+    // happens inline inside the Storyboard tiles via "Alle generieren".
     { id: 'text' as TabId, label: t('videoComposer.voiceSubtitles'), icon: Mic },
     { id: 'audio' as TabId, label: t('videoComposer.music'), icon: Music },
     { id: 'export' as TabId, label: t('videoComposer.export'), icon: Download },
@@ -719,16 +723,14 @@ export default function VideoComposerDashboard() {
     campaign: 'Cutdowns & A/B-Varianten',
   };
 
-  // User-visible workflow steps — Stage 18 hides the technical "Clips" step
-  // because clip generation now happens inline inside the Storyboard player tiles.
-  const STEPS: TopStepperStep[] = TABS
-    .filter((tab) => tab.id !== 'clips')
-    .map((t) => ({
-      id: t.id,
-      label: t.label,
-      hint: STEP_HINTS[t.id],
-      icon: t.icon,
-    }));
+  // User-visible workflow steps — Stage 19: Clips-Step ist komplett entfernt,
+  // Clip-Generation läuft inline im Storyboard.
+  const STEPS: TopStepperStep[] = TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    hint: STEP_HINTS[t.id],
+    icon: t.icon,
+  }));
 
   useEffect(() => {
     saveDraft(project);
@@ -1449,7 +1451,7 @@ export default function VideoComposerDashboard() {
           clearDraft();
           setProject({ ...defaultProject, id: newProjectId });
           lastSyncedProjectIdRef.current = null; // re-arm hydration for new id
-          setActiveTab('clips');
+          setActiveTab('storyboard');
         }}
       />
 
