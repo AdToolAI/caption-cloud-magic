@@ -164,7 +164,7 @@ export function usePipelineProgress({
 
   const clipsReal = useMemo(() => {
     const b = baselineRef.current;
-    if (aiScenes.length === 0) return { progress: 0, running: false, done: false };
+    if (aiScenes.length === 0) return { progress: 0, running: false, done: false, failed: false };
     const ready = aiScenes.filter((s) => s.clipStatus === 'ready').length;
     const generating = aiScenes.filter((s) => s.clipStatus === 'generating').length;
     const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
@@ -178,6 +178,7 @@ export function usePipelineProgress({
       progress,
       running: generating > 0,
       done: progress >= 1 && generating === 0 && failed === 0,
+      failed: failed > 0 && generating === 0,
     };
   }, [aiScenes]);
 
@@ -268,6 +269,18 @@ export function usePipelineProgress({
     musicReal.running, exportReal.running,
   ]);
 
+  useEffect(() => {
+    setEventFlags((prev) => {
+      const next = { ...prev };
+      if (prev.clips && (clipsReal.done || clipsReal.failed)) next.clips = false;
+      if (prev.voiceover && voiceoverReal.done) next.voiceover = false;
+      if (prev.lipsync && (lipsyncReal.done || lipsyncReal.failed)) next.lipsync = false;
+      if (prev.music && musicReal.done) next.music = false;
+      if (prev.export && exportReal.done) next.export = false;
+      return next;
+    });
+  }, [clipsReal.done, clipsReal.failed, voiceoverReal.done, lipsyncReal.done, lipsyncReal.failed, musicReal.done, exportReal.done]);
+
   const phases: PipelinePhaseState[] = useMemo(() => {
     const list: { id: PipelinePhaseId; real: { progress: number; running: boolean; done: boolean; applicable?: boolean; failed?: boolean } }[] = [
       { id: 'clips', real: { ...clipsReal, applicable: true } },
@@ -357,9 +370,10 @@ export function usePipelineProgress({
     : 0;
   const hasFailure = phases.some((p) => p.status === 'failed');
   const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
-  const currentOverall = allDone ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
+  const completedCleanly = !isActive && !hasFailure && phases.some((p) => p.status === 'done');
+  const currentOverall = allDone || completedCleanly ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
   runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
-  const overallPercent = Math.round(allDone ? 100 : Math.min(99, runFloorRef.current));
+  const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
 
   return {
     phases,
