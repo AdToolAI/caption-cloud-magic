@@ -59,9 +59,36 @@ export default function SceneInlinePlayer({
     scene.lockReferenceUrl ||
     undefined;
   const status = scene.clipStatus;
-  const isReady = status === 'ready' && !!clipUrl;
-  const isFailed = status === 'failed';
-  const isWorking = isGenerating || status === 'generating';
+
+  // Pipeline-Vollständigkeit: Bei Cinematic-Sync/Dialog-/Talking-Head-Szenen
+  // ist der Clip erst dann "wirklich fertig", wenn auch der Lip-Sync sauber
+  // durchgelaufen ist. Sonst zeigen wir keinen grünen Haken.
+  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const needsLipsync =
+    scene.engineOverride === 'cinematic-sync' ||
+    !!(scene as any).twoshotStage ||
+    dialogVoiceCount > 1;
+  const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
+  const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
+  const lipsyncDone =
+    !needsLipsync ||
+    lipSyncStatus === 'done' ||
+    lipSyncStatus === 'ready' ||
+    lipSyncStatus === 'no_voiceover' ||
+    twoshotStage === 'done' ||
+    twoshotStage === 'complete';
+  const lipsyncFailed = lipSyncStatus === 'failed' || twoshotStage === 'failed';
+  const lipsyncRunning =
+    needsLipsync &&
+    !lipsyncDone &&
+    !lipsyncFailed &&
+    (lipSyncStatus === 'running' ||
+      (twoshotStage && twoshotStage !== 'failed') ||
+      status === 'ready'); // clip ready, lip-sync still pending
+
+  const isReady = status === 'ready' && !!clipUrl && lipsyncDone && !lipsyncFailed;
+  const isFailed = status === 'failed' || lipsyncFailed;
+  const isWorking = isGenerating || status === 'generating' || lipsyncRunning;
 
   const handleMouseEnter = () => {
     setHovering(true);
