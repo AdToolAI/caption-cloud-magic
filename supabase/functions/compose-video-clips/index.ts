@@ -21,8 +21,10 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { countFacesInImage } from "../_shared/face-count.ts";
+import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+
+const ANCHOR_AUDIT_VERSION = 2;
 
 
 const corsHeaders = {
