@@ -711,9 +711,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       ? true
       : renderAsSeparateScenes;
 
-    emitPipelineEvent({ type: 'voiceover:start' });
-    if (useProfessionalSrs) emitPipelineEvent({ type: 'lipsync:start' });
-
     if (blocks.length < 2 || !useProfessionalSrs) {
       await handleGenerateInline();
       return;
