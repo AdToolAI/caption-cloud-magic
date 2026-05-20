@@ -475,6 +475,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       }
     } catch (_) { /* noop — non-fatal */ }
     setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
     let okCount = 0;
     let cumulativeOffset = 0;
     const timedBlocks: typeof blocks = [];
@@ -636,6 +637,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         variant: 'destructive',
       });
     } finally {
+      emitPipelineEvent({ type: 'voiceover:end' });
       setGenerating(false);
     }
   };
@@ -758,6 +760,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       return;
     }
     setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
+    emitPipelineEvent({ type: 'lipsync:start' });
     let okCount = 0;
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
@@ -1053,6 +1057,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         variant: 'destructive',
       });
     } finally {
+      emitPipelineEvent({ type: 'voiceover:end' });
+      emitPipelineEvent({ type: 'lipsync:end' });
       setGenerating(false);
       setGenStage(null);
     }
