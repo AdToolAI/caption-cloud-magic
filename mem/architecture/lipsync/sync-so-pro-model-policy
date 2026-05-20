@@ -5,10 +5,10 @@ type: feature
 ---
 
 **Two-Shot Segments-API (Mai 2026, gehärtet):**
-- `compose-twoshot-lipsync` sendet einen **einzigen** Sync.so-Job pro Szene mit `model: "sync-3"`.
+- `compose-twoshot-lipsync` sendet einen **einzigen** Sync.so-Job pro Szene: primär `model: "sync-3"`, bei Sync.so-Fehler `segments configuration is invalid` automatischer Retry mit `model: "lipsync-2"`.
 - `input` = `[video, audio(refId='vo_merged')]` mit der gemergten WAV (`audio_plan.twoshot.url`) als einziger Audio-Referenz.
-- `segments[]` = 1 Segment pro Dialog-Turn mit `startTime`/`endTime` auf der Video-Timeline + `audioInput.refId='vo_merged'` + `audioInput.startTime/endTime` als Crop in den gemergten Track. Sync.so wählt das sprechende Gesicht pro Segment intern aus dem Audio-Signal.
-- `options.sync_mode: "remap"` (Sync.so-Default für segmentierte Generations).
+- `segments[]` = normalisierte, sortierte, überlappungsfreie Segmente mit `startTime`/`endTime` auf der Video-Timeline + `audioInput.refId='vo_merged'` + `audioInput.startTime/endTime` als Crop in den gemergten Track. Der erste Start wird auf `0.001` gesetzt, Tail-Silence bis zur sicheren Audio-/Video-Grenze wird ergänzt.
+- `options.sync_mode: "remap"` (Sync.so-Default für segmentierte Generations). `bodyMeta` speichert Modell, Segmente, Ref-Key und Provider-Response für Debugging.
 - Verworfen wurde der frühere Ansatz mit N per-speaker padded tracks + Crops in diese (Sync.so antwortete mit `The segments configuration is invalid.`) sowie die sequenzielle 2-Pass-Strategie (`generation_pipeline_failed` auf stillen AI-Videos).
 - Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert (kein Raten beim Debuggen).
 
