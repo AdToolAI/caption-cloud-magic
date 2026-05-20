@@ -19,6 +19,8 @@ import StoryboardScenePlayerList from './StoryboardScenePlayerList';
 import SceneStyleMode from './SceneStyleMode';
 import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
+import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
+import { Play, CheckCircle2 } from 'lucide-react';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
   hook: 'Hook',
