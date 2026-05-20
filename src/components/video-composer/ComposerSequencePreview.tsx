@@ -1078,7 +1078,10 @@ export default function ComposerSequencePreview({
                 /^lipsync_pass_\d+_failed/.test(err) ||
                 err.startsWith('auto-retry:');
               const friendly =
-                err.startsWith('anchor_identity_clone_detected') ? 'Charakter wurde geklont — bitte „Clip + Lip-Sync neu rendern" klicken'
+                err.startsWith('anchor_identity_clone_detected') || err.startsWith('anchor_identity_duplicate_detected') ? 'Charakter wurde doppelt erkannt — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('anchor_extra_person_detected') ? 'Anchor enthält eine zusätzliche Person — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('anchor_identity_missing_detected') ? 'Ein Charakter fehlt im Anchor — bitte „Clip + Lip-Sync neu rendern" klicken'
+                : err.startsWith('anchor_identity_ambiguous') ? 'Anchor-Identitäten unklar — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('anchor_missing_speakers') ? 'Anchor zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('source_clip_missing_speakers') ? 'Video zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('syncso_') ? `Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken`
