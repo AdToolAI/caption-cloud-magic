@@ -46,7 +46,7 @@ export default function MotionStudioTopStepper({
       )}
       aria-label="Workflow steps"
     >
-      <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 overflow-x-auto no-scrollbar">
+      <div className="max-w-7xl mx-auto flex items-center gap-2 sm:gap-3 overflow-x-auto overflow-y-hidden no-scrollbar">
         {steps.map((step, i) => {
           const Icon = step.icon;
           const done = isStepDone(step.id);
