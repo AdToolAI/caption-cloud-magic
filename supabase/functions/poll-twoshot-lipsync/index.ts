@@ -220,7 +220,7 @@ serve(async (req) => {
     }
 
     if (["FAILED", "REJECTED", "CANCELED"].includes(polled.status)) {
-      const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", sceneId).single();
+      const latest = await supabase.from("composer_scenes").select("audio_plan, clip_url, lip_sync_source_clip_url").eq("id", sceneId).single();
       const latestPlan = (latest.data?.audio_plan ?? plan) as Record<string, any>;
       const latestTwoshot = (latestPlan.twoshot ?? {}) as Record<string, any>;
       const latestSyncJobs = (latestTwoshot.syncJobs ?? syncJobs) as Record<string, any>;
@@ -232,36 +232,33 @@ serve(async (req) => {
       }
 
       // ── Auto-retry transient provider failures ────────────────────────
-      // Sync.so sporadically returns generic "generation pipeline" errors
-      // that succeed on retry. Re-submit the SAME pass up to MAX_RETRIES
-      // times before declaring a real failure. Credits stay reserved.
+      // First two retries: resubmit same pass (Sync.so often succeeds on retry).
+      // Third strategy: switch from point-coordinates to bounding_boxes mode
+      //   (Sync.so docs: more robust when own face detection is available).
+      // Fourth strategy: full-scene auto-detect single-pass fallback using the
+      //   merged dialogue track — sacrifices per-face targeting but always
+      //   produces *some* lipsynced output, avoiding a 95% UI hang.
       const TRANSIENT_REGEX = /(generation pipeline|internal|timeout|temporarily|rate.?limit|503|502|504)/i;
       const MAX_RETRIES = 2;
       const retryAttempts = Number(latestCurrentJob?.retryAttempts ?? 0);
       const errMsg = String(polled.error ?? polled.status);
       const isTransient = TRANSIENT_REGEX.test(errMsg);
+      const fallbackTried = !!latestSyncJobs.fallbackTried;
+      const fallbackMode = String(latestSyncJobs.fallbackMode ?? "");
 
-      if (isTransient && retryAttempts < MAX_RETRIES && latestCurrentJob) {
+      // Phase A: simple retry (same input) up to MAX_RETRIES
+      if (isTransient && retryAttempts < MAX_RETRIES && latestCurrentJob && !fallbackMode) {
         try {
-          // 5s backoff for first retry, 15s for second
           await new Promise((r) => setTimeout(r, retryAttempts === 0 ? 5_000 : 15_000));
           const newJobId = await startSyncJob(syncApiKey, {
             videoUrl: String(latestCurrentJob.videoUrl),
             audioUrl: String(latestCurrentJob.audioUrl),
             targetCoords: Array.isArray(latestCurrentJob.targetCoords) ? latestCurrentJob.targetCoords as [number, number] : null,
+            faceBbox: Array.isArray(latestCurrentJob.faceBbox) && latestCurrentJob.faceBbox.length === 4 ? latestCurrentJob.faceBbox as [number, number, number, number] : null,
           });
           const patchedJobs = latestJobs.map((j: any) =>
             j.jobId === jobId
-              ? {
-                  ...j,
-                  jobId: newJobId,
-                  status: "PROCESSING",
-                  startedAt: now,
-                  retryAttempts: retryAttempts + 1,
-                  previousJobId: jobId,
-                  previousFailedAt: now,
-                  previousError: errMsg.slice(0, 400),
-                }
+              ? { ...j, jobId: newJobId, status: "PROCESSING", startedAt: now, retryAttempts: retryAttempts + 1, previousJobId: jobId, previousFailedAt: now, previousError: errMsg.slice(0, 400) }
               : j,
           );
           await supabase.from("composer_scenes").update({
@@ -272,31 +269,74 @@ serve(async (req) => {
               ...latestPlan,
               twoshot: {
                 ...latestTwoshot,
-                syncJobs: {
-                  ...latestSyncJobs,
-                  jobs: patchedJobs,
-                  lastTransientError: errMsg.slice(0, 400),
-                  lastTransientAt: now,
-                  retryCount: Number(latestSyncJobs.retryCount ?? 0) + 1,
-                },
-                heartbeat: {
-                  ...(latestTwoshot.heartbeat ?? {}),
-                  pass: currentPass,
-                  total_passes: totalPasses,
-                  syncJobId: newJobId,
-                  retriedAt: now,
-                  retryAttempts: retryAttempts + 1,
-                },
+                syncJobs: { ...latestSyncJobs, jobs: patchedJobs, lastTransientError: errMsg.slice(0, 400), lastTransientAt: now, retryCount: Number(latestSyncJobs.retryCount ?? 0) + 1 },
+                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: currentPass, total_passes: totalPasses, syncJobId: newJobId, retriedAt: now, retryAttempts: retryAttempts + 1 },
               },
             },
           }).eq("id", sceneId);
           return json({ ok: true, status: "RETRIED", scene_id: sceneId, pass: currentPass, jobId: newJobId, retryAttempts: retryAttempts + 1 });
         } catch (retryErr) {
-          // Fall through to real failure below
           console.warn(`[poll-twoshot-lipsync ${sceneId}] retry submit failed`, (retryErr as Error).message);
         }
       }
 
+      // Phase B: switch to auto-detect single-pass fallback on the *original*
+      // source video using the merged dialogue track. This bypasses the
+      // per-face two-pass path entirely — if Sync.so consistently refuses the
+      // face-targeted submit, it usually accepts an auto-detect request.
+      const sourceVideoUrl: string | null =
+        latestSyncJobs.sourceVideoUrl
+        || latest.data?.lip_sync_source_clip_url
+        || latest.data?.clip_url
+        || null;
+      const mergedAudioUrl: string | null = latestSyncJobs.mergedAudioUrl || latestTwoshot.url || null;
+
+      if (!fallbackTried && !fallbackMode && sourceVideoUrl && mergedAudioUrl) {
+        try {
+          const newJobId = await startSyncJob(syncApiKey, {
+            videoUrl: sourceVideoUrl,
+            audioUrl: mergedAudioUrl,
+            autoDetect: true,
+          });
+          const newJob = {
+            pass: 1,
+            jobId: newJobId,
+            status: "PROCESSING",
+            videoUrl: sourceVideoUrl,
+            audioUrl: mergedAudioUrl,
+            mode: "auto_detect_single_pass",
+            startedAt: now,
+            fallback: true,
+          };
+          await supabase.from("composer_scenes").update({
+            replicate_prediction_id: `sync:${newJobId}`,
+            twoshot_stage: "lipsync_fallback",
+            clip_error: `auto-retry: sync.so two-pass refused — switching to auto-detect single-pass fallback`,
+            updated_at: now,
+            audio_plan: {
+              ...latestPlan,
+              twoshot: {
+                ...latestTwoshot,
+                syncJobs: {
+                  ...latestSyncJobs,
+                  fallbackTried: true,
+                  fallbackMode: "auto_detect_single_pass",
+                  fallbackStartedAt: now,
+                  currentPass: 1,
+                  totalPasses: 1,
+                  jobs: [...latestJobs, newJob],
+                },
+                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: 1, total_passes: 1, syncJobId: newJobId, fallback: true, fallbackStartedAt: now },
+              },
+            },
+          }).eq("id", sceneId);
+          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: newJobId, mode: "auto_detect_single_pass" });
+        } catch (fbErr) {
+          console.warn(`[poll-twoshot-lipsync ${sceneId}] fallback submit failed`, (fbErr as Error).message);
+        }
+      }
+
+      // Phase C: out of options. Refund + mark failed with a user-actionable reason.
       if (!latestSyncJobs.refunded) {
         const cost = Number(latestSyncJobs.costCredits ?? 0);
         if (cost > 0) {
@@ -306,14 +346,17 @@ serve(async (req) => {
           }
         }
       }
+      const finalReason = fallbackMode
+        ? `source_clip_unusable: Sync.so refused both face-targeted and auto-detect passes (${errMsg.slice(0, 200)}). Bitte den Quellclip neu rendern.`
+        : `syncso_failed: ${(polled.error || "unknown").slice(0, 320)}${retryAttempts > 0 ? ` (after ${retryAttempts} retries)` : ""}`;
       await supabase.from("composer_scenes").update({
         lip_sync_status: "failed",
         twoshot_stage: "failed",
-        clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}${retryAttempts > 0 ? ` (after ${retryAttempts} retries)` : ""}`,
+        clip_error: finalReason,
         updated_at: now,
         audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: latestJobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
       }).eq("id", sceneId);
-      return json({ ok: false, status: polled.status, error: polled.error ?? polled.status, retried: retryAttempts }, 200);
+      return json({ ok: false, status: polled.status, error: polled.error ?? polled.status, retried: retryAttempts, fallbackTried }, 200);
     }
 
 
