@@ -486,13 +486,14 @@ serve(async (req) => {
       try {
         const { data: dbRow } = await supabaseAdmin
           .from('composer_scenes')
-          .select('cinematic_preset_slug, clip_status, clip_url, character_audio_url')
+          .select('cinematic_preset_slug, engine_override, clip_status, clip_url, character_audio_url')
           .eq('id', scene.id)
           .maybeSingle();
         const slug = (dbRow as any)?.cinematic_preset_slug as string | null;
+        const dbEngine = (dbRow as any)?.engine_override as string | null;
         const status = (dbRow as any)?.clip_status as string | null;
         const hasAudio = !!(dbRow as any)?.character_audio_url;
-        if (slug && slug.startsWith('dialog-srs:') && (hasAudio || status === 'generating' || status === 'ready')) {
+        if (dbEngine !== 'cinematic-sync' && slug && slug.startsWith('dialog-srs:') && (hasAudio || status === 'generating' || status === 'ready')) {
           console.log(`[compose-video-clips] Skipping SRS lip-sync sub-scene ${scene.id} (slug=${slug}, status=${status})`);
           results.push({ sceneId: scene.id, status: status === 'ready' ? 'ready' : 'generating' });
           continue;
