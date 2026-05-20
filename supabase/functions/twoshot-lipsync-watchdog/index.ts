@@ -207,9 +207,8 @@ serve(async (req) => {
         ageMs > STALE_RESET_REINVOKE_MS
       ) {
         try {
-          await supabase.functions.invoke("compose-twoshot-lipsync", {
-            body: { scene_id: s.id },
-          });
+          await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
+
           summary.reinvoked++;
         } catch (e) {
           summary.errors.push(`reinvoke ${s.id}: ${(e as Error).message}`);
