@@ -280,32 +280,39 @@ async function startSyncSoSegmentsJob(
   syncApiKey: string,
   params: {
     videoUrl: string;
-    speakers: Array<{ refId: string; audioUrl: string }>;
-    segments: Array<{ startSec: number; endSec: number; refId: string; cropStart?: number; cropEnd?: number }>;
+    /** Single merged voiceover WAV (full scene timeline). */
+    mergedAudioUrl: string;
+    /** Dialogue turns mapped onto video timeline. Each turn → 1 segment with
+     *  audioInput.refId of the merged track + crop matching the turn timestamps.
+     *  This mirrors the Sync.so "Multiple Segments with Single Audio Input"
+     *  example from https://sync.so/docs/developer-guides/segments . */
+    segments: Array<{ startSec: number; endSec: number }>;
     model?: string;
   },
   label: string,
-): Promise<string> {
+): Promise<{ jobId: string; bodyMeta: Record<string, unknown> }> {
+  const REF = "vo_merged";
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
-    ...params.speakers.map((s) => ({ type: "audio", url: s.audioUrl, refId: s.refId })),
+    { type: "audio", url: params.mergedAudioUrl, refId: REF },
   ];
-  const segments = params.segments.map((s) => {
-    const audioInput: Record<string, unknown> = { refId: s.refId };
-    if (typeof s.cropStart === "number" && typeof s.cropEnd === "number") {
-      audioInput.startTime = s.cropStart;
-      audioInput.endTime = s.cropEnd;
-    }
-    return { startTime: s.startSec, endTime: s.endSec, audioInput };
-  });
+  const segments = params.segments.map((s) => ({
+    startTime: Math.max(0, Number(s.startSec.toFixed(3))),
+    endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
+    audioInput: {
+      refId: REF,
+      startTime: Math.max(0, Number(s.startSec.toFixed(3))),
+      endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
+    },
+  }));
   const body = {
-    model: params.model ?? "lipsync-2-pro",
+    model: params.model ?? "sync-3",
     input: inputArr,
     segments,
     options: {
-      sync_mode: "cut_off",
+      // Segmented generations default to `remap` per Sync.so docs (recommended).
+      sync_mode: "remap",
       output_format: "mp4",
-      temperature: 0.5,
     },
   };
   const resp = await fetch("https://api.sync.so/v2/generate", {
@@ -319,7 +326,15 @@ async function startSyncSoSegmentsJob(
   }
   const data = await resp.json();
   if (!data?.id) throw new Error(`${label}_missing_job_id: ${JSON.stringify(data).slice(0, 240)}`);
-  return String(data.id);
+  return {
+    jobId: String(data.id),
+    bodyMeta: {
+      model: body.model,
+      segments_count: segments.length,
+      sync_mode: body.options.sync_mode,
+      merged_audio_url: params.mergedAudioUrl,
+    },
+  };
 }
 
 /**
@@ -861,47 +876,34 @@ serve(async (req) => {
       let outUrl: string | null = null;
 
       if (useMultiPass) {
-        // ── Sync.so Segments API — ONE job, multi-speaker ──────────────
-        // The previous sequential 2-pass strategy kept failing with
-        // `generation_pipeline_failed` on stiller AI two-shots because each
-        // pass fed Sync.so an 8s clip with one near-silent voice track.
-        // Sync.so's documented multi-speaker path is the Segments API:
-        // one video + per-speaker audio refs + a segments[] array mapping
-        // each dialog turn (video time range) to the right speaker ref.
-        // Sync.so picks the speaking face per segment internally.
+        // ── Sync.so Segments API — ONE job, single merged-audio reference ──
+        // Matches the documented "Multiple Segments with Single Audio Input"
+        // pattern (https://sync.so/docs/developer-guides/segments).
+        //
+        // We pass ONE audio input (the full merged 8s WAV) and one segment
+        // per dialogue turn. Each segment crops the merged audio to the turn
+        // window — Sync.so internally selects the speaking face per segment
+        // from the audio signal. No per-speaker tracks, no manual coordinates.
+        //
+        // The previous payload sent N per-speaker padded tracks PLUS
+        // audioInput crops into those padded tracks, which Sync.so rejected
+        // as "The segments configuration is invalid".
         const turns = Array.isArray((scene as any).audio_plan?.twoshot?.segments)
           ? ((scene as any).audio_plan.twoshot.segments as Array<any>)
           : [];
-        const speakerRefMap = new Map<string, { refId: string; audioUrl: string; speaker: string; character_id: string | null }>();
-        for (let i = 0; i < passes.length; i++) {
-          const pass = passes[i];
-          const key = String(pass.character_id || pass.speaker_slug || pass.speaker || `spk${i}`).toLowerCase();
-          const refId = `spk_${i}`;
-          speakerRefMap.set(key, {
-            refId,
-            audioUrl: pass.track_url,
-            speaker: pass.speaker,
-            character_id: pass.character_id ?? null,
-          });
-        }
-        const segmentsPayload: Array<{ startSec: number; endSec: number; refId: string; cropStart: number; cropEnd: number }> = [];
+        const sceneDurForClamp = Math.max(0.1, Number((scene as any).duration_seconds) || voDuration || 8);
+        const segmentsPayload: Array<{ startSec: number; endSec: number }> = [];
         for (const t of turns) {
-          const tKey = String(t.character_id || t.speaker_slug || t.speaker || "").toLowerCase();
-          const ref = speakerRefMap.get(tKey) ?? speakerRefMap.get(tKey.split("-")[0]);
-          if (!ref) continue;
           const s = Number(t.startSec);
           const e = Number(t.endSec);
           if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
           segmentsPayload.push({
-            startSec: Math.max(0, s),
-            endSec: Math.max(s + 0.05, e),
-            refId: ref.refId,
-            cropStart: Math.max(0, s),
-            cropEnd: Math.max(s + 0.05, e),
+            startSec: Math.max(0, Math.min(sceneDurForClamp, s)),
+            endSec: Math.max(s + 0.05, Math.min(sceneDurForClamp, e)),
           });
         }
-        if (segmentsPayload.length === 0 || speakerRefMap.size === 0) {
-          await refund(`segments_build_failed: turns=${turns.length} speakers=${speakerRefMap.size}`);
+        if (segmentsPayload.length === 0) {
+          await refund(`segments_build_failed: turns=${turns.length}`);
           return;
         }
 
@@ -919,7 +921,6 @@ serve(async (req) => {
                 mode: "segments",
                 started_at: startedAt,
                 segments_count: segmentsPayload.length,
-                speakers_count: speakerRefMap.size,
               },
             },
           },
@@ -931,19 +932,46 @@ serve(async (req) => {
         }
 
         let jobId: string;
+        let bodyMeta: Record<string, unknown> = {};
         try {
-          jobId = await startSyncSoSegmentsJob(
+          const result = await startSyncSoSegmentsJob(
             SYNC_API_KEY!,
             {
               videoUrl: sourceClipUrl,
-              speakers: Array.from(speakerRefMap.values()).map((s) => ({ refId: s.refId, audioUrl: s.audioUrl })),
+              mergedAudioUrl: mergedVo.url,
               segments: segmentsPayload,
-              model: "lipsync-2-pro",
+              model: "sync-3",
             },
             "lipsync_segments",
           );
+          jobId = result.jobId;
+          bodyMeta = result.bodyMeta;
         } catch (e) {
-          await refund(`lipsync_segments_failed: ${(e as Error).message}`);
+          // Persist the provider error verbatim so we don't have to guess on retry.
+          const errMsg = (e as Error).message;
+          const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
+          const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
+          const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
+          await supabase.from("composer_scenes").update({
+            audio_plan: {
+              ...latestPlan,
+              twoshot: {
+                ...latestTwoshot,
+                syncJobs: {
+                  ...(latestTwoshot.syncJobs ?? {}),
+                  provider: "sync.so",
+                  mode: "segments",
+                  lastError: errMsg.slice(0, 500),
+                  lastErrorAt: new Date().toISOString(),
+                  attemptedModel: "sync-3",
+                  attemptedSegments: segmentsPayload.length,
+                  mergedAudioUrl: mergedVo.url,
+                  sourceVideoUrl: sourceClipUrl,
+                },
+              },
+            },
+          }).eq("id", scene_id);
+          await refund(`lipsync_segments_failed: ${errMsg}`);
           return;
         }
 
@@ -961,11 +989,11 @@ serve(async (req) => {
                 sourceVideoUrl: sourceClipUrl,
                 mergedAudioUrl: mergedVo.url,
                 costCredits: cost,
+                bodyMeta,
                 jobs: [{
                   jobId,
                   status: "PROCESSING",
                   videoUrl: sourceClipUrl,
-                  speakers: Array.from(speakerRefMap.values()),
                   segments: segmentsPayload,
                   startedAt,
                 }],
@@ -974,7 +1002,6 @@ serve(async (req) => {
                 mode: "segments",
                 started_at: startedAt,
                 segments_count: segmentsPayload.length,
-                speakers_count: speakerRefMap.size,
                 syncJobId: jobId,
               },
             },
@@ -982,7 +1009,7 @@ serve(async (req) => {
         });
         console.log(
           `[compose-twoshot-lipsync ${scene_id}] segments job queued on Sync.so`,
-          { jobId, segments: segmentsPayload.length, speakers: speakerRefMap.size },
+          { jobId, segments: segmentsPayload.length, model: "sync-3" },
         );
         return;
       } else {

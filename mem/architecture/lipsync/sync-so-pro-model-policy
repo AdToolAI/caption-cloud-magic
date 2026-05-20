@@ -1,51 +1,27 @@
 ---
 name: Lipsync Pro Policy
-description: Sync.so lipsync-2-pro policy, sample-accurate PCM/WAV audio pipeline, two-shot padding, cut_off sync_mode, preview muting rules
+description: Sync.so two-shot lip-sync — Segments API with single merged audio + sync-3 model, sample-accurate PCM/WAV pipeline, idempotent refunds
 type: feature
 ---
-Alle 3 Lipsync-Edge-Functions (compose-lipsync-scene, compose-twoshot-lipsync, lip-sync-video) nutzen `sync/lipsync-2-pro` mit `temperature:0.5`, `active_speaker:true`, `output_format:'mp4'`; COST 14 (single) / 28 (two-shot); MIN_VO_DURATION 0.4s; Artlist-Parität, kein Face-Morph.
 
-**Pre-Flight Anchor Face-Audit (Mai 2026):** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert das Ergebnis via `_shared/face-count.ts` (Gemini 2.5 Flash). Bei `faces < expectedFaces` wird der Cache invalidiert und genau 1× neu komponiert. Wenn auch der Retry zu wenig Gesichter zeigt → Szene wird mit `clip_error='anchor_missing_speakers: N/M …'` abgebrochen BEVOR Hailuo Credits brennt. compose-scene-anchor enthält ab v6 `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces) + Negativ-Prompt gegen Solo-Close-ups.
+**Two-Shot Segments-API (Mai 2026, gehärtet):**
+- `compose-twoshot-lipsync` sendet einen **einzigen** Sync.so-Job pro Szene mit `model: "sync-3"`.
+- `input` = `[video, audio(refId='vo_merged')]` mit der gemergten WAV (`audio_plan.twoshot.url`) als einziger Audio-Referenz.
+- `segments[]` = 1 Segment pro Dialog-Turn mit `startTime`/`endTime` auf der Video-Timeline + `audioInput.refId='vo_merged'` + `audioInput.startTime/endTime` als Crop in den gemergten Track. Sync.so wählt das sprechende Gesicht pro Segment intern aus dem Audio-Signal.
+- `options.sync_mode: "remap"` (Sync.so-Default für segmentierte Generations).
+- Verworfen wurde der frühere Ansatz mit N per-speaker padded tracks + Crops in diese (Sync.so antwortete mit `The segments configuration is invalid.`) sowie die sequenzielle 2-Pass-Strategie (`generation_pipeline_failed` auf stillen AI-Videos).
+- Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert (kein Raten beim Debuggen).
 
-**No-Silent-Fallback (Mai 2026):** Wenn `compose-twoshot-lipsync` 2+ Sprecher hat, aber im fertigen Clip <2 Gesichter findet, **failt es laut** mit `clip_error='source_clip_missing_speakers: …'` und refundet Credits — kein single-pass merged-VO Fallback mehr (das war die Quelle für "beide Stimmen kommen aus einem Mund"). Der User triggert dann **"🎥 Clip + Lip-Sync neu rendern"** in `SceneCard` (clears reference_image_url/clip_url/lip_sync_*, re-invokes compose-video-clips), damit ein echter Two-Shot-Quellclip entsteht.
+**Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert das Ergebnis via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).
 
-**Two-Shot Face-Targeting (Mai 2026, Artlist-Parität, gehärtet):**
-- Sync.so's `face_index`/`speaker`-Felder existieren **nicht** offiziell — werden defensiv mitgesendet, sind aber **nicht** das Primärsignal.
-- Korrektes Targeting via `active_speaker_detection: { auto_detect: false, frame_number: 0, coordinates: [x, y] }`. `active_speaker: false` setzen, sonst überschreibt Auto-Detect.
-- `compose-twoshot-lipsync` ruft einmal pro Szene Gemini Vision (`google/gemini-2.5-flash`) mit einer **Fallback-Kette** auf: (1) Cache (`audio_plan.twoshot.faceMap` mit ≥2 Faces), (2) `scene.reference_image_url` (Anchor-Bild — Composer-Spalte; Fallback `lock_reference_url` für DC-Altdaten), (3) Clip-URL **deaktiviert**, weil Lovable AI Gateway `image_url` keine MP4-URLs decoded (vor Mai 2026 hat das stillschweigend 0 zurückgegeben → False-Positive `source_clip_missing_speakers`). Fix Mai 2026: `askGeminiForFaces`/`countFacesInImage` returnen `null` bei `kind:'video'`, bis echte First-Frame-Extraktion vorgeschaltet ist. Anchor-Spalte ist die einzig zuverlässige Detection-Quelle.
-- Pass-Index → Face: Pass 0 = left, Pass 1 = right (Passes sind nach `character_shots`-Reihenfolge sortiert).
-- Fallback ohne Gemini: Heuristik [W*0.3, H*0.5] / [W*0.7, H*0.5] mit 1280×720 als Default-Dimension.
-- `audio_plan.twoshot.heartbeat.targetFace` + `targetSource` ('gemini'|'heuristic') werden pro Pass geschrieben (UI-Sichtbarkeit). Pass-End wird mit `DONE`-Log inklusive Output-URL gemarkert.
+**No-Silent-Fallback:** Wenn 2+ Sprecher, aber im fertigen Clip <2 Gesichter → `clip_error='source_clip_missing_speakers'` + Refund, kein single-pass merged-VO Fallback (verhindert „beide Stimmen aus einem Mund"). User triggert „🎥 Clip + Lip-Sync neu rendern" in `SceneCard`.
 
-**Export-Audio Two-Shot (Mai 2026):**
-- Der finale Sync.so-Multi-Pass-Clip enthält in seiner eingebetteten Audiospur nur die **letzte** Pass-Stimme — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV).
-- `compose-video-assemble` filtert daher Voiceover-Clips für lip-synced Szenen NUR dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat. Two-Shot-Szenen behalten ihre externe gemischte VO als zusätzliche Tonspur im finalen Mux, sonst hört man im Export nur einen Sprecher.
+**Pricing:** Sync.so Creator $19/mo plan; `ceil(durationSec) × 9 × 2 passes` credits (€0.18/s, ~22% margin); MIN_VO_DURATION 0.4s; idempotent refunds via deterministic UUID.
 
-**No-Burned-In-Text Policy (Mai 2026):**
-- Das Dialogskript (`Name: line`) darf **niemals** als Visual-Prompt an `compose-scene-anchor` oder ein i2v-Modell weitergegeben werden — Nano Banana 2 würde die Sätze als Captions / Shirt-Labels in das First-Frame brennen.
-- `SceneDialogStudio` benutzt ausschließlich `scene.aiPrompt` oder einen neutralen Fallback ("Two-shot conversation…"), nie `dialogScriptText`.
-- `compose-scene-anchor` sanitized den eingehenden `scenePrompt` zusätzlich serverseitig (`stripSpokenDialog`): entfernt `Name:`-Zeilen und Inhalte in Quotes; ergänzt ein hartes `NO_TYPOGRAPHY_SUFFIX`. Cache-Key auf `v5|…` gebumpt.
+**Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier; pcm_44100 wäre Pro-only). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV (`.wav`, `audio/wav`). `scene_audio_clips.metadata.format = 'wav'`.
 
+**No-Burned-In-Text Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben — Nano Banana 2 würde es als Captions in das Frame brennen. `SceneDialogStudio` benutzt nur `scene.aiPrompt` oder neutralen Fallback. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`.
 
+**Export-Audio Two-Shot:** Der finale Sync.so-Clip enthält in seiner eingebetteten Audiospur nur Last-Pass-Stimme — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV). `compose-video-assemble` filtert Voiceover-Clips für lip-synced Szenen nur dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat.
 
-**Sample-Accurate Audio Pipeline (Drift-Fix Mai 2026):**
-- `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching mehr. ElevenLabs liefert `output_format=pcm_24000` (Starter-Tier-kompatibel; `pcm_44100` wäre Pro-only und wirft 403 `output_format_not_allowed`) → linear resampled auf 44.1 kHz; Hume liefert `format.type=wav` → decode + resample auf 44.1 kHz mono.
-- Konkatenation und Stille-Padding sample-genau (≈22 µs Auflösung), kein 26-ms-Frame-Quantisierungsfehler.
-- Merged track wird **hart auf `totalSamples = round(sceneDur * 44100)` getrimmt**, niemals länger.
-- Per-Speaker-Tracks werden aus derselben Sample-Timeline gebaut (`Int16Array(totalSamples)` mit den Samples des Sprechers bei `_startSample`, Rest = 0). Damit ist Sprecher-Position byte-identisch zwischen Merged- und Per-Speaker-Spur → kein Versatz zwischen Lipsync-Output und Playback.
-- Upload als WAV (`.wav`, `audio/wav`). Idempotenz-Check verlangt `.wav`-Suffix, sodass alte MP3-Outputs automatisch einmalig regeneriert werden.
-- `scene_audio_clips.metadata.format = 'wav'`, `sample_rate`, `total_samples`, plus Public-Segments ohne `_startSample`/`_endSample`.
-
-**sync_mode immer `cut_off`:**
-- Da die WAV-Spur exakt scene-lang ist, ist `loop` obsolet und gefährlich (loopt Tail-Silence in nächsten Pass). Beide Funktionen senden hartcodiert `sync_mode: 'cut_off'` an Sync.so.
-
-**Two-Shot Multi-Pass Rules (Stage 2+):**
-- Pro Pass `face_index` + `speaker` an Replicate mitgeben (deterministic face targeting), sonst kollabieren beide Passes auf dasselbe Gesicht.
-- compose-twoshot-audio paddet alle Per-Speaker-Tracks auf `totalSamples = round(sceneDur * 44100)`; wenn `scene.duration_seconds` 0/null ist, Fallback-Kette: `audio_plan.duration` → `audio_plan.targetDuration` → 10s (Hailuo-Default).
-- compose-twoshot-lipsync prüft vor Pass 1 ob `mergedVo.duration < sceneDuration - 0.5` und ruft compose-twoshot-audio mit `force_regenerate: true` neu auf.
-- Nach Erfolg `audio_plan.speakers[*].audioUrl = null` + `mergedInto: 'twoshot'` setzen (verhindert dass useSceneAudioClips virtuelle Per-Speaker-Clips synthetisiert).
-- Alle prior `video_creations` Rows mit `metadata.scene_id = scene_id` werden mit `superseded: true` markiert.
-
-**Preview Mute Policy (ComposerSequencePreview):**
-- Wenn `scene.audioPlan.twoshot.useExternalAudio === true` → Video-Element wird HART gemutet (`el.muted = true`), unabhängig von `mutedRef.current`. Andernfalls plays embedded last-pass audio simultaneously mit merged external track = Echo.
-- Helper `sceneShouldForceMute(scene)` + `resolveVideoMuted(scene)` an allen 5 mute-Stellen (preloadSlot, play-loop, mute-change effect, image-branch transition, crossfade transition).
+**Preview Mute Policy:** `sceneShouldForceMute(scene)` + `resolveVideoMuted(scene)` an allen 5 mute-Stellen in ComposerSequencePreview (preloadSlot, play-loop, mute-change effect, image-branch transition, crossfade transition).
