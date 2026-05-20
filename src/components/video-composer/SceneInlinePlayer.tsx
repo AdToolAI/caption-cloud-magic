@@ -143,7 +143,7 @@ export default function SceneInlinePlayer({
           {isWorking && (
             <span className="px-1.5 py-0.5 rounded-md bg-primary/15 backdrop-blur text-[9px] font-semibold text-primary border border-primary/40 flex items-center gap-1">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              Baut
+              {lipsyncRunning && status === 'ready' ? 'Lip-Sync' : 'Baut'}
             </span>
           )}
           {!isReady && !isWorking && !isFailed && (
