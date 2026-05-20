@@ -142,10 +142,10 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v9 — bumped after Dialog-block stripping (prevents Samuel-twice leak
-    // when a script has the same speaker on multiple lines).
+    // v10 — bumped after Featuring-prefix stripping (prevents wrong-face leak
+    // when a slot label and trailing description name different characters).
     const promptHash = await sha1(
-      `v9|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}`,
+      `v10|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
     );
 
     const { data: cached } = await admin
