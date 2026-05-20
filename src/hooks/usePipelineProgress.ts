@@ -355,11 +355,11 @@ export function usePipelineProgress({
     : 0;
 
   const runSoftPercent = isActive && pipelineStartRef.current
-    ? Math.min(95, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95)
+    ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
     : 0;
   const hasFailure = phases.some((p) => p.status === 'failed');
   const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
-  const currentOverall = allDone ? 100 : hasFailure ? phaseOverall : Math.min(99, Math.max(runSoftPercent, phaseOverall));
+  const currentOverall = allDone ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
   runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
   const overallPercent = Math.round(allDone ? 100 : Math.min(99, runFloorRef.current));
 
