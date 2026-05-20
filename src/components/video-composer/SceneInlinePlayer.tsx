@@ -70,9 +70,10 @@ export default function SceneInlinePlayer({
     dialogVoiceCount > 1;
   const lipSyncStatus = (scene as any).lipSyncStatus as string | null | undefined;
   const twoshotStage = (scene as any).twoshotStage as string | null | undefined;
+  const lipSyncAppliedAt = (scene as any).lipSyncAppliedAt as string | null | undefined;
   const lipsyncDone =
     !needsLipsync ||
-    lipSyncStatus === 'done' ||
+    (lipSyncStatus === 'done' && !!lipSyncAppliedAt) ||
     lipSyncStatus === 'ready' ||
     lipSyncStatus === 'no_voiceover' ||
     twoshotStage === 'done' ||
