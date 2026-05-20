@@ -197,6 +197,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // markers first so the edge function's running-takeover guard sees a
           // clean slate instead of stale 'failed'/twoshot_stage='failed'.
           if (d.lip_sync_status === 'failed') {
+            autoRetried.current.add(d.id); // ensures only one auto-recovery per mount
             await supabase
               .from('composer_scenes')
               .update({
