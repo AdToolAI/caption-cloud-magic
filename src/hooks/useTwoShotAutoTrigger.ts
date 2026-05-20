@@ -135,25 +135,28 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         }
 
         // Recoverable failure reasons we auto-retry exactly once per mount.
-        // (Hard refusals like 'no_voiceover' must NOT be retried — they need
-        // the user to add a VO first.)
+        // (Hard refusals like 'no_voiceover' or 'source_clip_unusable' need
+        // user action — never auto-retry those.)
         const RETRYABLE_ERRORS = new Set([
           'multi_speaker_scene_routed_to_single_lipsync',
           'watchdog_stuck_lipsync_refunded',
         ]);
+        const RETRYABLE_REGEX = /^(lipsync_pass_\d+_failed|syncso_(failed|rejected|canceled)|twoshot_presync_timeout|syncso_poll_timeout)/i;
+        const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS)/i;
 
         const candidates = (data as any[]).filter((d) => {
           if (d.engine_override !== 'cinematic-sync') return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.lip_sync_applied_at) return false;
           if (inflight.current.has(d.id)) return false;
+          if (autoRetried.current.has(d.id)) return false;
           if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
           if (
             d.lip_sync_status === 'failed' &&
             typeof d.clip_error === 'string' &&
-            (RETRYABLE_ERRORS.has(d.clip_error) ||
-              /^lipsync_pass_\d+_failed/.test(d.clip_error))
+            !HARD_FAIL_REGEX.test(d.clip_error) &&
+            (RETRYABLE_ERRORS.has(d.clip_error) || RETRYABLE_REGEX.test(d.clip_error))
           ) {
             return true;
           }
