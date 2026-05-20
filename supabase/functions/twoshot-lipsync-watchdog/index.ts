@@ -154,9 +154,8 @@ serve(async (req) => {
 
         // Still within window → poll for completion
         try {
-          await supabase.functions.invoke("poll-twoshot-lipsync", {
-            body: { scene_id: s.id },
-          });
+          await invokeFn("poll-twoshot-lipsync", { scene_id: s.id });
+
           summary.polled++;
         } catch (e) {
           summary.errors.push(`poll ${s.id}: ${(e as Error).message}`);
