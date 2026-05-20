@@ -37,8 +37,15 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
   const generate = useCallback(
     async (scene: ComposerScene) => {
       if (!scene) return;
+      // ── INSTANT FEEDBACK (0s) ───────────────────────────────────────
+      // Fire BEFORE any slow async (ensureProject, anchor compose, edge
+      // function). The user must see the loading state on the very next
+      // frame after clicking, not 30s later.
       setGenerating((prev) => ({ ...prev, [scene.id]: true }));
       emitPipelineEvent({ type: 'clips:start' });
+      if (scene.clipSource?.startsWith('ai-')) {
+        opts.onOptimisticPatch?.(scene.id, { clipStatus: 'generating' });
+      }
       const previousStatus = scene.clipStatus;
       try {
         let pid = opts.projectId;
@@ -46,17 +53,14 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         if (opts.ensureProject) {
           const persisted = await opts.ensureProject();
           if (!persisted) {
+            opts.onOptimisticPatch?.(scene.id, { clipStatus: previousStatus });
+            emitPipelineEvent({ type: 'clips:end' });
             setGenerating((prev) => ({ ...prev, [scene.id]: false }));
             return;
           }
           pid = persisted.projectId;
-          // After persistence the scene id may have changed — match by orderIndex.
           const dbScene = persisted.scenes.find((s) => s.orderIndex === scene.orderIndex);
           if (dbScene) workingScene = { ...dbScene, ...scene, id: dbScene.id };
-        }
-
-        if (workingScene.clipSource?.startsWith('ai-')) {
-          opts.onOptimisticPatch?.(workingScene.id, { clipStatus: 'generating' });
         }
 
         const { data, error } = await supabase.functions.invoke('compose-video-clips', {
@@ -100,6 +104,9 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           title: 'Generierung gestartet',
           description: `Szene ${(workingScene.orderIndex ?? 0) + 1} wird gebaut…`,
         });
+        // Intentionally do NOT emit clips:end on success — the server only
+        // STARTED generation. Real `clipStatus === 'generating'` keeps the
+        // pipeline bar alive until realtime flips the scene to ready/failed.
       } catch (err: any) {
         opts.onOptimisticPatch?.(scene.id, { clipStatus: previousStatus });
         console.error('[useSceneGenerate] failed', err);
@@ -109,8 +116,8 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           description: realMsg || err?.message || 'Bitte erneut versuchen.',
           variant: 'destructive',
         });
-      } finally {
         emitPipelineEvent({ type: 'clips:end' });
+      } finally {
         setGenerating((prev) => ({ ...prev, [scene.id]: false }));
       }
     },
