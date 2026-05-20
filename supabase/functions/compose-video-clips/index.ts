@@ -258,6 +258,31 @@ serve(async (req) => {
     const charById = new Map<string, ComposerCharacter>();
     (characters || []).forEach(c => { if (c?.id) charById.set(c.id, c); });
 
+    /**
+     * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
+     * the image anchor renderer. Mirrors `compose-scene-anchor`'s server-side
+     * sanitizer but applied early so the Dialog-block leak cannot reach Nano
+     * Banana (which would otherwise paint the same speaker twice when a
+     * script repeats a name across lines).
+     */
+    const stripDialogForAnchor = (raw: string): string => {
+      if (!raw) return '';
+      const cleaned = raw
+        .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, '')
+        .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, '')
+        .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, '')
+        .replace(/^.*\b(speak\s+to\s+camera\s+in\s+turns|lip[- ]?sync\s+mouth\s+movement|timing\s+must\s+follow|speaker\s+order|in\s+turns|dialogue\s*:|conversation\s+script).*$/gim, '')
+        .replace(/^[\p{Lu}][\p{L}\s'\-]{0,40}\s*[:\-—]\s.*$/gmu, '')
+        .replace(/"[^"]{1,400}"/g, '')
+        .replace(/„[^"]{1,400}"/g, '')
+        .replace(/«[^»]{1,400}»/g, '')
+        .replace(/'[^']{2,400}'/g, '')
+        .replace(/\n{2,}/g, '\n')
+        .trim();
+      const meaningful = cleaned.replace(/[\s.\-,;:!?]/g, '').length >= 10;
+      return meaningful ? cleaned : '';
+    };
+
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
     const injectCharacter = (prompt: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
       if (!shot || !shot.characterId || shot.shotType === 'absent') return prompt;
