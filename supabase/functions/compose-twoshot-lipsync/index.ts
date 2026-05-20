@@ -771,14 +771,15 @@ serve(async (req) => {
         cachedFaceMap,
         LOVABLE_API_KEY,
       );
+      const sourceVideoDims = await probeMp4Dims(sourceClipUrl);
       const fallbackDims = {
-        width: Number(faceMap?.width) || 1280,
-        height: Number(faceMap?.height) || 720,
+        width: Number(sourceVideoDims?.width) || Number(faceMap?.width) || 1280,
+        height: Number(sourceVideoDims?.height) || Number(faceMap?.height) || 720,
       };
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] faceMap`,
         faceMap
-          ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, source: faceMap.source }
+          ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, videoWidth: fallbackDims.width, videoHeight: fallbackDims.height, source: faceMap.source }
           : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrlForDetect, clip: !!detectionClipUrl },
       );
       if (!faceMap) {
