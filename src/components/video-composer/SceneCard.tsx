@@ -1283,6 +1283,19 @@ export default function SceneCard({
                         title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
                         onClick={async () => {
                           try {
+                            const prevPlan = ((scene as any).audioPlan ?? {}) as Record<string, any>;
+                            const prevTwoshot = ((prevPlan.twoshot ?? {}) as Record<string, any>);
+                            const {
+                              faceMap: _faceMap,
+                              syncJobs: _syncJobs,
+                              heartbeat: _heartbeat,
+                              anchor_face_audit: _anchorAudit,
+                              ...twoshotWithoutAnchorState
+                            } = prevTwoshot;
+                            const resetAudioPlan = {
+                              ...prevPlan,
+                              twoshot: twoshotWithoutAnchorState,
+                            };
                             // Hard reset: clear composed anchor, clip, and all
                             // lipsync state so compose-video-clips re-runs the
                             // full cinematic-sync pipeline (multi-cast anchor
@@ -1299,6 +1312,7 @@ export default function SceneCard({
                                 lip_sync_source_clip_url: null,
                                 twoshot_stage: null,
                                 replicate_prediction_id: null,
+                                audio_plan: resetAudioPlan,
                                 updated_at: new Date().toISOString(),
                               })
                               .eq('id', scene.id);
