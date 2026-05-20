@@ -165,10 +165,13 @@ serve(async (req) => {
     const plan = (scene.audio_plan ?? {}) as Record<string, any>;
     const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
     const syncJobs = (twoshot.syncJobs ?? {}) as Record<string, any>;
+    const isSegments = String(syncJobs.mode ?? twoshot.heartbeat?.mode ?? "") === "segments";
     const jobs = Array.isArray(syncJobs.jobs) ? syncJobs.jobs : [];
-    const currentPass = Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
-    const totalPasses = Number(syncJobs.totalPasses || jobs.length || 2);
-    const currentJob = jobs.find((j: any) => Number(j?.pass) === currentPass) ?? jobs[jobs.length - 1];
+    const currentPass = isSegments ? 1 : Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
+    const totalPasses = isSegments ? 1 : Number(syncJobs.totalPasses || jobs.length || 2);
+    const currentJob = isSegments
+      ? (jobs[jobs.length - 1] ?? jobs[0])
+      : (jobs.find((j: any) => Number(j?.pass) === currentPass) ?? jobs[jobs.length - 1]);
     const jobId = String(currentJob?.jobId || String(scene.replicate_prediction_id ?? "").replace(/^sync:/, ""));
     if (!jobId) return json({ error: "no_sync_job" }, 422);
 
@@ -209,7 +212,7 @@ serve(async (req) => {
         twoshot_stage: "failed",
         clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}`,
         updated_at: now,
-        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status } } },
+        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now } } },
       }).eq("id", sceneId);
       return json({ ok: false, status: polled.status, error: polled.error ?? polled.status }, 200);
     }
@@ -222,7 +225,6 @@ serve(async (req) => {
 
     // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
     // (mode != 'segments') still chain to the next pass for backward compat.
-    const isSegments = String(syncJobs.mode ?? "") === "segments";
     if (!isSegments && currentPass < totalPasses) {
       const speakers = Array.isArray(twoshot.speakers) ? twoshot.speakers : [];
       const nextIdx = currentPass;
