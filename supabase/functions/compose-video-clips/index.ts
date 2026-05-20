@@ -1189,12 +1189,14 @@ serve(async (req) => {
           const duration = scene.durationSeconds >= 8 ? 10 : 6;
           const resolution = quality === 'pro' ? '1080p' : '768p';
           const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncScene = (scene.engineOverride ?? 'auto') === 'cinematic-sync';
 
           await supabaseAdmin
             .from('composer_scenes')
             .update({
               clip_status: 'generating',
               clip_quality: quality,
+              ...(isCinematicSyncScene ? { lip_sync_source_clip_url: null, lip_sync_status: 'pending', twoshot_stage: 'master_clip' } : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim('ai-hailuo', isI2V),
               updated_at: new Date().toISOString(),
             })
@@ -1222,7 +1224,7 @@ serve(async (req) => {
 
           await supabaseAdmin
             .from('composer_scenes')
-            .update({ replicate_prediction_id: prediction.id })
+            .update({ replicate_prediction_id: prediction.id, ...(isCinematicSyncScene ? { twoshot_stage: 'master_clip' } : {}) })
             .eq('id', scene.id);
 
           results.push({ sceneId: scene.id, status: 'generating', predictionId: prediction.id });
