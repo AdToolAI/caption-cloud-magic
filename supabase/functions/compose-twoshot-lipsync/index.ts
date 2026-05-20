@@ -874,6 +874,7 @@ serve(async (req) => {
               syncMode: "cut_off",
               temperature: 0.5,
               targetCoords: firstTarget.coords,
+              faceBbox: Array.isArray(firstTarget.bbox) && firstTarget.bbox.length === 4 ? firstTarget.bbox as [number, number, number, number] : null,
               frameNumber: 0,
             },
             "twoshot_pass_1",
