@@ -595,7 +595,7 @@ serve(async (req) => {
                       portraitUrl: portraitUrls[0],
                       portraitUrls,
                       characterNames,
-                      scenePrompt: scene.aiPrompt || '',
+                      scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || `Exactly ${portraitUrls.length} distinct people in a modern setting, each visible exactly once, natural conversation framing. No rendered text.`,
                       aspectRatio: '16:9',
                       shotType: scene.characterShot?.shotType,
                       strictNoDuplicates: strict,
