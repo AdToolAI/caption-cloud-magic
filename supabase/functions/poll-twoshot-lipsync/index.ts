@@ -225,7 +225,8 @@ serve(async (req) => {
       const nextIdx = currentPass;
       const nextSpeaker = speakers[nextIdx];
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
-      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null);
+      const videoDims = await probeMp4Dims(polled.outputUrl);
+      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
