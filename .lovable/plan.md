@@ -1,20 +1,45 @@
-## Aktueller Stand
+## Diagnose
 
-Der Lip-Sync ist auf die Sync.so Segments-API mit **einer** gemergten Audio-Referenz umgestellt — exakt wie das offizielle „Multiple Segments with Single Audio Input"-Beispiel in der Sync.so-Doku.
+Der aktuelle Fehler kommt nicht aus der UI und nicht vom Backend-Status. Die betroffene Szene `2641218f-b9b7-46b5-a56d-2fee61e53389` wird von Sync.so weiterhin mit `The segments configuration is invalid.` abgelehnt.
 
-### Was war kaputt
-- Wir haben pro Sprecher eine voll gepaddete 8-Sekunden-WAV als eigene `refId` an Sync.so geschickt und zusätzlich `audioInput.startTime/endTime` als Crops gesetzt.
-- Sync.so hat das mit `The segments configuration is invalid.` abgelehnt.
+Die Ursache liegt sehr wahrscheinlich in der Struktur der Segment-Payload:
 
-### Was ist jetzt anders
-- `compose-twoshot-lipsync` sendet jetzt nur **eine** Audio-Referenz: den bereits gemergten 8s-WAV-Track (`audio_plan.twoshot.url`).
-- Pro Dialog-Turn ein `segment` mit `startTime/endTime` (Video-Timeline) + `audioInput.refId="vo_merged"` + matching Crop.
-- Modell: `sync-3` (laut Sync.so robuster für AI-generierte Videos).
-- `sync_mode: "remap"` (Sync.so-Default für segmentierte Generationen).
-- Bei Provider-Fehler wird die exakte Sync.so-Fehlermeldung in `audio_plan.twoshot.syncJobs.lastError` gespeichert.
-- Beide zuvor fehlgeschlagenen Szenen wurden zurückgesetzt — kein erneutes Hailuo-Rendern nötig.
+- Die Doku nutzt für Audio-Inputs im SDK `ref_id`, die REST-Referenz spricht aber bei Segmenten von `refId`.
+- Unser Payload speichert nur reduzierte `bodyMeta`, nicht die exakte gesendete Payload; dadurch ist das Debugging unnötig schwer.
+- Der Poller enthält noch Legacy-Code für alte 2-Pass-Jobs. Das ist nicht der direkte Fehler, erhöht aber das Risiko bei alten `syncJobs`-Zuständen.
 
-### Was zu testen ist
-1. „🎥 Lip-Sync neu rendern" in der betroffenen Szene klicken.
-2. Erwartetes Ergebnis: Sync.so akzeptiert den Job, `lip_sync_status='done'`, Stimmen kommen aus den richtigen Mündern, weiterhin 2 Charaktere sichtbar.
-3. Wenn es trotzdem scheitert, steht der genaue Sync.so-Fehler in `composer_scenes.audio_plan.twoshot.syncJobs.lastError`.
+## Plan
+
+1. **Sync.so Segment-Payload robust machen**
+   - Audio-Input mit beiden kompatiblen Referenzformen absichern, falls die API/SDK-Doku zwischen `ref_id` und `refId` unterscheidet.
+   - Segment-Zeiten hart validieren: sortiert, keine Überlappungen, Mindestlänge, innerhalb Video- und Audio-Dauer.
+   - Bei Start bei `0.0` minimal auf eine sichere Grenze normalisieren, falls Sync.so Null-Boundaries ablehnt.
+
+2. **Fallback-Strategie einbauen, ohne wieder “beide Stimmen aus einem Mund” zu riskieren**
+   - Erst Segments mit `sync-3` versuchen.
+   - Wenn Sync.so genau `segments configuration is invalid` zurückgibt, automatisch mit dem dokumentierten stabileren Modell `lipsync-2` und identischer Segment-Struktur erneut anlegen.
+   - Kein Single-Mouth-Fallback; bei echtem Provider-Fail wird weiter sauber refundet.
+
+3. **Poller auf Segment-Jobs härten**
+   - Segment-Mode strikt als Single-Job behandeln.
+   - Legacy-2-Pass-Verhalten nur noch für alte Jobs ohne `mode: 'segments'` verwenden.
+   - Fehlermeldungen weiter in `clip_error` und `audio_plan.twoshot.syncJobs` speichern.
+
+4. **Bessere Provider-Diagnose speichern**
+   - `bodyMeta` erweitern: Modell, Segmentzeiten, Audio-Ref-Key-Variante, Video-/Audio-URL-Dauerhinweise.
+   - Exakte Sync.so-Response bei Create- und Poll-Fehlern begrenzt speichern.
+
+5. **Betroffene Szene resetten und neu anstoßen**
+   - Nur Lip-Sync-Zustand zurücksetzen.
+   - Bestehendes 2-Personen-Video, FaceMap und gemergte WAV behalten.
+   - Danach einmal die korrigierte Edge Function triggern, damit wir sehen, ob Sync.so den Job annimmt.
+
+## Dateien/Backend
+
+- `supabase/functions/compose-twoshot-lipsync/index.ts`
+- `supabase/functions/poll-twoshot-lipsync/index.ts`
+- eine kleine Datenkorrektur für die betroffene Szene in `composer_scenes`
+
+## Erwartetes Ergebnis
+
+Nach Umsetzung sollte der Sync.so-Job nicht mehr schon an der Segment-Konfiguration scheitern. Falls Sync.so danach trotzdem ablehnt, sehen wir endlich die vollständige relevante Provider-Antwort und können gezielt auf Audio-/Video-Content statt auf Payload-Struktur debuggen.

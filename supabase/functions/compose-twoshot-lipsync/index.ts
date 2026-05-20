@@ -288,25 +288,55 @@ async function startSyncSoSegmentsJob(
      *  example from https://sync.so/docs/developer-guides/segments . */
     segments: Array<{ startSec: number; endSec: number }>;
     model?: string;
+    audioDurationSec?: number;
+    videoDurationSec?: number;
   },
   label: string,
 ): Promise<{ jobId: string; bodyMeta: Record<string, unknown> }> {
   const REF = "vo_merged";
+  const model = params.model ?? "sync-3";
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
     { type: "audio", url: params.mergedAudioUrl, refId: REF },
   ];
-  const segments = params.segments.map((s) => ({
-    startTime: Math.max(0, Number(s.startSec.toFixed(3))),
-    endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
-    audioInput: {
-      refId: REF,
-      startTime: Math.max(0, Number(s.startSec.toFixed(3))),
-      endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
-    },
-  }));
+  const audioDur = Number(params.audioDurationSec);
+  const videoDur = Number(params.videoDurationSec);
+  const finiteDurations = [audioDur, videoDur].filter((n) => Number.isFinite(n) && n > 0);
+  const maxTimeline = finiteDurations.length
+    ? Math.max(0.1, Math.min(...finiteDurations))
+    : Math.max(0.1, ...params.segments.map((s) => Number(s.endSec)).filter((n) => Number.isFinite(n)));
+  const normalized = [...params.segments]
+    .map((s) => ({ startSec: Number(s.startSec), endSec: Number(s.endSec) }))
+    .filter((s) => Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec > s.startSec)
+    .sort((a, b) => a.startSec - b.startSec)
+    .reduce<Array<{ startSec: number; endSec: number; kind: "dialog" | "tail_silence" }>>((acc, s) => {
+      const prevEnd = acc.length ? acc[acc.length - 1].endSec : 0;
+      const start = Math.max(prevEnd, Math.min(maxTimeline, s.startSec));
+      const end = Math.max(start + 0.08, Math.min(maxTimeline, s.endSec));
+      if (end <= maxTimeline && end - start >= 0.08) acc.push({ startSec: start, endSec: end, kind: "dialog" });
+      return acc;
+    }, []);
+  const lastEnd = normalized.at(-1)?.endSec ?? 0;
+  if (maxTimeline - lastEnd >= 0.25) {
+    normalized.push({ startSec: lastEnd, endSec: maxTimeline, kind: "tail_silence" });
+  }
+  if (!normalized.length) throw new Error(`${label}_segments_empty_after_normalize`);
+
+  const segments = normalized.map((s, idx) => {
+    const start = Number((idx === 0 && s.startSec === 0 ? 0.001 : s.startSec).toFixed(3));
+    const end = Number(Math.max(start + 0.08, s.endSec).toFixed(3));
+    return {
+      startTime: start,
+      endTime: end,
+      audioInput: {
+        refId: REF,
+        startTime: start,
+        endTime: end,
+      },
+    };
+  });
   const body = {
-    model: params.model ?? "sync-3",
+    model,
     input: inputArr,
     segments,
     options: {
@@ -333,6 +363,12 @@ async function startSyncSoSegmentsJob(
       segments_count: segments.length,
       sync_mode: body.options.sync_mode,
       merged_audio_url: params.mergedAudioUrl,
+      audio_duration_sec: params.audioDurationSec ?? null,
+      video_duration_sec: params.videoDurationSec ?? null,
+      ref_keys: ["refId"],
+      segment_kinds: normalized.map((s) => s.kind),
+      segments,
+      create_response: JSON.stringify(data).slice(0, 1000),
     },
   };
 }
@@ -931,24 +967,72 @@ serve(async (req) => {
           return;
         }
 
-        let jobId: string;
+        let jobId = "";
         let bodyMeta: Record<string, unknown> = {};
         try {
-          const result = await startSyncSoSegmentsJob(
+          let result = await startSyncSoSegmentsJob(
             SYNC_API_KEY!,
             {
               videoUrl: sourceClipUrl,
               mergedAudioUrl: mergedVo.url,
               segments: segmentsPayload,
               model: "sync-3",
+              audioDurationSec: voDuration || sceneDurForClamp,
+              videoDurationSec: sceneDurForClamp,
             },
             "lipsync_segments",
           );
+          result.bodyMeta.fallback_from = null;
           jobId = result.jobId;
           bodyMeta = result.bodyMeta;
         } catch (e) {
+          const firstErrMsg = (e as Error).message;
+          if (/segments configuration is invalid/i.test(firstErrMsg)) {
+            try {
+              const fallback = await startSyncSoSegmentsJob(
+                SYNC_API_KEY!,
+                {
+                  videoUrl: sourceClipUrl,
+                  mergedAudioUrl: mergedVo.url,
+                  segments: segmentsPayload,
+                  model: "lipsync-2",
+                  audioDurationSec: voDuration || sceneDurForClamp,
+                  videoDurationSec: sceneDurForClamp,
+                },
+                "lipsync_segments_fallback",
+              );
+              jobId = fallback.jobId;
+              bodyMeta = { ...fallback.bodyMeta, fallback_from: "sync-3", fallback_reason: firstErrMsg.slice(0, 500) };
+            } catch (fallbackErr) {
+              const errMsg = `${firstErrMsg} | fallback_lipsync-2_failed: ${(fallbackErr as Error).message}`;
+              const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
+              const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
+              const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
+              await supabase.from("composer_scenes").update({
+                audio_plan: {
+                  ...latestPlan,
+                  twoshot: {
+                    ...latestTwoshot,
+                    syncJobs: {
+                      ...(latestTwoshot.syncJobs ?? {}),
+                      provider: "sync.so",
+                      mode: "segments",
+                      lastError: errMsg.slice(0, 1000),
+                      lastErrorAt: new Date().toISOString(),
+                      attemptedModel: "sync-3+lipsync-2",
+                      attemptedSegments: segmentsPayload.length,
+                      mergedAudioUrl: mergedVo.url,
+                      sourceVideoUrl: sourceClipUrl,
+                    },
+                  },
+                },
+              }).eq("id", scene_id);
+              await refund(`lipsync_segments_failed: ${errMsg}`);
+              return;
+            }
+          } else {
           // Persist the provider error verbatim so we don't have to guess on retry.
-          const errMsg = (e as Error).message;
+          const errMsg = firstErrMsg;
           const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
           const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
           const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
@@ -973,6 +1057,7 @@ serve(async (req) => {
           }).eq("id", scene_id);
           await refund(`lipsync_segments_failed: ${errMsg}`);
           return;
+          }
         }
 
         await setStage(supabase, scene_id, "lipsync_1", {
@@ -995,6 +1080,7 @@ serve(async (req) => {
                   status: "PROCESSING",
                   videoUrl: sourceClipUrl,
                   segments: segmentsPayload,
+                  model: bodyMeta.model ?? "sync-3",
                   startedAt,
                 }],
               },
@@ -1009,7 +1095,7 @@ serve(async (req) => {
         });
         console.log(
           `[compose-twoshot-lipsync ${scene_id}] segments job queued on Sync.so`,
-          { jobId, segments: segmentsPayload.length, model: "sync-3" },
+          { jobId, segments: segmentsPayload.length, model: bodyMeta.model ?? "sync-3", fallback_from: bodyMeta.fallback_from ?? null },
         );
         return;
       } else {
