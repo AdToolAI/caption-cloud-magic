@@ -226,51 +226,8 @@ serve(async (req) => {
       const latestPlan = (latest.data?.audio_plan ?? plan) as Record<string, any>;
       const latestTwoshot = (latestPlan.twoshot ?? {}) as Record<string, any>;
       const latestSyncJobs = (latestTwoshot.syncJobs ?? syncJobs) as Record<string, any>;
-      const failedBecauseInvalidSegments = isSegments && /segments configuration is invalid/i.test(String(polled.error ?? ""));
-      const model = String(currentJob?.model || latestSyncJobs.bodyMeta?.model || "");
-      if (failedBecauseInvalidSegments && model !== "lipsync-2" && latestSyncJobs.mergedAudioUrl && currentJob?.videoUrl) {
-        const rawSegments = Array.isArray(latestSyncJobs.bodyMeta?.segments) ? latestSyncJobs.bodyMeta.segments : currentJob?.segments;
-        const fallbackSegments = Array.isArray(rawSegments) ? rawSegments : [];
-        try {
-          const fallbackJobId = await startSegmentsFallbackJob(syncApiKey, {
-            videoUrl: String(currentJob.videoUrl),
-            audioUrl: String(latestSyncJobs.mergedAudioUrl),
-            segments: fallbackSegments as Array<Record<string, unknown>>,
-          });
-          const fallbackJob = {
-            jobId: fallbackJobId,
-            status: "PROCESSING",
-            videoUrl: currentJob.videoUrl,
-            segments: fallbackSegments,
-            model: "lipsync-2",
-            fallbackFrom: model || "sync-3",
-            fallbackReason: polled.error ?? polled.status,
-            startedAt: now,
-          };
-          await supabase.from("composer_scenes").update({
-            replicate_prediction_id: `sync:${fallbackJobId}`,
-            lip_sync_status: "running",
-            twoshot_stage: "lipsync_1",
-            clip_error: null,
-            updated_at: now,
-            audio_plan: {
-              ...latestPlan,
-              twoshot: {
-                ...latestTwoshot,
-                syncJobs: {
-                  ...latestSyncJobs,
-                  mode: "segments",
-                  bodyMeta: { ...(latestSyncJobs.bodyMeta ?? {}), fallback_from: model || "sync-3", fallback_model: "lipsync-2", fallback_reason: polled.error ?? polled.status },
-                  jobs: [...jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, error: polled.error, failedAt: now } : j), fallbackJob],
-                },
-                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), mode: "segments", syncJobId: fallbackJobId, fallback: true, started_at: now },
-              },
-            },
-          }).eq("id", sceneId);
-          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: fallbackJobId });
-        } catch (fallbackErr) {
-          polled.error = `${polled.error ?? polled.status} | fallback_lipsync-2_failed: ${(fallbackErr as Error).message}`;
-        }
+      if (isSegments && /segments configuration is invalid/i.test(String(polled.error ?? ""))) {
+        polled.error = `${polled.error ?? polled.status} | segment_mode_disabled_retry_with_two_pass`;
       }
       if (!latestSyncJobs.refunded) {
         const cost = Number(latestSyncJobs.costCredits ?? 0);
