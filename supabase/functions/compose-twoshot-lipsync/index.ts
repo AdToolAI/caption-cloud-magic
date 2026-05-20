@@ -280,32 +280,39 @@ async function startSyncSoSegmentsJob(
   syncApiKey: string,
   params: {
     videoUrl: string;
-    speakers: Array<{ refId: string; audioUrl: string }>;
-    segments: Array<{ startSec: number; endSec: number; refId: string; cropStart?: number; cropEnd?: number }>;
+    /** Single merged voiceover WAV (full scene timeline). */
+    mergedAudioUrl: string;
+    /** Dialogue turns mapped onto video timeline. Each turn → 1 segment with
+     *  audioInput.refId of the merged track + crop matching the turn timestamps.
+     *  This mirrors the Sync.so "Multiple Segments with Single Audio Input"
+     *  example from https://sync.so/docs/developer-guides/segments . */
+    segments: Array<{ startSec: number; endSec: number }>;
     model?: string;
   },
   label: string,
-): Promise<string> {
+): Promise<{ jobId: string; bodyMeta: Record<string, unknown> }> {
+  const REF = "vo_merged";
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
-    ...params.speakers.map((s) => ({ type: "audio", url: s.audioUrl, refId: s.refId })),
+    { type: "audio", url: params.mergedAudioUrl, refId: REF },
   ];
-  const segments = params.segments.map((s) => {
-    const audioInput: Record<string, unknown> = { refId: s.refId };
-    if (typeof s.cropStart === "number" && typeof s.cropEnd === "number") {
-      audioInput.startTime = s.cropStart;
-      audioInput.endTime = s.cropEnd;
-    }
-    return { startTime: s.startSec, endTime: s.endSec, audioInput };
-  });
+  const segments = params.segments.map((s) => ({
+    startTime: Math.max(0, Number(s.startSec.toFixed(3))),
+    endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
+    audioInput: {
+      refId: REF,
+      startTime: Math.max(0, Number(s.startSec.toFixed(3))),
+      endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
+    },
+  }));
   const body = {
-    model: params.model ?? "lipsync-2-pro",
+    model: params.model ?? "sync-3",
     input: inputArr,
     segments,
     options: {
-      sync_mode: "cut_off",
+      // Segmented generations default to `remap` per Sync.so docs (recommended).
+      sync_mode: "remap",
       output_format: "mp4",
-      temperature: 0.5,
     },
   };
   const resp = await fetch("https://api.sync.so/v2/generate", {
@@ -319,7 +326,15 @@ async function startSyncSoSegmentsJob(
   }
   const data = await resp.json();
   if (!data?.id) throw new Error(`${label}_missing_job_id: ${JSON.stringify(data).slice(0, 240)}`);
-  return String(data.id);
+  return {
+    jobId: String(data.id),
+    bodyMeta: {
+      model: body.model,
+      segments_count: segments.length,
+      sync_mode: body.options.sync_mode,
+      merged_audio_url: params.mergedAudioUrl,
+    },
+  };
 }
 
 /**
