@@ -269,6 +269,60 @@ async function pollSyncSoDirectPrediction(
 }
 
 /**
+ * Sync.so v2 Segments API — single job, multi-speaker.
+ *
+ * Docs: https://sync.so/docs/developer-guides/segments
+ * Avoids the fragile sequential 2-pass approach (which kept failing with
+ * `generation_pipeline_failed` on stiller AI two-shots). Sync.so handles
+ * speaker selection per segment internally — no manual coordinates needed.
+ */
+async function startSyncSoSegmentsJob(
+  syncApiKey: string,
+  params: {
+    videoUrl: string;
+    speakers: Array<{ refId: string; audioUrl: string }>;
+    segments: Array<{ startSec: number; endSec: number; refId: string; cropStart?: number; cropEnd?: number }>;
+    model?: string;
+  },
+  label: string,
+): Promise<string> {
+  const inputArr: Array<Record<string, unknown>> = [
+    { type: "video", url: params.videoUrl },
+    ...params.speakers.map((s) => ({ type: "audio", url: s.audioUrl, refId: s.refId })),
+  ];
+  const segments = params.segments.map((s) => {
+    const audioInput: Record<string, unknown> = { refId: s.refId };
+    if (typeof s.cropStart === "number" && typeof s.cropEnd === "number") {
+      audioInput.startTime = s.cropStart;
+      audioInput.endTime = s.cropEnd;
+    }
+    return { startTime: s.startSec, endTime: s.endSec, audioInput };
+  });
+  const body = {
+    model: params.model ?? "lipsync-2-pro",
+    input: inputArr,
+    segments,
+    options: {
+      sync_mode: "cut_off",
+      output_format: "mp4",
+      temperature: 0.5,
+    },
+  };
+  const resp = await fetch("https://api.sync.so/v2/generate", {
+    method: "POST",
+    headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`${label}_create_${resp.status}: ${txt.slice(0, 500)}`);
+  }
+  const data = await resp.json();
+  if (!data?.id) throw new Error(`${label}_missing_job_id: ${JSON.stringify(data).slice(0, 240)}`);
+  return String(data.id);
+}
+
+/**
  * Detect face centers in the two-shot anchor image via Gemini Vision.
  * Returns coordinates normalized to the image's natural pixel space.
  * Sync.so honors these coordinates relative to the input video frame size,
