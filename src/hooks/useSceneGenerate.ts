@@ -15,6 +15,7 @@ import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractFunctionsError } from '@/lib/functionsError';
+import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import type {
   ComposerScene,
   ComposerCharacter,
@@ -37,6 +38,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
     async (scene: ComposerScene) => {
       if (!scene) return;
       setGenerating((prev) => ({ ...prev, [scene.id]: true }));
+      emitPipelineEvent({ type: 'clips:start' });
       const previousStatus = scene.clipStatus;
       try {
         let pid = opts.projectId;
@@ -108,6 +110,7 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
           variant: 'destructive',
         });
       } finally {
+        emitPipelineEvent({ type: 'clips:end' });
         setGenerating((prev) => ({ ...prev, [scene.id]: false }));
       }
     },
