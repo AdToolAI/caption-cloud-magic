@@ -80,7 +80,7 @@ interface LocalProject {
 
 const STORAGE_KEY = 'video-composer-draft';
 const TAB_STORAGE_KEY = 'video-composer-draft-tab';
-const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'clips', 'text', 'audio', 'export', 'campaign'];
+const TAB_ORDER: TabId[] = ['briefing', 'storyboard', 'text', 'audio', 'export', 'campaign'];
 
 function loadDraft(): LocalProject | null {
   try {
@@ -110,6 +110,7 @@ function clearDraft() {
 function restoreActiveTab(): TabId {
   try {
     const stored = localStorage.getItem(TAB_STORAGE_KEY) as TabId | null;
+    if (stored === 'clips') return 'storyboard';
     if (stored && TAB_ORDER.includes(stored)) return stored;
     return 'briefing';
   } catch {
