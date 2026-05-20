@@ -334,16 +334,6 @@ export function usePipelineProgress({
 
   const activePhase = phases.find((p) => p.status === 'running');
   const isActive = phases.some((p) => p.status === 'running');
-  // ETA across remaining + active phases
-  const etaSeconds = useMemo(() => {
-    if (!isActive) return 0;
-    return phases.reduce((sum, p) => {
-      if (p.status === 'done') return sum;
-      const remaining = 1 - p.progress;
-      return sum + remaining * PHASE_NOMINAL_SECONDS[p.id];
-    }, 0);
-  }, [phases, isActive]);
-
   // Pipeline start time = first time anything went "running"
   useEffect(() => {
     if (isActive && pipelineStartRef.current === null) {
@@ -374,6 +364,7 @@ export function usePipelineProgress({
   const currentOverall = allDone || completedCleanly ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
   runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
   const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
+  const etaSeconds = isActive ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
 
   return {
     phases,
