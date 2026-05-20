@@ -182,6 +182,7 @@ async function startSyncSoDirectGeneration(
     syncMode?: "cut_off" | "loop" | "bounce";
     temperature?: number;
     targetCoords?: [number, number] | null;
+    faceBbox?: [number, number, number, number] | null;
     frameNumber?: number;
   },
   label: string,
@@ -197,7 +198,14 @@ async function startSyncSoDirectGeneration(
     temperature: params.temperature ?? 0.5,
   };
 
-  if (params.targetCoords) {
+  if (params.faceBbox && params.faceBbox.length === 4) {
+    // Sync.so docs: bounding_boxes is more robust than point coordinates
+    // when own face detection is available. Single-frame box (frame 0).
+    options.active_speaker_detection = {
+      auto_detect: false,
+      bounding_boxes: [params.faceBbox],
+    };
+  } else if (params.targetCoords) {
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: params.frameNumber ?? 0,
@@ -866,6 +874,7 @@ serve(async (req) => {
               syncMode: "cut_off",
               temperature: 0.5,
               targetCoords: firstTarget.coords,
+              faceBbox: Array.isArray(firstTarget.bbox) && firstTarget.bbox.length === 4 ? firstTarget.bbox as [number, number, number, number] : null,
               frameNumber: 0,
             },
             "twoshot_pass_1",
