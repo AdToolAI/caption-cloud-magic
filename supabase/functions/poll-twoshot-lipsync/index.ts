@@ -191,7 +191,9 @@ serve(async (req) => {
     const plan = (scene.audio_plan ?? {}) as Record<string, any>;
     const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
     const syncJobs = (twoshot.syncJobs ?? {}) as Record<string, any>;
-    const isSegments = String(syncJobs.mode ?? twoshot.heartbeat?.mode ?? "") === "segments";
+    const mode = String(syncJobs.mode ?? twoshot.heartbeat?.mode ?? "");
+    const isSegments = mode === "segments";
+    const isTwoPass = mode === "two_pass";
     const jobs = Array.isArray(syncJobs.jobs) ? syncJobs.jobs : [];
     const currentPass = isSegments ? 1 : Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
     const totalPasses = isSegments ? 1 : Number(syncJobs.totalPasses || jobs.length || 2);
@@ -297,7 +299,7 @@ serve(async (req) => {
 
     // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
     // (mode != 'segments') still chain to the next pass for backward compat.
-    if (!isSegments && currentPass < totalPasses) {
+      if (!isSegments && currentPass < totalPasses) {
       const speakers = Array.isArray(twoshot.speakers) ? twoshot.speakers : [];
       const nextIdx = currentPass;
       const nextSpeaker = speakers[nextIdx];
@@ -320,6 +322,7 @@ serve(async (req) => {
         character_id: nextSpeaker.character_id ?? null,
         targetFace: target.side,
         targetCoords: target.coords,
+        targetSource: target.source,
         startedAt: now,
       };
       await supabase.from("composer_scenes").update({
@@ -330,8 +333,8 @@ serve(async (req) => {
           ...plan,
           twoshot: {
             ...twoshot,
-            syncJobs: { ...syncJobs, currentPass: nextPass, totalPasses, jobs: [...updatedJobs, nextJob] },
-            heartbeat: { pass: nextPass, total_passes: totalPasses, started_at: now, speaker: nextSpeaker.speaker, targetFace: target.side, targetSource: target.source, syncJobId: nextJobId },
+            syncJobs: { ...syncJobs, mode: isTwoPass ? "two_pass" : syncJobs.mode, currentPass: nextPass, totalPasses, jobs: [...updatedJobs, nextJob] },
+            heartbeat: { mode: isTwoPass ? "two_pass" : twoshot.heartbeat?.mode, pass: nextPass, total_passes: totalPasses, started_at: now, speaker: nextSpeaker.speaker, targetFace: target.side, targetSource: target.source, syncJobId: nextJobId },
           },
         },
       }).eq("id", sceneId);
