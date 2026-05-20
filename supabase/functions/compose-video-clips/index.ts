@@ -21,8 +21,10 @@ function parseRetryAfter(msg: string): number {
 import { createClient } from "npm:@supabase/supabase-js@2";
 import Replicate from "npm:replicate@0.25.2";
 import { getVisualStyleHint } from "../_shared/composer-visual-styles.ts";
-import { countFacesInImage } from "../_shared/face-count.ts";
+import { countFacesInImage, countHumansInImage } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
+
+const ANCHOR_AUDIT_VERSION = 2;
 
 
 const corsHeaders = {
@@ -523,19 +525,15 @@ serve(async (req) => {
           }
 
           // ── Server-side multi-cast anchor safety net ────────────────────
-          // If this cinematic-sync scene has 2+ cast characters but the
-          // referenceImageUrl is either missing or doesn't look like a
-          // composed scene anchor (no /scene-anchors/ in path), call
-          // compose-scene-anchor with ALL portraits. Without this, Hailuo
-          // i2v invents the cast and Sync.so/lipsync-2 can't switch
-          // active speakers.
+          // ALWAYS audit when 2+ cast members, even if a /scene-anchors/ image
+          // is already pinned — a previously composed anchor can still contain
+          // an extra/cloned person from an older pipeline version. We only
+          // reuse an existing anchor when audit_version matches and ok===true.
           try {
             const castShots = (scene.characterShots ?? []).filter(
               (s) => s && s.shotType !== 'absent' && s.characterId,
             );
-            const refUrl = String(scene.referenceImageUrl ?? '');
-            const looksComposed = refUrl.includes('/scene-anchors/') || refUrl.includes('/composer-anchors/');
-            if (castShots.length >= 2 && !looksComposed) {
+            if (castShots.length >= 2) {
               const portraitUrls = castShots
                 .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
                 .filter((u): u is string => typeof u === 'string' && u.length > 0)
@@ -547,8 +545,18 @@ serve(async (req) => {
                 const expectedFaces = portraitUrls.length;
                 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
+                // Has the currently-pinned anchor passed the current audit version?
+                const prevAuditRaw = ((scene as any).audioPlan?.twoshot?.anchor_face_audit) ?? null;
+                const prevAuditOk =
+                  prevAuditRaw &&
+                  prevAuditRaw.ok === true &&
+                  Number(prevAuditRaw.version) === ANCHOR_AUDIT_VERSION;
+                const existingRefUrl = String(scene.referenceImageUrl ?? '');
+                const existingLooksComposed =
+                  existingRefUrl.includes('/scene-anchors/') ||
+                  existingRefUrl.includes('/composer-anchors/');
+
                 // composeAnchor — single attempt at compose-scene-anchor.
-                // Returns the composed URL on success, null on any failure.
                 const composeAnchor = async (label: string, strict = false): Promise<string | null> => {
                   console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits) [${label}${strict ? ', strict' : ''}]`);
                   const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
@@ -577,91 +585,118 @@ serve(async (req) => {
                   return typeof aj?.composedUrl === 'string' ? aj.composedUrl : null;
                 };
 
-                // Helper: invalidate cache so the next compose call truly re-renders.
                 const invalidateCache = async () => {
                   await supabaseAdmin.from('scene_anchor_cache').delete().eq('scene_id', scene.id);
                 };
 
-                // ── Pass 1: compose, then audit face-count + identity together.
-                let composedUrl = await composeAnchor('attempt-1');
-                let faceCount: number | null = null;
-                let identityFailure: 'clone' | 'extra' | 'missing' | 'ambiguous' | null = null;
-                let identityNotes = "";
-
+                // Evaluate: face count + human count + identity audit.
                 const evaluate = async (url: string, label: string) => {
-                  const fc = await countFacesInImage(url, LOVABLE_API_KEY!, { kind: 'image' });
+                  const [fc, hc] = await Promise.all([
+                    countFacesInImage(url, LOVABLE_API_KEY!, { kind: 'image' }),
+                    countHumansInImage(url, LOVABLE_API_KEY!),
+                  ]);
                   let identity: 'clone' | 'extra' | 'missing' | 'ambiguous' | null = null;
                   let notes = "";
-                  // Hard-count check: EXACTLY expectedFaces. Anything else is a
-                  // failure — too few = missing, too many = extra/clone.
-                  if (fc !== null && fc > expectedFaces) {
+                  // Human-count is the strictest signal — catches profile/background extras.
+                  if (hc !== null && hc > expectedFaces) {
+                    identity = 'extra';
+                    notes = `human count ${hc} > expected ${expectedFaces}`;
+                  } else if (fc !== null && fc > expectedFaces) {
                     identity = 'extra';
                     notes = `face count ${fc} > expected ${expectedFaces}`;
                   }
-                  // Deep audit (only meaningful for multi-portrait).
+                  // Deep identity audit (only meaningful for multi-portrait).
                   if (portraitUrls.length >= 2) {
                     const audit = await auditAnchorIdentity(url, portraitUrls, characterNames, LOVABLE_API_KEY!);
                     if (audit && !audit.ok) {
-                      // Audit wins over heuristic count for the failure reason.
                       identity = audit.reason ?? identity ?? 'ambiguous';
                       notes = audit.detail || notes;
                     }
                   }
-                  console.log(`[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} identity=${identity ?? 'ok'} notes="${notes.slice(0, 120)}"`);
-                  return { faceCount: fc, identity, notes };
+                  console.log(`[compose-video-clips] anchor audit scene ${scene.id} ${label}: faces=${fc}/${expectedFaces} humans=${hc}/${expectedFaces} identity=${identity ?? 'ok'} notes="${notes.slice(0, 120)}"`);
+                  return { faceCount: fc, humanCount: hc, identity, notes };
                 };
 
-                if (composedUrl && LOVABLE_API_KEY) {
-                  const e1 = await evaluate(composedUrl, 'attempt-1');
-                  faceCount = e1.faceCount;
-                  identityFailure = e1.identity;
-                  identityNotes = e1.notes;
+                let composedUrl: string | null = null;
+                let faceCount: number | null = null;
+                let humanCount: number | null = null;
+                let identityFailure: 'clone' | 'extra' | 'missing' | 'ambiguous' | null = null;
+                let identityNotes = "";
+                let skipAuditPersist = false;
 
-                  // Retry once when anything is wrong (too few, too many, clone,
-                  // missing, ambiguous). Strict mode for the retry adds an extra
-                  // anti-duplicate / anti-extra-person hardening block to the
-                  // compose-scene-anchor prompt.
-                  const needsRetry =
-                    identityFailure !== null ||
-                    (faceCount !== null && faceCount !== expectedFaces);
-                  if (needsRetry) {
-                    console.log(`[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces}, identity=${identityFailure}) → strict retry`);
+                // 1) Reuse existing anchor only if it passed current audit version.
+                if (prevAuditOk && existingLooksComposed) {
+                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: reusing pinned anchor (audit v${ANCHOR_AUDIT_VERSION} ok)`);
+                  composedUrl = existingRefUrl;
+                  faceCount = Number.isFinite(Number(prevAuditRaw?.detected)) ? Number(prevAuditRaw.detected) : null;
+                  humanCount = Number.isFinite(Number(prevAuditRaw?.humans)) ? Number(prevAuditRaw.humans) : null;
+                  skipAuditPersist = true;
+                } else {
+                  // 2) Stale or missing anchor → invalidate cache and re-compose.
+                  if (existingLooksComposed) {
+                    console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: pinned anchor missing audit v${ANCHOR_AUDIT_VERSION} → re-composing`);
                     await invalidateCache();
-                    const retryUrl = await composeAnchor('attempt-2', true);
-                    if (retryUrl) {
-                      const e2 = await evaluate(retryUrl, 'attempt-2');
-                      composedUrl = retryUrl;
-                      faceCount = e2.faceCount;
-                      identityFailure = e2.identity;
-                      identityNotes = e2.notes;
+                  }
+                  composedUrl = await composeAnchor('attempt-1');
+
+                  if (composedUrl && LOVABLE_API_KEY) {
+                    const e1 = await evaluate(composedUrl, 'attempt-1');
+                    faceCount = e1.faceCount;
+                    humanCount = e1.humanCount;
+                    identityFailure = e1.identity;
+                    identityNotes = e1.notes;
+
+                    const needsRetry =
+                      identityFailure !== null ||
+                      (faceCount !== null && faceCount !== expectedFaces) ||
+                      (humanCount !== null && humanCount !== expectedFaces);
+                    if (needsRetry) {
+                      console.log(`[compose-video-clips] anchor scene ${scene.id}: attempt-1 failed (faces=${faceCount}/${expectedFaces} humans=${humanCount}/${expectedFaces} identity=${identityFailure}) → strict retry`);
+                      await invalidateCache();
+                      const retryUrl = await composeAnchor('attempt-2', true);
+                      if (retryUrl) {
+                        const e2 = await evaluate(retryUrl, 'attempt-2');
+                        composedUrl = retryUrl;
+                        faceCount = e2.faceCount;
+                        humanCount = e2.humanCount;
+                        identityFailure = e2.identity;
+                        identityNotes = e2.notes;
+                      }
                     }
                   }
                 }
 
                 if (composedUrl) {
                   scene.referenceImageUrl = composedUrl;
-                  const auditMeta = {
-                    anchor_face_audit: {
-                      detected: faceCount,
-                      expected: expectedFaces,
-                      ok: faceCount === expectedFaces && identityFailure === null,
-                      identityFailure,
-                      notes: identityNotes || undefined,
-                      at: new Date().toISOString(),
-                    },
-                  };
-                  await supabaseAdmin
-                    .from('composer_scenes')
-                    .update({
-                      reference_image_url: composedUrl,
-                      updated_at: new Date().toISOString(),
-                      audio_plan: { ...((scene as any).audioPlan ?? {}), twoshot: { ...(((scene as any).audioPlan ?? {}).twoshot ?? {}), ...auditMeta } },
-                    })
-                    .eq('id', scene.id);
-                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? '?'}/${expectedFaces}, identity=${identityFailure ?? 'ok'}) → ${composedUrl.slice(0, 80)}…`);
+                  if (!skipAuditPersist) {
+                    const okFinal =
+                      identityFailure === null &&
+                      (faceCount === null || faceCount === expectedFaces) &&
+                      (humanCount === null || humanCount === expectedFaces);
+                    const auditMeta = {
+                      anchor_face_audit: {
+                        version: ANCHOR_AUDIT_VERSION,
+                        detected: faceCount,
+                        humans: humanCount,
+                        expected: expectedFaces,
+                        ok: okFinal,
+                        identityFailure,
+                        notes: identityNotes || undefined,
+                        at: new Date().toISOString(),
+                      },
+                    };
+                    await supabaseAdmin
+                      .from('composer_scenes')
+                      .update({
+                        reference_image_url: composedUrl,
+                        updated_at: new Date().toISOString(),
+                        audio_plan: { ...((scene as any).audioPlan ?? {}), twoshot: { ...(((scene as any).audioPlan ?? {}).twoshot ?? {}), ...auditMeta } },
+                      })
+                      .eq('id', scene.id);
+                  }
+                  console.log(`[compose-video-clips] cinematic-sync scene ${scene.id}: anchor pinned (faces=${faceCount ?? '?'}/${expectedFaces}, humans=${humanCount ?? '?'}/${expectedFaces}, identity=${identityFailure ?? 'ok'}) → ${composedUrl.slice(0, 80)}…`);
 
-                  // Hard-abort BEFORE Hailuo/Sync.so spend credits when the
-                  // anchor is not exactly right.
+                  // Hard-abort BEFORE Hailuo/Sync.so spend credits.
                   const reasonMap: Record<string, string> = {
                     clone: 'anchor_identity_duplicate_detected',
                     extra: 'anchor_extra_person_detected',
@@ -670,13 +705,19 @@ serve(async (req) => {
                   };
                   if (identityFailure) {
                     const code = reasonMap[identityFailure] ?? 'anchor_identity_failed';
-                    const msg = `${code}: ${identityNotes || identityFailure} (faces=${faceCount ?? '?'}/${expectedFaces}) — anchor wurde 2× neu gerendert und ist weiterhin nicht sauber. Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
+                    const msg = `${code}: ${identityNotes || identityFailure} (faces=${faceCount ?? '?'}/${expectedFaces}, humans=${humanCount ?? '?'}/${expectedFaces}) — Anchor wurde 2× neu gerendert und ist weiterhin nicht sauber. Bitte "🎥 Clip + Lip-Sync neu rendern" drücken oder Charakter-Portraits prüfen.`;
                     await supabaseAdmin.from('composer_scenes').update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() }).eq('id', scene.id);
                     results.push({ sceneId: scene.id, status: 'failed', error: msg });
                     continue;
                   }
-                  if (faceCount !== null && faceCount < expectedFaces) {
-                    const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} faces visible after 2 compose attempts`;
+                  if (humanCount !== null && humanCount > expectedFaces) {
+                    const msg = `anchor_extra_person_detected: ${humanCount}/${expectedFaces} Personen sichtbar — ein zusätzlicher Mensch wurde in die Szene gerendert (eventuell im Profil/Hintergrund).`;
+                    await supabaseAdmin.from('composer_scenes').update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() }).eq('id', scene.id);
+                    results.push({ sceneId: scene.id, status: 'failed', error: msg });
+                    continue;
+                  }
+                  if (faceCount !== null && faceCount < expectedFaces && (humanCount === null || humanCount < expectedFaces)) {
+                    const msg = `anchor_missing_speakers: ${faceCount}/${expectedFaces} Gesichter sichtbar nach 2 Compose-Versuchen`;
                     console.warn(`[compose-video-clips] cinematic-sync scene ${scene.id}: aborting — ${msg}`);
                     await supabaseAdmin
                       .from('composer_scenes')
@@ -690,7 +731,7 @@ serve(async (req) => {
                     continue;
                   }
                   if (faceCount !== null && faceCount > expectedFaces) {
-                    const msg = `anchor_extra_person_detected: ${faceCount}/${expectedFaces} faces visible — an extra person was rendered in the scene.`;
+                    const msg = `anchor_extra_person_detected: ${faceCount}/${expectedFaces} Gesichter sichtbar — eine zusätzliche Person wurde gerendert.`;
                     await supabaseAdmin.from('composer_scenes').update({ clip_status: 'failed', clip_error: msg, updated_at: new Date().toISOString() }).eq('id', scene.id);
                     results.push({ sceneId: scene.id, status: 'failed', error: msg });
                     continue;

@@ -1,104 +1,91 @@
-## Ziel
+## Befund
 
-Lip Sync läuft jetzt, aber der vorgelagerte Scene-Anchor ist noch nicht streng genug: Er erlaubt aktuell faktisch „mindestens 2 Gesichter“. Dadurch kann das Bild 3 Personen enthalten, z. B. Charakter A doppelt plus Charakter B einmal. Die saubere Lösung ist: Für Two-Shot-Szenen darf der Anchor nur exakt die erwarteten Charaktere enthalten, jede Identität genau einmal.
+Ja, das Problem kann weiterhin bestehen – aber nicht mehr wegen Sync.so. In der aktuellen Szene ist der Lip-Sync erfolgreich, jedoch basiert er auf einem bereits falschen Master-Clip/Anchor: Im gespeicherten `faceMap` wurden nur 2 Gesichter erkannt, obwohl visuell 3 Personen im Bild sind. Außerdem fehlt bei der sichtbaren Szene die neue `anchor_face_audit`-Metadatenmarkierung, d. h. sie ist sehr wahrscheinlich vor bzw. außerhalb der neuen Strict-Audit-Schiene durchgelaufen oder die Prüfung hat den dritten Menschen nicht als klares Gesicht gezählt.
 
-## Ursache
+## Saubere Lösung
 
-Aktuell prüft die Pipeline hauptsächlich:
+### 1. Bestehende Szene nicht weiterverwenden
+Die aktuelle Szene muss vollständig als visueller Clip neu gerendert werden, nicht nur Lip-Sync neu ausführen. Dazu werden für die betroffene Szene gelöscht/zurückgesetzt:
 
-- Sind mindestens so viele Gesichter sichtbar wie erwartet?
-- Sind die Referenzpersonen grundsätzlich vorhanden?
-
-Das reicht für diesen Fehler nicht, weil dein Screenshot diesen Fall zeigt:
-
-```text
-Erwartet:   Person A + Person B
-Ist-Bild:   Person A + Person B + Person A-Klon
-```
-
-Das besteht eine „mindestens 2 Gesichter“-Prüfung, ist aber für Lip Sync und Story-Konsistenz falsch.
-
-## Plan
-
-### 1. Anchor-Prompt auf „exakt N Personen“ härten
-
-`compose-scene-anchor` soll für Multi-Character-Szenen nicht nur sagen „alle Personen sichtbar“, sondern verbindlich:
-
-- Exakt 2 Menschen im Bild bei zwei Charakteren.
-- Keine dritte Person, kein Statist, kein Spiegelbild, kein Duplikat.
-- Jede Referenzperson genau einmal.
-- Klare Slot-Zuordnung: Referenz #1 links, Referenz #2 rechts bzw. definierte Screen-Positionen.
-- Bei Business-/Meeting-Szenen ausdrücklich keine zusätzliche Person im Vordergrund oder am Tisch.
-
-Damit wird das Bildmodell weniger wahrscheinlich einen „extra Kollegen“ generieren.
-
-### 2. Audit von „mindestens genug“ auf „exakt richtig“ ändern
-
-In `compose-video-clips` wird die Face-Audit-Regel geändert:
-
-```text
-Bisher: faceCount >= expectedFaces ist ok
-Neu:    faceCount === expectedFaces ist ok
-        faceCount < expectedFaces -> missing speakers
-        faceCount > expectedFaces -> extra/clone/person inserted
-```
-
-Für Two-Shot bedeutet das: 3 Gesichter bei 2 erwarteten Charakteren wird hart abgelehnt, bevor Hailuo oder Sync.so Credits verbrauchen.
-
-### 3. Identity-Audit auf „jede Identität genau einmal“ erweitern
-
-`_shared/identity-audit.ts` soll nicht nur prüfen, ob Referenz A und B vorhanden sind, sondern auch:
-
-- Wie viele sichtbare Hauptgesichter gibt es insgesamt?
-- Welche Gesichter matchen Referenz #1?
-- Welche Gesichter matchen Referenz #2?
-- Gibt es extra Gesichter ohne Referenz?
-- Kommt dieselbe Referenzidentität mehr als einmal vor?
-
-Abbruchgründe werden dadurch klarer:
-
-```text
-anchor_extra_person_detected
-anchor_identity_duplicate_detected
-anchor_identity_missing_detected
-anchor_identity_ambiguous
-```
-
-### 4. Retry nur mit gezieltem Anti-Duplikat-Prompt
-
-Wenn der erste Anchor 3 statt 2 Personen enthält oder eine Identität doppelt zeigt:
-
-- Cache für diese Szene löschen.
-- Einmal neu rendern mit verschärftem Prompt:
-  - „Remove all extra humans.“
-  - „Only the two reference people may appear.“
-  - „Do not duplicate either person.“
-- Wenn der zweite Versuch wieder falsch ist: Szene sauber abbrechen statt falschen Clip zu erzeugen.
-
-### 5. Bestehende kaputte Szene neu starten
-
-Nach dem Fix wird für die betroffene Szene gelöscht:
-
-- geklonter `reference_image_url`
+- `clip_url`
+- `lip_sync_source_clip_url`
+- `reference_image_url`
 - `lock_reference_url`
-- `scene_anchor_cache`
-- aktueller Clip/Lip-Sync-Zustand
-- alte FaceMap/SyncJobs im `audio_plan.twoshot`
+- Two-shot `faceMap`, `syncJobs`, `heartbeat`
+- `clip_status` zurück auf neu generierbar
 
-Danach läuft sie einmal durch die neue strengere Pipeline.
+Sonst lip-synct das System weiterhin denselben falschen 3-Personen-Clip.
 
-### 6. UI-Fehler verständlicher machen
+### 2. Anchor-Prüfung darf nicht nur Gesichter zählen
+Der aktuelle `countFacesInImage` zählt nur „klar sichtbare Gesichter“. In deinem Screenshot steht die zusätzliche Person seitlich/profilartig – genau so ein Fall kann vom Count als „nicht klar identifizierbar“ ignoriert werden.
 
-Wenn der Anchor abgelehnt wird, soll im Composer nicht nur generisch „fehlgeschlagen“ stehen, sondern z. B.:
+Ich würde daher eine zweite Audit-Stufe ergänzen:
+
+- `countHumansInImage`: zählt sichtbare menschliche Körper/Personen, nicht nur Frontalgesichter.
+- Für Two-Shot gilt dann:
+  - `humans === expectedCharacters`
+  - `faces >= expectedCharacters` nur als Zusatzsignal
+  - wenn `humans > expectedCharacters`: harter Abbruch `anchor_extra_person_detected`
+
+Damit wird „2 Gesichter, aber 3 Körper“ zuverlässig abgefangen.
+
+### 3. Strict-Audit auch für bereits komponierte Anchors erzwingen
+Aktuell wird die Cinematic-Sync-Sicherheitslogik nur aktiv, wenn `referenceImageUrl` nicht wie ein komponierter Anchor aussieht. Wenn aber ein falscher `/scene-anchors/`-Anchor bereits gespeichert ist, kann die Pipeline ihn überspringen.
+
+Ich würde ändern:
+
+- Bei Cinematic-Sync + 2+ Cast immer Audit durchführen, auch wenn `referenceImageUrl` schon ein `/scene-anchors/`-Bild ist.
+- Nur wenn `anchor_face_audit.ok === true` und die Audit-Version aktuell ist, darf der bestehende Anchor wiederverwendet werden.
+- Sonst Cache invalidieren und neu rendern.
+
+### 4. Provider-Prompt zusätzlich auf „two-person isolation“ umstellen
+Beim zweiten Strict-Retry wird der Prompt noch stärker eingeschränkt:
+
+- „exactly two people total in the entire image“
+- „empty office background, no colleagues, no third body, no partial person“
+- „crop/framing must exclude all other humans“
+- bei 2 Personen: explizite Rollenpositionierung links/rechts
+
+Das reduziert die Wahrscheinlichkeit, dass Nano Banana oder Hailuo aus einer Business-Szene automatisch einen dritten Kollegen ergänzt.
+
+### 5. Hailuo-Output nach dem Master-Clip prüfen
+Selbst wenn der Anchor korrekt ist, kann das i2v-Modell im Video eine dritte Person ergänzen. Deshalb würde ich nach dem Master-Clip-Render eine First-Frame-Prüfung ergänzen:
+
+- Frame aus dem erzeugten Clip extrahieren bzw. vorhandene erste Frame-Quelle nutzen.
+- `countHumansInImage` auf den Master-Clip-Frame anwenden.
+- Wenn `humans > expectedCharacters`, Clip als fehlerhaft markieren und nicht zu Sync.so weitergeben.
+
+Falls First-Frame-Extraktion serverseitig aktuell zu groß ist, machen wir das mindestens auf dem Anchor sofort und markieren Master-Clip-Validierung als nächsten Schritt.
+
+### 6. UI-Status klarer machen
+Wenn die Szene wegen 3 Personen gestoppt wird, soll die UI klar sagen:
 
 ```text
-Anchor enthält zusätzliche Person: 3/2 Gesichter erkannt
-Charakter wurde doppelt erkannt: bitte Anchor neu rendern
+Anchor enthält zusätzliche Person: 3/2 Personen erkannt. Clip wurde nicht weiter lip-synct.
 ```
+
+Oder:
+
+```text
+Master-Clip enthält zusätzliche Person: 3/2 Personen erkannt. Bitte Clip neu rendern.
+```
+
+## Technische Änderungen
+
+- Neue Shared-Hilfe in `supabase/functions/_shared/face-count.ts` oder separater Datei: `countHumansInImage`.
+- `compose-video-clips`:
+  - Cinematic-Sync-Anchors immer auditieren, nicht nur wenn sie neu komponiert wurden.
+  - Audit-Version in `audio_plan.twoshot.anchor_face_audit.version` speichern.
+  - Existing Anchors ohne aktuelle Audit-Version invalidieren.
+  - Hard-Abort bei `humans > expectedFaces`.
+- `compose-scene-anchor`:
+  - Cache-Key auf neue Version erhöhen.
+  - Strict-Retry-Prompt um „no third body / no partial person / no colleague“ erweitern.
+- Betroffene Szene `4e771db5-cc40-40ec-b889-58057a3c9855` vollständig resetten, damit sie wirklich neu durchläuft.
 
 ## Erwartetes Ergebnis
 
-- Two-Shot-Szenen mit 2 Charakteren enthalten exakt 2 Personen.
-- Ein geklonter dritter Charakter wird vor Video- und Lip-Sync-Generierung erkannt.
-- Keine Credits werden für sichtbar falsche Anchors verbrannt.
-- Wenn das Bildmodell trotz Retry keinen sauberen Anchor schafft, stoppt die Szene klar mit verständlicher Fehlermeldung.
+- Ein Two-Shot mit 2 Charakteren darf nicht mehr als 2 sichtbare Menschen enthalten – auch nicht, wenn nur 2 Gesichter erkannt werden.
+- Bereits gespeicherte fehlerhafte Anchors werden nicht still wiederverwendet.
+- Die falsche Szene wird neu erzeugt statt nur erneut gelip-synct.
+- Wenn das Bild-/Video-Modell trotzdem eine dritte Person einfügt, stoppt die Pipeline vor weiteren Kosten mit einer eindeutigen Fehlermeldung.
