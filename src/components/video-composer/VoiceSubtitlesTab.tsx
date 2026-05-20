@@ -45,6 +45,7 @@ import { ScriptTagToolbar } from '@/components/video-composer/voice-studio/Scrip
 import { SegmentCardList } from '@/components/video-composer/voice-studio/SegmentCardList';
 import { isMultiSpeakerScript, parseSpeakerScript } from '@/lib/voice-studio/parseSpeakerScript';
 import { stitchSpeakerSegments } from '@/lib/voice-studio/stitchSpeakerSegments';
+import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import type { MultiSpeakerVoiceCfg } from '@/types/video-composer';
 
 interface VoiceSubtitlesTabProps {
@@ -281,6 +282,7 @@ export default function VoiceSubtitlesTab({
       if (!ok) return;
     }
     setGeneratingVo(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Nicht eingeloggt');
@@ -454,6 +456,7 @@ export default function VoiceSubtitlesTab({
     } catch (err: any) {
       toast({ title: t('videoComposer.voError'), description: err.message, variant: 'destructive' });
     } finally {
+      emitPipelineEvent({ type: 'voiceover:end' });
       setGeneratingVo(false);
     }
   };
