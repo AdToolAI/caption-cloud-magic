@@ -615,12 +615,25 @@ serve(async (req) => {
             const castShots = (scene.characterShots ?? []).filter(
               (s) => s && s.shotType !== 'absent' && s.characterId,
             );
-            if (castShots.length >= 2) {
-              const portraitUrls = castShots
+            // Speaker-list override: when a dialog script is present, the
+            // visual cast MUST equal the deduplicated set of actual speakers,
+            // in script order. This prevents the "Samuel speaks twice → 3
+            // people in frame" failure mode by only sending portraits of
+            // people who actually speak.
+            const scriptSpeakers = uniqueSpeakerSlugsFromScript(scene.dialogScript);
+            let effectiveShots = castShots;
+            if (scriptSpeakers.length > 0) {
+              const remapped = scriptSpeakers
+                .map((slug) => resolveSpeakerToShot(slug, castShots))
+                .filter((x): x is { characterId: string; shotType: CharacterShotType } => !!x);
+              if (remapped.length >= 1) effectiveShots = remapped;
+            }
+            if (effectiveShots.length >= 2) {
+              const portraitUrls = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
                 .filter((u): u is string => typeof u === 'string' && u.length > 0)
                 .slice(0, 4);
-              const characterNames = castShots
+              const characterNames = effectiveShots
                 .map((cs) => charById.get(cs.characterId)?.name)
                 .filter((n): n is string => typeof n === 'string' && n.length > 0);
               if (portraitUrls.length >= 2) {
