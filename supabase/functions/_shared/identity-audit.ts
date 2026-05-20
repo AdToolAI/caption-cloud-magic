@@ -2,23 +2,34 @@
  * Identity audit for multi-character scene anchors.
  *
  * Sends the composed anchor + each reference portrait to Gemini Vision and
- * asks whether all reference identities appear distinctly in the anchor.
- * Catches the "Nano Banana 2 cloned one character" failure mode BEFORE we
- * spend Hailuo + Sync.so credits.
+ * asks for a STRICT identity bookkeeping:
+ *   - total distinct people visible in the anchor
+ *   - per reference: how many times that identity appears (0 = missing, 1 = ok, ≥2 = cloned)
+ *   - extra people that don't match any reference
+ *
+ * Catches THREE failure modes BEFORE we burn Hailuo + Sync.so credits:
+ *   1. CLONE     — same reference rendered twice (or two anchor faces look identical)
+ *   2. EXTRA     — an additional unrelated person appears (3rd colleague, bystander)
+ *   3. MISSING   — a reference person did not appear at all
  *
  * Returns:
- *   - { ok: true }                   — all references map to distinct faces
- *   - { ok: false, reason: 'clone' } — at least one reference appears twice
- *                                       or two faces in anchor look identical
- *   - { ok: false, reason: 'missing', missing: [names] } — references not found
- *   - null                            — call failed; caller decides
+ *   - { ok: true }
+ *   - { ok: false, reason: 'clone' | 'extra' | 'missing' | 'ambiguous', ... }
+ *   - null on transport failure (caller decides)
  */
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 export interface IdentityAuditResult {
   ok: boolean;
-  reason?: "clone" | "missing" | "ambiguous";
+  reason?: "clone" | "missing" | "ambiguous" | "extra";
+  /** Names of references that did not appear in the anchor. */
   missing?: string[];
+  /** Names of references that appear more than once. */
+  duplicated?: string[];
+  /** Total number of distinct humans in the anchor (best-effort). */
+  totalPeople?: number;
+  /** Number of extra humans beyond the reference set. */
+  extraPeople?: number;
   detail?: string;
 }
 
@@ -30,16 +41,26 @@ export async function auditAnchorIdentity(
   timeoutMs = 25_000,
 ): Promise<IdentityAuditResult | null> {
   if (!anchorUrl || portraitUrls.length < 2 || !lovableKey) return null;
+  const N = portraitUrls.length;
   const refLabel = portraitUrls
     .map((_, i) => `reference #${i + 1}${names[i] ? ` = ${names[i]}` : ""}`)
     .join(", ");
   const text =
-    `You will receive a COMPOSED SCENE image followed by ${portraitUrls.length} REFERENCE PORTRAITS (${refLabel}). ` +
-    `Decide whether each reference person appears as a CLEARLY DISTINCT individual in the composed scene. ` +
-    `A common failure is "cloning": the same reference person appears twice (or two faces look almost identical). ` +
-    `Reply STRICT JSON only, no prose: ` +
-    `{"matches":[{"ref":1,"present":true|false,"distinctFromOthers":true|false}, ...],` +
-    `"clonedPair":[i,j]|null,"reason":"ok|clone|missing|ambiguous","notes":"<short>"}.`;
+    `You will receive a COMPOSED SCENE image followed by ${N} REFERENCE PORTRAITS (${refLabel}). ` +
+    `The composed scene MUST contain EXACTLY ${N} distinct humans, with each reference person appearing EXACTLY ONCE. ` +
+    `Audit it carefully. Watch for: ` +
+    `(a) "cloning" — the same reference appears twice, or two anchor faces look identical; ` +
+    `(b) "extra people" — additional humans in the frame (colleagues at the desk, bystanders, posters/photos of people, mirror reflections of people, mannequins, statues, on-screen people); ` +
+    `(c) "missing" — a reference person does not appear at all. ` +
+    `Count posters/screens/mirrors/statues showing a human face as a "person" for this audit. ` +
+    `Reply with STRICT JSON only, no prose:\n` +
+    `{` +
+    `"totalPeople": <integer — distinct humans visible, including extras>,` +
+    `"perReference": [{"ref": 1, "appearances": <0|1|2|...>}, ...],` +
+    `"extraPeople": <integer — humans not matching any reference>,` +
+    `"reason": "ok|clone|extra|missing|ambiguous",` +
+    `"notes": "<short>"` +
+    `}.`;
 
   const content: any[] = [
     { type: "text", text },
@@ -63,15 +84,51 @@ export async function auditAnchorIdentity(
     const m = String(txt).match(/\{[\s\S]*\}/);
     if (!m) return null;
     const parsed = JSON.parse(m[0]);
-    const matches: Array<{ ref: number; present?: boolean; distinctFromOthers?: boolean }> = Array.isArray(parsed?.matches) ? parsed.matches : [];
-    const missing = matches.filter((x) => x?.present === false).map((x) => names[(x.ref ?? 1) - 1] ?? `#${x.ref}`);
-    const cloned = Array.isArray(parsed?.clonedPair) && parsed.clonedPair.length === 2;
     const reason = String(parsed?.reason ?? "").toLowerCase();
-    if (cloned || reason === "clone") return { ok: false, reason: "clone", detail: String(parsed?.notes ?? "").slice(0, 200) };
-    if (missing.length > 0 || reason === "missing") return { ok: false, reason: "missing", missing, detail: String(parsed?.notes ?? "").slice(0, 200) };
-    const allDistinct = matches.every((x) => x?.distinctFromOthers !== false);
-    if (!allDistinct) return { ok: false, reason: "ambiguous", detail: String(parsed?.notes ?? "").slice(0, 200) };
-    return { ok: true };
+    const detail = String(parsed?.notes ?? "").slice(0, 240);
+    const totalPeople = Number.isFinite(Number(parsed?.totalPeople)) ? Number(parsed.totalPeople) : undefined;
+    const extraPeople = Number.isFinite(Number(parsed?.extraPeople)) ? Number(parsed.extraPeople) : undefined;
+    const perRef: Array<{ ref: number; appearances?: number }> = Array.isArray(parsed?.perReference) ? parsed.perReference : [];
+
+    const missing: string[] = [];
+    const duplicated: string[] = [];
+    for (const entry of perRef) {
+      const idx = Number(entry?.ref);
+      if (!Number.isFinite(idx) || idx < 1 || idx > N) continue;
+      const appearances = Number(entry?.appearances ?? 0);
+      const name = names[idx - 1] ?? `#${idx}`;
+      if (appearances <= 0) missing.push(name);
+      else if (appearances >= 2) duplicated.push(name);
+    }
+
+    // Priority of failures: clone > extra > missing > ambiguous. A clone is
+    // the most damaging because lipsync will target the wrong face.
+    if (duplicated.length > 0 || reason === "clone") {
+      return {
+        ok: false,
+        reason: "clone",
+        duplicated: duplicated.length > 0 ? duplicated : undefined,
+        totalPeople,
+        extraPeople,
+        detail: detail || `duplicated: ${duplicated.join(", ") || "unspecified"}`,
+      };
+    }
+    if ((extraPeople !== undefined && extraPeople > 0) || reason === "extra" || (totalPeople !== undefined && totalPeople > N)) {
+      return {
+        ok: false,
+        reason: "extra",
+        totalPeople,
+        extraPeople,
+        detail: detail || `extra people in frame (total=${totalPeople ?? "?"}, expected=${N})`,
+      };
+    }
+    if (missing.length > 0 || reason === "missing") {
+      return { ok: false, reason: "missing", missing, totalPeople, extraPeople, detail };
+    }
+    if (reason === "ambiguous") {
+      return { ok: false, reason: "ambiguous", totalPeople, extraPeople, detail };
+    }
+    return { ok: true, totalPeople, extraPeople };
   } catch {
     return null;
   }
