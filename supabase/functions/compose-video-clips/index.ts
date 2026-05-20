@@ -861,12 +861,23 @@ serve(async (req) => {
         const refUrl = String(scene.referenceImageUrl ?? '');
         const looksComposed = refUrl.includes('/scene-anchors/') || refUrl.includes('/composer-anchors/');
         if (isI2V && !isHeygenRoute && !isCinematicSync && !refUrl) {
-          const castShots = (scene.characterShots ?? []).filter(
+          const castShotsRaw = (scene.characterShots ?? []).filter(
             (s) => s && s.shotType !== 'absent' && s.characterId,
           );
           // Also accept the legacy singular characterShot.
-          if (castShots.length === 0 && scene.characterShot && scene.characterShot.shotType !== 'absent') {
-            castShots.push(scene.characterShot);
+          if (castShotsRaw.length === 0 && scene.characterShot && scene.characterShot.shotType !== 'absent') {
+            castShotsRaw.push(scene.characterShot);
+          }
+          // Speaker-list override (same logic as cinematic-sync above): when
+          // a dialog script is present, only the people who actually speak
+          // get a portrait slot in the anchor.
+          const scriptSpeakers = uniqueSpeakerSlugsFromScript(scene.dialogScript);
+          let castShots = castShotsRaw;
+          if (scriptSpeakers.length > 0) {
+            const remapped = scriptSpeakers
+              .map((slug) => resolveSpeakerToShot(slug, castShotsRaw))
+              .filter((x): x is { characterId: string; shotType: CharacterShotType } => !!x);
+            if (remapped.length >= 1) castShots = remapped;
           }
           if (castShots.length >= 1 && !looksComposed) {
             const portraitUrls = castShots
@@ -877,7 +888,11 @@ serve(async (req) => {
               .map((cs) => charById.get(cs.characterId)?.name)
               .filter((n): n is string => typeof n === 'string' && n.length > 0);
             if (portraitUrls.length >= 1) {
-              console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s)`);
+              const neutralFallback =
+                portraitUrls.length >= 2
+                  ? `Exactly ${portraitUrls.length} distinct people in a modern setting (${characterNames.join(' and ')}), each visible exactly once, natural conversation framing. No rendered text.`
+                  : 'Natural cinematic scene, photorealistic, no rendered text.';
+              console.log(`[compose-video-clips] universal anchor for ${src} scene ${scene.id}: composing ${portraitUrls.length} portrait(s) (speakers=${scriptSpeakers.length})`);
               try {
                 const anchorResp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/compose-scene-anchor`, {
                   method: 'POST',
@@ -890,7 +905,7 @@ serve(async (req) => {
                     portraitUrl: portraitUrls[0],
                     portraitUrls,
                     characterNames,
-                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || (portraitUrls.length >= 2 ? `Exactly ${portraitUrls.length} distinct people in a modern setting, each visible exactly once, natural conversation framing. No rendered text.` : 'Natural cinematic scene, photorealistic, no rendered text.'),
+                    scenePrompt: stripDialogForAnchor(scene.aiPrompt || '') || neutralFallback,
                     aspectRatio: '16:9',
                     shotType: castShots[0]?.shotType,
                   }),
