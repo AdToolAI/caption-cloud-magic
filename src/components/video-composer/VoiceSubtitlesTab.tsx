@@ -782,7 +782,13 @@ export default function VoiceSubtitlesTab({
             <div className="flex gap-2">
               <Button onClick={handleGenerateVoiceover} disabled={generatingVo || !voiceover.script.trim()} className="gap-2 flex-1">
                 {generatingVo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mic className="h-4 w-4" />}
-                {generatingVo ? t('videoComposer.generating') : (isMultiSpeakerScript(voiceover.script) ? `${t('videoComposer.generateVo')} · Multi-Speaker` : t('videoComposer.generateVo'))}
+                {generatingVo
+                  ? t('videoComposer.generating')
+                  : (voiceover.script.trim()
+                      ? (isMultiSpeakerScript(voiceover.script)
+                          ? `${t('videoComposer.generateClipWithVo')} · Multi-Speaker`
+                          : t('videoComposer.generateClipWithVo'))
+                      : t('videoComposer.generateVo'))}
               </Button>
             </div>
             {voiceover.audioUrl && (
