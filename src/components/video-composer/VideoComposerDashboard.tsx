@@ -39,6 +39,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import MotionStudioTemplatePicker from './MotionStudioTemplatePicker';
 import MotionStudioTopStepper, { type TopStepperStep } from './MotionStudioTopStepper';
+import PipelineProgressBar from './PipelineProgressBar';
 import AutoDirectorWizard from './AutoDirectorWizard';
 import AdDirectorWizard from './AdDirectorWizard';
 import ShareProjectDialog from './ShareProjectDialog';
@@ -1246,6 +1247,11 @@ export default function VideoComposerDashboard() {
           onSelect={(id) => handleTabChange(id as TabId)}
         />
       </div>
+
+      <PipelineProgressBar
+        scenes={project.scenes}
+        assemblyConfig={project.assemblyConfig}
+      />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-6">
