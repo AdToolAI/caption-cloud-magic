@@ -45,6 +45,7 @@ function resolveSpeakerCount(scene: any): number {
 
 export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
+  const progressActive = useRef(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -74,6 +75,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             hasSyncSoJob(d) &&
             !inflight.current.has(`poll:${d.id}`),
         );
+        if (runningSyncJobs.length > 0 && !progressActive.current) {
+          progressActive.current = true;
+          emitPipelineEvent({ type: 'lipsync:start' });
+        }
         for (const d of runningSyncJobs) {
           inflight.current.add(`poll:${d.id}`);
           supabase.functions
@@ -132,7 +137,20 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           }
           return false;
         });
-        if (candidates.length === 0) return;
+        if (candidates.length === 0) {
+          const anyVisibleLipsyncWork = (data as any[]).some(
+            (d) =>
+              d.engine_override === 'cinematic-sync' &&
+              !d.lip_sync_applied_at &&
+              (d.lip_sync_status === 'running' ||
+                (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
+          );
+          if (!anyVisibleLipsyncWork && progressActive.current) {
+            progressActive.current = false;
+            emitPipelineEvent({ type: 'lipsync:end' });
+          }
+          return;
+        }
 
 
         // Optimistischer Client-Lock — verhindert Doppel-Trigger im selben Tick.
@@ -140,7 +158,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Function reserviert Credits und setzt den Status atomar selbst;
         // sonst blockiert ihre Duplicate-Run-Sperre den frisch gestarteten Job.
         candidates.forEach((d) => inflight.current.add(d.id));
-        emitPipelineEvent({ type: 'lipsync:start' });
+        if (!progressActive.current) {
+          progressActive.current = true;
+          emitPipelineEvent({ type: 'lipsync:start' });
+        }
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
