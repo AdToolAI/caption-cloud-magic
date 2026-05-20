@@ -112,9 +112,11 @@ serve(async (req) => {
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
-    // v6 — bumped after two-shot framing enforcement (mandatory N-shot
-    // composition with equal screen share + anti-occlusion negatives).
-    const promptHash = await sha1(`v6|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}`);
+    const strictMode = body.strictNoDuplicates === true;
+    // v7 — bumped after exact-count enforcement (no extra people, no clones).
+    const promptHash = await sha1(
+      `v7|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}`,
+    );
 
     const { data: cached } = await admin
       .from("scene_anchor_cache")
@@ -134,7 +136,8 @@ serve(async (req) => {
     // --- Build edit prompt ---
     const aspect = body.aspectRatio ?? "16:9";
     const isMulti = portraits.length > 1;
-    const peopleNoun = isMulti ? `these ${portraits.length} people` : "this person";
+    const N = portraits.length;
+    const peopleNoun = isMulti ? `these ${N} people` : "this person";
     const nameClause = names.length > 0
       ? ` Reference portraits, in strict order: ${names.map((n, i) => `Image #${i + 1} = ${n} (use ONLY image #${i + 1} for ${n}'s face)`).join("; ")}.`
       : "";
@@ -146,7 +149,7 @@ serve(async (req) => {
         `NO face morphing, NO blending of faces, NO "average" composite faces, NO de-aging, NO smoothing of skin texture. ` +
         `Identity preservation outranks aesthetics — keep the people looking like themselves even if the lighting is unflattering. ` +
         `Faces MUST remain clearly recognizable as the SAME individuals from the reference portraits — a stranger comparing the result to the references must immediately confirm they are the same people. ` +
-        `All ${portraits.length} characters appear together in the SAME frame, naturally placed per the scene (side by side, facing each other, in conversation), faces clearly visible to camera. ` +
+        `All ${N} characters appear together in the SAME frame, naturally placed per the scene (side by side, facing each other, in conversation), faces clearly visible to camera. ` +
         `If scene lighting differs, only adapt skin shading and color temperature — NEVER alter underlying face geometry, hair, or distinctive marks. ` +
         `Generic lookalikes, AI "average" faces, or substituted people are FORBIDDEN.`
       : ` ABSOLUTE IDENTITY LOCK: Copy this person's face pixel-for-pixel from the reference portrait. Preserve face shape, eyes, nose, mouth, hairline, hair, skin tone, ASYMMETRIC details and any distinctive marks EXACTLY. NO morphing, NO beautification, NO de-aging. Identity preservation outranks aesthetics. The result must be unmistakably the same person.`;
@@ -156,19 +159,33 @@ serve(async (req) => {
     // any spoken dialog, captions, or labels into the composed first frame.
     const NO_TYPOGRAPHY_SUFFIX =
       ` ABSOLUTELY NO rendered text of any kind: no captions, no subtitles, no speech bubbles, no spoken words rendered as text, no words on clothing or shirts, no signs, no labels, no logos with text, no watermarks, no on-screen titles. The image must contain ZERO typography. Treat any dialog quoted in the scene description as audio-only context — do NOT visualize it as text.`;
+    // EXACT-COUNT enforcement (multi only). The lipsync pipeline relies on
+    // the anchor showing EXACTLY N distinct faces — no extras, no duplicates,
+    // no background bystanders. This is the single biggest source of the
+    // "character appears twice / a third stranger appears" failure mode.
+    const EXACT_COUNT_SUFFIX = isMulti
+      ? ` EXACT PERSON COUNT — NON-NEGOTIABLE: the final image must show EXACTLY ${N} human beings — not ${N - 1}, not ${N + 1}, not ${N + 2}. ` +
+        `Each of the ${N} reference people appears EXACTLY ONCE. ` +
+        `FORBIDDEN: duplicating any reference person, rendering the same identity twice, twins, doppelgängers, clones, mirror reflections of a person, posters/photos of a person on the wall, screens showing a person, statues or mannequins of a person. ` +
+        `FORBIDDEN: any additional human beyond the ${N} references — no extra colleague, no bystander at the desk/table, no waiter, no passer-by in the background, no crowd, no silhouettes of other people, no hands or arms of unseen people entering the frame. ` +
+        `Empty background humans (out-of-focus crowd) are also FORBIDDEN. The frame contains EXACTLY ${N} people total.`
+      : "";
     // Two-shot framing enforcement — when ≥2 portraits, the downstream
     // lipsync pipeline REQUIRES that all N faces are clearly visible and
     // separable in the first frame. Without this, Hailuo i2v often crops
     // to a single character or stacks faces and the multi-pass face-target
     // lipsync collapses to one speaker. This rule is Artlist-parity.
     const TWO_SHOT_FRAMING_SUFFIX = isMulti
-      ? ` MANDATORY TWO-SHOT FRAMING: a wide ${portraits.length}-shot where ALL ${portraits.length} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${portraits.length} distinct faces.`
+      ? ` MANDATORY TWO-SHOT FRAMING: a wide ${N}-shot where ALL ${N} characters are fully visible in the SAME frame at roughly EQUAL screen share. Each face must be unobstructed, front-3/4 to camera, with clear separation between subjects (no occlusion, no overlap of heads). NEVER produce a single-character close-up, NEVER cut anyone out of frame, NEVER show only the back of a head. Position the subjects left/right or in a slight arc so a face detector can find ${N} distinct faces.`
       : "";
     const TWO_SHOT_NEGATIVE = isMulti
-      ? ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping.`
+      ? ` AVOID: single person, solo close-up, one face cropped to frame, back of head, full profile silhouette where the face is hidden, one character occluded by the other, faces overlapping, three people when only two are referenced, extra coworker, extra colleague, extra bystander, background crowd, twins, identical-looking people, repeated face.`
+      : "";
+    const STRICT_RETRY_SUFFIX = strictMode && isMulti
+      ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity or an extra human. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} people. Remove any extra humans. Do NOT repeat any reference person. Do NOT add anyone who is not in the references. If you cannot fit all ${N} references cleanly, prefer a slightly tighter framing over inventing extra people. Final headcount in frame: ${N}. Repeat: ${N}.`
       : "";
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
