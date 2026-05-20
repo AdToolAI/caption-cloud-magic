@@ -1,60 +1,36 @@
-## Diagnose
+## Befund
 
-Der Backend-Status ist gesund. Der aktuelle Fehler ist wieder Sync.so-seitig:
+Das aktuelle Lip-Sync schlägt nicht mehr wegen der alten `segments configuration` fehl. Der aktuelle Fehler ist:
 
-- Szene `a2bc5281-fa22-484b-a237-4cda3b158762` wurde mit `The segments configuration is invalid.` abgelehnt.
-- Auch der automatische Fallback-Job (`lipsync-2`) wurde abgelehnt.
-- Die gespeicherte Payload zeigt den wahrscheinlich entscheidenden Fehler: Wir fügen ein `tail_silence`-Segment von `6.316s` bis `8s` hinzu, das auf denselben Audio-Track zeigt, obwohl dort keine echte Sprache mehr liegt. Sync.so akzeptiert Segmente technisch, lehnt aber unsere konkrete Segment-Konfiguration ab.
-- Zusätzlich ist `sync-3` laut offizieller Doku zwar ein gültiges Modell, aber die dokumentierten Segments-Beispiele nutzen `lipsync-2`. Der Segments-Pfad ist für diesen Two-Shot-Fall zu fragil.
+- Sync.so startet Pass 1, bricht dann mit `An error occurred in the generation pipeline` ab.
+- Die Scene hat ein 1376×768 Video, aber der gespeicherte Face-Target-Punkt für links wurde als `[215,169]` an Sync.so geschickt.
+- Der echte linke Gesichtsmittelpunkt liegt im extrahierten Video-Frame sichtbar eher bei ca. `[315,190]` bis `[360,210]`. Der aktuelle Punkt sitzt zu weit links/oben am Haar-/Randbereich. Das kann Sync.so beim face-targeted Direct API Call crashen lassen.
+- Zusätzlich pollt `compose-twoshot-lipsync` teilweise noch selbst im Edge-Function-Hintergrund; für diese Art Job ist die robustere Architektur: Job starten, sofort zurückgeben, Client/Status-Function pollt weiter.
 
 ## Plan
 
-1. **Segments-API aus dem Standardpfad entfernen**
-   - Für Szenen mit 2 echten Charakteren nicht mehr `segments[]` verwenden.
-   - Kein `tail_silence` mehr an Sync.so senden.
-   - Segment-Mode nur noch als Legacy-Erkennung im Poller behalten, damit alte Jobs sauber auslaufen oder fehlschlagen können.
+1. **Face-Koordinaten korrigieren**
+   - In `compose-twoshot-lipsync` und `poll-twoshot-lipsync` die Target-Koordinaten nicht mehr aus `normCenter × videoDims` neu skalieren, wenn bereits echte Pixel-Center aus dem Anchor/Frame vorhanden sind.
+   - Stattdessen gespeicherte `center`-Koordinaten direkt verwenden und nur proportional anpassen, falls Video- und Anchor-Dimensionen wirklich unterschiedlich sind.
+   - Target-Punkte defensiv in die Face-Bounding-Box ziehen: lieber Gesichtszentrum als Haar-/Randpunkt.
 
-2. **Stabile 2-Pass-Face-Pipeline wieder aktivieren**
-   - Pro Sprecher den vorhandenen per-character WAV-Track nutzen (`audio_plan.twoshot.speakers[].track_url`).
-   - Pass 1 animiert das linke Gesicht mit Track 1.
-   - Pass 2 nimmt das Ergebnis aus Pass 1 und animiert das rechte Gesicht mit Track 2.
-   - Face-Ziele kommen aus dem bereits erfolgreichen `faceMap` (`left`/`right`), nicht aus automatischer Erkennung.
+2. **Provider-Payload vereinfachen**
+   - Für Two-Pass keine fragilen Extras mehr senden, die Sync.so intern triggern können.
+   - `active_speaker_detection.auto_detect=false` nur mit validierten Koordinaten; wenn Koordinaten nicht plausibel sind, klar failen + refund statt Provider-Crash.
 
-3. **Async korrekt machen**
-   - `compose-twoshot-lipsync` startet nur den ersten Sync.so-Job, speichert Job-ID + Pass-Status und gibt sofort `202` zurück.
-   - `poll-twoshot-lipsync` startet nach Abschluss von Pass 1 automatisch Pass 2.
-   - Nach Pass 2 wird das finale Video re-gehostet und die Szene auf `done` gesetzt.
+3. **Polling sauber aufteilen**
+   - `compose-twoshot-lipsync` soll nur Pass 1 erstellen, DB auf `running` setzen und sofort `202` zurückgeben.
+   - `poll-twoshot-lipsync` übernimmt Polling, startet Pass 2 nach Pass-1-Erfolg und finalisiert nach Pass 2.
+   - Dadurch vermeiden wir Edge-Function-Timeout-/WaitUntil-Risiko und folgen dem stabilen Client-Polling-Pattern.
 
-4. **Keine falsche Single-Mouth-Ausgabe**
-   - Wenn 2 Sprecher vorhanden sind, aber keine 2 Gesichter erkannt werden, bleibt der Job fehlgeschlagen mit Refund.
-   - Kein Single-Pass-Merged-Audio-Fallback für 2 Sprecher.
+4. **Fehlerdiagnose verbessern**
+   - Den kompletten Sync.so Poll-Response im `audio_plan.twoshot.syncJobs.jobs[].providerResponse` speichern.
+   - `targetCoords`, `faceCenter`, `bbox`, `videoDims`, `anchorDims` pro Pass speichern, damit der nächste Fehler sofort sichtbar ist.
 
-5. **Bessere Fehlerdiagnose und Refund-Sicherheit**
-   - Provider-Responses pro Pass in `audio_plan.twoshot.syncJobs.jobs[]` speichern.
-   - Refund bleibt idempotent: nur einmal pro fehlgeschlagenem Job.
-   - Fehlertext in der UI bleibt konkret (`pass_1`, `pass_2`, Zielgesicht, Provider-Fehler).
-
-6. **Betroffene Szene zurücksetzen**
-   - Szene `a2bc5281-fa22-484b-a237-4cda3b158762` auf `lip_sync_status='pending'` und `twoshot_stage='master_clip'` setzen.
-   - Bestehendes Video, FaceMap und Audio-Tracks behalten.
-   - Danach kann der Button „Lip-Sync neu rendern“ erneut gestartet werden.
-
-## Technische Änderungen
-
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-  - Two-shot mit 2 Sprechern startet wieder als `mode: 'two_pass'` statt `mode: 'segments'`.
-  - Nutzung von `startSyncSoDirectGeneration()` mit `targetCoords` pro Gesicht.
-  - Kein langer Polling-Loop im Compose-Handler.
-
-- `supabase/functions/poll-twoshot-lipsync/index.ts`
-  - `two_pass` als primärer Modus.
-  - Nach `COMPLETED` von Pass 1: Pass 2 starten.
-  - Nach `COMPLETED` von Pass 2: finalisieren.
-  - Segment-Fallback entfernen bzw. nur noch alte Segment-Jobs defensiv behandeln.
-
-- Datenkorrektur
-  - Nur Lip-Sync-Status und stale `syncJobs` der betroffenen Szene zurücksetzen; Assets bleiben erhalten.
+5. **Betroffene Scene zurücksetzen**
+   - Scene `840536cb-96f0-4912-9c31-bb9b2e46448f` auf `lip_sync_status='pending'`, `twoshot_stage='master_clip'` zurücksetzen.
+   - Stale `replicate_prediction_id` und `syncJobs` entfernen, aber Clip, FaceMap und Audio behalten.
 
 ## Erwartetes Ergebnis
 
-Der nächste Render nutzt keine problematische Sync.so-Segments-Konfiguration mehr. Stattdessen wird pro Gesicht gezielt ein eigener Sprecher-Track angewendet, wodurch beide Personen sichtbar bleiben und nicht beide Stimmen aus einem Mund kommen.
+Nach dem nächsten Klick auf „Lip-Sync neu rendern“ wird Pass 1 mit korrektem Gesichtspunkt gestartet; falls Sync.so dennoch ablehnt, haben wir vollständige Provider-Daten und automatische Credit-Erstattung statt erneutem Blindflug.
