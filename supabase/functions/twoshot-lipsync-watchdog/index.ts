@@ -49,8 +49,20 @@ serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  const summary = {
-    polled: 0,
+  const invokeFn = async (name: string, body: Record<string, unknown>) => {
+    const r = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok && r.status >= 500) {
+      const txt = await r.text().catch(() => "");
+      throw new Error(`${name}_${r.status}: ${txt.slice(0, 200)}`);
+    }
+    return r;
+  };
+
+
     refundedPresync: 0,
     refundedSyncTimeout: 0,
     reinvoked: 0,
