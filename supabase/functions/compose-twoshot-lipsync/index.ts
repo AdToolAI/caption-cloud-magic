@@ -299,13 +299,12 @@ async function startSyncSoSegmentsJob(
     { type: "video", url: params.videoUrl },
     { type: "audio", url: params.mergedAudioUrl, refId: REF },
   ];
-  const maxTimeline = Math.max(
-    0.1,
-    Math.min(
-      Number(params.audioDurationSec) || Number.POSITIVE_INFINITY,
-      Number(params.videoDurationSec) || Number.POSITIVE_INFINITY,
-    ),
-  );
+  const audioDur = Number(params.audioDurationSec);
+  const videoDur = Number(params.videoDurationSec);
+  const finiteDurations = [audioDur, videoDur].filter((n) => Number.isFinite(n) && n > 0);
+  const maxTimeline = finiteDurations.length
+    ? Math.max(0.1, Math.min(...finiteDurations))
+    : Math.max(0.1, ...params.segments.map((s) => Number(s.endSec)).filter((n) => Number.isFinite(n)));
   const normalized = [...params.segments]
     .map((s) => ({ startSec: Number(s.startSec), endSec: Number(s.endSec) }))
     .filter((s) => Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec > s.startSec)
@@ -968,7 +967,7 @@ serve(async (req) => {
           return;
         }
 
-        let jobId: string;
+        let jobId = "";
         let bodyMeta: Record<string, unknown> = {};
         try {
           let result = await startSyncSoSegmentsJob(
