@@ -143,11 +143,10 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v11 — bumped after removing complete Featuring clauses and adding
-    // names/count to the safe fallback (prevents wrong-face/extra-person leak
-    // when a slot label and trailing description name different characters).
+    // v12 — bumped after forcing cinematic-sync to clear stale per-scene cache
+    // and preserving audio_plan.twoshot when persisting audit metadata.
     const promptHash = await sha1(
-      `v11|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
+      `v12|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
     );
 
     const { data: cached } = await admin
