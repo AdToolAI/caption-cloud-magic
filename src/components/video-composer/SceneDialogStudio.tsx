@@ -450,6 +450,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const handleGenerateInline = async () => {
     let pid = '';
     let sceneId = scene.id;
+    setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
     try {
       const ids = await resolvePersistedIds();
       if (!ids) {
@@ -458,12 +460,16 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           description: PROJECT_REQUIRED[language],
           variant: 'destructive',
         });
+        emitPipelineEvent({ type: 'voiceover:end' });
+        setGenerating(false);
         return;
       }
       pid = ids.pid;
       sceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
+      emitPipelineEvent({ type: 'voiceover:end' });
+      setGenerating(false);
       return;
     }
     // Pin dialog into the visible AI prompt immediately so the user sees the
@@ -474,8 +480,6 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         onUpdate({ dialogScript: script, dialogVoices: voicePerSpeaker, aiPrompt: dialogPrompt });
       }
     } catch (_) { /* noop — non-fatal */ }
-    setGenerating(true);
-    emitPipelineEvent({ type: 'voiceover:start' });
     let okCount = 0;
     let cumulativeOffset = 0;
     const timedBlocks: typeof blocks = [];
