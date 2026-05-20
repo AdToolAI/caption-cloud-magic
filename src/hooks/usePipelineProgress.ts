@@ -130,7 +130,7 @@ export function usePipelineProgress({
           lipsyncDone: lipTargets.filter(
             (s) =>
               (s as any).lipSyncStatus === 'done' ||
-              (s as any).lipSyncStatus === 'ready' ||
+              ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
               (s as any).twoshotStage === 'done' ||
               (s as any).twoshotStage === 'complete',
           ).length,
@@ -212,8 +212,7 @@ export function usePipelineProgress({
     );
     const done = targets.filter(
       (s) =>
-        (s as any).lipSyncStatus === 'done' ||
-        (s as any).lipSyncStatus === 'ready' ||
+        ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
         (s as any).twoshotStage === 'done' ||
         (s as any).twoshotStage === 'complete',
     ).length;
