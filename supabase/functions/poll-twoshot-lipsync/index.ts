@@ -90,6 +90,32 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
   return String(data.id);
 }
 
+async function startSegmentsFallbackJob(
+  syncApiKey: string,
+  params: { videoUrl: string; audioUrl: string; segments: Array<Record<string, unknown>> },
+): Promise<string> {
+  const resp = await fetch("https://api.sync.so/v2/generate", {
+    method: "POST",
+    headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "lipsync-2",
+      input: [
+        { type: "video", url: params.videoUrl },
+        { type: "audio", url: params.audioUrl, refId: "vo_merged" },
+      ],
+      segments: params.segments,
+      options: { sync_mode: "remap", output_format: "mp4" },
+    }),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new Error(`segments_fallback_create_${resp.status}: ${txt.slice(0, 500)}`);
+  }
+  const data = await resp.json();
+  if (!data?.id) throw new Error(`segments_fallback_missing_id: ${JSON.stringify(data).slice(0, 240)}`);
+  return String(data.id);
+}
+
 async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string }> {
   const resp = await fetch(`https://api.sync.so/v2/generate/${jobId}`, {
     headers: { "x-api-key": syncApiKey },
