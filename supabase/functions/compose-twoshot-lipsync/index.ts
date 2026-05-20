@@ -288,25 +288,60 @@ async function startSyncSoSegmentsJob(
      *  example from https://sync.so/docs/developer-guides/segments . */
     segments: Array<{ startSec: number; endSec: number }>;
     model?: string;
+    audioDurationSec?: number;
+    videoDurationSec?: number;
   },
   label: string,
 ): Promise<{ jobId: string; bodyMeta: Record<string, unknown> }> {
   const REF = "vo_merged";
+  const model = params.model ?? "sync-3";
   const inputArr: Array<Record<string, unknown>> = [
     { type: "video", url: params.videoUrl },
-    { type: "audio", url: params.mergedAudioUrl, refId: REF },
+    // The REST schema documents `refId`; some SDK examples use `ref_id`.
+    // Supplying both keeps this resilient across Sync.so parser variants.
+    { type: "audio", url: params.mergedAudioUrl, refId: REF, ref_id: REF },
   ];
-  const segments = params.segments.map((s) => ({
-    startTime: Math.max(0, Number(s.startSec.toFixed(3))),
-    endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
-    audioInput: {
-      refId: REF,
-      startTime: Math.max(0, Number(s.startSec.toFixed(3))),
-      endTime: Math.max(Number(s.startSec.toFixed(3)) + 0.05, Number(s.endSec.toFixed(3))),
-    },
-  }));
+  const maxTimeline = Math.max(
+    0.1,
+    Math.min(
+      Number(params.audioDurationSec) || Number.POSITIVE_INFINITY,
+      Number(params.videoDurationSec) || Number.POSITIVE_INFINITY,
+    ),
+  );
+  const normalized = [...params.segments]
+    .map((s) => ({ startSec: Number(s.startSec), endSec: Number(s.endSec) }))
+    .filter((s) => Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec > s.startSec)
+    .sort((a, b) => a.startSec - b.startSec)
+    .reduce<Array<{ startSec: number; endSec: number; kind: "dialog" | "tail_silence" }>>((acc, s) => {
+      const prevEnd = acc.length ? acc[acc.length - 1].endSec : 0;
+      const start = Math.max(prevEnd, Math.min(maxTimeline, s.startSec));
+      const end = Math.max(start + 0.08, Math.min(maxTimeline, s.endSec));
+      if (end <= maxTimeline && end - start >= 0.08) acc.push({ startSec: start, endSec: end, kind: "dialog" });
+      return acc;
+    }, []);
+  const lastEnd = normalized.at(-1)?.endSec ?? 0;
+  if (maxTimeline - lastEnd >= 0.25) {
+    normalized.push({ startSec: lastEnd, endSec: maxTimeline, kind: "tail_silence" });
+  }
+  if (!normalized.length) throw new Error(`${label}_segments_empty_after_normalize`);
+
+  const segments = normalized.map((s, idx) => {
+    const start = Number((idx === 0 && s.startSec === 0 ? 0.001 : s.startSec).toFixed(3));
+    const end = Number(Math.max(start + 0.08, s.endSec).toFixed(3));
+    return {
+      startTime: start,
+      endTime: end,
+      audioInput: {
+        refId: REF,
+        ref_id: REF,
+        startTime: start,
+        endTime: end,
+      },
+      metadata: { kind: s.kind },
+    };
+  });
   const body = {
-    model: params.model ?? "sync-3",
+    model,
     input: inputArr,
     segments,
     options: {
@@ -333,6 +368,11 @@ async function startSyncSoSegmentsJob(
       segments_count: segments.length,
       sync_mode: body.options.sync_mode,
       merged_audio_url: params.mergedAudioUrl,
+      audio_duration_sec: params.audioDurationSec ?? null,
+      video_duration_sec: params.videoDurationSec ?? null,
+      ref_keys: ["refId", "ref_id"],
+      segments,
+      create_response: JSON.stringify(data).slice(0, 1000),
     },
   };
 }
