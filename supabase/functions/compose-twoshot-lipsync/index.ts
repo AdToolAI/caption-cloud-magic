@@ -269,111 +269,6 @@ async function pollSyncSoDirectPrediction(
 }
 
 /**
- * Sync.so v2 Segments API — single job, multi-speaker.
- *
- * Docs: https://sync.so/docs/developer-guides/segments
- * Avoids the fragile sequential 2-pass approach (which kept failing with
- * `generation_pipeline_failed` on stiller AI two-shots). Sync.so handles
- * speaker selection per segment internally — no manual coordinates needed.
- */
-async function startSyncSoSegmentsJob(
-  syncApiKey: string,
-  params: {
-    videoUrl: string;
-    /** Single merged voiceover WAV (full scene timeline). */
-    mergedAudioUrl: string;
-    /** Dialogue turns mapped onto video timeline. Each turn → 1 segment with
-     *  audioInput.refId of the merged track + crop matching the turn timestamps.
-     *  This mirrors the Sync.so "Multiple Segments with Single Audio Input"
-     *  example from https://sync.so/docs/developer-guides/segments . */
-    segments: Array<{ startSec: number; endSec: number }>;
-    model?: string;
-    audioDurationSec?: number;
-    videoDurationSec?: number;
-  },
-  label: string,
-): Promise<{ jobId: string; bodyMeta: Record<string, unknown> }> {
-  const REF = "vo_merged";
-  const model = params.model ?? "sync-3";
-  const inputArr: Array<Record<string, unknown>> = [
-    { type: "video", url: params.videoUrl },
-    { type: "audio", url: params.mergedAudioUrl, refId: REF },
-  ];
-  const audioDur = Number(params.audioDurationSec);
-  const videoDur = Number(params.videoDurationSec);
-  const finiteDurations = [audioDur, videoDur].filter((n) => Number.isFinite(n) && n > 0);
-  const maxTimeline = finiteDurations.length
-    ? Math.max(0.1, Math.min(...finiteDurations))
-    : Math.max(0.1, ...params.segments.map((s) => Number(s.endSec)).filter((n) => Number.isFinite(n)));
-  const normalized = [...params.segments]
-    .map((s) => ({ startSec: Number(s.startSec), endSec: Number(s.endSec) }))
-    .filter((s) => Number.isFinite(s.startSec) && Number.isFinite(s.endSec) && s.endSec > s.startSec)
-    .sort((a, b) => a.startSec - b.startSec)
-    .reduce<Array<{ startSec: number; endSec: number; kind: "dialog" | "tail_silence" }>>((acc, s) => {
-      const prevEnd = acc.length ? acc[acc.length - 1].endSec : 0;
-      const start = Math.max(prevEnd, Math.min(maxTimeline, s.startSec));
-      const end = Math.max(start + 0.08, Math.min(maxTimeline, s.endSec));
-      if (end <= maxTimeline && end - start >= 0.08) acc.push({ startSec: start, endSec: end, kind: "dialog" });
-      return acc;
-    }, []);
-  const lastEnd = normalized.at(-1)?.endSec ?? 0;
-  if (maxTimeline - lastEnd >= 0.25) {
-    normalized.push({ startSec: lastEnd, endSec: maxTimeline, kind: "tail_silence" });
-  }
-  if (!normalized.length) throw new Error(`${label}_segments_empty_after_normalize`);
-
-  const segments = normalized.map((s, idx) => {
-    const start = Number((idx === 0 && s.startSec === 0 ? 0.001 : s.startSec).toFixed(3));
-    const end = Number(Math.max(start + 0.08, s.endSec).toFixed(3));
-    return {
-      startTime: start,
-      endTime: end,
-      audioInput: {
-        refId: REF,
-        startTime: start,
-        endTime: end,
-      },
-    };
-  });
-  const body = {
-    model,
-    input: inputArr,
-    segments,
-    options: {
-      // Segmented generations default to `remap` per Sync.so docs (recommended).
-      sync_mode: "remap",
-      output_format: "mp4",
-    },
-  };
-  const resp = await fetch("https://api.sync.so/v2/generate", {
-    method: "POST",
-    headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const txt = await resp.text().catch(() => "");
-    throw new Error(`${label}_create_${resp.status}: ${txt.slice(0, 500)}`);
-  }
-  const data = await resp.json();
-  if (!data?.id) throw new Error(`${label}_missing_job_id: ${JSON.stringify(data).slice(0, 240)}`);
-  return {
-    jobId: String(data.id),
-    bodyMeta: {
-      model: body.model,
-      segments_count: segments.length,
-      sync_mode: body.options.sync_mode,
-      merged_audio_url: params.mergedAudioUrl,
-      audio_duration_sec: params.audioDurationSec ?? null,
-      video_duration_sec: params.videoDurationSec ?? null,
-      ref_keys: ["refId"],
-      segment_kinds: normalized.map((s) => s.kind),
-      segments,
-      create_response: JSON.stringify(data).slice(0, 1000),
-    },
-  };
-}
-
-/**
  * Detect face centers in the two-shot anchor image via Gemini Vision.
  * Returns coordinates normalized to the image's natural pixel space.
  * Sync.so honors these coordinates relative to the input video frame size,
@@ -912,152 +807,66 @@ serve(async (req) => {
       let outUrl: string | null = null;
 
       if (useMultiPass) {
-        // ── Sync.so Segments API — ONE job, single merged-audio reference ──
-        // Matches the documented "Multiple Segments with Single Audio Input"
-        // pattern (https://sync.so/docs/developer-guides/segments).
-        //
-        // We pass ONE audio input (the full merged 8s WAV) and one segment
-        // per dialogue turn. Each segment crops the merged audio to the turn
-        // window — Sync.so internally selects the speaking face per segment
-        // from the audio signal. No per-speaker tracks, no manual coordinates.
-        //
-        // The previous payload sent N per-speaker padded tracks PLUS
-        // audioInput crops into those padded tracks, which Sync.so rejected
-        // as "The segments configuration is invalid".
-        const turns = Array.isArray((scene as any).audio_plan?.twoshot?.segments)
-          ? ((scene as any).audio_plan.twoshot.segments as Array<any>)
-          : [];
-        const sceneDurForClamp = Math.max(0.1, Number((scene as any).duration_seconds) || voDuration || 8);
-        const segmentsPayload: Array<{ startSec: number; endSec: number }> = [];
-        for (const t of turns) {
-          const s = Number(t.startSec);
-          const e = Number(t.endSec);
-          if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
-          segmentsPayload.push({
-            startSec: Math.max(0, Math.min(sceneDurForClamp, s)),
-            endSec: Math.max(s + 0.05, Math.min(sceneDurForClamp, e)),
-          });
-        }
-        if (segmentsPayload.length === 0) {
-          await refund(`segments_build_failed: turns=${turns.length}`);
+        // ── Sync.so two-pass face-targeted pipeline ──────────────────────
+        // The Segments API kept rejecting valid-looking two-shot payloads with
+        // `The segments configuration is invalid`. For 2 visible speakers we
+        // now use the stable path: one padded per-character WAV per pass and
+        // explicit face coordinates from the cached faceMap.
+        if (!useSyncSoDirect) {
+          await refund("twoshot_two_pass_requires_direct_sync_api_key");
           return;
         }
-
+        const firstSpeaker = passes[0];
+        if (!firstSpeaker?.track_url) {
+          await refund("twoshot_first_speaker_track_missing");
+          return;
+        }
+        const firstTarget = pickTargetCoordinates(0, faceMap, fallbackDims);
+        if (!firstTarget) {
+          await refund("twoshot_first_face_target_missing");
+          return;
+        }
         const startedAt = new Date().toISOString();
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
-        await setStage(supabase, scene_id, "lipsync_1", {
-          audio_plan: {
-            ...prevPlan,
-            twoshot: {
-              ...prevTwoshot,
-              speakers: publicPasses,
-              faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
-              heartbeat: {
-                mode: "segments",
-                started_at: startedAt,
-                segments_count: segmentsPayload.length,
-              },
-            },
-          },
-        });
-
-        if (!useSyncSoDirect) {
-          await refund("sync_segments_requires_direct_api_key");
-          return;
-        }
-
         let jobId = "";
-        let bodyMeta: Record<string, unknown> = {};
         try {
-          let result = await startSyncSoSegmentsJob(
+          jobId = await startSyncSoDirectGeneration(
             SYNC_API_KEY!,
             {
               videoUrl: sourceClipUrl,
-              mergedAudioUrl: mergedVo.url,
-              segments: segmentsPayload,
-              model: "sync-3",
-              audioDurationSec: voDuration || sceneDurForClamp,
-              videoDurationSec: sceneDurForClamp,
+              audioUrl: firstSpeaker.track_url,
+              syncMode: "cut_off",
+              temperature: 0.5,
+              targetCoords: firstTarget.coords,
+              frameNumber: 0,
             },
-            "lipsync_segments",
+            "twoshot_pass_1",
           );
-          result.bodyMeta.fallback_from = null;
-          jobId = result.jobId;
-          bodyMeta = result.bodyMeta;
         } catch (e) {
-          const firstErrMsg = (e as Error).message;
-          if (/segments configuration is invalid/i.test(firstErrMsg)) {
-            try {
-              const fallback = await startSyncSoSegmentsJob(
-                SYNC_API_KEY!,
-                {
-                  videoUrl: sourceClipUrl,
-                  mergedAudioUrl: mergedVo.url,
-                  segments: segmentsPayload,
-                  model: "lipsync-2",
-                  audioDurationSec: voDuration || sceneDurForClamp,
-                  videoDurationSec: sceneDurForClamp,
-                },
-                "lipsync_segments_fallback",
-              );
-              jobId = fallback.jobId;
-              bodyMeta = { ...fallback.bodyMeta, fallback_from: "sync-3", fallback_reason: firstErrMsg.slice(0, 500) };
-            } catch (fallbackErr) {
-              const errMsg = `${firstErrMsg} | fallback_lipsync-2_failed: ${(fallbackErr as Error).message}`;
-              const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
-              const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
-              const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
-              await supabase.from("composer_scenes").update({
-                audio_plan: {
-                  ...latestPlan,
-                  twoshot: {
-                    ...latestTwoshot,
-                    syncJobs: {
-                      ...(latestTwoshot.syncJobs ?? {}),
-                      provider: "sync.so",
-                      mode: "segments",
-                      lastError: errMsg.slice(0, 1000),
-                      lastErrorAt: new Date().toISOString(),
-                      attemptedModel: "sync-3+lipsync-2",
-                      attemptedSegments: segmentsPayload.length,
-                      mergedAudioUrl: mergedVo.url,
-                      sourceVideoUrl: sourceClipUrl,
-                    },
-                  },
-                },
-              }).eq("id", scene_id);
-              await refund(`lipsync_segments_failed: ${errMsg}`);
-              return;
-            }
-          } else {
-          // Persist the provider error verbatim so we don't have to guess on retry.
-          const errMsg = firstErrMsg;
-          const latest = await supabase.from("composer_scenes").select("audio_plan").eq("id", scene_id).single();
-          const latestPlan = (latest.data?.audio_plan ?? prevPlan) as Record<string, any>;
-          const latestTwoshot = (latestPlan.twoshot ?? prevTwoshot) as Record<string, any>;
+          const errMsg = (e as Error).message;
           await supabase.from("composer_scenes").update({
             audio_plan: {
-              ...latestPlan,
+              ...prevPlan,
               twoshot: {
-                ...latestTwoshot,
+                ...prevTwoshot,
+                speakers: publicPasses,
+                faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
                 syncJobs: {
-                  ...(latestTwoshot.syncJobs ?? {}),
                   provider: "sync.so",
-                  mode: "segments",
-                  lastError: errMsg.slice(0, 500),
+                  mode: "two_pass",
+                  lastError: errMsg.slice(0, 1000),
                   lastErrorAt: new Date().toISOString(),
-                  attemptedModel: "sync-3",
-                  attemptedSegments: segmentsPayload.length,
-                  mergedAudioUrl: mergedVo.url,
+                  costCredits: cost,
                   sourceVideoUrl: sourceClipUrl,
+                  mergedAudioUrl: mergedVo.url,
+                  jobs: [],
                 },
               },
             },
           }).eq("id", scene_id);
-          await refund(`lipsync_segments_failed: ${errMsg}`);
+          await refund(`twoshot_pass_1_create_failed: ${errMsg}`);
           return;
-          }
         }
 
         await setStage(supabase, scene_id, "lipsync_1", {
@@ -1068,34 +877,47 @@ serve(async (req) => {
               ...prevTwoshot,
               speakers: publicPasses,
               faceMap: faceMap ?? (prevTwoshot as any).faceMap ?? null,
+              url: mergedVo.url,
+              useExternalAudio: true,
+              embeddedAudio: false,
               syncJobs: {
                 provider: "sync.so",
-                mode: "segments",
+                mode: "two_pass",
                 sourceVideoUrl: sourceClipUrl,
                 mergedAudioUrl: mergedVo.url,
                 costCredits: cost,
-                bodyMeta,
+                currentPass: 1,
+                totalPasses: Math.min(2, passes.length),
                 jobs: [{
+                  pass: 1,
                   jobId,
                   status: "PROCESSING",
                   videoUrl: sourceClipUrl,
-                  segments: segmentsPayload,
-                  model: bodyMeta.model ?? "sync-3",
+                  audioUrl: firstSpeaker.track_url,
+                  speaker: firstSpeaker.speaker,
+                  character_id: firstSpeaker.character_id ?? null,
+                  targetFace: firstTarget.side,
+                  targetCoords: firstTarget.coords,
+                  targetSource: firstTarget.source,
                   startedAt,
                 }],
               },
               heartbeat: {
-                mode: "segments",
+                mode: "two_pass",
+                pass: 1,
+                total_passes: Math.min(2, passes.length),
                 started_at: startedAt,
-                segments_count: segmentsPayload.length,
+                speaker: firstSpeaker.speaker,
+                targetFace: firstTarget.side,
+                targetSource: firstTarget.source,
                 syncJobId: jobId,
               },
             },
           },
         });
         console.log(
-          `[compose-twoshot-lipsync ${scene_id}] segments job queued on Sync.so`,
-          { jobId, segments: segmentsPayload.length, model: bodyMeta.model ?? "sync-3", fallback_from: bodyMeta.fallback_from ?? null },
+          `[compose-twoshot-lipsync ${scene_id}] two-pass job queued on Sync.so`,
+          { jobId, pass: 1, targetFace: firstTarget.side, targetCoords: firstTarget.coords },
         );
         return;
       } else {

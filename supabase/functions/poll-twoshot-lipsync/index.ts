@@ -90,32 +90,6 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
   return String(data.id);
 }
 
-async function startSegmentsFallbackJob(
-  syncApiKey: string,
-  params: { videoUrl: string; audioUrl: string; segments: Array<Record<string, unknown>> },
-): Promise<string> {
-  const resp = await fetch("https://api.sync.so/v2/generate", {
-    method: "POST",
-    headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "lipsync-2",
-      input: [
-        { type: "video", url: params.videoUrl },
-        { type: "audio", url: params.audioUrl, refId: "vo_merged" },
-      ],
-      segments: params.segments,
-      options: { sync_mode: "remap", output_format: "mp4" },
-    }),
-  });
-  if (!resp.ok) {
-    const txt = await resp.text().catch(() => "");
-    throw new Error(`segments_fallback_create_${resp.status}: ${txt.slice(0, 500)}`);
-  }
-  const data = await resp.json();
-  if (!data?.id) throw new Error(`segments_fallback_missing_id: ${JSON.stringify(data).slice(0, 240)}`);
-  return String(data.id);
-}
-
 async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string }> {
   const resp = await fetch(`https://api.sync.so/v2/generate/${jobId}`, {
     headers: { "x-api-key": syncApiKey },
@@ -191,7 +165,9 @@ serve(async (req) => {
     const plan = (scene.audio_plan ?? {}) as Record<string, any>;
     const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
     const syncJobs = (twoshot.syncJobs ?? {}) as Record<string, any>;
-    const isSegments = String(syncJobs.mode ?? twoshot.heartbeat?.mode ?? "") === "segments";
+    const mode = String(syncJobs.mode ?? twoshot.heartbeat?.mode ?? "");
+    const isSegments = mode === "segments";
+    const isTwoPass = mode === "two_pass";
     const jobs = Array.isArray(syncJobs.jobs) ? syncJobs.jobs : [];
     const currentPass = isSegments ? 1 : Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
     const totalPasses = isSegments ? 1 : Number(syncJobs.totalPasses || jobs.length || 2);
@@ -224,51 +200,8 @@ serve(async (req) => {
       const latestPlan = (latest.data?.audio_plan ?? plan) as Record<string, any>;
       const latestTwoshot = (latestPlan.twoshot ?? {}) as Record<string, any>;
       const latestSyncJobs = (latestTwoshot.syncJobs ?? syncJobs) as Record<string, any>;
-      const failedBecauseInvalidSegments = isSegments && /segments configuration is invalid/i.test(String(polled.error ?? ""));
-      const model = String(currentJob?.model || latestSyncJobs.bodyMeta?.model || "");
-      if (failedBecauseInvalidSegments && model !== "lipsync-2" && latestSyncJobs.mergedAudioUrl && currentJob?.videoUrl) {
-        const rawSegments = Array.isArray(latestSyncJobs.bodyMeta?.segments) ? latestSyncJobs.bodyMeta.segments : currentJob?.segments;
-        const fallbackSegments = Array.isArray(rawSegments) ? rawSegments : [];
-        try {
-          const fallbackJobId = await startSegmentsFallbackJob(syncApiKey, {
-            videoUrl: String(currentJob.videoUrl),
-            audioUrl: String(latestSyncJobs.mergedAudioUrl),
-            segments: fallbackSegments as Array<Record<string, unknown>>,
-          });
-          const fallbackJob = {
-            jobId: fallbackJobId,
-            status: "PROCESSING",
-            videoUrl: currentJob.videoUrl,
-            segments: fallbackSegments,
-            model: "lipsync-2",
-            fallbackFrom: model || "sync-3",
-            fallbackReason: polled.error ?? polled.status,
-            startedAt: now,
-          };
-          await supabase.from("composer_scenes").update({
-            replicate_prediction_id: `sync:${fallbackJobId}`,
-            lip_sync_status: "running",
-            twoshot_stage: "lipsync_1",
-            clip_error: null,
-            updated_at: now,
-            audio_plan: {
-              ...latestPlan,
-              twoshot: {
-                ...latestTwoshot,
-                syncJobs: {
-                  ...latestSyncJobs,
-                  mode: "segments",
-                  bodyMeta: { ...(latestSyncJobs.bodyMeta ?? {}), fallback_from: model || "sync-3", fallback_model: "lipsync-2", fallback_reason: polled.error ?? polled.status },
-                  jobs: [...jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, error: polled.error, failedAt: now } : j), fallbackJob],
-                },
-                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), mode: "segments", syncJobId: fallbackJobId, fallback: true, started_at: now },
-              },
-            },
-          }).eq("id", sceneId);
-          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: fallbackJobId });
-        } catch (fallbackErr) {
-          polled.error = `${polled.error ?? polled.status} | fallback_lipsync-2_failed: ${(fallbackErr as Error).message}`;
-        }
+      if (isSegments && /segments configuration is invalid/i.test(String(polled.error ?? ""))) {
+        polled.error = `${polled.error ?? polled.status} | segment_mode_disabled_retry_with_two_pass`;
       }
       if (!latestSyncJobs.refunded) {
         const cost = Number(latestSyncJobs.costCredits ?? 0);
@@ -297,7 +230,7 @@ serve(async (req) => {
 
     // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
     // (mode != 'segments') still chain to the next pass for backward compat.
-    if (!isSegments && currentPass < totalPasses) {
+      if (!isSegments && currentPass < totalPasses) {
       const speakers = Array.isArray(twoshot.speakers) ? twoshot.speakers : [];
       const nextIdx = currentPass;
       const nextSpeaker = speakers[nextIdx];
@@ -320,6 +253,7 @@ serve(async (req) => {
         character_id: nextSpeaker.character_id ?? null,
         targetFace: target.side,
         targetCoords: target.coords,
+        targetSource: target.source,
         startedAt: now,
       };
       await supabase.from("composer_scenes").update({
@@ -330,8 +264,8 @@ serve(async (req) => {
           ...plan,
           twoshot: {
             ...twoshot,
-            syncJobs: { ...syncJobs, currentPass: nextPass, totalPasses, jobs: [...updatedJobs, nextJob] },
-            heartbeat: { pass: nextPass, total_passes: totalPasses, started_at: now, speaker: nextSpeaker.speaker, targetFace: target.side, targetSource: target.source, syncJobId: nextJobId },
+            syncJobs: { ...syncJobs, mode: isTwoPass ? "two_pass" : syncJobs.mode, currentPass: nextPass, totalPasses, jobs: [...updatedJobs, nextJob] },
+            heartbeat: { mode: isTwoPass ? "two_pass" : twoshot.heartbeat?.mode, pass: nextPass, total_passes: totalPasses, started_at: now, speaker: nextSpeaker.speaker, targetFace: target.side, targetSource: target.source, syncJobId: nextJobId },
           },
         },
       }).eq("id", sceneId);
