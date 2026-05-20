@@ -1,64 +1,104 @@
-## Diagnose
+## Ziel
 
-Der gehostete Backend-Status ist normal. Das Problem liegt in der Pipeline selbst, nicht an Lovable Cloud.
+Lip Sync läuft jetzt, aber der vorgelagerte Scene-Anchor ist noch nicht streng genug: Er erlaubt aktuell faktisch „mindestens 2 Gesichter“. Dadurch kann das Bild 3 Personen enthalten, z. B. Charakter A doppelt plus Charakter B einmal. Die saubere Lösung ist: Für Two-Shot-Szenen darf der Anchor nur exakt die erwarteten Charaktere enthalten, jede Identität genau einmal.
 
-Was ich in Logs/DB gesehen habe:
+## Ursache
 
-- Sync.so wird wirklich direkt aufgerufen (`sync.so/v2 direct`).
-- Die neueste Szene `40367ba2-...` ist nicht mehr „hängend“, sondern Sync.so hat Pass 1 nach kurzer Zeit mit `An error occurred in the generation pipeline` abgelehnt.
-- Die ältere Szene `2f0f6807-...` wurde nach ca. 10 Minuten vom `qa-watchdog` automatisch als stuck markiert und refunded, obwohl ein echter `sync:` Job lief. Das killt lange laufende Sync.so-Jobs weiterhin.
-- Der Anchor enthält sichtbar einen Klon: die zwei linken Männer sehen wie dieselbe Person aus. Unsere bisherige Prüfung zählt nur „2 Gesichter“, aber prüft nicht „Matthew und Samuel sind zwei unterschiedliche Identitäten“.
-- Die Face-Koordinaten sind nicht vertrauenswürdig: Gemini meldet z.B. `1920x1080`, das echte Anchor-/Videoformat ist aber `1376x768`. Dadurch können Sync.so-Koordinaten neben dem eigentlichen Gesicht landen und die Generation scheitert.
+Aktuell prüft die Pipeline hauptsächlich:
+
+- Sind mindestens so viele Gesichter sichtbar wie erwartet?
+- Sind die Referenzpersonen grundsätzlich vorhanden?
+
+Das reicht für diesen Fehler nicht, weil dein Screenshot diesen Fall zeigt:
+
+```text
+Erwartet:   Person A + Person B
+Ist-Bild:   Person A + Person B + Person A-Klon
+```
+
+Das besteht eine „mindestens 2 Gesichter“-Prüfung, ist aber für Lip Sync und Story-Konsistenz falsch.
 
 ## Plan
 
-1. **Watchdog darf echte Sync.so-Jobs nicht mehr töten**
-   - `qa-watchdog` ignoriert `lip_sync_status='running'` mit `replicate_prediction_id='sync:...'` für den alten 10-Minuten-Stale-Fail.
-   - Stattdessen wird höchstens der Poller angestoßen oder ein viel längeres Provider-TTL-Fenster genutzt.
-   - Refund nur noch bei echtem Sync.so-Fehler, nicht bei „läuft lange“.
+### 1. Anchor-Prompt auf „exakt N Personen“ härten
 
-2. **Sync.so-Koordinaten korrekt normalisieren**
-   - Vor dem Start von Sync.so wird die echte Bild-/Video-Auflösung aus dem Anchor bzw. Clip gelesen.
-   - Gemini soll normalisierte Face-Center zurückgeben (`x/y` von 0–1), nicht frei geschätzte Pixelmaße.
-   - Die Koordinaten werden serverseitig auf die echte Frame-Größe umgerechnet.
-   - Wenn ein Zielpunkt nicht plausibel auf einem Gesicht liegt, wird nicht gespendet, sondern sauber mit `face_target_invalid` abgebrochen.
+`compose-scene-anchor` soll für Multi-Character-Szenen nicht nur sagen „alle Personen sichtbar“, sondern verbindlich:
 
-3. **Identity-Audit statt Face-Count**
-   - Der Anchor-Check vergleicht Referenzportrait A/B mit dem komponierten Anchor.
-   - Akzeptiert wird nur:
-     - beide erwarteten Personen sichtbar,
-     - Person A und B eindeutig unterschiedlich,
-     - keine geklonte/duplizierte Identität,
-     - keine irrelevante dritte Person als Sprecherziel.
-   - Bei Klon: Cache invalidieren, einmal neu rendern mit härterem Anti-Clone-Prompt.
-   - Wenn erneut Klon: abbrechen mit `anchor_identity_clone_detected`, bevor Hailuo/Sync.so Credits verbrennen.
+- Exakt 2 Menschen im Bild bei zwei Charakteren.
+- Keine dritte Person, kein Statist, kein Spiegelbild, kein Duplikat.
+- Jede Referenzperson genau einmal.
+- Klare Slot-Zuordnung: Referenz #1 links, Referenz #2 rechts bzw. definierte Screen-Positionen.
+- Bei Business-/Meeting-Szenen ausdrücklich keine zusätzliche Person im Vordergrund oder am Tisch.
 
-4. **Serverseitigen Anchor-Fallback reparieren**
-   - `compose-video-clips` ruft `compose-scene-anchor` aktuell serverseitig mit Service-Auth auf, während `compose-scene-anchor` einen echten User erwartet.
-   - Diese interne Funktion-zu-Funktion-Nutzung wird sauber unterstützt: User aus der Szene/Projekt-Zuordnung ermitteln, aber weiterhin keine öffentliche Umgehung erlauben.
-   - Dadurch funktioniert auch der Button „Clip + Lip-Sync neu rendern“ zuverlässig ohne alten/kaputten Anchor.
+Damit wird das Bildmodell weniger wahrscheinlich einen „extra Kollegen“ generieren.
 
-5. **Sync.so-Fehler besser auswerten und nicht blind retryen**
-   - Poller speichert Sync.so `status`, `error_code`, `message`, Job-ID und Input-Metadaten vollständig in `audio_plan.twoshot.syncJobs`.
-   - Bei `generation_pipeline_failed` wird maximal einmal mit neu normalisierten Koordinaten neu versucht.
-   - Danach klarer Fehler im UI statt Endlos-Retry.
+### 2. Audit von „mindestens genug“ auf „exakt richtig“ ändern
 
-6. **UI-Status präzisieren**
-   - Preview zeigt nicht mehr pauschal „Lip-Sync wird vorbereitet…“.
-   - Stattdessen:
-     - `Sync.so Pass 1 läuft`
-     - `Sync.so Pass 2 läuft`
-     - `Sync.so wartet noch`
-     - `Anchor-Klon erkannt`
-     - `Sync.so Providerfehler: ...`
+In `compose-video-clips` wird die Face-Audit-Regel geändert:
 
-7. **Bestehende kaputte Szene sauber neu starten**
-   - Für die aktuelle Szene werden der geklonte Anchor, `faceMap`, `syncJobs`, `replicate_prediction_id` und Lip-Sync-Status geleert.
-   - Danach wird die Pipeline neu gestartet, damit sie mit Identity-Audit und korrekten Koordinaten läuft.
+```text
+Bisher: faceCount >= expectedFaces ist ok
+Neu:    faceCount === expectedFaces ist ok
+        faceCount < expectedFaces -> missing speakers
+        faceCount > expectedFaces -> extra/clone/person inserted
+```
+
+Für Two-Shot bedeutet das: 3 Gesichter bei 2 erwarteten Charakteren wird hart abgelehnt, bevor Hailuo oder Sync.so Credits verbrauchen.
+
+### 3. Identity-Audit auf „jede Identität genau einmal“ erweitern
+
+`_shared/identity-audit.ts` soll nicht nur prüfen, ob Referenz A und B vorhanden sind, sondern auch:
+
+- Wie viele sichtbare Hauptgesichter gibt es insgesamt?
+- Welche Gesichter matchen Referenz #1?
+- Welche Gesichter matchen Referenz #2?
+- Gibt es extra Gesichter ohne Referenz?
+- Kommt dieselbe Referenzidentität mehr als einmal vor?
+
+Abbruchgründe werden dadurch klarer:
+
+```text
+anchor_extra_person_detected
+anchor_identity_duplicate_detected
+anchor_identity_missing_detected
+anchor_identity_ambiguous
+```
+
+### 4. Retry nur mit gezieltem Anti-Duplikat-Prompt
+
+Wenn der erste Anchor 3 statt 2 Personen enthält oder eine Identität doppelt zeigt:
+
+- Cache für diese Szene löschen.
+- Einmal neu rendern mit verschärftem Prompt:
+  - „Remove all extra humans.“
+  - „Only the two reference people may appear.“
+  - „Do not duplicate either person.“
+- Wenn der zweite Versuch wieder falsch ist: Szene sauber abbrechen statt falschen Clip zu erzeugen.
+
+### 5. Bestehende kaputte Szene neu starten
+
+Nach dem Fix wird für die betroffene Szene gelöscht:
+
+- geklonter `reference_image_url`
+- `lock_reference_url`
+- `scene_anchor_cache`
+- aktueller Clip/Lip-Sync-Zustand
+- alte FaceMap/SyncJobs im `audio_plan.twoshot`
+
+Danach läuft sie einmal durch die neue strengere Pipeline.
+
+### 6. UI-Fehler verständlicher machen
+
+Wenn der Anchor abgelehnt wird, soll im Composer nicht nur generisch „fehlgeschlagen“ stehen, sondern z. B.:
+
+```text
+Anchor enthält zusätzliche Person: 3/2 Gesichter erkannt
+Charakter wurde doppelt erkannt: bitte Anchor neu rendern
+```
 
 ## Erwartetes Ergebnis
 
-- Kein 10-Minuten-Stuck/Watchdog-Abbruch mehr für echte Sync.so-Jobs.
-- Geklonte Charaktere werden vor dem Video-/Lip-Sync-Schritt erkannt.
-- Sync.so erhält valide Face-Koordinaten passend zur echten Frame-Größe.
-- Wenn Sync.so trotzdem ablehnt, sieht man den echten Providerfehler statt einer generischen Endlosschleife.
+- Two-Shot-Szenen mit 2 Charakteren enthalten exakt 2 Personen.
+- Ein geklonter dritter Charakter wird vor Video- und Lip-Sync-Generierung erkannt.
+- Keine Credits werden für sichtbar falsche Anchors verbrannt.
+- Wenn das Bildmodell trotz Retry keinen sauberen Anchor schafft, stoppt die Szene klar mit verständlicher Fehlermeldung.
