@@ -7,6 +7,7 @@ type: feature
 **Two-Shot Lip-Sync (Mai 2026, stabiler Pfad):**
 - `compose-twoshot-lipsync` nutzt bei 2 echten Gesichtern **keine Sync.so Segments API mehr**. Segments (`sync-3`/`lipsync-2` + `segments[]`) wurde wegen wiederholtem Provider-Fehler `The segments configuration is invalid.` verworfen.
 - Standard ist jetzt **Two-Pass Face-Targeting** über Sync.so Direct API: Pass 1 = linkes Gesicht + Sprecher-Track 1, Pass 2 = rechtes Gesicht + Sprecher-Track 2.
+- Face-Target-Koordinaten müssen aus den gespeicherten Pixel-`center`-Werten der Anchor-FaceMap kommen; `normCenter × videoDims` ist verboten, wenn bereits Pixel-Center existieren, weil 16:9/1:1-Dimensions-Mismatch Sync.so mit `generation_pipeline_failed` crashen kann.
 - Audio pro Pass ist der vorhandene gepaddete per-character WAV-Track aus `audio_plan.twoshot.speakers[].track_url`; das finale Preview/Export-Audio bleibt die gemergte WAV (`audio_plan.twoshot.url`) mit `useExternalAudio=true`.
 - Face-Ziele kommen aus `audio_plan.twoshot.faceMap` (`left`/`right`) und werden als `options.active_speaker_detection.auto_detect=false` + Koordinaten an Sync.so gesendet.
 - `compose-twoshot-lipsync` queued nur Pass 1 und returnt `202`; `poll-twoshot-lipsync` chained Pass 2 und finalisiert nach Completion. Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert.

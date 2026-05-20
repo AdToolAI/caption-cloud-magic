@@ -15,7 +15,7 @@ function json(body: unknown, status = 200) {
 }
 
 type FaceMap = {
-  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; normCenter?: [number, number] }>;
+  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
   width?: number;
   height?: number;
 };
@@ -43,17 +43,31 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } {
+function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
   const side: "left" | "right" = passIndex === 0 ? "left" : "right";
   const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
   const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
   if (Array.isArray(match?.center) && match.center.length === 2) {
-    const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
-    const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
-    const coords: [number, number] = Array.isArray(match.normCenter)
-      ? [Math.round(Number(match.normCenter[0]) * W), Math.round(Number(match.normCenter[1]) * H)]
-      : [Math.round(Number(match.center[0]) * (W / (Number(faceMap?.width) || W))), Math.round(Number(match.center[1]) * (H / (Number(faceMap?.height) || H)))];
-    return { coords, side, source: "gemini" };
+    const anchorW = Number(faceMap?.width) || 0;
+    const anchorH = Number(faceMap?.height) || 0;
+    const videoW = Number(videoDims?.width) || anchorW || 1280;
+    const videoH = Number(videoDims?.height) || anchorH || 720;
+    const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
+    const scaleX = sameAspect ? videoW / anchorW : 1;
+    const scaleY = sameAspect ? videoH / anchorH : 1;
+    const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
+    const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
+    let x = faceCenter[0];
+    let y = faceCenter[1];
+    if (bbox) {
+      const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
+      if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
+        x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
+        y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
+      }
+    }
+    const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
+    return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
   const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
@@ -90,7 +104,7 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
   return String(data.id);
 }
 
-async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string }> {
+async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status: string; outputUrl?: string; error?: string; providerResponse?: Record<string, unknown> }> {
   const resp = await fetch(`https://api.sync.so/v2/generate/${jobId}`, {
     headers: { "x-api-key": syncApiKey },
   });
@@ -102,7 +116,7 @@ async function pollSyncJob(syncApiKey: string, jobId: string): Promise<{ status:
   const status = String(data?.status ?? "").toUpperCase();
   const outputUrl = data?.outputUrl || data?.output_url || data?.output;
   const error = data?.error || data?.errorMessage || data?.message || data?.error_code;
-  return { status, outputUrl: typeof outputUrl === "string" ? outputUrl : undefined, error: typeof error === "string" ? error : undefined };
+  return { status, outputUrl: typeof outputUrl === "string" ? outputUrl : undefined, error: typeof error === "string" ? error : undefined, providerResponse: data };
 }
 
 async function rehostVideo(supabase: any, userId: string, sceneId: string, url: string): Promise<string> {
@@ -180,14 +194,14 @@ serve(async (req) => {
     const polled = await pollSyncJob(syncApiKey, jobId);
     const now = new Date().toISOString();
 
-    if (["PENDING", "PROCESSING"].includes(polled.status)) {
+    if (["PENDING", "PROCESSING", "RUNNING", "QUEUED"].includes(polled.status)) {
       await supabase.from("composer_scenes").update({
         updated_at: now,
         audio_plan: {
           ...plan,
           twoshot: {
             ...twoshot,
-            syncJobs: { ...syncJobs, currentPass, totalPasses, jobs: jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, lastPolledAt: now } : j) },
+            syncJobs: { ...syncJobs, currentPass, totalPasses, jobs: jobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, lastPolledAt: now, providerResponse: polled.providerResponse } : j) },
             heartbeat: { ...(twoshot.heartbeat ?? {}), pass: currentPass, total_passes: totalPasses, syncJobId: jobId, lastPolledAt: now },
           },
         },
@@ -217,7 +231,7 @@ serve(async (req) => {
         twoshot_stage: "failed",
         clip_error: `syncso_${polled.status.toLowerCase()}: ${(polled.error || "unknown").slice(0, 420)}`,
         updated_at: now,
-        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now } } },
+        audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: (Array.isArray(latestSyncJobs.jobs) ? latestSyncJobs.jobs : jobs).map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
       }).eq("id", sceneId);
       return json({ ok: false, status: polled.status, error: polled.error ?? polled.status }, 200);
     }
@@ -226,7 +240,7 @@ serve(async (req) => {
       return json({ error: "unexpected_sync_status", status: polled.status }, 502);
     }
 
-    const updatedJobs = jobs.map((j: any) => j.jobId === jobId ? { ...j, status: "COMPLETED", outputUrl: polled.outputUrl, completedAt: now } : j);
+    const updatedJobs = jobs.map((j: any) => j.jobId === jobId ? { ...j, status: "COMPLETED", outputUrl: polled.outputUrl, completedAt: now, providerResponse: polled.providerResponse } : j);
 
     // Segments-mode = single job, no next-pass spawn. Legacy multi-pass rows
     // (mode != 'segments') still chain to the next pass for backward compat.
@@ -237,6 +251,9 @@ serve(async (req) => {
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
       const videoDims = await probeMp4Dims(polled.outputUrl);
       const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
+      if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
+        return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
+      }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
@@ -254,6 +271,10 @@ serve(async (req) => {
         targetFace: target.side,
         targetCoords: target.coords,
         targetSource: target.source,
+        faceCenter: target.faceCenter ?? null,
+        faceBbox: target.bbox ?? null,
+        anchorDims: target.anchorDims ?? null,
+        videoDims: target.videoDims ?? null,
         startedAt: now,
       };
       await supabase.from("composer_scenes").update({
