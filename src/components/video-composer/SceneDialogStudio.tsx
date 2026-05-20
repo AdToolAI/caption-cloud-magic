@@ -743,6 +743,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         return;
       }
     }
+    setGenerating(true);
+    emitPipelineEvent({ type: 'voiceover:start' });
+    emitPipelineEvent({ type: 'lipsync:start' });
     // Ensure the project is persisted before spawning sub-scenes (otherwise
     // onAddScene would write to a non-existent project_id).
     let pidForSrs = (projectId || scene.projectId || '').trim();
@@ -755,17 +758,20 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       const ids = await resolvePersistedIds();
       if (!ids) {
         toast({ title: t.failed, description: PROJECT_REQUIRED[language], variant: 'destructive' });
+        emitPipelineEvent({ type: 'voiceover:end' });
+        emitPipelineEvent({ type: 'lipsync:end' });
+        setGenerating(false);
         return;
       }
       pidForSrs = ids.pid;
       resolvedParentSceneId = ids.sceneId;
     } catch (e) {
       toast({ title: t.failed, description: formatError(e), variant: 'destructive' });
+      emitPipelineEvent({ type: 'voiceover:end' });
+      emitPipelineEvent({ type: 'lipsync:end' });
+      setGenerating(false);
       return;
     }
-    setGenerating(true);
-    emitPipelineEvent({ type: 'voiceover:start' });
-    emitPipelineEvent({ type: 'lipsync:start' });
     let okCount = 0;
     // Marker so we can clean up previously auto-spawned SRS sub-scenes for
     // *this* parent scene before regenerating. Stored in the free-form
