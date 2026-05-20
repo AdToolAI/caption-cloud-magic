@@ -105,7 +105,8 @@ serve(async (req) => {
         // sentence describes a DIFFERENT character, which the image model
         // resolves visually as "render slot-name as other-name" (the source of
         // the wrong-face / duplicated-character failure).
-        .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, "")
+        .replace(/^\s*featuring\s+[^:\n]{1,200}:.*$/gim, "")
+        .replace(/\bfeaturing\s+[^:\n.]{1,200}:\s*[^.\n]{1,600}\.?/gim, "")
         // Drop bullet/dash speaker lines like "- Samuel Dusatko says: ..."
         // or "* Matthew Dusatko speaks: ..." or "• Sarah: ..."
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, "")
@@ -136,16 +137,17 @@ serve(async (req) => {
     const safeScenePrompt = meaningful
       ? cleanedPrompt
       : (portraitsForFallback >= 2
-        ? `Exactly ${portraitsForFallback} distinct people in a modern office meeting, both visible once, seated together in conversation. No rendered text.`
+        ? `Exactly ${portraitsForFallback} distinct people${names.length ? ` (${names.join(' and ')})` : ''} in a modern office meeting, each visible exactly once, seated together in conversation. No other humans. No rendered text.`
         : "Natural cinematic scene, photorealistic, no rendered text.");
 
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v10 — bumped after Featuring-prefix stripping (prevents wrong-face leak
+    // v11 — bumped after removing complete Featuring clauses and adding
+    // names/count to the safe fallback (prevents wrong-face/extra-person leak
     // when a slot label and trailing description name different characters).
     const promptHash = await sha1(
-      `v10|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
+      `v11|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
     );
 
     const { data: cached } = await admin
