@@ -471,14 +471,7 @@ export default function StoryboardTab({
           clicks "Generieren" and stays for the full ~7–8 min pipeline. */}
       <PipelineProgressBar
         scenes={scenes}
-        assemblyConfig={{
-          colorGrading: 'none',
-          transitionStyle: 'crossfade',
-          kineticText: false,
-          voiceover: null,
-          music: null,
-          beatSync: false,
-        }}
+        assemblyConfig={DEFAULT_ASSEMBLY_CONFIG}
         className="!sticky !top-2 !mx-0 !px-3 rounded-xl border border-gold/20 bg-card/70"
       />
 
