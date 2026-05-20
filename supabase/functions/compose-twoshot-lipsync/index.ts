@@ -840,6 +840,10 @@ serve(async (req) => {
           await refund("twoshot_first_face_target_missing");
           return;
         }
+        if (!Number.isFinite(firstTarget.coords[0]) || !Number.isFinite(firstTarget.coords[1]) || firstTarget.coords[0] <= 0 || firstTarget.coords[1] <= 0) {
+          await refund(`twoshot_first_face_target_invalid: ${JSON.stringify(firstTarget.coords)}`);
+          return;
+        }
         const startedAt = new Date().toISOString();
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
@@ -913,6 +917,10 @@ serve(async (req) => {
                   targetFace: firstTarget.side,
                   targetCoords: firstTarget.coords,
                   targetSource: firstTarget.source,
+                  faceCenter: firstTarget.faceCenter ?? null,
+                  faceBbox: firstTarget.bbox ?? null,
+                  anchorDims: firstTarget.anchorDims ?? null,
+                  videoDims: firstTarget.videoDims ?? null,
                   startedAt,
                 }],
               },
