@@ -62,12 +62,15 @@ serve(async (req) => {
     return r;
   };
 
-
+  const summary = {
+    polled: 0,
     refundedPresync: 0,
     refundedSyncTimeout: 0,
     reinvoked: 0,
     errors: [] as string[],
   };
+
+
 
   try {
     const now = Date.now();
