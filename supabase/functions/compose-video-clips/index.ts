@@ -340,6 +340,13 @@ serve(async (req) => {
       return hit;
     };
 
+    const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
+      const cleanNames = names.filter(Boolean);
+      const n = Math.max(cleanNames.length, fallbackCount, 2);
+      const named = cleanNames.length > 0 ? `: ${cleanNames.join(' and ')}` : '';
+      return `Exactly ${n} distinct people${named}, each visible exactly once, in a modern office conversation scene. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+    };
+
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
     const injectCharacter = (prompt: string, shot?: { characterId: string; shotType: CharacterShotType }): string => {
       if (!shot || !shot.characterId || shot.shotType === 'absent') return prompt;
