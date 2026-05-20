@@ -9,7 +9,7 @@ import TalkingHeadDialog from './TalkingHeadDialog';
 import SceneSnippetPicker from '@/components/motion-studio/SceneSnippetPicker';
 import type { SceneSnippet } from '@/types/motion-studio';
 import type { ComposerScene, ClipSource, ComposerCharacter } from '@/types/video-composer';
-import { DEFAULT_TEXT_OVERLAY, getClipCost, getClipRate } from '@/types/video-composer';
+import { DEFAULT_TEXT_OVERLAY, DEFAULT_ASSEMBLY_CONFIG, getClipCost, getClipRate } from '@/types/video-composer';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useComposerHistoryContext } from './ComposerHistoryContext';
 import { sceneToSnakeSnapshot } from '@/lib/video-composer/sceneSnapshot';
@@ -20,6 +20,7 @@ import SceneStyleMode from './SceneStyleMode';
 import SceneAvatarMode from './SceneAvatarMode';
 import { useSceneGenerate } from '@/hooks/useSceneGenerate';
 import { useGenerateAllClips } from '@/hooks/useGenerateAllClips';
+import PipelineProgressBar from './PipelineProgressBar';
 import { Play, CheckCircle2 } from 'lucide-react';
 
 const SCENE_TYPE_LABEL_DE: Record<string, string> = {
@@ -464,6 +465,16 @@ export default function StoryboardTab({
           </Button>
         </div>
       </div>
+
+      {/* Inline Pipeline Progress — visible directly in the workspace,
+          not just at the top of the page. Appears the instant the user
+          clicks "Generieren" and stays for the full ~7–8 min pipeline. */}
+      <PipelineProgressBar
+        scenes={scenes}
+        assemblyConfig={DEFAULT_ASSEMBLY_CONFIG}
+        className="!sticky !top-2 !mx-0 !px-3 rounded-xl border border-gold/20 bg-card/70"
+      />
+
 
       {/* AI Generation Tips (gold) */}
       <div className="relative overflow-hidden rounded-xl bg-card/40 backdrop-blur-sm border border-gold/20 shadow-soft">
