@@ -74,14 +74,24 @@ function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | unde
   return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic" };
 }
 
-async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null }): Promise<string> {
+async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; faceBbox?: [number, number, number, number] | null; autoDetect?: boolean }): Promise<string> {
+  let asd: Record<string, unknown>;
+  if (params.autoDetect) {
+    asd = { auto_detect: true };
+  } else if (params.faceBbox && params.faceBbox.length === 4) {
+    // Sync.so docs: when you have your own detection, bounding_boxes is more
+    // robust than frame_number+coordinates. Pass single-frame box (frame 0).
+    asd = { auto_detect: false, bounding_boxes: [params.faceBbox] };
+  } else if (params.targetCoords) {
+    asd = { auto_detect: false, frame_number: 0, coordinates: params.targetCoords };
+  } else {
+    asd = { auto_detect: true };
+  }
   const options: Record<string, unknown> = {
     sync_mode: "cut_off",
     output_format: "mp4",
     temperature: 0.5,
-    active_speaker_detection: params.targetCoords
-      ? { auto_detect: false, frame_number: 0, coordinates: params.targetCoords }
-      : { auto_detect: true },
+    active_speaker_detection: asd,
   };
   const resp = await fetch("https://api.sync.so/v2/generate", {
     method: "POST",
