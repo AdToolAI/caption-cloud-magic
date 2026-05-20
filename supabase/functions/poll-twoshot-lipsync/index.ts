@@ -15,7 +15,7 @@ function json(body: unknown, status = 200) {
 }
 
 type FaceMap = {
-  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; normCenter?: [number, number] }>;
+  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
   width?: number;
   height?: number;
 };
@@ -43,17 +43,31 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic" } {
+function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
   const side: "left" | "right" = passIndex === 0 ? "left" : "right";
   const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
   const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
   if (Array.isArray(match?.center) && match.center.length === 2) {
-    const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
-    const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
-    const coords: [number, number] = Array.isArray(match.normCenter)
-      ? [Math.round(Number(match.normCenter[0]) * W), Math.round(Number(match.normCenter[1]) * H)]
-      : [Math.round(Number(match.center[0]) * (W / (Number(faceMap?.width) || W))), Math.round(Number(match.center[1]) * (H / (Number(faceMap?.height) || H)))];
-    return { coords, side, source: "gemini" };
+    const anchorW = Number(faceMap?.width) || 0;
+    const anchorH = Number(faceMap?.height) || 0;
+    const videoW = Number(videoDims?.width) || anchorW || 1280;
+    const videoH = Number(videoDims?.height) || anchorH || 720;
+    const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
+    const scaleX = sameAspect ? videoW / anchorW : 1;
+    const scaleY = sameAspect ? videoH / anchorH : 1;
+    const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
+    const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
+    let x = faceCenter[0];
+    let y = faceCenter[1];
+    if (bbox) {
+      const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
+      if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
+        x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
+        y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
+      }
+    }
+    const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
+    return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
   const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
