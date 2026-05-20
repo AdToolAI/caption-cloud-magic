@@ -81,13 +81,16 @@ export function usePipelineProgress({
   }, []);
 
   // ── Derived per-phase progress (from real state) ──────────────────
+  const dialogVoiceCount = (s: ComposerScene) =>
+    s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+
   const hasLipsyncScenes = useMemo(
     () =>
       scenes.some(
         (s) =>
           (s as any).twoshotStage ||
           s.engineOverride === 'cinematic-sync' ||
-          ((s.dialogVoices?.length ?? 0) > 1),
+          dialogVoiceCount(s) > 1,
       ),
     [scenes],
   );
