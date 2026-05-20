@@ -269,6 +269,11 @@ serve(async (req) => {
       if (!raw) return '';
       const cleaned = raw
         .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, '')
+        // Drop server-injected "Featuring NAME (shotType): ..." / "Featuring NAME and NAME: ..." prefixes —
+        // they often pair a slot NAME with a DIFFERENT character description in the
+        // following sentence, which the image model interprets as "render Slot-Name
+        // visually as Other-Name", producing wrong/duplicated faces.
+        .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, '')
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu, '')
         .replace(/^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s*:\s.*$/gmu, '')
         .replace(/^.*\b(speak\s+to\s+camera\s+in\s+turns|lip[- ]?sync\s+mouth\s+movement|timing\s+must\s+follow|speaker\s+order|in\s+turns|dialogue\s*:|conversation\s+script).*$/gim, '')
@@ -281,6 +286,58 @@ serve(async (req) => {
         .trim();
       const meaningful = cleaned.replace(/[\s.\-,;:!?]/g, '').length >= 10;
       return meaningful ? cleaned : '';
+    };
+
+    /**
+     * Parse a dialog script ("NAME: text" per line) and return the unique
+     * speaker slugs in first-appearance order. Used to override the visual
+     * cast for anchor composition: even if `character_shots` lists more
+     * slots than the script actually uses, the anchor should only render
+     * the people who actually speak (and each exactly ONCE).
+     */
+    const uniqueSpeakerSlugsFromScript = (script?: string | null): string[] => {
+      const s = (script ?? '').trim();
+      if (!s) return [];
+      const out: string[] = [];
+      const seen = new Set<string>();
+      for (const line of s.split('\n')) {
+        const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
+        if (!m) continue;
+        const slug = m[1].trim().toLowerCase().replace(/\s+/g, '-');
+        if (slug && !seen.has(slug)) {
+          seen.add(slug);
+          out.push(slug);
+        }
+      }
+      return out;
+    };
+
+    /**
+     * Resolve a speaker slug ("matthew-dusatko" or "matthew") to the matching
+     * cast member in `character_shots` (preferred — has the portrait) so we
+     * can build a clean portraitUrls[] / characterNames[] pair from the
+     * dialog script alone.
+     */
+    const resolveSpeakerToShot = (
+      slug: string,
+      shots: Array<{ characterId: string; shotType: CharacterShotType }>,
+    ): { characterId: string; shotType: CharacterShotType } | undefined => {
+      if (!slug || shots.length === 0) return undefined;
+      const lower = slug.toLowerCase();
+      const first = lower.split('-')[0];
+      // 1) exact match
+      let hit = shots.find((s) => String(s.characterId).toLowerCase() === lower);
+      if (hit) return hit;
+      // 2) first-name match against characterId
+      hit = shots.find((s) => String(s.characterId).toLowerCase().split('-')[0] === first);
+      if (hit) return hit;
+      // 3) match via brand character name
+      hit = shots.find((s) => {
+        const c = charById.get(s.characterId);
+        const cn = (c?.name || '').toLowerCase();
+        return cn === lower || cn.split(/\s+/)[0] === first;
+      });
+      return hit;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
