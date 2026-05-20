@@ -301,7 +301,9 @@ export function useGenerateAllClips({
       });
       emitPipelineEvent({ type: 'clips:end' });
     } finally {
-      emitPipelineEvent({ type: 'clips:end' });
+      // Do NOT emit clips:end on success — the server only STARTED rendering.
+      // The pipeline bar stays alive via real `clipStatus === 'generating'`
+      // until realtime flips scenes to ready/failed.
       setIsGeneratingAll(false);
     }
   }, [
