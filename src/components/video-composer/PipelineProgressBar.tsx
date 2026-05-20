@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePipelineProgress } from '@/hooks/usePipelineProgress';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
@@ -79,13 +79,16 @@ export default function PipelineProgressBar({
                 <div
                   className={cn(
                     'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium transition-all',
-                    p.status === 'done' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+                    p.status === 'done' && 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-[0_0_16px_hsl(var(--success)/0.18)]',
+                    p.status === 'failed' && 'bg-destructive/15 text-destructive border border-destructive/40',
                     p.status === 'running' && 'bg-primary/15 text-primary border border-primary/40 animate-pulse',
                     p.status === 'idle' && 'bg-muted/20 text-muted-foreground/60 border border-border/40',
                   )}
                 >
                   {p.status === 'done' ? (
                     <Check className="h-3 w-3" strokeWidth={3} />
+                  ) : p.status === 'failed' ? (
+                    <AlertCircle className="h-3 w-3" />
                   ) : p.status === 'running' ? (
                     <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (

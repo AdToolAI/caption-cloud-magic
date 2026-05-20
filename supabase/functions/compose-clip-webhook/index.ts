@@ -33,10 +33,9 @@ serve(async (req) => {
       throw new Error('Missing scene_id or project_id query params');
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     const payload = await req.json();
     // v2 — archive every AI clip to Media Library (KI tab)
@@ -232,21 +231,53 @@ serve(async (req) => {
         console.error('[compose-clip-webhook] continuity chain error:', chainErr);
       }
 
-      // 🎤 Auto Lip-Sync — DISABLED for webhook context.
-      //
-      // Both `compose-lipsync-scene` and `compose-twoshot-lipsync` require a
-      // valid user JWT (they call `supabase.auth.getUser(token)` before doing
-      // anything). This webhook runs with the service role and therefore
-      // cannot satisfy that auth check; previous attempts here returned
-      // 401 and left the scene in an unrecoverable state where Lip-Sync
-      // appeared "failed" although the silent clip rendered fine.
-      //
-      // The client-side `useTwoShotAutoTrigger` polls every 8 s while the
-      // composer dashboard is mounted and triggers the correct function
-      // with the real user session — that's the supported path.
-      //
-      // Kept here intentionally as a no-op so future contributors don't
-      // re-introduce the broken backend trigger.
+      // 🎤 Auto Lip-Sync fallback — server-side, but ownership-safe.
+      // The Lip-Sync functions now accept service-role calls and derive the
+      // owner from composer_projects, so the webhook can rescue the pipeline
+      // even if the user leaves the tab before the client poller fires.
+      try {
+        const { data: lipScene } = await supabase
+          .from('composer_scenes')
+          .select('id, engine_override, clip_url, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, dialog_script, audio_plan')
+          .eq('id', sceneId)
+          .single();
+
+        const alreadyFinal =
+          lipScene?.lip_sync_applied_at ||
+          lipScene?.lip_sync_status === 'done' ||
+          lipScene?.twoshot_stage === 'done' ||
+          lipScene?.twoshot_stage === 'complete';
+        const alreadyRunning =
+          lipScene?.lip_sync_status === 'running' ||
+          (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
+
+        if (lipScene?.engine_override === 'cinematic-sync' && lipScene.clip_url && !alreadyFinal && !alreadyRunning) {
+          const plan = (lipScene.audio_plan ?? {}) as Record<string, any>;
+          const speakers = Math.max(
+            detectSpeakerCount(String(lipScene.dialog_script ?? '')),
+            Array.isArray(plan.speakers) ? plan.speakers.length : 0,
+            Array.isArray(plan.twoshot?.speakers) ? plan.twoshot.speakers.length : 0,
+          );
+          const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+          const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({ scene_id: sceneId }),
+          }).then(async (r) => {
+            if (!r.ok) {
+              const txt = await r.text().catch(() => '');
+              console.error(`[compose-clip-webhook] ${fnName} fallback failed`, r.status, txt.slice(0, 500));
+            }
+          });
+          // @ts-ignore — Deno Deploy / Supabase edge runtime API
+          if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+            // @ts-ignore
+            EdgeRuntime.waitUntil(lipPromise);
+          }
+        }
+      } catch (lipErr) {
+        console.error('[compose-clip-webhook] auto-lipsync fallback error:', lipErr);
+      }
 
 
     } else if (status === 'failed') {

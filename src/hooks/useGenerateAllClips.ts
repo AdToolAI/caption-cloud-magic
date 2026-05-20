@@ -36,6 +36,22 @@ interface UseGenerateAllClipsArgs {
   onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
 }
 
+function isScenePipelineReady(scene: ComposerScene) {
+  const dialogVoiceCount = scene.dialogVoices ? Object.keys(scene.dialogVoices).length : 0;
+  const needsLipsync =
+    scene.engineOverride === 'cinematic-sync' ||
+    !!(scene as any).twoshotStage ||
+    dialogVoiceCount > 1;
+  if (scene.clipSource === 'upload' && !!scene.uploadUrl && !needsLipsync) return true;
+  if (scene.clipStatus !== 'ready') return false;
+  if (!needsLipsync) return true;
+  return (
+    ((scene as any).lipSyncStatus === 'done' && !!(scene as any).lipSyncAppliedAt) ||
+    (scene as any).twoshotStage === 'done' ||
+    (scene as any).twoshotStage === 'complete'
+  );
+}
+
 export function useGenerateAllClips({
   scenes,
   projectId,
@@ -71,16 +87,12 @@ export function useGenerateAllClips({
   // ── Derived counters for the storyboard master-button ─────────────
   const readyCount = useMemo(
     () =>
-      scenes.filter(
-        (s) =>
-          s.clipStatus === 'ready' ||
-          (s.clipSource === 'upload' && !!s.uploadUrl),
-      ).length,
+      scenes.filter(isScenePipelineReady).length,
     [scenes],
   );
 
   const generatingCount = useMemo(
-    () => scenes.filter((s) => s.clipStatus === 'generating').length,
+    () => scenes.filter((s) => s.clipStatus === 'generating' || (s as any).lipSyncStatus === 'running').length,
     [scenes],
   );
 
@@ -108,7 +120,7 @@ export function useGenerateAllClips({
     [pendingScenes],
   );
 
-  const allReady = scenes.length > 0 && pendingScenes.length === 0;
+  const allReady = scenes.length > 0 && scenes.every(isScenePipelineReady);
 
   // ── Action ────────────────────────────────────────────────────────
   const generateAll = useCallback(async () => {

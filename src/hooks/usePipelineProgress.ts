@@ -19,7 +19,7 @@ export interface PipelinePhaseState {
   label: string;
   weight: number; // 0..1
   progress: number; // 0..1 (within phase)
-  status: 'idle' | 'running' | 'done';
+  status: 'idle' | 'running' | 'done' | 'failed';
 }
 
 interface UsePipelineProgressArgs {
@@ -56,6 +56,10 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   export: 90,
 };
 
+// Customer-facing Composer generation should feel like one stable 7–8 minute
+// process, not like separate phases racing each other to 70% after 2 minutes.
+const RUN_NOMINAL_SECONDS = 480;
+
 export function usePipelineProgress({
   scenes,
   assemblyConfig,
@@ -81,6 +85,8 @@ export function usePipelineProgress({
   const startedAtRef = useRef<Record<PipelinePhaseId, number | null>>({
     clips: null, voiceover: null, lipsync: null, music: null, export: null,
   });
+  const pipelineStartRef = useRef<number | null>(null);
+  const runFloorRef = useRef(0);
 
   // ── Event-driven "start" flags ───────────────────────────────────
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
@@ -98,6 +104,12 @@ export function usePipelineProgress({
     return subscribePipelineEvents((e) => {
       const [phase, action] = e.type.split(':') as [PipelinePhaseId, 'start' | 'end'];
       if (action === 'start') {
+        if (pipelineStartRef.current === null || phase === 'clips') {
+          pipelineStartRef.current = Date.now();
+          runFloorRef.current = 0;
+          floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
+          startedAtRef.current = { clips: null, voiceover: null, lipsync: null, music: null, export: null };
+        }
         // Reset this phase so it starts at 0 % for the new run.
         floorRef.current[phase] = 0;
         startedAtRef.current[phase] = Date.now();
@@ -117,8 +129,7 @@ export function usePipelineProgress({
           clipsTotal: ai.length,
           lipsyncDone: lipTargets.filter(
             (s) =>
-              (s as any).lipSyncStatus === 'done' ||
-              (s as any).lipSyncStatus === 'ready' ||
+              ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
               (s as any).twoshotStage === 'done' ||
               (s as any).twoshotStage === 'complete',
           ).length,
@@ -153,7 +164,7 @@ export function usePipelineProgress({
 
   const clipsReal = useMemo(() => {
     const b = baselineRef.current;
-    if (aiScenes.length === 0) return { progress: 0, running: false, done: false };
+    if (aiScenes.length === 0) return { progress: 0, running: false, done: false, failed: false };
     const ready = aiScenes.filter((s) => s.clipStatus === 'ready').length;
     const generating = aiScenes.filter((s) => s.clipStatus === 'generating').length;
     const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
@@ -167,6 +178,7 @@ export function usePipelineProgress({
       progress,
       running: generating > 0,
       done: progress >= 1 && generating === 0 && failed === 0,
+      failed: failed > 0 && generating === 0,
     };
   }, [aiScenes]);
 
@@ -200,8 +212,7 @@ export function usePipelineProgress({
     );
     const done = targets.filter(
       (s) =>
-        (s as any).lipSyncStatus === 'done' ||
-        (s as any).lipSyncStatus === 'ready' ||
+        ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
         (s as any).twoshotStage === 'done' ||
         (s as any).twoshotStage === 'complete',
     ).length;
@@ -258,6 +269,18 @@ export function usePipelineProgress({
     musicReal.running, exportReal.running,
   ]);
 
+  useEffect(() => {
+    setEventFlags((prev) => {
+      const next = { ...prev };
+      if (prev.clips && (clipsReal.done || clipsReal.failed)) next.clips = false;
+      if (prev.voiceover && voiceoverReal.done) next.voiceover = false;
+      if (prev.lipsync && (lipsyncReal.done || lipsyncReal.failed)) next.lipsync = false;
+      if (prev.music && musicReal.done) next.music = false;
+      if (prev.export && exportReal.done) next.export = false;
+      return next;
+    });
+  }, [clipsReal.done, clipsReal.failed, voiceoverReal.done, lipsyncReal.done, lipsyncReal.failed, musicReal.done, exportReal.done]);
+
   const phases: PipelinePhaseState[] = useMemo(() => {
     const list: { id: PipelinePhaseId; real: { progress: number; running: boolean; done: boolean; applicable?: boolean; failed?: boolean } }[] = [
       { id: 'clips', real: { ...clipsReal, applicable: true } },
@@ -291,7 +314,7 @@ export function usePipelineProgress({
           weight: PHASE_WEIGHTS[p.id],
           progress: floorRef.current[p.id],
           status: ((p.real as any).failed
-            ? 'idle'
+            ? 'failed'
             : p.real.done
             ? 'done'
             : running
@@ -304,31 +327,18 @@ export function usePipelineProgress({
     eventFlags, floorTick,
   ]);
 
-  const totalWeight = phases.reduce((sum, p) => sum + p.weight, 0) || 1;
-  const overallPercent = Math.round(
-    (phases.reduce((sum, p) => sum + p.weight * p.progress, 0) / totalWeight) * 100,
-  );
+  const phaseOverall = (() => {
+    const totalWeight = phases.reduce((sum, p) => sum + p.weight, 0) || 1;
+    return (phases.reduce((sum, p) => sum + p.weight * p.progress, 0) / totalWeight) * 100;
+  })();
 
   const activePhase = phases.find((p) => p.status === 'running');
   const isActive = phases.some((p) => p.status === 'running');
-
-
-
-  // ETA across remaining + active phases
-  const etaSeconds = useMemo(() => {
-    if (!isActive) return 0;
-    return phases.reduce((sum, p) => {
-      if (p.status === 'done') return sum;
-      const remaining = 1 - p.progress;
-      return sum + remaining * PHASE_NOMINAL_SECONDS[p.id];
-    }, 0);
-  }, [phases, isActive]);
-
   // Pipeline start time = first time anything went "running"
-  const pipelineStartRef = useRef<number | null>(null);
   useEffect(() => {
     if (isActive && pipelineStartRef.current === null) {
       pipelineStartRef.current = Date.now();
+      runFloorRef.current = 0;
     }
     if (!isActive && phases.every((p) => p.status !== 'running')) {
       // keep last value briefly; reset 5s after everything settles
@@ -344,6 +354,17 @@ export function usePipelineProgress({
   const elapsedSeconds = pipelineStartRef.current
     ? Math.round((Date.now() - pipelineStartRef.current) / 1000)
     : 0;
+
+  const runSoftPercent = isActive && pipelineStartRef.current
+    ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
+    : 0;
+  const hasFailure = phases.some((p) => p.status === 'failed');
+  const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
+  const completedCleanly = !isActive && !hasFailure && phases.some((p) => p.status === 'done');
+  const currentOverall = allDone || completedCleanly ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
+  runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
+  const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
+  const etaSeconds = isActive ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
 
   return {
     phases,

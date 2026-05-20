@@ -19,6 +19,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
@@ -44,6 +45,7 @@ function resolveSpeakerCount(scene: any): number {
 
 export function useTwoShotAutoTrigger(projectId: string | undefined) {
   const inflight = useRef<Set<string>>(new Set());
+  const progressActive = useRef(false);
 
   useEffect(() => {
     if (!projectId) return;
@@ -60,10 +62,31 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const now = Date.now();
         const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
+        const STALE_SYNC_MS = 12 * 60 * 1000; // Sync.so should settle well before this; avoid endless spinner
 
         const hasSyncSoJob = (d: any) =>
           typeof d.replicate_prediction_id === 'string' &&
           d.replicate_prediction_id.startsWith('sync:');
+
+        const staleSyncJobs = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            hasSyncSoJob(d) &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > STALE_SYNC_MS,
+        );
+        if (staleSyncJobs.length > 0) {
+          await Promise.all(
+            staleSyncJobs.map((d) =>
+              supabase
+                .from('composer_scenes')
+                .update({ lip_sync_status: 'failed', twoshot_stage: 'failed', clip_error: 'syncso_poll_timeout' })
+                .eq('id', d.id),
+            ),
+          );
+        }
 
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
@@ -71,8 +94,13 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
+            !staleSyncJobs.some((s) => s.id === d.id) &&
             !inflight.current.has(`poll:${d.id}`),
         );
+        if (runningSyncJobs.length > 0 && !progressActive.current) {
+          progressActive.current = true;
+          emitPipelineEvent({ type: 'lipsync:start' });
+        }
         for (const d of runningSyncJobs) {
           inflight.current.add(`poll:${d.id}`);
           supabase.functions
@@ -119,6 +147,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.lip_sync_applied_at) return false;
           if (inflight.current.has(d.id)) return false;
+          if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
           if (
             d.lip_sync_status === 'failed' &&
@@ -130,7 +159,20 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           }
           return false;
         });
-        if (candidates.length === 0) return;
+        if (candidates.length === 0) {
+          const anyVisibleLipsyncWork = (data as any[]).some(
+            (d) =>
+              d.engine_override === 'cinematic-sync' &&
+              !d.lip_sync_applied_at &&
+              (d.lip_sync_status === 'running' ||
+                (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
+          );
+          if (!anyVisibleLipsyncWork && progressActive.current) {
+            progressActive.current = false;
+            emitPipelineEvent({ type: 'lipsync:end' });
+          }
+          return;
+        }
 
 
         // Optimistischer Client-Lock — verhindert Doppel-Trigger im selben Tick.
@@ -138,6 +180,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Function reserviert Credits und setzt den Status atomar selbst;
         // sonst blockiert ihre Duplicate-Run-Sperre den frisch gestarteten Job.
         candidates.forEach((d) => inflight.current.add(d.id));
+        if (!progressActive.current) {
+          progressActive.current = true;
+          emitPipelineEvent({ type: 'lipsync:start' });
+        }
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
@@ -168,6 +214,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               const reason = lsData?.error ?? errBody?.error;
               const message = lsData?.message ?? errBody?.message;
               if (reason === 'tts_failed' || reason === 'no_voiceover') {
+                emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Cinematic-Sync braucht ein Voiceover',
                   description:
@@ -175,6 +222,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   variant: 'destructive',
                 });
               } else if (lsErr) {
+                emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Lip-Sync fehlgeschlagen',
                   description:
