@@ -284,6 +284,7 @@ export function useGenerateAllClips({
       });
       emitPipelineEvent({ type: 'clips:end' });
     } finally {
+      emitPipelineEvent({ type: 'clips:end' });
       setIsGeneratingAll(false);
     }
   }, [
