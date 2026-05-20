@@ -19,6 +19,7 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
@@ -119,6 +120,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.lip_sync_applied_at) return false;
           if (inflight.current.has(d.id)) return false;
+          if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
           if (
             d.lip_sync_status === 'failed' &&
@@ -138,6 +140,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Function reserviert Credits und setzt den Status atomar selbst;
         // sonst blockiert ihre Duplicate-Run-Sperre den frisch gestarteten Job.
         candidates.forEach((d) => inflight.current.add(d.id));
+        emitPipelineEvent({ type: 'lipsync:start' });
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
@@ -168,6 +171,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               const reason = lsData?.error ?? errBody?.error;
               const message = lsData?.message ?? errBody?.message;
               if (reason === 'tts_failed' || reason === 'no_voiceover') {
+                emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Cinematic-Sync braucht ein Voiceover',
                   description:
@@ -175,6 +179,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   variant: 'destructive',
                 });
               } else if (lsErr) {
+                emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Lip-Sync fehlgeschlagen',
                   description:
