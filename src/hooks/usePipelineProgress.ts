@@ -19,7 +19,7 @@ export interface PipelinePhaseState {
   label: string;
   weight: number; // 0..1
   progress: number; // 0..1 (within phase)
-  status: 'idle' | 'running' | 'done';
+  status: 'idle' | 'running' | 'done' | 'failed';
 }
 
 interface UsePipelineProgressArgs {
@@ -56,6 +56,10 @@ const PHASE_NOMINAL_SECONDS: Record<PipelinePhaseId, number> = {
   export: 90,
 };
 
+// Customer-facing Composer generation should feel like one stable 7–8 minute
+// process, not like separate phases racing each other to 70% after 2 minutes.
+const RUN_NOMINAL_SECONDS = 480;
+
 export function usePipelineProgress({
   scenes,
   assemblyConfig,
@@ -81,6 +85,8 @@ export function usePipelineProgress({
   const startedAtRef = useRef<Record<PipelinePhaseId, number | null>>({
     clips: null, voiceover: null, lipsync: null, music: null, export: null,
   });
+  const pipelineStartRef = useRef<number | null>(null);
+  const runFloorRef = useRef(0);
 
   // ── Event-driven "start" flags ───────────────────────────────────
   const [eventFlags, setEventFlags] = useState<Record<PipelinePhaseId, boolean>>({
@@ -98,6 +104,12 @@ export function usePipelineProgress({
     return subscribePipelineEvents((e) => {
       const [phase, action] = e.type.split(':') as [PipelinePhaseId, 'start' | 'end'];
       if (action === 'start') {
+        if (pipelineStartRef.current === null || phase === 'clips') {
+          pipelineStartRef.current = Date.now();
+          runFloorRef.current = 0;
+          floorRef.current = { clips: 0, voiceover: 0, lipsync: 0, music: 0, export: 0 };
+          startedAtRef.current = { clips: null, voiceover: null, lipsync: null, music: null, export: null };
+        }
         // Reset this phase so it starts at 0 % for the new run.
         floorRef.current[phase] = 0;
         startedAtRef.current[phase] = Date.now();
