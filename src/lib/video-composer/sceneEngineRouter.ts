@@ -108,11 +108,24 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
 
   // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
+    // Single speaker → komponiere den Sprecher in die echte Szene (Hailuo i2v
+    // + Sync.so Lip-Sync) statt einen nackten HeyGen-Avatar-Bust zu zeigen.
+    if (speakers < 2) {
+      return {
+        engine: 'cinematic-sync',
+        label: '🎬 Cinematic + Lip-Sync (Auto)',
+        reason:
+          'Sprecher wird in die echte Szene komponiert (Hailuo i2v) und danach frame-genau lip-synct (Sync.so). Werbe-Niveau statt Avatar-Bust.',
+        extraCostEur: 0.95,
+      };
+    }
+    // 2+ Sprecher → HeyGen Two-Shot bleibt der sichere Default (Cinematic-Sync
+    // ist für einen Sprecher pro Shot optimiert).
     return {
       engine: 'heygen-talking-head',
-      label: speakers >= 2 ? `🎙️ HeyGen Lip-Sync (${speakers} Sprecher)` : '🎙️ HeyGen Lip-Sync',
+      label: `🎙️ HeyGen Lip-Sync (${speakers} Sprecher)`,
       reason:
-        'Charakter spricht im Bild — HeyGen Photo Avatar liefert frame-genauen Lip-Sync (Werbe-Niveau).',
+        'Mehrere Sprecher im Bild — HeyGen Two-Shot liefert frame-genauen Lip-Sync pro Person.',
       extraCostEur: estimateHeygenCostEur(speakers),
     };
   }
