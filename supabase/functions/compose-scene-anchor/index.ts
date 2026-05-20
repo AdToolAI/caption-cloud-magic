@@ -31,6 +31,10 @@ interface Body {
   scenePrompt: string;
   aspectRatio?: "16:9" | "9:16" | "1:1";
   shotType?: string;
+  /** When true, append an extra anti-duplicate/anti-extra-person hardening
+   *  block. Used by compose-video-clips on the SECOND attempt after the
+   *  first anchor showed a cloned identity or an extra person. */
+  strictNoDuplicates?: boolean;
 }
 
 async function sha1(s: string): Promise<string> {
