@@ -992,7 +992,8 @@ serve(async (req) => {
               syncMode: "cut_off",
               temperature: pass1Segment ? 0.65 : 0.5,
               targetCoords: firstTarget.coords,
-              faceBbox: Array.isArray(firstTarget.bbox) && firstTarget.bbox.length === 4 ? firstTarget.bbox as [number, number, number, number] : null,
+              // No `faceBbox`: Sync.so wants per-frame box arrays, not a
+              // single static one. coordinates+frame_number is the stable path.
               frameNumber: 0,
               segmentSecs: pass1Segment,
             },
