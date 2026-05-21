@@ -126,6 +126,16 @@ export function usePipelineProgress({
             s.engineOverride === 'cinematic-sync' ||
             (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
         );
+        const dsTotals = lipTargets.reduce(
+          (acc, s) => {
+            const ds = (s as any).dialogShots ?? (s as any).dialog_shots ?? null;
+            const shots = Array.isArray(ds?.shots) ? ds.shots : [];
+            acc.total += shots.length;
+            acc.done += shots.filter((sh: any) => sh.status === 'ready').length;
+            return acc;
+          },
+          { done: 0, total: 0 },
+        );
         baselineRef.current = {
           clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
           clipsTotal: ai.length,
@@ -133,9 +143,12 @@ export function usePipelineProgress({
             (s) =>
               ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
               (s as any).twoshotStage === 'done' ||
-              (s as any).twoshotStage === 'complete',
+              (s as any).twoshotStage === 'complete' ||
+              ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
           ).length,
           lipsyncTotal: lipTargets.length,
+          dialogShotsDone: dsTotals.done,
+          dialogShotsTotal: dsTotals.total,
           voiceoverHadAudio: !!ac?.voiceover?.audioUrl,
           musicHad: !!ac?.music,
         };
