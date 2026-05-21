@@ -450,6 +450,10 @@ export default function VideoComposerDashboard() {
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
+            // Trust the DB as source of truth for clip_url. If the DB has it
+            // cleared (e.g. after a reset / re-render), the local stale URL
+            // must NOT bleed back into UI — otherwise the preview would keep
+            // playing an old / wrong clip while the new render is pending.
             clipUrl: row.clip_url ?? undefined,
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
