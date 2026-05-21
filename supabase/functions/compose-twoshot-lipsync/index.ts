@@ -913,6 +913,7 @@ serve(async (req) => {
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
         let jobId = "";
+        if (!(await reserveCredits())) return;
         try {
           jobId = await startSyncSoDirectGeneration(
             SYNC_API_KEY!,
@@ -1022,6 +1023,7 @@ serve(async (req) => {
         // request `cut_off` (no loop artefacts).
         const syncMode = "cut_off";
         let outputUrl: string | null = null;
+        if (!(await reserveCredits())) return;
         try {
           if (useSyncSoDirect) {
             outputUrl = await runSyncSoDirectPrediction(
