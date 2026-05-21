@@ -912,15 +912,14 @@ serve(async (req) => {
           ];
         }
       }
-      // temperature bumped 0.5 → 0.7 so mouth motion is clearly visible on
-      // the lip-ready neutral plate (0.5 + closed-lip prompt produced the
-      // ventriloquist effect).
+      // temperature 0.85 — lip-ready neutral plate needs high articulation
+      // (0.5 produced ventriloquist effect, 0.7 still too subtle on Two-Shot).
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: mergedAudioUrl,
         targetCoords: target.coords,
         segmentSecs: nextSegment,
-        temperature: 0.7,
+        temperature: 0.85,
       });
 
       await appendTwoshotDiag(supabase, sceneId, {
