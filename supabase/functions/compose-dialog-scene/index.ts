@@ -656,7 +656,7 @@ serve(async (req) => {
           error: "INSUFFICIENT_CREDITS",
           required: totalCost,
           have: wallet?.balance ?? 0,
-          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Turns × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
+          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Sprecher × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
         },
         402,
       );
