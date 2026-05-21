@@ -80,18 +80,17 @@ function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | unde
   return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic" };
 }
 
-async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; faceBbox?: [number, number, number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+  // Sync.so Speaker Selection: documented stable path for a single manual
+  // selection is `auto_detect:false + frame_number + coordinates`. We do NOT
+  // send `bounding_boxes` (a single static box is not what that field expects
+  // and was the source of generic "An unknown error occurred" failures on
+  // two-shot face-targeted passes).
   let asd: Record<string, unknown>;
-  if (params.autoDetect) {
+  if (params.autoDetect || !params.targetCoords) {
     asd = { auto_detect: true };
-  } else if (params.faceBbox && params.faceBbox.length === 4) {
-    // Sync.so docs: when you have your own detection, bounding_boxes is more
-    // robust than frame_number+coordinates. Pass single-frame box (frame 0).
-    asd = { auto_detect: false, bounding_boxes: [params.faceBbox] };
-  } else if (params.targetCoords) {
-    asd = { auto_detect: false, frame_number: 0, coordinates: params.targetCoords };
   } else {
-    asd = { auto_detect: true };
+    asd = { auto_detect: false, frame_number: 0, coordinates: params.targetCoords };
   }
   const options: Record<string, unknown> = {
     sync_mode: "cut_off",
@@ -103,8 +102,8 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
+      // Audio-only window — see compose-twoshot-lipsync for rationale.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
       aud.segments_secs = seg;
     }
     return [vid, aud];
