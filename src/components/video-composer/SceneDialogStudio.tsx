@@ -1042,13 +1042,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         okCount = 1;
         toast({
-          title: language === 'de' ? 'Two-Shot wird gerendert' : language === 'es' ? 'Renderizando Two-Shot' : 'Rendering Two-Shot',
+          title: language === 'de' ? 'Dialog-Shots werden gerendert' : language === 'es' ? 'Renderizando Dialog-Shots' : 'Rendering Dialog Shots',
           description:
             language === 'de'
-              ? `Beide Sprecher werden in EINE ${masterDuration}s-Szene komponiert. Du siehst den Fortschritt live in der Clip-Karte (6 Phasen).`
+              ? `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`
               : language === 'es'
-              ? `Ambos hablantes se componen en UNA escena de ${masterDuration}s. Verás el progreso en vivo en la tarjeta del clip (6 fases).`
-              : `Both speakers are being composed into ONE ${masterDuration}s scene. Live progress shows in the clip card (6 phases).`,
+              ? `Por cada turno se renderiza un shot dedicado (Hailuo + Sync.so) y al final se concatena a una escena de ${masterDuration}s. Progreso en vivo en la tarjeta del clip.`
+              : `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`,
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
