@@ -935,43 +935,38 @@ serve(async (req) => {
         (plan as any)?.twoshot?.url ||
         nextSpeaker.track_url;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
-      // Use per-turn windows when present so a speaker with multiple turns
-      // never re-animates over the OTHER speaker's voiced range.
-      let nextSegment: [number, number] | Array<[number, number]> | null = null;
-      if (vrNext && sceneDurSec > 0) {
-        if (Array.isArray(vrNext.turns) && vrNext.turns.length > 0) {
-          const turns = vrNext.turns
-            .map(
-              (t: any) =>
-                [
-                  Math.max(0, Number(t.startSec)),
-                  Math.min(sceneDurSec, Number(t.endSec)),
-                ] as [number, number],
-            )
-            .filter(
-              ([a, b]: [number, number]) =>
-                Number.isFinite(a) && Number.isFinite(b) && b > a,
-            );
-          if (turns.length > 0) nextSegment = turns;
-        } else if (
-          Number.isFinite(vrNext.startSec) &&
-          Number.isFinite(vrNext.endSec) &&
-          vrNext.endSec > vrNext.startSec
-        ) {
-          nextSegment = [
-            Math.max(0, Number(vrNext.startSec)),
-            Math.min(sceneDurSec, Number(vrNext.endSec)),
-          ];
+      // Collect raw per-turn ranges for ALL speakers so we can expand each
+      // window with a tiny pre-roll/tail without crossing into the OTHER
+      // speaker's turn (fixes ventriloquist on short 2nd turns + frame-grid
+      // drift). Audio itself stays sample-exact; only video window widens.
+      const extractRawTurns = (sp: any): Array<[number, number]> => {
+        const vr = sp?.voicedRange;
+        if (!vr) return [];
+        if (Array.isArray(vr.turns) && vr.turns.length > 0) {
+          return vr.turns
+            .map((t: any) => [Number(t.startSec), Number(t.endSec)] as [number, number])
+            .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
         }
-      }
-      // temperature 0.85 — lip-ready neutral plate needs high articulation
-      // (0.5 produced ventriloquist effect, 0.7 still too subtle on Two-Shot).
+        if (Number.isFinite(vr.startSec) && Number.isFinite(vr.endSec) && vr.endSec > vr.startSec) {
+          return [[Number(vr.startSec), Number(vr.endSec)]];
+        }
+        return [];
+      };
+      const ownTurnsNext = extractRawTurns(nextSpeaker);
+      const otherTurnsNext = speakers
+        .filter((_: any, i: number) => i !== nextIdx)
+        .flatMap((sp: any) => extractRawTurns(sp));
+      const expandedNext = expandTurnsWithPreRoll(ownTurnsNext, otherTurnsNext, sceneDurSec);
+      const nextSegment: [number, number] | Array<[number, number]> | null =
+        expandedNext.windows.length === 0 ? null : expandedNext.windows;
+      // Adaptive temperature: short turns need 1.0, long turns stay at 0.85.
+      const nextTemp = pickTemperatureForTurns(expandedNext.minTurnDur);
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: mergedAudioUrl,
         targetCoords: target.coords,
         segmentSecs: nextSegment,
-        temperature: 0.85,
+        temperature: nextTemp,
       });
 
       await appendTwoshotDiag(supabase, sceneId, {
