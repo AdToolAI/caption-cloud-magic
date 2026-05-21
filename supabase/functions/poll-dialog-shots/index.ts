@@ -1,32 +1,23 @@
 /**
- * poll-dialog-shots — resumable poller for the dialog-based shot pipeline.
+ * poll-dialog-shots — Sequential Sync.so chain poller.
  *
- * Runtime constraints: Supabase Edge Runtime does NOT allow spawning
- * subprocesses (no `Deno.Command('ffmpeg')`). All audio slicing happens
- * in pure TypeScript on raw Int16 PCM / WAV samples. Final video
- * stitching is deferred to the existing render pipeline; this function
- * only orchestrates per-shot Hailuo + Sync.so jobs and writes their
- * outputs back to `composer_scenes.dialog_shots`.
+ * v2 design: per-turn Sync.so lipsync-2-pro passes on the same master plate,
+ * chained sequentially. Each turn's output becomes the next turn's video
+ * input. The final turn's output is the new clip_url. NO ffmpeg, NO Remotion
+ * stitching — Sync.so's `sync_mode='cut_off'` leaves frames outside the
+ * narrow `segments_secs` window untouched, so chaining safely preserves
+ * earlier turns' lip animation.
  *
- * Per-shot lifecycle:
- *   pending → generating (Hailuo running)
- *           → generated  (Hailuo done, plate_url set)
- *           → lipsyncing (Sync.so job queued, sync_job_id set)
- *           → ready      (lipsync_url set)
- *           → failed
+ * Per-turn lifecycle:
+ *   pending → lipsyncing (sync_job_id set) → ready (output_url set)
+ *                                          → failed
  *
- * When all shots are 'ready':
- *   - 1 shot   → that shot's lipsync_url becomes clip_url
- *   - N shots  → the existing source clip_url is kept (the original master
- *                two-shot plate already plays audio); shots[] is fully
- *                preserved for the Director's Cut / render pipeline to
- *                stitch the per-speaker lipsync clips later.
- *   In both cases lip_sync_status='done' so the UI stops spinning.
+ * Runtime constraints: Supabase Edge Runtime cannot spawn subprocesses, so
+ * audio slicing is done in pure TypeScript on Int16 PCM/WAV samples.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
-import Replicate from "npm:replicate@0.25.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,51 +35,46 @@ function json(body: unknown, status = 200) {
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const SAMPLE_RATE = 44100;
+/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding). */
+const SYNC_LEAD_IN_SEC = 0.12;
+const SYNC_TAIL_SEC = 0.08;
 
-interface DialogShot {
+interface DialogTurnShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  portrait_url: string | null;
   startSec: number;
   endSec: number;
   durSec: number;
-  hailuo_target_sec: number;
-  status:
-    | "pending"
-    | "generating"
-    | "generated"
-    | "lipsyncing"
-    | "ready"
-    | "failed";
-  hailuo_prediction_id?: string;
-  plate_url?: string;
-  audio_slice_url?: string;
+  target_coords: [number, number] | null;
+  temperature: number;
+  status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
-  lipsync_url?: string;
+  output_url?: string;
   error?: string;
   started_at?: string;
   completed_at?: string;
 }
+
 interface DialogShotsState {
-  version: 1;
-  status: "generating" | "lipsyncing" | "stitching" | "done" | "failed";
-  shots: DialogShot[];
+  version: 2;
+  status: "queued" | "lipsyncing" | "done" | "failed";
+  shots: DialogTurnShot[];
+  source_clip_url: string;
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
   refunded: boolean;
   started_at: string;
-  stitched_url?: string | null;
-  stitched_at?: string;
+  video_width: number;
+  video_height: number;
+  final_url?: string | null;
+  finished_at?: string;
   error?: string;
 }
 
-// ── Pure-TS WAV helpers ─────────────────────────────────────────────────
-// Decode → slice samples by time → re-encode as 16-bit PCM mono WAV.
-// Mirrors the format produced by compose-twoshot-audio so Sync.so sees
-// the exact same encoding it always has.
+// ── Pure-TS WAV slicing ─────────────────────────────────────────────────
 
 function resampleLinear(input: Int16Array, fromRate: number, toRate: number): Int16Array {
   if (fromRate === toRate) return input;
@@ -113,12 +99,8 @@ function decodeWavToMonoSamples(wav: Uint8Array): Int16Array {
     throw new Error("Not a RIFF/WAVE file");
   }
   let off = 12;
-  let audioFormat = 1,
-    channels = 1,
-    sampleRate = SAMPLE_RATE,
-    bitsPerSample = 16;
-  let dataOff = -1,
-    dataLen = 0;
+  let audioFormat = 1, channels = 1, sampleRate = SAMPLE_RATE, bitsPerSample = 16;
+  let dataOff = -1, dataLen = 0;
   while (off + 8 <= wav.byteLength) {
     const id = dv.getUint32(off, false);
     const size = dv.getUint32(off + 4, true);
@@ -160,18 +142,18 @@ function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
   const buf = new ArrayBuffer(44 + dataBytes);
   const v = new DataView(buf);
-  v.setUint32(0, 0x52494646, false); // "RIFF"
+  v.setUint32(0, 0x52494646, false);
   v.setUint32(4, 36 + dataBytes, true);
-  v.setUint32(8, 0x57415645, false); // "WAVE"
-  v.setUint32(12, 0x666d7420, false); // "fmt "
+  v.setUint32(8, 0x57415645, false);
+  v.setUint32(12, 0x666d7420, false);
   v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true); // PCM
-  v.setUint16(22, 1, true); // mono
+  v.setUint16(20, 1, true);
+  v.setUint16(22, 1, true);
   v.setUint32(24, SAMPLE_RATE, true);
-  v.setUint32(28, SAMPLE_RATE * 2, true); // byte rate
-  v.setUint16(32, 2, true); // block align
-  v.setUint16(34, 16, true); // bits per sample
-  v.setUint32(36, 0x64617461, false); // "data"
+  v.setUint32(28, SAMPLE_RATE * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  v.setUint32(36, 0x64617461, false);
   v.setUint32(40, dataBytes, true);
   new Uint8Array(buf, 44).set(
     new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
@@ -179,23 +161,32 @@ function samplesToWav(samples: Int16Array): Uint8Array {
   return new Uint8Array(buf);
 }
 
-/** Pure-TS slice of a master WAV by time range. */
-async function sliceMasterWavToBytes(
+/** Cache master WAV samples across all turns in one invocation. */
+const masterSampleCache = new Map<string, Int16Array>();
+
+async function getMasterSamples(masterUrl: string): Promise<Int16Array> {
+  const cached = masterSampleCache.get(masterUrl);
+  if (cached) return cached;
+  const resp = await fetch(masterUrl);
+  if (!resp.ok) throw new Error(`fetch master wav ${resp.status}`);
+  const wavBytes = new Uint8Array(await resp.arrayBuffer());
+  const samples = decodeWavToMonoSamples(wavBytes);
+  masterSampleCache.set(masterUrl, samples);
+  return samples;
+}
+
+async function sliceWavBytes(
   masterUrl: string,
   startSec: number,
   endSec: number,
 ): Promise<Uint8Array> {
-  const resp = await fetch(masterUrl);
-  if (!resp.ok) throw new Error(`slice fetch master ${resp.status}`);
-  const wavBytes = new Uint8Array(await resp.arrayBuffer());
-  const samples = decodeWavToMonoSamples(wavBytes);
+  const samples = await getMasterSamples(masterUrl);
   const startSample = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
   const endSample = Math.min(samples.length, Math.ceil(endSec * SAMPLE_RATE));
   if (endSample <= startSample) {
     throw new Error(`empty slice ${startSec}-${endSec}s`);
   }
-  const slice = samples.slice(startSample, endSample);
-  return samplesToWav(slice);
+  return samplesToWav(samples.slice(startSample, endSample));
 }
 
 async function uploadToStorage(
@@ -213,35 +204,90 @@ async function uploadToStorage(
   return pub.publicUrl;
 }
 
-async function startSyncJob(
+// ── Sync.so wrappers ────────────────────────────────────────────────────
+
+/** Expand a turn window with pre-roll/tail, clamped to neighbouring turn
+ *  boundaries (never bleed into another speaker's window). */
+function expandWindow(
+  shot: DialogTurnShot,
+  allShots: DialogTurnShot[],
+): [number, number] {
+  const prev = allShots
+    .filter((s) => s.idx < shot.idx)
+    .reduce<number>((max, s) => Math.max(max, s.endSec), 0);
+  const nextStart = allShots
+    .filter((s) => s.idx > shot.idx)
+    .reduce<number>((min, s) => Math.min(min, s.startSec), Number.POSITIVE_INFINITY);
+  const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (shot.startSec - prev) / 2));
+  const maxTail =
+    Number.isFinite(nextStart)
+      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - shot.endSec) / 2))
+      : SYNC_TAIL_SEC;
+  return [
+    Math.max(0, shot.startSec - maxLeadIn),
+    shot.endSec + maxTail,
+  ];
+}
+
+async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
   audioUrl: string,
+  segment: [number, number],
+  coords: [number, number] | null,
+  temperature: number,
 ): Promise<string> {
-  const payload = {
+  const options: Record<string, unknown> = {
+    output_format: "mp4",
+    sync_mode: "cut_off",
+    temperature,
+  };
+  if (coords) {
+    options.active_speaker_detection = {
+      auto_detect: false,
+      frame_number: 0,
+      coordinates: coords,
+    };
+  } else {
+    options.active_speaker_detection = { auto_detect: true };
+  }
+  const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl },
+      { type: "video", url: videoUrl, segments_secs: [segment] },
       { type: "audio", url: audioUrl },
     ],
-    options: {
-      output_format: "mp4",
-      sync_mode: "cut_off",
-      active_speaker_detection: { auto_detect: true },
-      temperature: 0.85,
-    },
+    options,
   };
-  const r = await fetch(`${SYNC_API_BASE}/generate`, {
+  let r = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "Content-Type": "application/json",
-    },
+    headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    throw new Error(`sync.so create ${r.status}: ${txt.slice(0, 300)}`);
+    // Fallback: retry without segments_secs if Sync.so rejects the window.
+    if (
+      r.status === 400 &&
+      /segments? configuration is invalid|only supported for video inputs|invalid.+segment/i.test(txt)
+    ) {
+      console.warn(
+        `[poll-dialog-shots] segments rejected, retry without window: ${txt.slice(0, 200)}`,
+      );
+      const fallback = { ...payload };
+      (fallback.input as any[])[0] = { type: "video", url: videoUrl };
+      r = await fetch(`${SYNC_API_BASE}/generate`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(fallback),
+      });
+      if (!r.ok) {
+        const t2 = await r.text().catch(() => "");
+        throw new Error(`sync.so create ${r.status}: ${t2.slice(0, 300)}`);
+      }
+    } else {
+      throw new Error(`sync.so create ${r.status}: ${txt.slice(0, 300)}`);
+    }
   }
   const data = await r.json();
   return String(data.id);
@@ -250,11 +296,7 @@ async function startSyncJob(
 async function pollSyncJob(
   apiKey: string,
   jobId: string,
-): Promise<{
-  status: string;
-  outputUrl?: string;
-  error?: string;
-}> {
+): Promise<{ status: string; outputUrl?: string; error?: string }> {
   const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
     headers: { "x-api-key": apiKey },
   });
@@ -297,9 +339,10 @@ async function refundIfNeeded(
   return { ...state, refunded: true };
 }
 
+// ── Per-scene processor ─────────────────────────────────────────────────
+
 async function processScene(
   supabase: ReturnType<typeof createClient>,
-  replicate: Replicate,
   syncKey: string,
   sceneId: string,
 ): Promise<{ status: string; mutated: boolean }> {
@@ -315,8 +358,13 @@ async function processScene(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.status === "done" || state.status === "failed")
+  if (state.version !== 2) {
+    // Legacy v1 (Hailuo-per-turn) state — ignore; user must reset via UI.
+    return { status: "legacy_v1_ignored", mutated: false };
+  }
+  if (state.status === "done" || state.status === "failed") {
     return { status: state.status, mutated: false };
+  }
 
   const { data: project } = await supabase
     .from("composer_projects")
@@ -325,148 +373,112 @@ async function processScene(
     .single();
   const userId = project?.user_id;
 
+  const shots = state.shots.map((s) => ({ ...s }));
   let mutated = false;
-  const shots = [...state.shots];
+  let newState: DialogShotsState = { ...state, shots };
 
-  // ── Step 1: poll Hailuo predictions ────────────────────────────────
-  for (const shot of shots) {
-    if (shot.status !== "generating" || !shot.hailuo_prediction_id) continue;
-    try {
-      const pred = await replicate.predictions.get(shot.hailuo_prediction_id);
-      if (pred.status === "succeeded") {
-        let outUrl: string | null = null;
-        const out = pred.output as any;
-        if (typeof out === "string") outUrl = out;
-        else if (Array.isArray(out) && out.length) outUrl = out[0];
-        else if (out && typeof out === "object")
-          outUrl = out.video ?? out.url ?? null;
-        if (!outUrl) {
+  // Determine the current "active" turn (the one we're processing this tick).
+  // Strict sequential: only ONE turn is in-flight at a time.
+  const activeIdx = shots.findIndex((s) => s.status === "lipsyncing");
+  const nextPendingIdx = shots.findIndex((s) => s.status === "pending");
+
+  // ── Step 1: poll the active turn ────────────────────────────────────
+  if (activeIdx >= 0) {
+    const shot = shots[activeIdx];
+    if (shot.sync_job_id) {
+      try {
+        const polled = await pollSyncJob(syncKey, shot.sync_job_id);
+        if (polled.status === "COMPLETED" && polled.outputUrl) {
+          shot.output_url = polled.outputUrl;
+          shot.status = "ready";
+          shot.completed_at = new Date().toISOString();
+          mutated = true;
+        } else if (["FAILED", "REJECTED", "CANCELED"].includes(polled.status)) {
           shot.status = "failed";
-          shot.error = "hailuo_no_output_url";
-        } else {
-          shot.plate_url = outUrl;
-          shot.status = "generated";
+          shot.error = `sync_${polled.status}: ${polled.error ?? "unknown"}`.slice(0, 300);
+          mutated = true;
         }
-        mutated = true;
-      } else if (pred.status === "failed" || pred.status === "canceled") {
-        shot.status = "failed";
-        shot.error = `hailuo_${pred.status}: ${pred.error ?? "unknown"}`.slice(0, 300);
-        mutated = true;
+      } catch (e) {
+        console.warn(
+          `[poll-dialog-shots] turn ${shot.idx} poll error`,
+          (e as Error).message,
+        );
       }
-    } catch (e) {
-      console.warn(
-        `[poll-dialog-shots] hailuo poll shot ${shot.idx} err`,
-        (e as Error).message,
-      );
     }
   }
 
-  // ── Step 2: slice audio (pure TS) + kick lipsync for generated shots ──
-  for (const shot of shots) {
-    if (shot.status !== "generated") continue;
-    if (!shot.plate_url) {
-      shot.status = "failed";
-      shot.error = "no_plate_url";
-      mutated = true;
-      continue;
-    }
-    try {
-      const sliceBytes = await sliceMasterWavToBytes(
-        state.master_audio_url,
-        shot.startSec,
-        shot.endSec,
-      );
-      const storagePath = `${userId}/dialog-shots/${sceneId}/shot-${shot.idx}-${Date.now()}.wav`;
-      const sliceUrl = await uploadToStorage(
-        supabase,
-        "voiceover-audio",
-        storagePath,
-        sliceBytes,
-        "audio/wav",
-      );
-
-      const jobId = await startSyncJob(syncKey, shot.plate_url, sliceUrl);
-      shot.audio_slice_url = sliceUrl;
-      shot.sync_job_id = jobId;
-      shot.status = "lipsyncing";
-      mutated = true;
-    } catch (e) {
-      shot.status = "failed";
-      shot.error = `lipsync_dispatch: ${(e as Error).message}`.slice(0, 300);
-      mutated = true;
-    }
-  }
-
-  // ── Step 3: poll lipsync jobs ──────────────────────────────────────
-  for (const shot of shots) {
-    if (shot.status !== "lipsyncing" || !shot.sync_job_id) continue;
-    try {
-      const polled = await pollSyncJob(syncKey, shot.sync_job_id);
-      if (polled.status === "COMPLETED" && polled.outputUrl) {
-        shot.lipsync_url = polled.outputUrl;
-        shot.status = "ready";
-        shot.completed_at = new Date().toISOString();
-        mutated = true;
-      } else if (["FAILED", "REJECTED", "CANCELED"].includes(polled.status)) {
-        shot.status = "failed";
-        shot.error = `sync_${polled.status}: ${polled.error ?? "unknown"}`.slice(0, 300);
-        mutated = true;
-      }
-    } catch (e) {
-      console.warn(
-        `[poll-dialog-shots] sync poll shot ${shot.idx} err`,
-        (e as Error).message,
-      );
-    }
-  }
-
-  // ── Step 4: determine pipeline status ──────────────────────────────
-  const allReady = shots.every((s) => s.status === "ready");
+  // ── Step 2: dispatch next pending turn IF no other turn is in-flight ──
+  const stillActive = shots.some((s) => s.status === "lipsyncing");
   const anyFailed = shots.some((s) => s.status === "failed");
-  const anyActive = shots.some((s) =>
-    ["pending", "generating", "generated", "lipsyncing"].includes(s.status),
-  );
 
-  let newPipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady) newPipelineStatus = "done";
-  else if (!anyActive && anyFailed) newPipelineStatus = "failed";
-  else if (anyActive) newPipelineStatus = "generating";
+  if (!stillActive && !anyFailed) {
+    const dispatchIdx = shots.findIndex((s) => s.status === "pending");
+    if (dispatchIdx >= 0) {
+      const shot = shots[dispatchIdx];
+      // Video input: the previous turn's output_url, OR the original source plate
+      // if this is turn 0.
+      const prevReady = shots
+        .filter((s) => s.idx < shot.idx && s.status === "ready" && s.output_url)
+        .pop();
+      const videoInput = prevReady?.output_url ?? state.source_clip_url;
+      try {
+        // Slice this turn's audio from the master WAV (pure TS)
+        const window = expandWindow(shot, shots);
+        const sliceBytes = await sliceWavBytes(state.master_audio_url, window[0], window[1]);
+        const storagePath = `${userId}/dialog-shots/${sceneId}/turn-${shot.idx}-${Date.now()}.wav`;
+        const sliceUrl = await uploadToStorage(
+          supabase,
+          "voiceover-audio",
+          storagePath,
+          sliceBytes,
+          "audio/wav",
+        );
+        const jobId = await startSyncTurnJob(
+          syncKey,
+          videoInput,
+          sliceUrl,
+          window,
+          shot.target_coords,
+          shot.temperature,
+        );
+        shot.sync_job_id = jobId;
+        shot.status = "lipsyncing";
+        shot.started_at = new Date().toISOString();
+        mutated = true;
+        console.log(
+          `[poll-dialog-shots] dispatched turn ${shot.idx} (${shot.speaker_name}) job=${jobId} window=[${window[0].toFixed(2)},${window[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+        );
+      } catch (e) {
+        shot.status = "failed";
+        shot.error = `dispatch: ${(e as Error).message}`.slice(0, 300);
+        mutated = true;
+      }
+    }
+  }
 
-  let newState: DialogShotsState = {
-    ...state,
-    shots,
-    status: newPipelineStatus,
-  };
+  // ── Step 3: determine pipeline status ──────────────────────────────
+  const allReady = shots.every((s) => s.status === "ready");
+  const hasFailure = shots.some((s) => s.status === "failed");
+  const hasActive = shots.some((s) => s.status === "lipsyncing");
 
-  // ── Step 5: finalise when all shots are ready (no ffmpeg available) ──
-  // Edge Runtime cannot spawn subprocesses, so we cannot concat MP4s here.
-  // - 1 shot   → the single lipsync_url IS the new clip_url.
-  // - N shots  → keep the existing source clip_url (the master two-shot
-  //              plate already plays its own audio). The Director's Cut
-  //              renderer can use shots[] to assemble a per-speaker cut
-  //              later. Either way we mark the scene as "done" so the UI
-  //              stops spinning at 95%.
+  let pipelineStatus: DialogShotsState["status"] = state.status;
+  if (allReady) pipelineStatus = "done";
+  else if (hasFailure && !hasActive) pipelineStatus = "failed";
+  else if (hasActive || nextPendingIdx >= 0) pipelineStatus = "lipsyncing";
+
+  newState = { ...newState, shots, status: pipelineStatus };
+
+  // ── Step 4: finalise on success ────────────────────────────────────
   if (allReady) {
+    const lastUrl = shots[shots.length - 1]?.output_url ?? state.source_clip_url;
     const nowIso = new Date().toISOString();
-    const sourceClip = scene.lip_sync_source_clip_url || scene.clip_url || null;
-    const newClipUrl =
-      shots.length === 1 && shots[0].lipsync_url
-        ? shots[0].lipsync_url
-        : sourceClip;
-
-    newState = {
-      ...newState,
-      stitched_url: newClipUrl,
-      stitched_at: nowIso,
-      status: "done",
-    };
-
+    newState = { ...newState, final_url: lastUrl, finished_at: nowIso, status: "done" };
     await supabase
       .from("composer_scenes")
       .update({
         dialog_shots: newState,
-        clip_url: newClipUrl,
-        lip_sync_source_clip_url: sourceClip,
+        clip_url: lastUrl,
+        lip_sync_source_clip_url: state.source_clip_url,
         lip_sync_applied_at: nowIso,
         lip_sync_status: "done",
         twoshot_stage: "done",
@@ -477,92 +489,98 @@ async function processScene(
     return { status: "done", mutated: true };
   }
 
-  // ── Step 6: handle terminal failure (refund + persist) ─────────────
-  if (newPipelineStatus === "failed") {
+  // ── Step 5: terminal failure → refund + persist ─────────────────────
+  if (pipelineStatus === "failed") {
     if (userId) newState = await refundIfNeeded(supabase, userId, newState);
+    const firstErr = shots.find((s) => s.error)?.error ?? "unknown";
     await supabase
       .from("composer_scenes")
       .update({
         dialog_shots: newState,
         lip_sync_status: "failed",
         twoshot_stage: "failed",
-        clip_error: `dialog_shots_failed: ${
-          shots.find((s) => s.error)?.error ?? "unknown"
-        }`.slice(0, 300),
+        clip_error: `dialog_shots_failed: ${firstErr}`.slice(0, 300),
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
     return { status: "failed", mutated: true };
   }
 
-  // ── Step 7: persist mid-flight state ───────────────────────────────
+  // ── Step 6: mid-flight persist ─────────────────────────────────────
   if (mutated) {
     await supabase
       .from("composer_scenes")
       .update({
         dialog_shots: newState,
+        lip_sync_status: "running",
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
   }
-  return { status: newPipelineStatus, mutated };
+
+  return { status: pipelineStatus, mutated };
 }
 
+// ── HTTP entry ──────────────────────────────────────────────────────────
+
 serve(async (req) => {
-  if (req.method === "OPTIONS")
-    return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const replicateKey = Deno.env.get("REPLICATE_API_KEY") ?? "";
-  const syncKey = Deno.env.get("SYNC_API_KEY") ?? "";
-  if (!replicateKey || !syncKey)
-    return json({ error: "missing provider keys" }, 500);
-
-  const supabase = createClient(supabaseUrl, serviceKey);
-  const replicate = new Replicate({ auth: replicateKey });
-
-  let sceneId: string | null = null;
   try {
-    // Webhook from Replicate puts scene_id in the query string;
-    // direct invocations send it in the JSON body.
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const syncKey = Deno.env.get("SYNC_SO_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY");
+    if (!syncKey) return json({ error: "missing_sync_key" }, 500);
+
+    const supabase = createClient(supabaseUrl, serviceKey);
+
+    // Accept scene_id from POST body OR ?scene_id query param.
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch {
+      // empty body OK (pg_cron tick)
+    }
     const url = new URL(req.url);
-    sceneId = url.searchParams.get("scene_id");
-    if (!sceneId) {
-      const body = await req.json().catch(() => ({}));
-      sceneId = body?.scene_id ? String(body.scene_id) : null;
+    const querySceneId = url.searchParams.get("scene_id");
+    const targetSceneId = (body?.scene_id as string) ?? querySceneId ?? null;
+
+    let sceneIds: string[] = [];
+    if (targetSceneId) {
+      sceneIds = [targetSceneId];
+    } else {
+      // pg_cron sweep: find all scenes with active v2 dialog chains
+      const { data: rows } = await supabase
+        .from("composer_scenes")
+        .select("id, dialog_shots")
+        .eq("lip_sync_status", "running");
+      sceneIds = (rows ?? [])
+        .filter(
+          (r: any) =>
+            r?.dialog_shots?.version === 2 &&
+            ["queued", "lipsyncing"].includes(String(r.dialog_shots?.status)),
+        )
+        .map((r: any) => r.id);
     }
-  } catch {
-    /* ignore */
-  }
 
-  try {
-    if (sceneId) {
-      const r = await processScene(supabase, replicate, syncKey, sceneId);
-      return json({ ok: true, scene_id: sceneId, ...r });
+    if (sceneIds.length === 0) {
+      return json({ ok: true, processed: 0 });
     }
 
-    // Cron sweep: all in-progress dialog_shots scenes.
-    const { data: scenes } = await supabase
-      .from("composer_scenes")
-      .select("id")
-      .not("dialog_shots", "is", null)
-      .is("lip_sync_applied_at", null)
-      .in("lip_sync_status", ["running", "pending"])
-      .limit(40);
-
-    const results: Array<{ id: string; status: string }> = [];
-    for (const s of scenes ?? []) {
+    const results: any[] = [];
+    for (const id of sceneIds) {
       try {
-        const r = await processScene(supabase, replicate, syncKey, s.id);
-        results.push({ id: s.id, status: r.status });
+        const r = await processScene(supabase, syncKey, id);
+        results.push({ scene_id: id, ...r });
       } catch (e) {
-        results.push({ id: s.id, status: `err:${(e as Error).message}` });
+        console.error(`[poll-dialog-shots] scene ${id} crashed`, e);
+        results.push({ scene_id: id, error: (e as Error).message });
       }
     }
-    return json({ ok: true, swept: results.length, results });
+
+    return json({ ok: true, processed: sceneIds.length, results });
   } catch (e) {
     console.error("[poll-dialog-shots] fatal", e);
-    return json({ error: (e as Error).message }, 500);
+    return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
   }
 });
