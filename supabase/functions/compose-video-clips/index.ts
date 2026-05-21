@@ -248,6 +248,7 @@ serve(async (req) => {
     // i2v models tend to hold the reference image static for the first 3-12 frames
     // before motion kicks in. These tokens push the model to start motion at frame 1.
     const NEGATIVE_PROMPT_I2V_EXTRA = ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
+    const CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE = ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling";
     const POSITIVE_CLEAN_CUE = ", clean cinematic composition, natural environment";
     // Positive cue appended ONLY for i2v requests — biases the model toward
     // immediate camera movement so the reference image doesn't appear as a still.
@@ -344,7 +345,21 @@ serve(async (req) => {
       const cleanNames = names.filter(Boolean);
       const n = Math.max(cleanNames.length, fallbackCount, 2);
       const named = cleanNames.length > 0 ? `: ${cleanNames.join(' and ')}` : '';
-      return `Exactly ${n} distinct people${named}, each visible exactly once, in a modern office conversation scene. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `Exactly ${n} distinct people${named}, each visible exactly once, in a modern office conversation scene. Both people hold relaxed listening expressions with calm resting mouth posture and closed relaxed lips, subtle natural head and eye movement, cinematic plate for later dialogue dubbing. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+    };
+
+    const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
+      const speakerSlugs = uniqueSpeakerSlugsFromScript(scene.dialogScript);
+      const cleanedVisualPrompt = stripDialogForAnchor(scene.aiPrompt || '');
+      if (speakerSlugs.length < 2) return cleanedVisualPrompt || (scene.aiPrompt || 'cinematic footage');
+      const castShots = (scene.characterShots ?? []).filter((s) => s && s.shotType !== 'absent' && s.characterId);
+      const speakerNames = speakerSlugs
+        .map((slug) => resolveSpeakerToShot(slug, castShots))
+        .map((shot) => shot ? charById.get(shot.characterId)?.name : null)
+        .filter((name): name is string => typeof name === 'string' && name.length > 0);
+      const neutralPlate = neutralTwoShotPrompt(speakerNames, speakerSlugs.length);
+      const sceneDescription = cleanedVisualPrompt || neutralPlate;
+      return `${sceneDescription}. Silent neutral master plate: ${neutralPlate}. Hold calm facial expressions and resting mouth posture throughout the shot; use only subtle breathing, eye movement, posture shifts and gentle camera motion.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
