@@ -1055,8 +1055,9 @@ serve(async (req) => {
                   targetFace: firstTarget.side,
                   targetCoords: firstTarget.coords,
                   targetSource: firstTarget.source,
+                  mappingSource: firstTarget.mappingSource,
                   faceCenter: firstTarget.faceCenter ?? null,
-                  faceBbox: firstTarget.bbox ?? null,
+                  faceBbox: firstTarget.bbox ?? null, // debug-only metadata
                   anchorDims: firstTarget.anchorDims ?? null,
                   videoDims: firstTarget.videoDims ?? null,
                   startedAt,
