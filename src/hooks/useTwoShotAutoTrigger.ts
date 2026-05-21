@@ -223,6 +223,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const candidates = (data as any[]).filter((d) => {
           if (d.engine_override !== 'cinematic-sync') return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          // Master clip must be READY — never try lip-sync on a failed/generating master.
+          if (d.clip_status && d.clip_status !== 'ready') return false;
           if (d.lip_sync_applied_at) return false;
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
