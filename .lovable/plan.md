@@ -1,68 +1,95 @@
-## Status
+## Diagnose
 
-Two-Pass Lip-Sync mit `temperature: 0.85` läuft. User-Feedback:
-1. **Timing leicht versetzt** — Lip-Sync hängt minimal hinter dem Voiceover.
-2. **Samuels zweite Zeile = Bauchredner** — erste Zeile gut, zweite Zeile kaum Mundöffnung.
-3. **Vergleich Artlist** — warum so viel sauberer?
+Du hast recht: In Szene 1 sind beide Charaktere gesetzt. Der Screenshot zeigt sogar den korrekt gesetzten Two-Shot-Anchor mit zwei Personen. Das Problem ist nicht „Cast fehlt“, sondern ein **State-/Pipeline-Bruch**:
 
-## Warum Artlist sauberer wirkt
+- **Thumbnail/Startbild** kommt aus `reference_image_url` / Scene-Anchor: zwei Personen, grauer neutraler Hintergrund, falsche Kleidung.
+- **Beim Play** nutzt die Vorschau `clip_url`: ein alter oder anders generierter Hailuo-Clip mit nur einer Person in Büro-Szene.
+- Die Szene ist aktuell in der Datenbank zurückgesetzt: `clip_status='pending'`, `clip_url=NULL`, `twoshot_stage='master_clip'`. Wenn die UI trotzdem noch ein altes Video abspielt, hält der Frontend-State einen veralteten `clipUrl` oder ein zusammengesetzter Preview-State wird nicht hart aus der DB bereinigt.
 
-Artlist/HeyGen/Hedra arbeiten NICHT mit einem statischen Hailuo-Plate + Sync.so-Overlay. Sie nutzen entweder:
-- **Face-Crop-Lipsync**: Speaker-Gesicht wird gecroppt, isoliert animiert (höhere Pixel-Dichte = mehr Mundauflösung), zurückgepastet.
-- **Viseme-driven Rigs**: 3D-Rig pro Sprecher mit echten Mund-Visemes statt Diffusion-Inpaint.
-- **Single-Face Pro-Modelle**: jeder Sprecher kommt aus einem Solo-Plate, dann werden beide nebeneinander komponiert — kein Two-Pass-Overlay nötig.
+Zusätzlich gibt es ein zweites echtes Problem: Der Anchor ist zwar two-shot, aber neutral/grauer Hintergrund und ohne die gewählten Casual-Outfits. Der Hailuo-Clip danach ist wiederum eine andere Szene. Genau diese Entkopplung darf in der Pipeline nicht passieren.
 
-Wir machen Full-Frame Two-Pass auf einem 1080p-Plate, in dem Samuels Gesicht ~25% der Höhe einnimmt → wenig Pixel pro Mund → Sync.so muss interpolieren → bei kurzen 2. Turns reicht das VAD-Signal nicht für volle Artikulation.
+## Ziel
 
-## Wahrscheinliche Ursachen für die zwei Probleme
+Die Pipeline muss deterministisch werden:
 
-**A) Bauchreden in Samuels 2. Zeile**
-Drei plausible Faktoren:
-1. **Pass 2 (Matthew) re-encodiert das gesamte Video** — auch Frames außerhalb seiner `segments_secs`. Pass-1-Artikulation auf Samuels 2. Turn wird durch eine zweite Generation leicht weichgezeichnet/verwaschen.
-2. **Sync.so VAD braucht Pre-Roll**: Ein kurzer 2. Turn (z.B. 0.6s) startet mitten in einer Phrase. Ohne ~80–150ms Vorlauf-Frames im `segments_secs`-Fenster fehlt der Engine der Onset-Kontext, sie öffnet den Mund kaum.
-3. **Temperature 0.85 ist global** — für lange 1. Turns ok, für kurze 2. Turns zu defensiv.
+```text
+Cast + Outfit + Szenenbeschreibung
+        ↓
+Scene Anchor mit 2 Personen + Outfit + gewünschter Szene
+        ↓
+Hailuo Masterclip MUSS diesen Anchor respektieren
+        ↓
+Post-Hailuo Audit: wenn nicht 2 Personen sichtbar → kein Lip-Sync, Refund, klarer Fehler
+        ↓
+Two-Pass Lip-Sync nur auf geprüften 2-Personen-Clip
+        ↓
+Preview spielt nur finalen gültigen Clip oder zeigt „wird neu gerendert“, niemals alte Clips
+```
 
-**B) Timing-Versatz**
-- `voicedRange.turns[].startSec` ist sample-exakt am TTS-Onset.
-- `segments_secs` an Sync.so läuft auf Video-Frame-Grid (24/25/30 fps) → wird auf nächste Frame-Boundary gerundet. Bei 30 fps kann das ±33ms Drift erzeugen — genau das was als „leicht versetzt" auffällt.
-- Zusätzlich: Hailuo-Master-Clip-Realdauer (siehe `probeMp4Duration`) weicht oft von der Soll-Dauer ab → Audio läuft korrekt, Video wird minimal gestreckt/komprimiert.
+## Implementierungsplan
 
-## Vorschlag (gestufter Fix, kein "alles auf einmal")
+### 1. Veraltete Preview-Clips zuverlässig entfernen
 
-### Schritt 1 — Per-Turn Pre-Roll Window (löst sowohl Bauchreden 2. Turn als auch Timing)
+- Beim Reset / Neurendern einer Cinematic-Sync-Szene nicht nur `clip_url` löschen, sondern auch lokale UI-Zustände zuverlässig überschreiben.
+- In `VideoComposerDashboard.refetchScenesFromDb` sicherstellen: Wenn DB `clip_url=NULL` und `clip_status='pending'`, darf lokal kein alter `clipUrl` weiterleben.
+- In `ComposerSequencePreview` verhindern, dass Szenen mit `clip_status !== 'ready'` als spielbar gelten, auch wenn lokal noch ein alter `clipUrl` vorhanden ist.
 
-In `compose-twoshot-lipsync` und `poll-twoshot-lipsync` die `segments_secs`-Fenster pro Turn um **−0.12s Lead-in / +0.08s Tail** erweitern, geclamped auf [0, sceneDur] und ohne Overlap zwischen Sprechern (bei Konflikt mittig splitten).
+### 2. Anchor-Prompt muss Outfit + Szene respektieren
 
-- Sync.so bekommt Pre-Roll-Frames vor dem TTS-Onset → VAD lockt sauber an die erste Silbe → keine "halb-geschlossenen" 2. Turns.
-- Tail-Padding fängt das Frame-Rounding ab → kein wahrnehmbarer Versatz mehr.
-- Audio selbst wird NICHT gepaddet — nur das Video-Window (löst nicht das alte `pad=0.25`-Problem, das hat den Audio-Onset verschoben).
+- Der aktuelle Server-Fallback `neutralTwoShotPrompt(...)` erzeugt bewusst einen neutralen grauen Two-Shot. Das war für Face-Lock gut, ist aber für echte Szenen falsch.
+- Für `cinematic-sync` mit 2+ Sprechern ändern:
+  - nicht nur „two people front facing gray background“ erzeugen,
+  - sondern: **beide Personen, gewählte Outfits, gleiche Szene/Umgebung, equal screen share, beide Münder sichtbar, keine Hand/Mikro vor Mund**.
+- Singulare Szenenformulierungen („he is staring at laptop“, „hand on his forehead“) werden entschärft, damit nicht eine Person die ganze Szene dominiert.
 
-### Schritt 2 — Adaptive Temperature pro Turn
+### 3. Hailuo-Masterclip muss auf Two-Shot geprüft werden
 
-Statt globaler 0.85: turn-individuell.
-- Lange Turns (≥2.0s): `0.85` (status quo, kein Jitter).
-- Kurze Turns (<2.0s): `1.0` (maximale Artikulation, kompensiert kurzes VAD-Fenster).
+- Nach dem Hailuo-Render den fertigen MP4-Clip auditieren:
+  - Frame 0.5s
+  - Mitte
+  - Ende
+- Erwartung bei Two-Shot: mindestens 2 sichtbare Gesichter / Personen.
+- Wenn Hailuo nur eine Person rendert:
+  - `clip_error='source_clip_missing_speakers'`
+  - `clip_status='failed'`
+  - automatischer Credit-Refund
+  - kein Sync.so-Lip-Sync starten
 
-Implementierung: `startSyncJob` akzeptiert ein Array von Temperaturen analog zu `segmentSecs` ist Overkill — stattdessen pro **Pass** eine Temperatur basierend auf der kürzesten Turn-Dauer des Sprechers.
+### 4. Lip-Sync nur auf validem Masterclip starten
 
-### Schritt 3 — Validierung
+- `compose-clip-webhook` / Auto-Trigger darf `compose-twoshot-lipsync` nur starten, wenn:
+  - `clip_status='ready'`
+  - `clip_url` gesetzt
+  - bei Two-Shot der Masterclip-Audit bestanden ist
+- Sonst klare UI-Fehlermeldung statt falschem One-Person-Voiceover.
 
-- Szene `70a34582-178c-4ed9-a357-5f4725e7902a` reset auf `master_clip`, neu rendern.
-- Diag-Log prüfen: `windows=[[a,b],[c,d]] tempPass1=… tempPass2=…`.
-- Erwartet: beide Samuel-Turns gleichmäßig artikuliert, Lippen synchron zum Voiceover ohne wahrnehmbaren Versatz.
+### 5. Testszene sauber zurücksetzen
 
-### Bewusst NICHT in diesem Schritt
+- Szene `70a34582-178c-4ed9-a357-5f4725e7902a` erneut resetten:
+  - `clip_url=NULL`
+  - `clip_status='pending'`
+  - `clip_error=NULL`
+  - `lip_sync_status='pending'`
+  - `twoshot_stage='master_clip'`
+  - alte Sync-Jobs / FaceMap nur dort löschen, wo sie aus einem ungültigen Render stammen
+- Danach ein frischer Render mit neuer Pipeline.
 
-- **Face-Crop-Lipsync** (echter Artlist-Ansatz) wäre die Königslösung, aber das ist ein eigenständiges Architektur-Projekt (Solo-Plate pro Sprecher + serverseitiges Compositing). Nur ansprechen wenn Schritt 1+2 nicht reicht.
-- **`pads`/`inference_steps`** anfassen — erst wenn Pre-Roll alleine nicht reicht.
+## Einschätzung zur Dauer
 
-## Geänderte Dateien
+Ehrlich: Für **diese konkrete Fehlerklasse** brauchen wir etwa **1 konzentrierten Implementierungsdurchlauf**.
 
-- `supabase/functions/compose-twoshot-lipsync/index.ts` — Pre-Roll-Helper + adaptive temperature für Pass 1.
-- `supabase/functions/poll-twoshot-lipsync/index.ts` — gleiche Logik für Pass 2 und Retries.
-- `mem/architecture/lipsync/sync-so-pro-model-policy` — Pre-Roll-Regel und adaptive Temperature dokumentieren.
-- Migration: Test-Szene reset.
+- **Heute fixbar:** veraltete Preview-Clips, falscher Play-State, Hailuo-One-Person-Audit, sauberer Reset.
+- **Noch 1 zusätzlicher Iterationslauf möglich:** Outfit-/Scene-Anchor kann je nach Bildmodell-Ausgabe noch nachjustiert werden.
+- **Artlist-Level Perfektion:** Das ist eine größere Architekturstufe (Face-Crop oder Solo-Speaker-Compositing), eher 3–10 Tage, aber für deinen aktuellen Fehler müssen wir nicht direkt dahin.
 
-## Frage an dich
+## Empfehlung
 
-Soll ich Schritt 1 (Pre-Roll) UND Schritt 2 (adaptive Temperature) gemeinsam umsetzen, oder zuerst nur Schritt 1 isolieren, damit wir wissen welcher Hebel was bewirkt?
+Ich würde jetzt nicht weiter an `temperature` oder Pre-Roll drehen. Das war Lip-Sync-Feintuning. Der aktuelle Fehler sitzt davor: **Anchor/Clip/Preview-State sind nicht mehr dieselbe Wahrheit**.
+
+Als nächstes implementieren wir den deterministischen Two-Shot-Gate:
+
+1. Preview darf keine stale Clips spielen.
+2. Anchor muss Szene + Outfit + beide Charaktere enthalten.
+3. Hailuo-Output wird geprüft, bevor Lip-Sync startet.
+
+Danach rendern wir Szene 1 neu und bewerten erst dann wieder Lip-Sync-Timing.
