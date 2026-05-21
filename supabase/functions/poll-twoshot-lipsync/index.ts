@@ -531,15 +531,25 @@ serve(async (req) => {
       const retryAttempts = Number(latestCurrentJob?.retryAttempts ?? 0);
       const errMsg = String(polled.error ?? polled.status);
       const isTransient = TRANSIENT_REGEX.test(errMsg);
-      const fallbackTried = !!latestSyncJobs.fallbackTried;
-      const fallbackMode = String(latestSyncJobs.fallbackMode ?? "");
+      // Per-pass fallback tracking. The previous global `fallbackTried` flag
+      // on syncJobs caused Pass 2 to skip its own auto-detect fallback if
+      // Pass 1 had already needed one — so a transient Sync.so failure on
+      // Pass 2 was reported as `source_clip_unusable_for_lipsync` without
+      // ever giving Pass 2 a second chance. We now key off the current job
+      // only, and keep `latestSyncJobs.fallbackTried` as legacy metadata.
+      const jobFallbackTried =
+        !!(latestCurrentJob as any)?.fallback ||
+        String((latestCurrentJob as any)?.mode ?? "") === "isolated_track_auto_detect";
+      const fallbackTried = jobFallbackTried;
+      const fallbackMode = String((latestCurrentJob as any)?.mode ?? "");
 
-      // Phase A: simple retry (same input) up to MAX_RETRIES
+      // Phase A: simple retry (same input) up to MAX_RETRIES — skip when the
+      // current job is already an auto-detect fallback.
       if (
         isTransient &&
         retryAttempts < MAX_RETRIES &&
         latestCurrentJob &&
-        !fallbackMode
+        !jobFallbackTried
       ) {
         try {
           await new Promise((r) =>
