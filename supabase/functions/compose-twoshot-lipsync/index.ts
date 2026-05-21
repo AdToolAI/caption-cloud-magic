@@ -216,14 +216,12 @@ async function startSyncSoDirectGeneration(
     temperature: params.temperature ?? 0.5,
   };
 
-  if (params.faceBbox && params.faceBbox.length === 4) {
-    // Sync.so docs: bounding_boxes is more robust than point coordinates
-    // when own face detection is available. Single-frame box (frame 0).
-    options.active_speaker_detection = {
-      auto_detect: false,
-      bounding_boxes: [params.faceBbox],
-    };
-  } else if (params.targetCoords) {
+  // Sync.so Speaker Selection API: for a single manually-selected speaker on
+  // one frame, the documented (and stable) payload is `frame_number +
+  // coordinates`. `bounding_boxes` is a per-frame array across the *entire*
+  // video — sending it as a single box has been observed to make Sync.so fail
+  // with the generic "An unknown error occurred". We only use coordinates.
+  if (params.targetCoords) {
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: params.frameNumber ?? 0,
