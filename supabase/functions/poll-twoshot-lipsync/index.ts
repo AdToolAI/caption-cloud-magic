@@ -204,7 +204,7 @@ serve(async (req) => {
 
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, clip_url, lip_sync_source_clip_url, audio_plan, lip_sync_status, twoshot_stage, lip_sync_applied_at")
+      .select("id, project_id, clip_url, lip_sync_source_clip_url, audio_plan, lip_sync_status, twoshot_stage, lip_sync_applied_at, character_shots")
       .eq("id", sceneId)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
