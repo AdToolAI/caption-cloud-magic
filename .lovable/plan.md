@@ -1,31 +1,98 @@
-## Status
+## Befund
 
-Drei konkrete Fixes ausgerollt, die zusammen den „Thumbnail zeigt Two-Shot, Play zeigt anderen Clip"-Bug erschlagen:
+Statt einen zweiten Modus parallel zu pflegen, ersetzen wir den bestehenden Two-Shot-Pfad komplett durch eine echte, dialogbasierte Shot-Pipeline. Das skaliert sauber von 1 über 2 bis N Sprecher und beseitigt die Schwachstelle, dass ein einziger Two-Shot-Clip mehrere Mund-/Sprecherwechsel halten muss.
 
-1. **Preview spielt keine stale Clips mehr.** `ComposerSequencePreview` betrachtet eine Szene nur noch als spielbar, wenn `clipStatus === 'ready'` UND `clipUrl` gesetzt ist. Ein zurückgesetzter Scene-State (clip_status='pending', clip_url=NULL) kann nicht mehr durch alten Local-State umgangen werden — das alte Hailuo-Video aus Vorrender-Versuchen kann nicht mehr abgespielt werden.
+## Zielarchitektur
 
-2. **Anchor respektiert Szene + Outfit.** Im Cinematic-Sync-Pfad in `compose-video-clips`:
-   - Outfit-Look-IDs werden serverseitig aus `avatar_outfit_looks` (`cover_url`/`front_url`) aufgelöst und als Portraits an `compose-scene-anchor` übergeben — Casual/Brand-Outfits landen jetzt im Anchor statt der bare Avatar-Portraits.
-   - Anchor-Prompt kombiniert immer das Two-Shot-Framing (`neutralTwoShotPrompt`) MIT der bereinigten Szenenbeschreibung. Vorher wurde bei ≥2 Sprechern stur ein neutraler grauer Plate ohne jeglichen Szenenkontext gerendert — das war exakt der „grauer Hintergrund statt Szene"-Effekt im Screenshot.
-   - `ANCHOR_AUDIT_VERSION` von 4 → 5 erhöht, damit alle zuvor gepinnten grauen Neutral-Anchors automatisch verworfen und neu komponiert werden.
+Eine Pipeline für 1, 2, 3 oder mehr Sprecher. Kein Sonderfall für Two-Shot mehr.
 
-3. **Testszene zurückgesetzt.** Szene `70a34582…` ist auf `clip_url=NULL`, `clip_status=pending`, `lip_sync_status=pending`, `twoshot_stage=master_clip`, `reference_image_url=NULL` zurückgesetzt; `scene_anchor_cache` für diese Szene gelöscht; alte `syncJobs`/`faceMap`/`anchor_face_audit` aus `audio_plan.twoshot` entfernt.
+```text
+Dialog-Skript (N Sprecher)
+  → Shot Plan: 1 Shot pro Sprecher-Turn (+ optional Establishing / Reaction)
+  → pro Shot:
+       eigener Charakter-Plate (richtige Person, Outfit, Szene, Mund frei)
+       genau das Audio dieses Turns
+       Lip-Sync nur auf dieses eine Gesicht
+       QC: richtiger Charakter, Mund sichtbar, Dauer passt
+  → Scene Assembly: Shots in Reihenfolge schneiden, Audio durchlaufen lassen
+  → ein einziger Szenen-Clip als finaler clip_url (kompatibel zum Composer)
+```
 
-## Bereits vorhandene Gates, die jetzt sauber greifen
+Damit gibt es kein „Pass 1 / Pass 2" mehr und kein Multi-Window-Targeting auf demselben Bild.
 
-- Anchor-Compose hat einen Face/Human-Audit + Identity-Audit + 1× Strict-Retry (`compose-video-clips` Z. 1011–1064). Bei `faces < expected` nach 2 Versuchen → `anchor_missing_speakers`-Fehler, kein Hailuo-Call.
-- Master-Clip-Audit in `compose-twoshot-lipsync` erkennt schon `source_clip_missing_speakers` und macht idempotenten Refund.
-- Auto-Lipsync-Trigger in `compose-clip-webhook` startet Two-Shot-Lipsync nur, wenn `clip_url` gesetzt ist.
+## Was aus dem alten Two-Shot-Pfad wird
 
-## Nicht angefasst
+- Das Datenmodellfeld `engine_override = 'cinematic-sync'` bleibt als Trigger erhalten.
+- Die Two-Shot-Anchor-/Pass-1-/Pass-2-Logik wird ersetzt.
+- Stages werden generischer:
+  ```text
+  audio → shot_plan → shot_render[i] → shot_lipsync[i] → assemble → done
+  ```
+- Alte Felder wie `twoshot_stage='lipsync_1' | 'lipsync_2'` werden ersetzt durch eine generische Shot-Liste pro Szene.
+- Bestehende, bereits fertige Szenen bleiben spielbar. Neue Renders gehen automatisch durch die neue Pipeline.
 
-- Pre-Roll/Tail (0.12s/0.08s) und adaptive Temperature (0.85 / 1.0 bei <2s) bleiben — das war Lip-Sync-Feintuning und ist unabhängig vom Anchor/State-Problem.
-- Solo-Plate-per-Speaker (Variante B) und Face-Crop-Lipsync (Variante C) sind nicht implementiert; erst neu bewerten, nachdem ein Re-Render mit den neuen Anchor-Regeln vorliegt.
+## Was wir konkret umbauen
 
-## Nächster Schritt für dich
+### 1. Dialog-Parsing für N Sprecher
+- Speaker-Erkennung aus `Name: Zeile` für beliebig viele Sprecher.
+- Audio wird weiterhin als ein sample-genaues Master-WAV erzeugt, zusätzlich pro Turn eine eigene Mini-WAV (genau der Audioabschnitt dieses Turns).
+- Pausen, Reihenfolge, Sprecher-IDs werden deterministisch festgehalten.
 
-1. In Szene 1 (Hook) auf „🎥 Clip + Lip-Sync neu rendern" klicken.
-2. Erwartung:
-   - Anchor zeigt beide Charaktere in den gewählten Casual-Outfits IN der Büro-/Laptop-Szene (nicht grauer Hintergrund).
-   - Hailuo-Masterclip zeigt durchgängig beide Personen.
-   - Lip-Sync läuft auf dieser zwei-personen Quelle und sollte das Bauchredner-Verhalten auf Samuels zweitem Turn nicht mehr zeigen, sobald der Masterclip real beide Sprecher hat.
+### 2. Shot Planner
+- Erzeugt pro Turn einen Shot mit Sprecher, Audiofenster, Zielcharakter, Outfit, Szene, Kameraeinstellung.
+- Optional Establishing-Shot am Anfang, Reaction-Shot bei langen Pausen.
+- Bei nur 1 Sprecher → ein einziger Sprecher-Shot.
+- Bei 3+ Sprechern → genauso viele Shots wie Turns. Keine Sonderlogik.
+
+### 3. Shot-Renderer
+- Pro Shot wird ein eigener Plate generiert (richtiger Charakter, sichtbarer Mund, korrektes Outfit, gewünschte Location).
+- Multi-Charakter-Szenen liefern weiterhin Establishing-Shot mit allen Personen, aber das ist ein eigener Shot ohne Lip-Sync.
+
+### 4. Shot-Lip-Sync
+- Pro Shot genau ein Lip-Sync-Job auf genau ein Gesicht mit genau einem Audiosegment.
+- Kein Multi-Window, kein zweiter Pass, kein Face-Switching im selben Clip.
+- Skaliert linear mit Anzahl Turns: 3 Turns = 3 Jobs, 7 Turns = 7 Jobs.
+
+### 5. QC-Gate pro Shot
+- Richtiger Charakter sichtbar
+- Mund nicht verdeckt
+- Shotdauer passt zur Audiodauer
+- Outfit/Location plausibel
+- Falls Fail: nur dieser Shot wird neu erzeugt, nicht die ganze Szene.
+
+### 6. Scene Assembly
+- Alle Shots in Reihenfolge zu einem MP4 stitchen.
+- Audio = das bekannte sample-genaue Master-WAV (so bleibt es perfekt synchron zum Composer/Export).
+- Resultat wird in `clip_url` geschrieben wie heute, damit der Composer/Export nichts merken muss.
+
+### 7. UI / Fortschritt
+- Pro Szene wird die Shot-Liste mit Status angezeigt.
+- Echte Steps statt globalem 95-%-Spinner.
+- Retry-Button pro Shot.
+- Anzahl Sprecher wird nicht mehr begrenzt — UI zeigt N Sprecher korrekt an.
+
+### 8. Watchdog / Refund
+- Heutige Two-Shot-Watchdog-Logik wird auf Shot-Level umgestellt.
+- Refund passiert pro Shot-Fehlversuch, nicht pauschal pro Szene.
+
+## Reihenfolge der Umsetzung
+
+1. Datenmodell erweitern: Shot-Liste pro Szene, Shot-Status, Shot-Audiofenster.
+2. Dialog-Parser auf N Sprecher umstellen.
+3. Shot Planner.
+4. Shot Renderer (ein Provider-Aufruf pro Shot).
+5. Turn-Lip-Sync (ein Job pro Shot).
+6. QC-Gate pro Shot.
+7. Scene Assembly zu einem `clip_url`.
+8. UI: Shot-Liste mit Live-Status, Retry pro Shot.
+9. Watchdog/Refund auf Shot-Ebene migrieren.
+10. Alten Two-Shot-Codepfad entfernen, sobald die neue Pipeline grün ist.
+11. Mit deiner aktuellen 2-Sprecher-Szene gegentesten, dann eine 3-Sprecher-Szene als Abnahmefall.
+
+## Was du als Ergebnis bekommst
+
+- Ein konsistenter Pfad für 1, 2 und mehr Sprecher.
+- Keine „zweiter Satz fehlt" Bauchredner-Effekte mehr, weil jeder Satz seinen eigenen Shot hat.
+- Echte filmische Schnitte statt einer einzigen langen Aufnahme.
+- Fehler werden auf Shot-Ebene sichtbar und gezielt wiederholbar.
+- Klare Skalierung Richtung Mehrpersonen-Dialoge ohne neuen Sondercode.
