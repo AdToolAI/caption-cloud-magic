@@ -975,7 +975,7 @@ serve(async (req) => {
         stage: `lipsync_${currentPass + 1}`,
         status: "PROCESSING",
         jobId: nextJobId,
-        reason: `pass=${currentPass + 1} face=${target.side} source=${target.source}${nextSegment ? ` windows=${formatSegments(nextSegment)} voicedSec=${vrNext?.voicedSec}` : ""}`,
+        reason: `pass=${currentPass + 1} face=${target.side} source=${target.source} temp=${nextTemp}${nextSegment ? ` windows=${formatSegments(nextSegment)} voicedSec=${vrNext?.voicedSec} minTurn=${expandedNext.minTurnDur.toFixed(2)}` : ""}`,
       });
       const nextPass = currentPass + 1;
       const nextJob = {
