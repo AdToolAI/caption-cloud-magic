@@ -33,6 +33,7 @@ const corsHeaders = {
 };
 
 const STALE_PRESYNC_MS = 8 * 60 * 1000; // 8 min: no sync job ever recorded
+const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // 2 min: CPU/preflight abort before Sync.so submit
 const STALE_SYNC_POLL_MS = 12 * 60 * 1000; // 12 min: Sync.so job stuck
 const STALE_RESET_REINVOKE_MS = 2 * 60 * 1000; // 2 min: auto-reset, re-fire
 
@@ -67,6 +68,7 @@ serve(async (req) => {
     polled: 0,
     refundedPresync: 0,
     refundedSyncTimeout: 0,
+    recoveredPreflight: 0,
     reinvoked: 0,
     errors: [] as string[],
   };
@@ -105,6 +107,7 @@ serve(async (req) => {
         s.replicate_prediction_id.startsWith("sync:");
       const hasHeartbeat = !!twoshot?.heartbeat?.syncJobId;
       const stage = String(s.twoshot_stage ?? "");
+      const hasAnyRecordedProviderJob = hasSyncJob || hasHeartbeat || jobs.length > 0;
 
       // ── Job 0: ZOMBIE STATE — lipsync_* stage but no real provider job.
       // This is the "stuck at 95%" symptom: client reset status to pending
@@ -142,6 +145,75 @@ serve(async (req) => {
           console.log(`[twoshot-watchdog ${s.id}] zombie state cleared, reinvoked (stage=${stage}, ageMs=${ageMs})`);
         } catch (e) {
           summary.errors.push(`zombie ${s.id}: ${(e as Error).message}`);
+        }
+        continue;
+      }
+
+      // ── Job 0b: PREFLIGHT / CPU-ABORT RECOVERY ────────────────────────
+      // If compose-twoshot-lipsync dies before creating a Sync.so job, the row
+      // must be reset and retried instead of staying at 95% forever. New code
+      // only charges credits immediately before provider submit, so normal
+      // preflight recovery does not refund. If a legacy row recorded a charge
+      // in syncJobs.costCredits without any provider job, refund it once.
+      if (
+        s.lip_sync_status === "running" &&
+        (stage === "preflight" || /^lipsync_/i.test(stage)) &&
+        !hasAnyRecordedProviderJob &&
+        typeof s.clip_url === "string" &&
+        s.clip_url.length > 0 &&
+        ageMs > STALE_PREFLIGHT_MS
+      ) {
+        try {
+          const cost = Number(syncJobs.costCredits ?? 0);
+          if (cost > 0 && !syncJobs.refunded) {
+            const { data: project } = await supabase
+              .from("composer_projects")
+              .select("user_id")
+              .eq("id", s.project_id)
+              .single();
+            if (project?.user_id) {
+              const { data: wallet } = await supabase
+                .from("wallets")
+                .select("balance")
+                .eq("user_id", project.user_id)
+                .single();
+              if (wallet) {
+                await supabase
+                  .from("wallets")
+                  .update({ balance: Number(wallet.balance ?? 0) + cost, updated_at: nowIso })
+                  .eq("user_id", project.user_id);
+              }
+            }
+          }
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "pending",
+              twoshot_stage: null,
+              replicate_prediction_id: null,
+              clip_error: "auto-retry: preflight_cpu_abort_recovered",
+              updated_at: nowIso,
+              audio_plan: {
+                ...(s.audio_plan as any),
+                twoshot: {
+                  ...twoshot,
+                  syncJobs: cost > 0 ? { ...syncJobs, refunded: true, recoveredAt: nowIso, lastError: "preflight_cpu_abort_recovered", lastErrorAt: nowIso } : syncJobs,
+                },
+              },
+            })
+            .eq("id", s.id);
+          await appendTwoshotDiag(supabase, s.id, {
+            source: "watchdog",
+            event: "preflight_cpu_abort_recovered",
+            stage,
+            status: "pending",
+            reason: `ageMs=${ageMs} no sync job before provider submit`,
+          });
+          await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
+          summary.recoveredPreflight++;
+          summary.reinvoked++;
+        } catch (e) {
+          summary.errors.push(`preflight_recover ${s.id}: ${(e as Error).message}`);
         }
         continue;
       }
@@ -239,6 +311,9 @@ serve(async (req) => {
       // still completes.
       const errMarker = String(s.clip_error ?? "");
       const isAutoReset = /^auto-(reset|retry)/i.test(errMarker);
+      const reinvokeDelayMs = /cpu-time-preflight-fix|preflight_cpu_abort/i.test(errMarker)
+        ? 5_000
+        : STALE_RESET_REINVOKE_MS;
       const stageAllowed =
         !s.twoshot_stage || s.twoshot_stage === "master_clip" || s.twoshot_stage === "failed";
       if (
@@ -247,7 +322,7 @@ serve(async (req) => {
         stageAllowed &&
         typeof s.clip_url === "string" &&
         s.clip_url.length > 0 &&
-        ageMs > STALE_RESET_REINVOKE_MS
+        ageMs > reinvokeDelayMs
       ) {
         try {
           await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });

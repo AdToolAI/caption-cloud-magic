@@ -295,13 +295,20 @@ type FaceMap = {
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
   try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    // Never download/scan the whole MP4 in an Edge Function. A full byte-by-byte
+    // scan has repeatedly hit the CPU watchdog before we can even create the
+    // Sync.so job. The tkhd atom is normally near the start; if it is not in the
+    // first MiB we simply fall back to the cached anchor/faceMap dimensions.
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=0-1048575" },
+      signal: AbortSignal.timeout(6_000),
+    });
     if (!resp.ok) return null;
     const buf = new Uint8Array(await resp.arrayBuffer());
-    const textAt = (i: number, n: number) => String.fromCharCode(...buf.slice(i, i + n));
     const readU32 = (i: number) => ((buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3]) >>> 0;
-    for (let i = 0; i < buf.length - 32; i++) {
-      if (textAt(i, 4) !== "tkhd") continue;
+    const maxScan = Math.min(buf.length - 32, 1_048_576);
+    for (let i = 0; i < maxScan; i++) {
+      if (buf[i] !== 0x74 || buf[i + 1] !== 0x6b || buf[i + 2] !== 0x68 || buf[i + 3] !== 0x64) continue;
       const version = buf[Math.max(0, i + 4)];
       const base = i + (version === 1 ? 96 : 84);
       if (base + 7 >= buf.length) continue;
@@ -530,7 +537,7 @@ serve(async (req) => {
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, reference_image_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, twoshot_stage, updated_at",
+        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, reference_image_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, updated_at",
       )
       .eq("id", scene_id)
       .single();
@@ -550,12 +557,15 @@ serve(async (req) => {
       const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
       const stage = String((scene as any).twoshot_stage ?? "");
       const hb = (scene as any)?.audio_plan?.twoshot?.heartbeat ?? null;
+      const jobs = (scene as any)?.audio_plan?.twoshot?.syncJobs?.jobs;
+      const hasRealSyncJob =
+        String((scene as any).replicate_prediction_id ?? "").startsWith("sync:") ||
+        (Array.isArray(jobs) && jobs.length > 0) ||
+        !!hb?.syncJobId;
       // Real progress markers: pipeline either set a heartbeat or advanced
-      // stage past 'master_clip'. Without those, the row is stuck before
-      // the background worker ever started — usually because the caller
-      // pre-set lip_sync_status='running' and the previous invocation got
-      // short-circuited here. Take over instead of returning 202.
-      const hasRealProgress = !!hb || (stage && stage !== "master_clip" && stage !== "audio" && stage !== "anchor");
+      // to an actual provider job. A preflight/lipsync marker without sync:* is
+      // exactly the CPU-abort zombie state; take over instead of returning 202.
+      const hasRealProgress = hasRealSyncJob || (!!hb && stage !== "preflight");
       if (hasRealProgress && ageMs < 10 * 60 * 1000) {
         return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
       }
@@ -631,36 +641,36 @@ serve(async (req) => {
     const SYNC_API_KEY = Deno.env.get("SYNC_API_KEY");
     if (!REPLICATE_KEY && !SYNC_API_KEY) return json({ error: "REPLICATE_API_KEY or SYNC_API_KEY missing" }, 500);
 
-    // Reserve credits + mark stage.
-    await supabase.from("wallets").update({
-      balance: wallet.balance - cost,
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", user.id);
-
-    await setStage(supabase, scene_id, "lipsync_1", {
+    // Mark preflight only. Credits are charged later, immediately before the
+    // Sync.so submit, so CPU/preflight aborts cannot burn user credits.
+    await setStage(supabase, scene_id, "preflight", {
       lip_sync_status: "running",
       clip_error: null,
+      replicate_prediction_id: null,
     });
     await appendTwoshotDiag(supabase, scene_id, {
       source: "compose",
-      event: "pipeline_started",
-      stage: "lipsync_1",
+      event: "preflight_started",
+      stage: "preflight",
       status: "running",
       reason: `cost=${cost} duration=${Number((scene as any).duration_seconds ?? 0)}s`,
     });
 
     let refunded = false;
+    let creditsReserved = false;
     const refund = async (reason: string) => {
       if (refunded) return;
       refunded = true;
       console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${cost}: ${reason}`);
-      const { data: w2 } = await supabase
-        .from("wallets").select("balance").eq("user_id", user.id).single();
-      if (w2) {
-        await supabase.from("wallets").update({
-          balance: w2.balance + cost,
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", user.id);
+      if (creditsReserved) {
+        const { data: w2 } = await supabase
+          .from("wallets").select("balance").eq("user_id", user.id).single();
+        if (w2) {
+          await supabase.from("wallets").update({
+            balance: Number(w2.balance ?? 0) + cost,
+            updated_at: new Date().toISOString(),
+          }).eq("user_id", user.id);
+        }
       }
       await setStage(supabase, scene_id, "failed", {
         lip_sync_status: "failed",
@@ -673,6 +683,25 @@ serve(async (req) => {
         status: "failed",
         reason,
       });
+    };
+
+    const reserveCredits = async (): Promise<boolean> => {
+      if (creditsReserved) return true;
+      const { data: latestWallet } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .single();
+      if (!latestWallet || Number(latestWallet.balance ?? 0) < cost) {
+        await refund(`INSUFFICIENT_CREDITS_BEFORE_PROVIDER_SUBMIT: required=${cost}`);
+        return false;
+      }
+      await supabase.from("wallets").update({
+        balance: Number(latestWallet.balance ?? 0) - cost,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id);
+      creditsReserved = true;
+      return true;
     };
 
     // ────────────────────────────────────────────────────────────────────
@@ -817,10 +846,13 @@ serve(async (req) => {
         cachedFaceMap,
         LOVABLE_API_KEY,
       );
-      const sourceVideoDims = await probeMp4Dims(sourceClipUrl);
+      // Do not probe the source MP4 here. The previous full-file probe was the
+      // CPU hotspot that killed the function before Sync.so job creation. For
+      // pass 1, cached anchor/faceMap dimensions are the authoritative target
+      // space; bounded MP4 probing is reserved for later poll-time fallbacks.
       const fallbackDims = {
-        width: Number(sourceVideoDims?.width) || Number(faceMap?.width) || 1280,
-        height: Number(sourceVideoDims?.height) || Number(faceMap?.height) || 720,
+        width: Number(faceMap?.width) || 1280,
+        height: Number(faceMap?.height) || 720,
       };
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] faceMap`,
@@ -880,6 +912,7 @@ serve(async (req) => {
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
         let jobId = "";
+        if (!(await reserveCredits())) return;
         try {
           jobId = await startSyncSoDirectGeneration(
             SYNC_API_KEY!,
@@ -989,6 +1022,7 @@ serve(async (req) => {
         // request `cut_off` (no loop artefacts).
         const syncMode = "cut_off";
         let outputUrl: string | null = null;
+        if (!(await reserveCredits())) return;
         try {
           if (useSyncSoDirect) {
             outputUrl = await runSyncSoDirectPrediction(
@@ -1224,7 +1258,8 @@ serve(async (req) => {
       accepted: true,
       scene_id,
       status: "running",
-      credits_reserved: cost,
+      credits_reserved: 0,
+      estimated_cost: cost,
     }, 202);
   } catch (e) {
     return json({ error: (e as Error).message }, 500);
