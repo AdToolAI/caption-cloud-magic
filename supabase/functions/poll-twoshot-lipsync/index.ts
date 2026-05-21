@@ -399,11 +399,15 @@ serve(async (req) => {
       // one face.
       if (!fallbackTried && !fallbackMode && latestCurrentJob?.audioUrl && latestCurrentJob?.videoUrl) {
         try {
+          // Keep the exact same speaker window so auto-detect cannot smear
+          // this speaker's animation over the OTHER speaker's voiced range.
+          const fallbackSegments = normalizeSegmentField((latestCurrentJob as any).audioSegmentSecs);
           const newJobId = await startSyncJob(syncApiKey, {
             videoUrl: String(latestCurrentJob.videoUrl),
             audioUrl: String(latestCurrentJob.audioUrl),
             autoDetect: true,
             temperature: 0.6,
+            segmentSecs: fallbackSegments,
           });
           const newJob = {
             ...latestCurrentJob,
