@@ -1,97 +1,62 @@
-## Ursache
+## Ursache (verifiziert in der DB)
 
-Ja — wir sollten die Ursache beheben. Die aktuelle Verschlechterung kommt nicht daher, dass Sync.so „einfach manchmal crasht“, sondern aus zwei konkreten Implementierungsfehlern:
+Szene `e3df41ad-…` hat:
 
-1. **Falsche Character-to-Face-Zuordnung**
-   - In der betroffenen Szene ist `character_shots`:
-     - `matthew-dusatko` = Position 0
-     - `samuel-dusatko` = Position 1
-   - Die FaceMap ist aber nur geometrisch:
-     - links = Gesicht 1
-     - rechts = Gesicht 2
-   - Der Code sortiert die Speaker nach `character_shots` und mapped dann stumpf:
-     - Pass 1 → linkes Gesicht
-     - Pass 2 → rechtes Gesicht
-   - Dadurch wurde Matthew mit der **linken** BBox gesendet, obwohl Matthew sehr wahrscheinlich rechts steht. Das kann Sync.so mit `An unknown error occurred` / `generation_pipeline_failed` crashen lassen.
+- `character_shots = [matthew (idx 0), samuel (idx 1)]`
+- `faceMap.faces = [left @ x=385, right @ x=991]` (Gemini-Detection nach x sortiert)
+- Jobs: Pass 1 = Matthew → **left** face, Pass 2 = Samuel → **right** face
 
-2. **Ungültige `bounding_boxes`-Payload**
-   - Sync.so-Doku sagt: `bounding_boxes` ist ein **per-frame array** über das Video.
-   - Unser Code sendet aktuell nur `bounding_boxes: [[x1,y1,x2,y2]]` als Einzelbox.
-   - Für eine manuelle Auswahl auf einem Frame ist laut Doku robuster/korrekter:
-     - `frame_number: 0`
-     - `coordinates: [x, y]`
-   - Das erklärt, warum der Provider generisch scheitert, obwohl Gesichter vorhanden sind.
+Die Annahme „character_shots[0] = linkes Gesicht" ist falsch. `character_shots` ist nur die Reihenfolge, in der die Casting-Slots in der UI hinzugefügt wurden — sie sagt **nichts darüber aus, auf welcher Seite Nano Banana 2 den Charakter im Anker-Frame tatsächlich gerendert hat**. In dieser Szene steht Matthew rechts und Samuel links, also bekommt Matthews Stimme Samuels Mund und umgekehrt → genau das vom User beschriebene Symptom.
 
-Der anschließende `auto_detect_single_pass`-Fallback hat das Symptom verschlimmert, weil er den kompletten gemischten Dialog auf ein automatisch gewähltes Gesicht legt. Deshalb spricht dann ein Charakter plötzlich alle Zeilen.
+Der zusätzliche Lipsync-Drift entsteht zum Teil dadurch, dass der Sync.so-Pass auf das falsche Gesicht trifft: Sync.so versucht trotzdem, Lippen zu synchronisieren, das Ergebnis sieht „fast richtig, aber leicht daneben" aus, weil der Track nicht zu den Mundbewegungen passt.
 
-## Plan zur echten Behebung
+## Plan: Identity-basiertes Face↔Character-Matching
 
-### 1. Character-to-Face-Mapping explizit machen
+### 1. Gemini-Vision-Matching im Anchor-Schritt
 
-In `compose-twoshot-lipsync`:
+`compose-scene-anchor` (oder direkt nach Anchor-Erzeugung in `compose-twoshot-lipsync`) bekommt einen zusätzlichen Schritt:
 
-- Neue Mapping-Funktion `resolveSpeakerFaceTarget(speaker, faceMap, character_shots)`.
-- Wenn `character_shots` zwei Charaktere enthält, wird die Face-Seite daraus stabil abgeleitet:
-  - Position 0 = linkes Gesicht
-  - Position 1 = rechtes Gesicht
-- Wichtig: Die Speaker-Reihenfolge wird nicht mehr dafür benutzt, implizit links/rechts zu bestimmen.
-- Jeder Job speichert künftig zusätzlich:
-  - `speakerCharacterId`
-  - `resolvedFaceSide`
-  - `mappingSource: "character_shots" | "fallback_order"`
+- Pro detektiertem Gesicht im Anker-Frame wird ein Crop (bbox + kleines Padding) an Gemini 2.5 Flash geschickt.
+- Zusammen mit den Reference-Portraits aller cast-Charaktere der Szene (max. 4) wird Gemini gefragt:
+  „Welche `characterId` aus der folgenden Liste passt am besten zu diesem Gesicht? Antworte ausschließlich mit der ID oder `unknown`."
+- Resultat: Jeder Eintrag in `faceMap.faces` bekommt ein neues Feld `characterId: string | null` und `matchConfidence: number`.
 
-Damit kann Matthew nicht mehr versehentlich auf Samuels Gesicht geschickt werden.
+Cache: Das Ergebnis wird in `audio_plan.twoshot.faceMap.faces[].characterId` persistiert (idempotent, kein erneuter Gemini-Call bei Retry).
 
-### 2. Sync.so Speaker Selection Payload korrigieren
+### 2. Mapping nutzt characterId statt Position
 
-In `compose-twoshot-lipsync` und `poll-twoshot-lipsync`:
+`pickTargetCoordinates` in `compose-twoshot-lipsync` + `poll-twoshot-lipsync`:
 
-- Standard für Two-Shot Face Targeting wird auf die dokumentierte Variante geändert:
+- **Primary**: Face wird über `faceMap.faces[].characterId === speaker.character_id` gewählt. `mappingSource = "identity_match"`.
+- **Secondary**: Wenn beide Faces kein Identity-Match haben, aber genau eines matched, bekommt das andere automatisch den verbleibenden Speaker (`mappingSource = "identity_match_inferred"`).
+- **Letzter Fallback**: Falls Gemini-Matching komplett scheitert, harter Stopp mit `clip_error = "speaker_face_mapping_failed"` + Refund + UI-CTA „Quellclip neu rendern" — kein blindes Position-Mapping mehr, weil das genau zu diesem Bug geführt hat.
 
-```json
-"active_speaker_detection": {
-  "auto_detect": false,
-  "frame_number": 0,
-  "coordinates": [x, y]
-}
-```
+### 3. Speaker-Mismatch-Detection als Pre-Flight
 
-- `bounding_boxes` wird nicht mehr aus einer Einzelbox gesendet.
-- Nur wenn später echte per-frame Boxen existieren, darf `bounding_boxes` wieder verwendet werden.
-- Die BBox bleibt nur als Debug-Metadatum im Job gespeichert, nicht als API-Payload.
+Vor dem ersten Sync.so-Call wird geprüft:
 
-### 3. Short-Utterance-Fix entschärfen
+- Anzahl unique `characterId`s in `faceMap.faces` ≥ Anzahl distinkter Sprecher in `audio_plan.twoshot.speakers`.
+- Wenn nicht: gleicher harter Stopp wie oben, bevor Credits an Sync.so gehen.
 
-- `segments_secs` bleibt nur optional für sehr kurze Clips, aber:
-  - Der Segment-Window wird **nur auf Audio** angewendet, nicht gleichzeitig auf Video, falls Sync.so dadurch die Sprecher-Auswahl destabilisiert.
-  - Wenn Sync.so Segments ablehnt, retry ohne Segments, aber weiterhin mit korrekten `coordinates`.
+### 4. Szene `e3df41ad-…` reparieren
 
-Ziel: „Was denn?“ wird erkannt, ohne dass die Video-Timeline oder Face-Auswahl beschädigt wird.
+- `clip_url` zurück auf Quellclip
+- `lip_sync_status = pending`, `twoshot_stage = null`, `replicate_prediction_id = null`
+- `audio_plan.twoshot.faceMap` löschen (damit Identity-Match frisch läuft)
+- 144 Credits für den falsch synchronisierten Render erstatten
 
-### 4. Destruktiven Single-Pass-Fallback entfernen
+### 5. Lipsync-Qualität (Sekundärfix)
 
-In `poll-twoshot-lipsync`:
-
-- `auto_detect_single_pass` mit gemischtem Audio wird entfernt.
-- Kein globaler Merge-Audio-Fallback mehr bei zwei sichtbaren Sprechern.
-- Wenn ein Pass scheitert:
-  - erst Retry mit korrekten Coordinates,
-  - dann einmal Retry mit `auto_detect:true`, aber weiterhin **nur mit dem isolierten Speaker-Track**,
-  - wenn das auch scheitert: sauberer Refund + klare Fehlermeldung statt falscher Mundbewegung.
-
-### 5. Aktuelle Szene sauber zurücksetzen
-
-Nach Deploy:
-
-- Szene `e3df41ad-aaa1-4659-85c2-0630e458dd52` wird aus dem schlechten Fallback-Output geholt.
-- `clip_url` wird wieder auf den originalen Quellclip gesetzt.
-- `lip_sync_status = pending`, `twoshot_stage = null`, `replicate_prediction_id = null`.
-- Der unbrauchbare Fallback-Render wird erstattet.
-- Danach läuft der Lip-Sync neu mit korrektem Mapping und korrektem Sync.so-Request.
+Sobald Mapping korrekt ist, ist Sync.so `lipsync-2-pro` mit `coordinates`-Payload bereits das beste verfügbare Modell — kein weiterer Modellwechsel nötig. Der Drift sollte verschwinden, weil die Mundregion stimmt. Falls nach diesem Fix immer noch sichtbarer Drift bleibt, schauen wir uns Audio-Offset (`segments_secs` vs. master start) als Folge-Issue an.
 
 ## Erwartetes Ergebnis
 
-- Sync.so bekommt keine falsch formatierte BBox-Payload mehr.
-- Jeder Sprecher wird auf sein tatsächlich zugeordnetes Gesicht geschickt.
-- Es gibt keinen Output mehr, in dem ein Charakter die Zeilen des anderen spricht.
-- Wenn Sync.so trotzdem ablehnt, endet die Szene kontrolliert mit Refund und neu-render-CTA, statt einen kaputten Clip als „done“ zu speichern.
+- Matthew spricht **immer** den Matthew-Mund, unabhängig davon, ob Nano Banana 2 ihn links oder rechts platziert.
+- Lip-Sync wirkt korrekt, weil Mundregion und Audiotrack zusammenpassen.
+- Kein stiller Output mit falscher Zuordnung mehr möglich — schlägt im Pre-Flight kontrolliert mit Refund fehl.
+
+## Technische Dateien
+
+- `supabase/functions/compose-twoshot-lipsync/index.ts` — Identity-Match nach `detectFacesInMaster`, neues `pickTargetCoordinates` mit `characterId`-Lookup, Pre-Flight-Guard.
+- `supabase/functions/poll-twoshot-lipsync/index.ts` — gleiches `pickTargetCoordinates`-Update für Pass 2.
+- Memory-Update: `mem://architecture/lipsync/sync-so-pro-model-policy` um „Identity-Match statt Position-Mapping" ergänzen.
