@@ -203,8 +203,11 @@ async function startSyncSoDirectGeneration(
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
+      // Scope ONLY the audio window — leaving the video untouched preserves
+      // the full timeline and Sync.so's speaker-detection on the unmodified
+      // frames. Scoping the video as well historically destabilized face
+      // selection on multi-speaker clips.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
       aud.segments_secs = seg;
     }
     return [vid, aud];
