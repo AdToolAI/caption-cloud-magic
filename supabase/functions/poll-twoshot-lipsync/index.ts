@@ -16,10 +16,20 @@ function json(body: unknown, status = 200) {
 }
 
 type FaceMap = {
-  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
+  faces?: Array<{
+    side?: "left" | "right";
+    center?: [number, number];
+    bbox?: [number, number, number, number];
+    normCenter?: [number, number];
+    /** Set by compose-twoshot-lipsync via Gemini identity-match. */
+    characterId?: string | null;
+    matchConfidence?: number;
+    matchSource?: "gemini-identity" | "gemini-inferred" | "unresolved";
+  }>;
   width?: number;
   height?: number;
 };
+
 
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
