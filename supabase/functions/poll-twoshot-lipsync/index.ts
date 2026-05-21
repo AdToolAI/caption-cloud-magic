@@ -419,15 +419,18 @@ serve(async (req) => {
       const nextSpeaker = speakers[nextIdx];
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
       const videoDims = await probeMp4Dims(polled.outputUrl);
-      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
+      const charShots = Array.isArray((scene as any).character_shots) ? ((scene as any).character_shots as Array<any>) : [];
+      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims, { characterId: nextSpeaker.character_id ?? null, characterShots: charShots });
       if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
         return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
       }
       // Short-utterance windowing: if this speaker only talks briefly inside
-      // a long scene, scope Sync.so to the voiced window so VAD reliably
-      // animates the targeted face (fixes "second character never opens
-      // mouth on short replies like 'Was denn?'"). Falls back to full track
-      // automatically if Sync.so rejects the segments payload.
+      // a long scene, scope Sync.so's audio input to the voiced window so VAD
+      // reliably animates the targeted face (fixes "second character never
+      // opens mouth on short replies like 'Was denn?'"). Falls back to full
+      // track automatically if Sync.so rejects the segments payload. Note: we
+      // only scope the AUDIO segment, never the video, so the picked face
+      // coordinates remain valid for the whole clip.
       const sceneDurSec = Number(twoshot.totalSec) || 0;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
       let nextSegment: [number, number] | null = null;
@@ -446,7 +449,6 @@ serve(async (req) => {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
         targetCoords: target.coords,
-        faceBbox: Array.isArray(target.bbox) && target.bbox.length === 4 ? target.bbox as [number, number, number, number] : null,
         segmentSecs: nextSegment,
         temperature: nextSegment ? 0.65 : 0.5,
       });
