@@ -232,7 +232,7 @@ serve(async (req) => {
     const currentPass = isSegments ? 1 : Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
     const totalPasses = isSegments ? 1 : Number(syncJobs.totalPasses || jobs.length || 2);
     const fallbackMode = String(syncJobs.fallbackMode ?? "");
-    const currentJob = isSegments || fallbackMode === "auto_detect_single_pass"
+    const currentJob = isSegments
       ? (jobs[jobs.length - 1] ?? jobs[0])
       : (jobs.find((j: any) => Number(j?.pass) === currentPass) ?? jobs[jobs.length - 1]);
     const jobId = String(currentJob?.jobId || String(scene.replicate_prediction_id ?? "").replace(/^sync:/, ""));
