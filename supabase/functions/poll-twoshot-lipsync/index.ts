@@ -16,10 +16,20 @@ function json(body: unknown, status = 200) {
 }
 
 type FaceMap = {
-  faces?: Array<{ side?: "left" | "right"; center?: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
+  faces?: Array<{
+    side?: "left" | "right";
+    center?: [number, number];
+    bbox?: [number, number, number, number];
+    normCenter?: [number, number];
+    /** Set by compose-twoshot-lipsync via Gemini identity-match. */
+    characterId?: string | null;
+    matchConfidence?: number;
+    matchSource?: "gemini-identity" | "gemini-inferred" | "unresolved";
+  }>;
   width?: number;
   height?: number;
 };
+
 
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
@@ -49,21 +59,35 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null, speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
-  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
-  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+function pickTargetCoordinates(
+  passIndex: number,
+
+  faceMap: FaceMap | null | undefined,
+  videoDims?: { width: number; height: number } | null,
+  speakerContext?: { characterId?: string | null } | null,
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "identity_match" | "pass_order"; matchConfidence?: number; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
   const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
-  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
-  if (charId && shots.length >= 2) {
-    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
-    if (shotIdx >= 0) {
-      side = shotIdx === 0 ? "left" : "right";
-      mappingSource = "character_shots";
+  let mappingSource: "identity_match" | "pass_order" = "pass_order";
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
+  let match: typeof faces[number] | undefined;
+  let matchConfidence: number | undefined;
+
+  // Primary: identity match (set upstream by compose-twoshot-lipsync).
+  if (charId && faces.length) {
+    const byId = faces.find((f) => String(f.characterId ?? "").toLowerCase() === charId);
+    if (byId && byId.side) {
+      match = byId;
+      side = byId.side;
+      mappingSource = "identity_match";
+      matchConfidence = byId.matchConfidence;
     }
   }
-  const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
-  const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
-  if (Array.isArray(match?.center) && match.center.length === 2) {
+  // Positional fallback.
+  if (!match) {
+    match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
+  }
+  if (match && Array.isArray(match.center) && match.center.length === 2) {
     const anchorW = Number(faceMap?.width) || 0;
     const anchorH = Number(faceMap?.height) || 0;
     const videoW = Number(videoDims?.width) || anchorW || 1280;
@@ -83,12 +107,13 @@ function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | unde
       }
     }
     const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-    return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
+    return { coords, side: side as "left" | "right", source: "gemini", mappingSource, matchConfidence, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
   const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
   return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic", mappingSource };
 }
+
 
 async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
   // Sync.so Speaker Selection: documented stable path for a single manual

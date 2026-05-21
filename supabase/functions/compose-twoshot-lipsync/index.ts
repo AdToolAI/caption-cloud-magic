@@ -323,11 +323,124 @@ async function pollSyncSoDirectPrediction(
  * the Gemini call.
  */
 type FaceMap = {
-  faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
+  faces: Array<{
+    side: "left" | "right";
+    center: [number, number];
+    bbox?: [number, number, number, number];
+    normCenter?: [number, number];
+    /** Resolved via Gemini identity-match against character portraits. */
+    characterId?: string | null;
+    matchConfidence?: number;
+    matchSource?: "gemini-identity" | "gemini-inferred" | "unresolved";
+  }>;
   width: number;
   height: number;
   source: "cache" | "anchor" | "clip-frame" | "heuristic-fallback";
 };
+
+/**
+ * Gemini-Vision identity match: given the anchor frame + one reference
+ * portrait per character, returns which characterId is on the left vs right.
+ * This is the authoritative source-of-truth for face↔character mapping;
+ * `character_shots[]` array position is NOT geometric and was the root cause
+ * of the dialog-swap bug.
+ *
+ * Returns null on any failure so the caller can apply a clean error path.
+ */
+async function askGeminiForIdentityMatch(
+  anchorUrl: string,
+  characters: Array<{ characterId: string; portraitUrl: string }>,
+  lovableKey: string,
+): Promise<{ left?: string | null; right?: string | null; confidence?: number } | null> {
+  if (!characters.length) return null;
+  try {
+    const ids = characters.map((c) => c.characterId);
+    const content: any[] = [
+      {
+        type: "text",
+        text:
+          "The FIRST image is a two-shot scene with two visible people (one on the LEFT, one on the RIGHT). " +
+          "The remaining images are reference portraits, in this order: " +
+          ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
+          "For the person on the LEFT of the scene and the person on the RIGHT of the scene, identify which reference portrait matches best by facial identity (face shape, hair, age, gender, distinctive features). " +
+          "Return STRICT JSON only — no prose, no markdown fences. " +
+          "Schema: {\"left\": \"<characterId or null>\", \"right\": \"<characterId or null>\", \"confidence\": <0..1>}. " +
+          "Use only IDs from this list: " + ids.join(", ") + ". " +
+          "If you are unsure, return null for that side. Never assign the same id to both sides unless only one character is provided.",
+      },
+      { type: "image_url", image_url: { url: anchorUrl } },
+      ...characters.map((c) => ({ type: "image_url", image_url: { url: c.portraitUrl } })),
+    ];
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content }],
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const allowed = new Set(ids.map((id) => id.toLowerCase()));
+    const sanitize = (v: any): string | null => {
+      const s = v ? String(v).toLowerCase().trim() : "";
+      return s && allowed.has(s) ? s : null;
+    };
+    const left = sanitize(parsed?.left);
+    const right = sanitize(parsed?.right);
+    const confidence = Number(parsed?.confidence);
+    return {
+      left,
+      right,
+      confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves brand_character portrait URLs for each unique characterId in
+ * `character_shots`, scoped to the scene's owner. Used by the identity-match
+ * step so Gemini can compare detected faces against canonical references.
+ */
+async function resolveCharacterPortraits(
+  supabase: any,
+  userId: string,
+  characterIds: string[],
+): Promise<Array<{ characterId: string; portraitUrl: string }>> {
+  const uniq = Array.from(new Set(characterIds.map((s) => String(s).toLowerCase()).filter(Boolean)));
+  if (!uniq.length) return [];
+  try {
+    // characterIds in composer scenes are slugs (e.g. "matthew-dusatko"),
+    // brand_characters uses display names — match via lowercased + hyphenated name.
+    const { data, error } = await supabase
+      .from("brand_characters")
+      .select("name, portrait_url, reference_image_url, user_id, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+    if (error || !Array.isArray(data)) return [];
+    const out: Array<{ characterId: string; portraitUrl: string }> = [];
+    for (const id of uniq) {
+      const row = data.find((r: any) => {
+        const slug = String(r?.name ?? "").toLowerCase().trim().replace(/\s+/g, "-");
+        return slug === id;
+      });
+      if (!row) continue;
+      const url = String(row.portrait_url || row.reference_image_url || "").trim();
+      if (url) out.push({ characterId: id, portraitUrl: url });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
@@ -454,28 +567,79 @@ async function detectFacesInMaster(
   clipUrl: string | null | undefined,
   cached: any,
   lovableKey: string | undefined,
+  characters: Array<{ characterId: string; portraitUrl: string }> = [],
 ): Promise<FaceMap | null> {
-  // Reject cached entries with bogus dims (legacy rows pre normalization fix).
-  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2 && Number(cached.width) > 0 && Number(cached.height) > 0 && cached.faces.every((f: any) => Array.isArray(f?.normCenter))) {
+  // Cache acceptance criteria: must have real dims AND identity-resolved
+  // characterId on every face (otherwise we'd re-use the broken pre-identity
+  // cache that caused the dialog swap). When characters are provided but the
+  // cache lacks characterId, we force a refresh so identity-match runs once.
+  const cacheLooksValid =
+    cached && Array.isArray(cached.faces) && cached.faces.length >= 2 &&
+    Number(cached.width) > 0 && Number(cached.height) > 0 &&
+    cached.faces.every((f: any) => Array.isArray(f?.normCenter));
+  const cacheHasIdentities =
+    cacheLooksValid && cached.faces.every((f: any) => typeof f?.characterId === "string" && f.characterId.length > 0);
+  const needIdentities = characters.length >= 2;
+  if (cacheLooksValid && (!needIdentities || cacheHasIdentities)) {
     return { ...cached, source: "cache" } as FaceMap;
   }
   if (!lovableKey || !anchorUrl) return null;
 
   // Probe REAL anchor dimensions so coordinates we hand to Sync.so actually
   // land on the face (Hailuo uses the anchor as first frame, so video dims
-  // == anchor dims). Gemini was hallucinating 1920x1080 for 1376x768 frames
-  // which moved the left-face target up-and-left into empty space and made
-  // Sync.so reject the job with `generation_pipeline_failed`.
+  // == anchor dims).
   const dims = await probeImageDims(anchorUrl);
   if (!dims) {
     console.warn(`[compose-twoshot-lipsync ${sceneId}] could not probe anchor dims — Sync.so coords may be off`);
   }
   const realDims = dims ?? { width: 1280, height: 720 };
 
-  const raw = await askGeminiForFaces(anchorUrl, lovableKey, "image");
-  if (!raw) return null;
-  const norm = normalizeFaces(raw, realDims);
-  if (norm.faces.length < 2) return null;
+  // If we already have positions cached but just need identities, reuse them
+  // instead of re-asking Gemini for face boxes.
+  let norm: { faces: FaceMap["faces"]; width: number; height: number };
+  if (cacheLooksValid) {
+    norm = { faces: cached.faces, width: Number(cached.width), height: Number(cached.height) };
+  } else {
+    const raw = await askGeminiForFaces(anchorUrl, lovableKey, "image");
+    if (!raw) return null;
+    norm = normalizeFaces(raw, realDims);
+    if (norm.faces.length < 2) return null;
+  }
+
+  // ── Identity-match step ─────────────────────────────────────────────
+  // Ask Gemini which character (by reference portrait) is on the left vs
+  // right of the anchor frame. This is the authoritative speaker↔face map;
+  // character_shots[] array order is NOT geometric.
+  if (characters.length >= 2) {
+    const identity = await askGeminiForIdentityMatch(anchorUrl, characters, lovableKey);
+    if (identity) {
+      const { left, right, confidence } = identity;
+      norm.faces = norm.faces.map((f) => {
+        if (f.side === "left" && left) {
+          return { ...f, characterId: left, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
+        }
+        if (f.side === "right" && right) {
+          return { ...f, characterId: right, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
+        }
+        return { ...f, matchSource: "unresolved" as const };
+      });
+      // Inference: if exactly one side resolved + exactly 2 candidates, assign
+      // the leftover candidate to the other side.
+      const ids = characters.map((c) => c.characterId);
+      const assigned = new Set(norm.faces.map((f) => f.characterId).filter(Boolean) as string[]);
+      const missing = ids.filter((id) => !assigned.has(id));
+      if (missing.length === 1) {
+        norm.faces = norm.faces.map((f) =>
+          f.characterId
+            ? f
+            : { ...f, characterId: missing[0], matchConfidence: 0.5, matchSource: "gemini-inferred" as const },
+        );
+      }
+    } else {
+      console.warn(`[compose-twoshot-lipsync ${sceneId}] gemini identity-match returned null`);
+    }
+  }
+
   const result: FaceMap = { ...norm, source: "anchor" };
   try {
     const { data: row } = await supabase
@@ -501,59 +665,70 @@ async function detectFacesInMaster(
 }
 
 
+
 /**
  * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
  *
- * Mapping is explicit and stable:
- *   1. If `characterId` + `characterShots` are provided, the speaker's
- *      position in `character_shots` (0 = left, 1 = right) determines the
- *      face side. This guarantees that "Matthew at shot index 1" goes to
- *      the right face even if speakers were sorted differently upstream.
- *   2. Otherwise we fall back to pass index (0 = left, 1 = right).
+ * Resolution priority (top wins):
+ *   1. `identity_match` — Gemini matched a face to this speaker's character
+ *      portrait. Authoritative: works regardless of left/right positioning.
+ *   2. `pass_order` — pure pass index fallback (0 = left, 1 = right). Used
+ *      only when identity match is unavailable.
  *
- * Returns null if even the heuristic isn't resolvable (no dimensions known).
+ * IMPORTANT: We deliberately do NOT fall back to `character_shots[]` array
+ * position anymore — that array is the UI casting order, not a geometric
+ * truth, and using it caused dialog to be sent to the wrong mouth.
+ *
+ * Returns null when no usable target can be derived.
  */
 function pickTargetCoordinates(
   passIndex: number,
-  faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>; width: number; height: number } | null,
+  faceMap: FaceMap | null,
   fallbackDims: { width: number; height: number },
-  speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null,
-): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
-  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
-  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  speakerContext?: { characterId?: string | null } | null,
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "identity_match" | "pass_order"; matchConfidence?: number; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
   const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
-  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
-  if (charId && shots.length >= 2) {
-    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
-    if (shotIdx >= 0) {
-      side = shotIdx === 0 ? "left" : "right";
-      mappingSource = "character_shots";
+  let mappingSource: "identity_match" | "pass_order" = "pass_order";
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let match: FaceMap["faces"][number] | undefined;
+  let matchConfidence: number | undefined;
+
+  // Primary: identity match via Gemini portrait comparison.
+  if (charId && faceMap?.faces?.length) {
+    const byId = faceMap.faces.find((f) => String(f.characterId ?? "").toLowerCase() === charId);
+    if (byId) {
+      match = byId;
+      side = byId.side;
+      mappingSource = "identity_match";
+      matchConfidence = byId.matchConfidence;
     }
   }
-  if (faceMap?.faces?.length) {
-    const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
-    if (match?.center) {
-      const anchorW = Number(faceMap.width) || 0;
-      const anchorH = Number(faceMap.height) || 0;
-      const videoW = Number(fallbackDims.width) || anchorW || 1280;
-      const videoH = Number(fallbackDims.height) || anchorH || 720;
-      const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
-      const scaleX = sameAspect ? videoW / anchorW : 1;
-      const scaleY = sameAspect ? videoH / anchorH : 1;
-      const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
-      const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
-      let x = faceCenter[0];
-      let y = faceCenter[1];
-      if (bbox) {
-        const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
-        if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
-          x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
-          y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
-        }
+  // Fallback: positional by pass index.
+  if (!match && faceMap?.faces?.length) {
+    match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
+  }
+
+  if (match?.center) {
+    const anchorW = Number(faceMap!.width) || 0;
+    const anchorH = Number(faceMap!.height) || 0;
+    const videoW = Number(fallbackDims.width) || anchorW || 1280;
+    const videoH = Number(fallbackDims.height) || anchorH || 720;
+    const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
+    const scaleX = sameAspect ? videoW / anchorW : 1;
+    const scaleY = sameAspect ? videoH / anchorH : 1;
+    const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
+    const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
+    let x = faceCenter[0];
+    let y = faceCenter[1];
+    if (bbox) {
+      const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
+      if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
+        x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
+        y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
       }
-      const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-      return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
     }
+    const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
+    return { coords, side, source: "gemini", mappingSource, matchConfidence, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = fallbackDims.width || 1280;
   const H = fallbackDims.height || 720;
@@ -561,6 +736,7 @@ function pickTargetCoordinates(
   const y = Math.round(H * 0.5);
   return { coords: [x, y], side, source: "heuristic", mappingSource };
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -892,6 +1068,18 @@ serve(async (req) => {
         ((scene as any).lock_reference_url as string | undefined) ||
         undefined;
       const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
+      // Resolve character portraits for identity matching. Without these,
+      // Gemini cannot tell which face belongs to which speaker and we fall
+      // back to the (unreliable) positional heuristic — so we hard-fail when
+      // both speakers are present but portraits are missing.
+      const distinctCharIds = Array.from(
+        new Set(
+          passes
+            .map((p) => String((p as any).character_id ?? "").toLowerCase())
+            .filter(Boolean),
+        ),
+      );
+      const characterPortraits = await resolveCharacterPortraits(supabase, user.id, distinctCharIds);
       const faceMap = await detectFacesInMaster(
         supabase,
         scene_id,
@@ -899,6 +1087,7 @@ serve(async (req) => {
         detectionClipUrl,
         cachedFaceMap,
         LOVABLE_API_KEY,
+        characterPortraits,
       );
       // Do not probe the source MP4 here. The previous full-file probe was the
       // CPU hotspot that killed the function before Sync.so job creation. For
@@ -911,7 +1100,17 @@ serve(async (req) => {
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] faceMap`,
         faceMap
-          ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, videoWidth: fallbackDims.width, videoHeight: fallbackDims.height, source: faceMap.source }
+          ? {
+              faces: faceMap.faces.length,
+              width: faceMap.width,
+              height: faceMap.height,
+              videoWidth: fallbackDims.width,
+              videoHeight: fallbackDims.height,
+              source: faceMap.source,
+              identities: faceMap.faces.map((f) => ({ side: f.side, characterId: f.characterId ?? null, matchSource: f.matchSource ?? "unresolved", confidence: f.matchConfidence ?? null })),
+              portraitsResolved: characterPortraits.length,
+              charactersExpected: distinctCharIds.length,
+            }
           : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrlForDetect, clip: !!detectionClipUrl },
       );
       if (!faceMap) {
@@ -926,17 +1125,35 @@ serve(async (req) => {
       // rendered clip only shows 1 visible face, NEVER fall back to a single
       // merged-VO pass on one mouth — that is exactly the "all dialogue
       // coming out of one character" failure mode the user is reporting.
-      // Instead refund credits, mark the scene failed with a precise reason,
-      // and let the user re-roll the source clip (via the "Clip + Lipsync
-      // neu rendern" action) so we get a real two-shot to lipsync.
       if (passes.length >= 2 && !hasTwoRealFaces) {
         const detected = faceMap?.faces?.length ?? 0;
         await refund(`source_clip_missing_speakers: detected ${detected}/${passes.length} faces in the rendered clip — the source video does not show all speakers, so multi-pass face-targeted lip-sync is impossible. Re-roll the clip (Clip + Lipsync neu rendern) to get a real two-shot.`);
         return;
       }
+
+      // ── Identity Pre-Flight ────────────────────────────────────────────
+      // If we have 2+ speakers but face↔character identity could not be
+      // resolved for both of them, refuse to send blind position-based
+      // coordinates to Sync.so — that is what caused the dialog-swap bug.
+      // The user is asked to re-roll the clip so a fresh identity pass runs.
+      if (passes.length >= 2 && hasTwoRealFaces) {
+        const resolvedIds = new Set(
+          (faceMap!.faces.map((f) => String(f.characterId ?? "").toLowerCase()).filter(Boolean)) as string[],
+        );
+        const missing = distinctCharIds.filter((id) => !resolvedIds.has(id));
+        if (missing.length > 0) {
+          await refund(
+            `speaker_face_mapping_failed: could not identity-match ${missing.join(", ")} against the rendered clip's faces. ` +
+            `Portraits resolved: ${characterPortraits.length}/${distinctCharIds.length}. ` +
+            `Bitte den Quellclip neu rendern, damit eine frische Gesichts-Identitäts-Zuordnung berechnet wird.`,
+          );
+          return;
+        }
+      }
       const useMultiPass = passes.length >= 2 && hasTwoRealFaces;
       const publicPasses = passes.map(({ _shotIdx: _shotIdx, ...p }) => p);
       let outUrl: string | null = null;
+
 
       if (useMultiPass) {
         // ── Sync.so two-pass face-targeted pipeline ──────────────────────
