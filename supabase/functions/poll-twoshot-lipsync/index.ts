@@ -36,6 +36,58 @@ function formatSegments(
   );
 }
 
+/**
+ * Expand per-turn voiced windows with a small video-frame pre-roll/tail so
+ * Sync.so's VAD gets onset context (fixes ventriloquist on short 2nd turns)
+ * and frame-grid rounding can't desync mouth from audio. Pre-roll/tail is
+ * capped at half the gap to the nearest neighbor turn (own OR other speaker)
+ * so windows never cross another speaker. Audio itself is NOT padded.
+ */
+const SYNC_LEAD_IN_SEC = 0.12;
+const SYNC_TAIL_SEC = 0.08;
+function expandTurnsWithPreRoll(
+  ownTurns: Array<[number, number]>,
+  otherTurns: Array<[number, number]>,
+  sceneDurSec: number,
+): { windows: Array<[number, number]>; minTurnDur: number } {
+  if (!Number.isFinite(sceneDurSec) || sceneDurSec <= 0 || ownTurns.length === 0) {
+    return { windows: [], minTurnDur: 0 };
+  }
+  const all = [...ownTurns, ...otherTurns]
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const expanded: Array<[number, number]> = [];
+  let minDur = Infinity;
+  for (const [s, e] of ownTurns) {
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    minDur = Math.min(minDur, e - s);
+    let prevEnd = 0;
+    let nextStart = sceneDurSec;
+    for (const [a, b] of all) {
+      if (b <= s) prevEnd = Math.max(prevEnd, b);
+      else if (a >= e) nextStart = Math.min(nextStart, a);
+    }
+    const maxLead = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (s - prevEnd) / 2));
+    const maxTail = Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - e) / 2));
+    expanded.push([
+      Math.max(0, s - maxLead),
+      Math.min(sceneDurSec, e + maxTail),
+    ]);
+  }
+  return {
+    windows: expanded,
+    minTurnDur: minDur === Infinity ? 0 : minDur,
+  };
+}
+
+/** Adaptive temperature: short turns (<2s) need 1.0 articulation. */
+function pickTemperatureForTurns(minTurnDurSec: number): number {
+  if (!Number.isFinite(minTurnDurSec) || minTurnDurSec <= 0) return 0.85;
+  return minTurnDurSec < 2.0 ? 1.0 : 0.85;
+}
+
+
+
 /** Normalize stored audioSegmentSecs (single or multi) for retry/fallback. */
 function normalizeSegmentField(
   s: unknown,
@@ -883,43 +935,38 @@ serve(async (req) => {
         (plan as any)?.twoshot?.url ||
         nextSpeaker.track_url;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
-      // Use per-turn windows when present so a speaker with multiple turns
-      // never re-animates over the OTHER speaker's voiced range.
-      let nextSegment: [number, number] | Array<[number, number]> | null = null;
-      if (vrNext && sceneDurSec > 0) {
-        if (Array.isArray(vrNext.turns) && vrNext.turns.length > 0) {
-          const turns = vrNext.turns
-            .map(
-              (t: any) =>
-                [
-                  Math.max(0, Number(t.startSec)),
-                  Math.min(sceneDurSec, Number(t.endSec)),
-                ] as [number, number],
-            )
-            .filter(
-              ([a, b]: [number, number]) =>
-                Number.isFinite(a) && Number.isFinite(b) && b > a,
-            );
-          if (turns.length > 0) nextSegment = turns;
-        } else if (
-          Number.isFinite(vrNext.startSec) &&
-          Number.isFinite(vrNext.endSec) &&
-          vrNext.endSec > vrNext.startSec
-        ) {
-          nextSegment = [
-            Math.max(0, Number(vrNext.startSec)),
-            Math.min(sceneDurSec, Number(vrNext.endSec)),
-          ];
+      // Collect raw per-turn ranges for ALL speakers so we can expand each
+      // window with a tiny pre-roll/tail without crossing into the OTHER
+      // speaker's turn (fixes ventriloquist on short 2nd turns + frame-grid
+      // drift). Audio itself stays sample-exact; only video window widens.
+      const extractRawTurns = (sp: any): Array<[number, number]> => {
+        const vr = sp?.voicedRange;
+        if (!vr) return [];
+        if (Array.isArray(vr.turns) && vr.turns.length > 0) {
+          return vr.turns
+            .map((t: any) => [Number(t.startSec), Number(t.endSec)] as [number, number])
+            .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
         }
-      }
-      // temperature 0.85 — lip-ready neutral plate needs high articulation
-      // (0.5 produced ventriloquist effect, 0.7 still too subtle on Two-Shot).
+        if (Number.isFinite(vr.startSec) && Number.isFinite(vr.endSec) && vr.endSec > vr.startSec) {
+          return [[Number(vr.startSec), Number(vr.endSec)]];
+        }
+        return [];
+      };
+      const ownTurnsNext = extractRawTurns(nextSpeaker);
+      const otherTurnsNext = speakers
+        .filter((_: any, i: number) => i !== nextIdx)
+        .flatMap((sp: any) => extractRawTurns(sp));
+      const expandedNext = expandTurnsWithPreRoll(ownTurnsNext, otherTurnsNext, sceneDurSec);
+      const nextSegment: [number, number] | Array<[number, number]> | null =
+        expandedNext.windows.length === 0 ? null : expandedNext.windows;
+      // Adaptive temperature: short turns need 1.0, long turns stay at 0.85.
+      const nextTemp = pickTemperatureForTurns(expandedNext.minTurnDur);
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: mergedAudioUrl,
         targetCoords: target.coords,
         segmentSecs: nextSegment,
-        temperature: 0.85,
+        temperature: nextTemp,
       });
 
       await appendTwoshotDiag(supabase, sceneId, {
@@ -928,7 +975,7 @@ serve(async (req) => {
         stage: `lipsync_${currentPass + 1}`,
         status: "PROCESSING",
         jobId: nextJobId,
-        reason: `pass=${currentPass + 1} face=${target.side} source=${target.source}${nextSegment ? ` windows=${formatSegments(nextSegment)} voicedSec=${vrNext?.voicedSec}` : ""}`,
+        reason: `pass=${currentPass + 1} face=${target.side} source=${target.source} temp=${nextTemp}${nextSegment ? ` windows=${formatSegments(nextSegment)} voicedSec=${vrNext?.voicedSec} minTurn=${expandedNext.minTurnDur.toFixed(2)}` : ""}`,
       });
       const nextPass = currentPass + 1;
       const nextJob = {
