@@ -162,7 +162,7 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     }),
   });
 
-  const useSegments = !!params.segmentSecs;
+  const useSegments = !!normalizedSegments;
   let resp = await submit(useSegments);
 
   if (!resp.ok && useSegments) {
