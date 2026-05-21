@@ -259,7 +259,7 @@ async function startSyncSoDirectGeneration(
     // the full track — the per-speaker WAV is already peak-normalized so VAD
     // still has a fighting chance.
     const txt = await createResp.text().catch(() => "");
-    if (/segments? configuration is invalid|invalid.+segment/i.test(txt) || createResp.status === 400) {
+    if (/segments? configuration is invalid|invalid.+segment|only supported for video inputs/i.test(txt) || createResp.status === 400) {
       console.warn(`[${label}] segments_secs rejected by Sync.so, retrying without window: ${txt.slice(0, 200)}`);
       createResp = await submit(false);
     } else {
