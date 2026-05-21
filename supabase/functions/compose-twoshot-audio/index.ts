@@ -665,13 +665,35 @@ serve(async (req) => {
         const group = speakerTracks[i];
         // Pre-allocate zeros = silence everywhere.
         const track = new Int16Array(totalSamples);
+        // Voiced region = union [earliest startSample, latest endSample] across
+        // all this speaker's utterances. Stored on the public speaker metadata
+        // so downstream lipsync passes can scope Sync.so to just this window
+        // (avoids "mouth never moves on short replies like 'Was denn?'").
+        let voicedStartSample = Number.POSITIVE_INFINITY;
+        let voicedEndSample = 0;
+        let voicedSampleCount = 0;
         for (const item of group.items) {
           const startSample = item.segment._startSample;
           const maxCopy = Math.max(0, Math.min(item.samples.length, totalSamples - startSample));
           if (maxCopy > 0) {
             track.set(item.samples.subarray(0, maxCopy), startSample);
+            if (startSample < voicedStartSample) voicedStartSample = startSample;
+            if (startSample + maxCopy > voicedEndSample) voicedEndSample = startSample + maxCopy;
+            voicedSampleCount += maxCopy;
           }
         }
+        const voicedSec = voicedSampleCount / SAMPLE_RATE;
+        const voicedStartSec = Number.isFinite(voicedStartSample) ? voicedStartSample / SAMPLE_RATE : 0;
+        const voicedEndSec = voicedEndSample / SAMPLE_RATE;
+
+        // For very short utterances (e.g. "Was denn?", ~0.6s buried in 10s of
+        // silence) ElevenLabs sometimes renders at a low peak level. Peak-
+        // normalize the per-speaker track so Sync.so's VAD reliably picks up
+        // the voiced region and animates the targeted face.
+        if (voicedSec > 0 && voicedSec < 2.0) {
+          peakNormalizeInPlace(track);
+        }
+
         const trackWav = samplesToWav(track);
         const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-char${i}-${group.speaker_slug}.wav`;
         const { error: tErr } = await supabase.storage
@@ -683,6 +705,14 @@ serve(async (req) => {
         }
         const { data: tp } = supabase.storage.from("voiceover-audio").getPublicUrl(trackPath);
         group.track_url = tp.publicUrl;
+        // Attach voicedRange — consumed by compose-twoshot-lipsync /
+        // poll-twoshot-lipsync to set Sync.so input[].segments_secs.
+        (group as any).voicedRange = {
+          startSec: Math.round(voicedStartSec * 1000) / 1000,
+          endSec: Math.round(voicedEndSec * 1000) / 1000,
+          voicedSec: Math.round(voicedSec * 1000) / 1000,
+          normalized: voicedSec > 0 && voicedSec < 2.0,
+        };
       } catch (e) {
         console.warn("[compose-twoshot-audio] per-character build error", (e as Error).message);
       }
