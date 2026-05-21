@@ -435,7 +435,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `Exactly ${n} distinct people${named}, each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `Exactly ${n} distinct people${named}, each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
