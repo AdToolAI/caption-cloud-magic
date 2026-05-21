@@ -1,19 +1,21 @@
 /**
- * poll-dialog-shots — Sequential Sync.so chain poller.
+ * poll-dialog-shots — Sequential Sync.so chain poller (v3 per-speaker).
  *
- * v2 design: per-turn Sync.so lipsync-2-pro passes on the same master plate,
- * chained sequentially. Each turn's output becomes the next turn's video
- * input. The final turn's output is the new clip_url. NO ffmpeg, NO Remotion
- * stitching — Sync.so's `sync_mode='cut_off'` leaves frames outside the
- * narrow `segments_secs` window untouched, so chaining safely preserves
- * earlier turns' lip animation.
+ * v3 design: ONE Sync.so lipsync-2-pro pass per CHARACTER (not per turn).
+ * All of a speaker's turns are sent in a single pass as multi-window
+ * `segments_secs`. With N distinct speakers this means N chained passes
+ * instead of N turns chained, so each face is only animated once and
+ * only the speaker's own video regions are re-encoded. Result: noticeably
+ * sharper output, and no "weak 2nd-line" artefact from cumulative
+ * re-encodes (the v2 bug).
  *
- * Per-turn lifecycle:
  *   pending → lipsyncing (sync_job_id set) → ready (output_url set)
  *                                          → failed
  *
- * Runtime constraints: Supabase Edge Runtime cannot spawn subprocesses, so
- * audio slicing is done in pure TypeScript on Int16 PCM/WAV samples.
+ * `sync_mode='cut_off'` leaves frames outside `segments_secs` untouched,
+ * so chaining N speaker-passes safely preserves earlier speakers' lip
+ * animation. Audio is always the full master WAV (Sync.so aligns it to
+ * absolute time inside each window).
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -35,17 +37,20 @@ function json(body: unknown, status = 200) {
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const SAMPLE_RATE = 44100;
-/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding). */
-const SYNC_LEAD_IN_SEC = 0.12;
-const SYNC_TAIL_SEC = 0.08;
+/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding).
+ *  Bumped from 0.12/0.08 (v2) → 0.18/0.12 for smoother short-window onsets.
+ *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
+ *  never bleed into another speaker's region. */
+const SYNC_LEAD_IN_SEC = 0.18;
+const SYNC_TAIL_SEC = 0.12;
 
-interface DialogTurnShot {
+interface DialogSpeakerShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  startSec: number;
-  endSec: number;
+  /** All windows for this speaker (time-ordered, disjoint). */
+  windows: Array<[number, number]>;
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
@@ -58,9 +63,9 @@ interface DialogTurnShot {
 }
 
 interface DialogShotsState {
-  version: 2;
+  version: 3;
   status: "queued" | "lipsyncing" | "done" | "failed";
-  shots: DialogTurnShot[];
+  shots: DialogSpeakerShot[];
   source_clip_url: string;
   master_audio_url: string;
   total_sec: number;
@@ -73,6 +78,7 @@ interface DialogShotsState {
   finished_at?: string;
   error?: string;
 }
+
 
 // ── Pure-TS WAV slicing ─────────────────────────────────────────────────
 
@@ -206,34 +212,41 @@ async function uploadToStorage(
 
 // ── Sync.so wrappers ────────────────────────────────────────────────────
 
-/** Expand a turn window with pre-roll/tail, clamped to neighbouring turn
- *  boundaries (never bleed into another speaker's window). */
-function expandWindow(
-  shot: DialogTurnShot,
-  allShots: DialogTurnShot[],
-): [number, number] {
-  const prev = allShots
-    .filter((s) => s.idx < shot.idx)
-    .reduce<number>((max, s) => Math.max(max, s.endSec), 0);
-  const nextStart = allShots
-    .filter((s) => s.idx > shot.idx)
-    .reduce<number>((min, s) => Math.min(min, s.startSec), Number.POSITIVE_INFINITY);
-  const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (shot.startSec - prev) / 2));
-  const maxTail =
-    Number.isFinite(nextStart)
-      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - shot.endSec) / 2))
+/** Expand every window of a speaker shot with pre-roll/tail, clamping each
+ *  side to the nearest neighbour boundary across ALL shots (own + other
+ *  speakers), so a pre-roll/tail can never bleed into someone else's
+ *  spoken region or another window of the same speaker. */
+function expandWindows(
+  shot: DialogSpeakerShot,
+  allShots: DialogSpeakerShot[],
+): Array<[number, number]> {
+  // Flatten all windows from all speakers (for boundary lookup).
+  const allWindows: Array<[number, number]> = [];
+  for (const s of allShots) for (const w of s.windows) allWindows.push(w);
+  allWindows.sort((a, b) => a[0] - b[0]);
+
+  const out: Array<[number, number]> = [];
+  for (const [start, end] of shot.windows) {
+    const prevEnd = allWindows
+      .filter(([, e]) => e <= start)
+      .reduce((m, [, e]) => Math.max(m, e), 0);
+    const nextStart = allWindows
+      .filter(([s]) => s >= end)
+      .reduce((m, [s]) => Math.min(m, s), Number.POSITIVE_INFINITY);
+    const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (start - prevEnd) / 2));
+    const maxTail = Number.isFinite(nextStart)
+      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - end) / 2))
       : SYNC_TAIL_SEC;
-  return [
-    Math.max(0, shot.startSec - maxLeadIn),
-    shot.endSec + maxTail,
-  ];
+    out.push([Math.max(0, start - maxLeadIn), end + maxTail]);
+  }
+  return out;
 }
 
-async function startSyncTurnJob(
+async function startSyncSpeakerJob(
   apiKey: string,
   videoUrl: string,
   audioUrl: string,
-  segment: [number, number],
+  windows: Array<[number, number]>,
   coords: [number, number] | null,
   temperature: number,
 ): Promise<string> {
@@ -254,7 +267,7 @@ async function startSyncTurnJob(
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl, segments_secs: [segment] },
+      { type: "video", url: videoUrl, segments_secs: windows },
       { type: "audio", url: audioUrl },
     ],
     options,
@@ -266,13 +279,13 @@ async function startSyncTurnJob(
   });
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    // Fallback: retry without segments_secs if Sync.so rejects the window.
+    // Fallback: retry without segments_secs if Sync.so rejects the windows.
     if (
       r.status === 400 &&
       /segments? configuration is invalid|only supported for video inputs|invalid.+segment/i.test(txt)
     ) {
       console.warn(
-        `[poll-dialog-shots] segments rejected, retry without window: ${txt.slice(0, 200)}`,
+        `[poll-dialog-shots] segments rejected, retry without windows: ${txt.slice(0, 200)}`,
       );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
@@ -292,6 +305,7 @@ async function startSyncTurnJob(
   const data = await r.json();
   return String(data.id);
 }
+
 
 async function pollSyncJob(
   apiKey: string,
@@ -358,9 +372,9 @@ async function processScene(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.version !== 2) {
-    // Legacy v1 (Hailuo-per-turn) state — ignore; user must reset via UI.
-    return { status: "legacy_v1_ignored", mutated: false };
+  if (state.version !== 3) {
+    // Legacy v1/v2 state — ignore; user must reset via UI to migrate.
+    return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
   if (state.status === "done" || state.status === "failed") {
     return { status: state.status, mutated: false };
@@ -422,17 +436,15 @@ async function processScene(
         .pop();
       const videoInput = prevReady?.output_url ?? state.source_clip_url;
       try {
-        // IMPORTANT: send the FULL master WAV to Sync.so on every turn —
-        // do NOT slice. Sync.so aligns audio to the `segments_secs` video
-        // window by absolute time; a sliced WAV starts at 0s and would
-        // desync from a window at e.g. 2.7s. Full master WAV + tight
-        // per-turn video window = stable per-speaker lipsync (Two-Shot policy).
-        const window = expandWindow(shot, shots);
-        const jobId = await startSyncTurnJob(
+        // FULL master WAV on every pass — Sync.so aligns audio to absolute
+        // time inside each `segments_secs` window. Multi-window = all of
+        // this speaker's turns animated in ONE pass on the prior video.
+        const windows = expandWindows(shot, shots);
+        const jobId = await startSyncSpeakerJob(
           syncKey,
           videoInput,
           state.master_audio_url,
-          window,
+          windows,
           shot.target_coords,
           shot.temperature,
         );
@@ -440,9 +452,13 @@ async function processScene(
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
         mutated = true;
+        const winStr = windows
+          .map(([a, b]) => `[${a.toFixed(2)},${b.toFixed(2)}]`)
+          .join(",");
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} (${shot.speaker_name}) job=${jobId} window=[${window[0].toFixed(2)},${window[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] dispatched speaker ${shot.idx} (${shot.speaker_name}) job=${jobId} windows=${winStr} coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
+
       } catch (e) {
         shot.status = "failed";
         shot.error = `dispatch: ${(e as Error).message}`.slice(0, 300);
@@ -565,7 +581,7 @@ serve(async (req) => {
       sceneIds = (rows ?? [])
         .filter(
           (r: any) =>
-            r?.dialog_shots?.version === 2 &&
+            r?.dialog_shots?.version === 3 &&
             ["queued", "lipsyncing"].includes(String(r.dialog_shots?.status)),
         )
         .map((r: any) => r.id);

@@ -313,27 +313,31 @@ interface TwoshotSpeaker {
   voicedRange?: { turns?: Turn[]; startSec?: number; endSec?: number };
 }
 
-interface DialogTurnShot {
+/**
+ * v3 SHOT MODEL — one Sync.so pass per CHARACTER (not per turn).
+ * All of a speaker's turns are passed as multi-window `segments_secs`,
+ * so each face is only animated once and only the speaker's own video
+ * regions are re-encoded. Eliminates the per-turn re-encode chain that
+ * softened later-turn mouths and caused weak animation on a speaker's
+ * 2nd line (v2 issue).
+ */
+interface DialogSpeakerShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  startSec: number;
-  endSec: number;
+  /** All turn windows belonging to THIS speaker (time-ordered). */
+  windows: Array<[number, number]>;
+  /** Sum of window durations (seconds). Used for pricing and temperature. */
   durSec: number;
-  /** Sync.so coords [x, y] in master-plate pixel space. Set by initiator
-   *  from cached faceMap; never auto_detect for multi-speaker scenes. */
+  /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
-  /** Adaptive temperature: 1.0 for very short turns (<2s), else 0.85.
-   *  Short turns need maximum articulation force; long turns prefer stability. */
+  /** Adaptive temperature based on the SHORTEST window of this speaker.
+   *  Short windows (<2s) get 1.0 for max articulation; longer get 0.9. */
   temperature: number;
-  status:
-    | "pending"
-    | "lipsyncing"
-    | "ready"
-    | "failed";
+  status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
-  /** Output URL of THIS turn's Sync.so pass. Becomes video input of next turn. */
+  /** Output URL of THIS speaker's pass. Becomes the next pass's video input. */
   output_url?: string;
   error?: string;
   started_at?: string;
@@ -341,22 +345,23 @@ interface DialogTurnShot {
 }
 
 interface DialogShotsState {
-  version: 2; // bumped from v1 (Hailuo-per-turn) to v2 (sequential master chain)
+  /** v3 = per-speaker multi-window passes (current).
+   *  v2 = per-turn chained passes (legacy, ignored by poller). */
+  version: 3;
   status: "queued" | "lipsyncing" | "done" | "failed";
-  /** Per-turn passes, time-ordered. */
-  shots: DialogTurnShot[];
-  /** The two-shot master plate this chain starts from. Stable reference. */
+  /** Per-speaker passes, ordered by first appearance in the dialog. */
+  shots: DialogSpeakerShot[];
+  /** Stable reference back to the original Hailuo master plate. */
   source_clip_url: string;
-  /** Master audio WAV (built by compose-twoshot-audio). Sliced per-turn. */
+  /** Master audio WAV. Sent in full to every pass (Sync.so aligns by absolute time). */
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
   refunded: boolean;
   started_at: string;
-  /** Video dims (px) Sync.so should treat coords against. */
   video_width: number;
   video_height: number;
-  /** Final output URL of the last successful turn. = clip_url when status=done. */
+  /** Final output URL of the last successful speaker pass. */
   final_url?: string | null;
   finished_at?: string;
   error?: string;
@@ -526,32 +531,76 @@ serve(async (req) => {
     const videoW = Number(workingFaceMap?.width) || 1280;
     const videoH = Number(workingFaceMap?.height) || 720;
 
-    const rawShots: DialogTurnShot[] = [];
-    let idx = 0;
+    // ── Build per-SPEAKER shot list (v3) ────────────────────────────────
+    // Group all of each speaker's turns into one shot with multi-window
+    // segments_secs. This avoids re-encoding the same face multiple times
+    // and produces smoother, sharper lipsync across the whole scene.
+    interface SpeakerAgg {
+      speaker_idx: number;
+      speaker_name: string;
+      character_id: string | null;
+      windows: Array<[number, number]>;
+      firstStart: number;
+    }
+    const agg = new Map<string, SpeakerAgg>();
+
     speakers.forEach((sp, sIdx) => {
       const turns = Array.isArray(sp.voicedRange?.turns)
         ? sp.voicedRange!.turns!
         : sp.voicedRange?.startSec != null && sp.voicedRange?.endSec != null
           ? [{ startSec: sp.voicedRange.startSec, endSec: sp.voicedRange.endSec }]
           : [];
+      if (turns.length === 0) return;
       const charId = String(sp.character_id ?? "").toLowerCase() || null;
-      const coords = charId ? coordsByCharId.get(charId) ?? null : null;
-      for (const t of turns) {
-        const dur = Math.max(MIN_TURN_DUR_SEC, t.endSec - t.startSec);
-        rawShots.push({
-          idx: idx++,
+      const key = `${sIdx}::${charId ?? sp.speaker ?? ""}`;
+      let entry = agg.get(key);
+      if (!entry) {
+        entry = {
           speaker_idx: sIdx,
           speaker_name: String(sp.speaker ?? `Speaker ${sIdx + 1}`),
           character_id: charId,
-          startSec: t.startSec,
-          endSec: t.endSec,
-          durSec: dur,
-          target_coords: coords,
-          temperature: dur < 2.0 ? 1.0 : 0.85,
-          status: "pending",
-        });
+          windows: [],
+          firstStart: Number.POSITIVE_INFINITY,
+        };
+        agg.set(key, entry);
+      }
+      for (const t of turns) {
+        const start = Number(t.startSec);
+        const end = Math.max(start + MIN_TURN_DUR_SEC, Number(t.endSec));
+        entry.windows.push([start, end]);
+        if (start < entry.firstStart) entry.firstStart = start;
       }
     });
+
+    const rawShots: DialogSpeakerShot[] = Array.from(agg.values())
+      .map((a) => {
+        const windows = a.windows.sort((x, y) => x[0] - y[0]);
+        const durSec = windows.reduce((s, [a0, a1]) => s + (a1 - a0), 0);
+        const minWindow = Math.min(
+          ...windows.map(([a0, a1]) => a1 - a0),
+          Number.POSITIVE_INFINITY,
+        );
+        const coords = a.character_id
+          ? coordsByCharId.get(a.character_id) ?? null
+          : null;
+        return {
+          idx: 0,
+          speaker_idx: a.speaker_idx,
+          speaker_name: a.speaker_name,
+          character_id: a.character_id,
+          windows,
+          durSec,
+          target_coords: coords,
+          temperature: minWindow < 2.0 ? 1.0 : 0.9,
+          status: "pending",
+          firstStart: a.firstStart,
+        } as DialogSpeakerShot & { firstStart: number };
+      })
+      .sort((a, b) => a.firstStart - b.firstStart)
+      .map((s, i) => {
+        const { firstStart: _f, ...rest } = s as any;
+        return { ...rest, idx: i } as DialogSpeakerShot;
+      });
 
     if (rawShots.length === 0) {
       await supabase
@@ -568,9 +617,6 @@ serve(async (req) => {
       );
     }
 
-    // Time-order shots
-    rawShots.sort((a, b) => a.startSec - b.startSec);
-    rawShots.forEach((s, i) => (s.idx = i));
 
     // Identity coverage check: every multi-speaker shot MUST have a coord.
     // Single-speaker scenes can fall back to Sync.so auto_detect safely.
@@ -610,7 +656,7 @@ serve(async (req) => {
           error: "INSUFFICIENT_CREDITS",
           required: totalCost,
           have: wallet?.balance ?? 0,
-          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Turns × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
+          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Sprecher × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
         },
         402,
       );
@@ -625,7 +671,7 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     const state: DialogShotsState = {
-      version: 2,
+      version: 3,
       status: "queued",
       shots: rawShots,
       source_clip_url: sourceClipUrl,
@@ -693,7 +739,7 @@ serve(async (req) => {
         ok: true,
         status: "queued",
         scene_id: sceneId,
-        turns: rawShots.length,
+        speakers: rawShots.length,
         cost_credits: totalCost,
       },
       202,
