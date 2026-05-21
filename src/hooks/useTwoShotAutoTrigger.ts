@@ -135,6 +135,48 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
+        // ── Zombie state: lipsync_* stage but no real Sync.so job. Caused
+        // by stale-reset clearing status while leaving the stage marker.
+        // Both client and watchdog previously skipped this; UI hung at 95%.
+        // Reset stage AND status atomically so the candidate-filter below
+        // picks it up in the same tick.
+        const zombies = (data as any[]).filter((d) => {
+          if (d.engine_override !== 'cinematic-sync') return false;
+          if (d.lip_sync_applied_at) return false;
+          if (d.lip_sync_status !== 'pending') return false;
+          if (typeof d.twoshot_stage !== 'string' || !/^lipsync_/i.test(d.twoshot_stage)) return false;
+          if (hasSyncSoJob(d)) return false;
+          const plan = d.audio_plan as any;
+          const jobs = plan?.twoshot?.syncJobs?.jobs;
+          const heartbeatJob = plan?.twoshot?.heartbeat?.syncJobId;
+          if (heartbeatJob) return false;
+          if (Array.isArray(jobs) && jobs.length > 0) return false;
+          return true;
+        });
+        if (zombies.length > 0) {
+          console.warn(
+            `[useTwoShotAutoTrigger] clearing ${zombies.length} zombie lipsync_* stage(s)`,
+          );
+          await Promise.all(
+            zombies.map((d) => {
+              inflight.current.delete(d.id);
+              // Mutate in-place so the candidate filter below sees the
+              // cleared stage immediately without waiting for a re-tick.
+              d.twoshot_stage = null;
+              d.replicate_prediction_id = null;
+              return supabase
+                .from('composer_scenes')
+                .update({
+                  twoshot_stage: null,
+                  replicate_prediction_id: null,
+                  clip_error: 'auto-retry: zombie_lipsync_stage_without_sync_job',
+                })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
+
         // Recoverable failure reasons we auto-retry exactly once per mount.
         // (Hard refusals like 'no_voiceover' or 'source_clip_unusable' need
         // user action — never auto-retry those.)
