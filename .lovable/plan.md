@@ -1,98 +1,48 @@
 ## Befund
 
-Statt einen zweiten Modus parallel zu pflegen, ersetzen wir den bestehenden Two-Shot-Pfad komplett durch eine echte, dialogbasierte Shot-Pipeline. Das skaliert sauber von 1 über 2 bis N Sprecher und beseitigt die Schwachstelle, dass ein einziger Two-Shot-Clip mehrere Mund-/Sprecherwechsel halten muss.
+Backend ist umgebaut, **UI nicht**. Konkret:
 
-## Zielarchitektur
+1. **Badges zeigen noch "Two-Shot · N Sprecher"** und "HeyGen Lip-Sync (N Sprecher)" (`SceneCard.tsx:746`, `sceneEngineRouter.ts:78,126`).
+2. **Manueller Render-Button in `SceneCard.tsx:1672-1763`** ruft hartkodiert `compose-twoshot-lipsync` / `compose-lipsync-scene` auf — komplett am neuen Pfad vorbei.
+3. **`SceneDialogStudio.tsx:924-1055,1391-1443`** Two-Shot-Manuell-Trigger + Texte "🎭 Two-Shot in echte Szene einbauen".
+4. **`SceneClipProgress.tsx:113-195,381-390`** zeigt die alten 6-Stage Two-Shot-Bars (`audio → anchor → master_clip → lipsync_1 → lipsync_2 → done`) statt der neuen Shot-Liste aus `dialog_shots`.
+5. **`sceneEngineRouter.ts`** Engine-Auswahl labelt Cinematic-Sync immer noch als "HeyGen Two-Shot".
+6. Auto-Trigger ruft korrekt `compose-dialog-scene` auf, pollt aber noch über `poll-twoshot-lipsync` statt sich auf den serverseitigen `poll-dialog-shots` Cron zu verlassen.
 
-Eine Pipeline für 1, 2, 3 oder mehr Sprecher. Kein Sonderfall für Two-Shot mehr.
+Der Auto-Trigger funktioniert also — aber jeder manuelle Klick und jede Status-Anzeige hängt noch am alten System. Deshalb sehen wir auch noch "Two-Shot · 2 Sprecher".
 
-```text
-Dialog-Skript (N Sprecher)
-  → Shot Plan: 1 Shot pro Sprecher-Turn (+ optional Establishing / Reaction)
-  → pro Shot:
-       eigener Charakter-Plate (richtige Person, Outfit, Szene, Mund frei)
-       genau das Audio dieses Turns
-       Lip-Sync nur auf dieses eine Gesicht
-       QC: richtiger Charakter, Mund sichtbar, Dauer passt
-  → Scene Assembly: Shots in Reihenfolge schneiden, Audio durchlaufen lassen
-  → ein einziger Szenen-Clip als finaler clip_url (kompatibel zum Composer)
-```
+## Umbau
 
-Damit gibt es kein „Pass 1 / Pass 2" mehr und kein Multi-Window-Targeting auf demselben Bild.
+### 1. Badges & Labels (rein Text)
+- `SceneCard.tsx:737-749` → `Dialog-Shots · N Sprecher` (+ Tooltip auf neuen Pipeline-Text).
+- `sceneEngineRouter.ts:78,122-128` → `🎭 Cinematic Dialog · N Sprecher` mit Beschreibung "1 Shot + Lip-Sync pro Sprecher-Turn, beliebig viele Personen".
+- `SceneDialogStudio.tsx:1391,1440-1443` → "Cinematic Dialog in Szene rendern".
 
-## Was aus dem alten Two-Shot-Pfad wird
+### 2. Manuelle Render-Pfade auf neue Function umbiegen
+- `SceneCard.tsx:1672-1763`: gesamten `twoshotSpeakers`-Block + `fnName = speakers>=2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene'` ersetzen durch einen einzigen `supabase.functions.invoke('compose-dialog-scene', { body: { scene_id } })`-Aufruf. Vorab nur `twoshot_stage: null` + `lip_sync_status: 'pending'` resetten.
+- `SceneDialogStudio.tsx:924-1055`: gleicher Umbau — der manuelle "Two-Shot rendern"-Button ruft `compose-dialog-scene` auf, kein eigenes `twoshotStage: 'audio'` Vorab-Setzen mehr.
 
-- Das Datenmodellfeld `engine_override = 'cinematic-sync'` bleibt als Trigger erhalten.
-- Die Two-Shot-Anchor-/Pass-1-/Pass-2-Logik wird ersetzt.
-- Stages werden generischer:
-  ```text
-  audio → shot_plan → shot_render[i] → shot_lipsync[i] → assemble → done
-  ```
-- Alte Felder wie `twoshot_stage='lipsync_1' | 'lipsync_2'` werden ersetzt durch eine generische Shot-Liste pro Szene.
-- Bestehende, bereits fertige Szenen bleiben spielbar. Neue Renders gehen automatisch durch die neue Pipeline.
+### 3. Progress-Overlay auf Shot-Liste
+- `SceneClipProgress.tsx`: alten 6-Stage Block (`TWO_SHOT_STAGES`) ersetzen durch eine kompakte Liste aus `scene.dialog_shots ?? []`. Pro Shot eine Zeile: `Shot {i+1} · {speaker} · {status}` mit Icons (queued/rendering/lipsyncing/ready/failed). Headline "🎭 Dialog-Shots · {ready}/{total}".
+- Fallback: wenn `dialog_shots` leer aber `engine_override='cinematic-sync'` und `lip_sync_status='running'`, zeige generischen "Audio wird vorbereitet…"-Step (entspricht Pre-Insert-Phase von `compose-dialog-scene`).
 
-## Was wir konkret umbauen
+### 4. Auto-Trigger entrümpeln
+- `useTwoShotAutoTrigger.ts`: Den `poll-twoshot-lipsync`-Aufruf (Zeile 113) entfernen — `poll-dialog-shots` läuft serverseitig per pg_cron. Stale-Recovery (Zombie-Stage, preflight-abort) bleibt, wird aber auch auf `dialog_shots`-Stati erweitert: shots, die >12min in `rendering`/`lipsyncing` hängen, markieren wir als failed → Hook-eigener Refund über `poll-dialog-shots` greift.
+- Datei umbenennen ist optional — Funktionalität bleibt, Trigger ist generisch.
 
-### 1. Dialog-Parsing für N Sprecher
-- Speaker-Erkennung aus `Name: Zeile` für beliebig viele Sprecher.
-- Audio wird weiterhin als ein sample-genaues Master-WAV erzeugt, zusätzlich pro Turn eine eigene Mini-WAV (genau der Audioabschnitt dieses Turns).
-- Pausen, Reihenfolge, Sprecher-IDs werden deterministisch festgehalten.
+### 5. `usePipelineProgress.ts` + `useGenerateAllClips.ts`
+- Bedingungen `twoshotStage in (audio|anchor|master_clip|lipsync_*)` ersetzen durch: "scene ist `cinematic-sync` UND (`lip_sync_status='running'` ODER es gibt mindestens einen `dialog_shots[i].status` != `ready`)". So bleibt die Pipeline-Progress-Bar korrekt.
 
-### 2. Shot Planner
-- Erzeugt pro Turn einen Shot mit Sprecher, Audiofenster, Zielcharakter, Outfit, Szene, Kameraeinstellung.
-- Optional Establishing-Shot am Anfang, Reaction-Shot bei langen Pausen.
-- Bei nur 1 Sprecher → ein einziger Sprecher-Shot.
-- Bei 3+ Sprechern → genauso viele Shots wie Turns. Keine Sonderlogik.
+### 6. Texte/Kommentare
+- "Two-Shot Hook" → "Dialog-Shots" überall in DE/EN/ES.
+- Die JSDoc-Header von `useTwoShotAutoTrigger.ts`, `SceneClipProgress.tsx`, `SceneDialogStudio.tsx` updaten.
 
-### 3. Shot-Renderer
-- Pro Shot wird ein eigener Plate generiert (richtiger Charakter, sichtbarer Mund, korrektes Outfit, gewünschte Location).
-- Multi-Charakter-Szenen liefern weiterhin Establishing-Shot mit allen Personen, aber das ist ein eigener Shot ohne Lip-Sync.
+### Nicht in diesem Schritt
+- `compose-twoshot-lipsync`, `compose-twoshot-audio`, `poll-twoshot-lipsync` Edge Functions **bleiben deployed** als Safety-Net, bis 1 grüne Woche durchgelaufen ist. Erst dann löschen.
+- `twoshot_stage` Spalte bleibt im Schema (Watchdog liest sie noch).
 
-### 4. Shot-Lip-Sync
-- Pro Shot genau ein Lip-Sync-Job auf genau ein Gesicht mit genau einem Audiosegment.
-- Kein Multi-Window, kein zweiter Pass, kein Face-Switching im selben Clip.
-- Skaliert linear mit Anzahl Turns: 3 Turns = 3 Jobs, 7 Turns = 7 Jobs.
+## Akzeptanztest
 
-### 5. QC-Gate pro Shot
-- Richtiger Charakter sichtbar
-- Mund nicht verdeckt
-- Shotdauer passt zur Audiodauer
-- Outfit/Location plausibel
-- Falls Fail: nur dieser Shot wird neu erzeugt, nicht die ganze Szene.
-
-### 6. Scene Assembly
-- Alle Shots in Reihenfolge zu einem MP4 stitchen.
-- Audio = das bekannte sample-genaue Master-WAV (so bleibt es perfekt synchron zum Composer/Export).
-- Resultat wird in `clip_url` geschrieben wie heute, damit der Composer/Export nichts merken muss.
-
-### 7. UI / Fortschritt
-- Pro Szene wird die Shot-Liste mit Status angezeigt.
-- Echte Steps statt globalem 95-%-Spinner.
-- Retry-Button pro Shot.
-- Anzahl Sprecher wird nicht mehr begrenzt — UI zeigt N Sprecher korrekt an.
-
-### 8. Watchdog / Refund
-- Heutige Two-Shot-Watchdog-Logik wird auf Shot-Level umgestellt.
-- Refund passiert pro Shot-Fehlversuch, nicht pauschal pro Szene.
-
-## Reihenfolge der Umsetzung
-
-1. Datenmodell erweitern: Shot-Liste pro Szene, Shot-Status, Shot-Audiofenster.
-2. Dialog-Parser auf N Sprecher umstellen.
-3. Shot Planner.
-4. Shot Renderer (ein Provider-Aufruf pro Shot).
-5. Turn-Lip-Sync (ein Job pro Shot).
-6. QC-Gate pro Shot.
-7. Scene Assembly zu einem `clip_url`.
-8. UI: Shot-Liste mit Live-Status, Retry pro Shot.
-9. Watchdog/Refund auf Shot-Ebene migrieren.
-10. Alten Two-Shot-Codepfad entfernen, sobald die neue Pipeline grün ist.
-11. Mit deiner aktuellen 2-Sprecher-Szene gegentesten, dann eine 3-Sprecher-Szene als Abnahmefall.
-
-## Was du als Ergebnis bekommst
-
-- Ein konsistenter Pfad für 1, 2 und mehr Sprecher.
-- Keine „zweiter Satz fehlt" Bauchredner-Effekte mehr, weil jeder Satz seinen eigenen Shot hat.
-- Echte filmische Schnitte statt einer einzigen langen Aufnahme.
-- Fehler werden auf Shot-Ebene sichtbar und gezielt wiederholbar.
-- Klare Skalierung Richtung Mehrpersonen-Dialoge ohne neuen Sondercode.
+1. **Bestehende 2-Sprecher-Szene** neu rendern → Badge zeigt "Dialog-Shots · 2 Sprecher", Progress zeigt 2 Shots, beide kommen ready durch, beide Sätze haben Lippenbewegung.
+2. **3-Sprecher-Skript** ("Anna: ... / Ben: ... / Cara: ...") → Badge "Dialog-Shots · 3 Sprecher", 3 Shots in Progress-Liste, finaler Clip enthält 3 korrekt gemundete Schnitte.
+3. **Manueller Render-Button** in `SceneCard` und `SceneDialogStudio` löst denselben Pfad aus wie Auto-Trigger (kein Aufruf an `compose-twoshot-lipsync` mehr in Network-Logs).
