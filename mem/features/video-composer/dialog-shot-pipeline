@@ -1,0 +1,18 @@
+---
+name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher)
+description: Composer cinematic-sync runs through compose-dialog-scene + poll-dialog-shots (per-turn Hailuo plate + per-turn Sync.so lipsync + ffmpeg concat) for 1..N speakers. Replaces legacy compose-twoshot-lipsync / compose-lipsync-scene.
+type: feature
+---
+
+Trigger: `engine_override = 'cinematic-sync'` on a composer_scene.
+
+Both auto-triggers reroute to the new function:
+- Client: `useTwoShotAutoTrigger` invokes `compose-dialog-scene` (no more speakers>=2 split).
+- Server: `compose-clip-webhook` rescue-path invokes `compose-dialog-scene`.
+
+Per-shot pipeline (one shot per speaker turn from `audio_plan.twoshot.speakers[*].voicedRange.turns[]`):
+1. `compose-dialog-scene` reserves credits up-front (HAILUO_FLAT 25 + 9 cr/s lipsync), persists `composer_scenes.dialog_shots` (JSONB array), fires Hailuo i2v in parallel with each speaker's portrait as first frame, returns 202.
+2. `poll-dialog-shots` runs every minute via pg_cron job `poll-dialog-shots-every-minute`. It also serves as the Replicate webhook for individual shot predictions. Per shot it: slices master WAV via ffmpeg → Sync.so lipsync-2-pro → marks ready.
+3. Once all shots are `ready` it stitches via `ffmpeg concat` + remux against the master WAV and writes the final `clip_url` (Composer-compatible).
+
+Refunds happen per shot (not per scene). Failed shots can be retried individually without re-rendering the scene.
