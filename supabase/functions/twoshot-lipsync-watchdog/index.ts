@@ -102,6 +102,41 @@ serve(async (req) => {
       const hasSyncJob =
         typeof s.replicate_prediction_id === "string" &&
         s.replicate_prediction_id.startsWith("sync:");
+      const hasHeartbeat = !!twoshot?.heartbeat?.syncJobId;
+      const stage = String(s.twoshot_stage ?? "");
+
+      // ── Job 0: ZOMBIE STATE — lipsync_* stage but no real provider job.
+      // This is the "stuck at 95%" symptom: client reset status to pending
+      // but the old stage marker remains, so neither side restarts.
+      // Reset and re-invoke compose-twoshot-lipsync from a clean slate.
+      if (
+        s.lip_sync_status === "pending" &&
+        /^lipsync_/i.test(stage) &&
+        !hasSyncJob &&
+        !hasHeartbeat &&
+        jobs.length === 0 &&
+        typeof s.clip_url === "string" &&
+        s.clip_url.length > 0 &&
+        ageMs > 60_000 // give the compose function 1 min to recover on its own
+      ) {
+        try {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              twoshot_stage: null,
+              replicate_prediction_id: null,
+              clip_error: "auto-retry: zombie_lipsync_stage_without_sync_job",
+              updated_at: nowIso,
+            })
+            .eq("id", s.id);
+          await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
+          summary.reinvoked++;
+          console.log(`[twoshot-watchdog ${s.id}] zombie state cleared, reinvoked (stage=${stage}, ageMs=${ageMs})`);
+        } catch (e) {
+          summary.errors.push(`zombie ${s.id}: ${(e as Error).message}`);
+        }
+        continue;
+      }
 
       // ── Job 1: poll running Sync.so jobs ─────────────────────────────
       if (s.lip_sync_status === "running" && hasSyncJob) {
