@@ -850,7 +850,7 @@ serve(async (req) => {
       // CPU hotspot that killed the function before Sync.so job creation. For
       // pass 1, cached anchor/faceMap dimensions are the authoritative target
       // space; bounded MP4 probing is reserved for later poll-time fallbacks.
-      const sourceVideoDims = null;
+      const sourceVideoDims: { width: number; height: number } | null = null;
       const fallbackDims = {
         width: Number(sourceVideoDims?.width) || Number(faceMap?.width) || 1280,
         height: Number(sourceVideoDims?.height) || Number(faceMap?.height) || 720,
