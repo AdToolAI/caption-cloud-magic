@@ -818,7 +818,27 @@ serve(async (req) => {
       const nextSpeaker = speakers[nextIdx];
       if (!nextSpeaker?.track_url)
         return json({ error: "missing_next_speaker_track" }, 422);
-      const videoDims = await probeMp4Dims(polled.outputUrl);
+      // Probe the previous pass output; fall back to anchor dims when the
+      // probe returns something obviously wrong (e.g. square dims for a
+      // landscape master), otherwise the next-pass face target ends up in
+      // the wrong pixel space and Sync.so animates the wrong region.
+      const probedDims = await probeMp4Dims(polled.outputUrl);
+      const anchorFace = twoshot.faceMap as FaceMap | null;
+      const anchorW = Number(anchorFace?.width) || 0;
+      const anchorH = Number(anchorFace?.height) || 0;
+      const probeLooksSane =
+        !!probedDims &&
+        Number(probedDims.width) > 0 &&
+        Number(probedDims.height) > 0 &&
+        (anchorW === 0 ||
+          Math.abs(
+            probedDims.width / probedDims.height - anchorW / anchorH,
+          ) < 0.1);
+      const videoDims = probeLooksSane
+        ? probedDims!
+        : anchorW && anchorH
+          ? { width: anchorW, height: anchorH }
+          : (probedDims ?? { width: 1280, height: 720 });
       const charShots = Array.isArray((scene as any).character_shots)
         ? ((scene as any).character_shots as Array<any>)
         : [];
@@ -882,12 +902,15 @@ serve(async (req) => {
           ];
         }
       }
+      // temperature bumped 0.5 → 0.7 so mouth motion is clearly visible on
+      // the lip-ready neutral plate (0.5 + closed-lip prompt produced the
+      // ventriloquist effect).
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: mergedAudioUrl,
         targetCoords: target.coords,
         segmentSecs: nextSegment,
-        temperature: 0.5,
+        temperature: 0.7,
       });
 
       await appendTwoshotDiag(supabase, sceneId, {
