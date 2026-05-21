@@ -243,7 +243,7 @@ async function startSyncJob(
   const options: Record<string, unknown> = {
     sync_mode: "cut_off",
     output_format: "mp4",
-    temperature: params.temperature ?? 0.5,
+    temperature: params.temperature ?? 0.85,
     active_speaker_detection: asd,
   };
   const normalizedSegments = (() => {
