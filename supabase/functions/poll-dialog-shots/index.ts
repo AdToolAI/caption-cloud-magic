@@ -436,17 +436,15 @@ async function processScene(
         .pop();
       const videoInput = prevReady?.output_url ?? state.source_clip_url;
       try {
-        // IMPORTANT: send the FULL master WAV to Sync.so on every turn —
-        // do NOT slice. Sync.so aligns audio to the `segments_secs` video
-        // window by absolute time; a sliced WAV starts at 0s and would
-        // desync from a window at e.g. 2.7s. Full master WAV + tight
-        // per-turn video window = stable per-speaker lipsync (Two-Shot policy).
-        const window = expandWindow(shot, shots);
-        const jobId = await startSyncTurnJob(
+        // FULL master WAV on every pass — Sync.so aligns audio to absolute
+        // time inside each `segments_secs` window. Multi-window = all of
+        // this speaker's turns animated in ONE pass on the prior video.
+        const windows = expandWindows(shot, shots);
+        const jobId = await startSyncSpeakerJob(
           syncKey,
           videoInput,
           state.master_audio_url,
-          window,
+          windows,
           shot.target_coords,
           shot.temperature,
         );
@@ -454,9 +452,13 @@ async function processScene(
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
         mutated = true;
+        const winStr = windows
+          .map(([a, b]) => `[${a.toFixed(2)},${b.toFixed(2)}]`)
+          .join(",");
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} (${shot.speaker_name}) job=${jobId} window=[${window[0].toFixed(2)},${window[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] dispatched speaker ${shot.idx} (${shot.speaker_name}) job=${jobId} windows=${winStr} coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
+
       } catch (e) {
         shot.status = "failed";
         shot.error = `dispatch: ${(e as Error).message}`.slice(0, 300);
