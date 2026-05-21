@@ -20,6 +20,7 @@ type: feature
 - Auch transiente Retries in `poll-twoshot-lipsync` übernehmen `audioSegmentSecs` aus dem letzten Job-Record (`normalizeSegmentField`), damit Sprecher-Fenster über Retries nicht verloren gehen.
 - Diagnose-Logging nutzt `formatSegments()` (crash-sicher für Single- und Multi-Window) — NIE direktes `pass1Segment[0].toFixed(...)` o.ä., da Multi-Turn-Fenster Arrays von Arrays sind.
 - Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert.
+- **Silent Master Plate Pflicht:** `compose-video-clips` darf bei `engineOverride='cinematic-sync'` den `[Dialog]...[/Dialog]` Block und Sprecherzeilen NIE an den i2v-Provider für den Masterclip weitergeben. Hailuo bekommt einen gesäuberten visuellen Prompt + neutralen Two-Shot-Plate-Zusatz (ruhige/geschlossene Lippen, Listening-Expression, subtile Körper-/Kamera-Bewegung). Talking/lip movement/speaking animation gehören ausschließlich in `negative_prompt`. Grund: Sync.so bewahrt Frames außerhalb `segments_secs`; wenn der Masterclip bereits sprechende Münder enthält, reden Figuren außerhalb ihrer Voiceover-Fenster weiter.
 
 **Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).
 
@@ -29,7 +30,7 @@ type: feature
 
 **Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV. `voicedRange.turns[i].startSec/endSec` ist sample-exakt am tatsächlichen TTS-Onset jeder Einzeläußerung.
 
-**No-Burned-In-Text Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`.
+**No-Burned-In-Text / No-Talking-Master Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`; `compose-video-clips` nutzt denselben Dialog-Stripper für Cinematic-Sync-Hailuo-Masterclips und erzwingt Silent Master Plates.
 
 **Export-Audio Two-Shot:** Der finale Sync.so-Clip enthält in seiner eingebetteten Audiospur nur Pass-2-Window-Audio — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV). `compose-video-assemble` filtert Voiceover-Clips für lip-synced Szenen nur dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat.
 
