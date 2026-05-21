@@ -1305,7 +1305,7 @@ export default function SceneCard({
                               .update({
                                 reference_image_url: null,
                                 clip_url: null,
-                                clip_status: null,
+                                clip_status: 'pending',
                                 clip_error: null,
                                 lip_sync_status: null,
                                 lip_sync_applied_at: null,
@@ -1320,7 +1320,7 @@ export default function SceneCard({
                             onUpdate({
                               referenceImageUrl: undefined,
                               clipUrl: undefined,
-                              clipStatus: 'generating',
+                              clipStatus: 'pending',
                               lipSyncStatus: null as any,
                               lipSyncAppliedAt: null as any,
                             });
