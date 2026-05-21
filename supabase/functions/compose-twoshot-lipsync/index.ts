@@ -500,16 +500,33 @@ async function detectFacesInMaster(
 
 /**
  * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
- * Order: faceMap (Gemini) → heuristic thirds of the master frame. Pass index
- * 0 → left face, 1 → right face. Returns null if even the heuristic isn't
- * resolvable (no dimensions known).
+ *
+ * Mapping is explicit and stable:
+ *   1. If `characterId` + `characterShots` are provided, the speaker's
+ *      position in `character_shots` (0 = left, 1 = right) determines the
+ *      face side. This guarantees that "Matthew at shot index 1" goes to
+ *      the right face even if speakers were sorted differently upstream.
+ *   2. Otherwise we fall back to pass index (0 = left, 1 = right).
+ *
+ * Returns null if even the heuristic isn't resolvable (no dimensions known).
  */
 function pickTargetCoordinates(
   passIndex: number,
   faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>; width: number; height: number } | null,
   fallbackDims: { width: number; height: number },
-): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
-  const side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null,
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
+  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
+  if (charId && shots.length >= 2) {
+    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
+    if (shotIdx >= 0) {
+      side = shotIdx === 0 ? "left" : "right";
+      mappingSource = "character_shots";
+    }
+  }
   if (faceMap?.faces?.length) {
     const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
     if (match?.center) {
@@ -532,14 +549,14 @@ function pickTargetCoordinates(
         }
       }
       const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-      return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
+      return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
     }
   }
   const W = fallbackDims.width || 1280;
   const H = fallbackDims.height || 720;
   const x = side === "left" ? Math.round(W * 0.3) : Math.round(W * 0.7);
   const y = Math.round(H * 0.5);
-  return { coords: [x, y], side, source: "heuristic" };
+  return { coords: [x, y], side, source: "heuristic", mappingSource };
 }
 
 serve(async (req) => {
