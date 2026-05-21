@@ -414,10 +414,40 @@ serve(async (req) => {
       if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
         return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
       }
+      // Short-utterance windowing: if this speaker only talks briefly inside
+      // a long scene, scope Sync.so to the voiced window so VAD reliably
+      // animates the targeted face (fixes "second character never opens
+      // mouth on short replies like 'Was denn?'"). Falls back to full track
+      // automatically if Sync.so rejects the segments payload.
+      const sceneDurSec = Number(twoshot.totalSec) || 0;
+      const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
+      let nextSegment: [number, number] | null = null;
+      if (vrNext && Number.isFinite(vrNext.voicedSec) && Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && sceneDurSec > 0) {
+        const shortAbsolute = vrNext.voicedSec < 2.0;
+        const shortRelative = (vrNext.voicedSec / sceneDurSec) < 0.35;
+        if ((shortAbsolute || shortRelative) && vrNext.endSec > vrNext.startSec) {
+          const pad = 0.25;
+          nextSegment = [
+            Math.max(0, Number(vrNext.startSec) - pad),
+            Math.min(sceneDurSec, Number(vrNext.endSec) + pad),
+          ];
+        }
+      }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
         targetCoords: target.coords,
+        faceBbox: Array.isArray(target.bbox) && target.bbox.length === 4 ? target.bbox as [number, number, number, number] : null,
+        segmentSecs: nextSegment,
+        temperature: nextSegment ? 0.65 : 0.5,
+      });
+      await appendTwoshotDiag(supabase, sceneId, {
+        source: "poll",
+        event: "sync_job_created",
+        stage: `lipsync_${currentPass + 1}`,
+        status: "PROCESSING",
+        jobId: nextJobId,
+        reason: `pass=${currentPass + 1} face=${target.side} source=${target.source}${nextSegment ? ` window=[${nextSegment[0].toFixed(2)}s,${nextSegment[1].toFixed(2)}s] voicedSec=${vrNext?.voicedSec}` : ""}`,
       });
       const nextPass = currentPass + 1;
       const nextJob = {
