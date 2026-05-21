@@ -137,9 +137,12 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
-      // Audio-only window — see compose-twoshot-lipsync for rationale.
+      // Sync.so v2: segments_secs is VIDEO-ONLY. Sync.so rejects it on audio
+      // inputs with "Start and end times are only supported for video inputs".
+      // Scoping the video window means only those frames get re-animated;
+      // the rest of the clip is preserved verbatim — exactly what two-pass needs.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      aud.segments_secs = seg;
+      vid.segments_secs = seg;
     }
     return [vid, aud];
   };
