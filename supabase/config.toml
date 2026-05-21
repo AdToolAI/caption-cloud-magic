@@ -39,6 +39,14 @@ timeout_sec = 300
 verify_jwt = true
 timeout_sec = 300
 
+[functions.compose-dialog-scene]
+verify_jwt = true
+timeout_sec = 180
+
+[functions.poll-dialog-shots]
+verify_jwt = false
+timeout_sec = 180
+
 [functions.compose-twoshot-audio]
 verify_jwt = true
 timeout_sec = 180

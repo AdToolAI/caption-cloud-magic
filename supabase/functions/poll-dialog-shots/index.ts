@@ -524,8 +524,21 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const syncKey = Deno.env.get("SYNC_SO_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY");
-    if (!syncKey) return json({ error: "missing_sync_key" }, 500);
+    // Match the legacy pipelines: the configured secret is `SYNC_API_KEY`.
+    // Keep alternate names as fallback so future renames don't break us.
+    const syncKey =
+      Deno.env.get("SYNC_API_KEY") ??
+      Deno.env.get("SYNC_SO_API_KEY") ??
+      Deno.env.get("SYNCSO_API_KEY");
+    if (!syncKey) {
+      return json(
+        {
+          error: "missing_sync_key",
+          checked: ["SYNC_API_KEY", "SYNC_SO_API_KEY", "SYNCSO_API_KEY"],
+        },
+        500,
+      );
+    }
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
