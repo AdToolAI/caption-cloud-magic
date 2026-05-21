@@ -76,6 +76,8 @@ export function usePipelineProgress({
     clipsTotal: number;
     lipsyncDone: number;
     lipsyncTotal: number;
+    dialogShotsDone: number;
+    dialogShotsTotal: number;
     voiceoverHadAudio: boolean;
     musicHad: boolean;
   } | null>(null);
@@ -124,6 +126,16 @@ export function usePipelineProgress({
             s.engineOverride === 'cinematic-sync' ||
             (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
         );
+        const dsTotals = lipTargets.reduce(
+          (acc, s) => {
+            const ds = (s as any).dialogShots ?? (s as any).dialog_shots ?? null;
+            const shots = Array.isArray(ds?.shots) ? ds.shots : [];
+            acc.total += shots.length;
+            acc.done += shots.filter((sh: any) => sh.status === 'ready').length;
+            return acc;
+          },
+          { done: 0, total: 0 },
+        );
         baselineRef.current = {
           clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
           clipsTotal: ai.length,
@@ -131,9 +143,12 @@ export function usePipelineProgress({
             (s) =>
               ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
               (s as any).twoshotStage === 'done' ||
-              (s as any).twoshotStage === 'complete',
+              (s as any).twoshotStage === 'complete' ||
+              ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
           ).length,
           lipsyncTotal: lipTargets.length,
+          dialogShotsDone: dsTotals.done,
+          dialogShotsTotal: dsTotals.total,
           voiceoverHadAudio: !!ac?.voiceover?.audioUrl,
           musicHad: !!ac?.music,
         };
@@ -210,12 +225,21 @@ export function usePipelineProgress({
         s.engineOverride === 'cinematic-sync' ||
         dialogVoiceCount(s) > 1,
     );
-    const done = targets.filter(
-      (s) =>
+
+    const getDialogShots = (s: any) => (s.dialogShots ?? s.dialog_shots ?? null) as
+      | { status?: string; shots?: Array<{ status: string }> }
+      | null;
+
+    const done = targets.filter((s) => {
+      const ds = getDialogShots(s);
+      if (ds?.status === 'done') return true;
+      return (
         ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
         (s as any).twoshotStage === 'done' ||
-        (s as any).twoshotStage === 'complete',
-    ).length;
+        (s as any).twoshotStage === 'complete'
+      );
+    }).length;
+
     // A scene is only "really" running if there's evidence of an active
     // provider job. Otherwise twoshot_stage='lipsync_*' + pending status
     // is a zombie state (the watchdog/client will repair it within a
@@ -227,6 +251,13 @@ export function usePipelineProgress({
       const jobs = plan?.twoshot?.syncJobs?.jobs;
       if (Array.isArray(jobs) && jobs.length > 0) return true;
       if (plan?.twoshot?.heartbeat?.syncJobId) return true;
+      // New Dialog-Shot pipeline: any non-terminal dialog_shots state counts
+      // as a real job (compose-dialog-scene has reserved the work).
+      const ds = getDialogShots(s);
+      if (ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+      if (Array.isArray(ds?.shots) && ds!.shots.some((sh) =>
+        ['pending', 'generating', 'generated', 'lipsyncing'].includes(sh.status),
+      )) return true;
       return false;
     };
     const running = targets.some(
@@ -243,14 +274,55 @@ export function usePipelineProgress({
         }
         return hasRealJob(s);
       },
-    );
-    const failed = targets.some((s) => (s as any).lipSyncStatus === 'failed' || (s as any).twoshotStage === 'failed');
+    ) || targets.some((s) => {
+      // Dialog-Shot pipeline doesn't always populate twoshot_stage.
+      const ds = getDialogShots(s);
+      return !!ds && ds.status !== 'done' && ds.status !== 'failed';
+    });
+
+    const failed = targets.some((s) => {
+      const ds = getDialogShots(s);
+      if (ds?.status === 'failed') return true;
+      return (s as any).lipSyncStatus === 'failed' || (s as any).twoshotStage === 'failed';
+    });
+
     const b = baselineRef.current;
-    const baseDone = b?.lipsyncDone ?? 0;
-    const baseTotal = b?.lipsyncTotal ?? targets.length;
-    const denom = Math.max(1, baseTotal - baseDone);
-    const numer = Math.max(0, done - baseDone);
-    const progress = Math.min(1, numer / denom);
+
+    // Per-shot progress (Dialog-Shot pipeline) — feinkörniger als Szenen.
+    const dsTotals = targets.reduce(
+      (acc, s) => {
+        const ds = getDialogShots(s);
+        const shots = Array.isArray(ds?.shots) ? ds!.shots : [];
+        acc.total += shots.length;
+        acc.done += shots.filter((sh) => sh.status === 'ready').length;
+        return acc;
+      },
+      { done: 0, total: 0 },
+    );
+
+    let progress: number;
+    if (dsTotals.total > 0) {
+      const baseDone = b?.dialogShotsDone ?? 0;
+      const baseTotal = b?.dialogShotsTotal ?? dsTotals.total;
+      const denom = Math.max(1, dsTotals.total - baseDone);
+      const numer = Math.max(0, dsTotals.done - baseDone);
+      progress = Math.min(1, numer / denom);
+      // Fall back to scene-level done if dialog metadata says done
+      if (progress < 1 && done >= targets.length) progress = 1;
+      // Use the larger of scene-level and shot-level so we never go
+      // backwards if dialog_shots are momentarily missing on a row.
+      const baseSceneDone = b?.lipsyncDone ?? 0;
+      const baseSceneTotal = b?.lipsyncTotal ?? targets.length;
+      const sceneDenom = Math.max(1, baseSceneTotal - baseSceneDone);
+      const sceneNumer = Math.max(0, done - baseSceneDone);
+      progress = Math.max(progress, Math.min(1, sceneNumer / sceneDenom));
+    } else {
+      const baseDone = b?.lipsyncDone ?? 0;
+      const baseTotal = b?.lipsyncTotal ?? targets.length;
+      const denom = Math.max(1, baseTotal - baseDone);
+      const numer = Math.max(0, done - baseDone);
+      progress = Math.min(1, numer / denom);
+    }
     return { progress, running, done: progress >= 1 && !running && !failed, applicable: true, failed };
   }, [scenes, hasLipsyncScenes]);
 
