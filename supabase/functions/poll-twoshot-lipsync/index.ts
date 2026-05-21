@@ -556,7 +556,10 @@ serve(async (req) => {
         jobId: nextJobId,
         status: "PROCESSING",
         videoUrl: polled.outputUrl,
-        audioUrl: nextSpeaker.track_url,
+        // Record the audio we ACTUALLY sent to Sync.so (merged WAV), not the
+        // legacy per-character track — retries/fallbacks read this field.
+        audioUrl: mergedAudioUrl,
+        audioSegmentSecs: nextSegment,
         speaker: nextSpeaker.speaker,
         character_id: nextSpeaker.character_id ?? null,
         targetFace: target.side,
