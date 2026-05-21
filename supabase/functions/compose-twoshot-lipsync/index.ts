@@ -323,11 +323,124 @@ async function pollSyncSoDirectPrediction(
  * the Gemini call.
  */
 type FaceMap = {
-  faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>;
+  faces: Array<{
+    side: "left" | "right";
+    center: [number, number];
+    bbox?: [number, number, number, number];
+    normCenter?: [number, number];
+    /** Resolved via Gemini identity-match against character portraits. */
+    characterId?: string | null;
+    matchConfidence?: number;
+    matchSource?: "gemini-identity" | "gemini-inferred" | "unresolved";
+  }>;
   width: number;
   height: number;
   source: "cache" | "anchor" | "clip-frame" | "heuristic-fallback";
 };
+
+/**
+ * Gemini-Vision identity match: given the anchor frame + one reference
+ * portrait per character, returns which characterId is on the left vs right.
+ * This is the authoritative source-of-truth for face↔character mapping;
+ * `character_shots[]` array position is NOT geometric and was the root cause
+ * of the dialog-swap bug.
+ *
+ * Returns null on any failure so the caller can apply a clean error path.
+ */
+async function askGeminiForIdentityMatch(
+  anchorUrl: string,
+  characters: Array<{ characterId: string; portraitUrl: string }>,
+  lovableKey: string,
+): Promise<{ left?: string | null; right?: string | null; confidence?: number } | null> {
+  if (!characters.length) return null;
+  try {
+    const ids = characters.map((c) => c.characterId);
+    const content: any[] = [
+      {
+        type: "text",
+        text:
+          "The FIRST image is a two-shot scene with two visible people (one on the LEFT, one on the RIGHT). " +
+          "The remaining images are reference portraits, in this order: " +
+          ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
+          "For the person on the LEFT of the scene and the person on the RIGHT of the scene, identify which reference portrait matches best by facial identity (face shape, hair, age, gender, distinctive features). " +
+          "Return STRICT JSON only — no prose, no markdown fences. " +
+          "Schema: {\"left\": \"<characterId or null>\", \"right\": \"<characterId or null>\", \"confidence\": <0..1>}. " +
+          "Use only IDs from this list: " + ids.join(", ") + ". " +
+          "If you are unsure, return null for that side. Never assign the same id to both sides unless only one character is provided.",
+      },
+      { type: "image_url", image_url: { url: anchorUrl } },
+      ...characters.map((c) => ({ type: "image_url", image_url: { url: c.portraitUrl } })),
+    ];
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content }],
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const allowed = new Set(ids.map((id) => id.toLowerCase()));
+    const sanitize = (v: any): string | null => {
+      const s = v ? String(v).toLowerCase().trim() : "";
+      return s && allowed.has(s) ? s : null;
+    };
+    const left = sanitize(parsed?.left);
+    const right = sanitize(parsed?.right);
+    const confidence = Number(parsed?.confidence);
+    return {
+      left,
+      right,
+      confidence: Number.isFinite(confidence) ? Math.max(0, Math.min(1, confidence)) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolves brand_character portrait URLs for each unique characterId in
+ * `character_shots`, scoped to the scene's owner. Used by the identity-match
+ * step so Gemini can compare detected faces against canonical references.
+ */
+async function resolveCharacterPortraits(
+  supabase: any,
+  userId: string,
+  characterIds: string[],
+): Promise<Array<{ characterId: string; portraitUrl: string }>> {
+  const uniq = Array.from(new Set(characterIds.map((s) => String(s).toLowerCase()).filter(Boolean)));
+  if (!uniq.length) return [];
+  try {
+    // characterIds in composer scenes are slugs (e.g. "matthew-dusatko"),
+    // brand_characters uses display names — match via lowercased + hyphenated name.
+    const { data, error } = await supabase
+      .from("brand_characters")
+      .select("name, portrait_url, reference_image_url, user_id, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+    if (error || !Array.isArray(data)) return [];
+    const out: Array<{ characterId: string; portraitUrl: string }> = [];
+    for (const id of uniq) {
+      const row = data.find((r: any) => {
+        const slug = String(r?.name ?? "").toLowerCase().trim().replace(/\s+/g, "-");
+        return slug === id;
+      });
+      if (!row) continue;
+      const url = String(row.portrait_url || row.reference_image_url || "").trim();
+      if (url) out.push({ characterId: id, portraitUrl: url });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
