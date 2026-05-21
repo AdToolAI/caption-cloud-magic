@@ -1182,21 +1182,20 @@ serve(async (req) => {
         const startedAt = new Date().toISOString();
         const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
         const prevTwoshot = (prevPlan.twoshot ?? {}) as Record<string, unknown>;
-        // Short-utterance windowing: if this speaker only talks for a brief
-        // moment inside a long scene, scope Sync.so to the voiced window.
+        // Single-source-of-truth audio: use the merged WAV (same audio the
+        // user hears) and scope Sync.so to this speaker's voiced window via
+        // segments_secs. Per-character padded tracks caused mouth-vs-voice
+        // drift because Sync.so re-encoded a different WAV than playback.
         const sceneDurSec = Number((prevTwoshot as any).totalSec) || Number((scene as any).duration_seconds) || 0;
         const vr1: any = (firstSpeaker as any).voicedRange ?? null;
         let pass1Segment: [number, number] | null = null;
-        if (vr1 && Number.isFinite(vr1.voicedSec) && Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && sceneDurSec > 0) {
-          const shortAbsolute = vr1.voicedSec < 2.0;
-          const shortRelative = sceneDurSec > 0 && (vr1.voicedSec / sceneDurSec) < 0.35;
-          if ((shortAbsolute || shortRelative) && vr1.endSec > vr1.startSec) {
-            const pad = 0.25;
-            pass1Segment = [
-              Math.max(0, Number(vr1.startSec) - pad),
-              Math.min(sceneDurSec, Number(vr1.endSec) + pad),
-            ];
-          }
+        if (vr1 && Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec && sceneDurSec > 0) {
+          // Sample-exact voiced range — no padding (padding shifted VAD onset
+          // and was the root cause of perceived mouth drift).
+          pass1Segment = [
+            Math.max(0, Number(vr1.startSec)),
+            Math.min(sceneDurSec, Number(vr1.endSec)),
+          ];
         }
         let jobId = "";
         if (!(await reserveCredits())) return;
@@ -1205,9 +1204,9 @@ serve(async (req) => {
             SYNC_API_KEY!,
             {
               videoUrl: sourceClipUrl,
-              audioUrl: firstSpeaker.track_url,
+              audioUrl: mergedVo.url,
               syncMode: "cut_off",
-              temperature: pass1Segment ? 0.65 : 0.5,
+              temperature: 0.5,
               targetCoords: firstTarget.coords,
               // No `faceBbox`: Sync.so wants per-frame box arrays, not a
               // single static one. coordinates+frame_number is the stable path.
@@ -1216,6 +1215,7 @@ serve(async (req) => {
             },
             "twoshot_pass_1",
           );
+
         } catch (e) {
           const errMsg = (e as Error).message;
           await supabase.from("composer_scenes").update({

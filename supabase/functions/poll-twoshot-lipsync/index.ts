@@ -452,34 +452,35 @@ serve(async (req) => {
       if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
         return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
       }
-      // Short-utterance windowing: if this speaker only talks briefly inside
-      // a long scene, scope Sync.so's audio input to the voiced window so VAD
-      // reliably animates the targeted face (fixes "second character never
-      // opens mouth on short replies like 'Was denn?'"). Falls back to full
-      // track automatically if Sync.so rejects the segments payload. Note: we
-      // only scope the AUDIO segment, never the video, so the picked face
-      // coordinates remain valid for the whole clip.
+      // Single-source-of-truth audio: use the merged WAV (same audio the user
+      // hears in preview/export) and scope Sync.so to this speaker's voiced
+      // window via segments_secs. Per-character padded tracks caused visible
+      // drift between mouth animation and merged audio because Sync.so
+      // re-encoded a different WAV than what plays back.
       const sceneDurSec = Number(twoshot.totalSec) || 0;
+      const mergedAudioUrl: string =
+        (twoshot as any)?.url ||
+        (plan as any)?.twoshot?.url ||
+        nextSpeaker.track_url;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
       let nextSegment: [number, number] | null = null;
-      if (vrNext && Number.isFinite(vrNext.voicedSec) && Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && sceneDurSec > 0) {
-        const shortAbsolute = vrNext.voicedSec < 2.0;
-        const shortRelative = (vrNext.voicedSec / sceneDurSec) < 0.35;
-        if ((shortAbsolute || shortRelative) && vrNext.endSec > vrNext.startSec) {
-          const pad = 0.25;
-          nextSegment = [
-            Math.max(0, Number(vrNext.startSec) - pad),
-            Math.min(sceneDurSec, Number(vrNext.endSec) + pad),
-          ];
-        }
+      if (vrNext && Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && vrNext.endSec > vrNext.startSec && sceneDurSec > 0) {
+        // Sample-exact voiced range — no padding (padding shifted the VAD
+        // onset and was the root cause of "char 2 mouth opens later than its
+        // voice plays").
+        nextSegment = [
+          Math.max(0, Number(vrNext.startSec)),
+          Math.min(sceneDurSec, Number(vrNext.endSec)),
+        ];
       }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
-        audioUrl: nextSpeaker.track_url,
+        audioUrl: mergedAudioUrl,
         targetCoords: target.coords,
         segmentSecs: nextSegment,
-        temperature: nextSegment ? 0.65 : 0.5,
+        temperature: 0.5,
       });
+
       await appendTwoshotDiag(supabase, sceneId, {
         source: "poll",
         event: "sync_job_created",
