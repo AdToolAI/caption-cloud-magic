@@ -25,6 +25,261 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { probeImageDims } from "../_shared/image-dims.ts";
+
+// ── FaceMap helpers (ported from compose-twoshot-lipsync) ──────────────
+// The dialog pipeline needs per-character pixel-space face coordinates so
+// every Sync.so turn lands on the correct mouth. Older anchors only have an
+// `anchor_face_audit` (counts/identity ok), but no positional faceMap. We
+// build one on the fly from the pinned anchor image when missing.
+
+interface FaceMapFace {
+  side: "left" | "right";
+  center: [number, number];
+  bbox?: [number, number, number, number];
+  normCenter?: [number, number];
+  characterId?: string | null;
+  matchConfidence?: number;
+  matchSource?: "gemini-identity" | "gemini-inferred" | "unresolved";
+}
+interface FaceMap {
+  faces: FaceMapFace[];
+  width: number;
+  height: number;
+  source: "cache" | "anchor" | "auto-rebuilt";
+}
+
+async function resolveCharacterPortraits(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  characterIds: string[],
+): Promise<Array<{ characterId: string; portraitUrl: string }>> {
+  const uniq = Array.from(
+    new Set(characterIds.map((s) => String(s).toLowerCase().trim()).filter(Boolean)),
+  );
+  if (!uniq.length) return [];
+  try {
+    const { data, error } = await supabase
+      .from("brand_characters")
+      .select("name, portrait_url, reference_image_url, user_id, updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+    if (error || !Array.isArray(data)) return [];
+    const out: Array<{ characterId: string; portraitUrl: string }> = [];
+    for (const id of uniq) {
+      const row = (data as any[]).find((r) => {
+        const slug = String(r?.name ?? "")
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, "-");
+        return slug === id;
+      });
+      if (!row) continue;
+      const url = String(row.portrait_url || row.reference_image_url || "").trim();
+      if (url) out.push({ characterId: id, portraitUrl: url });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+async function askGeminiForFaces(
+  url: string,
+  lovableKey: string,
+): Promise<{ faces: any[] } | null> {
+  try {
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${lovableKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text:
+                  "You see a multi-shot frame with one or more human faces. " +
+                  "Return STRICT JSON only — no prose, no markdown fences. " +
+                  'Schema: {"faces": [{"side": "left"|"right", "center": [nx,ny], "bbox": [nx1,ny1,nx2,ny2]}]}. ' +
+                  "Coordinates MUST be NORMALIZED to 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
+                  "Sort by horizontal position: smallest x = left.",
+              },
+              { type: "image_url", image_url: { url } },
+            ],
+          },
+        ],
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    return { faces: Array.isArray(parsed?.faces) ? parsed.faces : [] };
+  } catch {
+    return null;
+  }
+}
+
+async function askGeminiForIdentityMatch(
+  anchorUrl: string,
+  characters: Array<{ characterId: string; portraitUrl: string }>,
+  lovableKey: string,
+): Promise<{ left?: string | null; right?: string | null } | null> {
+  if (!characters.length) return null;
+  try {
+    const ids = characters.map((c) => c.characterId);
+    const content: any[] = [
+      {
+        type: "text",
+        text:
+          "The FIRST image is a two-shot scene (one person on the LEFT, one on the RIGHT). " +
+          "Remaining images are reference portraits in order: " +
+          ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
+          "Identify which portrait matches the LEFT and RIGHT person by facial identity. " +
+          'Return STRICT JSON only: {"left":"<id or null>","right":"<id or null>"}. ' +
+          "Allowed ids: " + ids.join(", ") + ".",
+      },
+      { type: "image_url", image_url: { url: anchorUrl } },
+      ...characters.map((c) => ({ type: "image_url", image_url: { url: c.portraitUrl } })),
+    ];
+    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${lovableKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [{ role: "user", content }],
+      }),
+      signal: AbortSignal.timeout(25_000),
+    });
+    if (!resp.ok) return null;
+    const j = await resp.json();
+    const txt = j?.choices?.[0]?.message?.content ?? "";
+    const m = String(txt).match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    const parsed = JSON.parse(m[0]);
+    const allowed = new Set(ids.map((id) => id.toLowerCase()));
+    const sanitize = (v: any): string | null => {
+      const s = v ? String(v).toLowerCase().trim() : "";
+      return s && allowed.has(s) ? s : null;
+    };
+    return { left: sanitize(parsed?.left), right: sanitize(parsed?.right) };
+  } catch {
+    return null;
+  }
+}
+
+async function buildFaceMapFromAnchor(
+  supabase: ReturnType<typeof createClient>,
+  sceneId: string,
+  anchorUrl: string,
+  characters: Array<{ characterId: string; portraitUrl: string }>,
+  lovableKey: string,
+): Promise<FaceMap | null> {
+  const dims = (await probeImageDims(anchorUrl)) ?? { width: 1280, height: 720 };
+  const raw = await askGeminiForFaces(anchorUrl, lovableKey);
+  if (!raw || !Array.isArray(raw.faces) || raw.faces.length < 1) return null;
+
+  const W = dims.width;
+  const H = dims.height;
+  const toPx = (n: number, axis: "x" | "y") => {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return 0;
+    const isNorm = Math.abs(v) <= 1.5;
+    const scaled = isNorm ? v * (axis === "x" ? W : H) : v;
+    const max = axis === "x" ? W : H;
+    return Math.round(Math.max(1, Math.min(max - 1, scaled)));
+  };
+  let faces: FaceMapFace[] = raw.faces
+    .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
+    .map((f: any) => {
+      const cx = toPx(f.center[0], "x");
+      const cy = toPx(f.center[1], "y");
+      const bb = Array.isArray(f.bbox) && f.bbox.length === 4
+        ? [toPx(f.bbox[0], "x"), toPx(f.bbox[1], "y"), toPx(f.bbox[2], "x"), toPx(f.bbox[3], "y")] as [
+          number, number, number, number,
+        ]
+        : undefined;
+      return {
+        center: [cx, cy] as [number, number],
+        bbox: bb,
+        normCenter: [Number(f.center[0]) || 0, Number(f.center[1]) || 0] as [number, number],
+        side: "left" as const,
+      };
+    })
+    .sort((a, b) => a.center[0] - b.center[0])
+    .map((f, idx, arr) => ({
+      ...f,
+      side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
+    }));
+
+  if (characters.length >= 2 && faces.length >= 2) {
+    const identity = await askGeminiForIdentityMatch(anchorUrl, characters, lovableKey);
+    if (identity) {
+      faces = faces.map((f) => {
+        if (f.side === "left" && identity.left) {
+          return { ...f, characterId: identity.left, matchConfidence: 0.9, matchSource: "gemini-identity" };
+        }
+        if (f.side === "right" && identity.right) {
+          return { ...f, characterId: identity.right, matchConfidence: 0.9, matchSource: "gemini-identity" };
+        }
+        return { ...f, matchSource: "unresolved" as const };
+      });
+      const ids = characters.map((c) => c.characterId);
+      const assigned = new Set(faces.map((f) => f.characterId).filter(Boolean) as string[]);
+      const missing = ids.filter((id) => !assigned.has(id));
+      if (missing.length === 1) {
+        faces = faces.map((f) =>
+          f.characterId
+            ? f
+            : { ...f, characterId: missing[0], matchConfidence: 0.5, matchSource: "gemini-inferred" },
+        );
+      }
+    }
+  } else if (characters.length === 1 && faces.length >= 1) {
+    faces = faces.map((f, i) => (i === 0 ? { ...f, characterId: characters[0].characterId, matchSource: "gemini-inferred" } : f));
+  }
+
+  const result: FaceMap = { faces, width: W, height: H, source: "auto-rebuilt" };
+  // Persist into audio_plan.twoshot.faceMap so retries skip Gemini.
+  try {
+    const { data: row } = await supabase
+      .from("composer_scenes")
+      .select("audio_plan")
+      .eq("id", sceneId)
+      .single();
+    const prevPlan = ((row as any)?.audio_plan ?? {}) as Record<string, any>;
+    const prevTwoshot = ((prevPlan as any).twoshot ?? {}) as Record<string, any>;
+    await supabase
+      .from("composer_scenes")
+      .update({
+        audio_plan: {
+          ...prevPlan,
+          twoshot: {
+            ...prevTwoshot,
+            faceMap: {
+              faces: result.faces,
+              width: result.width,
+              height: result.height,
+              source: result.source,
+            },
+          },
+        },
+      })
+      .eq("id", sceneId);
+  } catch {
+    // best-effort
+  }
+  return result;
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
