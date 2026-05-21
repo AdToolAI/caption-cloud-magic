@@ -641,6 +641,13 @@ serve(async (req) => {
       lip_sync_status: "running",
       clip_error: null,
     });
+    await appendTwoshotDiag(supabase, scene_id, {
+      source: "compose",
+      event: "pipeline_started",
+      stage: "lipsync_1",
+      status: "running",
+      reason: `cost=${cost} duration=${sceneDuration}s`,
+    });
 
     let refunded = false;
     const refund = async (reason: string) => {
@@ -658,6 +665,13 @@ serve(async (req) => {
       await setStage(supabase, scene_id, "failed", {
         lip_sync_status: "failed",
         clip_error: reason.slice(0, 500),
+      });
+      await appendTwoshotDiag(supabase, scene_id, {
+        source: "compose",
+        event: "refund",
+        stage: "failed",
+        status: "failed",
+        reason,
       });
     };
 
