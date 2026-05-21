@@ -59,12 +59,8 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null, speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
-  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
-  let mappingSource: "character_shots" | "pass_order" = "pass_order";
-  const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
-  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
 function pickTargetCoordinates(
+
   passIndex: number,
   faceMap: FaceMap | null | undefined,
   videoDims?: { width: number; height: number } | null,
