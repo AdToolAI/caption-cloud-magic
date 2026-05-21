@@ -372,9 +372,9 @@ async function processScene(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.version !== 2) {
-    // Legacy v1 (Hailuo-per-turn) state — ignore; user must reset via UI.
-    return { status: "legacy_v1_ignored", mutated: false };
+  if (state.version !== 3) {
+    // Legacy v1/v2 state — ignore; user must reset via UI to migrate.
+    return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
   if (state.status === "done" || state.status === "failed") {
     return { status: state.status, mutated: false };
