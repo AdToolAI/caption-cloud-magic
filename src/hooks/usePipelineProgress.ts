@@ -238,7 +238,7 @@ export function usePipelineProgress({
         const stage = (s as any).twoshotStage;
         if (!stage || ['complete', 'done', 'failed'].includes(stage)) return false;
         // Audio/anchor/master_clip stages legitimately precede the sync job.
-        if (['audio', 'anchor', 'master_clip'].includes(stage)) {
+        if (['audio', 'anchor', 'master_clip', 'preflight'].includes(stage)) {
           return (s as any).lipSyncStatus === 'running';
         }
         return hasRealJob(s);
