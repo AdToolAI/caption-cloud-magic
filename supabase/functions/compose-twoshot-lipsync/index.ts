@@ -247,7 +247,7 @@ async function startSyncSoDirectGeneration(
   const options: Record<string, unknown> = {
     sync_mode: params.syncMode ?? "cut_off",
     output_format: "mp4",
-    temperature: params.temperature ?? 0.5,
+    temperature: params.temperature ?? 0.85,
   };
 
   // Sync.so Speaker Selection API: for a single manually-selected speaker on
