@@ -185,13 +185,30 @@ async function startSyncSoDirectGeneration(
     targetCoords?: [number, number] | null;
     faceBbox?: [number, number, number, number] | null;
     frameNumber?: number;
+    /**
+     * When set, both the video and audio inputs are scoped to this window
+     * (Sync.so `input[].segments_secs`). Only frames inside the window are
+     * regenerated — the rest of the source video is preserved verbatim. We
+     * use this for very-short utterances ("Was denn?") that get lost in long
+     * silence-padded per-speaker tracks: scoping to the voiced window means
+     * Sync.so sees a nearly-fully-voiced clip and VAD reliably triggers.
+     */
+    segmentSecs?: [number, number] | null;
+    /** When true, ignore segments-invalid errors and let the caller retry. */
+    allowSegmentsRetry?: boolean;
   },
   label: string,
 ): Promise<string> {
-  const inputArr: Array<Record<string, unknown>> = [
-    { type: "video", url: params.videoUrl },
-    { type: "audio", url: params.audioUrl },
-  ];
+  const buildInput = (withSegments: boolean): Array<Record<string, unknown>> => {
+    const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
+    const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
+    if (withSegments && params.segmentSecs) {
+      const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
+      vid.segments_secs = seg;
+      aud.segments_secs = seg;
+    }
+    return [vid, aud];
+  };
 
   const options: Record<string, unknown> = {
     sync_mode: params.syncMode ?? "cut_off",
@@ -216,18 +233,37 @@ async function startSyncSoDirectGeneration(
     options.active_speaker_detection = { auto_detect: true };
   }
 
-  const createResp = await fetch("https://api.sync.so/v2/generate", {
-    method: "POST",
-    headers: {
-      "x-api-key": syncApiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "lipsync-2-pro",
-      input: inputArr,
-      options,
-    }),
-  });
+  const submit = async (withSegments: boolean): Promise<Response> => {
+    return await fetch("https://api.sync.so/v2/generate", {
+      method: "POST",
+      headers: {
+        "x-api-key": syncApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "lipsync-2-pro",
+        input: buildInput(withSegments),
+        options,
+      }),
+    });
+  };
+
+  const useSegments = !!params.segmentSecs;
+  let createResp = await submit(useSegments);
+
+  if (!createResp.ok && useSegments) {
+    // Auto-fallback: if Sync.so rejects the segments_secs payload (we've seen
+    // `The segments configuration is invalid` historically), retry once with
+    // the full track — the per-speaker WAV is already peak-normalized so VAD
+    // still has a fighting chance.
+    const txt = await createResp.text().catch(() => "");
+    if (/segments? configuration is invalid|invalid.+segment/i.test(txt) || createResp.status === 400) {
+      console.warn(`[${label}] segments_secs rejected by Sync.so, retrying without window: ${txt.slice(0, 200)}`);
+      createResp = await submit(false);
+    } else {
+      throw new Error(`${label}_create_${createResp.status}: ${txt.slice(0, 400)}`);
+    }
+  }
 
   if (!createResp.ok) {
     const txt = await createResp.text().catch(() => "");
