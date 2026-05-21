@@ -282,6 +282,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 twoshot_stage: null,
                 clip_error: `auto-retry: ${d.clip_error ?? 'failed'}`,
                 replicate_prediction_id: null,
+                dialog_shots: null,
               })
               .eq('id', d.id);
           }
