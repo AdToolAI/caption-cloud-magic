@@ -422,21 +422,16 @@ async function processScene(
         .pop();
       const videoInput = prevReady?.output_url ?? state.source_clip_url;
       try {
-        // Slice this turn's audio from the master WAV (pure TS)
+        // IMPORTANT: send the FULL master WAV to Sync.so on every turn —
+        // do NOT slice. Sync.so aligns audio to the `segments_secs` video
+        // window by absolute time; a sliced WAV starts at 0s and would
+        // desync from a window at e.g. 2.7s. Full master WAV + tight
+        // per-turn video window = stable per-speaker lipsync (Two-Shot policy).
         const window = expandWindow(shot, shots);
-        const sliceBytes = await sliceWavBytes(state.master_audio_url, window[0], window[1]);
-        const storagePath = `${userId}/dialog-shots/${sceneId}/turn-${shot.idx}-${Date.now()}.wav`;
-        const sliceUrl = await uploadToStorage(
-          supabase,
-          "voiceover-audio",
-          storagePath,
-          sliceBytes,
-          "audio/wav",
-        );
         const jobId = await startSyncTurnJob(
           syncKey,
           videoInput,
-          sliceUrl,
+          state.master_audio_url,
           window,
           shot.target_coords,
           shot.temperature,
