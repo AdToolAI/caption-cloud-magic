@@ -1218,9 +1218,15 @@ serve(async (req) => {
             })
             .eq('id', scene.id);
 
+          const masterPrompt = isCinematicSyncScene
+            ? buildCinematicSyncMasterPrompt(scene)
+            : scene.aiPrompt;
+          const masterNegative = isCinematicSyncScene
+            ? `${negativeFor(isI2V, scene.negativePrompt)}${CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE}`
+            : negativeFor(isI2V, scene.negativePrompt);
           const hailuoInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
-            negative_prompt: negativeFor(isI2V, scene.negativePrompt),
+            prompt: enrichPrompt(masterPrompt, undefined, isI2V),
+            negative_prompt: masterNegative,
             duration: duration,
             resolution: resolution,
           };
