@@ -271,7 +271,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+          // NEW dialog-based shot pipeline (1, 2, 3+ speakers) — replaces the
+          // legacy compose-twoshot-lipsync / compose-lipsync-scene split.
+          const fnName = 'compose-dialog-scene';
 
           // For retry-candidates (previously 'failed'), clear the failure
           // markers first so the edge function's running-takeover guard sees a
