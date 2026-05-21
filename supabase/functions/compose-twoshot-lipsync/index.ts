@@ -1370,7 +1370,7 @@ serve(async (req) => {
                 videoUrl: sourceClipUrl,
                 audioUrl: mergedVo.url,
                 syncMode,
-                temperature: 0.5,
+                temperature: 0.85,
                 targetCoords: null, // auto-detect for single-speaker
               },
               "lipsync_single_pass",
