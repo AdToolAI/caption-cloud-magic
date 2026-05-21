@@ -161,7 +161,7 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
 
   if (!resp.ok && useSegments) {
     const txt = await resp.text().catch(() => "");
-    if (/segments? configuration is invalid|invalid.+segment/i.test(txt) || resp.status === 400) {
+    if (/segments? configuration is invalid|invalid.+segment|only supported for video inputs/i.test(txt) || resp.status === 400) {
       console.warn(`[poll-twoshot-lipsync] segments_secs rejected, retrying without window: ${txt.slice(0, 200)}`);
       resp = await submit(false);
     } else {
