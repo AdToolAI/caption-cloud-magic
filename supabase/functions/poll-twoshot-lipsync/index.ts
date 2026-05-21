@@ -24,13 +24,18 @@ type FaceMap = {
 async function probeMp4Dims(url: string | null | undefined): Promise<{ width: number; height: number } | null> {
   if (!url) return null;
   try {
-    const resp = await fetch(url, { signal: AbortSignal.timeout(12_000) });
+    // Bounded probe only. Full MP4 downloads + byte-by-byte string conversion
+    // can exceed Edge CPU limits on generated clips.
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=0-1048575" },
+      signal: AbortSignal.timeout(6_000),
+    });
     if (!resp.ok) return null;
     const buf = new Uint8Array(await resp.arrayBuffer());
-    const textAt = (i: number, n: number) => String.fromCharCode(...buf.slice(i, i + n));
     const readU32 = (i: number) => ((buf[i] << 24) | (buf[i + 1] << 16) | (buf[i + 2] << 8) | buf[i + 3]) >>> 0;
-    for (let i = 0; i < buf.length - 32; i++) {
-      if (textAt(i, 4) !== "tkhd") continue;
+    const maxScan = Math.min(buf.length - 32, 1_048_576);
+    for (let i = 0; i < maxScan; i++) {
+      if (buf[i] !== 0x74 || buf[i + 1] !== 0x6b || buf[i + 2] !== 0x68 || buf[i + 3] !== 0x64) continue;
       const version = buf[Math.max(0, i + 4)];
       const base = i + (version === 1 ? 96 : 84);
       if (base + 7 >= buf.length) continue;
