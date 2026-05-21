@@ -462,17 +462,69 @@ serve(async (req) => {
     }
 
     // ── Build per-turn shot list ────────────────────────────────────────
-    const coordsByCharId = new Map<string, [number, number]>();
-    if (faceMap?.faces?.length) {
-      for (const f of faceMap.faces) {
-        const cid = String(f.characterId ?? "").toLowerCase();
-        if (cid && Array.isArray(f.center) && f.center.length === 2) {
-          coordsByCharId.set(cid, [Number(f.center[0]), Number(f.center[1])]);
+    const buildCoordsMap = (fm: typeof faceMap) => {
+      const m = new Map<string, [number, number]>();
+      if (fm?.faces?.length) {
+        for (const f of fm.faces) {
+          const cid = String(f.characterId ?? "").toLowerCase();
+          if (cid && Array.isArray(f.center) && f.center.length === 2) {
+            m.set(cid, [Number(f.center[0]), Number(f.center[1])]);
+          }
         }
       }
+      return m;
+    };
+
+    let workingFaceMap: any = faceMap;
+    let coordsByCharId = buildCoordsMap(workingFaceMap);
+
+    const distinctCharIds = Array.from(
+      new Set(
+        speakers
+          .map((sp) => String(sp.character_id ?? "").toLowerCase())
+          .filter(Boolean),
+      ),
+    );
+    const needsRebuild =
+      distinctCharIds.length >= 1 &&
+      distinctCharIds.some((id) => !coordsByCharId.has(id));
+
+    if (needsRebuild) {
+      const anchorUrl =
+        (scene as any).reference_image_url || sourceClipUrl || null;
+      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+      if (anchorUrl && lovableKey && /\.(png|jpe?g|webp)(\?|$)/i.test(String(anchorUrl))) {
+        console.log(
+          `[compose-dialog-scene] faceMap missing/incomplete — auto-rebuilding from anchor (${distinctCharIds.length} speakers)`,
+        );
+        const portraits = await resolveCharacterPortraits(supabase, userId, distinctCharIds);
+        const rebuilt = await buildFaceMapFromAnchor(
+          supabase,
+          sceneId,
+          String(anchorUrl),
+          portraits,
+          lovableKey,
+        );
+        if (rebuilt) {
+          workingFaceMap = rebuilt;
+          coordsByCharId = buildCoordsMap(rebuilt);
+          console.log(
+            `[compose-dialog-scene] faceMap rebuilt: ${rebuilt.faces.length} faces, identities=${rebuilt.faces.map((f) => f.characterId ?? "?").join(",")}`,
+          );
+        } else {
+          console.warn(
+            `[compose-dialog-scene] auto-rebuild returned null (anchor=${String(anchorUrl).slice(0, 80)} portraits=${portraits.length}/${distinctCharIds.length})`,
+          );
+        }
+      } else {
+        console.warn(
+          `[compose-dialog-scene] cannot auto-rebuild faceMap (anchor=${!!anchorUrl} key=${!!lovableKey})`,
+        );
+      }
     }
-    const videoW = Number(faceMap?.width) || 1280;
-    const videoH = Number(faceMap?.height) || 720;
+
+    const videoW = Number(workingFaceMap?.width) || 1280;
+    const videoH = Number(workingFaceMap?.height) || 720;
 
     const rawShots: DialogTurnShot[] = [];
     let idx = 0;
@@ -495,7 +547,6 @@ serve(async (req) => {
           endSec: t.endSec,
           durSec: dur,
           target_coords: coords,
-          // Adaptive temperature: short turns need stronger articulation
           temperature: dur < 2.0 ? 1.0 : 0.85,
           status: "pending",
         });
@@ -522,7 +573,7 @@ serve(async (req) => {
     rawShots.forEach((s, i) => (s.idx = i));
 
     // Identity coverage check: every multi-speaker shot MUST have a coord.
-    // Without coords Sync.so would auto-detect → swap risk.
+    // Single-speaker scenes can fall back to Sync.so auto_detect safely.
     const distinctSpeakerIdxs = new Set(rawShots.map((s) => s.speaker_idx));
     if (distinctSpeakerIdxs.size >= 2) {
       const missing = rawShots.filter((s) => !s.target_coords);
@@ -536,7 +587,7 @@ serve(async (req) => {
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error:
-              `dialog_missing_face_coords: ${missingChars.join(", ")} — bitte „🎥 Clip + Lip-Sync neu rendern" für eine frische Identity-Detection.`,
+              `dialog_missing_face_coords: ${missingChars.join(", ")} — Gesichts-Identitäts-Mapping nicht möglich. Bitte „🎥 Clip + Lip-Sync neu rendern" für eine frische Anchor + Identity-Detection.`,
           })
           .eq("id", sceneId);
         return json(
