@@ -1384,7 +1384,7 @@ serve(async (req) => {
                 video: sourceClipUrl,
                 audio: mergedVo.url,
                 sync_mode: syncMode,
-                temperature: 0.5,
+                temperature: 0.85,
                 active_speaker: true,
                 output_format: "mp4",
               },
