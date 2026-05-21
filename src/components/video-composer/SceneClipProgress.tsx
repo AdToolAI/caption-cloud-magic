@@ -105,37 +105,26 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     }
   };
 
-  // Cinematic-Sync state — render-engine === 'cinematic-sync' has 2 phases
-  // (1) Hailuo i2v re-render of real scene  (2) Sync.so lip-sync polish.
+  // Cinematic-Sync state — Dialog-Shot pipeline (1..N speakers).
+  // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
 
-  // ── Two-Shot Hook pipeline (6-stage progress) ────────────────────────────
-  // Active whenever the audio-plan has ≥ 2 speakers (multi-character dialog).
-  // Stages are written by `compose-twoshot-audio`, `compose-video-clips` and
-  // `compose-twoshot-lipsync`. We render an overlay with a 6-step bar so the
-  // user can see exactly where the pipeline is in real time.
-  const speakerCount = scene.audioPlan?.speakers?.length ?? 0;
-  const isTwoShot = speakerCount >= 2;
-  const twoshotStage = scene.twoshotStage ?? null;
-  const TWO_SHOT_STAGES: Array<{ key: NonNullable<typeof twoshotStage>; label: string }> = [
-    { key: 'audio', label: 'Voiceover' },
-    { key: 'anchor', label: 'Anchor' },
-    { key: 'master_clip', label: 'Master-Clip' },
-    { key: 'lipsync_1', label: 'Lip-Sync 1/2' },
-    { key: 'lipsync_2', label: 'Lip-Sync 2/2' },
-    { key: 'continuity', label: 'Continuity' },
-  ];
-  const stageIndex = (() => {
-    if (!twoshotStage || twoshotStage === 'done') return -1;
-    return TWO_SHOT_STAGES.findIndex((s) => s.key === twoshotStage);
-  })();
-  const currentStageLabel = stageIndex >= 0 ? TWO_SHOT_STAGES[stageIndex].label : null;
-  const showTwoShotOverlay =
-    isTwoShot &&
-    twoshotStage &&
-    twoshotStage !== 'done' &&
-    !hqReady; // once HQ is ready (and stage = done) we hide the bar
+  // ── Dialog-Shot pipeline progress (per-shot status) ──────────────────────
+  // `dialog_shots` is written by `compose-dialog-scene` and updated by
+  // `poll-dialog-shots`. Each shot has its own lifecycle: pending →
+  // generating → generated → lipsyncing → ready (or failed).
+  const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const dialogShots: Array<{
+    idx: number;
+    speaker_name?: string;
+    status: 'pending' | 'generating' | 'generated' | 'lipsyncing' | 'ready' | 'failed';
+    error?: string;
+  }> = Array.isArray(dialogShotsState?.shots) ? dialogShotsState.shots : [];
+  const isDialog = isCinematic && (dialogShots.length > 0 || lipSyncRunning);
+  const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
+  const dialogTotal = dialogShots.length;
+  const showDialogOverlay = isDialog && !hqReady && dialogShotsState?.status !== 'done';
 
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
