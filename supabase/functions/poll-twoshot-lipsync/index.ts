@@ -358,11 +358,13 @@ serve(async (req) => {
       if (isTransient && retryAttempts < MAX_RETRIES && latestCurrentJob && !fallbackMode) {
         try {
           await new Promise((r) => setTimeout(r, retryAttempts === 0 ? 5_000 : 15_000));
+          const retrySegments = normalizeSegmentField((latestCurrentJob as any).audioSegmentSecs);
           const newJobId = await startSyncJob(syncApiKey, {
             videoUrl: String(latestCurrentJob.videoUrl),
             audioUrl: String(latestCurrentJob.audioUrl),
             targetCoords: Array.isArray(latestCurrentJob.targetCoords) ? latestCurrentJob.targetCoords as [number, number] : null,
             faceBbox: Array.isArray(latestCurrentJob.faceBbox) && latestCurrentJob.faceBbox.length === 4 ? latestCurrentJob.faceBbox as [number, number, number, number] : null,
+            segmentSecs: retrySegments,
           });
           const patchedJobs = latestJobs.map((j: any) =>
             j.jobId === jobId
