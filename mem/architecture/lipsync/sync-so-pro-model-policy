@@ -1,8 +1,9 @@
 ---
 name: Lipsync Pro Policy
-description: Sync.so two-shot lip-sync — merged WAV in both passes + per-turn segments_secs windows, no TTS text mutation, idempotent refunds
+description: Sync.so two-shot lip-sync — merged WAV in both passes + per-turn segments_secs windows mit Pre-Roll/Tail + adaptive Temperature, no TTS text mutation, idempotent refunds
 type: feature
 ---
+
 
 **Two-Shot Lip-Sync (Mai 2026, stabiler Pfad):**
 - `compose-twoshot-lipsync` nutzt bei 2 echten Gesichtern **keine Sync.so Segments API mehr**. Standard ist **Two-Pass Face-Targeting** über Sync.so Direct API: Pass 1 = Face 1, Pass 2 = Face 2.
