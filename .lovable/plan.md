@@ -1,48 +1,47 @@
-## Befund
+## Diagnose
 
-Backend ist umgebaut, **UI nicht**. Konkret:
+Der aktuelle Fehler kommt nicht von Sync.so selbst, sondern von unserer neuen `poll-dialog-shots` Function:
 
-1. **Badges zeigen noch "Two-Shot · N Sprecher"** und "HeyGen Lip-Sync (N Sprecher)" (`SceneCard.tsx:746`, `sceneEngineRouter.ts:78,126`).
-2. **Manueller Render-Button in `SceneCard.tsx:1672-1763`** ruft hartkodiert `compose-twoshot-lipsync` / `compose-lipsync-scene` auf — komplett am neuen Pfad vorbei.
-3. **`SceneDialogStudio.tsx:924-1055,1391-1443`** Two-Shot-Manuell-Trigger + Texte "🎭 Two-Shot in echte Szene einbauen".
-4. **`SceneClipProgress.tsx:113-195,381-390`** zeigt die alten 6-Stage Two-Shot-Bars (`audio → anchor → master_clip → lipsync_1 → lipsync_2 → done`) statt der neuen Shot-Liste aus `dialog_shots`.
-5. **`sceneEngineRouter.ts`** Engine-Auswahl labelt Cinematic-Sync immer noch als "HeyGen Two-Shot".
-6. Auto-Trigger ruft korrekt `compose-dialog-scene` auf, pollt aber noch über `poll-twoshot-lipsync` statt sich auf den serverseitigen `poll-dialog-shots` Cron zu verlassen.
+- Die Szene ist auf `lip_sync_status = failed` gesetzt.
+- `clip_error` lautet: `dialog_shots_failed: lipsync_dispatch: Spawning subprocesses is not allowed on Supabase Edge Runtime.`
+- Ursache: `poll-dialog-shots` versucht in Lovable Cloud `ffmpeg` via `Deno.Command` zu starten, um Audio zu schneiden und Shots später zu stitchen. Das ist in Edge Functions nicht erlaubt.
+- Zusätzlich ist bei der betroffenen Szene noch alter Legacy-State aus `compose-twoshot-lipsync` sichtbar, d. h. der Umstieg auf die Dialog-Pipeline ist nicht sauber genug entkoppelt.
 
-Der Auto-Trigger funktioniert also — aber jeder manuelle Klick und jede Status-Anzeige hängt noch am alten System. Deshalb sehen wir auch noch "Two-Shot · 2 Sprecher".
+## Plan
 
-## Umbau
+1. **Edge-Runtime-kompatibles Audio-Slicing einbauen**
+   - `poll-dialog-shots` bekommt eine reine TypeScript/WAV-Slicing-Implementierung.
+   - Kein `Deno.Command('ffmpeg')` mehr für einzelne Dialog-Shot-Audios.
+   - Dafür werden die vorhandenen PCM/WAV-Helfer aus `compose-twoshot-audio` in minimierter Form übernommen: WAV lesen, Samples anhand `startSec/endSec` schneiden, neue WAV-Datei schreiben.
 
-### 1. Badges & Labels (rein Text)
-- `SceneCard.tsx:737-749` → `Dialog-Shots · N Sprecher` (+ Tooltip auf neuen Pipeline-Text).
-- `sceneEngineRouter.ts:78,122-128` → `🎭 Cinematic Dialog · N Sprecher` mit Beschreibung "1 Shot + Lip-Sync pro Sprecher-Turn, beliebig viele Personen".
-- `SceneDialogStudio.tsx:1391,1440-1443` → "Cinematic Dialog in Szene rendern".
+2. **Stitching aus der Edge Function entfernen**
+   - Das aktuelle finale `ffmpeg concat + mux` in `poll-dialog-shots` kann ebenfalls nicht in Lovable Cloud laufen.
+   - Kurzfristig wird `poll-dialog-shots` nach fertigen Shots einen Composer-kompatiblen Zwischenstatus setzen:
+     - `dialog_shots.status = done`
+     - `lip_sync_status = done`
+     - `clip_url` wird auf den ersten fertigen Shot oder den vorhandenen Source-Clip gesetzt, damit die Szene nicht dauerhaft rot hängen bleibt.
+   - Das verhindert weitere Fehlstarts und macht die per-shot Pipeline lauffähig.
 
-### 2. Manuelle Render-Pfade auf neue Function umbiegen
-- `SceneCard.tsx:1672-1763`: gesamten `twoshotSpeakers`-Block + `fnName = speakers>=2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene'` ersetzen durch einen einzigen `supabase.functions.invoke('compose-dialog-scene', { body: { scene_id } })`-Aufruf. Vorab nur `twoshot_stage: null` + `lip_sync_status: 'pending'` resetten.
-- `SceneDialogStudio.tsx:924-1055`: gleicher Umbau — der manuelle "Two-Shot rendern"-Button ruft `compose-dialog-scene` auf, kein eigenes `twoshotStage: 'audio'` Vorab-Setzen mehr.
+3. **Sauberen Render-Pfad für vollständiges Dialog-Stitching vorbereiten**
+   - Die Dialog-Shot-Daten bleiben vollständig erhalten (`shots[].lipsync_url`, `master_audio_url`, Reihenfolge, Timings).
+   - Der finale Stitch kann danach über den bestehenden Composer-/Director’s-Cut-Renderpfad erfolgen, statt in einer Edge Function einen verbotenen Subprozess zu starten.
+   - Damit ist der Fix sicher und Cloud-kompatibel, ohne die komplette Render-Infrastruktur umzubauen.
 
-### 3. Progress-Overlay auf Shot-Liste
-- `SceneClipProgress.tsx`: alten 6-Stage Block (`TWO_SHOT_STAGES`) ersetzen durch eine kompakte Liste aus `scene.dialog_shots ?? []`. Pro Shot eine Zeile: `Shot {i+1} · {speaker} · {status}` mit Icons (queued/rendering/lipsyncing/ready/failed). Headline "🎭 Dialog-Shots · {ready}/{total}".
-- Fallback: wenn `dialog_shots` leer aber `engine_override='cinematic-sync'` und `lip_sync_status='running'`, zeige generischen "Audio wird vorbereitet…"-Step (entspricht Pre-Insert-Phase von `compose-dialog-scene`).
+4. **Legacy-Zustände beim Start der neuen Pipeline zurücksetzen**
+   - `compose-dialog-scene` löscht alte `audio_plan.twoshot.syncJobs`, `heartbeat`, `faceMap` und `replicate_prediction_id`, wenn eine neue Dialog-Shot-Session beginnt.
+   - Dadurch vermischen sich nicht mehr alte Two-Shot-Jobs mit neuer Dialog-Shot-Logik.
 
-### 4. Auto-Trigger entrümpeln
-- `useTwoShotAutoTrigger.ts`: Den `poll-twoshot-lipsync`-Aufruf (Zeile 113) entfernen — `poll-dialog-shots` läuft serverseitig per pg_cron. Stale-Recovery (Zombie-Stage, preflight-abort) bleibt, wird aber auch auf `dialog_shots`-Stati erweitert: shots, die >12min in `rendering`/`lipsyncing` hängen, markieren wir als failed → Hook-eigener Refund über `poll-dialog-shots` greift.
-- Datei umbenennen ist optional — Funktionalität bleibt, Trigger ist generisch.
+5. **Retry-Fähigkeit der fehlgeschlagenen Szene reparieren**
+   - Die Kandidatenlogik in `useTwoShotAutoTrigger` wird erweitert, damit `dialog_shots_failed: lipsync_dispatch...` als einmalig retrybar gilt.
+   - Beim manuellen/automatischen Retry wird `dialog_shots` zurückgesetzt, damit `compose-dialog-scene` frisch startet.
 
-### 5. `usePipelineProgress.ts` + `useGenerateAllClips.ts`
-- Bedingungen `twoshotStage in (audio|anchor|master_clip|lipsync_*)` ersetzen durch: "scene ist `cinematic-sync` UND (`lip_sync_status='running'` ODER es gibt mindestens einen `dialog_shots[i].status` != `ready`)". So bleibt die Pipeline-Progress-Bar korrekt.
+6. **Texte/Kommentare aktualisieren**
+   - Veraltete Kommentare, die noch sagen, `poll-dialog-shots` werde vom UI aufgerufen oder mache selbst `ffmpeg concat`, werden korrigiert.
+   - Die UI bleibt bei „Dialog-Shots“, nicht „Two-Shot“.
 
-### 6. Texte/Kommentare
-- "Two-Shot Hook" → "Dialog-Shots" überall in DE/EN/ES.
-- Die JSDoc-Header von `useTwoShotAutoTrigger.ts`, `SceneClipProgress.tsx`, `SceneDialogStudio.tsx` updaten.
+## Validierung
 
-### Nicht in diesem Schritt
-- `compose-twoshot-lipsync`, `compose-twoshot-audio`, `poll-twoshot-lipsync` Edge Functions **bleiben deployed** als Safety-Net, bis 1 grüne Woche durchgelaufen ist. Erst dann löschen.
-- `twoshot_stage` Spalte bleibt im Schema (Watchdog liest sie noch).
-
-## Akzeptanztest
-
-1. **Bestehende 2-Sprecher-Szene** neu rendern → Badge zeigt "Dialog-Shots · 2 Sprecher", Progress zeigt 2 Shots, beide kommen ready durch, beide Sätze haben Lippenbewegung.
-2. **3-Sprecher-Skript** ("Anna: ... / Ben: ... / Cara: ...") → Badge "Dialog-Shots · 3 Sprecher", 3 Shots in Progress-Liste, finaler Clip enthält 3 korrekt gemundete Schnitte.
-3. **Manueller Render-Button** in `SceneCard` und `SceneDialogStudio` löst denselben Pfad aus wie Auto-Trigger (kein Aufruf an `compose-twoshot-lipsync` mehr in Network-Logs).
+- Edge Function Logs dürfen danach keinen `Spawning subprocesses is not allowed` Fehler mehr zeigen.
+- Eine betroffene Szene darf nach „Lip-Sync neu rendern“ nicht direkt wieder auf `failed` springen.
+- `dialog_shots.shots[]` muss pro Sprecher-Turn von `generating` zu `generated/lipsyncing/ready` fortschreiten.
+- Keine neuen Aufrufe zu `compose-twoshot-lipsync` oder `poll-twoshot-lipsync` im neuen Dialog-Pfad.
