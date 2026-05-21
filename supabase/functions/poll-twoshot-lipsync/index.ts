@@ -49,8 +49,18 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
-  const side: "left" | "right" = passIndex === 0 ? "left" : "right";
+function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null, speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
+  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
+  if (charId && shots.length >= 2) {
+    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
+    if (shotIdx >= 0) {
+      side = shotIdx === 0 ? "left" : "right";
+      mappingSource = "character_shots";
+    }
+  }
   const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
   const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
   if (Array.isArray(match?.center) && match.center.length === 2) {
@@ -73,11 +83,11 @@ function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | unde
       }
     }
     const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-    return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
+    return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
   const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
-  return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic" };
+  return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic", mappingSource };
 }
 
 async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
