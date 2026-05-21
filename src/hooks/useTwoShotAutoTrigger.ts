@@ -63,11 +63,17 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const now = Date.now();
         const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
+        const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // CPU/preflight abort before a Sync.so job exists
         const STALE_SYNC_MS = 12 * 60 * 1000; // Sync.so should settle well before this; avoid endless spinner
 
         const hasSyncSoJob = (d: any) =>
           typeof d.replicate_prediction_id === 'string' &&
           d.replicate_prediction_id.startsWith('sync:');
+        const hasRecordedProviderJob = (d: any) => {
+          const plan = d.audio_plan as any;
+          const jobs = plan?.twoshot?.syncJobs?.jobs;
+          return hasSyncSoJob(d) || !!plan?.twoshot?.heartbeat?.syncJobId || (Array.isArray(jobs) && jobs.length > 0);
+        };
 
         const staleSyncJobs = (data as any[]).filter(
           (d) =>
@@ -110,13 +116,45 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             .finally(() => setTimeout(() => inflight.current.delete(`poll:${d.id}`), 12_000));
         }
 
+        // Preflight/CPU-abort recovery: running but no provider job was ever
+        // recorded. Clear the stage too so the candidate filter can re-invoke.
+        const preflightAborts = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            !hasRecordedProviderJob(d) &&
+            (d.twoshot_stage === 'preflight' || /^lipsync_/i.test(String(d.twoshot_stage ?? ''))) &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > STALE_PREFLIGHT_MS,
+        );
+        if (preflightAborts.length > 0) {
+          await Promise.all(
+            preflightAborts.map((d) => {
+              inflight.current.delete(d.id);
+              d.lip_sync_status = 'pending';
+              d.twoshot_stage = null;
+              d.replicate_prediction_id = null;
+              return supabase
+                .from('composer_scenes')
+                .update({
+                  lip_sync_status: 'pending',
+                  twoshot_stage: null,
+                  replicate_prediction_id: null,
+                  clip_error: 'auto-retry: preflight_cpu_abort_recovered',
+                })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
         // Stale-recovery: 'running' >6min ohne lip_sync_applied_at → reset
         const stale = (data as any[]).filter(
           (d) =>
             d.engine_override === 'cinematic-sync' &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
-            !hasSyncSoJob(d) &&
+            !hasRecordedProviderJob(d) &&
             d.updated_at &&
             now - new Date(d.updated_at).getTime() > STALE_MS,
         );
@@ -129,7 +167,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               inflight.current.delete(d.id);
               return supabase
                 .from('composer_scenes')
-                .update({ lip_sync_status: 'pending', clip_error: 'auto-reset: stale running' })
+                .update({ lip_sync_status: 'pending', twoshot_stage: null, replicate_prediction_id: null, clip_error: 'auto-reset: stale running' })
                 .eq('id', d.id);
             }),
           );
