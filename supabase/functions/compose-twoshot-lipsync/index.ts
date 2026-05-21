@@ -953,7 +953,7 @@ serve(async (req) => {
           await refund("twoshot_first_speaker_track_missing");
           return;
         }
-        const firstTarget = pickTargetCoordinates(0, faceMap, fallbackDims);
+        const firstTarget = pickTargetCoordinates(0, faceMap, fallbackDims, { characterId: firstSpeaker.character_id ?? null, characterShots: charShots });
         if (!firstTarget) {
           await refund("twoshot_first_face_target_missing");
           return;
