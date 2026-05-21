@@ -1,71 +1,30 @@
-## Befund
+# Lip-Sync Fix — Lip-Ready Master Plate + Temperatur 0.7
 
-Der neueste technische Sync-Run ist nicht mehr abgebrochen: `lip_sync_status = done`. Das Problem ist jetzt sichtbar im Ergebnisvideo.
+## Ursache des Bauchredner-Effekts
 
-Die eigentliche Ursache ist sehr wahrscheinlich der **Masterclip vor dem Lip-Sync**:
+Der vorige Fix („Silent Master Plate" mit `closed relaxed lips / calm resting mouth posture`) hat das Gegenteil bewirkt: Sync.so konnte auf einem Bild mit explizit geschlossenen, fixierten Lippen kaum Mundbewegung durchsetzen. Plus `temperature 0.5` war zu defensiv. Ergebnis: Charaktere mit Stimme, aber praktisch ohne Lippenbewegung.
 
-- Der Hailuo-Quellclip wird aktuell mit dem vollen `ai_prompt` erzeugt.
-- In diesem Prompt steht noch der komplette Dialog-Block:
+## Umgesetzt
 
-```text
-Samuel and Matthew speak to camera in turns with natural, subtle lip-sync mouth movement...
-- Samuel says: ...
-- Matthew says: ...
-```
+1. **Lip-Ready Master Plate** (`compose-video-clips`)
+   - `closed relaxed lips` / `calm resting mouth posture` raus.
+   - Stattdessen: natürliche, animierbare Gesichter, sichtbare Mundpartie, keine Hände/Mikros vor dem Mund, stabile Front-/Drei-Viertel-Komposition.
+   - Sprech-/Mund-Negativliste bleibt im `negative_prompt`.
 
-- Danach bekommt Sync.so nur Zeitfenster, in denen es einzelne Sprecher neu animieren soll.
-- Außerhalb dieser Fenster bewahrt Sync.so aber den ursprünglichen Videoinhalt.
-- Wenn der ursprüngliche Hailuo-Clip bereits sprechende Münder hat, bewegen sich die Lippen also weiter, obwohl das Voiceover-Fenster vorbei ist.
+2. **Sync.so Temperature 0.5 → 0.7** in beiden Pässen — sichtbare Artikulation auf neutralem Plate.
 
-Kurz: **Sync.so macht inzwischen was wir verlangen, aber der Input-Clip ist falsch: er ist nicht wirklich stumm/neutral.**
+3. **Pass-2-Dimensions-Fallback** (`poll-twoshot-lipsync`)
+   - Wenn die MP4-Probe des Pass-1-Outputs unplausible Maße zurückgibt (z.B. quadratisch statt 16:9), wird auf die Anchor-FaceMap-Dimensionen zurückgefallen. Damit landen die Face-Koordinaten für Pass 2 garantiert im richtigen Pixelraum.
 
-## Plan
+4. **Fehlerhafte Szene zurückgesetzt** (`b6c2402c-…`)
+   - Clip, Sync-Jobs, Stages, Diagnose entfernt.
+   - Bereit für „🎥 Clip + Lip-Sync neu rendern".
 
-1. **Cinematic-Sync-Masterprompt säubern**
-   - Für `engineOverride = cinematic-sync` wird vor dem Hailuo-Render der Dialog vollständig aus dem Prompt entfernt.
-   - Der Masterclip bekommt nur noch die visuelle Szenenbeschreibung, keine Sprecherzeilen, keine “speak to camera”, keine “lip-sync mouth movement”-Anweisungen.
+## Validierung
 
-2. **Neutralen Two-Shot-Master erzwingen**
-   - Für Multi-Speaker-Szenen wird ein spezieller Masterclip-Prompt verwendet:
-     - beide Charaktere sichtbar
-     - natürliche Präsenz
-     - ruhige/geschlossene Lippen
-     - subtile Kopf-/Kamera-/Körperbewegung
-     - keine Sprech-/Mundbewegungs-Performance
-   - Die Szene soll also wie ein stummes Schauspiel-/Listening-Plate wirken, auf das Sync.so anschließend gezielt die echten Sprecherfenster setzt.
+- `clip_error` bleibt bei Erfolg leer.
+- Pass 1 + Pass 2 nutzen `temperature 0.7`.
+- Masterprompt enthält keine `closed/resting/relaxed lips`-Phrasen mehr.
+- Pass 2 nutzt Anchor-Dimensionen, falls Probe unplausibel.
 
-3. **Negative Prompt für Masterclip härten**
-   - Bei cinematic-sync wird der Provider-`negative_prompt` erweitert um Begriffe wie:
-     - talking mouth
-     - lip movement
-     - speaking animation
-     - open mouth speech
-     - exaggerated facial talking
-   - Diese Wörter kommen nicht in den positiven Prompt, sondern nur in das dedizierte Negative-Prompt-Feld.
-
-4. **Prompt-Leak in Hailuo verhindern**
-   - `stripDialogForAnchor(...)` wird nicht nur für den Anchor verwendet, sondern auch für den Hailuo-Masterclip.
-   - Damit kann ein `[Dialog]...[/Dialog]` Block nicht mehr bis zum Video-Provider durchrutschen.
-
-5. **Erfolgsstatus sauber halten**
-   - Wenn `poll-twoshot-lipsync` final erfolgreich ist, wird `clip_error` gelöscht.
-   - Erfolgreiche Fallback-/Retry-Läufe behalten Diagnose-Metadaten, werden aber nicht mehr als Fehler im UI angezeigt.
-
-6. **Betroffene Szene vollständig neu rendern**
-   - Für die aktuelle Szene muss nicht nur Lip-Sync neu gestartet werden, sondern **Clip + Lip-Sync**.
-   - Ich setze die stale Masterclip-/Lip-Sync-Metadaten zurück, damit Hailuo mit dem neuen neutralen Prompt einen frischen stummen Masterclip erzeugt.
-
-7. **Deploy & Validierung**
-   - Deploy: `compose-video-clips` und `poll-twoshot-lipsync`.
-   - Danach prüfe ich:
-     - der an Hailuo gesendete Prompt enthält keinen Dialogblock mehr
-     - `clip_error` ist bei erfolgreichem Ergebnis leer
-     - die Szene steht wieder sauber auf einem regenerierbaren Zustand
-
-## Erwartetes Ergebnis
-
-Der neue Masterclip zeigt beide Charaktere ohne dauerhaftes Sprechen. Sync.so animiert danach nur noch die jeweiligen Sprecherfenster, statt vorhandene falsche Mundbewegungen aus dem Quellclip weiterzutragen.
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Bitte „🎥 Clip + Lip-Sync neu rendern" auf der Szene drücken.

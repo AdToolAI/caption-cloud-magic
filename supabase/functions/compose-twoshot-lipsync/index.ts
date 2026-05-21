@@ -1248,7 +1248,10 @@ serve(async (req) => {
               videoUrl: sourceClipUrl,
               audioUrl: mergedVo.url,
               syncMode: "cut_off",
-              temperature: 0.5,
+              // 0.7 (was 0.5) — the lip-ready neutral plate has a soft natural
+              // mouth and needs a higher temperature for visible articulation.
+              // 0.5 + closed-lip prompt produced the ventriloquist effect.
+              temperature: 0.7,
               targetCoords: firstTarget.coords,
               // No `faceBbox`: Sync.so wants per-frame box arrays, not a
               // single static one. coordinates+frame_number is the stable path.

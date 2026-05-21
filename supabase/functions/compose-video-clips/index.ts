@@ -429,7 +429,13 @@ serve(async (req) => {
       const n = Math.max(cleanNames.length, fallbackCount, 2);
       const named =
         cleanNames.length > 0 ? `: ${cleanNames.join(" and ")}` : "";
-      return `Exactly ${n} distinct people${named}, each visible exactly once, in a modern office conversation scene. Both people hold relaxed listening expressions with calm resting mouth posture and closed relaxed lips, subtle natural head and eye movement, cinematic plate for later dialogue dubbing. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
+      // mouth posture — that produces a frozen, ventriloquist-style face that
+      // Sync.so cannot meaningfully animate on top of. We only ask for a
+      // natural, lip-ready neutral expression with the mouth area clearly
+      // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
+      // constraints live exclusively in the negative_prompt.
+      return `Exactly ${n} distinct people${named}, each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
@@ -452,7 +458,11 @@ serve(async (req) => {
       );
       const sceneDescription =
         cleanedVisualPrompt || "modern cinematic interior scene";
-      return `Silent neutral master plate: ${neutralPlate}. Visual setting: ${sceneDescription}. Hold calm facial expressions and resting mouth posture throughout the shot; use only subtle breathing, eye movement, posture shifts and gentle camera motion.`;
+      // "Lip-ready" plate: natural, animatable face — NOT a frozen one. The
+      // negative prompt forbids talking/mouth-flap, but the positive prompt
+      // must not over-constrain the mouth or Sync.so produces ventriloquist
+      // motion.
+      return `Lip-ready neutral master plate: ${neutralPlate} Visual setting: ${sceneDescription}. Keep facial expressions natural and animatable, with the mouth area soft and clearly visible.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
