@@ -472,15 +472,24 @@ serve(async (req) => {
         (plan as any)?.twoshot?.url ||
         nextSpeaker.track_url;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
-      let nextSegment: [number, number] | null = null;
-      if (vrNext && Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && vrNext.endSec > vrNext.startSec && sceneDurSec > 0) {
-        // Sample-exact voiced range — no padding (padding shifted the VAD
-        // onset and was the root cause of "char 2 mouth opens later than its
-        // voice plays").
-        nextSegment = [
-          Math.max(0, Number(vrNext.startSec)),
-          Math.min(sceneDurSec, Number(vrNext.endSec)),
-        ];
+      // Use per-turn windows when present so a speaker with multiple turns
+      // never re-animates over the OTHER speaker's voiced range.
+      let nextSegment: [number, number] | Array<[number, number]> | null = null;
+      if (vrNext && sceneDurSec > 0) {
+        if (Array.isArray(vrNext.turns) && vrNext.turns.length > 0) {
+          const turns = vrNext.turns
+            .map((t: any) => [
+              Math.max(0, Number(t.startSec)),
+              Math.min(sceneDurSec, Number(t.endSec)),
+            ] as [number, number])
+            .filter(([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+          if (turns.length > 0) nextSegment = turns;
+        } else if (Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && vrNext.endSec > vrNext.startSec) {
+          nextSegment = [
+            Math.max(0, Number(vrNext.startSec)),
+            Math.min(sceneDurSec, Number(vrNext.endSec)),
+          ];
+        }
       }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
