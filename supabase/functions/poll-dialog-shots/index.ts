@@ -212,34 +212,41 @@ async function uploadToStorage(
 
 // ── Sync.so wrappers ────────────────────────────────────────────────────
 
-/** Expand a turn window with pre-roll/tail, clamped to neighbouring turn
- *  boundaries (never bleed into another speaker's window). */
-function expandWindow(
-  shot: DialogTurnShot,
-  allShots: DialogTurnShot[],
-): [number, number] {
-  const prev = allShots
-    .filter((s) => s.idx < shot.idx)
-    .reduce<number>((max, s) => Math.max(max, s.endSec), 0);
-  const nextStart = allShots
-    .filter((s) => s.idx > shot.idx)
-    .reduce<number>((min, s) => Math.min(min, s.startSec), Number.POSITIVE_INFINITY);
-  const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (shot.startSec - prev) / 2));
-  const maxTail =
-    Number.isFinite(nextStart)
-      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - shot.endSec) / 2))
+/** Expand every window of a speaker shot with pre-roll/tail, clamping each
+ *  side to the nearest neighbour boundary across ALL shots (own + other
+ *  speakers), so a pre-roll/tail can never bleed into someone else's
+ *  spoken region or another window of the same speaker. */
+function expandWindows(
+  shot: DialogSpeakerShot,
+  allShots: DialogSpeakerShot[],
+): Array<[number, number]> {
+  // Flatten all windows from all speakers (for boundary lookup).
+  const allWindows: Array<[number, number]> = [];
+  for (const s of allShots) for (const w of s.windows) allWindows.push(w);
+  allWindows.sort((a, b) => a[0] - b[0]);
+
+  const out: Array<[number, number]> = [];
+  for (const [start, end] of shot.windows) {
+    const prevEnd = allWindows
+      .filter(([, e]) => e <= start)
+      .reduce((m, [, e]) => Math.max(m, e), 0);
+    const nextStart = allWindows
+      .filter(([s]) => s >= end)
+      .reduce((m, [s]) => Math.min(m, s), Number.POSITIVE_INFINITY);
+    const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (start - prevEnd) / 2));
+    const maxTail = Number.isFinite(nextStart)
+      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - end) / 2))
       : SYNC_TAIL_SEC;
-  return [
-    Math.max(0, shot.startSec - maxLeadIn),
-    shot.endSec + maxTail,
-  ];
+    out.push([Math.max(0, start - maxLeadIn), end + maxTail]);
+  }
+  return out;
 }
 
-async function startSyncTurnJob(
+async function startSyncSpeakerJob(
   apiKey: string,
   videoUrl: string,
   audioUrl: string,
-  segment: [number, number],
+  windows: Array<[number, number]>,
   coords: [number, number] | null,
   temperature: number,
 ): Promise<string> {
@@ -260,7 +267,7 @@ async function startSyncTurnJob(
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl, segments_secs: [segment] },
+      { type: "video", url: videoUrl, segments_secs: windows },
       { type: "audio", url: audioUrl },
     ],
     options,
@@ -272,13 +279,13 @@ async function startSyncTurnJob(
   });
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    // Fallback: retry without segments_secs if Sync.so rejects the window.
+    // Fallback: retry without segments_secs if Sync.so rejects the windows.
     if (
       r.status === 400 &&
       /segments? configuration is invalid|only supported for video inputs|invalid.+segment/i.test(txt)
     ) {
       console.warn(
-        `[poll-dialog-shots] segments rejected, retry without window: ${txt.slice(0, 200)}`,
+        `[poll-dialog-shots] segments rejected, retry without windows: ${txt.slice(0, 200)}`,
       );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
@@ -298,6 +305,7 @@ async function startSyncTurnJob(
   const data = await r.json();
   return String(data.id);
 }
+
 
 async function pollSyncJob(
   apiKey: string,
