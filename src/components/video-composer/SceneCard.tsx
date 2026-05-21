@@ -734,19 +734,19 @@ export default function SceneCard({
                             className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
                             title={
                               lang === "de"
-                                ? `${speakerCount} Sprecher erkannt. Beim Generieren wird automatisch der Two-Shot-Hook gerendert: Anchor (beide im Bild) → 10 s Master-Clip → sequenzieller Lip-Sync für jeden Sprecher → Continuity-Check. Klick öffnet das Dialog-Studio als Fallback (eigene Cuts pro Sprecher).`
+                                ? `${speakerCount} Sprecher erkannt. Beim Generieren läuft die Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate (Mund frei, eigenes Portrait) + dedizierter Sync.so Lip-Sync, danach zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher. Klick öffnet das Dialog-Studio.`
                                 : lang === "es"
-                                  ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta automáticamente el pipeline Two-Shot Hook (anchor → master clip → lip-sync secuencial por hablante → continuity). Click abre el Dialog Studio como fallback.`
-                                  : `${speakerCount} speakers detected. Generating runs the Two-Shot Hook pipeline automatically (anchor → 10 s master clip → sequential lip-sync per speaker → continuity check). Click opens Dialog Studio as a fallback (one cut per speaker).`
+                                  ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta el pipeline Dialog-Shot: un plate Hailuo + lip-sync Sync.so dedicado por turno, después concat a un clip. Escala a N hablantes. Click abre el Dialog Studio.`
+                                  : `${speakerCount} speakers detected. Generating runs the Dialog-Shot pipeline: one dedicated Hailuo plate + Sync.so lip-sync per speaker turn, then concatenated to one clip. Scales to N speakers. Click opens Dialog Studio.`
                             }
                             onClick={() => setSplitConfirmOpen(true)}
                           >
                             🎭{" "}
                             {lang === "de"
-                              ? `Two-Shot · ${speakerCount} Sprecher`
+                              ? `Dialog-Shots · ${speakerCount} Sprecher`
                               : lang === "es"
-                                ? `Two-Shot · ${speakerCount} hablantes`
-                                : `Two-Shot · ${speakerCount} speakers`}
+                                ? `Dialog-Shots · ${speakerCount} hablantes`
+                                : `Dialog-Shots · ${speakerCount} speakers`}
                           </Badge>
                         )}
                         <Select
