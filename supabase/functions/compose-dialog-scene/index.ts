@@ -671,7 +671,7 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     const state: DialogShotsState = {
-      version: 2,
+      version: 3,
       status: "queued",
       shots: rawShots,
       source_clip_url: sourceClipUrl,
