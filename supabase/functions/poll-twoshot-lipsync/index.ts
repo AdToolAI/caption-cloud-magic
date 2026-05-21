@@ -658,7 +658,7 @@ serve(async (req) => {
             videoUrl: String(latestCurrentJob.videoUrl),
             audioUrl: String(latestCurrentJob.audioUrl),
             autoDetect: true,
-            temperature: 0.6,
+            temperature: 0.7,
             segmentSecs: fallbackSegments,
           });
           const newJob = {
