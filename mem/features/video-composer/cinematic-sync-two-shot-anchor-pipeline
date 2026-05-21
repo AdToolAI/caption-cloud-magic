@@ -1,0 +1,22 @@
+---
+name: Cinematic-Sync Two-Shot Anchor Pipeline
+description: Scene-aware + outfit-aware two-shot anchor composition gates for cinematic-sync, with stale-clip preview protection
+type: feature
+---
+
+**Cinematic-Sync Two-Shot Pipeline (Mai 2026, gehärtet):**
+
+- **Outfit-aware anchor**: In `compose-video-clips` werden für `engineOverride='cinematic-sync'` mit 2+ Sprechern die `outfitLookId`-Felder pro `characterShots`-Slot serverseitig über `avatar_outfit_looks.cover_url` (Fallback `front_url`) aufgelöst. Diese Outfit-URLs werden als `portraitUrls` an `compose-scene-anchor` übergeben, sodass das fertige Two-Shot-Anchor-Bild die vom User gewählte Casual/Brand/Theme-Garderobe trägt — nicht das bare Avatar-Portrait.
+
+- **Scene-aware anchor prompt**: Der Anchor-Prompt kombiniert IMMER `neutralTwoShotPrompt(names, count)` (Two-Shot-Framing: equal screen share, beide Münder frei, keine Hand vorm Mund, Lip-ready) MIT der über `stripDialogForAnchor()` gereinigten Szenenbeschreibung („Visual setting: …"). Frühere Variante schickte bei ≥2 Sprechern stur einen neutralen grauen Plate ohne Szenenkontext → Anchor war Two-Shot, Hailuo-i2v driftete dann auf eine völlig andere Szene. Outfit-Lock-Suffix („Keep all selected outfits intact; do not change clothing") verhindert dass Nano Banana 2 die Garderobe ersetzt.
+
+- **`ANCHOR_AUDIT_VERSION = 5`**: Bumpt automatisch alle zuvor gepinnten v4-Anchor (graue Neutral-Plates ohne Szene/Outfit), erzwingt frische Komposition mit den neuen Regeln.
+
+- **Stale-clip Preview-Guard**: `ComposerSequencePreview.playable` filtert ausschließlich Szenen mit `clipStatus === 'ready' && clipUrl` (bzw. Image-Scenes mit `uploadUrl`). Ein lokal noch vorhandener `clipUrl` aus einem alten Render kann die Preview nicht mehr füttern, sobald die DB die Szene auf `pending`/`generating` zurücksetzt — das fixt den „Thumbnail zeigt neuen Two-Shot-Anchor, Play spielt alten Solo-Clip"-Bug nach Reset.
+
+- **Bestehende Gates (unverändert, jetzt sauber greifend)**:
+  - Anchor-Compose hat Face-Count + Human-Count + Identity-Audit (Gemini Vision) + 1 Strict-Retry; bei `faces < expected` → `anchor_missing_speakers`, kein Hailuo-Burn.
+  - Master-Clip-Audit in `compose-twoshot-lipsync` (`detectFacesInMaster`) refundet bei `source_clip_missing_speakers` und blockiert Lip-Sync.
+  - Auto-Lipsync-Trigger in `compose-clip-webhook` läuft nur bei `clip_url` ≠ NULL.
+
+- **Reset-Pfad für Test/Recovery**: Szene zurücksetzen heißt `clip_url=NULL`, `clip_status='pending'`, `lip_sync_status='pending'`, `twoshot_stage='master_clip'`, `reference_image_url=NULL` UND `audio_plan.twoshot.{syncJobs,faceMap,anchor_face_audit,heartbeat}` entfernen UND `DELETE FROM scene_anchor_cache WHERE scene_id=…`. Nur dann komponiert die Pipeline einen frischen Anchor.
