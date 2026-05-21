@@ -5516,6 +5516,7 @@ export type Database = {
           created_at: string
           dialog_locked_at: string | null
           dialog_script: string | null
+          dialog_shots: Json | null
           dialog_voices: Json
           director_modifiers: Json | null
           duration_seconds: number
@@ -5594,6 +5595,7 @@ export type Database = {
           created_at?: string
           dialog_locked_at?: string | null
           dialog_script?: string | null
+          dialog_shots?: Json | null
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
@@ -5672,6 +5674,7 @@ export type Database = {
           created_at?: string
           dialog_locked_at?: string | null
           dialog_script?: string | null
+          dialog_shots?: Json | null
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
