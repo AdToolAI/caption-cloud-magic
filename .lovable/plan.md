@@ -1,32 +1,45 @@
-## Problem
+## Befund
 
-Der sticky Pipeline-Ladebalken (`PipelineProgressBar` + `usePipelineProgress`) zeigt für die neue Dialog-Shot-Pipeline keinen Lipsync-Fortschritt mehr an. Grund: `usePipelineProgress.lipsyncReal.running` hängt an einem `hasRealJob`-Check, der nur die alte Two-Shot-Architektur kennt (`replicate_prediction_id` startet mit `sync:` oder `audio_plan.twoshot.syncJobs`). Die neue Pipeline schreibt stattdessen `composer_scenes.dialog_shots = { status, shots[] }` und setzt `replicate_prediction_id` nicht mehr auf `sync:...`. Folge: die Phase springt von "idle" direkt auf "done" (oder bleibt unsichtbar), obwohl Hailuo-Plate + Sync.so-Turns aktiv sind. Die Events (`lipsync:start/end`) feuern bereits korrekt aus `useTwoShotAutoTrigger` und `SceneDialogStudio` — nur die State-Ableitung ist veraltet.
+Der aktuelle Fehler ist nicht mehr primär ein Sync.so-Timeout, sondern ein blockierter Preflight:
 
-## Umsetzung (nur Frontend)
+- Die betroffene Cinematic-Sync-Szene landet auf `lip_sync_status = failed`.
+- `clip_error` ist konkret: `dialog_missing_face_coords: samuel-dusatko, matthew-dusatko`.
+- `audio_plan.twoshot.anchor_face_audit` bestätigt zwar `detected: 2`, `humans: 2`, `ok: true`, aber es wird kein `audio_plan.twoshot.faceMap` mit `characterId -> [x,y]` gespeichert.
+- Die neue `compose-dialog-scene` Pipeline erwartet dieses FaceMap bereits fertig im `audio_plan.twoshot.faceMap`; die alte Pipeline konnte es selbst nachberechnen. Dadurch schlägt die neue Pipeline vor dem ersten Sync.so-Job fehl.
 
-1. **`usePipelineProgress.ts` — Dialog-Shot-Pipeline als gültige Lipsync-Quelle anerkennen**
-   - `hasRealJob(s)` erweitern: auch `true`, wenn `s.dialogShots?.shots?.length > 0` und der globale `dialog_shots.status` nicht `done`/`failed` ist.
-   - `lipsyncReal.running` zusätzlich `true`, wenn irgendeine Cinematic-Sync-Szene `dialog_shots.status` in `pending` | `composing` | `polling` hat oder mindestens ein Shot in `generating` | `generated` | `lipsyncing` ist.
-   - `lipsyncReal.done` zusätzlich, wenn `dialog_shots.status === 'done'` für alle relevanten Szenen.
-   - `lipsyncReal.failed` zusätzlich, wenn `dialog_shots.status === 'failed'`.
-   - **Feinkörniger Fortschritt:** Statt nur Szenen-Granularität — wenn Dialog-Shots vorhanden sind, Progress über `Σ ready_shots / Σ total_shots` aller Cinematic-Sync-Szenen berechnen (analog zur Baseline-Logik), damit der Balken pro abgeschlossenem Turn weiterläuft, nicht erst pro fertiger Szene.
-   - Baseline-Capture beim `lipsync:start` ergänzen: `dialogShotsBaseline = { readyShots, totalShots }`.
+## Plan
 
-2. **`SceneClipProgress.tsx` — kleines Polish**
-   - `DialogShotsBar` ist heute nur sichtbar, solange `clipStatus === 'generating'`. Anzeige zusätzlich aktivieren, wenn `clipStatus === 'ready'` aber `dialog_shots.status !== 'done'` (Phase Lipsync läuft auf fertigem Master). Aktuell wird nur das kleine "Lip-Sync läuft"-Overlay gezeigt — der Fortschrittsbalken pro Shot fehlt in dieser Phase. Lösung: `DialogShotsBar` zusätzlich im `hqReady`-Pfad rendern, wenn `showDialogOverlay`-Bedingung erfüllt ist.
+1. **FaceMap-Logik in die neue Pipeline übernehmen**
+   - In `supabase/functions/compose-dialog-scene/index.ts` die robuste Face-Detection/Identity-Mapping-Logik aus der alten `compose-twoshot-lipsync` Pipeline wiederverwenden/adaptieren:
+     - Charakter-Portraits für die Sprecher auflösen.
+     - Zwei Gesichter im gepinnten Anchor/Reference-Frame erkennen.
+     - Gemini Identity-Match: linkes/rechtes Gesicht eindeutig auf `samuel-dusatko` / `matthew-dusatko` mappen.
+     - `faceMap` mit `faces[].characterId`, `center`, `width`, `height` in `audio_plan.twoshot.faceMap` persistieren.
 
-3. **Sanity-Check**
-   - Keine Änderungen an Edge Functions, DB oder Pipeline-Events nötig — Trigger emittieren bereits `lipsync:start/end`.
-   - Keine neuen Felder. Liest nur bestehendes `composer_scenes.dialog_shots`.
+2. **Keine harte Sperre bei vorhandenem Audit aber fehlendem FaceMap**
+   - `compose-dialog-scene` soll bei `anchor_face_audit.ok === true`, aber fehlendem/stalem `faceMap`, selbst eine frische FaceMap-Erzeugung starten.
+   - Erst wenn nach dieser Erzeugung Sprecher-Koordinaten fehlen, sauber fehlschlagen mit klarer Fehlermeldung und Refund-Schutz.
+
+3. **Reset/Retry für die aktuell kaputte Szene**
+   - Nach dem Code-Fix die betroffene Szene aus dem `dialog_missing_face_coords` Failure zurück auf retryfähigen Zustand setzen:
+     - `lip_sync_status = pending`
+     - `twoshot_stage = master_clip`
+     - `dialog_shots = null`
+     - `lip_sync_applied_at = null`
+     - `clip_error = null`
+   - Der Auto-Trigger startet danach wieder `compose-dialog-scene`.
+
+4. **Deploy & Validierung**
+   - `compose-dialog-scene` deployen.
+   - Funktion gezielt für die betroffene Szene anstoßen oder den Auto-Trigger greifen lassen.
+   - Prüfen, dass `dialog_shots.version = 2` entsteht und die Shots `target_coords` enthalten.
+   - Danach `poll-dialog-shots` prüfen: erster Turn muss einen Sync.so Job dispatchen statt direkt `failed` zu werden.
 
 ## Dateien
 
-- `src/hooks/usePipelineProgress.ts`
-- `src/components/video-composer/SceneClipProgress.tsx`
+- `supabase/functions/compose-dialog-scene/index.ts`
+- Optional nur zur Daten-Reparatur: `composer_scenes` Datensatz der betroffenen Szene
 
-## Validierung
+## Erwartetes Ergebnis
 
-- Cinematic-Sync-Szene starten → globaler Balken muss in Phase "Lipsync" auf `running` springen, sobald `dialog_shots` befüllt sind.
-- Pro fertigem Shot sollte der Lipsync-Phasenfortschritt sichtbar weiterlaufen (z. B. 1/3 → 2/3 → 3/3).
-- Bei `dialog_shots.status = 'done'` Phase auf `done` (grün, 100 %).
-- Bei `dialog_shots.status = 'failed'` Phase auf `failed` (rot).
+Die neue Dialog-Shot-Lip-Sync-Pipeline erzeugt ihre Face-Koordinaten selbst, statt an einem fehlenden Legacy-Cache zu scheitern. Dadurch startet Sync.so wieder korrekt pro Sprecher-Turn mit festen Zielkoordinaten.
