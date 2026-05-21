@@ -1068,6 +1068,18 @@ serve(async (req) => {
         ((scene as any).lock_reference_url as string | undefined) ||
         undefined;
       const detectionClipUrl = ((scene as any).lip_sync_source_clip_url || scene.clip_url) as string | null | undefined;
+      // Resolve character portraits for identity matching. Without these,
+      // Gemini cannot tell which face belongs to which speaker and we fall
+      // back to the (unreliable) positional heuristic — so we hard-fail when
+      // both speakers are present but portraits are missing.
+      const distinctCharIds = Array.from(
+        new Set(
+          passes
+            .map((p) => String((p as any).character_id ?? "").toLowerCase())
+            .filter(Boolean),
+        ),
+      );
+      const characterPortraits = await resolveCharacterPortraits(supabase, user.id, distinctCharIds);
       const faceMap = await detectFacesInMaster(
         supabase,
         scene_id,
@@ -1075,6 +1087,7 @@ serve(async (req) => {
         detectionClipUrl,
         cachedFaceMap,
         LOVABLE_API_KEY,
+        characterPortraits,
       );
       // Do not probe the source MP4 here. The previous full-file probe was the
       // CPU hotspot that killed the function before Sync.so job creation. For
@@ -1087,7 +1100,17 @@ serve(async (req) => {
       console.log(
         `[compose-twoshot-lipsync ${scene_id}] faceMap`,
         faceMap
-          ? { faces: faceMap.faces.length, width: faceMap.width, height: faceMap.height, videoWidth: fallbackDims.width, videoHeight: fallbackDims.height, source: faceMap.source }
+          ? {
+              faces: faceMap.faces.length,
+              width: faceMap.width,
+              height: faceMap.height,
+              videoWidth: fallbackDims.width,
+              videoHeight: fallbackDims.height,
+              source: faceMap.source,
+              identities: faceMap.faces.map((f) => ({ side: f.side, characterId: f.characterId ?? null, matchSource: f.matchSource ?? "unresolved", confidence: f.matchConfidence ?? null })),
+              portraitsResolved: characterPortraits.length,
+              charactersExpected: distinctCharIds.length,
+            }
           : { faces: 0, source: "heuristic-fallback", anchor: !!anchorUrlForDetect, clip: !!detectionClipUrl },
       );
       if (!faceMap) {
@@ -1102,17 +1125,35 @@ serve(async (req) => {
       // rendered clip only shows 1 visible face, NEVER fall back to a single
       // merged-VO pass on one mouth — that is exactly the "all dialogue
       // coming out of one character" failure mode the user is reporting.
-      // Instead refund credits, mark the scene failed with a precise reason,
-      // and let the user re-roll the source clip (via the "Clip + Lipsync
-      // neu rendern" action) so we get a real two-shot to lipsync.
       if (passes.length >= 2 && !hasTwoRealFaces) {
         const detected = faceMap?.faces?.length ?? 0;
         await refund(`source_clip_missing_speakers: detected ${detected}/${passes.length} faces in the rendered clip — the source video does not show all speakers, so multi-pass face-targeted lip-sync is impossible. Re-roll the clip (Clip + Lipsync neu rendern) to get a real two-shot.`);
         return;
       }
+
+      // ── Identity Pre-Flight ────────────────────────────────────────────
+      // If we have 2+ speakers but face↔character identity could not be
+      // resolved for both of them, refuse to send blind position-based
+      // coordinates to Sync.so — that is what caused the dialog-swap bug.
+      // The user is asked to re-roll the clip so a fresh identity pass runs.
+      if (passes.length >= 2 && hasTwoRealFaces) {
+        const resolvedIds = new Set(
+          (faceMap!.faces.map((f) => String(f.characterId ?? "").toLowerCase()).filter(Boolean)) as string[],
+        );
+        const missing = distinctCharIds.filter((id) => !resolvedIds.has(id));
+        if (missing.length > 0) {
+          await refund(
+            `speaker_face_mapping_failed: could not identity-match ${missing.join(", ")} against the rendered clip's faces. ` +
+            `Portraits resolved: ${characterPortraits.length}/${distinctCharIds.length}. ` +
+            `Bitte den Quellclip neu rendern, damit eine frische Gesichts-Identitäts-Zuordnung berechnet wird.`,
+          );
+          return;
+        }
+      }
       const useMultiPass = passes.length >= 2 && hasTwoRealFaces;
       const publicPasses = passes.map(({ _shotIdx: _shotIdx, ...p }) => p);
       let outUrl: string | null = null;
+
 
       if (useMultiPass) {
         // ── Sync.so two-pass face-targeted pipeline ──────────────────────
