@@ -55,6 +55,30 @@ function concatSamples(parts: Int16Array[]): Int16Array {
   return out;
 }
 
+/**
+ * Peak-normalize Int16 PCM in-place to a target peak (default −1 dBFS ≈ 29205).
+ * Only applied to per-speaker tracks whose voiced region is very short — the
+ * Sync.so VAD needs enough signal to detect speech and animate the mouth. We
+ * intentionally do NOT touch the merged track so the final playback level is
+ * consistent across speakers.
+ */
+function peakNormalizeInPlace(samples: Int16Array, targetPeak = 29205): void {
+  let peak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i];
+    const a = v < 0 ? -v : v;
+    if (a > peak) peak = a;
+  }
+  if (peak <= 0 || peak >= targetPeak) return;
+  const gain = targetPeak / peak;
+  // Skip near-no-op gains.
+  if (gain < 1.05) return;
+  for (let i = 0; i < samples.length; i++) {
+    const v = Math.round(samples[i] * gain);
+    samples[i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+  }
+}
+
 function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
   const buf = new ArrayBuffer(44 + dataBytes);
