@@ -36,6 +36,58 @@ function formatSegments(
   );
 }
 
+/**
+ * Expand per-turn voiced windows with a small video-frame pre-roll/tail so
+ * Sync.so's VAD gets onset context (fixes ventriloquist on short 2nd turns)
+ * and frame-grid rounding can't desync mouth from audio. Pre-roll/tail is
+ * capped at half the gap to the nearest neighbor turn (own OR other speaker)
+ * so windows never cross another speaker. Audio itself is NOT padded.
+ */
+const SYNC_LEAD_IN_SEC = 0.12;
+const SYNC_TAIL_SEC = 0.08;
+function expandTurnsWithPreRoll(
+  ownTurns: Array<[number, number]>,
+  otherTurns: Array<[number, number]>,
+  sceneDurSec: number,
+): { windows: Array<[number, number]>; minTurnDur: number } {
+  if (!Number.isFinite(sceneDurSec) || sceneDurSec <= 0 || ownTurns.length === 0) {
+    return { windows: [], minTurnDur: 0 };
+  }
+  const all = [...ownTurns, ...otherTurns]
+    .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a)
+    .sort((x, y) => x[0] - y[0]);
+  const expanded: Array<[number, number]> = [];
+  let minDur = Infinity;
+  for (const [s, e] of ownTurns) {
+    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) continue;
+    minDur = Math.min(minDur, e - s);
+    let prevEnd = 0;
+    let nextStart = sceneDurSec;
+    for (const [a, b] of all) {
+      if (b <= s) prevEnd = Math.max(prevEnd, b);
+      else if (a >= e) nextStart = Math.min(nextStart, a);
+    }
+    const maxLead = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (s - prevEnd) / 2));
+    const maxTail = Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - e) / 2));
+    expanded.push([
+      Math.max(0, s - maxLead),
+      Math.min(sceneDurSec, e + maxTail),
+    ]);
+  }
+  return {
+    windows: expanded,
+    minTurnDur: minDur === Infinity ? 0 : minDur,
+  };
+}
+
+/** Adaptive temperature: short turns (<2s) need 1.0 articulation. */
+function pickTemperatureForTurns(minTurnDurSec: number): number {
+  if (!Number.isFinite(minTurnDurSec) || minTurnDurSec <= 0) return 0.85;
+  return minTurnDurSec < 2.0 ? 1.0 : 0.85;
+}
+
+
+
 /** Normalize stored audioSegmentSecs (single or multi) for retry/fallback. */
 function normalizeSegmentField(
   s: unknown,
