@@ -496,6 +496,12 @@ serve(async (req) => {
       track_url?: string;
     }> = [];
     let cursorSamples = 0;
+    // Inter-speaker pause inserted as real silence — NEVER appended as text
+    // to the TTS prompt. Earlier we appended " ..." to non-final utterances,
+    // which ElevenLabs sometimes voiced as an audible mumble/breath at the
+    // end of short replies ("Was denn? <mumble>"). Silence here is sample-
+    // accurate and never bleeds into another speaker's lip-sync window.
+    const INTER_SPEAKER_PAUSE_SEC = 0.25;
     for (let i = 0; i < blocks.length; i++) {
       const block = blocks[i];
       const voice = resolveVoice(block, dialogVoices, charByName);
@@ -506,8 +512,15 @@ serve(async (req) => {
           message: `Sprecher "${block.rawSpeaker}" hat keine Stimme zugeordnet.`,
         }, 400);
       }
-      const isLast = i === blocks.length - 1;
-      const utterance = isLast ? block.text : `${block.text} ...`;
+      // Insert pause as PCM silence BEFORE every non-first utterance.
+      if (i > 0 && INTER_SPEAKER_PAUSE_SEC > 0) {
+        const pause = silenceSamples(INTER_SPEAKER_PAUSE_SEC);
+        if (pause.length > 0) {
+          sampleBuffers.push(pause);
+          cursorSamples += pause.length;
+        }
+      }
+      const utterance = block.text;
       let pcm: Int16Array;
       try {
         if (voice.engine === "hume") {
@@ -707,11 +720,25 @@ serve(async (req) => {
         group.track_url = tp.publicUrl;
         // Attach voicedRange — consumed by compose-twoshot-lipsync /
         // poll-twoshot-lipsync to set Sync.so input[].segments_secs.
+        // `turns[]` holds one window per actual utterance. We pass these as
+        // multiple disjoint segments to Sync.so so that for a speaker with
+        // multiple turns (e.g. Samuel at 0–2.3s AND 3.9–6.4s) we never
+        // include the OTHER speaker's window (Matthew 2.3–3.9s) inside the
+        // first speaker's lip-sync pass. The union `startSec → endSec` is
+        // kept for backward compat but should not be used as a single window.
+        const turnWindows = group.items
+          .map((it) => ({
+            startSec: Math.round((it.segment._startSample / SAMPLE_RATE) * 1000) / 1000,
+            endSec: Math.round((it.segment._endSample / SAMPLE_RATE) * 1000) / 1000,
+          }))
+          .filter((w) => w.endSec > w.startSec)
+          .sort((a, b) => a.startSec - b.startSec);
         (group as any).voicedRange = {
           startSec: Math.round(voicedStartSec * 1000) / 1000,
           endSec: Math.round(voicedEndSec * 1000) / 1000,
           voicedSec: Math.round(voicedSec * 1000) / 1000,
           normalized: voicedSec > 0 && voicedSec < 2.0,
+          turns: turnWindows,
         };
       } catch (e) {
         console.warn("[compose-twoshot-audio] per-character build error", (e as Error).message);
