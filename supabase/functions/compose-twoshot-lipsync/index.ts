@@ -669,56 +669,66 @@ async function detectFacesInMaster(
 /**
  * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
  *
- * Mapping is explicit and stable:
- *   1. If `characterId` + `characterShots` are provided, the speaker's
- *      position in `character_shots` (0 = left, 1 = right) determines the
- *      face side. This guarantees that "Matthew at shot index 1" goes to
- *      the right face even if speakers were sorted differently upstream.
- *   2. Otherwise we fall back to pass index (0 = left, 1 = right).
+ * Resolution priority (top wins):
+ *   1. `identity_match` — Gemini matched a face to this speaker's character
+ *      portrait. Authoritative: works regardless of left/right positioning.
+ *   2. `pass_order` — pure pass index fallback (0 = left, 1 = right). Used
+ *      only when identity match is unavailable.
  *
- * Returns null if even the heuristic isn't resolvable (no dimensions known).
+ * IMPORTANT: We deliberately do NOT fall back to `character_shots[]` array
+ * position anymore — that array is the UI casting order, not a geometric
+ * truth, and using it caused dialog to be sent to the wrong mouth.
+ *
+ * Returns null when no usable target can be derived.
  */
 function pickTargetCoordinates(
   passIndex: number,
-  faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>; width: number; height: number } | null,
+  faceMap: FaceMap | null,
   fallbackDims: { width: number; height: number },
-  speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null,
-): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
-  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
-  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  speakerContext?: { characterId?: string | null } | null,
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "identity_match" | "pass_order"; matchConfidence?: number; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
   const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
-  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
-  if (charId && shots.length >= 2) {
-    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
-    if (shotIdx >= 0) {
-      side = shotIdx === 0 ? "left" : "right";
-      mappingSource = "character_shots";
+  let mappingSource: "identity_match" | "pass_order" = "pass_order";
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let match: FaceMap["faces"][number] | undefined;
+  let matchConfidence: number | undefined;
+
+  // Primary: identity match via Gemini portrait comparison.
+  if (charId && faceMap?.faces?.length) {
+    const byId = faceMap.faces.find((f) => String(f.characterId ?? "").toLowerCase() === charId);
+    if (byId) {
+      match = byId;
+      side = byId.side;
+      mappingSource = "identity_match";
+      matchConfidence = byId.matchConfidence;
     }
   }
-  if (faceMap?.faces?.length) {
-    const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
-    if (match?.center) {
-      const anchorW = Number(faceMap.width) || 0;
-      const anchorH = Number(faceMap.height) || 0;
-      const videoW = Number(fallbackDims.width) || anchorW || 1280;
-      const videoH = Number(fallbackDims.height) || anchorH || 720;
-      const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
-      const scaleX = sameAspect ? videoW / anchorW : 1;
-      const scaleY = sameAspect ? videoH / anchorH : 1;
-      const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
-      const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
-      let x = faceCenter[0];
-      let y = faceCenter[1];
-      if (bbox) {
-        const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
-        if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
-          x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
-          y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
-        }
+  // Fallback: positional by pass index.
+  if (!match && faceMap?.faces?.length) {
+    match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
+  }
+
+  if (match?.center) {
+    const anchorW = Number(faceMap!.width) || 0;
+    const anchorH = Number(faceMap!.height) || 0;
+    const videoW = Number(fallbackDims.width) || anchorW || 1280;
+    const videoH = Number(fallbackDims.height) || anchorH || 720;
+    const sameAspect = anchorW > 0 && anchorH > 0 && Math.abs((videoW / videoH) - (anchorW / anchorH)) < 0.03;
+    const scaleX = sameAspect ? videoW / anchorW : 1;
+    const scaleY = sameAspect ? videoH / anchorH : 1;
+    const bbox = Array.isArray(match.bbox) && match.bbox.length === 4 ? match.bbox : undefined;
+    const faceCenter: [number, number] = [Math.round(Number(match.center[0]) || 0), Math.round(Number(match.center[1]) || 0)];
+    let x = faceCenter[0];
+    let y = faceCenter[1];
+    if (bbox) {
+      const [x1, y1, x2, y2] = bbox.map((n) => Number(n));
+      if ([x1, y1, x2, y2].every(Number.isFinite) && x2 > x1 && y2 > y1) {
+        x = Math.round(Math.max(x1 + 4, Math.min(x2 - 4, x)));
+        y = Math.round(Math.max(y1 + 4, Math.min(y2 - 4, y)));
       }
-      const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-      return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
     }
+    const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
+    return { coords, side, source: "gemini", mappingSource, matchConfidence, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = fallbackDims.width || 1280;
   const H = fallbackDims.height || 720;
@@ -726,6 +736,7 @@ function pickTargetCoordinates(
   const y = Math.round(H * 0.5);
   return { coords: [x, y], side, source: "heuristic", mappingSource };
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
