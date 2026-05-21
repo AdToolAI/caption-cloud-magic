@@ -1266,7 +1266,9 @@ serve(async (req) => {
                   jobId,
                   status: "PROCESSING",
                   videoUrl: sourceClipUrl,
-                  audioUrl: firstSpeaker.track_url,
+                  audioUrl: mergedVo.url,
+                  audioSegmentSecs: pass1Segment,
+
                   speaker: firstSpeaker.speaker,
                   character_id: firstSpeaker.character_id ?? null,
                   targetFace: firstTarget.side,
