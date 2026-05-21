@@ -105,37 +105,26 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     }
   };
 
-  // Cinematic-Sync state — render-engine === 'cinematic-sync' has 2 phases
-  // (1) Hailuo i2v re-render of real scene  (2) Sync.so lip-sync polish.
+  // Cinematic-Sync state — Dialog-Shot pipeline (1..N speakers).
+  // Each speaker turn becomes its own Hailuo plate + Sync.so lipsync.
   const isCinematic = scene.engineOverride === 'cinematic-sync';
   const lipSyncRunning = isCinematic && scene.lipSyncStatus === 'running';
 
-  // ── Two-Shot Hook pipeline (6-stage progress) ────────────────────────────
-  // Active whenever the audio-plan has ≥ 2 speakers (multi-character dialog).
-  // Stages are written by `compose-twoshot-audio`, `compose-video-clips` and
-  // `compose-twoshot-lipsync`. We render an overlay with a 6-step bar so the
-  // user can see exactly where the pipeline is in real time.
-  const speakerCount = scene.audioPlan?.speakers?.length ?? 0;
-  const isTwoShot = speakerCount >= 2;
-  const twoshotStage = scene.twoshotStage ?? null;
-  const TWO_SHOT_STAGES: Array<{ key: NonNullable<typeof twoshotStage>; label: string }> = [
-    { key: 'audio', label: 'Voiceover' },
-    { key: 'anchor', label: 'Anchor' },
-    { key: 'master_clip', label: 'Master-Clip' },
-    { key: 'lipsync_1', label: 'Lip-Sync 1/2' },
-    { key: 'lipsync_2', label: 'Lip-Sync 2/2' },
-    { key: 'continuity', label: 'Continuity' },
-  ];
-  const stageIndex = (() => {
-    if (!twoshotStage || twoshotStage === 'done') return -1;
-    return TWO_SHOT_STAGES.findIndex((s) => s.key === twoshotStage);
-  })();
-  const currentStageLabel = stageIndex >= 0 ? TWO_SHOT_STAGES[stageIndex].label : null;
-  const showTwoShotOverlay =
-    isTwoShot &&
-    twoshotStage &&
-    twoshotStage !== 'done' &&
-    !hqReady; // once HQ is ready (and stage = done) we hide the bar
+  // ── Dialog-Shot pipeline progress (per-shot status) ──────────────────────
+  // `dialog_shots` is written by `compose-dialog-scene` and updated by
+  // `poll-dialog-shots`. Each shot has its own lifecycle: pending →
+  // generating → generated → lipsyncing → ready (or failed).
+  const dialogShotsState = (scene as any).dialogShots ?? (scene as any).dialog_shots ?? null;
+  const dialogShots: Array<{
+    idx: number;
+    speaker_name?: string;
+    status: 'pending' | 'generating' | 'generated' | 'lipsyncing' | 'ready' | 'failed';
+    error?: string;
+  }> = Array.isArray(dialogShotsState?.shots) ? dialogShotsState.shots : [];
+  const isDialog = isCinematic && (dialogShots.length > 0 || lipSyncRunning);
+  const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
+  const dialogTotal = dialogShots.length;
+  const showDialogOverlay = isDialog && !hqReady && dialogShotsState?.status !== 'done';
 
   // READY → show video / image (with optional Fast-Preview swap badge if both exist)
   if (hqReady) {
@@ -192,7 +181,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               {trim > 0 ? `${trim.toFixed(2)}s` : 'Trim'}
             </button>
           )}
-          {isTwoShot && twoshotStage === 'done' && typeof scene.continuityDriftScore === 'number' && scene.continuityDriftScore > 0.35 && (
+          {isDialog && dialogShotsState?.status === 'done' && typeof scene.continuityDriftScore === 'number' && scene.continuityDriftScore > 0.35 && (
             <div
               className="absolute bottom-1 left-1 bg-amber-500/90 text-black rounded px-1.5 py-0.5 text-[9px] font-semibold flex items-center gap-1 shadow"
               title={`Continuity-Drift ${scene.continuityDriftScore.toFixed(2)} — Charakter-Identität weicht vom Anchor ab. Re-Render empfohlen.`}
@@ -243,7 +232,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             </div>
           </div>
         )}
-        {showTwoShotOverlay && <TwoShotStageBar stages={TWO_SHOT_STAGES} stageIndex={stageIndex} currentLabel={currentStageLabel} />}
+        {showDialogOverlay && <DialogShotsBar shots={dialogShots} ready={dialogReady} total={dialogTotal} />}
       </div>
     );
   }
@@ -371,43 +360,55 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   );
 }
 
-interface TwoShotStageBarProps {
-  stages: ReadonlyArray<{ key: string; label: string }>;
-  stageIndex: number;
-  currentLabel: string | null;
+interface DialogShotsBarProps {
+  shots: Array<{
+    idx: number;
+    speaker_name?: string;
+    status: 'pending' | 'generating' | 'generated' | 'lipsyncing' | 'ready' | 'failed';
+    error?: string;
+  }>;
+  ready: number;
+  total: number;
 }
 
 /**
- * 6-step progress overlay for the multi-character Two-Shot Hook pipeline.
- * Sits on top of the generation skeleton and shows which stage is active.
+ * Per-shot progress overlay for the Dialog-Shot Pipeline (1..N speakers).
+ * Each shot = 1 Hailuo plate + 1 Sync.so lipsync for one speaker turn.
  */
-function TwoShotStageBar({ stages, stageIndex, currentLabel }: TwoShotStageBarProps) {
+function DialogShotsBar({ shots, ready, total }: DialogShotsBarProps) {
+  const headline = total > 0
+    ? `🎭 Dialog-Shots · ${ready}/${total}`
+    : '🎭 Dialog-Shots · Audio wird vorbereitet…';
   return (
     <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-2 py-1.5 pointer-events-none">
       <div className="flex items-center gap-1 mb-1">
-        <Loader2 className="h-3 w-3 text-amber-300 animate-spin shrink-0" />
-        <span className="text-[9px] font-bold text-amber-200 uppercase tracking-wide truncate">
-          🎭 Two-Shot Hook · {currentLabel ?? '…'}
+        <Loader2 className="h-3 w-3 text-emerald-300 animate-spin shrink-0" />
+        <span className="text-[9px] font-bold text-emerald-200 uppercase tracking-wide truncate">
+          {headline}
         </span>
       </div>
-      <div className="flex items-center gap-0.5">
-        {stages.map((s, i) => {
-          const done = i < stageIndex;
-          const active = i === stageIndex;
-          return (
-            <div
-              key={s.key}
-              className={cn(
-                'h-1 flex-1 rounded-full transition-colors',
-                done && 'bg-amber-400',
-                active && 'bg-amber-300 animate-pulse',
-                !done && !active && 'bg-white/15',
-              )}
-              title={s.label}
-            />
-          );
-        })}
-      </div>
+      {total > 0 && (
+        <div className="flex items-center gap-0.5">
+          {shots.map((s) => {
+            const isReady = s.status === 'ready';
+            const isFailed = s.status === 'failed';
+            const isActive = s.status === 'generating' || s.status === 'lipsyncing' || s.status === 'generated';
+            return (
+              <div
+                key={s.idx}
+                className={cn(
+                  'h-1 flex-1 rounded-full transition-colors',
+                  isReady && 'bg-emerald-400',
+                  isFailed && 'bg-destructive',
+                  isActive && 'bg-emerald-300 animate-pulse',
+                  !isReady && !isFailed && !isActive && 'bg-white/15',
+                )}
+                title={`Shot ${s.idx + 1}${s.speaker_name ? ' · ' + s.speaker_name : ''} · ${s.status}${s.error ? ' · ' + s.error : ''}`}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

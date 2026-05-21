@@ -1042,13 +1042,13 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
         okCount = 1;
         toast({
-          title: language === 'de' ? 'Two-Shot wird gerendert' : language === 'es' ? 'Renderizando Two-Shot' : 'Rendering Two-Shot',
+          title: language === 'de' ? 'Dialog-Shots werden gerendert' : language === 'es' ? 'Renderizando Dialog-Shots' : 'Rendering Dialog Shots',
           description:
             language === 'de'
-              ? `Beide Sprecher werden in EINE ${masterDuration}s-Szene komponiert. Du siehst den Fortschritt live in der Clip-Karte (6 Phasen).`
+              ? `Pro Sprecher-Turn wird ein eigener Shot (Hailuo + Sync.so Lip-Sync) gerendert und am Ende zu einer ${masterDuration}s-Szene gestitcht. Live-Fortschritt im Clip-Karten-Overlay.`
               : language === 'es'
-              ? `Ambos hablantes se componen en UNA escena de ${masterDuration}s. Verás el progreso en vivo en la tarjeta del clip (6 fases).`
-              : `Both speakers are being composed into ONE ${masterDuration}s scene. Live progress shows in the clip card (6 phases).`,
+              ? `Por cada turno se renderiza un shot dedicado (Hailuo + Sync.so) y al final se concatena a una escena de ${masterDuration}s. Progreso en vivo en la tarjeta del clip.`
+              : `One dedicated shot (Hailuo + Sync.so lip-sync) per speaker turn, concatenated into a ${masterDuration}s scene at the end. Live progress in the clip-card overlay.`,
         });
         if (onClose) onClose();
       } catch (twoShotErr) {
@@ -1388,12 +1388,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (blocks.length < 2 || !allPortraits || renderAsSeparateScenes) return null;
         return (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
-            🎭 <strong>Two-Shot-Modus:</strong>{' '}
+            🎭 <strong>Dialog-Shot Pipeline:</strong>{' '}
             {language === 'de'
-              ? 'Beide Sprecher werden in EINE 10s-Szene komponiert. Sequenzieller Lip-Sync pro Gesicht via Sync.so + Continuity Guardian.'
+              ? `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`
               : language === 'es'
-              ? 'Ambos hablantes en UNA escena de 10s. Lip-sync secuencial por cara vía Sync.so + Continuity Guardian.'
-              : 'Both speakers composed into ONE 10s scene. Sequential per-face lip-sync via Sync.so + Continuity Guardian.'}
+              ? `Un plate Hailuo + lip-sync Sync.so dedicado por turno. ${blocks.length} shots se concatenan al final.`
+              : `One dedicated Hailuo plate + Sync.so lip-sync per speaker turn. ${blocks.length} shots concatenated into a single scene.`}
           </div>
         );
       })()}
@@ -1437,10 +1437,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 <>
                   <User className="h-3 w-3" />{' '}
                   {language === 'de'
-                    ? `🎭 Two-Shot in echte Szene einbauen (~€1.65)`
+                    ? `🎭 ${blocks.length} Dialog-Shots in echte Szene rendern`
                     : language === 'es'
-                    ? `🎭 Componer Two-Shot en escena real (~€1.65)`
-                    : `🎭 Render Two-Shot into real scene (~€1.65)`}
+                    ? `🎭 Renderizar ${blocks.length} Dialog-Shots en escena real`
+                    : `🎭 Render ${blocks.length} Dialog Shots into real scene`}
                 </>
               ) : (
                 <>

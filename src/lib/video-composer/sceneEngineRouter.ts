@@ -99,17 +99,20 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
   if (override === 'cinematic-sync') {
     return {
       engine: 'cinematic-sync',
-      label: '🎬 Cinematic + Lip-Sync',
+      label: speakers >= 2 ? `🎭 Cinematic Dialog · ${speakers} Sprecher` : '🎬 Cinematic + Lip-Sync',
       reason:
-        'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
-      extraCostEur: 0.20,
+        speakers >= 2
+          ? 'Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate + Sync.so Lip-Sync, dann zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher.'
+          : 'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
+      extraCostEur: speakers >= 2 ? 0.55 * speakers : 0.20,
     };
   }
 
   // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
-    // Single speaker → komponiere den Sprecher in die echte Szene (Hailuo i2v
-    // + Sync.so Lip-Sync) statt einen nackten HeyGen-Avatar-Bust zu zeigen.
+    // Cinematic-Sync handles 1..N speakers via the Dialog-Shot Pipeline:
+    // one Hailuo plate + one Sync.so lipsync per speaker turn, then
+    // concatenated. No more HeyGen Two-Shot fallback.
     if (speakers < 2) {
       return {
         engine: 'cinematic-sync',
@@ -119,14 +122,12 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
         extraCostEur: 0.95,
       };
     }
-    // 2+ Sprecher → HeyGen Two-Shot bleibt der sichere Default (Cinematic-Sync
-    // ist für einen Sprecher pro Shot optimiert).
     return {
-      engine: 'heygen-talking-head',
-      label: `🎙️ HeyGen Lip-Sync (${speakers} Sprecher)`,
+      engine: 'cinematic-sync',
+      label: `🎭 Cinematic Dialog · ${speakers} Sprecher (Auto)`,
       reason:
-        'Mehrere Sprecher im Bild — HeyGen Two-Shot liefert frame-genauen Lip-Sync pro Person.',
-      extraCostEur: estimateHeygenCostEur(speakers),
+        'Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate + Sync.so Lip-Sync, dann zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher.',
+      extraCostEur: 0.55 * speakers,
     };
   }
 
