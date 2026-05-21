@@ -1437,10 +1437,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 <>
                   <User className="h-3 w-3" />{' '}
                   {language === 'de'
-                    ? `🎭 Two-Shot in echte Szene einbauen (~€1.65)`
+                    ? `🎭 ${blocks.length} Dialog-Shots in echte Szene rendern`
                     : language === 'es'
-                    ? `🎭 Componer Two-Shot en escena real (~€1.65)`
-                    : `🎭 Render Two-Shot into real scene (~€1.65)`}
+                    ? `🎭 Renderizar ${blocks.length} Dialog-Shots en escena real`
+                    : `🎭 Render ${blocks.length} Dialog Shots into real scene`}
                 </>
               ) : (
                 <>
