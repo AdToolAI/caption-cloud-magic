@@ -170,6 +170,10 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
               <span className="text-[8px] text-emerald-100/80">Sync.so · ~60 s</span>
             </div>
           )}
+          {/* Per-shot progress bar while dialog pipeline is finishing on top of a ready master clip */}
+          {isDialog && dialogShotsState?.status !== 'done' && (
+            <DialogShotsBar shots={dialogShots} ready={dialogReady} total={dialogTotal} />
+          )}
           {showTrimButton && !lipSyncRunning && (
             <button
               type="button"
