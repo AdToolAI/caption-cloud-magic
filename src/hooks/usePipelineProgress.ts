@@ -76,6 +76,8 @@ export function usePipelineProgress({
     clipsTotal: number;
     lipsyncDone: number;
     lipsyncTotal: number;
+    dialogShotsDone: number;
+    dialogShotsTotal: number;
     voiceoverHadAudio: boolean;
     musicHad: boolean;
   } | null>(null);
