@@ -252,13 +252,9 @@ serve(async (req) => {
           (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
 
         if (lipScene?.engine_override === 'cinematic-sync' && lipScene.clip_url && !alreadyFinal && !alreadyRunning) {
-          const plan = (lipScene.audio_plan ?? {}) as Record<string, any>;
-          const speakers = Math.max(
-            detectSpeakerCount(String(lipScene.dialog_script ?? '')),
-            Array.isArray(plan.speakers) ? plan.speakers.length : 0,
-            Array.isArray(plan.twoshot?.speakers) ? plan.twoshot.speakers.length : 0,
-          );
-          const fnName = speakers >= 2 ? 'compose-twoshot-lipsync' : 'compose-lipsync-scene';
+          // NEW dialog-based shot pipeline (scales 1..N speakers). Replaces
+          // the legacy two-shot / single-shot Sync.so split.
+          const fnName = 'compose-dialog-scene';
           const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
@@ -269,6 +265,7 @@ serve(async (req) => {
               console.error(`[compose-clip-webhook] ${fnName} fallback failed`, r.status, txt.slice(0, 500));
             }
           });
+
           // @ts-ignore — Deno Deploy / Supabase edge runtime API
           if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
             // @ts-ignore
