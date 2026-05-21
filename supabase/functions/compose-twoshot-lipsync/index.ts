@@ -638,36 +638,36 @@ serve(async (req) => {
     const SYNC_API_KEY = Deno.env.get("SYNC_API_KEY");
     if (!REPLICATE_KEY && !SYNC_API_KEY) return json({ error: "REPLICATE_API_KEY or SYNC_API_KEY missing" }, 500);
 
-    // Reserve credits + mark stage.
-    await supabase.from("wallets").update({
-      balance: wallet.balance - cost,
-      updated_at: new Date().toISOString(),
-    }).eq("user_id", user.id);
-
-    await setStage(supabase, scene_id, "lipsync_1", {
+    // Mark preflight only. Credits are charged later, immediately before the
+    // Sync.so submit, so CPU/preflight aborts cannot burn user credits.
+    await setStage(supabase, scene_id, "preflight", {
       lip_sync_status: "running",
       clip_error: null,
+      replicate_prediction_id: null,
     });
     await appendTwoshotDiag(supabase, scene_id, {
       source: "compose",
-      event: "pipeline_started",
-      stage: "lipsync_1",
+      event: "preflight_started",
+      stage: "preflight",
       status: "running",
       reason: `cost=${cost} duration=${Number((scene as any).duration_seconds ?? 0)}s`,
     });
 
     let refunded = false;
+    let creditsReserved = false;
     const refund = async (reason: string) => {
       if (refunded) return;
       refunded = true;
       console.warn(`[compose-twoshot-lipsync ${scene_id}] Refund ${cost}: ${reason}`);
-      const { data: w2 } = await supabase
-        .from("wallets").select("balance").eq("user_id", user.id).single();
-      if (w2) {
-        await supabase.from("wallets").update({
-          balance: w2.balance + cost,
-          updated_at: new Date().toISOString(),
-        }).eq("user_id", user.id);
+      if (creditsReserved) {
+        const { data: w2 } = await supabase
+          .from("wallets").select("balance").eq("user_id", user.id).single();
+        if (w2) {
+          await supabase.from("wallets").update({
+            balance: Number(w2.balance ?? 0) + cost,
+            updated_at: new Date().toISOString(),
+          }).eq("user_id", user.id);
+        }
       }
       await setStage(supabase, scene_id, "failed", {
         lip_sync_status: "failed",
@@ -680,6 +680,25 @@ serve(async (req) => {
         status: "failed",
         reason,
       });
+    };
+
+    const reserveCredits = async (): Promise<boolean> => {
+      if (creditsReserved) return true;
+      const { data: latestWallet } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .single();
+      if (!latestWallet || Number(latestWallet.balance ?? 0) < cost) {
+        await refund(`INSUFFICIENT_CREDITS_BEFORE_PROVIDER_SUBMIT: required=${cost}`);
+        return false;
+      }
+      await supabase.from("wallets").update({
+        balance: Number(latestWallet.balance ?? 0) - cost,
+        updated_at: new Date().toISOString(),
+      }).eq("user_id", user.id);
+      creditsReserved = true;
+      return true;
     };
 
     // ────────────────────────────────────────────────────────────────────
