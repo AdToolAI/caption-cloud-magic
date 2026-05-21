@@ -1,19 +1,23 @@
 ---
 name: Lipsync Pro Policy
-description: Sync.so two-shot lip-sync — merged WAV in both passes + segments_secs scoping, sample-exact voiced range, idempotent refunds
+description: Sync.so two-shot lip-sync — merged WAV in both passes + per-turn segments_secs windows, no TTS text mutation, idempotent refunds
 type: feature
 ---
 
 **Two-Shot Lip-Sync (Mai 2026, stabiler Pfad):**
 - `compose-twoshot-lipsync` nutzt bei 2 echten Gesichtern **keine Sync.so Segments API mehr**. Standard ist **Two-Pass Face-Targeting** über Sync.so Direct API: Pass 1 = Face 1, Pass 2 = Face 2.
-- **Single-Source-of-Truth Audio**: Beide Passes bekommen denselben `audio_plan.twoshot.url` (merged WAV — exakt das Audio das User im Preview/Export hört) als `audioUrl`. Per-character `track_url` ist nur noch Debug-/Recovery-Artefakt, NICHT mehr Sync.so-Input. Damit entfällt Re-Encode-Drift zwischen Mund-Animation und tatsächlich abgespieltem Audio (verursachte „Char 2 redet später als seine Stimme spielt").
-- Scoping pro Pass via `segments_secs = [voicedRange.startSec, voicedRange.endSec]` **ausschließlich am Video-Input** (Sync.so v2 lehnt es auf Audio-Inputs mit „Start and end times are only supported for video inputs" → 400 ab). Merged-WAV bleibt unscoped als Audio-Input. Nur Frames im Window werden re-animiert, der Rest des Clips bleibt verbatim — exakt das was Two-Pass braucht. **Kein Pre-/Post-Padding** (das frühere `pad=0.25` verschob die VAD-Onset und war Hauptursache für sichtbaren Mund-vs-Voice-Versatz).
-- `temperature = 0.5` einheitlich für beide Passes (kein Bonus für windowed mehr).
+- **Single-Source-of-Truth Audio**: Beide Passes bekommen denselben `audio_plan.twoshot.url` (merged WAV — exakt das Audio das User im Preview/Export hört) als `audioUrl`. Per-character `track_url` ist nur noch Debug-/Recovery-Artefakt, NICHT mehr Sync.so-Input. Damit entfällt Re-Encode-Drift zwischen Mund-Animation und tatsächlich abgespieltem Audio.
+- **Per-Turn Windows (kein Union-Fenster!):** Scoping pro Pass via `segments_secs` als **mehrere disjunkte Fenster pro Sprecher-Turn**, ausschließlich am Video-Input. Beispiel: Samuel spricht in Zeile 1 (0–2.3s) und Zeile 3 (3.9–6.4s), Matthew dazwischen (2.3–3.9s). Samuels Pass MUSS `segments_secs=[[0,2.3],[3.9,6.4]]` bekommen — ein Union-Fenster `[[0,6.4]]` würde Matthews Mundbereich überschreiben und ihn fremde Zeilen mitsprechen lassen. Quelle der Turns: `audio_plan.twoshot.speakers[i].voicedRange.turns[]` (gesetzt von `compose-twoshot-audio`).
+- `segmentSecs`-Parameter in `startSyncJob`/`startSyncSoDirectGeneration` akzeptiert sowohl `[start,end]` als auch `Array<[start,end]>`; intern normalisiert auf `Array<[start,end]>`. Sync.so v2 lehnt `segments_secs` auf Audio-Inputs mit „Start and end times are only supported for video inputs" → 400 ab; Fallback: retry ohne Window.
+- **Keine TTS-Textmutation:** `compose-twoshot-audio` darf NIE den Skripttext verändern, bevor er an ElevenLabs/Hume geht — kein angehängtes ` ...`, kein zusätzliches Token. Pausen zwischen Sprechern werden ausschließlich als echte PCM-Silence (`INTER_SPEAKER_PAUSE_SEC = 0.25s`) zwischen den Audio-Samples eingefügt. Grund: bei kurzen Zeilen wie „Was denn?" hat ElevenLabs das ` ...` als hörbares Murmeln/Atmen voiced.
+- **Kein Pre-/Post-Padding** auf `segments_secs` (frühere `pad=0.25` verschob die VAD-Onset und war Hauptursache für sichtbaren Mund-vs-Voice-Versatz).
+- `temperature = 0.5` einheitlich für beide Passes.
 - Face-Target-Koordinaten kommen aus den Pixel-`center`-Werten der Anchor-FaceMap; `normCenter × videoDims` ist verboten, wenn bereits Pixel-Center existieren.
 - Face-Identity-Mapping: `pickTargetCoordinates` matched `faceMap.faces[].characterId === speaker.character_id` (Gemini Vision Identity Match), nicht Position. Bei fehlgeschlagenem Match: harter Stopp + Refund.
-- Sync.so Payload: `auto_detect:false + frame_number:0 + coordinates:[x,y]`. KEIN `bounding_boxes` (Single-Box-Format wird nicht unterstützt → generic „Unknown error").
-- `compose-twoshot-lipsync` queued nur Pass 1, returnt 202; `poll-twoshot-lipsync` chained Pass 2 nach Pass-1-Completion.
-- Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert. Fallback: wenn Sync.so `segments_secs` ablehnt, retry ohne Window (bestehende Logik in `startSyncJob`).
+- Sync.so Payload: `auto_detect:false + frame_number:0 + coordinates:[x,y]`. KEIN `bounding_boxes`.
+- `compose-twoshot-lipsync` queued nur Pass 1, returnt 202; `poll-twoshot-lipsync` chained Pass 2 nach Pass-1-Completion und nutzt dabei dieselbe Per-Turn-Logik.
+- Auto-Detect-Fallback (`isolated_track_auto_detect`) verwendet ausschließlich die **per-character isolierte Spur** (`latestCurrentJob.audioUrl` = der per-speaker padded WAV) — NIEMALS die merged WAV mit auto_detect, sonst würden alle Zeilen auf ein Gesicht gemappt.
+- Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert.
 
 **Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).
 
@@ -21,7 +25,7 @@ type: feature
 
 **Pricing:** Sync.so Creator $19/mo plan; `ceil(durationSec) × 9 × 2 passes` credits (€0.18/s, ~22% margin); MIN_VO_DURATION 0.4s; idempotent refunds via deterministic UUID.
 
-**Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV. `voicedRange.startSec/endSec` ist sample-exakt am tatsächlichen TTS-Onset.
+**Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV. `voicedRange.turns[i].startSec/endSec` ist sample-exakt am tatsächlichen TTS-Onset jeder Einzeläußerung.
 
 **No-Burned-In-Text Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`.
 
