@@ -1,27 +1,30 @@
 ---
 name: Lipsync Pro Policy
-description: Sync.so two-shot lip-sync — Segments API with single merged audio + sync-3 model, sample-accurate PCM/WAV pipeline, idempotent refunds
+description: Sync.so two-shot lip-sync — merged WAV in both passes + segments_secs scoping, sample-exact voiced range, idempotent refunds
 type: feature
 ---
 
 **Two-Shot Lip-Sync (Mai 2026, stabiler Pfad):**
-- `compose-twoshot-lipsync` nutzt bei 2 echten Gesichtern **keine Sync.so Segments API mehr**. Segments (`sync-3`/`lipsync-2` + `segments[]`) wurde wegen wiederholtem Provider-Fehler `The segments configuration is invalid.` verworfen.
-- Standard ist jetzt **Two-Pass Face-Targeting** über Sync.so Direct API: Pass 1 = linkes Gesicht + Sprecher-Track 1, Pass 2 = rechtes Gesicht + Sprecher-Track 2.
-- Face-Target-Koordinaten müssen aus den gespeicherten Pixel-`center`-Werten der Anchor-FaceMap kommen; `normCenter × videoDims` ist verboten, wenn bereits Pixel-Center existieren, weil 16:9/1:1-Dimensions-Mismatch Sync.so mit `generation_pipeline_failed` crashen kann.
-- Audio pro Pass ist der vorhandene gepaddete per-character WAV-Track aus `audio_plan.twoshot.speakers[].track_url`; das finale Preview/Export-Audio bleibt die gemergte WAV (`audio_plan.twoshot.url`) mit `useExternalAudio=true`.
-- Face-Ziele kommen aus `audio_plan.twoshot.faceMap` (`left`/`right`) und werden als `options.active_speaker_detection.auto_detect=false` + Koordinaten an Sync.so gesendet.
-- `compose-twoshot-lipsync` queued nur Pass 1 und returnt `202`; `poll-twoshot-lipsync` chained Pass 2 und finalisiert nach Completion. Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert.
+- `compose-twoshot-lipsync` nutzt bei 2 echten Gesichtern **keine Sync.so Segments API mehr**. Standard ist **Two-Pass Face-Targeting** über Sync.so Direct API: Pass 1 = Face 1, Pass 2 = Face 2.
+- **Single-Source-of-Truth Audio**: Beide Passes bekommen denselben `audio_plan.twoshot.url` (merged WAV — exakt das Audio das User im Preview/Export hört) als `audioUrl`. Per-character `track_url` ist nur noch Debug-/Recovery-Artefakt, NICHT mehr Sync.so-Input. Damit entfällt Re-Encode-Drift zwischen Mund-Animation und tatsächlich abgespieltem Audio (verursachte „Char 2 redet später als seine Stimme spielt").
+- Scoping pro Pass via `segments_secs = [voicedRange.startSec, voicedRange.endSec]`. **Kein Pre-/Post-Padding** (das frühere `pad=0.25` verschob die VAD-Onset und war Hauptursache für sichtbaren Mund-vs-Voice-Versatz).
+- `temperature = 0.5` einheitlich für beide Passes (kein Bonus für windowed mehr).
+- Face-Target-Koordinaten kommen aus den Pixel-`center`-Werten der Anchor-FaceMap; `normCenter × videoDims` ist verboten, wenn bereits Pixel-Center existieren.
+- Face-Identity-Mapping: `pickTargetCoordinates` matched `faceMap.faces[].characterId === speaker.character_id` (Gemini Vision Identity Match), nicht Position. Bei fehlgeschlagenem Match: harter Stopp + Refund.
+- Sync.so Payload: `auto_detect:false + frame_number:0 + coordinates:[x,y]`. KEIN `bounding_boxes` (Single-Box-Format wird nicht unterstützt → generic „Unknown error").
+- `compose-twoshot-lipsync` queued nur Pass 1, returnt 202; `poll-twoshot-lipsync` chained Pass 2 nach Pass-1-Completion.
+- Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert. Fallback: wenn Sync.so `segments_secs` ablehnt, retry ohne Window (bestehende Logik in `startSyncJob`).
 
-**Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert das Ergebnis via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).
+**Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).
 
-**No-Silent-Fallback:** Wenn 2+ Sprecher, aber im fertigen Clip <2 Gesichter → `clip_error='source_clip_missing_speakers'` + Refund, kein single-pass merged-VO Fallback (verhindert „beide Stimmen aus einem Mund"). User triggert „🎥 Clip + Lip-Sync neu rendern" in `SceneCard`.
+**No-Silent-Fallback:** Wenn 2+ Sprecher, aber im fertigen Clip <2 Gesichter → `clip_error='source_clip_missing_speakers'` + Refund, kein single-pass merged-VO Fallback. User triggert „🎥 Clip + Lip-Sync neu rendern" in `SceneCard`.
 
 **Pricing:** Sync.so Creator $19/mo plan; `ceil(durationSec) × 9 × 2 passes` credits (€0.18/s, ~22% margin); MIN_VO_DURATION 0.4s; idempotent refunds via deterministic UUID.
 
-**Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier; pcm_44100 wäre Pro-only). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV (`.wav`, `audio/wav`). `scene_audio_clips.metadata.format = 'wav'`.
+**Sample-Accurate Audio Pipeline:** `compose-twoshot-audio` läuft komplett auf Int16-PCM @ 44.1 kHz mono — kein MP3-Byte-Stitching. ElevenLabs `output_format=pcm_24000` (Starter-Tier). Hume liefert WAV → decode + resample. Merged track hart auf `totalSamples = round(sceneDur * 44100)` getrimmt. Upload als WAV. `voicedRange.startSec/endSec` ist sample-exakt am tatsächlichen TTS-Onset.
 
-**No-Burned-In-Text Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben — Nano Banana 2 würde es als Captions in das Frame brennen. `SceneDialogStudio` benutzt nur `scene.aiPrompt` oder neutralen Fallback. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`.
+**No-Burned-In-Text Policy:** Dialog-Skript (`Name: line`) nie als Visual-Prompt an `compose-scene-anchor` oder i2v geben. `compose-scene-anchor` sanitized serverseitig (`stripSpokenDialog`) + `NO_TYPOGRAPHY_SUFFIX`.
 
-**Export-Audio Two-Shot:** Der finale Sync.so-Clip enthält in seiner eingebetteten Audiospur nur Last-Pass-Stimme — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV). `compose-video-assemble` filtert Voiceover-Clips für lip-synced Szenen nur dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat.
+**Export-Audio Two-Shot:** Der finale Sync.so-Clip enthält in seiner eingebetteten Audiospur nur Pass-2-Window-Audio — die volle gemischte Dialog-Spur liegt in `audio_plan.twoshot.url` (WAV). `compose-video-assemble` filtert Voiceover-Clips für lip-synced Szenen nur dann raus, wenn die Szene **kein** `audio_plan.twoshot.useExternalAudio === true` hat.
 
-**Preview Mute Policy:** `sceneShouldForceMute(scene)` + `resolveVideoMuted(scene)` an allen 5 mute-Stellen in ComposerSequencePreview (preloadSlot, play-loop, mute-change effect, image-branch transition, crossfade transition).
+**Preview Mute Policy:** `sceneShouldForceMute(scene)` + `resolveVideoMuted(scene)` an allen 5 mute-Stellen in ComposerSequencePreview.
