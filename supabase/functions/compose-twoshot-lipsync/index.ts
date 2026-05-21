@@ -258,7 +258,7 @@ async function startSyncSoDirectGeneration(
     });
   };
 
-  const useSegments = !!params.segmentSecs;
+  const useSegments = !!normalizedSegments;
   let createResp = await submit(useSegments);
 
   if (!createResp.ok && useSegments) {
