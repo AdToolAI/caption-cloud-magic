@@ -247,7 +247,7 @@ async function startSyncSoDirectGeneration(
   const options: Record<string, unknown> = {
     sync_mode: params.syncMode ?? "cut_off",
     output_format: "mp4",
-    temperature: params.temperature ?? 0.5,
+    temperature: params.temperature ?? 0.85,
   };
 
   // Sync.so Speaker Selection API: for a single manually-selected speaker on
@@ -1248,10 +1248,10 @@ serve(async (req) => {
               videoUrl: sourceClipUrl,
               audioUrl: mergedVo.url,
               syncMode: "cut_off",
-              // 0.7 (was 0.5) — the lip-ready neutral plate has a soft natural
-              // mouth and needs a higher temperature for visible articulation.
-              // 0.5 + closed-lip prompt produced the ventriloquist effect.
-              temperature: 0.7,
+              // 0.85 — lip-ready neutral plate needs high articulation for
+              // visible mouth motion. 0.5 → ventriloquist effect, 0.7 still
+              // too subtle on Two-Shot plates.
+              temperature: 0.85,
               targetCoords: firstTarget.coords,
               // No `faceBbox`: Sync.so wants per-frame box arrays, not a
               // single static one. coordinates+frame_number is the stable path.
@@ -1370,7 +1370,7 @@ serve(async (req) => {
                 videoUrl: sourceClipUrl,
                 audioUrl: mergedVo.url,
                 syncMode,
-                temperature: 0.5,
+                temperature: 0.85,
                 targetCoords: null, // auto-detect for single-speaker
               },
               "lipsync_single_pass",
@@ -1384,7 +1384,7 @@ serve(async (req) => {
                 video: sourceClipUrl,
                 audio: mergedVo.url,
                 sync_mode: syncMode,
-                temperature: 0.5,
+                temperature: 0.85,
                 active_speaker: true,
                 output_format: "mp4",
               },
