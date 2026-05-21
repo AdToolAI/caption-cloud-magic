@@ -1,97 +1,170 @@
-## Befund
+## Kurzantwort
 
-Der aktuelle Fehler ist dieselbe Szene `cb2b149d-a926-48c5-8589-e3c590faface` aus deinem Screenshot. Sie ist nicht nur „hängengeblieben“, sondern Sync.so hat **Pass 1 dreimal hintereinander** mit `generation_pipeline_failed` abgelehnt:
+Ja, wir können die Ursache eingrenzen und beheben. Es sind zwei verschiedene Probleme, die sich überlagern:
 
-- Quellvideo ist technisch ok: MP4/H.264, **1376×768**, 10.125s.
-- Audio ist technisch ok: WAV/PCM 44.1kHz mono, 8s.
-- FaceMap ist vorhanden: links `[358,215]`, rechts `[1018,223]`.
-- Fehler passiert bei Pass 1 mit `active_speaker_detection.coordinates=[358,215]`.
+1. **Der aktuelle 95%-Hänger ist ein App-State-Bug, kein laufender Anbieter-Job.**
+2. **Die eigentlichen Lip-Sync-Crashes kommen von der aktuellen Two-Pass-Strategie gegen Sync.so, die bei Multi-Face-Clips weiterhin fragil ist.**
 
-Damit ist die reine Retry-Logik nicht genug: Wenn Sync.so denselben Input 3× ablehnt, ist die Anfrage für diesen Clip wahrscheinlich **deterministisch problematisch**. Der Hauptverdacht ist der aktuelle Two-Pass-Ansatz mit **nur einem Punkt-Koordinatenziel auf Frame 0**. Laut Sync.so-Doku müssen Koordinaten exakt zum extrahierten Frame passen; robuster ist bei eigener Detection die Übergabe von `bounding_boxes` statt nur `coordinates`.
+## Was ich konkret gefunden habe
 
-## Ziel
+### Aktuelle hängende Szene
 
-Der Kunde soll keinen rohen Sync.so-Fehler mehr bekommen. Die Pipeline soll bei Provider-/Targeting-Problemen automatisch auf eine stabilere Strategie umschalten und erst dann sichtbar fehlschlagen, wenn der Quellclip selbst ungeeignet ist.
+Die aktuelle Szene `97a82039-19e1-4b6c-a050-98ed4e9db81c` steht so in der Datenbank:
 
-## Umsetzung
+```text
+lip_sync_status = pending
+twoshot_stage = lipsync_1
+replicate_prediction_id = 8mjrptg1phrmy0cy8z5tpvwfv4
+syncJobs = leer
+heartbeat = leer
+clip_error = auto-reset: stale running
+```
 
-### 1. Sync.so Speaker Selection robuster machen
+Das ist ein Zombie-State:
 
-In `compose-twoshot-lipsync` und `poll-twoshot-lipsync` wird der Sync.so-Request geändert:
+- `lipsync_1` sagt der UI: „Lip Sync läuft“.
+- `pending` sagt dem Backend: „wartet auf Neustart“.
+- Es gibt aber **keine Sync.so Job-ID** (`sync:*`) und keinen `syncJobs.jobs[]` Eintrag.
+- Der Watchdog ignoriert diesen Zustand aktuell, weil er pending-Szenen mit `twoshot_stage = lipsync_1` nicht neu startet.
+- Der Client ignoriert ihn ebenfalls, weil er `lipsync_1` nicht als startbaren Retry-Zustand akzeptiert.
 
-- Primär nicht mehr nur `coordinates` senden.
-- Wenn `faceBbox` vorhanden ist, `options.active_speaker_detection.bounding_boxes` für Frame 0 senden.
-- `frame_number`/`coordinates` nur noch als Fallback nutzen, wenn keine Box vorhanden ist.
-- FaceMap-Dimensionen werden gegen echte MP4-Dimensionen validiert; wenn sie nicht passen, werden BBox/Center sauber skaliert.
+Darum hängt die Anzeige bei 95%, obwohl kein echter Job mehr läuft.
 
-Warum: Sync.so dokumentiert `bounding_boxes` explizit als robusteren Weg, wenn eigene Face-Detection vorhanden ist.
+### Warum der eigentliche Lip Sync crasht
 
-### 2. Pass-Order/Faces absichern
+Bei der vorherigen Szene `cb2b149d-a926-48c5-8589-e3c590faface` ist der Anbieter wirklich gescheitert:
 
-Aktuell wird Pass 1 nach `character_shots` sortiert, aber das kann bei Szene/Prompt/FaceMap in der Praxis Matthew auf das linke Gesicht pinnen, obwohl Matthew im Clip rechts steht. Das kann Sync.so intern destabilisieren oder den falschen Mund animieren.
+```text
+clip_error = source_clip_unusable: Sync.so refused both face-targeted and auto-detect passes
+syncJobs.jobs = 2
+fallbackMode = auto_detect_single_pass
+lastError = An unknown error occurred.
+```
 
-Ich ergänze eine defensive Zuordnung:
+Das heißt: Dort wurde Sync.so tatsächlich erreicht, aber Sync.so hat sowohl den face-targeted Pass als auch den Auto-Detect-Fallback abgelehnt.
 
-- Wenn Cast-Positionen/Faces nicht eindeutig sind, wird nicht blind `passIndex -> left/right` verwendet.
-- Die Pipeline prüft, ob Speaker-Name/Character-Shot visuell zur Face-Seite passt, soweit Metadaten vorhanden sind.
-- Falls unklar: sichere Reihenfolge aus FaceMap + CharacterShot-Position statt zufälliger Track-Reihenfolge.
+Das Muster wiederholt sich in älteren Szenen mit:
 
-### 3. Nach endgültigem Sync.so-Pass-Fail automatisch auf sicheren Fallback wechseln
+```text
+syncso_failed: An error occurred in the generation pipeline.
+```
 
-Wenn ein Two-Pass-Job nach Retries wieder `generation_pipeline_failed` liefert:
+Die wahrscheinliche technische Ursache ist nicht „11 Minuten warten“, sondern die Art, wie wir Zwei-Charakter-Lip-Sync aktuell ausführen:
 
-- Nicht sofort endgültig `failed` für den Kunden.
-- Stattdessen automatisch eine zweite Strategie starten:
-  - gleicher Clip,
-  - merged dialogue audio,
-  - Sync.so `auto_detect=true`,
-  - `sync_mode=cut_off`,
-  - markiert als `fallback: auto_detect_single_pass`.
+- Wir starten sequentielle Einzel-Passes pro Sprecher.
+- Dafür wird ein Gesicht per BBox/Koordinate auf Frame 0 gepinnt.
+- Der Clip bleibt aber ein echter Zwei-Personen-Clip mit mehreren sichtbaren Gesichtern.
+- Sync.so dokumentiert für Multi-Speaker-Fälle eigentlich die **Segments API**: mehrere Audio-Inputs + Zeitsegmente in einem einzigen Generate-Call.
+- Unsere aktuelle Two-Pass-Strategie erzeugt mehr Angriffsfläche: falsches Gesicht, Provider-internes Face-Tracking, Zwischendatei, zweiter Pass, Timeout, Reset-State.
 
-Wenn dieser Fallback klappt, wird die Szene als `done` gespeichert und die gemischte externe Dialogspur bleibt aktiv (`useExternalAudio=true`).
+Zusätzlich gibt es einen Architekturfehler im Statushandling:
 
-Wenn auch dieser Fallback scheitert, wird sauber refundet und die UI bekommt eine verständliche Meldung: Quellclip neu rendern, weil der Provider diesen Clip nicht lipsyncen kann.
+- `compose-twoshot-lipsync` setzt früh `twoshot_stage = lipsync_1` und `lip_sync_status = running`.
+- Erst später wird der echte Sync.so Job erstellt und als `replicate_prediction_id = sync:<jobId>` gespeichert.
+- Wenn die Hintergrundausführung zwischen diesen Schritten stirbt oder vom Client zurückgesetzt wird, bleibt `lipsync_1` ohne echten Job zurück.
 
-### 4. Watchdog darf keine finalen Provider-Fails verstecken
+## Können wir das beheben?
 
-Der `twoshot-lipsync-watchdog` bleibt als Server-Sicherheit aktiv, bekommt aber klarere Regeln:
+Ja. Nicht indem wir nur mehr Retries hinzufügen, sondern indem wir die Pipeline robuster umbauen.
 
-- laufende Jobs weiter pollen,
-- Retry/Fallback-Status nicht als „tot“ markieren,
-- nur wirklich stale Jobs nach Timeout beenden,
-- Fehlermeldungen mit `fallback_attempted`, `final_provider_failed`, `source_clip_unusable` speichern.
+## Fix-Plan
 
-### 5. UI-Auto-Retry für genau diesen Fehler erlauben
+### 1. Zombie-State sofort reparieren
 
-`useTwoShotAutoTrigger` wird erweitert:
+In `useTwoShotAutoTrigger` und `twoshot-lipsync-watchdog` wird dieser Zustand erkannt:
 
-- `syncso_failed`, `syncso_rejected`, `syncso_canceled`, `generation_pipeline_failed` gelten als recoverable, solange noch kein Fallback versucht wurde.
-- Kein Endlosloop: pro Szene nur eine automatische Recovery-Runde.
-- Der Progress-Balken zeigt während Retry/Fallback weiter „läuft“, nicht 95%-Stillstand.
+```text
+pending + lipsync_* + keine sync:* Job-ID + keine syncJobs.jobs[] + kein heartbeat
+```
 
-### 6. Aktuelle Szene reparieren
+Dann wird die Szene sauber zurückgesetzt:
 
-Nach der Code-Härtung setze ich die aktuelle Szene zurück:
+```text
+twoshot_stage = null
+replicate_prediction_id = null
+clip_error = auto-retry: zombie_lipsync_stage_without_sync_job
+```
 
-- `lip_sync_status = pending`
-- `twoshot_stage = null`
-- `clip_error = auto-retry: hardened sync.so fallback`
-- `replicate_prediction_id = null`
+Danach wird `compose-twoshot-lipsync` neu aufgerufen.
 
-Dann kann die neue Pipeline dieselbe Szene erneut verarbeiten.
+### 2. Fortschrittsbalken korrigieren
 
-## Nicht im Scope
+`usePipelineProgress` darf `twoshot_stage = lipsync_1` nur noch als laufend zählen, wenn wirklich ein Job existiert:
 
-- Kein Umbau der Voiceover-Erzeugung.
-- Kein Wechsel von Sync.so zu einem anderen Anbieter.
-- Kein Pricing-Änderung.
-- Kein Render-/Export-Umbau.
+```text
+lip_sync_status = running
+oder replicate_prediction_id beginnt mit sync:
+oder audio_plan.twoshot.syncJobs.jobs[] enthält Job
+oder heartbeat.syncJobId existiert
+```
 
-## Erwartetes Ergebnis
+Damit kann die UI nicht mehr bei 95% hängen, wenn backendseitig nichts läuft.
 
-Die Pipeline wird nicht „fehlerfrei“ im Sinne von „Provider kann niemals fehlschlagen“ — das kann kein externer KI-Anbieter garantieren. Aber sie wird produktionsstabiler:
+### 3. Diagnose-Historie an jede Szene schreiben
 
-- transienter Sync.so-Fehler → Retry,
-- deterministischer Face-Targeting-Fehler → anderer Targeting-Modus/BBox,
-- weiterhin fehlerhaft → Auto-Detect-Fallback,
-- final unmöglich → Refund + verständliche Meldung statt 95%-Hänger oder roher Provider-Fehler.
+Wir speichern in `audio_plan.twoshot.diagnostics` die letzten Statuswechsel:
+
+```text
+source, event, stage, status, jobId, reason, timestamp
+```
+
+Dann sehen wir beim nächsten Fehler sofort:
+
+- ob Sync.so überhaupt erstellt wurde,
+- welcher Job gepollt wurde,
+- ob der Client zurückgesetzt hat,
+- ob der Watchdog eingegriffen hat,
+- ob ein Provider-Fehler oder ein App-State-Fehler vorliegt.
+
+### 4. Two-Pass als Hauptstrategie ersetzen
+
+Für echte Zwei-Charakter-Szenen sollten wir die Sync.so **Segments API** als primäre Strategie verwenden:
+
+```text
+1 Video Input
+2 Audio Inputs, je Sprecher
+Segments mit startTime/endTime + audioInput.refId
+1 Sync.so Generate-Job
+```
+
+Das passt besser zum Problem als zwei nacheinander gerenderte Face-Passes.
+
+Vorteil:
+
+- nur ein Provider-Job,
+- keine Zwischenclip-Kaskade,
+- weniger Timeout-Risiko,
+- bessere Multi-Speaker-Semantik,
+- weniger Zombie-State-Möglichkeiten.
+
+### 5. Two-Pass nur noch als Fallback behalten
+
+Wenn Segments von Sync.so abgelehnt wird, kann Two-Pass weiterhin als Fallback existieren. Aber nicht mehr als Standardpfad.
+
+### 6. Aktuelle Szene nach dem Fix zurücksetzen
+
+Die aktuelle Szene wird nach der Codeänderung sauber neu startbar gemacht:
+
+```text
+lip_sync_status = pending
+twoshot_stage = null
+replicate_prediction_id = null
+clip_error = auto-retry: segmented pipeline fix applied
+```
+
+## Ergebnis
+
+Nach dem Umbau unterscheiden wir sauber:
+
+- **Provider crasht wirklich** → klare Diagnose + Refund + Fallback.
+- **App-State hängt** → Watchdog/Client reparieren automatisch.
+- **Kein echter Job läuft** → UI zeigt keinen 95%-Dauerlauf mehr.
+- **Zwei Sprecher** → primär ein Segment-basierter Multi-Speaker-Job statt fragiler Zwei-Pass-Kaskade.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
