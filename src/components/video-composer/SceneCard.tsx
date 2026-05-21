@@ -1669,48 +1669,24 @@ export default function SceneCard({
                             disabled={scene.lipSyncStatus === "running"}
                             onClick={async () => {
                               try {
-                                // Multi-speaker Cinematic-Sync MUST use the two-shot
-                                // pipeline; single-speaker scenes use the legacy one.
-                                // compose-lipsync-scene short-circuits multi-speaker
-                                // with `multi_speaker_scene_routed_to_single_lipsync`.
-                                const dialogScript = String(
-                                  (scene as any).dialogScript ?? "",
-                                );
-                                const scriptSpeakers = new Set<string>();
-                                for (const line of dialogScript.split("\n")) {
-                                  const m = line.match(
-                                    /^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/,
-                                  );
-                                  if (m)
-                                    scriptSpeakers.add(
-                                      m[1].trim().toLowerCase(),
-                                    );
-                                }
-                                const planSpeakers = Array.isArray(
-                                  scene.audioPlan?.speakers,
-                                )
-                                  ? scene.audioPlan!.speakers!.length
-                                  : 0;
-                                const twoshotSpeakers = Array.isArray(
-                                  (scene.audioPlan as any)?.twoshot?.speakers,
-                                )
-                                  ? (scene.audioPlan as any).twoshot.speakers
-                                      .length
-                                  : 0;
-                                const speakerCount = Math.max(
-                                  scriptSpeakers.size,
-                                  planSpeakers,
-                                  twoshotSpeakers,
-                                );
-                                const fnName =
-                                  scene.engineOverride === "cinematic-sync" &&
-                                  speakerCount >= 2
-                                    ? "compose-twoshot-lipsync"
-                                    : "compose-lipsync-scene";
+                                // Unified Dialog-Shot Pipeline: one Hailuo
+                                // plate + one Sync.so lipsync per speaker turn
+                                // (1..N speakers). Clear stale lip-sync flags
+                                // so the new run starts clean.
+                                await supabase
+                                  .from("composer_scenes")
+                                  .update({
+                                    lip_sync_status: "pending",
+                                    twoshot_stage: null,
+                                    clip_error: null,
+                                    dialog_shots: null,
+                                  })
+                                  .eq("id", scene.id);
                                 const { error } =
-                                  await supabase.functions.invoke(fnName, {
-                                    body: { scene_id: scene.id },
-                                  });
+                                  await supabase.functions.invoke(
+                                    "compose-dialog-scene",
+                                    { body: { scene_id: scene.id } },
+                                  );
                                 if (error) throw error;
                                 onUpdate({ lipSyncStatus: "running" });
                               } catch (e) {
