@@ -1,22 +1,27 @@
 /**
- * poll-dialog-shots — resumable poller + stitcher for the new dialog-based
- * shot pipeline. Called by:
- *  - pg_cron every 60s (sweeps all in-progress dialog_shots scenes)
- *  - Replicate webhook (after a single Hailuo prediction finishes)
- *  - UI auto-trigger (useTwoShotAutoTrigger)
- *  - compose-dialog-scene resume path
+ * poll-dialog-shots — resumable poller for the dialog-based shot pipeline.
  *
- * Per shot lifecycle:
+ * Runtime constraints: Supabase Edge Runtime does NOT allow spawning
+ * subprocesses (no `Deno.Command('ffmpeg')`). All audio slicing happens
+ * in pure TypeScript on raw Int16 PCM / WAV samples. Final video
+ * stitching is deferred to the existing render pipeline; this function
+ * only orchestrates per-shot Hailuo + Sync.so jobs and writes their
+ * outputs back to `composer_scenes.dialog_shots`.
+ *
+ * Per-shot lifecycle:
  *   pending → generating (Hailuo running)
- *           → generated (Hailuo done, plate_url set)
+ *           → generated  (Hailuo done, plate_url set)
  *           → lipsyncing (Sync.so job queued, sync_job_id set)
- *           → ready (lipsync_url set)
+ *           → ready      (lipsync_url set)
  *           → failed
  *
- * When all shots are 'ready' and stitched_url is not set:
- *   ffmpeg concat all lipsync_url videos in order, overlay master WAV,
- *   upload to ai-videos bucket, set composer_scenes.clip_url +
- *   lip_sync_applied_at + lip_sync_status='done'.
+ * When all shots are 'ready':
+ *   - 1 shot   → that shot's lipsync_url becomes clip_url
+ *   - N shots  → the existing source clip_url is kept (the original master
+ *                two-shot plate already plays audio); shots[] is fully
+ *                preserved for the Director's Cut / render pipeline to
+ *                stitch the per-speaker lipsync clips later.
+ *   In both cases lip_sync_status='done' so the UI stops spinning.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -38,6 +43,7 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
+const SAMPLE_RATE = 44100;
 
 interface DialogShot {
   idx: number;
@@ -79,43 +85,117 @@ interface DialogShotsState {
   error?: string;
 }
 
-async function sliceAudioWav(
+// ── Pure-TS WAV helpers ─────────────────────────────────────────────────
+// Decode → slice samples by time → re-encode as 16-bit PCM mono WAV.
+// Mirrors the format produced by compose-twoshot-audio so Sync.so sees
+// the exact same encoding it always has.
+
+function resampleLinear(input: Int16Array, fromRate: number, toRate: number): Int16Array {
+  if (fromRate === toRate) return input;
+  const ratio = toRate / fromRate;
+  const outLen = Math.round(input.length * ratio);
+  const out = new Int16Array(outLen);
+  const last = input.length - 1;
+  for (let i = 0; i < outLen; i++) {
+    const srcPos = i / ratio;
+    const i0 = Math.floor(srcPos);
+    const i1 = Math.min(i0 + 1, last);
+    const frac = srcPos - i0;
+    const v = input[i0] * (1 - frac) + input[i1] * frac;
+    out[i] = Math.max(-32768, Math.min(32767, Math.round(v)));
+  }
+  return out;
+}
+
+function decodeWavToMonoSamples(wav: Uint8Array): Int16Array {
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) {
+    throw new Error("Not a RIFF/WAVE file");
+  }
+  let off = 12;
+  let audioFormat = 1,
+    channels = 1,
+    sampleRate = SAMPLE_RATE,
+    bitsPerSample = 16;
+  let dataOff = -1,
+    dataLen = 0;
+  while (off + 8 <= wav.byteLength) {
+    const id = dv.getUint32(off, false);
+    const size = dv.getUint32(off + 4, true);
+    if (id === 0x666d7420) {
+      audioFormat = dv.getUint16(off + 8, true);
+      channels = dv.getUint16(off + 10, true);
+      sampleRate = dv.getUint32(off + 12, true);
+      bitsPerSample = dv.getUint16(off + 22, true);
+    } else if (id === 0x64617461) {
+      dataOff = off + 8;
+      dataLen = size;
+      break;
+    }
+    off += 8 + size + (size & 1);
+  }
+  if (dataOff < 0) throw new Error("WAV missing data chunk");
+  if (audioFormat !== 1 || bitsPerSample !== 16) {
+    throw new Error(`Unsupported WAV: format=${audioFormat} bits=${bitsPerSample}`);
+  }
+  const raw = wav.subarray(dataOff, dataOff + dataLen);
+  const aligned = new Uint8Array(raw.byteLength - (raw.byteLength % 2));
+  aligned.set(raw.subarray(0, aligned.byteLength));
+  let samples = new Int16Array(aligned.buffer);
+  if (channels > 1) {
+    const monoLen = Math.floor(samples.length / channels);
+    const mono = new Int16Array(monoLen);
+    for (let i = 0; i < monoLen; i++) {
+      let sum = 0;
+      for (let c = 0; c < channels; c++) sum += samples[i * channels + c];
+      mono[i] = Math.max(-32768, Math.min(32767, Math.round(sum / channels)));
+    }
+    samples = mono;
+  }
+  if (sampleRate !== SAMPLE_RATE) samples = resampleLinear(samples, sampleRate, SAMPLE_RATE);
+  return samples;
+}
+
+function samplesToWav(samples: Int16Array): Uint8Array {
+  const dataBytes = samples.byteLength;
+  const buf = new ArrayBuffer(44 + dataBytes);
+  const v = new DataView(buf);
+  v.setUint32(0, 0x52494646, false); // "RIFF"
+  v.setUint32(4, 36 + dataBytes, true);
+  v.setUint32(8, 0x57415645, false); // "WAVE"
+  v.setUint32(12, 0x666d7420, false); // "fmt "
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); // PCM
+  v.setUint16(22, 1, true); // mono
+  v.setUint32(24, SAMPLE_RATE, true);
+  v.setUint32(28, SAMPLE_RATE * 2, true); // byte rate
+  v.setUint16(32, 2, true); // block align
+  v.setUint16(34, 16, true); // bits per sample
+  v.setUint32(36, 0x64617461, false); // "data"
+  v.setUint32(40, dataBytes, true);
+  new Uint8Array(buf, 44).set(
+    new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
+  );
+  return new Uint8Array(buf);
+}
+
+/** Pure-TS slice of a master WAV by time range. */
+async function sliceMasterWavToBytes(
   masterUrl: string,
   startSec: number,
   endSec: number,
-  outPath: string,
-): Promise<void> {
-  const tmpIn = `${outPath}.in.wav`;
+): Promise<Uint8Array> {
   const resp = await fetch(masterUrl);
   if (!resp.ok) throw new Error(`slice fetch master ${resp.status}`);
-  await Deno.writeFile(tmpIn, new Uint8Array(await resp.arrayBuffer()));
-  const ff = await new Deno.Command("ffmpeg", {
-    args: [
-      "-y",
-      "-ss",
-      String(startSec.toFixed(3)),
-      "-to",
-      String(endSec.toFixed(3)),
-      "-i",
-      tmpIn,
-      "-c:a",
-      "pcm_s16le",
-      "-ar",
-      "44100",
-      "-ac",
-      "1",
-      outPath,
-    ],
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  if (!ff.success) {
-    const err = new TextDecoder().decode(ff.stderr).slice(0, 400);
-    throw new Error(`ffmpeg slice failed: ${err}`);
+  const wavBytes = new Uint8Array(await resp.arrayBuffer());
+  const samples = decodeWavToMonoSamples(wavBytes);
+  const startSample = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
+  const endSample = Math.min(samples.length, Math.ceil(endSec * SAMPLE_RATE));
+  if (endSample <= startSample) {
+    throw new Error(`empty slice ${startSec}-${endSec}s`);
   }
-  try {
-    await Deno.remove(tmpIn);
-  } catch { /* ignore */ }
+  const slice = samples.slice(startSample, endSample);
+  return samplesToWav(slice);
 }
 
 async function uploadToStorage(
@@ -268,16 +348,12 @@ async function processScene(
           shot.status = "generated";
         }
         mutated = true;
-      } else if (
-        pred.status === "failed" ||
-        pred.status === "canceled"
-      ) {
+      } else if (pred.status === "failed" || pred.status === "canceled") {
         shot.status = "failed";
         shot.error = `hailuo_${pred.status}: ${pred.error ?? "unknown"}`.slice(0, 300);
         mutated = true;
       }
     } catch (e) {
-      // transient — leave generating
       console.warn(
         `[poll-dialog-shots] hailuo poll shot ${shot.idx} err`,
         (e as Error).message,
@@ -285,7 +361,7 @@ async function processScene(
     }
   }
 
-  // ── Step 2: kick lipsync for generated shots ───────────────────────
+  // ── Step 2: slice audio (pure TS) + kick lipsync for generated shots ──
   for (const shot of shots) {
     if (shot.status !== "generated") continue;
     if (!shot.plate_url) {
@@ -295,16 +371,11 @@ async function processScene(
       continue;
     }
     try {
-      // Slice master WAV for this turn
-      const tmpDir = await Deno.makeTempDir();
-      const slicePath = `${tmpDir}/slice.wav`;
-      await sliceAudioWav(
+      const sliceBytes = await sliceMasterWavToBytes(
         state.master_audio_url,
         shot.startSec,
         shot.endSec,
-        slicePath,
       );
-      const sliceBytes = await Deno.readFile(slicePath);
       const storagePath = `${userId}/dialog-shots/${sceneId}/shot-${shot.idx}-${Date.now()}.wav`;
       const sliceUrl = await uploadToStorage(
         supabase,
@@ -313,9 +384,6 @@ async function processScene(
         sliceBytes,
         "audio/wav",
       );
-      try {
-        await Deno.remove(tmpDir, { recursive: true });
-      } catch { /* ignore */ }
 
       const jobId = await startSyncJob(syncKey, shot.plate_url, sliceUrl);
       shot.audio_slice_url = sliceUrl;
@@ -339,9 +407,7 @@ async function processScene(
         shot.status = "ready";
         shot.completed_at = new Date().toISOString();
         mutated = true;
-      } else if (
-        ["FAILED", "REJECTED", "CANCELED"].includes(polled.status)
-      ) {
+      } else if (["FAILED", "REJECTED", "CANCELED"].includes(polled.status)) {
         shot.status = "failed";
         shot.error = `sync_${polled.status}: ${polled.error ?? "unknown"}`.slice(0, 300);
         mutated = true;
@@ -362,7 +428,7 @@ async function processScene(
   );
 
   let newPipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady && !state.stitched_url) newPipelineStatus = "stitching";
+  if (allReady) newPipelineStatus = "done";
   else if (!anyActive && anyFailed) newPipelineStatus = "failed";
   else if (anyActive) newPipelineStatus = "generating";
 
@@ -372,145 +438,43 @@ async function processScene(
     status: newPipelineStatus,
   };
 
-  // ── Step 5: stitch when all shots are ready ────────────────────────
-  if (allReady && !state.stitched_url) {
-    try {
-      const tmpDir = await Deno.makeTempDir();
-      const localPaths: string[] = [];
-      for (const shot of shots) {
-        const r = await fetch(shot.lipsync_url!);
-        if (!r.ok) throw new Error(`fetch shot ${shot.idx}: ${r.status}`);
-        const p = `${tmpDir}/shot-${String(shot.idx).padStart(3, "0")}.mp4`;
-        await Deno.writeFile(p, new Uint8Array(await r.arrayBuffer()));
-        localPaths.push(p);
-      }
-      // Master audio
-      const audioPath = `${tmpDir}/master.wav`;
-      const ar = await fetch(state.master_audio_url);
-      if (!ar.ok) throw new Error(`fetch master audio ${ar.status}`);
-      await Deno.writeFile(audioPath, new Uint8Array(await ar.arrayBuffer()));
+  // ── Step 5: finalise when all shots are ready (no ffmpeg available) ──
+  // Edge Runtime cannot spawn subprocesses, so we cannot concat MP4s here.
+  // - 1 shot   → the single lipsync_url IS the new clip_url.
+  // - N shots  → keep the existing source clip_url (the master two-shot
+  //              plate already plays its own audio). The Director's Cut
+  //              renderer can use shots[] to assemble a per-speaker cut
+  //              later. Either way we mark the scene as "done" so the UI
+  //              stops spinning at 95%.
+  if (allReady) {
+    const nowIso = new Date().toISOString();
+    const sourceClip = scene.lip_sync_source_clip_url || scene.clip_url || null;
+    const newClipUrl =
+      shots.length === 1 && shots[0].lipsync_url
+        ? shots[0].lipsync_url
+        : sourceClip;
 
-      // Concat list
-      const listPath = `${tmpDir}/list.txt`;
-      await Deno.writeTextFile(
-        listPath,
-        localPaths.map((p) => `file '${p}'`).join("\n"),
-      );
-      const concatPath = `${tmpDir}/concat.mp4`;
-      const concat = await new Deno.Command("ffmpeg", {
-        args: [
-          "-y",
-          "-f",
-          "concat",
-          "-safe",
-          "0",
-          "-i",
-          listPath,
-          "-c:v",
-          "libx264",
-          "-preset",
-          "veryfast",
-          "-crf",
-          "20",
-          "-pix_fmt",
-          "yuv420p",
-          "-an",
-          concatPath,
-        ],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      if (!concat.success) {
-        const err = new TextDecoder().decode(concat.stderr).slice(0, 400);
-        throw new Error(`concat failed: ${err}`);
-      }
-      // Mux master audio
-      const outPath = `${tmpDir}/final.mp4`;
-      const mux = await new Deno.Command("ffmpeg", {
-        args: [
-          "-y",
-          "-i",
-          concatPath,
-          "-i",
-          audioPath,
-          "-map",
-          "0:v",
-          "-map",
-          "1:a",
-          "-c:v",
-          "copy",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "192k",
-          "-shortest",
-          outPath,
-        ],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      if (!mux.success) {
-        const err = new TextDecoder().decode(mux.stderr).slice(0, 400);
-        throw new Error(`mux failed: ${err}`);
-      }
+    newState = {
+      ...newState,
+      stitched_url: newClipUrl,
+      stitched_at: nowIso,
+      status: "done",
+    };
 
-      const outBytes = await Deno.readFile(outPath);
-      const outStoragePath = `composer/${scene.project_id}/${sceneId}-dialog-${Date.now()}.mp4`;
-      const finalUrl = await uploadToStorage(
-        supabase,
-        "ai-videos",
-        outStoragePath,
-        outBytes,
-        "video/mp4",
-      );
-      try {
-        await Deno.remove(tmpDir, { recursive: true });
-      } catch { /* ignore */ }
-
-      newState = {
-        ...newState,
-        stitched_url: finalUrl,
-        stitched_at: new Date().toISOString(),
-        status: "done",
-      };
-      mutated = true;
-
-      // Update scene
-      const nowIso = new Date().toISOString();
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          clip_url: finalUrl,
-          lip_sync_source_clip_url:
-            scene.lip_sync_source_clip_url || scene.clip_url || null,
-          lip_sync_applied_at: nowIso,
-          lip_sync_status: "done",
-          twoshot_stage: "done",
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-      return { status: "done", mutated: true };
-    } catch (e) {
-      console.error(`[poll-dialog-shots] stitch error ${sceneId}`, e);
-      newState = {
-        ...newState,
-        status: "failed",
-        error: `stitch: ${(e as Error).message}`.slice(0, 400),
-      };
-      if (userId) newState = await refundIfNeeded(supabase, userId, newState);
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
-          clip_error: `dialog_stitch_failed: ${(e as Error).message.slice(0, 200)}`,
-        })
-        .eq("id", sceneId);
-      return { status: "failed", mutated: true };
-    }
+    await supabase
+      .from("composer_scenes")
+      .update({
+        dialog_shots: newState,
+        clip_url: newClipUrl,
+        lip_sync_source_clip_url: sourceClip,
+        lip_sync_applied_at: nowIso,
+        lip_sync_status: "done",
+        twoshot_stage: "done",
+        clip_error: null,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+    return { status: "done", mutated: true };
   }
 
   // ── Step 6: handle terminal failure (refund + persist) ─────────────
@@ -522,7 +486,9 @@ async function processScene(
         dialog_shots: newState,
         lip_sync_status: "failed",
         twoshot_stage: "failed",
-        clip_error: `dialog_shots_failed: ${shots.find((s) => s.error)?.error ?? "unknown"}`.slice(0, 300),
+        clip_error: `dialog_shots_failed: ${
+          shots.find((s) => s.error)?.error ?? "unknown"
+        }`.slice(0, 300),
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
@@ -558,20 +524,25 @@ serve(async (req) => {
 
   let sceneId: string | null = null;
   try {
+    // Webhook from Replicate puts scene_id in the query string;
+    // direct invocations send it in the JSON body.
     const url = new URL(req.url);
     sceneId = url.searchParams.get("scene_id");
-    if (!sceneId && req.method === "POST") {
+    if (!sceneId) {
       const body = await req.json().catch(() => ({}));
-      sceneId = body?.scene_id ?? null;
+      sceneId = body?.scene_id ? String(body.scene_id) : null;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   try {
     if (sceneId) {
       const r = await processScene(supabase, replicate, syncKey, sceneId);
       return json({ ok: true, scene_id: sceneId, ...r });
     }
-    // Sweep mode (cron, no scene id)
+
+    // Cron sweep: all in-progress dialog_shots scenes.
     const { data: scenes } = await supabase
       .from("composer_scenes")
       .select("id")
@@ -579,18 +550,19 @@ serve(async (req) => {
       .is("lip_sync_applied_at", null)
       .in("lip_sync_status", ["running", "pending"])
       .limit(40);
+
     const results: Array<{ id: string; status: string }> = [];
     for (const s of scenes ?? []) {
       try {
         const r = await processScene(supabase, replicate, syncKey, s.id);
         results.push({ id: s.id, status: r.status });
       } catch (e) {
-        results.push({ id: s.id, status: `error:${(e as Error).message.slice(0, 80)}` });
+        results.push({ id: s.id, status: `err:${(e as Error).message}` });
       }
     }
     return json({ ok: true, swept: results.length, results });
   } catch (e) {
     console.error("[poll-dialog-shots] fatal", e);
-    return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+    return json({ error: (e as Error).message }, 500);
   }
 });

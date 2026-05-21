@@ -349,10 +349,26 @@ serve(async (req) => {
       stitched_url: null,
     };
 
+    // Strip legacy two-shot lipsync state so the new dialog pipeline
+    // doesn't mix with stale syncJobs / heartbeat / faceMap from the
+    // old `compose-twoshot-lipsync` flow.
+    const cleanPlan = { ...plan };
+    if (cleanPlan.twoshot && typeof cleanPlan.twoshot === "object") {
+      const ts = { ...(cleanPlan.twoshot as Record<string, any>) };
+      delete ts.syncJobs;
+      delete ts.heartbeat;
+      delete ts.faceMap;
+      delete ts.anchor_face_audit;
+      delete ts.diagnostics;
+      cleanPlan.twoshot = ts;
+    }
+
     await supabase
       .from("composer_scenes")
       .update({
         dialog_shots: dialogShotsState,
+        audio_plan: cleanPlan,
+        replicate_prediction_id: null,
         lip_sync_status: "running",
         twoshot_stage: "dialog_shots",
         clip_error: null,
