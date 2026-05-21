@@ -33,6 +33,7 @@ const corsHeaders = {
 };
 
 const STALE_PRESYNC_MS = 8 * 60 * 1000; // 8 min: no sync job ever recorded
+const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // 2 min: CPU/preflight abort before Sync.so submit
 const STALE_SYNC_POLL_MS = 12 * 60 * 1000; // 12 min: Sync.so job stuck
 const STALE_RESET_REINVOKE_MS = 2 * 60 * 1000; // 2 min: auto-reset, re-fire
 
@@ -67,6 +68,7 @@ serve(async (req) => {
     polled: 0,
     refundedPresync: 0,
     refundedSyncTimeout: 0,
+    recoveredPreflight: 0,
     reinvoked: 0,
     errors: [] as string[],
   };
@@ -105,6 +107,7 @@ serve(async (req) => {
         s.replicate_prediction_id.startsWith("sync:");
       const hasHeartbeat = !!twoshot?.heartbeat?.syncJobId;
       const stage = String(s.twoshot_stage ?? "");
+      const hasAnyRecordedProviderJob = hasSyncJob || hasHeartbeat || jobs.length > 0;
 
       // ── Job 0: ZOMBIE STATE — lipsync_* stage but no real provider job.
       // This is the "stuck at 95%" symptom: client reset status to pending
