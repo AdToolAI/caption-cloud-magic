@@ -567,28 +567,79 @@ async function detectFacesInMaster(
   clipUrl: string | null | undefined,
   cached: any,
   lovableKey: string | undefined,
+  characters: Array<{ characterId: string; portraitUrl: string }> = [],
 ): Promise<FaceMap | null> {
-  // Reject cached entries with bogus dims (legacy rows pre normalization fix).
-  if (cached && Array.isArray(cached.faces) && cached.faces.length >= 2 && Number(cached.width) > 0 && Number(cached.height) > 0 && cached.faces.every((f: any) => Array.isArray(f?.normCenter))) {
+  // Cache acceptance criteria: must have real dims AND identity-resolved
+  // characterId on every face (otherwise we'd re-use the broken pre-identity
+  // cache that caused the dialog swap). When characters are provided but the
+  // cache lacks characterId, we force a refresh so identity-match runs once.
+  const cacheLooksValid =
+    cached && Array.isArray(cached.faces) && cached.faces.length >= 2 &&
+    Number(cached.width) > 0 && Number(cached.height) > 0 &&
+    cached.faces.every((f: any) => Array.isArray(f?.normCenter));
+  const cacheHasIdentities =
+    cacheLooksValid && cached.faces.every((f: any) => typeof f?.characterId === "string" && f.characterId.length > 0);
+  const needIdentities = characters.length >= 2;
+  if (cacheLooksValid && (!needIdentities || cacheHasIdentities)) {
     return { ...cached, source: "cache" } as FaceMap;
   }
   if (!lovableKey || !anchorUrl) return null;
 
   // Probe REAL anchor dimensions so coordinates we hand to Sync.so actually
   // land on the face (Hailuo uses the anchor as first frame, so video dims
-  // == anchor dims). Gemini was hallucinating 1920x1080 for 1376x768 frames
-  // which moved the left-face target up-and-left into empty space and made
-  // Sync.so reject the job with `generation_pipeline_failed`.
+  // == anchor dims).
   const dims = await probeImageDims(anchorUrl);
   if (!dims) {
     console.warn(`[compose-twoshot-lipsync ${sceneId}] could not probe anchor dims — Sync.so coords may be off`);
   }
   const realDims = dims ?? { width: 1280, height: 720 };
 
-  const raw = await askGeminiForFaces(anchorUrl, lovableKey, "image");
-  if (!raw) return null;
-  const norm = normalizeFaces(raw, realDims);
-  if (norm.faces.length < 2) return null;
+  // If we already have positions cached but just need identities, reuse them
+  // instead of re-asking Gemini for face boxes.
+  let norm: { faces: FaceMap["faces"]; width: number; height: number };
+  if (cacheLooksValid) {
+    norm = { faces: cached.faces, width: Number(cached.width), height: Number(cached.height) };
+  } else {
+    const raw = await askGeminiForFaces(anchorUrl, lovableKey, "image");
+    if (!raw) return null;
+    norm = normalizeFaces(raw, realDims);
+    if (norm.faces.length < 2) return null;
+  }
+
+  // ── Identity-match step ─────────────────────────────────────────────
+  // Ask Gemini which character (by reference portrait) is on the left vs
+  // right of the anchor frame. This is the authoritative speaker↔face map;
+  // character_shots[] array order is NOT geometric.
+  if (characters.length >= 2) {
+    const identity = await askGeminiForIdentityMatch(anchorUrl, characters, lovableKey);
+    if (identity) {
+      const { left, right, confidence } = identity;
+      norm.faces = norm.faces.map((f) => {
+        if (f.side === "left" && left) {
+          return { ...f, characterId: left, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
+        }
+        if (f.side === "right" && right) {
+          return { ...f, characterId: right, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
+        }
+        return { ...f, matchSource: "unresolved" as const };
+      });
+      // Inference: if exactly one side resolved + exactly 2 candidates, assign
+      // the leftover candidate to the other side.
+      const ids = characters.map((c) => c.characterId);
+      const assigned = new Set(norm.faces.map((f) => f.characterId).filter(Boolean) as string[]);
+      const missing = ids.filter((id) => !assigned.has(id));
+      if (missing.length === 1) {
+        norm.faces = norm.faces.map((f) =>
+          f.characterId
+            ? f
+            : { ...f, characterId: missing[0], matchConfidence: 0.5, matchSource: "gemini-inferred" as const },
+        );
+      }
+    } else {
+      console.warn(`[compose-twoshot-lipsync ${sceneId}] gemini identity-match returned null`);
+    }
+  }
+
   const result: FaceMap = { ...norm, source: "anchor" };
   try {
     const { data: row } = await supabase
@@ -612,6 +663,7 @@ async function detectFacesInMaster(
   }
   return result;
 }
+
 
 
 /**
