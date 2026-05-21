@@ -15,6 +15,43 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/**
+ * Format a single `[start,end]` window OR multi-window `[[a,b],[c,d]]` array
+ * into a human-readable diagnostic string. Crash-safe for both shapes.
+ */
+function formatSegments(
+  seg: [number, number] | Array<[number, number]> | null | undefined,
+): string {
+  if (!seg) return "[]";
+  const arr: Array<[number, number]> = Array.isArray(seg[0])
+    ? (seg as Array<[number, number]>)
+    : [seg as [number, number]];
+  return (
+    "[" +
+    arr
+      .map(([a, b]) => `${Number(a).toFixed(2)}-${Number(b).toFixed(2)}s`)
+      .join(", ") +
+    "]"
+  );
+}
+
+/** Normalize stored audioSegmentSecs (single or multi) for retry/fallback. */
+function normalizeSegmentField(
+  s: unknown,
+): [number, number] | Array<[number, number]> | null {
+  if (!s || !Array.isArray(s) || s.length === 0) return null;
+  if (Array.isArray((s as any[])[0])) {
+    return (s as Array<[number, number]>).filter(
+      (w) => Array.isArray(w) && w.length === 2 && Number.isFinite(Number(w[0])) && Number.isFinite(Number(w[1])) && Number(w[1]) > Number(w[0]),
+    );
+  }
+  const a = Number((s as any[])[0]);
+  const b = Number((s as any[])[1]);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return null;
+  return [a, b];
+}
+
+
 type FaceMap = {
   faces?: Array<{
     side?: "left" | "right";
