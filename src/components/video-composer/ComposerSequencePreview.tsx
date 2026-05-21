@@ -73,11 +73,22 @@ export default function ComposerSequencePreview({
   const getImageUrl = (s: ComposerScene | undefined): string | undefined =>
     s?.clipUrl || s?.uploadUrl;
 
+  // A scene is "playable" only when it actually has a finalized clip/image.
+  // We intentionally check `clipStatus` so a stale local `clipUrl` cannot
+  // bleed through when the DB already moved the scene back to 'pending'
+  // (e.g. after a reset / "neu rendern"). Image-scene uploads (`uploadUrl`)
+  // are always considered ready.
   const playable = useMemo(
     () =>
-      scenes.filter(
-        s => s.clipUrl || (isImageScene(s) && (s.clipUrl || s.uploadUrl)),
-      ),
+      scenes.filter((s) => {
+        if (isImageScene(s)) {
+          // Image scenes: an uploaded image is always playable; an AI-image
+          // clip only when the scene is marked ready.
+          if (s.uploadUrl) return true;
+          return s.clipStatus === 'ready' && !!s.clipUrl;
+        }
+        return s.clipStatus === 'ready' && !!s.clipUrl;
+      }),
     [scenes],
   );
 
