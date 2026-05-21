@@ -49,8 +49,18 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
   }
 }
 
-function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
-  const side: "left" | "right" = passIndex === 0 ? "left" : "right";
+function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | undefined, videoDims?: { width: number; height: number } | null, speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } {
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
+  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
+  if (charId && shots.length >= 2) {
+    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
+    if (shotIdx >= 0) {
+      side = shotIdx === 0 ? "left" : "right";
+      mappingSource = "character_shots";
+    }
+  }
   const faces = Array.isArray(faceMap?.faces) ? faceMap!.faces! : [];
   const match = faces.find((f) => f.side === side) ?? faces[Math.min(passIndex, Math.max(0, faces.length - 1))];
   if (Array.isArray(match?.center) && match.center.length === 2) {
@@ -73,25 +83,24 @@ function pickTargetCoordinates(passIndex: number, faceMap: FaceMap | null | unde
       }
     }
     const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-    return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
+    return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
   }
   const W = Number(videoDims?.width) || Number(faceMap?.width) || 1280;
   const H = Number(videoDims?.height) || Number(faceMap?.height) || 720;
-  return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic" };
+  return { coords: [Math.round(W * (side === "left" ? 0.3 : 0.7)), Math.round(H * 0.5)], side, source: "heuristic", mappingSource };
 }
 
-async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; faceBbox?: [number, number, number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+  // Sync.so Speaker Selection: documented stable path for a single manual
+  // selection is `auto_detect:false + frame_number + coordinates`. We do NOT
+  // send `bounding_boxes` (a single static box is not what that field expects
+  // and was the source of generic "An unknown error occurred" failures on
+  // two-shot face-targeted passes).
   let asd: Record<string, unknown>;
-  if (params.autoDetect) {
+  if (params.autoDetect || !params.targetCoords) {
     asd = { auto_detect: true };
-  } else if (params.faceBbox && params.faceBbox.length === 4) {
-    // Sync.so docs: when you have your own detection, bounding_boxes is more
-    // robust than frame_number+coordinates. Pass single-frame box (frame 0).
-    asd = { auto_detect: false, bounding_boxes: [params.faceBbox] };
-  } else if (params.targetCoords) {
-    asd = { auto_detect: false, frame_number: 0, coordinates: params.targetCoords };
   } else {
-    asd = { auto_detect: true };
+    asd = { auto_detect: false, frame_number: 0, coordinates: params.targetCoords };
   }
   const options: Record<string, unknown> = {
     sync_mode: "cut_off",
@@ -103,8 +112,8 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
+      // Audio-only window — see compose-twoshot-lipsync for rationale.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
       aud.segments_secs = seg;
     }
     return [vid, aud];
@@ -195,7 +204,7 @@ serve(async (req) => {
 
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
-      .select("id, project_id, clip_url, lip_sync_source_clip_url, audio_plan, lip_sync_status, twoshot_stage, lip_sync_applied_at")
+      .select("id, project_id, clip_url, lip_sync_source_clip_url, audio_plan, lip_sync_status, twoshot_stage, lip_sync_applied_at, character_shots")
       .eq("id", sceneId)
       .single();
     if (sErr || !scene) return json({ error: "scene not found" }, 404);
@@ -223,7 +232,7 @@ serve(async (req) => {
     const currentPass = isSegments ? 1 : Number(syncJobs.currentPass || twoshot.heartbeat?.pass || 1);
     const totalPasses = isSegments ? 1 : Number(syncJobs.totalPasses || jobs.length || 2);
     const fallbackMode = String(syncJobs.fallbackMode ?? "");
-    const currentJob = isSegments || fallbackMode === "auto_detect_single_pass"
+    const currentJob = isSegments
       ? (jobs[jobs.length - 1] ?? jobs[0])
       : (jobs.find((j: any) => Number(j?.pass) === currentPass) ?? jobs[jobs.length - 1]);
     const jobId = String(currentJob?.jobId || String(scene.replicate_prediction_id ?? "").replace(/^sync:/, ""));
@@ -308,38 +317,35 @@ serve(async (req) => {
         }
       }
 
-      // Phase B: switch to auto-detect single-pass fallback on the *original*
-      // source video using the merged dialogue track. This bypasses the
-      // per-face two-pass path entirely — if Sync.so consistently refuses the
-      // face-targeted submit, it usually accepts an auto-detect request.
-      const sourceVideoUrl: string | null =
-        latestSyncJobs.sourceVideoUrl
-        || latest.data?.lip_sync_source_clip_url
-        || latest.data?.clip_url
-        || null;
-      const mergedAudioUrl: string | null = latestSyncJobs.mergedAudioUrl || latestTwoshot.url || null;
-
-      if (!fallbackTried && !fallbackMode && sourceVideoUrl && mergedAudioUrl) {
+      // Phase B: per-pass safe recovery — re-submit the SAME pass with the
+      // SAME isolated speaker track, but switch active-speaker-detection from
+      // explicit coordinates to `auto_detect:true`. Because the audio input
+      // contains only one speaker, Sync.so will animate the most-active face
+      // for that audio — almost always the right one. We never fall back to
+      // the merged dialogue on auto-detect, which would smear all lines onto
+      // one face.
+      if (!fallbackTried && !fallbackMode && latestCurrentJob?.audioUrl && latestCurrentJob?.videoUrl) {
         try {
           const newJobId = await startSyncJob(syncApiKey, {
-            videoUrl: sourceVideoUrl,
-            audioUrl: mergedAudioUrl,
+            videoUrl: String(latestCurrentJob.videoUrl),
+            audioUrl: String(latestCurrentJob.audioUrl),
             autoDetect: true,
+            temperature: 0.6,
           });
           const newJob = {
-            pass: 1,
+            ...latestCurrentJob,
+            pass: Number(latestCurrentJob.pass ?? currentPass),
             jobId: newJobId,
             status: "PROCESSING",
-            videoUrl: sourceVideoUrl,
-            audioUrl: mergedAudioUrl,
-            mode: "auto_detect_single_pass",
+            mode: "isolated_track_auto_detect",
             startedAt: now,
             fallback: true,
+            previousJobId: jobId,
+            previousError: errMsg.slice(0, 400),
           };
           await supabase.from("composer_scenes").update({
             replicate_prediction_id: `sync:${newJobId}`,
-            twoshot_stage: "lipsync_fallback",
-            clip_error: `auto-retry: sync.so two-pass refused — switching to auto-detect single-pass fallback`,
+            clip_error: `auto-retry: face-targeted refused — switching to isolated-track auto-detect for pass ${latestCurrentJob.pass ?? currentPass}`,
             updated_at: now,
             audio_plan: {
               ...latestPlan,
@@ -348,19 +354,25 @@ serve(async (req) => {
                 syncJobs: {
                   ...latestSyncJobs,
                   fallbackTried: true,
-                  fallbackMode: "auto_detect_single_pass",
+                  fallbackMode: "isolated_track_auto_detect",
                   fallbackStartedAt: now,
-                  currentPass: 1,
-                  totalPasses: 1,
-                  jobs: [...latestJobs, newJob],
+                  jobs: latestJobs.map((j: any) => j.jobId === jobId ? newJob : j),
                 },
-                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: 1, total_passes: 1, syncJobId: newJobId, fallback: true, fallbackStartedAt: now },
+                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: Number(latestCurrentJob.pass ?? currentPass), syncJobId: newJobId, fallback: true, fallbackStartedAt: now },
               },
             },
           }).eq("id", sceneId);
-          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: newJobId, mode: "auto_detect_single_pass" });
+          await appendTwoshotDiag(supabase, sceneId, {
+            source: "poll",
+            event: "isolated_track_auto_detect_retry",
+            stage: `lipsync_${latestCurrentJob.pass ?? currentPass}`,
+            status: "PROCESSING",
+            jobId: newJobId,
+            reason: `pass=${latestCurrentJob.pass ?? currentPass} prev=${jobId} prevError=${errMsg.slice(0, 160)}`,
+          });
+          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: newJobId, mode: "isolated_track_auto_detect" });
         } catch (fbErr) {
-          console.warn(`[poll-twoshot-lipsync ${sceneId}] fallback submit failed`, (fbErr as Error).message);
+          console.warn(`[poll-twoshot-lipsync ${sceneId}] isolated-track fallback submit failed`, (fbErr as Error).message);
         }
       }
 
@@ -375,7 +387,7 @@ serve(async (req) => {
         }
       }
       const finalReason = fallbackMode
-        ? `source_clip_unusable: Sync.so refused both face-targeted and auto-detect passes (${errMsg.slice(0, 200)}). Bitte den Quellclip neu rendern.`
+        ? `source_clip_unusable_for_lipsync: Sync.so refused both face-targeted and isolated-track auto-detect passes (${errMsg.slice(0, 200)}). Bitte den Quellclip neu rendern.`
         : `syncso_failed: ${(polled.error || "unknown").slice(0, 320)}${retryAttempts > 0 ? ` (after ${retryAttempts} retries)` : ""}`;
       await supabase.from("composer_scenes").update({
         lip_sync_status: "failed",
@@ -410,15 +422,18 @@ serve(async (req) => {
       const nextSpeaker = speakers[nextIdx];
       if (!nextSpeaker?.track_url) return json({ error: "missing_next_speaker_track" }, 422);
       const videoDims = await probeMp4Dims(polled.outputUrl);
-      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims);
+      const charShots = Array.isArray((scene as any).character_shots) ? ((scene as any).character_shots as Array<any>) : [];
+      const target = pickTargetCoordinates(nextIdx, twoshot.faceMap as FaceMap | null, videoDims, { characterId: nextSpeaker.character_id ?? null, characterShots: charShots });
       if (!Number.isFinite(target.coords[0]) || !Number.isFinite(target.coords[1]) || target.coords[0] <= 0 || target.coords[1] <= 0) {
         return json({ error: "invalid_next_face_target", coords: target.coords }, 422);
       }
       // Short-utterance windowing: if this speaker only talks briefly inside
-      // a long scene, scope Sync.so to the voiced window so VAD reliably
-      // animates the targeted face (fixes "second character never opens
-      // mouth on short replies like 'Was denn?'"). Falls back to full track
-      // automatically if Sync.so rejects the segments payload.
+      // a long scene, scope Sync.so's audio input to the voiced window so VAD
+      // reliably animates the targeted face (fixes "second character never
+      // opens mouth on short replies like 'Was denn?'"). Falls back to full
+      // track automatically if Sync.so rejects the segments payload. Note: we
+      // only scope the AUDIO segment, never the video, so the picked face
+      // coordinates remain valid for the whole clip.
       const sceneDurSec = Number(twoshot.totalSec) || 0;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
       let nextSegment: [number, number] | null = null;
@@ -437,7 +452,6 @@ serve(async (req) => {
         videoUrl: polled.outputUrl,
         audioUrl: nextSpeaker.track_url,
         targetCoords: target.coords,
-        faceBbox: Array.isArray(target.bbox) && target.bbox.length === 4 ? target.bbox as [number, number, number, number] : null,
         segmentSecs: nextSegment,
         temperature: nextSegment ? 0.65 : 0.5,
       });
@@ -461,8 +475,9 @@ serve(async (req) => {
         targetFace: target.side,
         targetCoords: target.coords,
         targetSource: target.source,
+        mappingSource: target.mappingSource,
         faceCenter: target.faceCenter ?? null,
-        faceBbox: target.bbox ?? null,
+        faceBbox: target.bbox ?? null, // debug-only metadata
         anchorDims: target.anchorDims ?? null,
         videoDims: target.videoDims ?? null,
         startedAt: now,

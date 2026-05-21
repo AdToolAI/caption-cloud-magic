@@ -203,8 +203,11 @@ async function startSyncSoDirectGeneration(
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
+      // Scope ONLY the audio window — leaving the video untouched preserves
+      // the full timeline and Sync.so's speaker-detection on the unmodified
+      // frames. Scoping the video as well historically destabilized face
+      // selection on multi-speaker clips.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
       aud.segments_secs = seg;
     }
     return [vid, aud];
@@ -216,14 +219,12 @@ async function startSyncSoDirectGeneration(
     temperature: params.temperature ?? 0.5,
   };
 
-  if (params.faceBbox && params.faceBbox.length === 4) {
-    // Sync.so docs: bounding_boxes is more robust than point coordinates
-    // when own face detection is available. Single-frame box (frame 0).
-    options.active_speaker_detection = {
-      auto_detect: false,
-      bounding_boxes: [params.faceBbox],
-    };
-  } else if (params.targetCoords) {
+  // Sync.so Speaker Selection API: for a single manually-selected speaker on
+  // one frame, the documented (and stable) payload is `frame_number +
+  // coordinates`. `bounding_boxes` is a per-frame array across the *entire*
+  // video — sending it as a single box has been observed to make Sync.so fail
+  // with the generic "An unknown error occurred". We only use coordinates.
+  if (params.targetCoords) {
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: params.frameNumber ?? 0,
@@ -502,16 +503,33 @@ async function detectFacesInMaster(
 
 /**
  * Pick [x, y] target coordinates for Sync.so active_speaker_detection.
- * Order: faceMap (Gemini) → heuristic thirds of the master frame. Pass index
- * 0 → left face, 1 → right face. Returns null if even the heuristic isn't
- * resolvable (no dimensions known).
+ *
+ * Mapping is explicit and stable:
+ *   1. If `characterId` + `characterShots` are provided, the speaker's
+ *      position in `character_shots` (0 = left, 1 = right) determines the
+ *      face side. This guarantees that "Matthew at shot index 1" goes to
+ *      the right face even if speakers were sorted differently upstream.
+ *   2. Otherwise we fall back to pass index (0 = left, 1 = right).
+ *
+ * Returns null if even the heuristic isn't resolvable (no dimensions known).
  */
 function pickTargetCoordinates(
   passIndex: number,
   faceMap: { faces: Array<{ side: "left" | "right"; center: [number, number]; bbox?: [number, number, number, number]; normCenter?: [number, number] }>; width: number; height: number } | null,
   fallbackDims: { width: number; height: number },
-): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
-  const side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  speakerContext?: { characterId?: string | null; characterShots?: Array<{ characterId?: string }> } | null,
+): { coords: [number, number]; side: "left" | "right"; source: "gemini" | "heuristic"; mappingSource: "character_shots" | "pass_order"; faceCenter?: [number, number]; bbox?: [number, number, number, number]; anchorDims?: { width: number; height: number }; videoDims?: { width: number; height: number } } | null {
+  let side: "left" | "right" = passIndex === 0 ? "left" : "right";
+  let mappingSource: "character_shots" | "pass_order" = "pass_order";
+  const charId = speakerContext?.characterId ? String(speakerContext.characterId).toLowerCase() : "";
+  const shots = Array.isArray(speakerContext?.characterShots) ? speakerContext!.characterShots! : [];
+  if (charId && shots.length >= 2) {
+    const shotIdx = shots.findIndex((s) => String(s?.characterId ?? "").toLowerCase() === charId);
+    if (shotIdx >= 0) {
+      side = shotIdx === 0 ? "left" : "right";
+      mappingSource = "character_shots";
+    }
+  }
   if (faceMap?.faces?.length) {
     const match = faceMap.faces.find((f) => f.side === side) ?? faceMap.faces[Math.min(passIndex, faceMap.faces.length - 1)];
     if (match?.center) {
@@ -534,14 +552,14 @@ function pickTargetCoordinates(
         }
       }
       const coords: [number, number] = [Math.round(x * scaleX), Math.round(y * scaleY)];
-      return { coords, side, source: "gemini", faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
+      return { coords, side, source: "gemini", mappingSource, faceCenter, bbox, anchorDims: anchorW && anchorH ? { width: anchorW, height: anchorH } : undefined, videoDims: { width: videoW, height: videoH } };
     }
   }
   const W = fallbackDims.width || 1280;
   const H = fallbackDims.height || 720;
   const x = side === "left" ? Math.round(W * 0.3) : Math.round(W * 0.7);
   const y = Math.round(H * 0.5);
-  return { coords: [x, y], side, source: "heuristic" };
+  return { coords: [x, y], side, source: "heuristic", mappingSource };
 }
 
 serve(async (req) => {
@@ -935,7 +953,7 @@ serve(async (req) => {
           await refund("twoshot_first_speaker_track_missing");
           return;
         }
-        const firstTarget = pickTargetCoordinates(0, faceMap, fallbackDims);
+        const firstTarget = pickTargetCoordinates(0, faceMap, fallbackDims, { characterId: firstSpeaker.character_id ?? null, characterShots: charShots });
         if (!firstTarget) {
           await refund("twoshot_first_face_target_missing");
           return;
@@ -974,7 +992,8 @@ serve(async (req) => {
               syncMode: "cut_off",
               temperature: pass1Segment ? 0.65 : 0.5,
               targetCoords: firstTarget.coords,
-              faceBbox: Array.isArray(firstTarget.bbox) && firstTarget.bbox.length === 4 ? firstTarget.bbox as [number, number, number, number] : null,
+              // No `faceBbox`: Sync.so wants per-frame box arrays, not a
+              // single static one. coordinates+frame_number is the stable path.
               frameNumber: 0,
               segmentSecs: pass1Segment,
             },
@@ -1036,8 +1055,9 @@ serve(async (req) => {
                   targetFace: firstTarget.side,
                   targetCoords: firstTarget.coords,
                   targetSource: firstTarget.source,
+                  mappingSource: firstTarget.mappingSource,
                   faceCenter: firstTarget.faceCenter ?? null,
-                  faceBbox: firstTarget.bbox ?? null,
+                  faceBbox: firstTarget.bbox ?? null, // debug-only metadata
                   anchorDims: firstTarget.anchorDims ?? null,
                   videoDims: firstTarget.videoDims ?? null,
                   startedAt,
