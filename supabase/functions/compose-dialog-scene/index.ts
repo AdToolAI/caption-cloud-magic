@@ -531,32 +531,76 @@ serve(async (req) => {
     const videoW = Number(workingFaceMap?.width) || 1280;
     const videoH = Number(workingFaceMap?.height) || 720;
 
-    const rawShots: DialogTurnShot[] = [];
-    let idx = 0;
+    // ── Build per-SPEAKER shot list (v3) ────────────────────────────────
+    // Group all of each speaker's turns into one shot with multi-window
+    // segments_secs. This avoids re-encoding the same face multiple times
+    // and produces smoother, sharper lipsync across the whole scene.
+    interface SpeakerAgg {
+      speaker_idx: number;
+      speaker_name: string;
+      character_id: string | null;
+      windows: Array<[number, number]>;
+      firstStart: number;
+    }
+    const agg = new Map<string, SpeakerAgg>();
+
     speakers.forEach((sp, sIdx) => {
       const turns = Array.isArray(sp.voicedRange?.turns)
         ? sp.voicedRange!.turns!
         : sp.voicedRange?.startSec != null && sp.voicedRange?.endSec != null
           ? [{ startSec: sp.voicedRange.startSec, endSec: sp.voicedRange.endSec }]
           : [];
+      if (turns.length === 0) return;
       const charId = String(sp.character_id ?? "").toLowerCase() || null;
-      const coords = charId ? coordsByCharId.get(charId) ?? null : null;
-      for (const t of turns) {
-        const dur = Math.max(MIN_TURN_DUR_SEC, t.endSec - t.startSec);
-        rawShots.push({
-          idx: idx++,
+      const key = `${sIdx}::${charId ?? sp.speaker ?? ""}`;
+      let entry = agg.get(key);
+      if (!entry) {
+        entry = {
           speaker_idx: sIdx,
           speaker_name: String(sp.speaker ?? `Speaker ${sIdx + 1}`),
           character_id: charId,
-          startSec: t.startSec,
-          endSec: t.endSec,
-          durSec: dur,
-          target_coords: coords,
-          temperature: dur < 2.0 ? 1.0 : 0.85,
-          status: "pending",
-        });
+          windows: [],
+          firstStart: Number.POSITIVE_INFINITY,
+        };
+        agg.set(key, entry);
+      }
+      for (const t of turns) {
+        const start = Number(t.startSec);
+        const end = Math.max(start + MIN_TURN_DUR_SEC, Number(t.endSec));
+        entry.windows.push([start, end]);
+        if (start < entry.firstStart) entry.firstStart = start;
       }
     });
+
+    const rawShots: DialogSpeakerShot[] = Array.from(agg.values())
+      .map((a) => {
+        const windows = a.windows.sort((x, y) => x[0] - y[0]);
+        const durSec = windows.reduce((s, [a0, a1]) => s + (a1 - a0), 0);
+        const minWindow = Math.min(
+          ...windows.map(([a0, a1]) => a1 - a0),
+          Number.POSITIVE_INFINITY,
+        );
+        const coords = a.character_id
+          ? coordsByCharId.get(a.character_id) ?? null
+          : null;
+        return {
+          idx: 0,
+          speaker_idx: a.speaker_idx,
+          speaker_name: a.speaker_name,
+          character_id: a.character_id,
+          windows,
+          durSec,
+          target_coords: coords,
+          temperature: minWindow < 2.0 ? 1.0 : 0.9,
+          status: "pending",
+          firstStart: a.firstStart,
+        } as DialogSpeakerShot & { firstStart: number };
+      })
+      .sort((a, b) => a.firstStart - b.firstStart)
+      .map((s, i) => {
+        const { firstStart: _f, ...rest } = s as any;
+        return { ...rest, idx: i } as DialogSpeakerShot;
+      });
 
     if (rawShots.length === 0) {
       await supabase
@@ -573,9 +617,6 @@ serve(async (req) => {
       );
     }
 
-    // Time-order shots
-    rawShots.sort((a, b) => a.startSec - b.startSec);
-    rawShots.forEach((s, i) => (s.idx = i));
 
     // Identity coverage check: every multi-speaker shot MUST have a coord.
     // Single-speaker scenes can fall back to Sync.so auto_detect safely.
