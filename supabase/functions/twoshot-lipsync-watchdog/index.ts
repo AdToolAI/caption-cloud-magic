@@ -311,6 +311,9 @@ serve(async (req) => {
       // still completes.
       const errMarker = String(s.clip_error ?? "");
       const isAutoReset = /^auto-(reset|retry)/i.test(errMarker);
+      const reinvokeDelayMs = /cpu-time-preflight-fix|preflight_cpu_abort/i.test(errMarker)
+        ? 5_000
+        : STALE_RESET_REINVOKE_MS;
       const stageAllowed =
         !s.twoshot_stage || s.twoshot_stage === "master_clip" || s.twoshot_stage === "failed";
       if (
@@ -319,7 +322,7 @@ serve(async (req) => {
         stageAllowed &&
         typeof s.clip_url === "string" &&
         s.clip_url.length > 0 &&
-        ageMs > STALE_RESET_REINVOKE_MS
+        ageMs > reinvokeDelayMs
       ) {
         try {
           await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
