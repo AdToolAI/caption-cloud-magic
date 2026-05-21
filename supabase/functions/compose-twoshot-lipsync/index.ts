@@ -1219,26 +1219,35 @@ serve(async (req) => {
         // drift because Sync.so re-encoded a different WAV than playback.
         const sceneDurSec = Number((prevTwoshot as any).totalSec) || Number((scene as any).duration_seconds) || 0;
         const vr1: any = (firstSpeaker as any).voicedRange ?? null;
-        // Use per-turn windows when present so we never re-animate this
-        // speaker over the OTHER speaker's voiced range. Fall back to the
-        // union range only when no per-turn data is available.
-        let pass1Segment: [number, number] | Array<[number, number]> | null = null;
-        if (vr1 && sceneDurSec > 0) {
-          if (Array.isArray(vr1.turns) && vr1.turns.length > 0) {
-            const turns = vr1.turns
-              .map((t: any) => [
-                Math.max(0, Number(t.startSec)),
-                Math.min(sceneDurSec, Number(t.endSec)),
-              ] as [number, number])
-              .filter(([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
-            if (turns.length > 0) pass1Segment = turns;
-          } else if (Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec) {
-            pass1Segment = [
-              Math.max(0, Number(vr1.startSec)),
-              Math.min(sceneDurSec, Number(vr1.endSec)),
-            ];
+        // Collect raw per-turn ranges for ALL speakers so we can expand each
+        // window with a tiny pre-roll/tail without crossing into the OTHER
+        // speaker's turn. Pre-roll gives Sync.so's VAD onset context (fixes
+        // ventriloquist effect on short 2nd turns); tail absorbs the
+        // segments_secs → video-frame-grid rounding (fixes audible drift).
+        const extractRawTurns = (sp: any): Array<[number, number]> => {
+          const vr = sp?.voicedRange;
+          if (!vr) return [];
+          if (Array.isArray(vr.turns) && vr.turns.length > 0) {
+            return vr.turns
+              .map((t: any) => [Number(t.startSec), Number(t.endSec)] as [number, number])
+              .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
           }
-        }
+          if (Number.isFinite(vr.startSec) && Number.isFinite(vr.endSec) && vr.endSec > vr.startSec) {
+            return [[Number(vr.startSec), Number(vr.endSec)]];
+          }
+          return [];
+        };
+        const ownTurns1 = extractRawTurns(firstSpeaker);
+        const otherTurns1 = passes
+          .filter((_, i) => i !== 0)
+          .flatMap((sp) => extractRawTurns(sp));
+        const expanded1 = expandTurnsWithPreRoll(ownTurns1, otherTurns1, sceneDurSec);
+        let pass1Segment: [number, number] | Array<[number, number]> | null =
+          expanded1.windows.length === 0 ? null : expanded1.windows;
+        // Adaptive temperature: short turns (<2s) need 1.0 articulation to
+        // compensate for the tight VAD window; longer turns stay at 0.85 to
+        // avoid jitter on long vowels/consonants.
+        const pass1Temp = pickTemperatureForTurns(expanded1.minTurnDur);
         let jobId = "";
         if (!(await reserveCredits())) return;
         try {
@@ -1248,10 +1257,8 @@ serve(async (req) => {
               videoUrl: sourceClipUrl,
               audioUrl: mergedVo.url,
               syncMode: "cut_off",
-              // 0.85 — lip-ready neutral plate needs high articulation for
-              // visible mouth motion. 0.5 → ventriloquist effect, 0.7 still
-              // too subtle on Two-Shot plates.
-              temperature: 0.85,
+              // Adaptive: 1.0 for short turns, 0.85 for long ones.
+              temperature: pass1Temp,
               targetCoords: firstTarget.coords,
               // No `faceBbox`: Sync.so wants per-frame box arrays, not a
               // single static one. coordinates+frame_number is the stable path.
