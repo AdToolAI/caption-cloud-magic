@@ -537,7 +537,7 @@ serve(async (req) => {
     const { data: scene, error: sErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, reference_image_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, twoshot_stage, updated_at",
+        "id, project_id, clip_url, lip_sync_source_clip_url, duration_seconds, audio_plan, character_audio_url, reference_image_url, lock_reference_url, character_shots, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, updated_at",
       )
       .eq("id", scene_id)
       .single();
@@ -557,12 +557,15 @@ serve(async (req) => {
       const ageMs = Date.now() - new Date((scene as any).updated_at ?? 0).getTime();
       const stage = String((scene as any).twoshot_stage ?? "");
       const hb = (scene as any)?.audio_plan?.twoshot?.heartbeat ?? null;
+      const jobs = (scene as any)?.audio_plan?.twoshot?.syncJobs?.jobs;
+      const hasRealSyncJob =
+        String((scene as any).replicate_prediction_id ?? "").startsWith("sync:") ||
+        (Array.isArray(jobs) && jobs.length > 0) ||
+        !!hb?.syncJobId;
       // Real progress markers: pipeline either set a heartbeat or advanced
-      // stage past 'master_clip'. Without those, the row is stuck before
-      // the background worker ever started — usually because the caller
-      // pre-set lip_sync_status='running' and the previous invocation got
-      // short-circuited here. Take over instead of returning 202.
-      const hasRealProgress = !!hb || (stage && stage !== "master_clip" && stage !== "audio" && stage !== "anchor");
+      // to an actual provider job. A preflight/lipsync marker without sync:* is
+      // exactly the CPU-abort zombie state; take over instead of returning 202.
+      const hasRealProgress = hasRealSyncJob || (!!hb && stage !== "preflight");
       if (hasRealProgress && ageMs < 10 * 60 * 1000) {
         return json({ accepted: true, scene_id, status: "already_running", credits_reserved: 0 }, 202);
       }
