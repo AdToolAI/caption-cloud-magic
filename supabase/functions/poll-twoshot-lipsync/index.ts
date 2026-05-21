@@ -317,38 +317,35 @@ serve(async (req) => {
         }
       }
 
-      // Phase B: switch to auto-detect single-pass fallback on the *original*
-      // source video using the merged dialogue track. This bypasses the
-      // per-face two-pass path entirely — if Sync.so consistently refuses the
-      // face-targeted submit, it usually accepts an auto-detect request.
-      const sourceVideoUrl: string | null =
-        latestSyncJobs.sourceVideoUrl
-        || latest.data?.lip_sync_source_clip_url
-        || latest.data?.clip_url
-        || null;
-      const mergedAudioUrl: string | null = latestSyncJobs.mergedAudioUrl || latestTwoshot.url || null;
-
-      if (!fallbackTried && !fallbackMode && sourceVideoUrl && mergedAudioUrl) {
+      // Phase B: per-pass safe recovery — re-submit the SAME pass with the
+      // SAME isolated speaker track, but switch active-speaker-detection from
+      // explicit coordinates to `auto_detect:true`. Because the audio input
+      // contains only one speaker, Sync.so will animate the most-active face
+      // for that audio — almost always the right one. We never fall back to
+      // the merged dialogue on auto-detect, which would smear all lines onto
+      // one face.
+      if (!fallbackTried && !fallbackMode && latestCurrentJob?.audioUrl && latestCurrentJob?.videoUrl) {
         try {
           const newJobId = await startSyncJob(syncApiKey, {
-            videoUrl: sourceVideoUrl,
-            audioUrl: mergedAudioUrl,
+            videoUrl: String(latestCurrentJob.videoUrl),
+            audioUrl: String(latestCurrentJob.audioUrl),
             autoDetect: true,
+            temperature: 0.6,
           });
           const newJob = {
-            pass: 1,
+            ...latestCurrentJob,
+            pass: Number(latestCurrentJob.pass ?? currentPass),
             jobId: newJobId,
             status: "PROCESSING",
-            videoUrl: sourceVideoUrl,
-            audioUrl: mergedAudioUrl,
-            mode: "auto_detect_single_pass",
+            mode: "isolated_track_auto_detect",
             startedAt: now,
             fallback: true,
+            previousJobId: jobId,
+            previousError: errMsg.slice(0, 400),
           };
           await supabase.from("composer_scenes").update({
             replicate_prediction_id: `sync:${newJobId}`,
-            twoshot_stage: "lipsync_fallback",
-            clip_error: `auto-retry: sync.so two-pass refused — switching to auto-detect single-pass fallback`,
+            clip_error: `auto-retry: face-targeted refused — switching to isolated-track auto-detect for pass ${latestCurrentJob.pass ?? currentPass}`,
             updated_at: now,
             audio_plan: {
               ...latestPlan,
@@ -357,19 +354,25 @@ serve(async (req) => {
                 syncJobs: {
                   ...latestSyncJobs,
                   fallbackTried: true,
-                  fallbackMode: "auto_detect_single_pass",
+                  fallbackMode: "isolated_track_auto_detect",
                   fallbackStartedAt: now,
-                  currentPass: 1,
-                  totalPasses: 1,
-                  jobs: [...latestJobs, newJob],
+                  jobs: latestJobs.map((j: any) => j.jobId === jobId ? newJob : j),
                 },
-                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: 1, total_passes: 1, syncJobId: newJobId, fallback: true, fallbackStartedAt: now },
+                heartbeat: { ...(latestTwoshot.heartbeat ?? {}), pass: Number(latestCurrentJob.pass ?? currentPass), syncJobId: newJobId, fallback: true, fallbackStartedAt: now },
               },
             },
           }).eq("id", sceneId);
-          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: newJobId, mode: "auto_detect_single_pass" });
+          await appendTwoshotDiag(supabase, sceneId, {
+            source: "poll",
+            event: "isolated_track_auto_detect_retry",
+            stage: `lipsync_${latestCurrentJob.pass ?? currentPass}`,
+            status: "PROCESSING",
+            jobId: newJobId,
+            reason: `pass=${latestCurrentJob.pass ?? currentPass} prev=${jobId} prevError=${errMsg.slice(0, 160)}`,
+          });
+          return json({ ok: true, status: "FALLBACK_QUEUED", scene_id: sceneId, jobId: newJobId, mode: "isolated_track_auto_detect" });
         } catch (fbErr) {
-          console.warn(`[poll-twoshot-lipsync ${sceneId}] fallback submit failed`, (fbErr as Error).message);
+          console.warn(`[poll-twoshot-lipsync ${sceneId}] isolated-track fallback submit failed`, (fbErr as Error).message);
         }
       }
 
@@ -384,7 +387,7 @@ serve(async (req) => {
         }
       }
       const finalReason = fallbackMode
-        ? `source_clip_unusable: Sync.so refused both face-targeted and auto-detect passes (${errMsg.slice(0, 200)}). Bitte den Quellclip neu rendern.`
+        ? `source_clip_unusable_for_lipsync: Sync.so refused both face-targeted and isolated-track auto-detect passes (${errMsg.slice(0, 200)}). Bitte den Quellclip neu rendern.`
         : `syncso_failed: ${(polled.error || "unknown").slice(0, 320)}${retryAttempts > 0 ? ` (after ${retryAttempts} retries)` : ""}`;
       await supabase.from("composer_scenes").update({
         lip_sync_status: "failed",
