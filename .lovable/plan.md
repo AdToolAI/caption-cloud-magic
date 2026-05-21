@@ -1,66 +1,32 @@
 ## Problem
 
-Der aktuelle Screenshot zeigt nicht primär einen Sync.so-Fehler, sondern einen vorgeschalteten Fehler:
+Der sticky Pipeline-Ladebalken (`PipelineProgressBar` + `usePipelineProgress`) zeigt für die neue Dialog-Shot-Pipeline keinen Lipsync-Fortschritt mehr an. Grund: `usePipelineProgress.lipsyncReal.running` hängt an einem `hasRealJob`-Check, der nur die alte Two-Shot-Architektur kennt (`replicate_prediction_id` startet mit `sync:` oder `audio_plan.twoshot.syncJobs`). Die neue Pipeline schreibt stattdessen `composer_scenes.dialog_shots = { status, shots[] }` und setzt `replicate_prediction_id` nicht mehr auf `sync:...`. Folge: die Phase springt von "idle" direkt auf "done" (oder bleibt unsichtbar), obwohl Hailuo-Plate + Sync.so-Turns aktiv sind. Die Events (`lipsync:start/end`) feuern bereits korrekt aus `useTwoShotAutoTrigger` und `SceneDialogStudio` — nur die State-Ableitung ist veraltet.
 
-- Die aktive Szene `2ed6d519-...` hat `clip_status = failed`, `clip_url = null`, `twoshot_stage = master_clip`.
-- Der Hailuo-Masterclip ist also fehlgeschlagen, bevor `compose-dialog-scene` überhaupt starten konnte.
-- Deshalb gibt es auch keine `compose-dialog-scene` Logs und `dialog_shots = null`.
-- Die alte Szene `7b93dffc-...` ist weiterhin ein Legacy-Sync.so-Ergebnis (`replicate_prediction_id = sync:...`, `dialog_shots = null`) und sollte nicht als Qualitätsreferenz weiterverwendet werden.
+## Umsetzung (nur Frontend)
 
-Zusätzlich ist im aktuellen Dialog-Chain-Code ein Qualitäts-/Timing-Risiko: pro Turn wird ein zugeschnittenes WAV an Sync.so geschickt, aber das `segments_secs` Fenster bleibt in der Zeitposition des Gesamtvideos. Das kann Sync.so falsch interpretieren, weil die Audio-Datei bei 0 beginnt, das Video-Fenster aber z. B. bei 2.7s liegt. Für Artlist-Qualität muss die volle Master-WAV in allen Turn-Passes verwendet werden, nicht geslicete Teil-Audios.
+1. **`usePipelineProgress.ts` — Dialog-Shot-Pipeline als gültige Lipsync-Quelle anerkennen**
+   - `hasRealJob(s)` erweitern: auch `true`, wenn `s.dialogShots?.shots?.length > 0` und der globale `dialog_shots.status` nicht `done`/`failed` ist.
+   - `lipsyncReal.running` zusätzlich `true`, wenn irgendeine Cinematic-Sync-Szene `dialog_shots.status` in `pending` | `composing` | `polling` hat oder mindestens ein Shot in `generating` | `generated` | `lipsyncing` ist.
+   - `lipsyncReal.done` zusätzlich, wenn `dialog_shots.status === 'done'` für alle relevanten Szenen.
+   - `lipsyncReal.failed` zusätzlich, wenn `dialog_shots.status === 'failed'`.
+   - **Feinkörniger Fortschritt:** Statt nur Szenen-Granularität — wenn Dialog-Shots vorhanden sind, Progress über `Σ ready_shots / Σ total_shots` aller Cinematic-Sync-Szenen berechnen (analog zur Baseline-Logik), damit der Balken pro abgeschlossenem Turn weiterläuft, nicht erst pro fertiger Szene.
+   - Baseline-Capture beim `lipsync:start` ergänzen: `dialogShotsBaseline = { readyShots, totalShots }`.
 
-## Umsetzung
+2. **`SceneClipProgress.tsx` — kleines Polish**
+   - `DialogShotsBar` ist heute nur sichtbar, solange `clipStatus === 'generating'`. Anzeige zusätzlich aktivieren, wenn `clipStatus === 'ready'` aber `dialog_shots.status !== 'done'` (Phase Lipsync läuft auf fertigem Master). Aktuell wird nur das kleine "Lip-Sync läuft"-Overlay gezeigt — der Fortschrittsbalken pro Shot fehlt in dieser Phase. Lösung: `DialogShotsBar` zusätzlich im `hqReady`-Pfad rendern, wenn `showDialogOverlay`-Bedingung erfüllt ist.
 
-1. **Dialog-Chain auf Master-Audio umstellen**
-   - In `poll-dialog-shots` keine WAV-Slices mehr erzeugen/uploaden.
-   - Jeder Sync.so-Turn bekommt dieselbe volle `master_audio_url`.
-   - `segments_secs` bleibt ausschließlich am Video-Input und begrenzt den jeweiligen Sprecher-Turn.
-   - Das vermeidet Offset-Drift und entspricht der stabileren Two-Shot-Policy.
-
-2. **Masterclip-Fehler nicht als Lip-Sync-Fehler hängen lassen**
-   - Wenn eine Cinematic-Sync-Szene beim Masterclip (`twoshot_stage = master_clip`) fehlschlägt, wird `lip_sync_status` nicht als wartender Lip-Sync angezeigt.
-   - UI/State sollen klar sagen: Masterclip fehlgeschlagen; Lip-Sync wurde noch nicht gestartet.
-   - Auto-Trigger darf Lip-Sync nur starten, wenn `clip_url` vorhanden und `clip_status = ready` ist.
-
-3. **Retry-Reset für betroffene Szene**
-   - Szene `2ed6d519-60dc-4fdd-947d-ff53a5a4ee39` wird auf einen sauberen Neuversuch gesetzt:
-     - `clip_status = pending`
-     - `replicate_prediction_id = null`
-     - `clip_url = null`
-     - `lip_sync_status = pending`
-     - `twoshot_stage = master_clip`
-     - `dialog_shots = null`
-   - Danach kann der Masterclip erneut generieren; erst nach `clip_url` startet die Dialog-Chain.
-
-4. **Legacy-Lip-Sync endgültig aus dem Weg räumen**
-   - Alte Legacy-Funktionen (`compose-twoshot-lipsync`, `poll-twoshot-lipsync`, ggf. `twoshot-lipsync-watchdog`) bekommen einen frühen 410-Stop, damit kein alter Pfad mehr versehentlich schlechtere Ergebnisse produziert.
-   - Bestehende Legacy-Szenen können gezielt auf Masterclip + neue Dialog-Chain zurückgesetzt werden.
-
-5. **Qualitäts-Härtung für Multi-Speaker**
-   - Face-Koordinaten bleiben Pflicht bei 2+ Sprechern; ohne `faceMap` wird hart abgebrochen statt Auto-Detect-Speaker-Swap zu riskieren.
-   - Turn-Fenster behalten Lead-in/Tail, aber ohne Audio-Slicing.
-   - Logs enthalten pro Turn: Speaker, Fenster, Koordinaten, Temperatur, Sync.so Job-ID.
-
-6. **Deploy & Validierung**
-   - Geänderte Edge Functions deployen.
-   - `poll-dialog-shots` direkt gegen eine Testszene anstoßen, sobald der Masterclip bereit ist.
-   - Datenbank prüfen:
-     - `dialog_shots.version = 2`
-     - pro Turn `status = ready`
-     - `final_url` gesetzt
-     - `clip_url = final_url`
-     - `lip_sync_status = done`
+3. **Sanity-Check**
+   - Keine Änderungen an Edge Functions, DB oder Pipeline-Events nötig — Trigger emittieren bereits `lipsync:start/end`.
+   - Keine neuen Felder. Liest nur bestehendes `composer_scenes.dialog_shots`.
 
 ## Dateien
 
-- `supabase/functions/poll-dialog-shots/index.ts`
-- `src/hooks/useTwoShotAutoTrigger.ts`
-- `src/components/video-composer/ClipsTab.tsx`
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-- `supabase/functions/poll-twoshot-lipsync/index.ts`
-- `supabase/functions/twoshot-lipsync-watchdog/index.ts`
-- optional: Projekt-Memory zur aktualisierten Dialog-Chain-Policy
+- `src/hooks/usePipelineProgress.ts`
+- `src/components/video-composer/SceneClipProgress.tsx`
 
-## Datenänderung
+## Validierung
 
-Einmaliger Reset der aktuell betroffenen Szene `2ed6d519-60dc-4fdd-947d-ff53a5a4ee39`, damit sie nicht im fehlgeschlagenen Masterclip-Zustand hängen bleibt.
+- Cinematic-Sync-Szene starten → globaler Balken muss in Phase "Lipsync" auf `running` springen, sobald `dialog_shots` befüllt sind.
+- Pro fertigem Shot sollte der Lipsync-Phasenfortschritt sichtbar weiterlaufen (z. B. 1/3 → 2/3 → 3/3).
+- Bei `dialog_shots.status = 'done'` Phase auf `done` (grün, 100 %).
+- Bei `dialog_shots.status = 'failed'` Phase auf `failed` (rot).
