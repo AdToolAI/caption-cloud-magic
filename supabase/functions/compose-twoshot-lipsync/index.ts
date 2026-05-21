@@ -846,7 +846,11 @@ serve(async (req) => {
         cachedFaceMap,
         LOVABLE_API_KEY,
       );
-      const sourceVideoDims = await probeMp4Dims(sourceClipUrl);
+      // Do not probe the source MP4 here. The previous full-file probe was the
+      // CPU hotspot that killed the function before Sync.so job creation. For
+      // pass 1, cached anchor/faceMap dimensions are the authoritative target
+      // space; bounded MP4 probing is reserved for later poll-time fallbacks.
+      const sourceVideoDims = null;
       const fallbackDims = {
         width: Number(sourceVideoDims?.width) || Number(faceMap?.width) || 1280,
         height: Number(sourceVideoDims?.height) || Number(faceMap?.height) || 720,
