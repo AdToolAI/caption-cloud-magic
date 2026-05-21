@@ -108,13 +108,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           progressActive.current = true;
           emitPipelineEvent({ type: 'lipsync:start' });
         }
-        for (const d of runningSyncJobs) {
-          inflight.current.add(`poll:${d.id}`);
-          supabase.functions
-            .invoke('poll-twoshot-lipsync', { body: { scene_id: d.id } })
-            .catch((err) => console.warn('[useTwoShotAutoTrigger] poll failed', d.id, err))
-            .finally(() => setTimeout(() => inflight.current.delete(`poll:${d.id}`), 12_000));
-        }
+        // Note: poll-dialog-shots runs server-side via pg_cron every minute
+        // AND as a Replicate webhook receiver — no client-side polling needed.
 
         // Preflight/CPU-abort recovery: running but no provider job was ever
         // recorded. Clear the stage too so the candidate filter can re-invoke.
