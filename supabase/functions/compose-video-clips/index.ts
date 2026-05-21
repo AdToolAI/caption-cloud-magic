@@ -870,8 +870,41 @@ serve(async (req) => {
               if (remapped.length >= 1) effectiveShots = remapped;
             }
             if (effectiveShots.length >= 2) {
+              // Resolve outfit-look cover images so the anchor renders the
+              // user-picked Casual/Brand outfit (instead of the bare portrait
+              // photo). Falls back to the avatar's base portrait when no
+              // outfit look is selected or the lookup fails.
+              const outfitLookIds = effectiveShots
+                .map((cs) => (cs as any).outfitLookId)
+                .filter((id): id is string => typeof id === "string" && id.length > 0);
+              const outfitUrlById = new Map<string, string>();
+              if (outfitLookIds.length > 0) {
+                try {
+                  const { data: outfitRows } = await supabaseAdmin
+                    .from("avatar_outfit_looks")
+                    .select("id, cover_url, front_url")
+                    .in("id", outfitLookIds);
+                  for (const row of outfitRows ?? []) {
+                    const url = (row as any).cover_url || (row as any).front_url;
+                    if (typeof url === "string" && url.length > 0) {
+                      outfitUrlById.set(String((row as any).id), url);
+                    }
+                  }
+                } catch (e) {
+                  console.warn(
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: outfit lookup failed`,
+                    e,
+                  );
+                }
+              }
               const portraitUrls = effectiveShots
-                .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
+                .map((cs) => {
+                  const outfitId = (cs as any).outfitLookId as string | undefined;
+                  const outfitUrl = outfitId ? outfitUrlById.get(outfitId) : undefined;
+                  return (
+                    outfitUrl || charById.get(cs.characterId)?.referenceImageUrl
+                  );
+                })
                 .filter(
                   (u): u is string => typeof u === "string" && u.length > 0,
                 )
@@ -903,19 +936,21 @@ serve(async (req) => {
                   strict = false,
                 ): Promise<string | null> => {
                   console.log(
-                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits) [${label}${strict ? ", strict" : ""}]`,
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: composing multi-cast anchor (${portraitUrls.length} portraits, outfits=${outfitUrlById.size}/${outfitLookIds.length}) [${label}${strict ? ", strict" : ""}]`,
                   );
-                  const anchorPrompt =
-                    scriptSpeakers.length >= 2
-                      ? neutralTwoShotPrompt(
-                          characterNames,
-                          portraitUrls.length,
-                        )
-                      : stripDialogForAnchor(scene.aiPrompt || "") ||
-                        neutralTwoShotPrompt(
-                          characterNames,
-                          portraitUrls.length,
-                        );
+                  // Scene-aware anchor: ALWAYS combine the two-shot framing
+                  // constraint with the cleaned visual scene description.
+                  // The neutral-only fallback used to produce a gray neutral
+                  // two-shot that bore no relation to the user's scene — the
+                  // i2v step would then drift to a totally different shot.
+                  const sceneDesc = stripDialogForAnchor(scene.aiPrompt || "");
+                  const framing = neutralTwoShotPrompt(
+                    characterNames,
+                    portraitUrls.length,
+                  );
+                  const anchorPrompt = sceneDesc
+                    ? `${framing} Visual setting: ${sceneDesc}. Keep all selected outfits intact; do not change clothing.`
+                    : framing;
                   const r = await fetch(
                     `${Deno.env.get("SUPABASE_URL")}/functions/v1/compose-scene-anchor`,
                     {
