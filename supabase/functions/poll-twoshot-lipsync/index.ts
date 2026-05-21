@@ -60,8 +60,8 @@ async function probeMp4Dims(url: string | null | undefined): Promise<{ width: nu
 }
 
 function pickTargetCoordinates(
-
   passIndex: number,
+
   faceMap: FaceMap | null | undefined,
   videoDims?: { width: number; height: number } | null,
   speakerContext?: { characterId?: string | null } | null,
