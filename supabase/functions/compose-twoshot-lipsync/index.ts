@@ -974,6 +974,14 @@ serve(async (req) => {
           `[compose-twoshot-lipsync ${scene_id}] two-pass job queued on Sync.so`,
           { jobId, pass: 1, targetFace: firstTarget.side, targetCoords: firstTarget.coords },
         );
+        await appendTwoshotDiag(supabase, scene_id, {
+          source: "compose",
+          event: "sync_job_created",
+          stage: "lipsync_1",
+          status: "PROCESSING",
+          jobId,
+          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}`,
+        });
         return;
       } else {
         // Fallback: legacy single merged-audio pass. With the sample-accurate
