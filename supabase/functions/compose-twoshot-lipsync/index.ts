@@ -1066,7 +1066,7 @@ serve(async (req) => {
           stage: "lipsync_1",
           status: "PROCESSING",
           jobId,
-          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}`,
+          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}${pass1Segment ? ` window=[${pass1Segment[0].toFixed(2)}s,${pass1Segment[1].toFixed(2)}s] voicedSec=${vr1?.voicedSec}` : ""}`,
         });
         return;
       } else {
