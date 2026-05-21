@@ -1,19 +1,21 @@
 /**
- * poll-dialog-shots — Sequential Sync.so chain poller.
+ * poll-dialog-shots — Sequential Sync.so chain poller (v3 per-speaker).
  *
- * v2 design: per-turn Sync.so lipsync-2-pro passes on the same master plate,
- * chained sequentially. Each turn's output becomes the next turn's video
- * input. The final turn's output is the new clip_url. NO ffmpeg, NO Remotion
- * stitching — Sync.so's `sync_mode='cut_off'` leaves frames outside the
- * narrow `segments_secs` window untouched, so chaining safely preserves
- * earlier turns' lip animation.
+ * v3 design: ONE Sync.so lipsync-2-pro pass per CHARACTER (not per turn).
+ * All of a speaker's turns are sent in a single pass as multi-window
+ * `segments_secs`. With N distinct speakers this means N chained passes
+ * instead of N turns chained, so each face is only animated once and
+ * only the speaker's own video regions are re-encoded. Result: noticeably
+ * sharper output, and no "weak 2nd-line" artefact from cumulative
+ * re-encodes (the v2 bug).
  *
- * Per-turn lifecycle:
  *   pending → lipsyncing (sync_job_id set) → ready (output_url set)
  *                                          → failed
  *
- * Runtime constraints: Supabase Edge Runtime cannot spawn subprocesses, so
- * audio slicing is done in pure TypeScript on Int16 PCM/WAV samples.
+ * `sync_mode='cut_off'` leaves frames outside `segments_secs` untouched,
+ * so chaining N speaker-passes safely preserves earlier speakers' lip
+ * animation. Audio is always the full master WAV (Sync.so aligns it to
+ * absolute time inside each window).
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -35,17 +37,20 @@ function json(body: unknown, status = 200) {
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const SAMPLE_RATE = 44100;
-/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding). */
-const SYNC_LEAD_IN_SEC = 0.12;
-const SYNC_TAIL_SEC = 0.08;
+/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding).
+ *  Bumped from 0.12/0.08 (v2) → 0.18/0.12 for smoother short-window onsets.
+ *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
+ *  never bleed into another speaker's region. */
+const SYNC_LEAD_IN_SEC = 0.18;
+const SYNC_TAIL_SEC = 0.12;
 
-interface DialogTurnShot {
+interface DialogSpeakerShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  startSec: number;
-  endSec: number;
+  /** All windows for this speaker (time-ordered, disjoint). */
+  windows: Array<[number, number]>;
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
@@ -58,9 +63,9 @@ interface DialogTurnShot {
 }
 
 interface DialogShotsState {
-  version: 2;
+  version: 3;
   status: "queued" | "lipsyncing" | "done" | "failed";
-  shots: DialogTurnShot[];
+  shots: DialogSpeakerShot[];
   source_clip_url: string;
   master_audio_url: string;
   total_sec: number;
@@ -73,6 +78,7 @@ interface DialogShotsState {
   finished_at?: string;
   error?: string;
 }
+
 
 // ── Pure-TS WAV slicing ─────────────────────────────────────────────────
 
