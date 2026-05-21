@@ -1197,14 +1197,25 @@ serve(async (req) => {
         // drift because Sync.so re-encoded a different WAV than playback.
         const sceneDurSec = Number((prevTwoshot as any).totalSec) || Number((scene as any).duration_seconds) || 0;
         const vr1: any = (firstSpeaker as any).voicedRange ?? null;
-        let pass1Segment: [number, number] | null = null;
-        if (vr1 && Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec && sceneDurSec > 0) {
-          // Sample-exact voiced range — no padding (padding shifted VAD onset
-          // and was the root cause of perceived mouth drift).
-          pass1Segment = [
-            Math.max(0, Number(vr1.startSec)),
-            Math.min(sceneDurSec, Number(vr1.endSec)),
-          ];
+        // Use per-turn windows when present so we never re-animate this
+        // speaker over the OTHER speaker's voiced range. Fall back to the
+        // union range only when no per-turn data is available.
+        let pass1Segment: [number, number] | Array<[number, number]> | null = null;
+        if (vr1 && sceneDurSec > 0) {
+          if (Array.isArray(vr1.turns) && vr1.turns.length > 0) {
+            const turns = vr1.turns
+              .map((t: any) => [
+                Math.max(0, Number(t.startSec)),
+                Math.min(sceneDurSec, Number(t.endSec)),
+              ] as [number, number])
+              .filter(([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+            if (turns.length > 0) pass1Segment = turns;
+          } else if (Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec) {
+            pass1Segment = [
+              Math.max(0, Number(vr1.startSec)),
+              Math.min(sceneDurSec, Number(vr1.endSec)),
+            ];
+          }
         }
         let jobId = "";
         if (!(await reserveCredits())) return;
