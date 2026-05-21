@@ -1388,12 +1388,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         if (blocks.length < 2 || !allPortraits || renderAsSeparateScenes) return null;
         return (
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2 py-1.5 text-[10px] text-emerald-400 leading-relaxed">
-            🎭 <strong>Two-Shot-Modus:</strong>{' '}
+            🎭 <strong>Dialog-Shot Pipeline:</strong>{' '}
             {language === 'de'
-              ? 'Beide Sprecher werden in EINE 10s-Szene komponiert. Sequenzieller Lip-Sync pro Gesicht via Sync.so + Continuity Guardian.'
+              ? `Pro Sprecher-Turn ein eigener Hailuo-Plate + dedizierter Sync.so Lip-Sync. ${blocks.length} Shots werden am Ende zu einer Szene gestitcht.`
               : language === 'es'
-              ? 'Ambos hablantes en UNA escena de 10s. Lip-sync secuencial por cara vía Sync.so + Continuity Guardian.'
-              : 'Both speakers composed into ONE 10s scene. Sequential per-face lip-sync via Sync.so + Continuity Guardian.'}
+              ? `Un plate Hailuo + lip-sync Sync.so dedicado por turno. ${blocks.length} shots se concatenan al final.`
+              : `One dedicated Hailuo plate + Sync.so lip-sync per speaker turn. ${blocks.length} shots concatenated into a single scene.`}
           </div>
         );
       })()}
