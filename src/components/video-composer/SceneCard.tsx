@@ -1,28 +1,45 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Badge } from '@/components/ui/badge';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
-  ChevronUp, ChevronDown, Trash2, GripVertical,
-  Sparkles, Upload, Video, Image as ImageIcon, Wand2, Beaker,
-  ArrowRight, ArrowLeft, Link2, Palette, Volume2, VolumeX,
+  ChevronUp,
+  ChevronDown,
+  Trash2,
+  GripVertical,
+  Sparkles,
+  Upload,
+  Video,
+  Image as ImageIcon,
+  Wand2,
+  Beaker,
+  ArrowRight,
+  ArrowLeft,
+  Link2,
+  Palette,
+  Volume2,
+  VolumeX,
   MessageSquareQuote,
-} from 'lucide-react';
+} from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from '@/components/ui/dialog';
-import CompareLabGrid from '@/components/compare-lab/CompareLabGrid';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import CompareLabGrid from "@/components/compare-lab/CompareLabGrid";
 import type {
   ComposerScene,
   SceneType,
@@ -30,72 +47,99 @@ import type {
   ClipQuality,
   TransitionStyle,
   ComposerCharacter,
-} from '@/types/video-composer';
-import { SCENE_TYPE_LABELS, CLIP_SOURCE_LABELS, getClipCost, getClipRate, QUALITY_LABELS } from '@/types/video-composer';
+} from "@/types/video-composer";
+import {
+  SCENE_TYPE_LABELS,
+  CLIP_SOURCE_LABELS,
+  getClipCost,
+  getClipRate,
+  QUALITY_LABELS,
+} from "@/types/video-composer";
 
-import SceneMediaUpload from './SceneMediaUpload';
-import StockMediaBrowser, { type StockMediaItem } from './StockMediaBrowser';
-import SceneReferenceImageUpload from './SceneReferenceImageUpload';
-import { CharacterShotBadge } from './CharacterShotBadge';
-import { CharacterCastPicker } from './CharacterCastPicker';
-import { UnifiedAssetPicker } from './UnifiedAssetPicker';
-import { SceneDirectorBox } from './SceneDirectorBox';
-import { useBrandLocations } from '@/hooks/useBrandLocations';
-import { useBrandBuildings } from '@/hooks/useBrandBuildings';
-import { useBrandProps } from '@/hooks/useBrandProps';
-import { useWorldCatalog } from '@/hooks/useWorldCatalog';
+import SceneMediaUpload from "./SceneMediaUpload";
+import StockMediaBrowser, { type StockMediaItem } from "./StockMediaBrowser";
+import SceneReferenceImageUpload from "./SceneReferenceImageUpload";
+import { CharacterShotBadge } from "./CharacterShotBadge";
+import { CharacterCastPicker } from "./CharacterCastPicker";
+import { UnifiedAssetPicker } from "./UnifiedAssetPicker";
+import { SceneDirectorBox } from "./SceneDirectorBox";
+import { useBrandLocations } from "@/hooks/useBrandLocations";
+import { useBrandBuildings } from "@/hooks/useBrandBuildings";
+import { useBrandProps } from "@/hooks/useBrandProps";
+import { useWorldCatalog } from "@/hooks/useWorldCatalog";
 // Phase 2 (Studio Set v2) — DirectorPresetPicker, CinematicStylePresets and
 // SceneShotDirectorPanel are no longer rendered inline; they live behind
 // SceneStyleSheet (one dialog, three tabs). The chip + sheet replace ~50
 // lines of always-visible JSX.
-import SceneStyleSheet from './SceneStyleSheet';
-import SceneStyleChip from './SceneStyleChip';
-import SceneSecondaryToggle from './SceneSecondaryToggle';
-import { buildShotPromptSuffix } from '@/lib/shotDirector/buildShotPromptSuffix';
-import PromptMentionEditor from '@/components/motion-studio/PromptMentionEditor';
-import StructuredPromptBuilder from '@/components/motion-studio/StructuredPromptBuilder';
-import StylePresetPicker from '@/components/motion-studio/StylePresetPicker';
-import MultiEnginePromptPreview from '@/components/motion-studio/MultiEnginePromptPreview';
-import { applyDirectorModifiers } from '@/lib/motion-studio/directorPresets';
-import { resolveMentions, findMentions } from '@/lib/motion-studio/mentionParser';
-import { composePromptLayers } from '@/lib/motion-studio/composePromptLayers';
-import { sceneFeaturesCharacter } from '@/lib/motion-studio/sceneFeaturesCharacter';
-import { useBrandCharacters, buildCharacterPromptInjection } from '@/hooks/useBrandCharacters';
+import SceneStyleSheet from "./SceneStyleSheet";
+import SceneStyleChip from "./SceneStyleChip";
+import SceneSecondaryToggle from "./SceneSecondaryToggle";
+import { buildShotPromptSuffix } from "@/lib/shotDirector/buildShotPromptSuffix";
+import PromptMentionEditor from "@/components/motion-studio/PromptMentionEditor";
+import StructuredPromptBuilder from "@/components/motion-studio/StructuredPromptBuilder";
+import StylePresetPicker from "@/components/motion-studio/StylePresetPicker";
+import MultiEnginePromptPreview from "@/components/motion-studio/MultiEnginePromptPreview";
+import { applyDirectorModifiers } from "@/lib/motion-studio/directorPresets";
+import {
+  resolveMentions,
+  findMentions,
+} from "@/lib/motion-studio/mentionParser";
+import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
+import { sceneFeaturesCharacter } from "@/lib/motion-studio/sceneFeaturesCharacter";
+import {
+  useBrandCharacters,
+  buildCharacterPromptInjection,
+} from "@/hooks/useBrandCharacters";
 import {
   stitchSlots,
   naiveSplitToSlots,
   hasAnySlot,
   type PromptSlots,
-} from '@/lib/motion-studio/structuredPromptStitcher';
-import { clipSourceToModelKey } from '@/lib/motion-studio/promptTokenLimits';
-import { ModelSelector } from '@/components/ai-video/ModelSelector';
-import { COMPOSER_AVAILABLE_MODELS, modelIdToSource, sourceToModelId } from '@/lib/video-composer/modelMapping';
-import { AI_VIDEO_TOOLKIT_MODELS } from '@/config/aiVideoModelRegistry';
-import { useUnifiedMentionLibrary } from '@/hooks/useUnifiedMentionLibrary';
-import { useStylePresets } from '@/hooks/useStylePresets';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import SceneCommentBadge from './SceneCommentBadge';
-import SceneCommentSheet from './SceneCommentSheet';
-import { useSceneCommentCounts } from '@/hooks/useComposerCollaboration';
-import { resolveSceneCharacterAnchor } from '@/lib/motion-studio/resolveSceneCharacterAnchor';
-import { applyCastToPrompt } from '@/lib/motion-studio/applyCastToPrompt';
-import { syncCastFromPrompt } from '@/lib/motion-studio/syncCastFromPrompt';
-import { applyDialogToPrompt } from '@/lib/motion-studio/applyDialogToPrompt';
-import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
-import SceneStillFrameStudio from './SceneStillFrameStudio';
-import SceneAnchorLibrary from './SceneAnchorLibrary';
-import { cn } from '@/lib/utils';
-import SceneDialogStudio from './SceneDialogStudio';
-import DirectorQualityCoach from './director-console/DirectorQualityCoach';
-import ScenePromptDetailsSheet from './ScenePromptDetailsSheet';
-import SceneCardSummaryHeader from './SceneCardSummaryHeader';
-import SceneStudioTabBar, { SceneStudioSectionHeader } from './SceneStudioTabBar';
-import { recommendEngineForScene, estimateHeygenCostEur } from '@/lib/video-composer/sceneEngineRouter';
+} from "@/lib/motion-studio/structuredPromptStitcher";
+import { clipSourceToModelKey } from "@/lib/motion-studio/promptTokenLimits";
+import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  COMPOSER_AVAILABLE_MODELS,
+  modelIdToSource,
+  sourceToModelId,
+} from "@/lib/video-composer/modelMapping";
+import { AI_VIDEO_TOOLKIT_MODELS } from "@/config/aiVideoModelRegistry";
+import { useUnifiedMentionLibrary } from "@/hooks/useUnifiedMentionLibrary";
+import { useStylePresets } from "@/hooks/useStylePresets";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import SceneCommentBadge from "./SceneCommentBadge";
+import SceneCommentSheet from "./SceneCommentSheet";
+import { useSceneCommentCounts } from "@/hooks/useComposerCollaboration";
+import { resolveSceneCharacterAnchor } from "@/lib/motion-studio/resolveSceneCharacterAnchor";
+import { applyCastToPrompt } from "@/lib/motion-studio/applyCastToPrompt";
+import { syncCastFromPrompt } from "@/lib/motion-studio/syncCastFromPrompt";
+import { applyDialogToPrompt } from "@/lib/motion-studio/applyDialogToPrompt";
+import { parseDialogScript } from "@/lib/talking-head/parseDialogScript";
+import SceneStillFrameStudio from "./SceneStillFrameStudio";
+import SceneAnchorLibrary from "./SceneAnchorLibrary";
+import { cn } from "@/lib/utils";
+import SceneDialogStudio from "./SceneDialogStudio";
+import DirectorQualityCoach from "./director-console/DirectorQualityCoach";
+import ScenePromptDetailsSheet from "./ScenePromptDetailsSheet";
+import SceneCardSummaryHeader from "./SceneCardSummaryHeader";
+import SceneStudioTabBar, {
+  SceneStudioSectionHeader,
+} from "./SceneStudioTabBar";
+import {
+  recommendEngineForScene,
+  estimateHeygenCostEur,
+} from "@/lib/video-composer/sceneEngineRouter";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SceneCardProps {
   scene: ComposerScene;
@@ -104,7 +148,7 @@ interface SceneCardProps {
   projectId?: string;
   characters?: ComposerCharacter[];
   /** Aspect ratio from briefing — used to filter Stock Library results. */
-  preferredAspect?: '16:9' | '9:16' | '1:1' | '4:5';
+  preferredAspect?: "16:9" | "9:16" | "1:1" | "4:5";
   onUpdate: (updates: Partial<ComposerScene>) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -113,11 +157,15 @@ interface SceneCardProps {
    * Block M — opens the Hybrid Extend dialog for this scene.
    * Parent owns the dialog state because it needs to refetch scenes after success.
    */
-  onHybridExtend?: (mode: 'forward' | 'backward' | 'bridge' | 'style-ref') => void;
+  onHybridExtend?: (
+    mode: "forward" | "backward" | "bridge" | "style-ref",
+  ) => void;
   /** True if at least one OTHER scene in the project has a clip_url (enables Bridge button). */
   hasOtherReadyScenes?: boolean;
   /** Allows the per-scene Dialog Studio to spawn shot-reverse-shot sub-scenes. */
-  onAddScene?: (partial: Partial<ComposerScene>) => Promise<string | undefined> | void;
+  onAddScene?: (
+    partial: Partial<ComposerScene>,
+  ) => Promise<string | undefined> | void;
   /** Inserts SRS sub-scenes at the parent's slot (replaces the dialog scene). */
   onInsertScenesAfter?: (
     parentSceneId: string,
@@ -129,7 +177,10 @@ interface SceneCardProps {
   onAddCharacter?: (character: ComposerCharacter) => void;
   language: string;
   /** Auto-persist hook for the per-scene Dialog Studio (voiceover generation). */
-  onEnsurePersisted?: () => Promise<{ projectId: string; scenes: ComposerScene[] }>;
+  onEnsurePersisted?: () => Promise<{
+    projectId: string;
+    scenes: ComposerScene[];
+  }>;
   /** Phase 2 — last_frame_url of the previous scene, surfaced as Quick Anchor. */
   previousSceneLastFrameUrl?: string;
   /** Phase 2 — 1-based index of previous scene for the chip label. */
@@ -144,16 +195,24 @@ interface SceneCardProps {
   embedded?: boolean;
 }
 
-const SCENE_TYPES: SceneType[] = ['hook', 'problem', 'solution', 'demo', 'social-proof', 'cta', 'custom'];
+const SCENE_TYPES: SceneType[] = [
+  "hook",
+  "problem",
+  "solution",
+  "demo",
+  "social-proof",
+  "cta",
+  "custom",
+];
 
 const sceneTypeColor: Record<SceneType, string> = {
-  hook: 'bg-red-500/20 text-red-400',
-  problem: 'bg-orange-500/20 text-orange-400',
-  solution: 'bg-green-500/20 text-green-400',
-  demo: 'bg-blue-500/20 text-blue-400',
-  'social-proof': 'bg-purple-500/20 text-purple-400',
-  cta: 'bg-primary/20 text-primary',
-  custom: 'bg-muted text-muted-foreground',
+  hook: "bg-red-500/20 text-red-400",
+  problem: "bg-orange-500/20 text-orange-400",
+  solution: "bg-green-500/20 text-green-400",
+  demo: "bg-blue-500/20 text-blue-400",
+  "social-proof": "bg-purple-500/20 text-purple-400",
+  cta: "bg-primary/20 text-primary",
+  custom: "bg-muted text-muted-foreground",
 };
 
 // Text overlay editing has moved to the dedicated "Text & Subtitles" tab.
@@ -181,33 +240,56 @@ export default function SceneCard({
   frameFirstMode,
   embedded,
 }: SceneCardProps) {
-  const lang = (language === 'es' ? 'es' : language === 'en' ? 'en' : 'de') as 'de' | 'en' | 'es';
-  const isStock = scene.clipSource === 'stock' || scene.clipSource === 'stock-image';
-  const clipSourceIcon = scene.clipSource.startsWith('ai-') ? Sparkles : isStock ? Video : Upload;
+  const lang = (language === "es" ? "es" : language === "en" ? "en" : "de") as
+    | "de"
+    | "en"
+    | "es";
+  const isStock =
+    scene.clipSource === "stock" || scene.clipSource === "stock-image";
+  const clipSourceIcon = scene.clipSource.startsWith("ai-")
+    ? Sparkles
+    : isStock
+      ? Video
+      : Upload;
   const ClipIcon = clipSourceIcon;
   const activeChar = scene.characterShot
     ? characters?.find((c) => c.id === scene.characterShot!.characterId)
     : undefined;
   // Library for live mention resolution preview
-  const { characters: libCharacters, locations: libLocations } = useUnifiedMentionLibrary();
+  const { characters: libCharacters, locations: libLocations } =
+    useUnifiedMentionLibrary();
   // World-asset pools for the UnifiedAssetPicker (Locations / Buildings / Props).
   const { locations: brandLocations } = useBrandLocations();
   const { buildings: brandBuildings } = useBrandBuildings();
   const { props: brandProps } = useBrandProps();
   // Curated catalog (admin-seeded preview rows) — surfaced directly in the
   // picker so users can use real-image assets without saving to their library.
-  const { catalogLocations, catalogBuildings, catalogProps } = useWorldCatalog();
+  const { catalogLocations, catalogBuildings, catalogProps } =
+    useWorldCatalog();
   // Library-first dedupe by lowercased name: a saved Brand asset always wins
   // over a catalog row with the same label so user edits / identity cards stick.
-  const mergeWithCatalog = <T extends { name: string }>(saved: T[], catalog: T[]): T[] => {
-    const safeSaved = (saved ?? []).filter((s): s is T => !!s && typeof s.name === 'string' && s.name.trim().length > 0);
-    const safeCatalog = (catalog ?? []).filter((c): c is T => !!c && typeof c.name === 'string' && c.name.trim().length > 0);
+  const mergeWithCatalog = <T extends { name: string }>(
+    saved: T[],
+    catalog: T[],
+  ): T[] => {
+    const safeSaved = (saved ?? []).filter(
+      (s): s is T =>
+        !!s && typeof s.name === "string" && s.name.trim().length > 0,
+    );
+    const safeCatalog = (catalog ?? []).filter(
+      (c): c is T =>
+        !!c && typeof c.name === "string" && c.name.trim().length > 0,
+    );
     const seen = new Set(safeSaved.map((s) => s.name.trim().toLowerCase()));
-    return [...safeSaved, ...safeCatalog.filter((c) => !seen.has(c.name.trim().toLowerCase()))];
+    return [
+      ...safeSaved,
+      ...safeCatalog.filter((c) => !seen.has(c.name.trim().toLowerCase())),
+    ];
   };
   // Phase 2 — auto-inject the user's favorite Brand Character into the preview.
   const { characters: brandChars } = useBrandCharacters();
-  const activeBrandChar = brandChars.find((c) => c.is_favorite) ?? brandChars[0];
+  const activeBrandChar =
+    brandChars.find((c) => c.is_favorite) ?? brandChars[0];
   const _brandApplies = activeBrandChar
     ? sceneFeaturesCharacter(scene, { name: activeBrandChar.name })
     : false;
@@ -248,8 +330,13 @@ export default function SceneCard({
   // Real-Time Collaboration — comment thread for this scene
   const [commentSheetOpen, setCommentSheetOpen] = useState(false);
   const { data: commentCounts } = useSceneCommentCounts(projectId);
-  const sceneCounts = (scene.id && commentCounts?.[scene.id]) || { total: 0, open: 0 };
-  const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
+  const sceneCounts = (scene.id && commentCounts?.[scene.id]) || {
+    total: 0,
+    open: 0,
+  };
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>(
+    undefined,
+  );
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id));
   }, []);
@@ -258,7 +345,7 @@ export default function SceneCard({
   // dialog from 2+). Hidden by default; opened via the "Skript schreiben" button
   // in the cast row. Initial open if a script already exists.
   const [dialogStudioOpen, setDialogStudioOpen] = useState<boolean>(
-    Boolean((scene.dialogScript ?? '').trim()),
+    Boolean((scene.dialogScript ?? "").trim()),
   );
   const dialogStudioRef = useRef<HTMLDivElement | null>(null);
   const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
@@ -270,8 +357,8 @@ export default function SceneCard({
   const [isExpandedState, setIsExpanded] = useState<boolean>(() => {
     if (embedded) return true;
     const hasContent =
-      Boolean((scene.aiPrompt ?? '').trim()) ||
-      Boolean((scene.dialogScript ?? '').trim()) ||
+      Boolean((scene.aiPrompt ?? "").trim()) ||
+      Boolean((scene.dialogScript ?? "").trim()) ||
       Boolean(scene.clipUrl) ||
       Boolean(scene.uploadUrl);
     return !hasContent;
@@ -280,48 +367,56 @@ export default function SceneCard({
   // fully open — the strip on the left handles selection/collapse.
   const isExpanded = embedded ? true : isExpandedState;
 
-
   const { systemPresets } = useStylePresets();
 
-  const promptMode: 'free' | 'structured' = scene.promptMode ?? 'free';
+  const promptMode: "free" | "structured" = scene.promptMode ?? "free";
   const promptSlots: PromptSlots = scene.promptSlots ?? {};
   const promptSlotOrder = scene.promptSlotOrder;
 
   // K-P1 — Cmd/Ctrl + Shift + S toggles Free ↔ Structured for the focused card.
   const cardRef = useRef<HTMLDivElement | null>(null);
   const isMac = useMemo(
-    () => typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform),
-    []
+    () => typeof navigator !== "undefined" && /Mac/i.test(navigator.platform),
+    [],
   );
-  const shortcutLabel = isMac ? '⌘⇧S' : 'Ctrl+Shift+S';
+  const shortcutLabel = isMac ? "⌘⇧S" : "Ctrl+Shift+S";
 
   const togglePromptMode = () => {
-    if (promptMode === 'free') {
+    if (promptMode === "free") {
       // Free → Structured: naive split (KI-Extractor optional, später)
-      const nextSlots = hasAnySlot(promptSlots) ? promptSlots : naiveSplitToSlots(scene.aiPrompt || '');
-      onUpdate({ promptMode: 'structured', promptSlots: nextSlots });
+      const nextSlots = hasAnySlot(promptSlots)
+        ? promptSlots
+        : naiveSplitToSlots(scene.aiPrompt || "");
+      onUpdate({ promptMode: "structured", promptSlots: nextSlots });
     } else {
       // Structured → Free: deterministic stitch (respect custom slot order)
       const stitched = stitchSlots(promptSlots, promptSlotOrder);
-      onUpdate({ promptMode: 'free', aiPrompt: stitched || scene.aiPrompt });
+      onUpdate({ promptMode: "free", aiPrompt: stitched || scene.aiPrompt });
     }
   };
 
   useEffect(() => {
-    if (!scene.clipSource.startsWith('ai-')) return;
+    if (!scene.clipSource.startsWith("ai-")) return;
     const handler = (e: KeyboardEvent) => {
       const mod = isMac ? e.metaKey : e.ctrlKey;
       if (!mod || !e.shiftKey) return;
-      if (e.key.toLowerCase() !== 's') return;
+      if (e.key.toLowerCase() !== "s") return;
       // Only fire when focus is inside this card
       if (!cardRef.current?.contains(document.activeElement)) return;
       e.preventDefault();
       togglePromptMode();
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [promptMode, promptSlots, promptSlotOrder, scene.aiPrompt, scene.clipSource, isMac]);
+  }, [
+    promptMode,
+    promptSlots,
+    promptSlotOrder,
+    scene.aiPrompt,
+    scene.clipSource,
+    isMac,
+  ]);
 
   // Auto-sync: when the scene prompt mentions a known character (e.g. the
   // storyboard LLM wrote "Sarah Dusatko wipes sweat…" but only added Matthew
@@ -331,8 +426,10 @@ export default function SceneCard({
   // so the marker picks up the auto-added slots in the same pass.
   useEffect(() => {
     if (!characters || characters.length === 0) return;
-    const current = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
-    const next = syncCastFromPrompt(scene.aiPrompt || '', current, characters);
+    const current =
+      scene.characterShots ??
+      (scene.characterShot ? [scene.characterShot] : []);
+    const next = syncCastFromPrompt(scene.aiPrompt || "", current, characters);
     if (next === current) return;
     onUpdate({
       characterShots: next,
@@ -346,20 +443,36 @@ export default function SceneCard({
   // first), so we can safely re-run on every cast / character-list change to
   // catch storyboard refreshes and late-arriving brand characters.
   useEffect(() => {
-    if (!scene.clipSource.startsWith('ai-')) return;
+    if (!scene.clipSource.startsWith("ai-")) return;
     if (!characters || characters.length === 0) return;
-    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+    const cast =
+      scene.characterShots ??
+      (scene.characterShot ? [scene.characterShot] : []);
     if (cast.length === 0) return;
-    if (promptMode === 'structured') {
-      const currentSubject = (promptSlots.subject as string) || '';
-      const newSubject = applyCastToPrompt(currentSubject, cast, characters, lang);
+    if (promptMode === "structured") {
+      const currentSubject = (promptSlots.subject as string) || "";
+      const newSubject = applyCastToPrompt(
+        currentSubject,
+        cast,
+        characters,
+        lang,
+      );
       if (newSubject !== currentSubject) {
         const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
-        onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
+        onUpdate({
+          promptSlots: nextSlots,
+          aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+        });
       }
     } else {
-      const newPrompt = applyCastToPrompt(scene.aiPrompt || '', cast, characters, lang);
-      if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
+      const newPrompt = applyCastToPrompt(
+        scene.aiPrompt || "",
+        cast,
+        characters,
+        lang,
+      );
+      if (newPrompt !== (scene.aiPrompt || ""))
+        onUpdate({ aiPrompt: newPrompt });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -367,7 +480,9 @@ export default function SceneCard({
     characters?.length,
     scene.characterShots?.length,
     scene.characterShot?.characterId,
-    scene.characterShots?.map((s) => `${s.characterId}:${s.shotType}`).join('|'),
+    scene.characterShots
+      ?.map((s) => `${s.characterId}:${s.shotType}`)
+      .join("|"),
   ]);
 
   // Sync scene.dialogScript → scene.aiPrompt (and promptSlots.subject in
@@ -381,27 +496,33 @@ export default function SceneCard({
   // timestamps would get wiped every time this effect re-runs (DB reload,
   // character refresh, promptMode change…).
   useEffect(() => {
-    if (!scene.clipSource.startsWith('ai-')) return;
+    if (!scene.clipSource.startsWith("ai-")) return;
     if (!characters || characters.length === 0) return;
     const hasTimedAudioPlan = (txt: string) =>
-      /Audio plan \(exact, do not deviate\)/i.test(txt || '');
-    const cast = scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : []);
+      /Audio plan \(exact, do not deviate\)/i.test(txt || "");
+    const cast =
+      scene.characterShots ??
+      (scene.characterShot ? [scene.characterShot] : []);
     const sceneCastChars = cast
       .map((cs) => characters.find((c) => c.id === cs.characterId))
       .filter((c): c is ComposerCharacter => !!c);
-    const blocks = parseDialogScript(scene.dialogScript ?? '', sceneCastChars);
-    if (promptMode === 'structured') {
-      const currentSubject = (promptSlots.subject as string) || '';
+    const blocks = parseDialogScript(scene.dialogScript ?? "", sceneCastChars);
+    if (promptMode === "structured") {
+      const currentSubject = (promptSlots.subject as string) || "";
       if (hasTimedAudioPlan(currentSubject)) return;
       const newSubject = applyDialogToPrompt(currentSubject, blocks, lang);
       if (newSubject !== currentSubject) {
         const nextSlots: PromptSlots = { ...promptSlots, subject: newSubject };
-        onUpdate({ promptSlots: nextSlots, aiPrompt: stitchSlots(nextSlots, promptSlotOrder) });
+        onUpdate({
+          promptSlots: nextSlots,
+          aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+        });
       }
     } else {
-      if (hasTimedAudioPlan(scene.aiPrompt || '')) return;
-      const newPrompt = applyDialogToPrompt(scene.aiPrompt || '', blocks, lang);
-      if (newPrompt !== (scene.aiPrompt || '')) onUpdate({ aiPrompt: newPrompt });
+      if (hasTimedAudioPlan(scene.aiPrompt || "")) return;
+      const newPrompt = applyDialogToPrompt(scene.aiPrompt || "", blocks, lang);
+      if (newPrompt !== (scene.aiPrompt || ""))
+        onUpdate({ aiPrompt: newPrompt });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.dialogScript, characters?.length, promptMode]);
@@ -412,7 +533,9 @@ export default function SceneCard({
   };
 
   const handleOrderChange = (order: Array<keyof PromptSlots>) => {
-    const safeOrder = order.filter((k) => k !== 'negative') as NonNullable<typeof scene.promptSlotOrder>;
+    const safeOrder = order.filter((k) => k !== "negative") as NonNullable<
+      typeof scene.promptSlotOrder
+    >;
     const stitched = stitchSlots(promptSlots, safeOrder);
     onUpdate({ promptSlotOrder: safeOrder, aiPrompt: stitched });
   };
@@ -426,27 +549,27 @@ export default function SceneCard({
         systemPresets && systemPresets.length > 0
           ? systemPresets[Math.floor(Math.random() * systemPresets.length)]
           : null;
-      const targetModel = clipSourceToModelKey(scene.clipSource) ?? 'ai-sora';
+      const targetModel = clipSourceToModelKey(scene.clipSource) ?? "ai-sora";
       const { data, error } = await supabase.functions.invoke(
-        'structured-prompt-compose',
+        "structured-prompt-compose",
         {
           body: {
-            mode: 'inspire',
+            mode: "inspire",
             language: lang,
             targetModel,
             seedStyle: seed?.name,
-            contextHint: scene.aiPrompt?.slice(0, 400) ?? '',
+            contextHint: scene.aiPrompt?.slice(0, 400) ?? "",
           },
-        }
+        },
       );
       if (error) throw error;
       const newSlots: PromptSlots | undefined = data?.slots;
       if (!newSlots || Object.keys(newSlots).length === 0) {
-        throw new Error('Empty inspire response');
+        throw new Error("Empty inspire response");
       }
       // Apply slots + flip to structured mode + sync free-text via stitcher.
       onUpdate({
-        promptMode: 'structured',
+        promptMode: "structured",
         promptSlots: newSlots,
         aiPrompt: stitchSlots(newSlots, promptSlotOrder),
         // If the seed brought director modifiers along, apply them too.
@@ -455,36 +578,47 @@ export default function SceneCard({
           : {}),
       });
       toast({
-        title: lang === 'de' ? '🎲 Neue Szenenidee' : lang === 'es' ? '🎲 Nueva idea de escena' : '🎲 Fresh scene idea',
+        title:
+          lang === "de"
+            ? "🎲 Neue Szenenidee"
+            : lang === "es"
+              ? "🎲 Nueva idea de escena"
+              : "🎲 Fresh scene idea",
         description: seed?.name
-          ? lang === 'de'
+          ? lang === "de"
             ? `Inspiriert von „${seed.name}"`
-            : lang === 'es'
-            ? `Inspirado en "${seed.name}"`
-            : `Inspired by "${seed.name}"`
+            : lang === "es"
+              ? `Inspirado en "${seed.name}"`
+              : `Inspired by "${seed.name}"`
           : undefined,
       });
     } catch (e: any) {
-      console.error('[SceneCard] inspire failed', e);
+      console.error("[SceneCard] inspire failed", e);
       toast({
-        title: lang === 'de' ? 'Inspire fehlgeschlagen' : lang === 'es' ? 'Falló la inspiración' : 'Inspire failed',
-        description: e?.message ?? '',
-        variant: 'destructive',
+        title:
+          lang === "de"
+            ? "Inspire fehlgeschlagen"
+            : lang === "es"
+              ? "Falló la inspiración"
+              : "Inspire failed",
+        description: e?.message ?? "",
+        variant: "destructive",
       });
     } finally {
       setInspiring(false);
     }
   };
 
-
   const handleStockSelect = (item: StockMediaItem) => {
     onUpdate({
-      clipSource: item.type === 'video' ? 'stock' : 'stock-image',
+      clipSource: item.type === "video" ? "stock" : "stock-image",
       clipUrl: item.url,
-      clipStatus: 'ready',
+      clipStatus: "ready",
       stockMediaThumb: item.thumbnailUrl || undefined,
-      stockMediaSource: item.source === 'upload' ? undefined : item.source,
-      stockMediaAuthor: item.authorName ? { name: item.authorName, url: item.authorUrl } : undefined,
+      stockMediaSource: item.source === "upload" ? undefined : item.source,
+      stockMediaAuthor: item.authorName
+        ? { name: item.authorName, url: item.authorUrl }
+        : undefined,
       uploadType: item.type,
     });
   };
@@ -495,8 +629,8 @@ export default function SceneCard({
       id={`scene-card-${scene.id || index}`}
       className={
         embedded
-          ? 'relative border-0 bg-transparent shadow-none rounded-none'
-          : 'relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]'
+          ? "relative border-0 bg-transparent shadow-none rounded-none"
+          : "relative border-border/40 bg-gradient-to-b from-card/90 to-card/60 group overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_-8px_hsl(var(--primary)/0.25)]"
       }
     >
       {/* Bond-style vertical gold accent on hover (hidden when embedded) */}
@@ -509,10 +643,10 @@ export default function SceneCard({
       <CardContent
         className={
           embedded
-            ? 'p-0 overflow-visible'
+            ? "p-0 overflow-visible"
             : isExpanded
-            ? 'p-4 overflow-hidden'
-            : 'p-2.5 overflow-hidden'
+              ? "p-4 overflow-hidden"
+              : "p-2.5 overflow-hidden"
         }
       >
         <SceneCardSummaryHeader
@@ -527,1277 +661,1714 @@ export default function SceneCard({
           language={lang}
         />
         {isExpanded && (
-        <div className="min-w-0">
-          <SceneStudioTabBar cardId={`scene-card-${scene.id || index}`} language={lang} />
-          {/* Content */}
-          <div className="flex-1 min-w-0 space-y-4">
-            <SceneStudioSectionHeader tab="story" language={lang} />
-            {/* Top row */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Select value={scene.sceneType} onValueChange={(v) => onUpdate({ sceneType: v as SceneType })}>
-                  <SelectTrigger className="h-7 w-auto gap-1 text-xs border-none p-0 px-2">
-                    <Badge className={`${sceneTypeColor[scene.sceneType]} text-[10px] border-none`}>
-                      {SCENE_TYPE_LABELS[scene.sceneType]?.[lang] || scene.sceneType}
-                    </Badge>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SCENE_TYPES.map((t) => (
-                      <SelectItem key={t} value={t} className="text-xs">
-                        {SCENE_TYPE_LABELS[t]?.[lang] || t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <span className="text-xs text-muted-foreground">{scene.durationSeconds}s</span>
-                <span className="text-[10px] text-primary">€{getClipCost(scene.clipSource, scene.clipQuality || 'standard', scene.durationSeconds).toFixed(2)}</span>
-                {(() => {
-                  const rec = recommendEngineForScene(scene);
-                  const override = scene.engineOverride ?? 'auto';
-                  // Multi-speaker hint: HeyGen MVP renders only first speaker per scene.
-                  // Surface a clickable warning that opens the Dialog Studio with
-                  // "Als getrennte Szenen rendern" pre-armed.
-                  const speakerLines = (scene.dialogScript ?? '')
-                    .split('\n')
-                    .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
-                    .filter(Boolean) as string[];
-                  const speakerCount = new Set(speakerLines).size;
-                  const showSplitHint =
-                    rec.engine === 'heygen-talking-head' && speakerCount >= 2;
-                  return (
-                    <>
-                    {showSplitHint && (
-                      <Badge
-                        variant="outline"
-                        className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
-                        title={
-                          lang === 'de'
-                            ? `${speakerCount} Sprecher erkannt. Beim Generieren wird automatisch der Two-Shot-Hook gerendert: Anchor (beide im Bild) → 10 s Master-Clip → sequenzieller Lip-Sync für jeden Sprecher → Continuity-Check. Klick öffnet das Dialog-Studio als Fallback (eigene Cuts pro Sprecher).`
-                            : lang === 'es'
-                            ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta automáticamente el pipeline Two-Shot Hook (anchor → master clip → lip-sync secuencial por hablante → continuity). Click abre el Dialog Studio como fallback.`
-                            : `${speakerCount} speakers detected. Generating runs the Two-Shot Hook pipeline automatically (anchor → 10 s master clip → sequential lip-sync per speaker → continuity check). Click opens Dialog Studio as a fallback (one cut per speaker).`
-                        }
-                        onClick={() => setSplitConfirmOpen(true)}
-                      >
-                        🎭 {lang === 'de' ? `Two-Shot · ${speakerCount} Sprecher` : lang === 'es' ? `Two-Shot · ${speakerCount} hablantes` : `Two-Shot · ${speakerCount} speakers`}
-                      </Badge>
-                    )}
-                    <Select
-                      value={override}
-                      onValueChange={(v) => onUpdate({ engineOverride: v as any })}
-                    >
-                      <SelectTrigger
-                        className={`h-5 w-auto gap-1 px-1.5 border-none p-0 text-[9px] [&_svg]:h-2.5 [&_svg]:w-2.5 ${
-                          rec.engine === 'heygen-talking-head'
-                            ? 'text-primary bg-primary/10 border border-primary/60'
-                            : rec.engine === 'cinematic-sync'
-                            ? 'text-emerald-300 bg-emerald-500/10 border border-emerald-500/50'
-                            : rec.engine === 'sync-polish'
-                            ? 'text-amber-300 bg-amber-500/10 border border-amber-500/40'
-                            : 'text-muted-foreground bg-transparent border border-border/50'
-                        } rounded-md`}
-                        title={rec.reason}
-                      >
-                        <SelectValue>{rec.label}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="auto" className="text-xs">⚙️ Auto (empfohlen)</SelectItem>
-                        <SelectItem value="cinematic-sync" className="text-xs">🎬 Cinematic + Lip-Sync (Artlist-Style)</SelectItem>
-                        <SelectItem value="heygen" className="text-xs">🎙️ HeyGen Talking-Head</SelectItem>
-                        <SelectItem value="broll" className="text-xs">📺 B-Roll (Off-Screen-VO)</SelectItem>
-                        <SelectItem value="sync-polish" className="text-xs">✨ Sync.so Polish</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
-                    </>
-                  );
-                })()}
-                {(() => {
-                  const slots = scene.characterShots && scene.characterShots.length > 0
-                    ? scene.characterShots
-                    : (scene.characterShot ? [scene.characterShot] : []);
-                  return slots
-                    .filter((s) => s.shotType !== 'absent')
-                    .map((s) => {
-                      const ch = characters?.find((c) => c.id === s.characterId);
-                      return (
-                        <CharacterShotBadge
-                          key={s.characterId}
-                          shot={s}
-                          characterName={ch?.name}
-                        />
-                      );
-                    });
-                })()}
-                {scene.hybridMode && (
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] h-4 px-1.5 gap-1 border-primary/40 text-primary"
-                    title={
-                      lang === 'de'
-                        ? 'Hybrid-Szene: Frame-anker zur Quellszene'
-                        : lang === 'es'
-                        ? 'Escena híbrida: anclada por frame a la escena fuente'
-                        : 'Hybrid scene: frame-anchored to source'
-                    }
-                  >
-                    {scene.hybridMode === 'bridge' ? (
-                      <Link2 className="h-2.5 w-2.5" />
-                    ) : scene.hybridMode === 'style-ref' ? (
-                      <Palette className="h-2.5 w-2.5" />
-                    ) : (
-                      <Link2 className="h-2.5 w-2.5" />
-                    )}
-                    {scene.hybridMode === 'forward'
-                      ? 'Sequel'
-                      : scene.hybridMode === 'backward'
-                      ? 'Prequel'
-                      : scene.hybridMode === 'bridge'
-                      ? 'Crossfade'
-                      : scene.hybridMode === 'style-ref'
-                      ? 'Style-Echo'
-                      : scene.hybridMode}
-                  </Badge>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {scene.id && projectId && (
-                  <SceneCommentBadge
-                    total={sceneCounts.total}
-                    open={sceneCounts.open}
-                    onClick={() => setCommentSheetOpen(true)}
-                  />
-                )}
-                <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={onDelete}>
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Duration slider */}
-            <Slider
-              value={[scene.durationSeconds]}
-              onValueChange={([v]) => onUpdate({ durationSeconds: v })}
-              min={3}
-              max={15}
-              step={1}
-              className="w-full"
+          <div className="min-w-0">
+            <SceneStudioTabBar
+              cardId={`scene-card-${scene.id || index}`}
+              language={lang}
             />
-
-            {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
-            {onHybridExtend && scene.clipStatus === 'ready' && scene.clipUrl && (
-              <div className="flex flex-wrap items-center gap-1.5 pt-1 rounded-md border border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 px-2 py-1.5">
-                <span className="text-[9px] uppercase tracking-wider font-semibold text-primary flex items-center gap-1">
-                  🎬 {lang === 'de' ? 'Director Mode' : lang === 'es' ? 'Director Mode' : 'Director Mode'}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[10px] gap-1.5"
-                  onClick={() => onHybridExtend('backward')}
-                  title={
-                    lang === 'de'
-                      ? 'Prequel — was passierte vor dieser Szene?'
-                      : lang === 'es'
-                      ? 'Prequel — ¿qué pasó antes de esta escena?'
-                      : 'Prequel — what happened before this scene?'
-                  }
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  {lang === 'de' ? 'Prequel' : lang === 'es' ? 'Prequel' : 'Prequel'}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[10px] gap-1.5"
-                  onClick={() => onHybridExtend('forward')}
-                  title={
-                    lang === 'de'
-                      ? 'Sequel — wie geht die Szene weiter?'
-                      : lang === 'es'
-                      ? 'Sequel — ¿cómo continúa la escena?'
-                      : 'Sequel — how does the scene continue?'
-                  }
-                >
-                  <ArrowRight className="h-3 w-3" />
-                  {lang === 'de' ? 'Sequel' : lang === 'es' ? 'Sequel' : 'Sequel'}
-                </Button>
-                {hasOtherReadyScenes && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[10px] gap-1.5"
-                    onClick={() => onHybridExtend('bridge')}
-                    title={
-                      lang === 'de'
-                        ? 'Crossfade — morphender Übergang in eine andere Szene'
-                        : lang === 'es'
-                        ? 'Crossfade — transición con morphing hacia otra escena'
-                        : 'Crossfade — morphing transition to another scene'
+            {/* Content */}
+            <div className="flex-1 min-w-0 space-y-4">
+              <SceneStudioSectionHeader tab="story" language={lang} />
+              {/* Top row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={scene.sceneType}
+                    onValueChange={(v) =>
+                      onUpdate({ sceneType: v as SceneType })
                     }
                   >
-                    <Link2 className="h-3 w-3" />
-                    {lang === 'de' ? 'Crossfade' : lang === 'es' ? 'Crossfade' : 'Crossfade'}
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-7 text-[10px] gap-1.5"
-                  onClick={() => onHybridExtend('style-ref')}
-                  title={
-                    lang === 'de'
-                      ? 'Style-Echo — neue Szene, gleiche Bildsprache'
-                      : lang === 'es'
-                      ? 'Style-Echo — nueva escena, mismo lenguaje visual'
-                      : 'Style-Echo — new scene, same visual language'
-                  }
-                >
-                  <Palette className="h-3 w-3" />
-                  {lang === 'de' ? 'Style-Echo' : lang === 'es' ? 'Style-Echo' : 'Style-Echo'}
-                </Button>
-              </div>
-            )}
-            {/* Clip source — 3 compact tabs (Stock / KI / Upload) + KI-Modell-Dropdown */}
-            {(() => {
-              const isAi = scene.clipSource.startsWith('ai-');
-              const isStockImage = scene.clipSource === 'stock-image';
-              const isUpload = scene.clipSource === 'upload';
-              const sourceMode: 'stock' | 'ai' | 'upload' = isAi ? 'ai' : isUpload ? 'upload' : 'stock';
-              const currentModelId = isAi ? sourceToModelId(scene.clipSource, scene.clipQuality) : '';
+                    <SelectTrigger className="h-7 w-auto gap-1 text-xs border-none p-0 px-2">
+                      <Badge
+                        className={`${sceneTypeColor[scene.sceneType]} text-[10px] border-none`}
+                      >
+                        {SCENE_TYPE_LABELS[scene.sceneType]?.[lang] ||
+                          scene.sceneType}
+                      </Badge>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SCENE_TYPES.map((t) => (
+                        <SelectItem key={t} value={t} className="text-xs">
+                          {SCENE_TYPE_LABELS[t]?.[lang] || t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              const tabs: Array<{ id: 'stock' | 'ai' | 'upload'; label: string }> = [
-                { id: 'stock',  label: lang === 'de' ? '🎁 Stock'        : lang === 'es' ? '🎁 Stock' : '🎁 Stock' },
-                { id: 'ai',     label: lang === 'de' ? '🤖 KI-Generiert' : lang === 'es' ? '🤖 IA'    : '🤖 AI-Generated' },
-                { id: 'upload', label: lang === 'de' ? '⬆ Eigenes'      : lang === 'es' ? '⬆ Propio' : '⬆ Upload' },
-              ];
-
-              const handleTabChange = (id: 'stock' | 'ai' | 'upload') => {
-                if (id === 'stock') {
-                  const next: ClipSource = isStockImage ? 'stock-image' : 'stock';
-                  onUpdate({ clipSource: next });
-                  setStockBrowserOpen(true);
-                } else if (id === 'upload') {
-                  onUpdate({ clipSource: 'upload' });
-                } else if (!isAi) {
-                  onUpdate({ clipSource: 'ai-hailuo', clipQuality: scene.clipQuality ?? 'standard' });
-                }
-              };
-
-              return (
-                <div className="space-y-2">
-                  <div className="flex gap-1.5 p-1 rounded-lg bg-card/40 border border-border/40">
-                    {tabs.map((tab) => {
-                      const active = sourceMode === tab.id;
-                      const isStockTab = tab.id === 'stock';
-                      return (
-                        <button
-                          key={tab.id}
-                          onClick={() => handleTabChange(tab.id)}
-                          className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
-                            active
-                              ? isStockTab
-                                ? 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40'
-                                : tab.id === 'ai'
-                                  ? 'bg-primary/15 text-primary ring-1 ring-primary/40'
-                                  : 'bg-muted text-foreground ring-1 ring-border'
-                              : 'text-muted-foreground hover:text-foreground hover:bg-card/60'
-                          }`}
+                  <span className="text-xs text-muted-foreground">
+                    {scene.durationSeconds}s
+                  </span>
+                  <span className="text-[10px] text-primary">
+                    €
+                    {getClipCost(
+                      scene.clipSource,
+                      scene.clipQuality || "standard",
+                      scene.durationSeconds,
+                    ).toFixed(2)}
+                  </span>
+                  {(() => {
+                    const rec = recommendEngineForScene(scene);
+                    const override = scene.engineOverride ?? "auto";
+                    // Multi-speaker hint: HeyGen MVP renders only first speaker per scene.
+                    // Surface a clickable warning that opens the Dialog Studio with
+                    // "Als getrennte Szenen rendern" pre-armed.
+                    const speakerLines = (scene.dialogScript ?? "")
+                      .split("\n")
+                      .map((l) =>
+                        l
+                          .match(
+                            /^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/,
+                          )?.[1]
+                          ?.trim()
+                          .toLowerCase(),
+                      )
+                      .filter(Boolean) as string[];
+                    const speakerCount = new Set(speakerLines).size;
+                    const showSplitHint =
+                      rec.engine === "heygen-talking-head" && speakerCount >= 2;
+                    return (
+                      <>
+                        {showSplitHint && (
+                          <Badge
+                            variant="outline"
+                            className="h-5 px-1.5 text-[9px] gap-1 cursor-pointer border-emerald-500/60 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                            title={
+                              lang === "de"
+                                ? `${speakerCount} Sprecher erkannt. Beim Generieren wird automatisch der Two-Shot-Hook gerendert: Anchor (beide im Bild) → 10 s Master-Clip → sequenzieller Lip-Sync für jeden Sprecher → Continuity-Check. Klick öffnet das Dialog-Studio als Fallback (eigene Cuts pro Sprecher).`
+                                : lang === "es"
+                                  ? `${speakerCount} hablantes detectados. Al renderizar se ejecuta automáticamente el pipeline Two-Shot Hook (anchor → master clip → lip-sync secuencial por hablante → continuity). Click abre el Dialog Studio como fallback.`
+                                  : `${speakerCount} speakers detected. Generating runs the Two-Shot Hook pipeline automatically (anchor → 10 s master clip → sequential lip-sync per speaker → continuity check). Click opens Dialog Studio as a fallback (one cut per speaker).`
+                            }
+                            onClick={() => setSplitConfirmOpen(true)}
+                          >
+                            🎭{" "}
+                            {lang === "de"
+                              ? `Two-Shot · ${speakerCount} Sprecher`
+                              : lang === "es"
+                                ? `Two-Shot · ${speakerCount} hablantes`
+                                : `Two-Shot · ${speakerCount} speakers`}
+                          </Badge>
+                        )}
+                        <Select
+                          value={override}
+                          onValueChange={(v) =>
+                            onUpdate({ engineOverride: v as any })
+                          }
                         >
-                          {tab.label}
-                          {isStockTab && active && (
-                            <span className="ml-0.5 px-1 rounded bg-emerald-500/25 text-emerald-200 text-[8px] font-semibold uppercase tracking-wide">
-                              Free
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <SelectTrigger
+                            className={`h-5 w-auto gap-1 px-1.5 border-none p-0 text-[9px] [&_svg]:h-2.5 [&_svg]:w-2.5 ${
+                              rec.engine === "heygen-talking-head"
+                                ? "text-primary bg-primary/10 border border-primary/60"
+                                : rec.engine === "cinematic-sync"
+                                  ? "text-emerald-300 bg-emerald-500/10 border border-emerald-500/50"
+                                  : rec.engine === "sync-polish"
+                                    ? "text-amber-300 bg-amber-500/10 border border-amber-500/40"
+                                    : "text-muted-foreground bg-transparent border border-border/50"
+                            } rounded-md`}
+                            title={rec.reason}
+                          >
+                            <SelectValue>{rec.label}</SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto" className="text-xs">
+                              ⚙️ Auto (empfohlen)
+                            </SelectItem>
+                            <SelectItem
+                              value="cinematic-sync"
+                              className="text-xs"
+                            >
+                              🎬 Cinematic + Lip-Sync (Artlist-Style)
+                            </SelectItem>
+                            <SelectItem value="heygen" className="text-xs">
+                              🎙️ HeyGen Talking-Head
+                            </SelectItem>
+                            <SelectItem value="broll" className="text-xs">
+                              📺 B-Roll (Off-Screen-VO)
+                            </SelectItem>
+                            <SelectItem value="sync-polish" className="text-xs">
+                              ✨ Sync.so Polish
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
+                      </>
+                    );
+                  })()}
+                  {(() => {
+                    const slots =
+                      scene.characterShots && scene.characterShots.length > 0
+                        ? scene.characterShots
+                        : scene.characterShot
+                          ? [scene.characterShot]
+                          : [];
+                    return slots
+                      .filter((s) => s.shotType !== "absent")
+                      .map((s) => {
+                        const ch = characters?.find(
+                          (c) => c.id === s.characterId,
+                        );
+                        return (
+                          <CharacterShotBadge
+                            key={s.characterId}
+                            shot={s}
+                            characterName={ch?.name}
+                          />
+                        );
+                      });
+                  })()}
+                  {scene.hybridMode && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] h-4 px-1.5 gap-1 border-primary/40 text-primary"
+                      title={
+                        lang === "de"
+                          ? "Hybrid-Szene: Frame-anker zur Quellszene"
+                          : lang === "es"
+                            ? "Escena híbrida: anclada por frame a la escena fuente"
+                            : "Hybrid scene: frame-anchored to source"
+                      }
+                    >
+                      {scene.hybridMode === "bridge" ? (
+                        <Link2 className="h-2.5 w-2.5" />
+                      ) : scene.hybridMode === "style-ref" ? (
+                        <Palette className="h-2.5 w-2.5" />
+                      ) : (
+                        <Link2 className="h-2.5 w-2.5" />
+                      )}
+                      {scene.hybridMode === "forward"
+                        ? "Sequel"
+                        : scene.hybridMode === "backward"
+                          ? "Prequel"
+                          : scene.hybridMode === "bridge"
+                            ? "Crossfade"
+                            : scene.hybridMode === "style-ref"
+                              ? "Style-Echo"
+                              : scene.hybridMode}
+                    </Badge>
+                  )}
+                </div>
 
-                  {sourceMode === 'stock' && (
-                    <div className="flex gap-1.5">
-                      {([
-                        { src: 'stock' as ClipSource,       label: lang === 'de' ? 'Video' : lang === 'es' ? 'Vídeo' : 'Video', icon: Video },
-                        { src: 'stock-image' as ClipSource, label: lang === 'de' ? 'Bild'  : lang === 'es' ? 'Imagen' : 'Image', icon: ImageIcon },
-                      ]).map((opt) => {
-                        const active = scene.clipSource === opt.src;
-                        const Icon = opt.icon;
+                <div className="flex items-center gap-1">
+                  {scene.id && projectId && (
+                    <SceneCommentBadge
+                      total={sceneCounts.total}
+                      open={sceneCounts.open}
+                      onClick={() => setCommentSheetOpen(true)}
+                    />
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive"
+                    onClick={onDelete}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Duration slider */}
+              <Slider
+                value={[scene.durationSeconds]}
+                onValueChange={([v]) => onUpdate({ durationSeconds: v })}
+                min={3}
+                max={15}
+                step={1}
+                className="w-full"
+              />
+
+              {/* 🎬 Director Mode — Hybrid Production actions (only when source clip is ready) */}
+              {onHybridExtend &&
+                scene.clipStatus === "ready" &&
+                scene.clipUrl && (
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1 rounded-md border border-primary/20 bg-gradient-to-r from-primary/5 via-transparent to-primary/5 px-2 py-1.5">
+                    <span className="text-[9px] uppercase tracking-wider font-semibold text-primary flex items-center gap-1">
+                      🎬{" "}
+                      {lang === "de"
+                        ? "Director Mode"
+                        : lang === "es"
+                          ? "Director Mode"
+                          : "Director Mode"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] gap-1.5"
+                      onClick={() => onHybridExtend("backward")}
+                      title={
+                        lang === "de"
+                          ? "Prequel — was passierte vor dieser Szene?"
+                          : lang === "es"
+                            ? "Prequel — ¿qué pasó antes de esta escena?"
+                            : "Prequel — what happened before this scene?"
+                      }
+                    >
+                      <ArrowLeft className="h-3 w-3" />
+                      {lang === "de"
+                        ? "Prequel"
+                        : lang === "es"
+                          ? "Prequel"
+                          : "Prequel"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] gap-1.5"
+                      onClick={() => onHybridExtend("forward")}
+                      title={
+                        lang === "de"
+                          ? "Sequel — wie geht die Szene weiter?"
+                          : lang === "es"
+                            ? "Sequel — ¿cómo continúa la escena?"
+                            : "Sequel — how does the scene continue?"
+                      }
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                      {lang === "de"
+                        ? "Sequel"
+                        : lang === "es"
+                          ? "Sequel"
+                          : "Sequel"}
+                    </Button>
+                    {hasOtherReadyScenes && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-[10px] gap-1.5"
+                        onClick={() => onHybridExtend("bridge")}
+                        title={
+                          lang === "de"
+                            ? "Crossfade — morphender Übergang in eine andere Szene"
+                            : lang === "es"
+                              ? "Crossfade — transición con morphing hacia otra escena"
+                              : "Crossfade — morphing transition to another scene"
+                        }
+                      >
+                        <Link2 className="h-3 w-3" />
+                        {lang === "de"
+                          ? "Crossfade"
+                          : lang === "es"
+                            ? "Crossfade"
+                            : "Crossfade"}
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] gap-1.5"
+                      onClick={() => onHybridExtend("style-ref")}
+                      title={
+                        lang === "de"
+                          ? "Style-Echo — neue Szene, gleiche Bildsprache"
+                          : lang === "es"
+                            ? "Style-Echo — nueva escena, mismo lenguaje visual"
+                            : "Style-Echo — new scene, same visual language"
+                      }
+                    >
+                      <Palette className="h-3 w-3" />
+                      {lang === "de"
+                        ? "Style-Echo"
+                        : lang === "es"
+                          ? "Style-Echo"
+                          : "Style-Echo"}
+                    </Button>
+                  </div>
+                )}
+              {/* Clip source — 3 compact tabs (Stock / KI / Upload) + KI-Modell-Dropdown */}
+              {(() => {
+                const isAi = scene.clipSource.startsWith("ai-");
+                const isStockImage = scene.clipSource === "stock-image";
+                const isUpload = scene.clipSource === "upload";
+                const sourceMode: "stock" | "ai" | "upload" = isAi
+                  ? "ai"
+                  : isUpload
+                    ? "upload"
+                    : "stock";
+                const currentModelId = isAi
+                  ? sourceToModelId(scene.clipSource, scene.clipQuality)
+                  : "";
+
+                const tabs: Array<{
+                  id: "stock" | "ai" | "upload";
+                  label: string;
+                }> = [
+                  {
+                    id: "stock",
+                    label:
+                      lang === "de"
+                        ? "🎁 Stock"
+                        : lang === "es"
+                          ? "🎁 Stock"
+                          : "🎁 Stock",
+                  },
+                  {
+                    id: "ai",
+                    label:
+                      lang === "de"
+                        ? "🤖 KI-Generiert"
+                        : lang === "es"
+                          ? "🤖 IA"
+                          : "🤖 AI-Generated",
+                  },
+                  {
+                    id: "upload",
+                    label:
+                      lang === "de"
+                        ? "⬆ Eigenes"
+                        : lang === "es"
+                          ? "⬆ Propio"
+                          : "⬆ Upload",
+                  },
+                ];
+
+                const handleTabChange = (id: "stock" | "ai" | "upload") => {
+                  if (id === "stock") {
+                    const next: ClipSource = isStockImage
+                      ? "stock-image"
+                      : "stock";
+                    onUpdate({ clipSource: next });
+                    setStockBrowserOpen(true);
+                  } else if (id === "upload") {
+                    onUpdate({ clipSource: "upload" });
+                  } else if (!isAi) {
+                    onUpdate({
+                      clipSource: "ai-hailuo",
+                      clipQuality: scene.clipQuality ?? "standard",
+                    });
+                  }
+                };
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex gap-1.5 p-1 rounded-lg bg-card/40 border border-border/40">
+                      {tabs.map((tab) => {
+                        const active = sourceMode === tab.id;
+                        const isStockTab = tab.id === "stock";
                         return (
                           <button
-                            key={opt.src}
-                            onClick={() => { onUpdate({ clipSource: opt.src }); setStockBrowserOpen(true); }}
-                            className={`px-2.5 py-1 rounded-md text-[10px] border transition-all flex items-center gap-1.5 ${
+                            key={tab.id}
+                            onClick={() => handleTabChange(tab.id)}
+                            className={`flex-1 px-2.5 py-1.5 rounded-md text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
                               active
-                                ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-300'
-                                : 'border-border/40 text-muted-foreground hover:border-border'
+                                ? isStockTab
+                                  ? "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/40"
+                                  : tab.id === "ai"
+                                    ? "bg-primary/15 text-primary ring-1 ring-primary/40"
+                                    : "bg-muted text-foreground ring-1 ring-border"
+                                : "text-muted-foreground hover:text-foreground hover:bg-card/60"
                             }`}
                           >
-                            <Icon className="h-2.5 w-2.5" />
-                            {opt.label}
+                            {tab.label}
+                            {isStockTab && active && (
+                              <span className="ml-0.5 px-1 rounded bg-emerald-500/25 text-emerald-200 text-[8px] font-semibold uppercase tracking-wide">
+                                Free
+                              </span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
-                  )}
 
-                  {sourceMode === 'ai' && (
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        {lang === 'de' ? 'KI-Modell · Qualität & Preis im Dropdown' : lang === 'es' ? 'Modelo IA' : 'AI Model'}
-                      </Label>
-                      <ModelSelector
-                        value={currentModelId}
-                        onChange={(modelId) => {
-                          const next = modelIdToSource(modelId);
-                          onUpdate({ clipSource: next.clipSource, clipQuality: next.clipQuality });
-                        }}
-                        currency="EUR"
-                        models={COMPOSER_AVAILABLE_MODELS}
-                        className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
-                      />
-                      {(() => {
-                        const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find((m) => m.id === currentModelId);
-                        if (!selectedModel?.capabilities?.audio) return null;
-                        const withAudio = scene.withAudio !== false;
-                        const onLabel = lang === 'de' ? 'Mit Sound' : lang === 'es' ? 'Con sonido' : 'With sound';
-                        const offLabel = lang === 'de' ? 'Ohne Sound' : lang === 'es' ? 'Sin sonido' : 'No sound';
-                        const tooltip = lang === 'de'
-                          ? 'Natives KI-Audio aus dem Modell verwenden — sonst stumm.'
-                          : lang === 'es'
-                            ? 'Usar audio nativo del modelo IA — si no, silenciado.'
-                            : 'Use native AI audio from the model — otherwise muted.';
-                        return (
-                          <div
-                            className="flex gap-1 mt-1.5 p-0.5 rounded-md bg-card/40 border border-border/40 w-fit"
-                            title={tooltip}
-                          >
+                    {sourceMode === "stock" && (
+                      <div className="flex gap-1.5">
+                        {[
+                          {
+                            src: "stock" as ClipSource,
+                            label:
+                              lang === "de"
+                                ? "Video"
+                                : lang === "es"
+                                  ? "Vídeo"
+                                  : "Video",
+                            icon: Video,
+                          },
+                          {
+                            src: "stock-image" as ClipSource,
+                            label:
+                              lang === "de"
+                                ? "Bild"
+                                : lang === "es"
+                                  ? "Imagen"
+                                  : "Image",
+                            icon: ImageIcon,
+                          },
+                        ].map((opt) => {
+                          const active = scene.clipSource === opt.src;
+                          const Icon = opt.icon;
+                          return (
                             <button
-                              type="button"
-                              onClick={() => onUpdate({ withAudio: true })}
-                              className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
-                                withAudio
-                                  ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
-                                  : 'text-muted-foreground hover:text-foreground'
+                              key={opt.src}
+                              onClick={() => {
+                                onUpdate({ clipSource: opt.src });
+                                setStockBrowserOpen(true);
+                              }}
+                              className={`px-2.5 py-1 rounded-md text-[10px] border transition-all flex items-center gap-1.5 ${
+                                active
+                                  ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-300"
+                                  : "border-border/40 text-muted-foreground hover:border-border"
                               }`}
                             >
-                              <Volume2 className="h-2.5 w-2.5" />
-                              {onLabel}
+                              <Icon className="h-2.5 w-2.5" />
+                              {opt.label}
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => onUpdate({ withAudio: false })}
-                              className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
-                                !withAudio
-                                  ? 'bg-muted text-foreground ring-1 ring-border'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {sourceMode === "ai" && (
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          {lang === "de"
+                            ? "KI-Modell · Qualität & Preis im Dropdown"
+                            : lang === "es"
+                              ? "Modelo IA"
+                              : "AI Model"}
+                        </Label>
+                        <ModelSelector
+                          value={currentModelId}
+                          onChange={(modelId) => {
+                            const next = modelIdToSource(modelId);
+                            onUpdate({
+                              clipSource: next.clipSource,
+                              clipQuality: next.clipQuality,
+                            });
+                          }}
+                          currency="EUR"
+                          models={COMPOSER_AVAILABLE_MODELS}
+                          className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
+                        />
+                        {(() => {
+                          const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find(
+                            (m) => m.id === currentModelId,
+                          );
+                          if (!selectedModel?.capabilities?.audio) return null;
+                          const withAudio = scene.withAudio !== false;
+                          const onLabel =
+                            lang === "de"
+                              ? "Mit Sound"
+                              : lang === "es"
+                                ? "Con sonido"
+                                : "With sound";
+                          const offLabel =
+                            lang === "de"
+                              ? "Ohne Sound"
+                              : lang === "es"
+                                ? "Sin sonido"
+                                : "No sound";
+                          const tooltip =
+                            lang === "de"
+                              ? "Natives KI-Audio aus dem Modell verwenden — sonst stumm."
+                              : lang === "es"
+                                ? "Usar audio nativo del modelo IA — si no, silenciado."
+                                : "Use native AI audio from the model — otherwise muted.";
+                          return (
+                            <div
+                              className="flex gap-1 mt-1.5 p-0.5 rounded-md bg-card/40 border border-border/40 w-fit"
+                              title={tooltip}
                             >
-                              <VolumeX className="h-2.5 w-2.5" />
-                              {offLabel}
-                            </button>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+                              <button
+                                type="button"
+                                onClick={() => onUpdate({ withAudio: true })}
+                                className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
+                                  withAudio
+                                    ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+                                    : "text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                <Volume2 className="h-2.5 w-2.5" />
+                                {onLabel}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onUpdate({ withAudio: false })}
+                                className={`px-2 py-1 rounded text-[10px] font-medium transition-all flex items-center gap-1 ${
+                                  !withAudio
+                                    ? "bg-muted text-foreground ring-1 ring-border"
+                                    : "text-muted-foreground hover:text-foreground"
+                                }`}
+                              >
+                                <VolumeX className="h-2.5 w-2.5" />
+                                {offLabel}
+                              </button>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
-            {/* Effects badges — Phase 3: hidden behind "Mehr ▾" drawer. */}
-            {secondaryOpen && scene.effects && scene.effects.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 items-center">
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
-                  <Wand2 className="h-2.5 w-2.5" />
-                  Effekte
-                </span>
-                {scene.effects.map((eff, i) => (
-                  <Badge
-                    key={`${eff.id}-${i}`}
-                    variant="outline"
-                    className="text-[9px] px-1.5 py-0 h-4 border-amber-500/30 bg-amber-500/5 text-amber-300/90"
-                  >
-                    {eff.id}
-                  </Badge>
-                ))}
-              </div>
-            )}
-
-            <SceneStudioSectionHeader tab="cast" language={lang} />
-            {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
-            {scene.clipSource.startsWith('ai-') && (
-              (characters && characters.length > 0) ||
-              libCharacters.length > 0 ||
-              brandLocations.length > 0 ||
-              brandBuildings.length > 0 ||
-              brandProps.length > 0 ||
-              catalogLocations.length > 0 ||
-              catalogBuildings.length > 0 ||
-              catalogProps.length > 0
-            ) && (
-              <>
-                <UnifiedAssetPicker
-                  characters={characters ?? []}
-                  libraryCharacters={libCharacters.map((c): ComposerCharacter => ({
-                    id: c.id,
-                    name: c.name,
-                    appearance: c.description ?? '',
-                    signatureItems: c.signature_items ?? '',
-                    referenceImageUrl: c.reference_image_url ?? undefined,
-                  }))}
-                  onAddToBriefing={onAddCharacter}
-                  cast={scene.characterShots}
-                  legacyCast={scene.characterShot}
-                  onCastChange={(next) => {
-                    const updates: Partial<ComposerScene> = {
-                      characterShots: next,
-                      // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
-                      characterShot: next[0],
-                    };
-                    if (promptMode === 'structured') {
-                      const subjectKey: keyof PromptSlots = 'subject';
-                      const currentSubject = (promptSlots[subjectKey] as string) || '';
-                      const newSubject = applyCastToPrompt(currentSubject, next, characters, lang);
-                      const nextSlots: PromptSlots = { ...promptSlots, [subjectKey]: newSubject };
-                      updates.promptSlots = nextSlots;
-                      updates.aiPrompt = stitchSlots(nextSlots, promptSlotOrder);
-                    } else {
-                      updates.aiPrompt = applyCastToPrompt(scene.aiPrompt || '', next, characters, lang);
-                    }
-                    onUpdate(updates);
-                  }}
-                  locations={mergeWithCatalog(
-                    brandLocations.map((l) => ({ id: l.id, name: l.name, reference_image_url: l.reference_image_url })),
-                    catalogLocations.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
-                  )}
-                  buildings={mergeWithCatalog(
-                    brandBuildings.map((b) => ({ id: b.id, name: b.name, reference_image_url: b.reference_image_url })),
-                    catalogBuildings.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
-                  )}
-                  props={mergeWithCatalog(
-                    brandProps.map((p) => ({ id: p.id, name: p.name, reference_image_url: p.reference_image_url })),
-                    catalogProps.map((c) => ({ id: c.id, name: c.name, reference_image_url: c.reference_image_url })),
-                  )}
-                  prompt={
-                    promptMode === 'structured'
-                      ? ((promptSlots.subject as string) || '')
-                      : (scene.aiPrompt || '')
-                  }
-                  onPromptChange={(nextPrompt) => {
-                    if (promptMode === 'structured') {
-                      const nextSlots: PromptSlots = { ...promptSlots, subject: nextPrompt };
-                      onUpdate({
-                        promptSlots: nextSlots,
-                        aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
-                      });
-                    } else {
-                      onUpdate({ aiPrompt: nextPrompt });
-                    }
-                  }}
-                  language={lang as 'en' | 'de' | 'es'}
-                />
-
-                {/* Trigger: open the per-scene Script/Dialog Studio. Available from 1 cast member upwards. */}
-                {(() => {
-                  const sceneCastCount =
-                    (scene.characterShots?.length ?? 0) ||
-                    (scene.characterShot ? 1 : 0);
-                  if (sceneCastCount < 1) return null;
-                  const hasScript = Boolean((scene.dialogScript ?? '').trim());
-                  const lineCount = hasScript
-                    ? (scene.dialogScript ?? '')
-                        .split(/\r?\n/)
-                        .filter((l) => /^\s*[A-Za-zÀ-ÿ][^\n]{0,40}\s*[:—-]\s*\S/.test(l)).length
-                    : 0;
-                  const label =
-                    lang === 'de' ? 'Skript schreiben'
-                    : lang === 'es' ? 'Escribir guion'
-                    : 'Write script';
-                  const lineLbl = (n: number) =>
-                    lang === 'de' ? `${n} Zeile${n === 1 ? '' : 'n'}`
-                    : lang === 'es' ? `${n} línea${n === 1 ? '' : 's'}`
-                    : `${n} line${n === 1 ? '' : 's'}`;
-                  return (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-[11px] gap-1.5 self-start text-muted-foreground hover:text-foreground"
-                      onClick={() => {
-                        setDialogStudioOpen((v) => {
-                          const next = !v;
-                          if (next) {
-                            setTimeout(() => {
-                              dialogStudioRef.current?.scrollIntoView({
-                                behavior: 'smooth',
-                                block: 'center',
-                              });
-                            }, 50);
-                          }
-                          return next;
-                        });
-                      }}
+              {/* Effects badges — Phase 3: hidden behind "Mehr ▾" drawer. */}
+              {secondaryOpen && scene.effects && scene.effects.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground/70 flex items-center gap-1">
+                    <Wand2 className="h-2.5 w-2.5" />
+                    Effekte
+                  </span>
+                  {scene.effects.map((eff, i) => (
+                    <Badge
+                      key={`${eff.id}-${i}`}
+                      variant="outline"
+                      className="text-[9px] px-1.5 py-0 h-4 border-amber-500/30 bg-amber-500/5 text-amber-300/90"
                     >
-                      <MessageSquareQuote className="h-3 w-3" />
-                      {label}
-                      {hasScript && lineCount > 0 && (
-                        <span className="text-[10px] opacity-70">· {lineLbl(lineCount)}</span>
+                      {eff.id}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+
+              <SceneStudioSectionHeader tab="cast" language={lang} />
+              {/* Character Cast picker (multi, max 4) — shown for any AI scene when the user has at least one avatar (briefing or library). */}
+              {scene.clipSource.startsWith("ai-") &&
+                ((characters && characters.length > 0) ||
+                  libCharacters.length > 0 ||
+                  brandLocations.length > 0 ||
+                  brandBuildings.length > 0 ||
+                  brandProps.length > 0 ||
+                  catalogLocations.length > 0 ||
+                  catalogBuildings.length > 0 ||
+                  catalogProps.length > 0) && (
+                  <>
+                    <UnifiedAssetPicker
+                      characters={characters ?? []}
+                      libraryCharacters={libCharacters.map(
+                        (c): ComposerCharacter => ({
+                          id: c.id,
+                          name: c.name,
+                          appearance: c.description ?? "",
+                          signatureItems: c.signature_items ?? "",
+                          referenceImageUrl: c.reference_image_url ?? undefined,
+                        }),
                       )}
-                    </Button>
-                  );
-                })()}
-              </>
-            )}
+                      onAddToBriefing={onAddCharacter}
+                      cast={scene.characterShots}
+                      legacyCast={scene.characterShot}
+                      onCastChange={(next) => {
+                        const updates: Partial<ComposerScene> = {
+                          characterShots: next,
+                          // Keep singular field in sync for backwards-compat (resolver, badge, lip-sync, render).
+                          characterShot: next[0],
+                        };
+                        if (promptMode === "structured") {
+                          const subjectKey: keyof PromptSlots = "subject";
+                          const currentSubject =
+                            (promptSlots[subjectKey] as string) || "";
+                          const newSubject = applyCastToPrompt(
+                            currentSubject,
+                            next,
+                            characters,
+                            lang,
+                          );
+                          const nextSlots: PromptSlots = {
+                            ...promptSlots,
+                            [subjectKey]: newSubject,
+                          };
+                          updates.promptSlots = nextSlots;
+                          updates.aiPrompt = stitchSlots(
+                            nextSlots,
+                            promptSlotOrder,
+                          );
+                        } else {
+                          updates.aiPrompt = applyCastToPrompt(
+                            scene.aiPrompt || "",
+                            next,
+                            characters,
+                            lang,
+                          );
+                        }
+                        onUpdate(updates);
+                      }}
+                      locations={mergeWithCatalog(
+                        brandLocations.map((l) => ({
+                          id: l.id,
+                          name: l.name,
+                          reference_image_url: l.reference_image_url,
+                        })),
+                        catalogLocations.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                          reference_image_url: c.reference_image_url,
+                        })),
+                      )}
+                      buildings={mergeWithCatalog(
+                        brandBuildings.map((b) => ({
+                          id: b.id,
+                          name: b.name,
+                          reference_image_url: b.reference_image_url,
+                        })),
+                        catalogBuildings.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                          reference_image_url: c.reference_image_url,
+                        })),
+                      )}
+                      props={mergeWithCatalog(
+                        brandProps.map((p) => ({
+                          id: p.id,
+                          name: p.name,
+                          reference_image_url: p.reference_image_url,
+                        })),
+                        catalogProps.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                          reference_image_url: c.reference_image_url,
+                        })),
+                      )}
+                      prompt={
+                        promptMode === "structured"
+                          ? (promptSlots.subject as string) || ""
+                          : scene.aiPrompt || ""
+                      }
+                      onPromptChange={(nextPrompt) => {
+                        if (promptMode === "structured") {
+                          const nextSlots: PromptSlots = {
+                            ...promptSlots,
+                            subject: nextPrompt,
+                          };
+                          onUpdate({
+                            promptSlots: nextSlots,
+                            aiPrompt: stitchSlots(nextSlots, promptSlotOrder),
+                          });
+                        } else {
+                          onUpdate({ aiPrompt: nextPrompt });
+                        }
+                      }}
+                      language={lang as "en" | "de" | "es"}
+                    />
 
-            <SceneStudioSectionHeader tab="audio" language={lang} />
-            {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
-            {scene.clipSource.startsWith('ai-') && characters && (
-              <SceneDialogStudio
-                ref={dialogStudioRef}
-                open={dialogStudioOpen}
-                onClose={() => setDialogStudioOpen(false)}
-                scene={scene}
-                cast={scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])}
-                characters={characters}
-                projectId={projectId}
-                language={lang}
-                onUpdate={onUpdate}
-                onAddScene={onAddScene}
-                onInsertScenesAfter={onInsertScenesAfter}
-                onEnsurePersisted={onEnsurePersisted}
-                autoSplitOnMount={autoSplitArmed}
-                onAutoSplitConsumed={() => setAutoSplitArmed(false)}
-              />
-            )}
+                    {/* Trigger: open the per-scene Script/Dialog Studio. Available from 1 cast member upwards. */}
+                    {(() => {
+                      const sceneCastCount =
+                        (scene.characterShots?.length ?? 0) ||
+                        (scene.characterShot ? 1 : 0);
+                      if (sceneCastCount < 1) return null;
+                      const hasScript = Boolean(
+                        (scene.dialogScript ?? "").trim(),
+                      );
+                      const lineCount = hasScript
+                        ? (scene.dialogScript ?? "")
+                            .split(/\r?\n/)
+                            .filter((l) =>
+                              /^\s*[A-Za-zÀ-ÿ][^\n]{0,40}\s*[:—-]\s*\S/.test(l),
+                            ).length
+                        : 0;
+                      const label =
+                        lang === "de"
+                          ? "Skript schreiben"
+                          : lang === "es"
+                            ? "Escribir guion"
+                            : "Write script";
+                      const lineLbl = (n: number) =>
+                        lang === "de"
+                          ? `${n} Zeile${n === 1 ? "" : "n"}`
+                          : lang === "es"
+                            ? `${n} línea${n === 1 ? "" : "s"}`
+                            : `${n} line${n === 1 ? "" : "s"}`;
+                      return (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-[11px] gap-1.5 self-start text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setDialogStudioOpen((v) => {
+                              const next = !v;
+                              if (next) {
+                                setTimeout(() => {
+                                  dialogStudioRef.current?.scrollIntoView({
+                                    behavior: "smooth",
+                                    block: "center",
+                                  });
+                                }, 50);
+                              }
+                              return next;
+                            });
+                          }}
+                        >
+                          <MessageSquareQuote className="h-3 w-3" />
+                          {label}
+                          {hasScript && lineCount > 0 && (
+                            <span className="text-[10px] opacity-70">
+                              · {lineLbl(lineCount)}
+                            </span>
+                          )}
+                        </Button>
+                      );
+                    })()}
+                  </>
+                )}
 
-            {/* Director Console — read-only Live Prompt + Audio Plan timeline.
+              <SceneStudioSectionHeader tab="audio" language={lang} />
+              {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
+              {scene.clipSource.startsWith("ai-") && characters && (
+                <SceneDialogStudio
+                  ref={dialogStudioRef}
+                  open={dialogStudioOpen}
+                  onClose={() => setDialogStudioOpen(false)}
+                  scene={scene}
+                  cast={
+                    scene.characterShots ??
+                    (scene.characterShot ? [scene.characterShot] : [])
+                  }
+                  characters={characters}
+                  projectId={projectId}
+                  language={lang}
+                  onUpdate={onUpdate}
+                  onAddScene={onAddScene}
+                  onInsertScenesAfter={onInsertScenesAfter}
+                  onEnsurePersisted={onEnsurePersisted}
+                  autoSplitOnMount={autoSplitArmed}
+                  onAutoSplitConsumed={() => setAutoSplitArmed(false)}
+                />
+              )}
+
+              {/* Director Console — read-only Live Prompt + Audio Plan timeline.
                 Always derived from `scene.audioPlan` + structured slots, never
                 writes back, so the locked Audio Plan is structurally immune to
                 useEffect-style overwrites. */}
-            {/* DirectorConsolePreview moved into ScenePromptDetailsSheet
+              {/* DirectorConsolePreview moved into ScenePromptDetailsSheet
                 (Phase 1 Studio-Set v2). DirectorQualityCoach stays inline; it
                 will be folded into a status bar in Phase 3. */}
-            {scene.clipSource.startsWith('ai-') && (
-              <DirectorQualityCoach scene={scene} language={lang} className="mt-2" />
-            )}
+              {scene.clipSource.startsWith("ai-") && (
+                <DirectorQualityCoach
+                  scene={scene}
+                  language={lang}
+                  className="mt-2"
+                />
+              )}
 
-            {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
-            <AlertDialog open={splitConfirmOpen} onOpenChange={setSplitConfirmOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {(() => {
-                      const speakerLines = (scene.dialogScript ?? '')
-                        .split('\n')
-                        .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
-                        .filter(Boolean) as string[];
-                      const n = Math.max(2, new Set(speakerLines).size);
-                      return lang === 'de'
-                        ? `Szene in ${n} Einzel-Szenen aufteilen?`
-                        : lang === 'es'
-                        ? `¿Dividir la escena en ${n} subescenas?`
-                        : `Split scene into ${n} sub-scenes?`;
-                    })()}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {(() => {
-                      const speakerLines = (scene.dialogScript ?? '')
-                        .split('\n')
-                        .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/)?.[1]?.trim().toLowerCase())
-                        .filter(Boolean) as string[];
-                      const n = Math.max(2, new Set(speakerLines).size);
-                      const eur = estimateHeygenCostEur(n).toFixed(2);
-                      return lang === 'de'
-                        ? `Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Die aktuelle Szene bleibt als Wrapper bestehen. Geschätzte Kosten: €${eur}.`
-                        : lang === 'es'
-                        ? `Cada hablante recibirá su propio clip HeyGen lip-sync en el storyboard. Coste estimado: €${eur}.`
-                        : `Each speaker becomes its own HeyGen lip-sync clip in the storyboard. Estimated cost: €${eur}.`;
-                    })()}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>
-                    {lang === 'de' ? 'Abbrechen' : lang === 'es' ? 'Cancelar' : 'Cancel'}
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      setDialogStudioOpen(true);
-                      setAutoSplitArmed(true);
-                      setTimeout(
-                        () => dialogStudioRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
-                        80,
-                      );
-                    }}
-                  >
-                    {lang === 'de' ? 'Splitten & generieren' : lang === 'es' ? 'Dividir y generar' : 'Split & generate'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-
-            {/* Scene-Aware Character Anchor — Phase 3: hidden behind "Mehr ▾". */}
-            {secondaryOpen && scene.clipSource.startsWith('ai-') && (() => {
-              const anchor = resolveSceneCharacterAnchor(scene, characters, activeBrandChar);
-              if (!anchor) return null;
-              const labels: Record<string, { de: string; cost: string; tone: string }> = {
-                'first-frame-direct':   { de: 'Anker: Porträt direkt', cost: '0,00€', tone: 'border-amber-500/40 bg-amber-500/10 text-amber-200' },
-                'first-frame-composed': { de: 'Anker: In Szene komponiert', cost: '~0,02€', tone: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' },
-                'subject-reference':    { de: 'Anker: Subject-Reference', cost: '0,00€', tone: 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200' },
-                'text-only':            { de: 'Identität nur über Text', cost: '0,00€', tone: 'border-border bg-muted/30 text-muted-foreground' },
-              };
-              const meta = labels[anchor.strategy];
-              return (
-                <div className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${meta.tone}`}>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold">{meta.de} · {anchor.name}</span>
-                    <span className="text-[9px] opacity-80">
-                      {anchor.strategy === 'first-frame-composed'
-                        ? 'Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)'
-                        : anchor.strategy === 'first-frame-direct'
-                        ? 'Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht'
-                        : anchor.strategy === 'subject-reference'
-                        ? 'Porträt geht in den Reference-Slot — keine Komposition-Sperre'
-                        : 'Kein Bild-Anker, Identität bleibt im Text-Prompt'}
-                      {' · '}{meta.cost}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onUpdate({ forcePortraitAsFirstFrame: !scene.forcePortraitAsFirstFrame })}
-                    title="Porträt direkt als erstes Bild verwenden (face-lock)"
-                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all whitespace-nowrap ${
-                      scene.forcePortraitAsFirstFrame
-                        ? 'bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40'
-                        : 'text-muted-foreground hover:text-foreground border border-border'
-                    }`}
-                  >
-                    Face-Lock {scene.forcePortraitAsFirstFrame ? 'AN' : 'AUS'}
-                  </button>
-                </div>
-              );
-            })()}
-
-
-            {/* Lip-Sync toggle — Phase 3: hidden behind "Mehr ▾". */}
-            {secondaryOpen && scene.clipSource.startsWith('ai-') && (scene.characterShot?.shotType ?? 'absent') !== 'absent' && (
-              <div className="flex flex-col gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
-                      🎙️ Lip-Sync zum Voiceover
-                      <span
-                        className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
-                        title="Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph"
-                      >
-                        PRO
-                      </span>
-                      {scene.lipSyncAppliedAt && (
-                        <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-bold">
-                          SYNCED
-                        </span>
-                      )}
-                      {scene.lipSyncStatus === 'running' && (
-                        <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold animate-pulse">
-                          SYNCING…
-                        </span>
-                      )}
-                      {scene.lipSyncStatus === 'failed' && (
-                        <span className="px-1 py-0.5 rounded bg-red-500/20 text-red-300 text-[8px] font-bold">
-                          FAILED
-                        </span>
-                      )}
-                      {scene.lipSyncStatus === 'no_voiceover' && (
-                        <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold">
-                          VO FEHLT
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-[9px] text-muted-foreground">
-                      {scene.lipSyncAppliedAt
-                        ? 'Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits'
-                        : 'Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onUpdate({ lipSyncWithVoiceover: !scene.lipSyncWithVoiceover })}
-                    disabled={scene.lipSyncStatus === 'running'}
-                    className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
-                      scene.lipSyncWithVoiceover
-                        ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
-                        : 'text-muted-foreground hover:text-foreground border border-border'
-                    }`}
-                  >
-                    {scene.lipSyncWithVoiceover ? 'AN' : 'AUS'}
-                  </button>
-                </div>
-                {(scene.lipSyncAppliedAt || scene.lipSyncStatus === 'failed' || scene.lipSyncStatus === 'no_voiceover') && scene.clipUrl && (
-                  <div className="flex flex-wrap items-center gap-2 self-end">
-                    <button
-                      type="button"
-                      disabled={scene.lipSyncStatus === 'running'}
-                      onClick={async () => {
-                        try {
-                          // Multi-speaker Cinematic-Sync MUST use the two-shot
-                          // pipeline; single-speaker scenes use the legacy one.
-                          // compose-lipsync-scene short-circuits multi-speaker
-                          // with `multi_speaker_scene_routed_to_single_lipsync`.
-                          const dialogScript = String((scene as any).dialogScript ?? '');
-                          const scriptSpeakers = new Set<string>();
-                          for (const line of dialogScript.split('\n')) {
-                            const m = line.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/);
-                            if (m) scriptSpeakers.add(m[1].trim().toLowerCase());
-                          }
-                          const planSpeakers = Array.isArray(scene.audioPlan?.speakers)
-                            ? scene.audioPlan!.speakers!.length
-                            : 0;
-                          const twoshotSpeakers = Array.isArray((scene.audioPlan as any)?.twoshot?.speakers)
-                            ? (scene.audioPlan as any).twoshot.speakers.length
-                            : 0;
-                          const speakerCount = Math.max(scriptSpeakers.size, planSpeakers, twoshotSpeakers);
-                          const fnName =
-                            scene.engineOverride === 'cinematic-sync' && speakerCount >= 2
-                              ? 'compose-twoshot-lipsync'
-                              : 'compose-lipsync-scene';
-                          const { error } = await supabase.functions.invoke(fnName, {
-                            body: { scene_id: scene.id },
-                          });
-                          if (error) throw error;
-                          onUpdate({ lipSyncStatus: 'running' });
-                        } catch (e) {
-                          console.warn('[SceneCard] re-sync failed', e);
-                        }
+              {/* Split confirmation dialog — fired by the amber multi-speaker badge above. */}
+              <AlertDialog
+                open={splitConfirmOpen}
+                onOpenChange={setSplitConfirmOpen}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      {(() => {
+                        const speakerLines = (scene.dialogScript ?? "")
+                          .split("\n")
+                          .map((l) =>
+                            l
+                              .match(
+                                /^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/,
+                              )?.[1]
+                              ?.trim()
+                              .toLowerCase(),
+                          )
+                          .filter(Boolean) as string[];
+                        const n = Math.max(2, new Set(speakerLines).size);
+                        return lang === "de"
+                          ? `Szene in ${n} Einzel-Szenen aufteilen?`
+                          : lang === "es"
+                            ? `¿Dividir la escena en ${n} subescenas?`
+                            : `Split scene into ${n} sub-scenes?`;
+                      })()}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {(() => {
+                        const speakerLines = (scene.dialogScript ?? "")
+                          .split("\n")
+                          .map((l) =>
+                            l
+                              .match(
+                                /^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/,
+                              )?.[1]
+                              ?.trim()
+                              .toLowerCase(),
+                          )
+                          .filter(Boolean) as string[];
+                        const n = Math.max(2, new Set(speakerLines).size);
+                        const eur = estimateHeygenCostEur(n).toFixed(2);
+                        return lang === "de"
+                          ? `Pro Sprecher entsteht ein eigener HeyGen-Lip-Sync-Clip im Storyboard. Die aktuelle Szene bleibt als Wrapper bestehen. Geschätzte Kosten: €${eur}.`
+                          : lang === "es"
+                            ? `Cada hablante recibirá su propio clip HeyGen lip-sync en el storyboard. Coste estimado: €${eur}.`
+                            : `Each speaker becomes its own HeyGen lip-sync clip in the storyboard. Estimated cost: €${eur}.`;
+                      })()}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>
+                      {lang === "de"
+                        ? "Abbrechen"
+                        : lang === "es"
+                          ? "Cancelar"
+                          : "Cancel"}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        setDialogStudioOpen(true);
+                        setAutoSplitArmed(true);
+                        setTimeout(
+                          () =>
+                            dialogStudioRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            }),
+                          80,
+                        );
                       }}
-                      className="text-[9px] text-primary hover:underline disabled:opacity-50"
                     >
-                      🔁 Lip-Sync neu rendern
-                    </button>
-                    {scene.engineOverride === 'cinematic-sync' && (
+                      {lang === "de"
+                        ? "Splitten & generieren"
+                        : lang === "es"
+                          ? "Dividir y generar"
+                          : "Split & generate"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              {/* Scene-Aware Character Anchor — Phase 3: hidden behind "Mehr ▾". */}
+              {secondaryOpen &&
+                scene.clipSource.startsWith("ai-") &&
+                (() => {
+                  const anchor = resolveSceneCharacterAnchor(
+                    scene,
+                    characters,
+                    activeBrandChar,
+                  );
+                  if (!anchor) return null;
+                  const labels: Record<
+                    string,
+                    { de: string; cost: string; tone: string }
+                  > = {
+                    "first-frame-direct": {
+                      de: "Anker: Porträt direkt",
+                      cost: "0,00€",
+                      tone: "border-amber-500/40 bg-amber-500/10 text-amber-200",
+                    },
+                    "first-frame-composed": {
+                      de: "Anker: In Szene komponiert",
+                      cost: "~0,02€",
+                      tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-200",
+                    },
+                    "subject-reference": {
+                      de: "Anker: Subject-Reference",
+                      cost: "0,00€",
+                      tone: "border-cyan-500/40 bg-cyan-500/10 text-cyan-200",
+                    },
+                    "text-only": {
+                      de: "Identität nur über Text",
+                      cost: "0,00€",
+                      tone: "border-border bg-muted/30 text-muted-foreground",
+                    },
+                  };
+                  const meta = labels[anchor.strategy];
+                  return (
+                    <div
+                      className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${meta.tone}`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-semibold">
+                          {meta.de} · {anchor.name}
+                        </span>
+                        <span className="text-[9px] opacity-80">
+                          {anchor.strategy === "first-frame-composed"
+                            ? "Charakter wird in die Szenen-Komposition gerendert (Nano Banana 2)"
+                            : anchor.strategy === "first-frame-direct"
+                              ? "Porträt wird als erstes Bild gesetzt — Modell startet mit Gesicht"
+                              : anchor.strategy === "subject-reference"
+                                ? "Porträt geht in den Reference-Slot — keine Komposition-Sperre"
+                                : "Kein Bild-Anker, Identität bleibt im Text-Prompt"}
+                          {" · "}
+                          {meta.cost}
+                        </span>
+                      </div>
                       <button
                         type="button"
-                        disabled={scene.clipStatus === 'generating' || scene.lipSyncStatus === 'running'}
-                        title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
-                        onClick={async () => {
-                          try {
-                            const prevPlan = ((scene as any).audioPlan ?? {}) as Record<string, any>;
-                            const prevTwoshot = ((prevPlan.twoshot ?? {}) as Record<string, any>);
-                            const {
-                              faceMap: _faceMap,
-                              syncJobs: _syncJobs,
-                              heartbeat: _heartbeat,
-                              anchor_face_audit: _anchorAudit,
-                              ...twoshotWithoutAnchorState
-                            } = prevTwoshot;
-                            const resetAudioPlan = {
-                              ...prevPlan,
-                              twoshot: twoshotWithoutAnchorState,
-                            };
-                            // Hard reset: clear composed anchor, clip, and all
-                            // lipsync state so compose-video-clips re-runs the
-                            // full cinematic-sync pipeline (multi-cast anchor
-                            // with face audit → Hailuo i2v → auto-lipsync).
-                            await supabase
-                              .from('composer_scenes')
-                              .update({
-                                reference_image_url: null,
-                                clip_url: null,
-                                clip_status: 'pending',
-                                clip_error: null,
-                                lip_sync_status: null,
-                                lip_sync_applied_at: null,
-                                lip_sync_source_clip_url: null,
-                                twoshot_stage: null,
-                                replicate_prediction_id: null,
-                                audio_plan: resetAudioPlan,
-                                updated_at: new Date().toISOString(),
-                              })
-                              .eq('id', scene.id);
-                            // Optimistic local update.
-                            onUpdate({
-                              referenceImageUrl: undefined,
-                              clipUrl: undefined,
-                              clipStatus: 'pending',
-                              lipSyncStatus: null as any,
-                              lipSyncAppliedAt: null as any,
-                            });
-                            const { error } = await supabase.functions.invoke('compose-video-clips', {
-                              body: {
-                                projectId: scene.projectId,
-                                scenes: [{
-                                  id: scene.id,
-                                  clipSource: scene.clipSource,
-                                  clipQuality: scene.clipQuality || 'standard',
-                                  aiPrompt: scene.aiPrompt,
-                                  durationSeconds: scene.durationSeconds,
-                                  characterShot: scene.characterShot,
-                                  characterShots: scene.characterShots,
-                                  dialogScript: scene.dialogScript,
-                                  dialogVoices: scene.dialogVoices,
-                                  engineOverride: 'cinematic-sync',
-                                  withAudio: scene.withAudio !== false,
-                                }],
-                                characters,
-                              },
-                            });
-                            if (error) throw error;
-                          } catch (e) {
-                            console.warn('[SceneCard] re-roll clip + lipsync failed', e);
-                            onUpdate({ clipStatus: 'failed' as any });
-                          }
-                        }}
-                        className="text-[9px] text-amber-300 hover:underline disabled:opacity-50"
+                        onClick={() =>
+                          onUpdate({
+                            forcePortraitAsFirstFrame:
+                              !scene.forcePortraitAsFirstFrame,
+                          })
+                        }
+                        title="Porträt direkt als erstes Bild verwenden (face-lock)"
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all whitespace-nowrap ${
+                          scene.forcePortraitAsFirstFrame
+                            ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40"
+                            : "text-muted-foreground hover:text-foreground border border-border"
+                        }`}
                       >
-                        🎥 Clip + Lip-Sync neu rendern
+                        Face-Lock{" "}
+                        {scene.forcePortraitAsFirstFrame ? "AN" : "AUS"}
                       </button>
-                    )}
+                    </div>
+                  );
+                })()}
+
+              {/* Lip-Sync toggle — Phase 3: hidden behind "Mehr ▾". */}
+              {secondaryOpen &&
+                scene.clipSource.startsWith("ai-") &&
+                (scene.characterShot?.shotType ?? "absent") !== "absent" && (
+                  <div className="flex flex-col gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-semibold text-primary flex items-center gap-1">
+                          🎙️ Lip-Sync zum Voiceover
+                          <span
+                            className="px-1 py-0.5 rounded bg-amber-400/20 text-amber-200 text-[8px] font-bold ring-1 ring-amber-400/30"
+                            title="Sync.so lipsync-2-pro — Artlist-grade fidelity, identity-locked, kein Face-Morph"
+                          >
+                            PRO
+                          </span>
+                          {scene.lipSyncAppliedAt && (
+                            <span className="px-1 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-bold">
+                              SYNCED
+                            </span>
+                          )}
+                          {scene.lipSyncStatus === "running" && (
+                            <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold animate-pulse">
+                              SYNCING…
+                            </span>
+                          )}
+                          {scene.lipSyncStatus === "failed" && (
+                            <span className="px-1 py-0.5 rounded bg-red-500/20 text-red-300 text-[8px] font-bold">
+                              FAILED
+                            </span>
+                          )}
+                          {scene.lipSyncStatus === "no_voiceover" && (
+                            <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[8px] font-bold">
+                              VO FEHLT
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-[9px] text-muted-foreground">
+                          {scene.lipSyncAppliedAt
+                            ? "Charakter spricht wortgenau · lipsync-2-pro · ~14 Credits"
+                            : "Auto: Sync.so lipsync-2-pro nach Generate (~14 Credits, Artlist-Qualität)"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdate({
+                            lipSyncWithVoiceover: !scene.lipSyncWithVoiceover,
+                          })
+                        }
+                        disabled={scene.lipSyncStatus === "running"}
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
+                          scene.lipSyncWithVoiceover
+                            ? "bg-primary/20 text-primary ring-1 ring-primary/40"
+                            : "text-muted-foreground hover:text-foreground border border-border"
+                        }`}
+                      >
+                        {scene.lipSyncWithVoiceover ? "AN" : "AUS"}
+                      </button>
+                    </div>
+                    {(scene.lipSyncAppliedAt ||
+                      scene.lipSyncStatus === "failed" ||
+                      scene.lipSyncStatus === "no_voiceover") &&
+                      scene.clipUrl && (
+                        <div className="flex flex-wrap items-center gap-2 self-end">
+                          <button
+                            type="button"
+                            disabled={scene.lipSyncStatus === "running"}
+                            onClick={async () => {
+                              try {
+                                // Multi-speaker Cinematic-Sync MUST use the two-shot
+                                // pipeline; single-speaker scenes use the legacy one.
+                                // compose-lipsync-scene short-circuits multi-speaker
+                                // with `multi_speaker_scene_routed_to_single_lipsync`.
+                                const dialogScript = String(
+                                  (scene as any).dialogScript ?? "",
+                                );
+                                const scriptSpeakers = new Set<string>();
+                                for (const line of dialogScript.split("\n")) {
+                                  const m = line.match(
+                                    /^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{1,40}?)\]?\s*[:：]/,
+                                  );
+                                  if (m)
+                                    scriptSpeakers.add(
+                                      m[1].trim().toLowerCase(),
+                                    );
+                                }
+                                const planSpeakers = Array.isArray(
+                                  scene.audioPlan?.speakers,
+                                )
+                                  ? scene.audioPlan!.speakers!.length
+                                  : 0;
+                                const twoshotSpeakers = Array.isArray(
+                                  (scene.audioPlan as any)?.twoshot?.speakers,
+                                )
+                                  ? (scene.audioPlan as any).twoshot.speakers
+                                      .length
+                                  : 0;
+                                const speakerCount = Math.max(
+                                  scriptSpeakers.size,
+                                  planSpeakers,
+                                  twoshotSpeakers,
+                                );
+                                const fnName =
+                                  scene.engineOverride === "cinematic-sync" &&
+                                  speakerCount >= 2
+                                    ? "compose-twoshot-lipsync"
+                                    : "compose-lipsync-scene";
+                                const { error } =
+                                  await supabase.functions.invoke(fnName, {
+                                    body: { scene_id: scene.id },
+                                  });
+                                if (error) throw error;
+                                onUpdate({ lipSyncStatus: "running" });
+                              } catch (e) {
+                                console.warn("[SceneCard] re-sync failed", e);
+                              }
+                            }}
+                            className="text-[9px] text-primary hover:underline disabled:opacity-50"
+                          >
+                            🔁 Lip-Sync neu rendern
+                          </button>
+                          {scene.engineOverride === "cinematic-sync" && (
+                            <button
+                              type="button"
+                              disabled={
+                                scene.clipStatus === "generating" ||
+                                scene.lipSyncStatus === "running"
+                              }
+                              title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
+                              onClick={async () => {
+                                try {
+                                  const prevPlan = ((scene as any).audioPlan ??
+                                    {}) as Record<string, any>;
+                                  const prevTwoshot = (prevPlan.twoshot ??
+                                    {}) as Record<string, any>;
+                                  const {
+                                    faceMap: _faceMap,
+                                    syncJobs: _syncJobs,
+                                    heartbeat: _heartbeat,
+                                    anchor_face_audit: _anchorAudit,
+                                    ...twoshotWithoutAnchorState
+                                  } = prevTwoshot;
+                                  const resetAudioPlan = {
+                                    ...prevPlan,
+                                    twoshot: twoshotWithoutAnchorState,
+                                  };
+                                  // Hard reset: clear composed anchor, clip, and all
+                                  // lipsync state so compose-video-clips re-runs the
+                                  // full cinematic-sync pipeline (multi-cast anchor
+                                  // with face audit → Hailuo i2v → auto-lipsync).
+                                  await supabase
+                                    .from("composer_scenes")
+                                    .update({
+                                      reference_image_url: null,
+                                      clip_url: null,
+                                      clip_status: "pending",
+                                      clip_error: null,
+                                      lip_sync_status: null,
+                                      lip_sync_applied_at: null,
+                                      lip_sync_source_clip_url: null,
+                                      twoshot_stage: null,
+                                      replicate_prediction_id: null,
+                                      audio_plan: resetAudioPlan,
+                                      updated_at: new Date().toISOString(),
+                                    })
+                                    .eq("id", scene.id);
+                                  // Optimistic local update.
+                                  onUpdate({
+                                    referenceImageUrl: undefined,
+                                    clipUrl: undefined,
+                                    clipStatus: "pending",
+                                    lipSyncStatus: null as any,
+                                    lipSyncAppliedAt: null as any,
+                                  });
+                                  const { error } =
+                                    await supabase.functions.invoke(
+                                      "compose-video-clips",
+                                      {
+                                        body: {
+                                          projectId: scene.projectId,
+                                          scenes: [
+                                            {
+                                              id: scene.id,
+                                              clipSource: scene.clipSource,
+                                              clipQuality:
+                                                scene.clipQuality || "standard",
+                                              aiPrompt: scene.aiPrompt,
+                                              durationSeconds:
+                                                scene.durationSeconds,
+                                              characterShot:
+                                                scene.characterShot,
+                                              characterShots:
+                                                scene.characterShots,
+                                              dialogScript: scene.dialogScript,
+                                              dialogVoices: scene.dialogVoices,
+                                              engineOverride: "cinematic-sync",
+                                              withAudio:
+                                                scene.withAudio !== false,
+                                            },
+                                          ],
+                                          characters,
+                                        },
+                                      },
+                                    );
+                                  if (error) throw error;
+                                } catch (e) {
+                                  console.warn(
+                                    "[SceneCard] re-roll clip + lipsync failed",
+                                    e,
+                                  );
+                                  onUpdate({ clipStatus: "failed" as any });
+                                }
+                              }}
+                              className="text-[9px] text-amber-300 hover:underline disabled:opacity-50"
+                            >
+                              🎥 Clip + Lip-Sync neu rendern
+                            </button>
+                          )}
+                        </div>
+                      )}
                   </div>
                 )}
-              </div>
-            )}
-            {scene.clipSource.startsWith('ai-') && (
-              <div className="space-y-2">
-                <SceneDirectorBox
-                  scene={scene}
-                  lang={lang as 'en' | 'de' | 'es'}
-                  characters={characters}
-                  libraryCharacters={libCharacters.map((c) => ({
-                    id: c.id,
-                    name: c.name,
-                    description: c.description ?? null,
-                    reference_image_url: c.reference_image_url ?? undefined,
-                  }))}
-                  locations={brandLocations.map((l) => ({ id: l.id, name: l.name, description: l.description ?? null, reference_image_url: l.reference_image_url }))}
-                  buildings={brandBuildings.map((b) => ({ id: b.id, name: b.name, description: b.description ?? null, reference_image_url: b.reference_image_url }))}
-                  props={brandProps.map((p) => ({ id: p.id, name: p.name, description: p.description ?? null, reference_image_url: p.reference_image_url }))}
-                  onAddCharacter={onAddCharacter}
-                  onApply={({ aiPrompt, dialogScript, characterShots }) => {
-                    const updates: Partial<ComposerScene> = { aiPrompt };
-                    if (dialogScript !== undefined) updates.dialogScript = dialogScript;
-                    if (characterShots && characterShots.length > 0) {
-                      updates.characterShots = characterShots;
-                      updates.characterShot = characterShots[0];
+              {scene.clipSource.startsWith("ai-") && (
+                <div className="space-y-2">
+                  <SceneDirectorBox
+                    scene={scene}
+                    lang={lang as "en" | "de" | "es"}
+                    characters={characters}
+                    libraryCharacters={libCharacters.map((c) => ({
+                      id: c.id,
+                      name: c.name,
+                      description: c.description ?? null,
+                      reference_image_url: c.reference_image_url ?? undefined,
+                    }))}
+                    locations={brandLocations.map((l) => ({
+                      id: l.id,
+                      name: l.name,
+                      description: l.description ?? null,
+                      reference_image_url: l.reference_image_url,
+                    }))}
+                    buildings={brandBuildings.map((b) => ({
+                      id: b.id,
+                      name: b.name,
+                      description: b.description ?? null,
+                      reference_image_url: b.reference_image_url,
+                    }))}
+                    props={brandProps.map((p) => ({
+                      id: p.id,
+                      name: p.name,
+                      description: p.description ?? null,
+                      reference_image_url: p.reference_image_url,
+                    }))}
+                    onAddCharacter={onAddCharacter}
+                    onApply={({ aiPrompt, dialogScript, characterShots }) => {
+                      const updates: Partial<ComposerScene> = { aiPrompt };
+                      if (dialogScript !== undefined)
+                        updates.dialogScript = dialogScript;
+                      if (characterShots && characterShots.length > 0) {
+                        updates.characterShots = characterShots;
+                        updates.characterShot = characterShots[0];
+                      }
+                      if (promptMode === "structured") {
+                        // Drop back to free mode so the user sees the new prompt verbatim.
+                        updates.promptMode = "free";
+                      }
+                      onUpdate(updates);
+                    }}
+                    onInsertFollowups={
+                      onInsertScenesAfter
+                        ? (descriptions) => {
+                            onInsertScenesAfter(
+                              scene.id,
+                              descriptions.map((d) => ({
+                                sceneType: scene.sceneType,
+                                durationSeconds: scene.durationSeconds,
+                                clipSource: scene.clipSource,
+                                clipQuality: scene.clipQuality,
+                                // Seed the new scene's prompt with the suggestion so the user can
+                                // refine or re-run the Scene Director on it immediately.
+                                aiPrompt: d,
+                              })),
+                            );
+                          }
+                        : undefined
                     }
-                    if (promptMode === 'structured') {
-                      // Drop back to free mode so the user sees the new prompt verbatim.
-                      updates.promptMode = 'free';
-                    }
-                    onUpdate(updates);
-                  }}
-                  onInsertFollowups={
-                    onInsertScenesAfter
-                      ? (descriptions) => {
-                          onInsertScenesAfter(
-                            scene.id,
-                            descriptions.map((d) => ({
-                              sceneType: scene.sceneType,
-                              durationSeconds: scene.durationSeconds,
-                              clipSource: scene.clipSource,
-                              clipQuality: scene.clipQuality,
-                              // Seed the new scene's prompt with the suggestion so the user can
-                              // refine or re-run the Scene Director on it immediately.
-                              aiPrompt: d,
-                            })),
-                          );
-                        }
-                      : undefined
-                  }
-                />
-              </div>
-            )}
-            {scene.clipSource.startsWith('ai-') && (
-              <div className="space-y-2">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <Label className="text-[10px] text-muted-foreground">
-                      {lang === 'de'
-                        ? 'KI-Prompt (EN) — bearbeitbar'
-                        : lang === 'es'
-                        ? 'Prompt IA (EN) — editable'
-                        : 'AI Prompt (EN) — editable'}
-                    </Label>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-5 px-2 text-[9px] gap-1 text-primary/80 hover:text-primary"
-                      onClick={togglePromptMode}
-                      title={`${lang === 'de' ? 'Modus wechseln' : lang === 'es' ? 'Cambiar modo' : 'Switch mode'} (${shortcutLabel})`}
-                    >
-                      {promptMode === 'free'
-                        ? (lang === 'de' ? '🧱 Strukturiert' : lang === 'es' ? '🧱 Estructurado' : '🧱 Structured')
-                        : (lang === 'de' ? '📝 Freitext' : lang === 'es' ? '📝 Texto libre' : '📝 Free text')}
-                    </Button>
+                  />
+                </div>
+              )}
+              {scene.clipSource.startsWith("ai-") && (
+                <div className="space-y-2">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-[10px] text-muted-foreground">
+                        {lang === "de"
+                          ? "KI-Prompt (EN) — bearbeitbar"
+                          : lang === "es"
+                            ? "Prompt IA (EN) — editable"
+                            : "AI Prompt (EN) — editable"}
+                      </Label>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-5 px-2 text-[9px] gap-1 text-primary/80 hover:text-primary"
+                        onClick={togglePromptMode}
+                        title={`${lang === "de" ? "Modus wechseln" : lang === "es" ? "Cambiar modo" : "Switch mode"} (${shortcutLabel})`}
+                      >
+                        {promptMode === "free"
+                          ? lang === "de"
+                            ? "🧱 Strukturiert"
+                            : lang === "es"
+                              ? "🧱 Estructurado"
+                              : "🧱 Structured"
+                          : lang === "de"
+                            ? "📝 Freitext"
+                            : lang === "es"
+                              ? "📝 Texto libre"
+                              : "📝 Free text"}
+                      </Button>
+                    </div>
+
+                    {promptMode === "free" ? (
+                      <>
+                        <PromptMentionEditor
+                          value={scene.aiPrompt || ""}
+                          onChange={(v) => onUpdate({ aiPrompt: v })}
+                          placeholder={
+                            lang === "de"
+                              ? "Describe the scene… nutze @charakter und @location aus deiner Library"
+                              : lang === "es"
+                                ? "Describe la escena… usa @personaje y @ubicación de tu biblioteca"
+                                : "Describe the scene visually… use @character and @location from your library"
+                          }
+                          rows={3}
+                        />
+                        <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
+                          {lang === "de"
+                            ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
+                            : lang === "es"
+                              ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
+                              : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
+                        </p>
+                      </>
+                    ) : (
+                      <StructuredPromptBuilder
+                        slots={promptSlots}
+                        onChange={handleSlotsChange}
+                        clipSource={scene.clipSource}
+                        contextHint={scene.aiPrompt}
+                        composedPrompt={stitchSlots(
+                          promptSlots,
+                          promptSlotOrder,
+                        )}
+                        language={lang}
+                        order={promptSlotOrder}
+                        onOrderChange={handleOrderChange}
+                        onOpenStylePresets={() => setStylePickerOpen(true)}
+                        onSavePreset={() => setStylePickerOpen(true)}
+                        onInspireMe={inspiring ? undefined : handleInspireMe}
+                      />
+                    )}
                   </div>
 
-                  {promptMode === 'free' ? (
-                    <>
-                      <PromptMentionEditor
-                        value={scene.aiPrompt || ''}
-                        onChange={(v) => onUpdate({ aiPrompt: v })}
-                        placeholder={
-                          lang === 'de'
-                            ? 'Describe the scene… nutze @charakter und @location aus deiner Library'
-                            : lang === 'es'
-                            ? 'Describe la escena… usa @personaje y @ubicación de tu biblioteca'
-                            : 'Describe the scene visually… use @character and @location from your library'
-                        }
-                        rows={3}
-                      />
-                      <p className="text-[10px] leading-relaxed text-muted-foreground/80 italic">
-                        {lang === 'de'
-                          ? 'ℹ️ Tippe @ um Charaktere & Locations zu taggen. Untertitel werden automatisch ausgeschlossen — füge sie im Tab „Voiceover & Untertitel" hinzu.'
-                          : lang === 'es'
-                          ? 'ℹ️ Escribe @ para etiquetar personajes y ubicaciones. Los subtítulos se excluyen automáticamente — añádelos en la pestaña "Voz y subtítulos".'
-                          : 'ℹ️ Type @ to tag characters & locations. Subtitles are automatically excluded — add them in the "Voice & Subtitles" tab.'}
-                      </p>
-                    </>
-                  ) : (
-                    <StructuredPromptBuilder
-                      slots={promptSlots}
-                      onChange={handleSlotsChange}
-                      clipSource={scene.clipSource}
-                      contextHint={scene.aiPrompt}
-                      composedPrompt={stitchSlots(promptSlots, promptSlotOrder)}
-                      language={lang}
-                      order={promptSlotOrder}
-                      onOrderChange={handleOrderChange}
-                      onOpenStylePresets={() => setStylePickerOpen(true)}
-                      onSavePreset={() => setStylePickerOpen(true)}
-                      onInspireMe={inspiring ? undefined : handleInspireMe}
-                    />
-                  )}
-                </div>
-
-                {/* Phase 1 (Studio Set v2) — single "Prompt-Details" button
+                  {/* Phase 1 (Studio Set v2) — single "Prompt-Details" button
                     replaces the former Erweitert toggle + inline Multi-Engine
                     + inline Compare-Lab + inline Final-Prompt-Preview triplet.
                     Everything now lives inside ScenePromptDetailsSheet so the
                     customer sees the prompt textarea exactly once. */}
-                {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setPromptDetailsOpen(true)}
-                      className="h-6 px-2 text-[10px] gap-1 text-primary/70 hover:text-primary"
-                    >
-                      <Sparkles className="h-3 w-3" />
-                      {lang === 'de'
-                        ? 'Prompt-Details ansehen'
-                        : lang === 'es'
-                        ? 'Ver detalles del prompt'
-                        : 'View prompt details'}
-                    </Button>
-                  </div>
-                )}
+                  {(scene.aiPrompt?.trim() || hasAnySlot(promptSlots)) && (
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setPromptDetailsOpen(true)}
+                        className="h-6 px-2 text-[10px] gap-1 text-primary/70 hover:text-primary"
+                      >
+                        <Sparkles className="h-3 w-3" />
+                        {lang === "de"
+                          ? "Prompt-Details ansehen"
+                          : lang === "es"
+                            ? "Ver detalles del prompt"
+                            : "View prompt details"}
+                      </Button>
+                    </div>
+                  )}
 
-                <StylePresetPicker
-                  open={stylePickerOpen}
-                  onOpenChange={setStylePickerOpen}
-                  currentSlots={promptSlots}
-                  currentModifiers={scene.directorModifiers || {}}
-                  onApply={(preset) => {
-                    onUpdate({
-                      promptMode: 'structured',
-                      promptSlots: preset.slots,
-                      directorModifiers: preset.director_modifiers,
-                      appliedStylePresetId: preset.id,
-                      aiPrompt: stitchSlots(preset.slots, promptSlotOrder),
-                    });
-                  }}
-                  language={lang}
-                />
+                  <StylePresetPicker
+                    open={stylePickerOpen}
+                    onOpenChange={setStylePickerOpen}
+                    currentSlots={promptSlots}
+                    currentModifiers={scene.directorModifiers || {}}
+                    onApply={(preset) => {
+                      onUpdate({
+                        promptMode: "structured",
+                        promptSlots: preset.slots,
+                        directorModifiers: preset.director_modifiers,
+                        appliedStylePresetId: preset.id,
+                        aiPrompt: stitchSlots(preset.slots, promptSlotOrder),
+                      });
+                    }}
+                    language={lang}
+                  />
 
-
-                {/* Phase 2 (Studio Set v2) — single chip + "Stil ändern"
+                  {/* Phase 2 (Studio Set v2) — single chip + "Stil ändern"
                     button replaces the previous trio of always-visible style
                     tools (DirectorPresetPicker + CinematicStylePresets +
                     SceneShotDirectorPanel). They now live behind
                     SceneStyleSheet (3 tabs). */}
-                <SceneStyleChip
-                  language={lang}
-                  shotDirector={scene.shotDirector}
-                  hasModifiers={Object.keys(scene.directorModifiers || {}).length > 0}
-                  onOpen={() => setStyleSheetOpen(true)}
-                  onReset={() => onUpdate({ shotDirector: {} })}
-                />
+                  <SceneStyleChip
+                    language={lang}
+                    shotDirector={scene.shotDirector}
+                    hasModifiers={
+                      Object.keys(scene.directorModifiers || {}).length > 0
+                    }
+                    onOpen={() => setStyleSheetOpen(true)}
+                    onReset={() => onUpdate({ shotDirector: {} })}
+                  />
 
-                {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
+                  {/* Phase 1 (Studio Set v2) — inline "Finaler Prompt (Vorschau)"
                     block was removed. The same composed prompt + layer
                     breakdown now lives inside ScenePromptDetailsSheet, opened
                     via the "Prompt-Details ansehen" button above. */}
-
-              </div>
-            )}
-
-            {(scene.clipSource === 'stock' || scene.clipSource === 'stock-image') && (
-              <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
-                <div className="flex items-center gap-1.5 text-[10px] text-emerald-300/90">
-                  <span>🎁</span>
-                  <span className="font-medium">Free Stock Library</span>
-                  <span className="text-emerald-300/60">· Pexels × Pixabay · 0 Credits</span>
                 </div>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {scene.stockMediaThumb || scene.clipUrl ? (
-                      <img
-                        src={scene.stockMediaThumb || scene.clipUrl}
-                        alt="stock thumbnail"
-                        className="w-10 h-7 rounded object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-7 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
-                        {scene.clipSource === 'stock' ? <Video className="h-3 w-3 text-muted-foreground" /> : <ImageIcon className="h-3 w-3 text-muted-foreground" />}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {scene.clipUrl
-                          ? (scene.stockMediaAuthor?.name
+              )}
+
+              {(scene.clipSource === "stock" ||
+                scene.clipSource === "stock-image") && (
+                <div className="space-y-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2">
+                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-300/90">
+                    <span>🎁</span>
+                    <span className="font-medium">Free Stock Library</span>
+                    <span className="text-emerald-300/60">
+                      · Pexels × Pixabay · 0 Credits
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      {scene.stockMediaThumb || scene.clipUrl ? (
+                        <img
+                          src={scene.stockMediaThumb || scene.clipUrl}
+                          alt="stock thumbnail"
+                          className="w-10 h-7 rounded object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-7 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
+                          {scene.clipSource === "stock" ? (
+                            <Video className="h-3 w-3 text-muted-foreground" />
+                          ) : (
+                            <ImageIcon className="h-3 w-3 text-muted-foreground" />
+                          )}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-muted-foreground truncate">
+                          {scene.clipUrl
+                            ? scene.stockMediaAuthor?.name
                               ? `${scene.stockMediaSource} · ${scene.stockMediaAuthor.name}`
-                              : 'Stock ausgewählt')
-                          : (scene.clipSource === 'stock' ? 'Kein Video gewählt' : 'Kein Bild gewählt')}
-                      </p>
+                              : "Stock ausgewählt"
+                            : scene.clipSource === "stock"
+                              ? "Kein Video gewählt"
+                              : "Kein Bild gewählt"}
+                        </p>
+                      </div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[10px] gap-1 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70"
+                      onClick={() => setStockBrowserOpen(true)}
+                    >
+                      <Video className="h-3 w-3" />
+                      Bibliothek öffnen
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[10px] gap-1 border-emerald-500/40 hover:bg-emerald-500/10 hover:border-emerald-500/70"
-                    onClick={() => setStockBrowserOpen(true)}
-                  >
-                    <Video className="h-3 w-3" />
-                    Bibliothek öffnen
-                  </Button>
+                  <Input
+                    value={scene.stockKeywords || ""}
+                    onChange={(e) =>
+                      onUpdate({ stockKeywords: e.target.value })
+                    }
+                    placeholder="Optional: Suchbegriffe für AI-Auto-Pick"
+                    className="text-xs bg-background/50 h-7"
+                  />
                 </div>
-                <Input
-                  value={scene.stockKeywords || ''}
-                  onChange={(e) => onUpdate({ stockKeywords: e.target.value })}
-                  placeholder="Optional: Suchbegriffe für AI-Auto-Pick"
-                  className="text-xs bg-background/50 h-7"
+              )}
+
+              {scene.clipSource === "upload" && (
+                <SceneMediaUpload
+                  projectId={projectId}
+                  sceneId={scene.id}
+                  uploadUrl={scene.uploadUrl}
+                  uploadType={scene.uploadType}
+                  onChange={(url, type) =>
+                    onUpdate({
+                      uploadUrl: url ?? undefined,
+                      uploadType: type ?? undefined,
+                      clipUrl: url ?? undefined,
+                      clipStatus: url ? "ready" : "pending",
+                    })
+                  }
                 />
-              </div>
-            )}
+              )}
 
-            {scene.clipSource === 'upload' && (
-              <SceneMediaUpload
-                projectId={projectId}
-                sceneId={scene.id}
-                uploadUrl={scene.uploadUrl}
-                uploadType={scene.uploadType}
-                onChange={(url, type) =>
-                  onUpdate({
-                    uploadUrl: url ?? undefined,
-                    uploadType: type ?? undefined,
-                    clipUrl: url ?? undefined,
-                    clipStatus: url ? 'ready' : 'pending',
-                  })
-                }
-              />
-            )}
-
-            {/* V2V Reference Video — only when the chosen AI model supports video-to-video */}
-            {(() => {
-              if (!scene.clipSource.startsWith('ai-')) return null;
-              const mid = sourceToModelId(scene.clipSource, scene.clipQuality);
-              const m = AI_VIDEO_TOOLKIT_MODELS.find((x) => x.id === mid);
-              if (!m?.capabilities?.v2v) return null;
-              const isRunway = scene.clipSource === 'ai-runway';
-              return (
-                <div className="space-y-1.5 pt-1 border-t border-primary/30">
-                  <div className="flex items-center gap-2">
-                    <Video className="h-3 w-3 text-primary" />
-                    <Label className="text-[11px] font-medium text-primary">
-                      {lang === 'de' ? 'Restyle mit Referenzvideo (V2V)' : lang === 'es' ? 'Restyle con video de referencia (V2V)' : 'Restyle with reference video (V2V)'}
-                    </Label>
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 h-3.5 border-primary/40 text-primary">
-                      {m.name}
-                    </Badge>
+              {/* V2V Reference Video — only when the chosen AI model supports video-to-video */}
+              {(() => {
+                if (!scene.clipSource.startsWith("ai-")) return null;
+                const mid = sourceToModelId(
+                  scene.clipSource,
+                  scene.clipQuality,
+                );
+                const m = AI_VIDEO_TOOLKIT_MODELS.find((x) => x.id === mid);
+                if (!m?.capabilities?.v2v) return null;
+                const isRunway = scene.clipSource === "ai-runway";
+                return (
+                  <div className="space-y-1.5 pt-1 border-t border-primary/30">
+                    <div className="flex items-center gap-2">
+                      <Video className="h-3 w-3 text-primary" />
+                      <Label className="text-[11px] font-medium text-primary">
+                        {lang === "de"
+                          ? "Restyle mit Referenzvideo (V2V)"
+                          : lang === "es"
+                            ? "Restyle con video de referencia (V2V)"
+                            : "Restyle with reference video (V2V)"}
+                      </Label>
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] px-1 py-0 h-3.5 border-primary/40 text-primary"
+                      >
+                        {m.name}
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 leading-snug">
+                      {isRunway
+                        ? lang === "de"
+                          ? "Runway Aleph benötigt zwingend ein Referenzvideo — ohne fällt die Szene auf Hailuo zurück."
+                          : lang === "es"
+                            ? "Runway Aleph requiere un video de referencia — sin él, la escena recurre a Hailuo."
+                            : "Runway Aleph requires a reference video — without it the scene falls back to Hailuo."
+                        : lang === "de"
+                          ? "Optional: Lade ein Referenzvideo hoch, das die KI im Stil deines Prompts neu interpretiert."
+                          : lang === "es"
+                            ? "Opcional: sube un video de referencia que la IA reinterpretará al estilo de tu prompt."
+                            : "Optional: upload a reference video that the AI will restyle according to your prompt."}
+                    </p>
+                    <SceneMediaUpload
+                      projectId={projectId}
+                      sceneId={`${scene.id}-v2v`}
+                      uploadUrl={scene.uploadUrl}
+                      uploadType={scene.uploadType}
+                      onChange={(url, type) =>
+                        onUpdate({
+                          uploadUrl: url ?? undefined,
+                          uploadType: type ?? undefined,
+                        })
+                      }
+                    />
                   </div>
-                  <p className="text-[10px] text-muted-foreground/80 leading-snug">
-                    {isRunway
-                      ? (lang === 'de'
-                          ? 'Runway Aleph benötigt zwingend ein Referenzvideo — ohne fällt die Szene auf Hailuo zurück.'
-                          : lang === 'es'
-                          ? 'Runway Aleph requiere un video de referencia — sin él, la escena recurre a Hailuo.'
-                          : 'Runway Aleph requires a reference video — without it the scene falls back to Hailuo.')
-                      : (lang === 'de'
-                          ? 'Optional: Lade ein Referenzvideo hoch, das die KI im Stil deines Prompts neu interpretiert.'
-                          : lang === 'es'
-                          ? 'Opcional: sube un video de referencia que la IA reinterpretará al estilo de tu prompt.'
-                          : 'Optional: upload a reference video that the AI will restyle according to your prompt.')}
-                  </p>
-                  <SceneMediaUpload
+                );
+              })()}
+
+              {/* Universal Reference Image — Phase 3: hidden behind "Mehr ▾". */}
+              {secondaryOpen && (
+                <div className="space-y-1.5 pt-1 border-t border-border/30">
+                  <div className="text-[10px] text-muted-foreground/80 leading-snug">
+                    {scene.clipSource.startsWith("ai-")
+                      ? lang === "de"
+                        ? "Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video)."
+                        : lang === "es"
+                          ? "Imagen de referencia opcional — la IA se basa en ella (Image-to-Video)."
+                          : "Optional reference image — the AI uses it as visual guide (image-to-video)."
+                      : lang === "de"
+                        ? "Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet."
+                        : lang === "es"
+                          ? "Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA."
+                          : "Optional reference image — used for continuity, brand-character sync and later AI transitions."}
+                  </div>
+                  {/* Phase 2 — Quick Anchor Library: prev frame, brand char, locations */}
+                  <SceneAnchorLibrary
+                    selectedReferenceUrl={scene.referenceImageUrl}
+                    previousSceneLastFrameUrl={previousSceneLastFrameUrl}
+                    previousSceneIndex={previousSceneIndex}
+                    onPick={(url) => onUpdate({ referenceImageUrl: url })}
+                    language={lang}
+                  />
+                  {scene.clipSource.startsWith("ai-") && projectId && (
+                    <div
+                      className={cn(
+                        frameFirstMode &&
+                          "rounded-md ring-2 ring-primary/40 ring-offset-1 ring-offset-background",
+                      )}
+                    >
+                      {frameFirstMode && (
+                        <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-primary">
+                          <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px]">
+                            1
+                          </span>
+                          {lang === "de"
+                            ? "Schritt 1 — Frame zuerst freezen"
+                            : lang === "es"
+                              ? "Paso 1 — congela el fotograma primero"
+                              : "Step 1 — freeze the frame first"}
+                        </div>
+                      )}
+                      {(() => {
+                        // Phase 3 — Auto-inject @character / @location reference images into still generation.
+                        const mentions = findMentions(
+                          scene.aiPrompt || "",
+                          libCharacters,
+                          libLocations,
+                        );
+                        const seenIds = new Set<string>();
+                        const injectedHints: Array<{
+                          url?: string;
+                          kind: "character" | "location";
+                          name: string;
+                        }> = [];
+                        for (const m of mentions) {
+                          if (seenIds.has(m.id)) continue;
+                          seenIds.add(m.id);
+                          const ent =
+                            m.kind === "character"
+                              ? libCharacters.find((c) => c.id === m.id)
+                              : libLocations.find((l) => l.id === m.id);
+                          if (ent?.reference_image_url) {
+                            injectedHints.push({
+                              url: ent.reference_image_url,
+                              kind: m.kind,
+                              name: ent.name,
+                            });
+                          }
+                        }
+                        // Always seed with the brand character (if scene features them) so a
+                        // plain prompt without @-mention still gets character lock.
+                        if (
+                          activeBrandChar?.reference_image_url &&
+                          sceneFeaturesCharacter(scene, {
+                            name: activeBrandChar.name,
+                          }) &&
+                          !injectedHints.some(
+                            (h) =>
+                              h.url === activeBrandChar.reference_image_url,
+                          )
+                        ) {
+                          injectedHints.unshift({
+                            url: activeBrandChar.reference_image_url,
+                            kind: "character",
+                            name: activeBrandChar.name,
+                          });
+                        }
+                        const composeUrls = injectedHints
+                          .map((h) => h.url!)
+                          .filter(Boolean);
+                        const fallbackHint = scene.referenceImageUrl;
+                        const labels = injectedHints.map((h) => ({
+                          kind: h.kind,
+                          name: h.name,
+                          thumb: h.url,
+                        }));
+                        return (
+                          <SceneStillFrameStudio
+                            projectId={projectId}
+                            sceneId={scene.id}
+                            prompt={scene.aiPrompt || ""}
+                            composeHintImageUrl={composeUrls[0] ?? fallbackHint}
+                            composeHintImageUrls={
+                              composeUrls.length > 0 ? composeUrls : undefined
+                            }
+                            injectedLabels={labels}
+                            selectedReferenceUrl={scene.referenceImageUrl}
+                            onPick={(url) =>
+                              onUpdate({ referenceImageUrl: url })
+                            }
+                            language={lang as "en" | "de" | "es"}
+                          />
+                        );
+                      })()}
+                    </div>
+                  )}
+                  <SceneReferenceImageUpload
                     projectId={projectId}
-                    sceneId={`${scene.id}-v2v`}
-                    uploadUrl={scene.uploadUrl}
-                    uploadType={scene.uploadType}
-                    onChange={(url, type) =>
-                      onUpdate({
-                        uploadUrl: url ?? undefined,
-                        uploadType: type ?? undefined,
-                      })
+                    sceneId={scene.id}
+                    referenceImageUrl={scene.referenceImageUrl}
+                    onChange={(url) =>
+                      onUpdate({ referenceImageUrl: url ?? undefined })
                     }
                   />
                 </div>
-              );
-            })()}
+              )}
 
-            {/* Universal Reference Image — Phase 3: hidden behind "Mehr ▾". */}
-            {secondaryOpen && (
-              <div className="space-y-1.5 pt-1 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground/80 leading-snug">
-                  {scene.clipSource.startsWith('ai-')
-                    ? (lang === 'de'
-                        ? 'Optionales Referenzbild — die KI orientiert sich daran (Image-to-Video).'
-                        : lang === 'es'
-                        ? 'Imagen de referencia opcional — la IA se basa en ella (Image-to-Video).'
-                        : 'Optional reference image — the AI uses it as visual guide (image-to-video).')
-                    : (lang === 'de'
-                        ? 'Optionales Referenzbild — wird für Continuity, Brand-Character-Sync und spätere KI-Übergänge verwendet.'
-                        : lang === 'es'
-                        ? 'Imagen de referencia opcional — usada para continuidad, sincronización de personajes y transiciones IA.'
-                        : 'Optional reference image — used for continuity, brand-character sync and later AI transitions.')}
+              {/* Hard-cut hint — Phase 3: hidden behind "Mehr ▾". */}
+              {secondaryOpen && (
+                <div
+                  className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
+                  title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
+                >
+                  <span className="text-[10px] text-muted-foreground">
+                    Harter Schnitt → Übergänge im Director's Cut
+                  </span>
                 </div>
-                {/* Phase 2 — Quick Anchor Library: prev frame, brand char, locations */}
-                <SceneAnchorLibrary
-                  selectedReferenceUrl={scene.referenceImageUrl}
-                  previousSceneLastFrameUrl={previousSceneLastFrameUrl}
-                  previousSceneIndex={previousSceneIndex}
-                  onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                  language={lang}
-                />
-                {scene.clipSource.startsWith('ai-') && projectId && (
-                  <div
-                    className={cn(
-                      frameFirstMode && 'rounded-md ring-2 ring-primary/40 ring-offset-1 ring-offset-background',
-                    )}
-                  >
-                    {frameFirstMode && (
-                      <div className="flex items-center gap-1.5 mb-1 text-[10px] font-semibold text-primary">
-                        <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-primary text-primary-foreground text-[9px]">1</span>
-                        {lang === 'de'
-                          ? 'Schritt 1 — Frame zuerst freezen'
-                          : lang === 'es'
-                          ? 'Paso 1 — congela el fotograma primero'
-                          : 'Step 1 — freeze the frame first'}
-                      </div>
-                    )}
-                    {(() => {
-                      // Phase 3 — Auto-inject @character / @location reference images into still generation.
-                      const mentions = findMentions(scene.aiPrompt || '', libCharacters, libLocations);
-                      const seenIds = new Set<string>();
-                      const injectedHints: Array<{ url?: string; kind: 'character' | 'location'; name: string }> = [];
-                      for (const m of mentions) {
-                        if (seenIds.has(m.id)) continue;
-                        seenIds.add(m.id);
-                        const ent = m.kind === 'character'
-                          ? libCharacters.find((c) => c.id === m.id)
-                          : libLocations.find((l) => l.id === m.id);
-                        if (ent?.reference_image_url) {
-                          injectedHints.push({ url: ent.reference_image_url, kind: m.kind, name: ent.name });
-                        }
-                      }
-                      // Always seed with the brand character (if scene features them) so a
-                      // plain prompt without @-mention still gets character lock.
-                      if (
-                        activeBrandChar?.reference_image_url &&
-                        sceneFeaturesCharacter(scene, { name: activeBrandChar.name }) &&
-                        !injectedHints.some((h) => h.url === activeBrandChar.reference_image_url)
-                      ) {
-                        injectedHints.unshift({
-                          url: activeBrandChar.reference_image_url,
-                          kind: 'character',
-                          name: activeBrandChar.name,
-                        });
-                      }
-                      const composeUrls = injectedHints.map((h) => h.url!).filter(Boolean);
-                      const fallbackHint = scene.referenceImageUrl;
-                      const labels = injectedHints.map((h) => ({ kind: h.kind, name: h.name, thumb: h.url }));
-                      return (
-                        <SceneStillFrameStudio
-                          projectId={projectId}
-                          sceneId={scene.id}
-                          prompt={scene.aiPrompt || ''}
-                          composeHintImageUrl={composeUrls[0] ?? fallbackHint}
-                          composeHintImageUrls={composeUrls.length > 0 ? composeUrls : undefined}
-                          injectedLabels={labels}
-                          selectedReferenceUrl={scene.referenceImageUrl}
-                          onPick={(url) => onUpdate({ referenceImageUrl: url })}
-                          language={lang as 'en' | 'de' | 'es'}
-                        />
-                      );
-                    })()}
-                  </div>
-                )}
-                <SceneReferenceImageUpload
-                  projectId={projectId}
-                  sceneId={scene.id}
-                  referenceImageUrl={scene.referenceImageUrl}
-                  onChange={(url) => onUpdate({ referenceImageUrl: url ?? undefined })}
-                />
-              </div>
-            )}
+              )}
 
-            {/* Hard-cut hint — Phase 3: hidden behind "Mehr ▾". */}
-            {secondaryOpen && (
-              <div
-                className="flex items-center gap-1.5 px-2 py-1 rounded bg-muted/40 border border-border/30"
-                title="Übergänge werden im Universal Director's Cut nachträglich hinzugefügt (sauberer & flexibler)."
-              >
-                <span className="text-[10px] text-muted-foreground">
-                  Harter Schnitt → Übergänge im Director's Cut
-                </span>
-              </div>
-            )}
-
-            {/* Phase 3 (Studio Set v2) — single drawer toggle for all secondary
+              {/* Phase 3 (Studio Set v2) — single drawer toggle for all secondary
                 settings. Active sub-features bubble up as small pills when the
                 drawer is closed so the user keeps situational awareness. */}
-            {(() => {
-              const anchor = scene.clipSource.startsWith('ai-')
-                ? resolveSceneCharacterAnchor(scene, characters, activeBrandChar)
-                : null;
-              const anchorShort: Record<string, string> = {
-                'first-frame-direct': lang === 'de' ? 'Anker: Porträt' : 'Anchor: portrait',
-                'first-frame-composed': lang === 'de' ? 'Anker: komponiert' : 'Anchor: composed',
-                'subject-reference': lang === 'de' ? 'Anker: Subject-Ref' : 'Anchor: subject-ref',
-                'text-only': lang === 'de' ? 'Anker: Text' : 'Anchor: text',
-              };
-              return (
-                <SceneSecondaryToggle
-                  language={lang}
-                  open={secondaryOpen}
-                  onToggle={() => setSecondaryOpen((v) => !v)}
-                  summary={{
-                    effectsCount: scene.effects?.length ?? 0,
-                    anchorLabel: anchor ? (anchorShort[anchor.strategy] ?? null) : null,
-                    faceLock: Boolean(scene.forcePortraitAsFirstFrame),
-                    lipSyncOn: Boolean(scene.lipSyncWithVoiceover),
-                    hasReferenceImage: Boolean(scene.referenceImageUrl),
-                  }}
-                />
-              );
-            })()}
-          </div>
+              {(() => {
+                const anchor = scene.clipSource.startsWith("ai-")
+                  ? resolveSceneCharacterAnchor(
+                      scene,
+                      characters,
+                      activeBrandChar,
+                    )
+                  : null;
+                const anchorShort: Record<string, string> = {
+                  "first-frame-direct":
+                    lang === "de" ? "Anker: Porträt" : "Anchor: portrait",
+                  "first-frame-composed":
+                    lang === "de" ? "Anker: komponiert" : "Anchor: composed",
+                  "subject-reference":
+                    lang === "de"
+                      ? "Anker: Subject-Ref"
+                      : "Anchor: subject-ref",
+                  "text-only": lang === "de" ? "Anker: Text" : "Anchor: text",
+                };
+                return (
+                  <SceneSecondaryToggle
+                    language={lang}
+                    open={secondaryOpen}
+                    onToggle={() => setSecondaryOpen((v) => !v)}
+                    summary={{
+                      effectsCount: scene.effects?.length ?? 0,
+                      anchorLabel: anchor
+                        ? (anchorShort[anchor.strategy] ?? null)
+                        : null,
+                      faceLock: Boolean(scene.forcePortraitAsFirstFrame),
+                      lipSyncOn: Boolean(scene.lipSyncWithVoiceover),
+                      hasReferenceImage: Boolean(scene.referenceImageUrl),
+                    }}
+                  />
+                );
+              })()}
+            </div>
 
-          {/* Thumbnail preview */}
-          <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {(scene.uploadType === 'image' || scene.clipSource === 'ai-image' || scene.clipSource === 'stock-image') && (scene.clipUrl || scene.uploadUrl) ? (
-              <img src={scene.clipUrl || scene.uploadUrl} alt="" className="w-full h-full object-cover" />
-            ) : scene.clipUrl ? (
-              <video src={scene.clipUrl} className="w-full h-full object-cover" muted />
-            ) : scene.uploadUrl ? (
-              <video src={scene.uploadUrl} className="w-full h-full object-cover" muted />
-            ) : (
-              <ClipIcon className="h-5 w-5 text-muted-foreground/30" />
-            )}
+            {/* Thumbnail preview */}
+            <div className="w-24 h-16 rounded bg-muted/30 border border-border/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              {(scene.uploadType === "image" ||
+                scene.clipSource === "ai-image" ||
+                scene.clipSource === "stock-image") &&
+              (scene.clipUrl || scene.uploadUrl) ? (
+                <img
+                  src={scene.clipUrl || scene.uploadUrl}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+              ) : scene.clipUrl ? (
+                <video
+                  src={scene.clipUrl}
+                  className="w-full h-full object-cover"
+                  muted
+                />
+              ) : scene.uploadUrl ? (
+                <video
+                  src={scene.uploadUrl}
+                  className="w-full h-full object-cover"
+                  muted
+                />
+              ) : (
+                <ClipIcon className="h-5 w-5 text-muted-foreground/30" />
+              )}
+            </div>
           </div>
-        </div>
         )}
       </CardContent>
 
@@ -1805,7 +2376,7 @@ export default function SceneCard({
       <StockMediaBrowser
         open={stockBrowserOpen}
         onOpenChange={setStockBrowserOpen}
-        initialType={scene.clipSource === 'stock-image' ? 'image' : 'video'}
+        initialType={scene.clipSource === "stock-image" ? "image" : "video"}
         preferredAspect={preferredAspect}
         onSelect={handleStockSelect}
       />
@@ -1840,45 +2411,52 @@ export default function SceneCard({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Beaker className="h-5 w-5 text-primary" />
-              {lang === 'de'
+              {lang === "de"
                 ? `Compare Lab — Szene ${index + 1}`
-                : lang === 'es'
-                ? `Compare Lab — Escena ${index + 1}`
-                : `Compare Lab — Scene ${index + 1}`}
+                : lang === "es"
+                  ? `Compare Lab — Escena ${index + 1}`
+                  : `Compare Lab — Scene ${index + 1}`}
             </DialogTitle>
             <DialogDescription>
-              {lang === 'de'
-                ? 'Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene.'
-                : lang === 'es'
-                ? 'Compara el mismo prompt en hasta 6 motores de vídeo IA en paralelo. Elige un ganador y aplícalo a tu escena.'
-                : 'Compare the same prompt across up to 6 AI video engines in parallel. Pick a winner and apply it to your scene.'}
+              {lang === "de"
+                ? "Vergleiche denselben Prompt parallel auf bis zu 6 KI-Video-Engines. Wähle einen Sieger und übernimm ihn in deine Szene."
+                : lang === "es"
+                  ? "Compara el mismo prompt en hasta 6 motores de vídeo IA en paralelo. Elige un ganador y aplícalo a tu escena."
+                  : "Compare the same prompt across up to 6 AI video engines in parallel. Pick a winner and apply it to your scene."}
             </DialogDescription>
           </DialogHeader>
           <CompareLabGrid
             initialPrompt={
-              promptMode === 'structured'
+              promptMode === "structured"
                 ? stitchSlots(promptSlots, promptSlotOrder)
-                : (scene.aiPrompt ?? '')
+                : (scene.aiPrompt ?? "")
             }
             initialAspectRatio={
-              preferredAspect === '4:5' ? '1:1' : (preferredAspect ?? '16:9') as '16:9' | '9:16' | '1:1'
+              preferredAspect === "4:5"
+                ? "1:1"
+                : ((preferredAspect ?? "16:9") as "16:9" | "9:16" | "1:1")
             }
             composerSceneId={scene.id}
             onWinnerSelected={(_engine, videoUrl) => {
               if (videoUrl) {
                 onUpdate({
-                  clipSource: 'upload',
+                  clipSource: "upload",
                   uploadUrl: videoUrl,
-                  uploadType: 'video',
+                  uploadType: "video",
                 });
                 toast({
-                  title: lang === 'de' ? 'Sieger übernommen' : lang === 'es' ? 'Ganador aplicado' : 'Winner applied',
+                  title:
+                    lang === "de"
+                      ? "Sieger übernommen"
+                      : lang === "es"
+                        ? "Ganador aplicado"
+                        : "Winner applied",
                   description:
-                    lang === 'de'
-                      ? 'Das gewählte Video wurde der Szene zugewiesen.'
-                      : lang === 'es'
-                      ? 'El vídeo seleccionado se asignó a la escena.'
-                      : 'The selected video has been assigned to the scene.',
+                    lang === "de"
+                      ? "Das gewählte Video wurde der Szene zugewiesen."
+                      : lang === "es"
+                        ? "El vídeo seleccionado se asignó a la escena."
+                        : "The selected video has been assigned to the scene.",
                 });
                 setCompareLabOpen(false);
               }
