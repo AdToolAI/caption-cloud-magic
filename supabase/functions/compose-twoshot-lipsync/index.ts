@@ -186,12 +186,12 @@ async function startSyncSoDirectGeneration(
     faceBbox?: [number, number, number, number] | null;
     frameNumber?: number;
     /**
-     * When set, both the video and audio inputs are scoped to this window
-     * (Sync.so `input[].segments_secs`). Only frames inside the window are
-     * regenerated — the rest of the source video is preserved verbatim. We
-     * use this for very-short utterances ("Was denn?") that get lost in long
-     * silence-padded per-speaker tracks: scoping to the voiced window means
-     * Sync.so sees a nearly-fully-voiced clip and VAD reliably triggers.
+     * When set, the VIDEO input is scoped to this window via Sync.so
+     * `input[].segments_secs` — only frames inside the window are regenerated;
+     * the rest of the source video is preserved verbatim. Sync.so v2 rejects
+     * `segments_secs` on audio inputs ("Start and end times are only supported
+     * for video inputs"), so we attach it strictly to the video input. The
+     * merged WAV stays unscoped as audio single-source-of-truth.
      */
     segmentSecs?: [number, number] | null;
     /** When true, ignore segments-invalid errors and let the caller retry. */
@@ -203,12 +203,13 @@ async function startSyncSoDirectGeneration(
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
     if (withSegments && params.segmentSecs) {
-      // Scope ONLY the audio window — leaving the video untouched preserves
-      // the full timeline and Sync.so's speaker-detection on the unmodified
-      // frames. Scoping the video as well historically destabilized face
-      // selection on multi-speaker clips.
+      // Sync.so v2: segments_secs is VIDEO-ONLY. Sync.so rejects it on audio
+      // inputs with "Start and end times are only supported for video inputs".
+      // Scoping the video window means only those frames get re-animated; the
+      // rest of the clip is preserved verbatim — exactly what two-pass needs.
+      // Audio (merged WAV) stays unscoped as single-source-of-truth.
       const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      aud.segments_secs = seg;
+      vid.segments_secs = seg;
     }
     return [vid, aud];
   };
@@ -258,7 +259,7 @@ async function startSyncSoDirectGeneration(
     // the full track — the per-speaker WAV is already peak-normalized so VAD
     // still has a fighting chance.
     const txt = await createResp.text().catch(() => "");
-    if (/segments? configuration is invalid|invalid.+segment/i.test(txt) || createResp.status === 400) {
+    if (/segments? configuration is invalid|invalid.+segment|only supported for video inputs/i.test(txt) || createResp.status === 400) {
       console.warn(`[${label}] segments_secs rejected by Sync.so, retrying without window: ${txt.slice(0, 200)}`);
       createResp = await submit(false);
     } else {
