@@ -581,7 +581,7 @@ serve(async (req) => {
       sceneIds = (rows ?? [])
         .filter(
           (r: any) =>
-            r?.dialog_shots?.version === 2 &&
+            r?.dialog_shots?.version === 3 &&
             ["queued", "lipsyncing"].includes(String(r.dialog_shots?.status)),
         )
         .map((r: any) => r.id);
