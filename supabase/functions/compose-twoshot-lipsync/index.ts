@@ -646,7 +646,7 @@ serve(async (req) => {
       event: "pipeline_started",
       stage: "lipsync_1",
       status: "running",
-      reason: `cost=${cost} duration=${sceneDuration}s`,
+      reason: `cost=${cost} duration=${Number((scene as any).duration_seconds ?? 0)}s`,
     });
 
     let refunded = false;
