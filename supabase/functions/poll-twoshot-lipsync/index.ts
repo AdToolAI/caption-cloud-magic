@@ -115,7 +115,7 @@ function pickTargetCoordinates(
 }
 
 
-async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | Array<[number, number]> | null; temperature?: number; faceBbox?: [number, number, number, number] | null }): Promise<string> {
   // Sync.so Speaker Selection: documented stable path for a single manual
   // selection is `auto_detect:false + frame_number + coordinates`. We do NOT
   // send `bounding_boxes` (a single static box is not what that field expects
@@ -133,16 +133,22 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     temperature: params.temperature ?? 0.5,
     active_speaker_detection: asd,
   };
+  const normalizedSegments = (() => {
+    const s = params.segmentSecs;
+    if (!s) return null;
+    const arr: Array<[number, number]> = Array.isArray(s[0])
+      ? (s as Array<[number, number]>)
+      : [s as [number, number]];
+    const cleaned = arr
+      .map(([a, b]) => [Math.max(0, Number(a)), Math.max(0, Number(b))] as [number, number])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+    return cleaned.length ? cleaned : null;
+  })();
   const buildInput = (withSegments: boolean) => {
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
-    if (withSegments && params.segmentSecs) {
-      // Sync.so v2: segments_secs is VIDEO-ONLY. Sync.so rejects it on audio
-      // inputs with "Start and end times are only supported for video inputs".
-      // Scoping the video window means only those frames get re-animated;
-      // the rest of the clip is preserved verbatim — exactly what two-pass needs.
-      const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
+    if (withSegments && normalizedSegments) {
+      vid.segments_secs = normalizedSegments;
     }
     return [vid, aud];
   };
