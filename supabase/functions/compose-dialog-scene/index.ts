@@ -313,27 +313,31 @@ interface TwoshotSpeaker {
   voicedRange?: { turns?: Turn[]; startSec?: number; endSec?: number };
 }
 
-interface DialogTurnShot {
+/**
+ * v3 SHOT MODEL — one Sync.so pass per CHARACTER (not per turn).
+ * All of a speaker's turns are passed as multi-window `segments_secs`,
+ * so each face is only animated once and only the speaker's own video
+ * regions are re-encoded. Eliminates the per-turn re-encode chain that
+ * softened later-turn mouths and caused weak animation on a speaker's
+ * 2nd line (v2 issue).
+ */
+interface DialogSpeakerShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  startSec: number;
-  endSec: number;
+  /** All turn windows belonging to THIS speaker (time-ordered). */
+  windows: Array<[number, number]>;
+  /** Sum of window durations (seconds). Used for pricing and temperature. */
   durSec: number;
-  /** Sync.so coords [x, y] in master-plate pixel space. Set by initiator
-   *  from cached faceMap; never auto_detect for multi-speaker scenes. */
+  /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
-  /** Adaptive temperature: 1.0 for very short turns (<2s), else 0.85.
-   *  Short turns need maximum articulation force; long turns prefer stability. */
+  /** Adaptive temperature based on the SHORTEST window of this speaker.
+   *  Short windows (<2s) get 1.0 for max articulation; longer get 0.9. */
   temperature: number;
-  status:
-    | "pending"
-    | "lipsyncing"
-    | "ready"
-    | "failed";
+  status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
-  /** Output URL of THIS turn's Sync.so pass. Becomes video input of next turn. */
+  /** Output URL of THIS speaker's pass. Becomes the next pass's video input. */
   output_url?: string;
   error?: string;
   started_at?: string;
@@ -341,22 +345,23 @@ interface DialogTurnShot {
 }
 
 interface DialogShotsState {
-  version: 2; // bumped from v1 (Hailuo-per-turn) to v2 (sequential master chain)
+  /** v3 = per-speaker multi-window passes (current).
+   *  v2 = per-turn chained passes (legacy, ignored by poller). */
+  version: 3;
   status: "queued" | "lipsyncing" | "done" | "failed";
-  /** Per-turn passes, time-ordered. */
-  shots: DialogTurnShot[];
-  /** The two-shot master plate this chain starts from. Stable reference. */
+  /** Per-speaker passes, ordered by first appearance in the dialog. */
+  shots: DialogSpeakerShot[];
+  /** Stable reference back to the original Hailuo master plate. */
   source_clip_url: string;
-  /** Master audio WAV (built by compose-twoshot-audio). Sliced per-turn. */
+  /** Master audio WAV. Sent in full to every pass (Sync.so aligns by absolute time). */
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
   refunded: boolean;
   started_at: string;
-  /** Video dims (px) Sync.so should treat coords against. */
   video_width: number;
   video_height: number;
-  /** Final output URL of the last successful turn. = clip_url when status=done. */
+  /** Final output URL of the last successful speaker pass. */
   final_url?: string | null;
   finished_at?: string;
   error?: string;
