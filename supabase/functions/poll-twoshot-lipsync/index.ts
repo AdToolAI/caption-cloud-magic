@@ -597,6 +597,7 @@ serve(async (req) => {
       lip_sync_applied_at: now,
       lip_sync_status: "done",
       twoshot_stage: "done",
+      clip_error: null,
       continuity_drift_score: null,
       continuity_drift_notes: null,
       updated_at: now,
