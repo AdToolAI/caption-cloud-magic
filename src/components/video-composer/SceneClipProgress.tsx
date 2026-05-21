@@ -232,7 +232,7 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
             </div>
           </div>
         )}
-        {showTwoShotOverlay && <TwoShotStageBar stages={TWO_SHOT_STAGES} stageIndex={stageIndex} currentLabel={currentStageLabel} />}
+        {showDialogOverlay && <DialogShotsBar shots={dialogShots} ready={dialogReady} total={dialogTotal} />}
       </div>
     );
   }
