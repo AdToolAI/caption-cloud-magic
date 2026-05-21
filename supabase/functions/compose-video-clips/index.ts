@@ -29,7 +29,7 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 4;
+const ANCHOR_AUDIT_VERSION = 5;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
