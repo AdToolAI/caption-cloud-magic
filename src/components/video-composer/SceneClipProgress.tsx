@@ -360,43 +360,55 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
   );
 }
 
-interface TwoShotStageBarProps {
-  stages: ReadonlyArray<{ key: string; label: string }>;
-  stageIndex: number;
-  currentLabel: string | null;
+interface DialogShotsBarProps {
+  shots: Array<{
+    idx: number;
+    speaker_name?: string;
+    status: 'pending' | 'generating' | 'generated' | 'lipsyncing' | 'ready' | 'failed';
+    error?: string;
+  }>;
+  ready: number;
+  total: number;
 }
 
 /**
- * 6-step progress overlay for the multi-character Two-Shot Hook pipeline.
- * Sits on top of the generation skeleton and shows which stage is active.
+ * Per-shot progress overlay for the Dialog-Shot Pipeline (1..N speakers).
+ * Each shot = 1 Hailuo plate + 1 Sync.so lipsync for one speaker turn.
  */
-function TwoShotStageBar({ stages, stageIndex, currentLabel }: TwoShotStageBarProps) {
+function DialogShotsBar({ shots, ready, total }: DialogShotsBarProps) {
+  const headline = total > 0
+    ? `🎭 Dialog-Shots · ${ready}/${total}`
+    : '🎭 Dialog-Shots · Audio wird vorbereitet…';
   return (
     <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/85 via-black/60 to-transparent px-2 py-1.5 pointer-events-none">
       <div className="flex items-center gap-1 mb-1">
-        <Loader2 className="h-3 w-3 text-amber-300 animate-spin shrink-0" />
-        <span className="text-[9px] font-bold text-amber-200 uppercase tracking-wide truncate">
-          🎭 Two-Shot Hook · {currentLabel ?? '…'}
+        <Loader2 className="h-3 w-3 text-emerald-300 animate-spin shrink-0" />
+        <span className="text-[9px] font-bold text-emerald-200 uppercase tracking-wide truncate">
+          {headline}
         </span>
       </div>
-      <div className="flex items-center gap-0.5">
-        {stages.map((s, i) => {
-          const done = i < stageIndex;
-          const active = i === stageIndex;
-          return (
-            <div
-              key={s.key}
-              className={cn(
-                'h-1 flex-1 rounded-full transition-colors',
-                done && 'bg-amber-400',
-                active && 'bg-amber-300 animate-pulse',
-                !done && !active && 'bg-white/15',
-              )}
-              title={s.label}
-            />
-          );
-        })}
-      </div>
+      {total > 0 && (
+        <div className="flex items-center gap-0.5">
+          {shots.map((s) => {
+            const isReady = s.status === 'ready';
+            const isFailed = s.status === 'failed';
+            const isActive = s.status === 'generating' || s.status === 'lipsyncing' || s.status === 'generated';
+            return (
+              <div
+                key={s.idx}
+                className={cn(
+                  'h-1 flex-1 rounded-full transition-colors',
+                  isReady && 'bg-emerald-400',
+                  isFailed && 'bg-destructive',
+                  isActive && 'bg-emerald-300 animate-pulse',
+                  !isReady && !isFailed && !isActive && 'bg-white/15',
+                )}
+                title={`Shot ${s.idx + 1}${s.speaker_name ? ' · ' + s.speaker_name : ''} · ${s.status}${s.error ? ' · ' + s.error : ''}`}
+              />
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
