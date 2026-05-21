@@ -464,7 +464,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       lipSyncTargets.forEach((sceneId) => {
         console.info(`[ClipsTab] Auto-triggering lip-sync for scene ${sceneId}`);
         supabase.functions
-          .invoke('compose-lipsync-scene', { body: { scene_id: sceneId } })
+          .invoke('compose-dialog-scene', { body: { scene_id: sceneId } })
           .then(({ data: lsData, error: lsErr }) => {
             const errBody = (lsErr as any)?.context;
             const reason = lsData?.error ?? errBody?.error;
