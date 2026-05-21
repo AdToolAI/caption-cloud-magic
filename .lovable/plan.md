@@ -1,165 +1,112 @@
-## Kurzantwort
+## Befund
 
-Ja, wir können die Ursache eingrenzen und beheben. Es sind zwei verschiedene Probleme, die sich überlagern:
+Der neue Fehler ist jetzt eindeutig isoliert:
 
-1. **Der aktuelle 95%-Hänger ist ein App-State-Bug, kein laufender Anbieter-Job.**
-2. **Die eigentlichen Lip-Sync-Crashes kommen von der aktuellen Two-Pass-Strategie gegen Sync.so, die bei Multi-Face-Clips weiterhin fragil ist.**
-
-## Was ich konkret gefunden habe
-
-### Aktuelle hängende Szene
-
-Die aktuelle Szene `97a82039-19e1-4b6c-a050-98ed4e9db81c` steht so in der Datenbank:
-
-```text
-lip_sync_status = pending
-twoshot_stage = lipsync_1
-replicate_prediction_id = 8mjrptg1phrmy0cy8z5tpvwfv4
-syncJobs = leer
-heartbeat = leer
-clip_error = auto-reset: stale running
-```
-
-Das ist ein Zombie-State:
-
-- `lipsync_1` sagt der UI: „Lip Sync läuft“.
-- `pending` sagt dem Backend: „wartet auf Neustart“.
-- Es gibt aber **keine Sync.so Job-ID** (`sync:*`) und keinen `syncJobs.jobs[]` Eintrag.
-- Der Watchdog ignoriert diesen Zustand aktuell, weil er pending-Szenen mit `twoshot_stage = lipsync_1` nicht neu startet.
-- Der Client ignoriert ihn ebenfalls, weil er `lipsync_1` nicht als startbaren Retry-Zustand akzeptiert.
-
-Darum hängt die Anzeige bei 95%, obwohl kein echter Job mehr läuft.
-
-### Warum der eigentliche Lip Sync crasht
-
-Bei der vorherigen Szene `cb2b149d-a926-48c5-8589-e3c590faface` ist der Anbieter wirklich gescheitert:
+- Die aktuelle Szene `e3df41ad-aaa1-4659-85c2-0630e458dd52` hängt bei:
+  - `lip_sync_status = running`
+  - `twoshot_stage = lipsync_1`
+  - `replicate_prediction_id = null`
+  - `syncJobs = null`
+- Die Diagnose-Historie enthält nur `pipeline_started`, aber **keinen** `sync_job_created`.
+- Die Edge-Function-Logs zeigen direkt danach:
 
 ```text
-clip_error = source_clip_unusable: Sync.so refused both face-targeted and auto-detect passes
-syncJobs.jobs = 2
-fallbackMode = auto_detect_single_pass
-lastError = An unknown error occurred.
+[compose-twoshot-lipsync ...] lipsync engine = sync.so/v2 (direct)
+ERROR CPU Time exceeded
 ```
 
-Das heißt: Dort wurde Sync.so tatsächlich erreicht, aber Sync.so hat sowohl den face-targeted Pass als auch den Auto-Detect-Fallback abgelehnt.
+Das bedeutet: Der Crash passiert **vor** dem Sync.so-Submit. Sync.so ist in diesem konkreten Fehler nicht die Ursache; die Edge Function wird durch CPU-Limit beendet, bevor überhaupt ein Provider-Job existiert.
 
-Das Muster wiederholt sich in älteren Szenen mit:
+## Wahrscheinliche Ursache im Code
 
-```text
-syncso_failed: An error occurred in the generation pipeline.
+Der Hotspot ist der MP4-Dimensions-Probe in `compose-twoshot-lipsync`:
+
+```ts
+const buf = new Uint8Array(await resp.arrayBuffer());
+const textAt = (i, n) => String.fromCharCode(...buf.slice(i, i + n));
+for (let i = 0; i < buf.length - 32; i++) {
+  if (textAt(i, 4) !== "tkhd") continue;
+}
 ```
 
-Die wahrscheinliche technische Ursache ist nicht „11 Minuten warten“, sondern die Art, wie wir Zwei-Charakter-Lip-Sync aktuell ausführen:
+Das lädt den kompletten MP4-Clip und scanned Byte-für-Byte mit `String.fromCharCode(...slice)`; bei größeren Hailuo/Sync-Clips ist das CPU-intensiv genug, um die Edge Function hart zu killen. Weil der Kill außerhalb normaler JS-Fehlerbehandlung passiert, greifen Refund und Fehlerstatus nicht zuverlässig.
 
-- Wir starten sequentielle Einzel-Passes pro Sprecher.
-- Dafür wird ein Gesicht per BBox/Koordinate auf Frame 0 gepinnt.
-- Der Clip bleibt aber ein echter Zwei-Personen-Clip mit mehreren sichtbaren Gesichtern.
-- Sync.so dokumentiert für Multi-Speaker-Fälle eigentlich die **Segments API**: mehrere Audio-Inputs + Zeitsegmente in einem einzigen Generate-Call.
-- Unsere aktuelle Two-Pass-Strategie erzeugt mehr Angriffsfläche: falsches Gesicht, Provider-internes Face-Tracking, Zwischendatei, zweiter Pass, Timeout, Reset-State.
+## Plan zur Behebung
 
-Zusätzlich gibt es einen Architekturfehler im Statushandling:
+### 1. Vollständigen MP4-Download aus dem Startpfad entfernen
 
-- `compose-twoshot-lipsync` setzt früh `twoshot_stage = lipsync_1` und `lip_sync_status = running`.
-- Erst später wird der echte Sync.so Job erstellt und als `replicate_prediction_id = sync:<jobId>` gespeichert.
-- Wenn die Hintergrundausführung zwischen diesen Schritten stirbt oder vom Client zurückgesetzt wird, bleibt `lipsync_1` ohne echten Job zurück.
+In `compose-twoshot-lipsync`:
 
-## Können wir das beheben?
+- Für Pass 1 keine MP4-Dimensionen mehr durch Vollscan ermitteln.
+- Primär die bereits gespeicherten `audio_plan.twoshot.faceMap.width/height` verwenden.
+- Bei vorhandenem FaceMap sind die Pixel-Koordinaten bereits auf Anchor-Dimensionen normalisiert; das reicht für den ersten Sync.so-Submit.
+- Dadurch wird der CPU-intensive Block vor `sync_job_created` entfernt.
 
-Ja. Nicht indem wir nur mehr Retries hinzufügen, sondern indem wir die Pipeline robuster umbauen.
+### 2. Falls Video-Dimensionen wirklich nötig sind: bounded parser
 
-## Fix-Plan
+Den vorhandenen `probeMp4Dims` in `compose-twoshot-lipsync` und `poll-twoshot-lipsync` ersetzen durch:
 
-### 1. Zombie-State sofort reparieren
+- HTTP `Range: bytes=0-1048575` statt kompletter Datei.
+- Byte-Vergleich statt `String.fromCharCode(...slice)` in jeder Schleife.
+- Harte maximale Scanlänge.
+- Bei fehlgeschlagenem Probe: sofort auf FaceMap-/Anchor-Dimensionen fallbacken.
 
-In `useTwoShotAutoTrigger` und `twoshot-lipsync-watchdog` wird dieser Zustand erkannt:
+### 3. Status erst nach echtem Sync.so-Job auf `lipsync_1` setzen
 
-```text
-pending + lipsync_* + keine sync:* Job-ID + keine syncJobs.jobs[] + kein heartbeat
-```
+Aktuell wird `twoshot_stage = lipsync_1` gesetzt, bevor ein Sync.so-Job existiert. Das erzeugt bei CPU-Kill wieder Zombie-State.
 
-Dann wird die Szene sauber zurückgesetzt:
+Umbau:
 
-```text
-twoshot_stage = null
-replicate_prediction_id = null
-clip_error = auto-retry: zombie_lipsync_stage_without_sync_job
-```
+- Vorbereitungsphase: `twoshot_stage = preflight`, `lip_sync_status = running`, Diagnose `preflight_started`.
+- Erst nach erfolgreichem `startSyncSoDirectGeneration(...)`:
+  - `twoshot_stage = lipsync_1`
+  - `replicate_prediction_id = sync:<jobId>`
+  - `syncJobs.jobs[0]` schreiben
+  - Diagnose `sync_job_created`
 
-Danach wird `compose-twoshot-lipsync` neu aufgerufen.
+### 4. Credits erst direkt vor Provider-Submit abbuchen
 
-### 2. Fortschrittsbalken korrigieren
+Damit ein CPU-Abbruch in der Preflight-Phase keine Credits verbrennt:
 
-`usePipelineProgress` darf `twoshot_stage = lipsync_1` nur noch als laufend zählen, wenn wirklich ein Job existiert:
+- Wallet nur prüfen, aber noch nicht abbuchen.
+- FaceMap, Speaker-Tracks und Zielkoordinaten vorbereiten.
+- Direkt vor `startSyncSoDirectGeneration` nochmal Wallet prüfen und dann abbuchen.
+- Wenn der Provider-Submit fehlschlägt, bestehende Refund-Logik nutzen.
+
+### 5. Watchdog für Preflight-Abbruch erweitern
+
+`twoshot-lipsync-watchdog` soll erkennen:
 
 ```text
 lip_sync_status = running
-oder replicate_prediction_id beginnt mit sync:
-oder audio_plan.twoshot.syncJobs.jobs[] enthält Job
-oder heartbeat.syncJobId existiert
+stage = preflight oder lipsync_1
+kein sync:* job
+keine syncJobs.jobs[]
+updated_at älter als z.B. 2 Minuten
 ```
 
-Damit kann die UI nicht mehr bei 95% hängen, wenn backendseitig nichts läuft.
+Dann:
 
-### 3. Diagnose-Historie an jede Szene schreiben
+- wenn keine Abbuchung nachweisbar: zurück auf `pending`, `twoshot_stage = null`
+- wenn Abbuchung nachweisbar: refund + zurück auf `pending`
+- Diagnose `preflight_cpu_abort_recovered` anhängen
+- `compose-twoshot-lipsync` neu auslösen
 
-Wir speichern in `audio_plan.twoshot.diagnostics` die letzten Statuswechsel:
+### 6. Aktuelle Szene reparieren
 
-```text
-source, event, stage, status, jobId, reason, timestamp
-```
+Nach dem Code-Fix:
 
-Dann sehen wir beim nächsten Fehler sofort:
+- Szene `e3df41ad-aaa1-4659-85c2-0630e458dd52` aus dem Zombie-State holen.
+- `lip_sync_status = pending`, `twoshot_stage = null`, `replicate_prediction_id = null` setzen.
+- `clip_error = auto-retry: cpu-time-preflight-fix applied` speichern.
+- Falls die bisherigen zwei CPU-Abbrüche Credits abgezogen haben, den Betrag anhand der Szene-Diagnose/Wallet-Historie prüfen und idempotent erstatten.
 
-- ob Sync.so überhaupt erstellt wurde,
-- welcher Job gepollt wurde,
-- ob der Client zurückgesetzt hat,
-- ob der Watchdog eingegriffen hat,
-- ob ein Provider-Fehler oder ein App-State-Fehler vorliegt.
+## Erwartetes Ergebnis
 
-### 4. Two-Pass als Hauptstrategie ersetzen
-
-Für echte Zwei-Charakter-Szenen sollten wir die Sync.so **Segments API** als primäre Strategie verwenden:
-
-```text
-1 Video Input
-2 Audio Inputs, je Sprecher
-Segments mit startTime/endTime + audioInput.refId
-1 Sync.so Generate-Job
-```
-
-Das passt besser zum Problem als zwei nacheinander gerenderte Face-Passes.
-
-Vorteil:
-
-- nur ein Provider-Job,
-- keine Zwischenclip-Kaskade,
-- weniger Timeout-Risiko,
-- bessere Multi-Speaker-Semantik,
-- weniger Zombie-State-Möglichkeiten.
-
-### 5. Two-Pass nur noch als Fallback behalten
-
-Wenn Segments von Sync.so abgelehnt wird, kann Two-Pass weiterhin als Fallback existieren. Aber nicht mehr als Standardpfad.
-
-### 6. Aktuelle Szene nach dem Fix zurücksetzen
-
-Die aktuelle Szene wird nach der Codeänderung sauber neu startbar gemacht:
-
-```text
-lip_sync_status = pending
-twoshot_stage = null
-replicate_prediction_id = null
-clip_error = auto-retry: segmented pipeline fix applied
-```
-
-## Ergebnis
-
-Nach dem Umbau unterscheiden wir sauber:
-
-- **Provider crasht wirklich** → klare Diagnose + Refund + Fallback.
-- **App-State hängt** → Watchdog/Client reparieren automatisch.
-- **Kein echter Job läuft** → UI zeigt keinen 95%-Dauerlauf mehr.
-- **Zwei Sprecher** → primär ein Segment-basierter Multi-Speaker-Job statt fragiler Zwei-Pass-Kaskade.
+- Kein `CPU Time exceeded` mehr vor Sync.so.
+- UI hängt nicht mehr bei `lipsync_1` ohne Job-ID.
+- Jede echte Provider-Ausführung hat sofort eine `sync:<jobId>` und Diagnose-Eintrag.
+- Preflight-Crashes sind automatisch recoverable und verbrennen keine Credits.
 
 <presentation-actions>
   <presentation-open-history>View History</presentation-open-history>
