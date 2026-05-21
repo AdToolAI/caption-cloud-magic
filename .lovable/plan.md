@@ -1,93 +1,72 @@
-## Symptom
+## Befund
 
-- **Char 1:** Lipsync „okay, aber nicht produktionsreif" — leichter, konstanter Drift.
-- **Char 2:** Mund öffnet sich **später** als seine Stimme im fertigen Video zu hören ist.
+Das aktuelle Problem hat zwei echte Ursachen, beide im aktuellen Payload sichtbar:
 
-Final-Audio im Preview/Export ist immer `audio_plan.twoshot.url` (merged WAV). Visuell wird zweistufig per Sync.so passe gerendert.
+1. **Unskriptierter Audio-Anhang**
+   - `compose-twoshot-audio` hängt an jede nicht-letzte Dialogzeile literal ` ... ` an.
+   - Bei kurzen Zeilen wie `Was denn? ...` kann die TTS-Stimme daraus ein hörbares Murmeln/Atmen/„Punkt Punkt“-ähnliches Extra erzeugen.
+   - Das erklärt den Teil „irgendwas Unverständliches mit dran, was nicht im Skript steht“.
 
-## Ursache
+2. **Falsches Lip-Sync-Fenster bei Charakteren mit mehreren Turns**
+   - Samuel hat Zeile 1 und Zeile 3.
+   - Aktuell wird daraus ein einziges `voicedRange` von `0.000s → 6.362s` gebaut.
+   - Dieses Fenster enthält aber auch Matthews Zeile 2 dazwischen.
+   - Pass 2 reanimiert dadurch den ersten Charakter über den kompletten Bereich inklusive der zweiten Sprecherzeile — daher wirkt es so, als würde ein Charakter fremde/folgende Zeilen mitsprechen.
 
-Wir senden Sync.so pro Pass den **per-character-padded WAV** (`speakers[i].track_url`) — also einen eigenen Track in voller Szenenlänge mit Stille drumherum. Dieser Track ist **sample-identisch** mit dem merged track an der jeweiligen Sprecher-Position, aber:
+Aktueller betroffener Scene-State bestätigt das:
 
-1. **Re-Encode-Drift:** Jeder per-character WAV wird separat hochgeladen, Sync.so dekodiert + re-encodet pro Pass. Bei `sync_mode=cut_off` + `temperature=0.5/0.65` reicht ein kleiner Onset-Versatz der internen VAD von Sync.so (typisch 80–250 ms), damit Pass 2 sichtbar gegenüber dem späteren merged-Audio-Onset hinterherläuft. Pass 1 hat denselben Drift, fällt aber weniger auf weil dort der Onset bei t≈0 liegt.
-2. **Doppelte Zeitachse:** Sync.so animiert basierend auf dem Onset im **per-character-Track**, aber gehört wird der **merged-Track**. Ein paar Frames Drift summieren sich, weil zwischen Track-Onset und merged-Audio-Onset zwei unterschiedliche WAV-Quellen liegen, die unabhängig durch ffmpeg/Sync.so laufen.
-3. **`segments_secs` mit `temperature=0.65`** erhöht die VAD-Toleranz für Pass 2 zusätzlich → Char-2-Mund öffnet später.
+```text
+Zeile 1 Samuel:  0.000s - 2.322s
+Zeile 2 Matthew: 2.322s - 3.854s
+Zeile 3 Samuel:  3.854s - 6.362s
 
-## Lösung: Single-Source-of-Truth Audio (merged WAV in BEIDEN Passes)
-
-Statt zwei verschiedener per-character WAVs schicken wir auf **beiden** Sync.so-Passes **denselben merged WAV** (`audio_plan.twoshot.url`) und scoping erfolgt ausschließlich über `segments_secs` auf den voiced-Bereich des jeweiligen Sprechers. Damit:
-
-- Sync.so sieht in beiden Passes **dasselbe Audio-Sample-Array**, das auch der User hört.
-- `segments_secs[i] = [speaker_i.startSec, speaker_i.endSec]` (ohne 0.25 s Padding — Padding verschiebt den VAD-Onset und ist der Hauptverdächtige für das Char-2-Late-Symptom).
-- Pass 2 läuft auf dem bereits-pass-1-gerenderten Video; Char 1 bleibt korrekt animiert (außerhalb von Pass-2-Window), Char 2 bekommt den Mund exakt im Audio-Fenster.
-- Re-Encode-Drift entfällt, weil das Audio bit-identisch zum Preview/Export ist.
-
-### Konkrete Code-Änderungen
-
-**`compose-twoshot-lipsync/index.ts`** (`twoshot_pass_1` Branch, ~Zeile 1200):
-
-```ts
-const sourceAudioUrl = mergedVo.url; // statt firstSpeaker.track_url
-const pass1Segment: [number, number] | null = vr1
-  ? [Math.max(0, vr1.startSec), Math.min(sceneDurSec, vr1.endSec)]
-  : null;
-jobId = await startSyncSoDirectGeneration(SYNC_API_KEY!, {
-  videoUrl: sourceClipUrl,
-  audioUrl: sourceAudioUrl,
-  syncMode: "cut_off",
-  temperature: 0.5,           // einheitlich, kein Bonus-Temp mehr für windowed
-  targetCoords: firstTarget.coords,
-  frameNumber: 0,
-  segmentSecs: pass1Segment,
-}, "twoshot_pass_1");
+Samuel-Pass aktuell: segments_secs = [[0.000, 6.362]]  ← falsch, enthält Matthew
+Matthew-Pass aktuell: segments_secs = [[2.322, 3.854]] ← korrekt
 ```
 
-**`poll-twoshot-lipsync/index.ts`** (Pass-2-Spawn, ~Zeile 476):
+## Plan
 
-```ts
-const sourceAudioUrl = (plan as any)?.twoshot?.url ?? nextSpeaker.track_url;
-const nextSegment: [number, number] | null = vrNext
-  ? [Math.max(0, vrNext.startSec), Math.min(sceneDurSec, vrNext.endSec)]
-  : null;
-const nextJobId = await startSyncJob(syncApiKey, {
-  videoUrl: polled.outputUrl,
-  audioUrl: sourceAudioUrl,
-  targetCoords: target.coords,
-  segmentSecs: nextSegment,
-  temperature: 0.5,
-});
+1. **TTS darf den Skripttext nicht mehr verändern**
+   - In `compose-twoshot-audio` wird `utterance = block.text` verwendet.
+   - Das literal angehängte ` ... ` wird entfernt.
+   - Falls Pausen zwischen Sprechern nötig sind, werden sie als echte PCM-Silence zwischen den Audio-Samples eingefügt, nicht als Text an die TTS gesendet.
+
+2. **Per-Turn statt Union-Fenster für Lip-Sync**
+   - Für jeden Sprecher werden die bestehenden `turns[]` als eigene Sync.so-Fenster genutzt.
+   - Beispiel Samuel wird künftig:
+
+```text
+segments_secs = [[0.000, 2.322], [3.854, 6.362]]
 ```
 
-**Padding entfernt** (0.25 s pre-/post-pad rausnehmen). Der voiced-Range aus `compose-twoshot-audio` ist bereits sample-genau am tatsächlichen TTS-Onset → kein zusätzliches Padding mehr nötig. Das eliminiert die ~250 ms Visual-Vorlauf, die der Mund vor Char-2-Voice „wartet".
+   - Matthew bleibt:
 
-**Fallback unverändert:** Wenn Sync.so `segments_secs` ablehnt, retry ohne window (bestehende Logik in `startSyncJob`).
+```text
+segments_secs = [[2.322, 3.854]]
+```
 
-**Per-character `track_url` bleibt** in `audio_plan.twoshot.speakers[].track_url` als Debug-/Recovery-Asset, wird aber von Sync.so nicht mehr konsumiert.
+   - Damit wird nie wieder ein anderer Sprecher innerhalb eines fremden Lip-Sync-Passes überschrieben.
 
-### Szene reparieren
+3. **Sync.so Payload-Typ erweitern**
+   - `segmentSecs` wird intern von einem einzelnen `[start,end]` auf mehrere Fenster `[[start,end], ...]` erweitert.
+   - Die Fenster bleiben weiterhin ausschließlich am Video-Input, Audio bleibt die merged WAV.
 
-Szene `e3df41ad-…`:
-- `clip_url` → ursprünglicher Quellclip (`lip_sync_source_clip_url`)
-- `lip_sync_status = pending`, `twoshot_stage = null`, `replicate_prediction_id = null`
-- 144 Credits refund für den falsch synchronisierten Render
-- Identity-Match-Cache (`audio_plan.twoshot.faceMap`) **behalten** — der ist nach dem letzten Fix korrekt; nur das Audio-Routing war daneben.
+4. **Retry-/Fallback-Metadaten härten**
+   - Jobs speichern die tatsächlich verwendete `mergedAudioUrl` und die exakten Segment-Windows.
+   - Transient retries übernehmen dieselben Segment-Windows statt versehentlich ohne Fenster oder mit falschem Debug-Audio neu zu starten.
+   - Der gefährliche Auto-Detect-Fallback wird so eingeschränkt, dass er nicht mit kompletter merged WAV ohne Fenster fremde Zeilen auf ein Gesicht mappen kann.
 
-## Memory-Update
+5. **Betroffene Szene sauber neu aufsetzen**
+   - Szene `88d3a20f-f177-47a9-a84f-8fca1e58e51b` wird auf den ursprünglichen Quellclip zurückgesetzt.
+   - Bestehende Two-Shot-Audio-Clips der Szene werden regeneriert, damit die `...`-Artefakte verschwinden.
+   - Lip-Sync wird wieder auf `pending` gesetzt; der nächste Lauf nutzt die korrigierten Segment-Fenster.
 
-`mem://architecture/lipsync/sync-so-pro-model-policy`:
-- Two-Pass nutzt jetzt **merged WAV in beiden Passes** + `segments_secs` per Sprecher.
-- Per-speaker padded tracks sind nur noch Debug-Artefakt, nicht Sync.so-Input.
-- Kein Pre-/Post-Pad mehr auf `segments_secs` — sample-exakter voiced-Range.
+6. **Memory aktualisieren**
+   - Dokumentieren: keine TTS-Textmutation, Pausen nur als Silence-Samples, und Multi-Turn-Speaker müssen disjunkte `segments_secs` pro Turn nutzen.
 
 ## Erwartetes Ergebnis
 
-- Char-1-Lipsync bleibt mind. gleich gut, vermutlich besser (kein Re-Encode-Drift mehr).
-- Char-2-Mund öffnet exakt mit der hörbaren Stimme, weil Audio = Preview-Audio.
-- Falls danach noch Mikro-Drift sichtbar ist, wäre der nächste Hebel `sync_mode: "loop"` statt `cut_off`, das aber erst nach Validierung dieses Fixes.
-
-## Dateien
-
-- `supabase/functions/compose-twoshot-lipsync/index.ts`
-- `supabase/functions/poll-twoshot-lipsync/index.ts`
-- DB-Migration: Szene-Reset + Credit-Refund
-- `mem://architecture/lipsync/sync-so-pro-model-policy`
+- Zeile 1 wird nur vom ersten Charakter gelip-synct.
+- Zeile 2 wird nur vom zweiten Charakter gelip-synct.
+- Zeile 3 wird wieder nur vom ersten Charakter gelip-synct.
+- Keine hörbaren Extra-Laute mehr durch angehängte Ellipsen im TTS-Input.

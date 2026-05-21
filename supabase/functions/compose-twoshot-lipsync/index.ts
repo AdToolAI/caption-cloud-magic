@@ -186,30 +186,38 @@ async function startSyncSoDirectGeneration(
     faceBbox?: [number, number, number, number] | null;
     frameNumber?: number;
     /**
-     * When set, the VIDEO input is scoped to this window via Sync.so
-     * `input[].segments_secs` — only frames inside the window are regenerated;
-     * the rest of the source video is preserved verbatim. Sync.so v2 rejects
-     * `segments_secs` on audio inputs ("Start and end times are only supported
-     * for video inputs"), so we attach it strictly to the video input. The
-     * merged WAV stays unscoped as audio single-source-of-truth.
+     * When set, the VIDEO input is scoped to these windows via Sync.so
+     * `input[].segments_secs` — only frames inside the windows are
+     * regenerated; the rest of the source video is preserved verbatim.
+     * Accepts a single `[start, end]` or multiple disjoint
+     * `[[start, end], ...]` ranges (needed when a speaker has more than one
+     * turn in the scene — Samuel at 0–2.3s AND 3.9–6.4s with Matthew in
+     * between at 2.3–3.9s). A single union range would otherwise re-animate
+     * Samuel over Matthew's voiced range too. Sync.so v2 rejects
+     * `segments_secs` on audio inputs, so we attach it strictly to video.
      */
-    segmentSecs?: [number, number] | null;
+    segmentSecs?: [number, number] | Array<[number, number]> | null;
     /** When true, ignore segments-invalid errors and let the caller retry. */
     allowSegmentsRetry?: boolean;
   },
   label: string,
 ): Promise<string> {
+  const normalizedSegments = (() => {
+    const s = params.segmentSecs;
+    if (!s) return null;
+    const arr: Array<[number, number]> = Array.isArray(s[0])
+      ? (s as Array<[number, number]>)
+      : [s as [number, number]];
+    const cleaned = arr
+      .map(([a, b]) => [Math.max(0, Number(a)), Math.max(0, Number(b))] as [number, number])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+    return cleaned.length ? cleaned : null;
+  })();
   const buildInput = (withSegments: boolean): Array<Record<string, unknown>> => {
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
-    if (withSegments && params.segmentSecs) {
-      // Sync.so v2: segments_secs is VIDEO-ONLY. Sync.so rejects it on audio
-      // inputs with "Start and end times are only supported for video inputs".
-      // Scoping the video window means only those frames get re-animated; the
-      // rest of the clip is preserved verbatim — exactly what two-pass needs.
-      // Audio (merged WAV) stays unscoped as single-source-of-truth.
-      const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
+    if (withSegments && normalizedSegments) {
+      vid.segments_secs = normalizedSegments;
     }
     return [vid, aud];
   };
@@ -250,7 +258,7 @@ async function startSyncSoDirectGeneration(
     });
   };
 
-  const useSegments = !!params.segmentSecs;
+  const useSegments = !!normalizedSegments;
   let createResp = await submit(useSegments);
 
   if (!createResp.ok && useSegments) {
@@ -1189,14 +1197,25 @@ serve(async (req) => {
         // drift because Sync.so re-encoded a different WAV than playback.
         const sceneDurSec = Number((prevTwoshot as any).totalSec) || Number((scene as any).duration_seconds) || 0;
         const vr1: any = (firstSpeaker as any).voicedRange ?? null;
-        let pass1Segment: [number, number] | null = null;
-        if (vr1 && Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec && sceneDurSec > 0) {
-          // Sample-exact voiced range — no padding (padding shifted VAD onset
-          // and was the root cause of perceived mouth drift).
-          pass1Segment = [
-            Math.max(0, Number(vr1.startSec)),
-            Math.min(sceneDurSec, Number(vr1.endSec)),
-          ];
+        // Use per-turn windows when present so we never re-animate this
+        // speaker over the OTHER speaker's voiced range. Fall back to the
+        // union range only when no per-turn data is available.
+        let pass1Segment: [number, number] | Array<[number, number]> | null = null;
+        if (vr1 && sceneDurSec > 0) {
+          if (Array.isArray(vr1.turns) && vr1.turns.length > 0) {
+            const turns = vr1.turns
+              .map((t: any) => [
+                Math.max(0, Number(t.startSec)),
+                Math.min(sceneDurSec, Number(t.endSec)),
+              ] as [number, number])
+              .filter(([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+            if (turns.length > 0) pass1Segment = turns;
+          } else if (Number.isFinite(vr1.startSec) && Number.isFinite(vr1.endSec) && vr1.endSec > vr1.startSec) {
+            pass1Segment = [
+              Math.max(0, Number(vr1.startSec)),
+              Math.min(sceneDurSec, Number(vr1.endSec)),
+            ];
+          }
         }
         let jobId = "";
         if (!(await reserveCredits())) return;

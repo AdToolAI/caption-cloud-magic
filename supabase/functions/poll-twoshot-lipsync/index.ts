@@ -115,7 +115,7 @@ function pickTargetCoordinates(
 }
 
 
-async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | null; temperature?: number }): Promise<string> {
+async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audioUrl: string; targetCoords?: [number, number] | null; autoDetect?: boolean; segmentSecs?: [number, number] | Array<[number, number]> | null; temperature?: number; faceBbox?: [number, number, number, number] | null }): Promise<string> {
   // Sync.so Speaker Selection: documented stable path for a single manual
   // selection is `auto_detect:false + frame_number + coordinates`. We do NOT
   // send `bounding_boxes` (a single static box is not what that field expects
@@ -133,16 +133,22 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     temperature: params.temperature ?? 0.5,
     active_speaker_detection: asd,
   };
+  const normalizedSegments = (() => {
+    const s = params.segmentSecs;
+    if (!s) return null;
+    const arr: Array<[number, number]> = Array.isArray(s[0])
+      ? (s as Array<[number, number]>)
+      : [s as [number, number]];
+    const cleaned = arr
+      .map(([a, b]) => [Math.max(0, Number(a)), Math.max(0, Number(b))] as [number, number])
+      .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+    return cleaned.length ? cleaned : null;
+  })();
   const buildInput = (withSegments: boolean) => {
     const vid: Record<string, unknown> = { type: "video", url: params.videoUrl };
     const aud: Record<string, unknown> = { type: "audio", url: params.audioUrl };
-    if (withSegments && params.segmentSecs) {
-      // Sync.so v2: segments_secs is VIDEO-ONLY. Sync.so rejects it on audio
-      // inputs with "Start and end times are only supported for video inputs".
-      // Scoping the video window means only those frames get re-animated;
-      // the rest of the clip is preserved verbatim — exactly what two-pass needs.
-      const seg = [[Math.max(0, params.segmentSecs[0]), Math.max(0, params.segmentSecs[1])]];
-      vid.segments_secs = seg;
+    if (withSegments && normalizedSegments) {
+      vid.segments_secs = normalizedSegments;
     }
     return [vid, aud];
   };
@@ -156,7 +162,7 @@ async function startSyncJob(syncApiKey: string, params: { videoUrl: string; audi
     }),
   });
 
-  const useSegments = !!params.segmentSecs;
+  const useSegments = !!normalizedSegments;
   let resp = await submit(useSegments);
 
   if (!resp.ok && useSegments) {
@@ -466,15 +472,24 @@ serve(async (req) => {
         (plan as any)?.twoshot?.url ||
         nextSpeaker.track_url;
       const vrNext: any = (nextSpeaker as any).voicedRange ?? null;
-      let nextSegment: [number, number] | null = null;
-      if (vrNext && Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && vrNext.endSec > vrNext.startSec && sceneDurSec > 0) {
-        // Sample-exact voiced range — no padding (padding shifted the VAD
-        // onset and was the root cause of "char 2 mouth opens later than its
-        // voice plays").
-        nextSegment = [
-          Math.max(0, Number(vrNext.startSec)),
-          Math.min(sceneDurSec, Number(vrNext.endSec)),
-        ];
+      // Use per-turn windows when present so a speaker with multiple turns
+      // never re-animates over the OTHER speaker's voiced range.
+      let nextSegment: [number, number] | Array<[number, number]> | null = null;
+      if (vrNext && sceneDurSec > 0) {
+        if (Array.isArray(vrNext.turns) && vrNext.turns.length > 0) {
+          const turns = vrNext.turns
+            .map((t: any) => [
+              Math.max(0, Number(t.startSec)),
+              Math.min(sceneDurSec, Number(t.endSec)),
+            ] as [number, number])
+            .filter(([a, b]: [number, number]) => Number.isFinite(a) && Number.isFinite(b) && b > a);
+          if (turns.length > 0) nextSegment = turns;
+        } else if (Number.isFinite(vrNext.startSec) && Number.isFinite(vrNext.endSec) && vrNext.endSec > vrNext.startSec) {
+          nextSegment = [
+            Math.max(0, Number(vrNext.startSec)),
+            Math.min(sceneDurSec, Number(vrNext.endSec)),
+          ];
+        }
       }
       const nextJobId = await startSyncJob(syncApiKey, {
         videoUrl: polled.outputUrl,
