@@ -16,7 +16,9 @@ type: feature
 - Face-Identity-Mapping: `pickTargetCoordinates` matched `faceMap.faces[].characterId === speaker.character_id` (Gemini Vision Identity Match), nicht Position. Bei fehlgeschlagenem Match: harter Stopp + Refund.
 - Sync.so Payload: `auto_detect:false + frame_number:0 + coordinates:[x,y]`. KEIN `bounding_boxes`.
 - `compose-twoshot-lipsync` queued nur Pass 1, returnt 202; `poll-twoshot-lipsync` chained Pass 2 nach Pass-1-Completion und nutzt dabei dieselbe Per-Turn-Logik.
-- Auto-Detect-Fallback (`isolated_track_auto_detect`) verwendet ausschließlich die **per-character isolierte Spur** (`latestCurrentJob.audioUrl` = der per-speaker padded WAV) — NIEMALS die merged WAV mit auto_detect, sonst würden alle Zeilen auf ein Gesicht gemappt.
+- Auto-Detect-Fallback (`isolated_track_auto_detect`) sendet weiterhin `audio_plan.twoshot.url` (merged WAV) **mit denselben per-Turn `segments_secs`** wie der Original-Pass — niemals merged WAV ohne Fenster mit auto_detect, sonst würden alle Zeilen auf ein Gesicht gemappt.
+- Auch transiente Retries in `poll-twoshot-lipsync` übernehmen `audioSegmentSecs` aus dem letzten Job-Record (`normalizeSegmentField`), damit Sprecher-Fenster über Retries nicht verloren gehen.
+- Diagnose-Logging nutzt `formatSegments()` (crash-sicher für Single- und Multi-Window) — NIE direktes `pass1Segment[0].toFixed(...)` o.ä., da Multi-Turn-Fenster Arrays von Arrays sind.
 - Provider-Fehler werden verbatim in `audio_plan.twoshot.syncJobs.lastError` + `lastErrorAt` gespeichert.
 
 **Pre-Flight Anchor Face-Audit:** `compose-video-clips` ruft für cinematic-sync-Szenen mit ≥2 cast `compose-scene-anchor` auf und verifiziert via `_shared/face-count.ts`. Bei `faces < expectedFaces` Cache invalidieren + 1× retry; sonst `clip_error='anchor_missing_speakers'` BEVOR Hailuo Credits brennt. `compose-scene-anchor` enthält `TWO_SHOT_FRAMING_SUFFIX` (equal screen share, no occlusion, front-3/4, N distinct faces).

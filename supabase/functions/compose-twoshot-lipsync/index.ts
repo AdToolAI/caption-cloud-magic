@@ -78,6 +78,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Format a single `[start,end]` window OR multi-window `[[a,b],[c,d]]` array
+ * into a human-readable diagnostic string. Used in log/diag messages —
+ * crash-safe whether the caller passed one window or many.
+ */
+function formatSegments(
+  seg: [number, number] | Array<[number, number]> | null | undefined,
+): string {
+  if (!seg) return "[]";
+  const arr: Array<[number, number]> = Array.isArray(seg[0])
+    ? (seg as Array<[number, number]>)
+    : [seg as [number, number]];
+  return (
+    "[" +
+    arr
+      .map(([a, b]) => `${Number(a).toFixed(2)}-${Number(b).toFixed(2)}s`)
+      .join(", ") +
+    "]"
+  );
+}
+
+
 function extractOutputUrl(output: unknown): string | null {
   if (typeof output === "string") return output;
   if (Array.isArray(output) && output.length) return output[0] as string;
@@ -1325,7 +1347,7 @@ serve(async (req) => {
           stage: "lipsync_1",
           status: "PROCESSING",
           jobId,
-          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}${pass1Segment ? ` window=[${pass1Segment[0].toFixed(2)}s,${pass1Segment[1].toFixed(2)}s] voicedSec=${vr1?.voicedSec}` : ""}`,
+          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}${pass1Segment ? ` windows=${formatSegments(pass1Segment)} voicedSec=${vr1?.voicedSec}` : ""}`,
         });
         return;
       } else {
