@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
+import { appendTwoshotDiag } from "../_shared/twoshotDiagnostics.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -356,6 +357,14 @@ serve(async (req) => {
         updated_at: now,
         audio_plan: { ...latestPlan, twoshot: { ...latestTwoshot, syncJobs: { ...latestSyncJobs, refunded: true, failedAt: now, error: polled.error ?? polled.status, lastError: polled.error ?? polled.status, lastErrorAt: now, jobs: latestJobs.map((j: any) => j.jobId === jobId ? { ...j, status: polled.status, failedAt: now, providerResponse: polled.providerResponse } : j) } } },
       }).eq("id", sceneId);
+      await appendTwoshotDiag(supabase, sceneId, {
+        source: "poll",
+        event: "final_provider_failure",
+        stage: "failed",
+        status: polled.status,
+        jobId,
+        reason: finalReason,
+      });
       return json({ ok: false, status: polled.status, error: polled.error ?? polled.status, retried: retryAttempts, fallbackTried }, 200);
     }
 

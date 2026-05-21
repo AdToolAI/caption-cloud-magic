@@ -24,6 +24,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import Replicate from "npm:replicate@0.25.2";
 import { isQaMockRequest, qaMockResponse } from "../_shared/qaMock.ts";
 import { probeImageDims } from "../_shared/image-dims.ts";
+import { appendTwoshotDiag } from "../_shared/twoshotDiagnostics.ts";
 
 
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
@@ -640,6 +641,13 @@ serve(async (req) => {
       lip_sync_status: "running",
       clip_error: null,
     });
+    await appendTwoshotDiag(supabase, scene_id, {
+      source: "compose",
+      event: "pipeline_started",
+      stage: "lipsync_1",
+      status: "running",
+      reason: `cost=${cost} duration=${Number((scene as any).duration_seconds ?? 0)}s`,
+    });
 
     let refunded = false;
     const refund = async (reason: string) => {
@@ -657,6 +665,13 @@ serve(async (req) => {
       await setStage(supabase, scene_id, "failed", {
         lip_sync_status: "failed",
         clip_error: reason.slice(0, 500),
+      });
+      await appendTwoshotDiag(supabase, scene_id, {
+        source: "compose",
+        event: "refund",
+        stage: "failed",
+        status: "failed",
+        reason,
       });
     };
 
@@ -959,6 +974,14 @@ serve(async (req) => {
           `[compose-twoshot-lipsync ${scene_id}] two-pass job queued on Sync.so`,
           { jobId, pass: 1, targetFace: firstTarget.side, targetCoords: firstTarget.coords },
         );
+        await appendTwoshotDiag(supabase, scene_id, {
+          source: "compose",
+          event: "sync_job_created",
+          stage: "lipsync_1",
+          status: "PROCESSING",
+          jobId,
+          reason: `pass=1 face=${firstTarget.side} source=${firstTarget.source}`,
+        });
         return;
       } else {
         // Fallback: legacy single merged-audio pass. With the sample-accurate

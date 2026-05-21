@@ -216,10 +216,33 @@ export function usePipelineProgress({
         (s as any).twoshotStage === 'done' ||
         (s as any).twoshotStage === 'complete',
     ).length;
+    // A scene is only "really" running if there's evidence of an active
+    // provider job. Otherwise twoshot_stage='lipsync_*' + pending status
+    // is a zombie state (the watchdog/client will repair it within a
+    // tick) and must NOT keep the progress bar pinned at 95 %.
+    const hasRealJob = (s: any) => {
+      const predId = s.replicatePredictionId;
+      if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
+      const plan = s.audioPlan as any;
+      const jobs = plan?.twoshot?.syncJobs?.jobs;
+      if (Array.isArray(jobs) && jobs.length > 0) return true;
+      if (plan?.twoshot?.heartbeat?.syncJobId) return true;
+      return false;
+    };
     const running = targets.some(
       (s) =>
-        (s as any).lipSyncStatus === 'running' ||
-        ((s as any).twoshotStage && (s as any).twoshotStage !== 'complete' && (s as any).twoshotStage !== 'done' && (s as any).twoshotStage !== 'failed'),
+        (s as any).lipSyncStatus === 'running' &&
+        hasRealJob(s),
+    ) || targets.some(
+      (s) => {
+        const stage = (s as any).twoshotStage;
+        if (!stage || ['complete', 'done', 'failed'].includes(stage)) return false;
+        // Audio/anchor/master_clip stages legitimately precede the sync job.
+        if (['audio', 'anchor', 'master_clip'].includes(stage)) {
+          return (s as any).lipSyncStatus === 'running';
+        }
+        return hasRealJob(s);
+      },
     );
     const failed = targets.some((s) => (s as any).lipSyncStatus === 'failed' || (s as any).twoshotStage === 'failed');
     const b = baselineRef.current;
