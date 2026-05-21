@@ -130,6 +130,13 @@ serve(async (req) => {
               updated_at: nowIso,
             })
             .eq("id", s.id);
+          await appendTwoshotDiag(supabase, s.id, {
+            source: "watchdog",
+            event: "zombie_state_cleared",
+            stage: stage,
+            status: "pending",
+            reason: `ageMs=${ageMs} no sync job, no heartbeat`,
+          });
           await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
           summary.reinvoked++;
           console.log(`[twoshot-watchdog ${s.id}] zombie state cleared, reinvoked (stage=${stage}, ageMs=${ageMs})`);
