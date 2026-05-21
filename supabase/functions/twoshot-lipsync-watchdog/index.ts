@@ -149,6 +149,75 @@ serve(async (req) => {
         continue;
       }
 
+      // ── Job 0b: PREFLIGHT / CPU-ABORT RECOVERY ────────────────────────
+      // If compose-twoshot-lipsync dies before creating a Sync.so job, the row
+      // must be reset and retried instead of staying at 95% forever. New code
+      // only charges credits immediately before provider submit, so normal
+      // preflight recovery does not refund. If a legacy row recorded a charge
+      // in syncJobs.costCredits without any provider job, refund it once.
+      if (
+        s.lip_sync_status === "running" &&
+        (stage === "preflight" || /^lipsync_/i.test(stage)) &&
+        !hasAnyRecordedProviderJob &&
+        typeof s.clip_url === "string" &&
+        s.clip_url.length > 0 &&
+        ageMs > STALE_PREFLIGHT_MS
+      ) {
+        try {
+          const cost = Number(syncJobs.costCredits ?? 0);
+          if (cost > 0 && !syncJobs.refunded) {
+            const { data: project } = await supabase
+              .from("composer_projects")
+              .select("user_id")
+              .eq("id", s.project_id)
+              .single();
+            if (project?.user_id) {
+              const { data: wallet } = await supabase
+                .from("wallets")
+                .select("balance")
+                .eq("user_id", project.user_id)
+                .single();
+              if (wallet) {
+                await supabase
+                  .from("wallets")
+                  .update({ balance: Number(wallet.balance ?? 0) + cost, updated_at: nowIso })
+                  .eq("user_id", project.user_id);
+              }
+            }
+          }
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "pending",
+              twoshot_stage: null,
+              replicate_prediction_id: null,
+              clip_error: "auto-retry: preflight_cpu_abort_recovered",
+              updated_at: nowIso,
+              audio_plan: {
+                ...(s.audio_plan as any),
+                twoshot: {
+                  ...twoshot,
+                  syncJobs: cost > 0 ? { ...syncJobs, refunded: true, recoveredAt: nowIso, lastError: "preflight_cpu_abort_recovered", lastErrorAt: nowIso } : syncJobs,
+                },
+              },
+            })
+            .eq("id", s.id);
+          await appendTwoshotDiag(supabase, s.id, {
+            source: "watchdog",
+            event: "preflight_cpu_abort_recovered",
+            stage,
+            status: "pending",
+            reason: `ageMs=${ageMs} no sync job before provider submit`,
+          });
+          await invokeFn("compose-twoshot-lipsync", { scene_id: s.id });
+          summary.recoveredPreflight++;
+          summary.reinvoked++;
+        } catch (e) {
+          summary.errors.push(`preflight_recover ${s.id}: ${(e as Error).message}`);
+        }
+        continue;
+      }
+
       // ── Job 1: poll running Sync.so jobs ─────────────────────────────
       if (s.lip_sync_status === "running" && hasSyncJob) {
         // Stale sync.so job — refund
