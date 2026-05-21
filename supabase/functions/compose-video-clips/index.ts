@@ -358,8 +358,8 @@ serve(async (req) => {
         .map((shot) => shot ? charById.get(shot.characterId)?.name : null)
         .filter((name): name is string => typeof name === 'string' && name.length > 0);
       const neutralPlate = neutralTwoShotPrompt(speakerNames, speakerSlugs.length);
-      const sceneDescription = cleanedVisualPrompt || neutralPlate;
-      return `${sceneDescription}. Silent neutral master plate: ${neutralPlate}. Hold calm facial expressions and resting mouth posture throughout the shot; use only subtle breathing, eye movement, posture shifts and gentle camera motion.`;
+      const sceneDescription = cleanedVisualPrompt || 'modern cinematic interior scene';
+      return `Silent neutral master plate: ${neutralPlate}. Visual setting: ${sceneDescription}. Hold calm facial expressions and resting mouth posture throughout the shot; use only subtle breathing, eye movement, posture shifts and gentle camera motion.`;
     };
 
     /** Inject character description based on shotType (Sherlock-Holmes anchor). */
