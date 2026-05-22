@@ -314,30 +314,31 @@ interface TwoshotSpeaker {
 }
 
 /**
- * v3 SHOT MODEL — one Sync.so pass per CHARACTER (not per turn).
- * All of a speaker's turns are passed as multi-window `segments_secs`,
- * so each face is only animated once and only the speaker's own video
- * regions are re-encoded. Eliminates the per-turn re-encode chain that
- * softened later-turn mouths and caused weak animation on a speaker's
- * 2nd line (v2 issue).
+ * v4 SHOT MODEL — one Sync.so pass per TURN, ALL passes run in PARALLEL
+ * on the SAME pristine master plate. No chaining → no cumulative re-encode
+ * softening. Each turn gets full Sync.so attention (single-window pass)
+ * with its own per-turn temperature → equally strong mouth animation on
+ * every sentence, including 2nd/3rd lines of the same speaker.
+ *
+ * The poller stitches all per-turn outputs together with ffmpeg by
+ * time-slicing: window i from out_T_i, gaps from the pristine master.
  */
-interface DialogSpeakerShot {
+interface DialogShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  /** All turn windows belonging to THIS speaker (time-ordered). */
-  windows: Array<[number, number]>;
-  /** Sum of window durations (seconds). Used for pricing and temperature. */
+  /** Single time window for THIS turn. */
+  window: [number, number];
+  /** Window duration (seconds). Used for pricing and temperature. */
   durSec: number;
   /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
-  /** Adaptive temperature based on the SHORTEST window of this speaker.
-   *  Short windows (<2s) get 1.0 for max articulation; longer get 0.9. */
+  /** Per-turn temperature: short turns (<2s) get 1.0 for max articulation. */
   temperature: number;
   status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
-  /** Output URL of THIS speaker's pass. Becomes the next pass's video input. */
+  /** Output URL of THIS turn's Sync.so pass (full-length MP4 with only this window animated). */
   output_url?: string;
   error?: string;
   started_at?: string;
@@ -345,15 +346,16 @@ interface DialogSpeakerShot {
 }
 
 interface DialogShotsState {
-  /** v3 = per-speaker multi-window passes (current).
+  /** v4 = per-turn parallel passes + ffmpeg time-slice stitch (current).
+   *  v3 = per-speaker multi-window passes (legacy, ignored by poller).
    *  v2 = per-turn chained passes (legacy, ignored by poller). */
-  version: 3;
-  status: "queued" | "lipsyncing" | "done" | "failed";
-  /** Per-speaker passes, ordered by first appearance in the dialog. */
-  shots: DialogSpeakerShot[];
+  version: 4;
+  status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
+  /** Per-turn passes, ordered by window start. */
+  shots: DialogShot[];
   /** Stable reference back to the original Hailuo master plate. */
   source_clip_url: string;
-  /** Master audio WAV. Sent in full to every pass (Sync.so aligns by absolute time). */
+  /** Master audio WAV. Sent in full to every pass; remuxed into the final stitched clip. */
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
@@ -361,7 +363,7 @@ interface DialogShotsState {
   started_at: string;
   video_width: number;
   video_height: number;
-  /** Final output URL of the last successful speaker pass. */
+  /** Final stitched output URL. */
   final_url?: string | null;
   finished_at?: string;
   error?: string;
