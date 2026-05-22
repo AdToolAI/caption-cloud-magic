@@ -1,27 +1,29 @@
 /**
- * compose-dialog-scene — Per-turn sequential Sync.so chain initiator.
+ * compose-dialog-scene — Per-turn PARALLEL Sync.so dispatcher (v4).
  *
- * Design (May 2026 rewrite):
+ * Design (v4, May 2026):
  *  - Treats `audio_plan.twoshot.speakers[*].voicedRange.turns[]` as a flat,
  *    time-ordered list of speaker turns.
- *  - Each turn = ONE Sync.so lipsync-2-pro pass on the existing master plate
- *    (the two-shot Hailuo clip). Tight `segments_secs=[[t.startSec, t.endSec]]`
- *    + identity-matched face coordinates from cached `audio_plan.twoshot.faceMap`.
- *  - Passes run SEQUENTIALLY in `poll-dialog-shots`: the output of turn N
- *    becomes the video input of turn N+1. The final turn's output is the
- *    new `clip_url`. NO ffmpeg, NO Remotion stitching needed.
+ *  - Each turn = ONE Sync.so lipsync-2-pro pass on the ORIGINAL pristine
+ *    master plate (no chaining). Tight single-window `segments_secs=[[t]]`
+ *    + identity-matched face coordinates from cached
+ *    `audio_plan.twoshot.faceMap` + per-turn temperature (1.0 if <2s, else 0.9).
+ *  - All passes run IN PARALLEL in `poll-dialog-shots`. When all are ready,
+ *    the poller stitches them with ffmpeg by time-slicing: window i from
+ *    out_T_i, gaps from the pristine master, then remuxes the master WAV.
  *
- * Why this beats the legacy compose-twoshot-lipsync two-pass-per-speaker:
- *  - Per-turn windows are the tightest possible scope → Sync.so face VAD
- *    has minimum competing audio and animates only one mouth per pass.
- *  - Sequential chaining preserves earlier turns' animation because
- *    `sync_mode='cut_off'` leaves frames outside `segments_secs` untouched.
- *  - Identity-matched coordinates eliminate the "wrong character speaks"
- *    swap that auto_detect produces on multi-window passes.
+ * Why v4 beats v3 (per-speaker multi-window):
+ *  - v3 gave Sync.so multiple windows in one pass → provider weighted
+ *    articulation toward the first/longest window, leaving later sentences
+ *    under-animated. v4 gives every turn full Sync.so attention.
+ *  - v4 has exactly ONE re-encode generation per pixel (vs v3's chained
+ *    Pass-1→Pass-2 softening).
+ *  - v4 is faster: passes run in parallel instead of serial.
  *
- * Returns 202 after queueing turn 0. `poll-dialog-shots` (pg_cron, 1min)
- * advances the chain.
+ * Returns 202 after queueing all shots. `poll-dialog-shots` (pg_cron, 1min)
+ * dispatches/polls/stitches.
  */
+
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
@@ -314,30 +316,31 @@ interface TwoshotSpeaker {
 }
 
 /**
- * v3 SHOT MODEL — one Sync.so pass per CHARACTER (not per turn).
- * All of a speaker's turns are passed as multi-window `segments_secs`,
- * so each face is only animated once and only the speaker's own video
- * regions are re-encoded. Eliminates the per-turn re-encode chain that
- * softened later-turn mouths and caused weak animation on a speaker's
- * 2nd line (v2 issue).
+ * v4 SHOT MODEL — one Sync.so pass per TURN, ALL passes run in PARALLEL
+ * on the SAME pristine master plate. No chaining → no cumulative re-encode
+ * softening. Each turn gets full Sync.so attention (single-window pass)
+ * with its own per-turn temperature → equally strong mouth animation on
+ * every sentence, including 2nd/3rd lines of the same speaker.
+ *
+ * The poller stitches all per-turn outputs together with ffmpeg by
+ * time-slicing: window i from out_T_i, gaps from the pristine master.
  */
-interface DialogSpeakerShot {
+interface DialogShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  /** All turn windows belonging to THIS speaker (time-ordered). */
-  windows: Array<[number, number]>;
-  /** Sum of window durations (seconds). Used for pricing and temperature. */
+  /** Single time window for THIS turn. */
+  window: [number, number];
+  /** Window duration (seconds). Used for pricing and temperature. */
   durSec: number;
   /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
-  /** Adaptive temperature based on the SHORTEST window of this speaker.
-   *  Short windows (<2s) get 1.0 for max articulation; longer get 0.9. */
+  /** Per-turn temperature: short turns (<2s) get 1.0 for max articulation. */
   temperature: number;
   status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
-  /** Output URL of THIS speaker's pass. Becomes the next pass's video input. */
+  /** Output URL of THIS turn's Sync.so pass (full-length MP4 with only this window animated). */
   output_url?: string;
   error?: string;
   started_at?: string;
@@ -345,15 +348,16 @@ interface DialogSpeakerShot {
 }
 
 interface DialogShotsState {
-  /** v3 = per-speaker multi-window passes (current).
+  /** v4 = per-turn parallel passes + ffmpeg time-slice stitch (current).
+   *  v3 = per-speaker multi-window passes (legacy, ignored by poller).
    *  v2 = per-turn chained passes (legacy, ignored by poller). */
-  version: 3;
-  status: "queued" | "lipsyncing" | "done" | "failed";
-  /** Per-speaker passes, ordered by first appearance in the dialog. */
-  shots: DialogSpeakerShot[];
+  version: 4;
+  status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
+  /** Per-turn passes, ordered by window start. */
+  shots: DialogShot[];
   /** Stable reference back to the original Hailuo master plate. */
   source_clip_url: string;
-  /** Master audio WAV. Sent in full to every pass (Sync.so aligns by absolute time). */
+  /** Master audio WAV. Sent in full to every pass; remuxed into the final stitched clip. */
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
@@ -361,7 +365,7 @@ interface DialogShotsState {
   started_at: string;
   video_width: number;
   video_height: number;
-  /** Final output URL of the last successful speaker pass. */
+  /** Final stitched output URL. */
   final_url?: string | null;
   finished_at?: string;
   error?: string;
@@ -531,19 +535,20 @@ serve(async (req) => {
     const videoW = Number(workingFaceMap?.width) || 1280;
     const videoH = Number(workingFaceMap?.height) || 720;
 
-    // ── Build per-SPEAKER shot list (v3) ────────────────────────────────
-    // Group all of each speaker's turns into one shot with multi-window
-    // segments_secs. This avoids re-encoding the same face multiple times
-    // and produces smoother, sharper lipsync across the whole scene.
-    interface SpeakerAgg {
+    // ── Build per-TURN shot list (v4) ───────────────────────────────────
+    // One Sync.so pass per turn. All passes run in PARALLEL on the SAME
+    // pristine master plate. The poller stitches per-turn outputs by
+    // time-slicing (window i from out_T_i, gaps from master). Result:
+    // every sentence gets full Sync.so attention with no cumulative
+    // re-encode softening.
+    interface RawTurn {
       speaker_idx: number;
       speaker_name: string;
       character_id: string | null;
-      windows: Array<[number, number]>;
-      firstStart: number;
+      start: number;
+      end: number;
     }
-    const agg = new Map<string, SpeakerAgg>();
-
+    const rawTurns: RawTurn[] = [];
     speakers.forEach((sp, sIdx) => {
       const turns = Array.isArray(sp.voicedRange?.turns)
         ? sp.voicedRange!.turns!
@@ -552,55 +557,42 @@ serve(async (req) => {
           : [];
       if (turns.length === 0) return;
       const charId = String(sp.character_id ?? "").toLowerCase() || null;
-      const key = `${sIdx}::${charId ?? sp.speaker ?? ""}`;
-      let entry = agg.get(key);
-      if (!entry) {
-        entry = {
-          speaker_idx: sIdx,
-          speaker_name: String(sp.speaker ?? `Speaker ${sIdx + 1}`),
-          character_id: charId,
-          windows: [],
-          firstStart: Number.POSITIVE_INFINITY,
-        };
-        agg.set(key, entry);
-      }
+      const speakerName = String(sp.speaker ?? `Speaker ${sIdx + 1}`);
       for (const t of turns) {
         const start = Number(t.startSec);
         const end = Math.max(start + MIN_TURN_DUR_SEC, Number(t.endSec));
-        entry.windows.push([start, end]);
-        if (start < entry.firstStart) entry.firstStart = start;
+        rawTurns.push({
+          speaker_idx: sIdx,
+          speaker_name: speakerName,
+          character_id: charId,
+          start,
+          end,
+        });
       }
     });
 
-    const rawShots: DialogSpeakerShot[] = Array.from(agg.values())
-      .map((a) => {
-        const windows = a.windows.sort((x, y) => x[0] - y[0]);
-        const durSec = windows.reduce((s, [a0, a1]) => s + (a1 - a0), 0);
-        const minWindow = Math.min(
-          ...windows.map(([a0, a1]) => a1 - a0),
-          Number.POSITIVE_INFINITY,
-        );
-        const coords = a.character_id
-          ? coordsByCharId.get(a.character_id) ?? null
+    const rawShots: DialogShot[] = rawTurns
+      .sort((a, b) => a.start - b.start)
+      .map((t, i) => {
+        const dur = t.end - t.start;
+        const coords = t.character_id
+          ? coordsByCharId.get(t.character_id) ?? null
           : null;
         return {
-          idx: 0,
-          speaker_idx: a.speaker_idx,
-          speaker_name: a.speaker_name,
-          character_id: a.character_id,
-          windows,
-          durSec,
+          idx: i,
+          speaker_idx: t.speaker_idx,
+          speaker_name: t.speaker_name,
+          character_id: t.character_id,
+          window: [t.start, t.end] as [number, number],
+          durSec: dur,
           target_coords: coords,
-          temperature: minWindow < 2.0 ? 1.0 : 0.9,
+          // Per-turn temperature — no pass-level compromise. Short turns
+          // (<2s) get max articulation (1.0); longer turns 0.9.
+          temperature: dur < 2.0 ? 1.0 : 0.9,
           status: "pending",
-          firstStart: a.firstStart,
-        } as DialogSpeakerShot & { firstStart: number };
-      })
-      .sort((a, b) => a.firstStart - b.firstStart)
-      .map((s, i) => {
-        const { firstStart: _f, ...rest } = s as any;
-        return { ...rest, idx: i } as DialogSpeakerShot;
+        };
       });
+
 
     if (rawShots.length === 0) {
       await supabase
@@ -656,7 +648,7 @@ serve(async (req) => {
           error: "INSUFFICIENT_CREDITS",
           required: totalCost,
           have: wallet?.balance ?? 0,
-          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Sprecher × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
+          message: `Dialog-Pipeline benötigt ${totalCost} Credits (${rawShots.length} Turns × ~${LIPSYNC_CREDITS_PER_SEC} cr/s).`,
         },
         402,
       );
@@ -671,7 +663,7 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     const state: DialogShotsState = {
-      version: 3,
+      version: 4,
       status: "queued",
       shots: rawShots,
       source_clip_url: sourceClipUrl,
@@ -739,7 +731,7 @@ serve(async (req) => {
         ok: true,
         status: "queued",
         scene_id: sceneId,
-        speakers: rawShots.length,
+        turns: rawShots.length,
         cost_credits: totalCost,
       },
       202,

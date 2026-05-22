@@ -1,21 +1,21 @@
 /**
- * poll-dialog-shots — Sequential Sync.so chain poller (v3 per-speaker).
+ * poll-dialog-shots — v4 PARALLEL per-turn Sync.so dispatcher + ffmpeg stitch.
  *
- * v3 design: ONE Sync.so lipsync-2-pro pass per CHARACTER (not per turn).
- * All of a speaker's turns are sent in a single pass as multi-window
- * `segments_secs`. With N distinct speakers this means N chained passes
- * instead of N turns chained, so each face is only animated once and
- * only the speaker's own video regions are re-encoded. Result: noticeably
- * sharper output, and no "weak 2nd-line" artefact from cumulative
- * re-encodes (the v2 bug).
+ * v4 design:
+ *  - Each turn = ONE Sync.so lipsync-2-pro pass on the ORIGINAL pristine
+ *    master plate (no chaining). Tight single-window `segments_secs=[[t]]`
+ *    + identity-matched face coords + per-turn temperature.
+ *  - ALL pending shots are dispatched in parallel (Sync.so Creator plan
+ *    permits concurrent jobs; no inter-shot dependency).
+ *  - Per-tick: poll every in-flight shot, dispatch any still-pending shot.
+ *  - On `allReady`: stitch with ffmpeg by time-slicing — window i from
+ *    out_T_i, gaps from the pristine master — then remux the master WAV.
+ *  - Result: every sentence has identical Sync.so attention, only ONE
+ *    re-encode generation per pixel, no chained softening.
  *
  *   pending → lipsyncing (sync_job_id set) → ready (output_url set)
  *                                          → failed
- *
- * `sync_mode='cut_off'` leaves frames outside `segments_secs` untouched,
- * so chaining N speaker-passes safely preserves earlier speakers' lip
- * animation. Audio is always the full master WAV (Sync.so aligns it to
- * absolute time inside each window).
+ *   (all turns ready) → stitching → done (clip_url updated)
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -36,21 +36,20 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
-const SAMPLE_RATE = 44100;
-/** Pre-roll/tail for segments_secs (Sync.so VAD onset + frame-grid rounding).
- *  Bumped from 0.12/0.08 (v2) → 0.18/0.12 for smoother short-window onsets.
+
+/** Pre-roll/tail for `segments_secs` (Sync.so VAD onset + frame-grid rounding).
  *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
- *  never bleed into another speaker's region. */
+ *  never bleed into another turn's region. */
 const SYNC_LEAD_IN_SEC = 0.18;
 const SYNC_TAIL_SEC = 0.12;
 
-interface DialogSpeakerShot {
+interface DialogShot {
   idx: number;
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  /** All windows for this speaker (time-ordered, disjoint). */
-  windows: Array<[number, number]>;
+  /** Single time window for THIS turn. */
+  window: [number, number];
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
@@ -63,9 +62,9 @@ interface DialogSpeakerShot {
 }
 
 interface DialogShotsState {
-  version: 3;
-  status: "queued" | "lipsyncing" | "done" | "failed";
-  shots: DialogSpeakerShot[];
+  version: 4;
+  status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
+  shots: DialogShot[];
   source_clip_url: string;
   master_audio_url: string;
   total_sec: number;
@@ -79,174 +78,35 @@ interface DialogShotsState {
   error?: string;
 }
 
+// ── Sync.so dispatch ────────────────────────────────────────────────────
 
-// ── Pure-TS WAV slicing ─────────────────────────────────────────────────
-
-function resampleLinear(input: Int16Array, fromRate: number, toRate: number): Int16Array {
-  if (fromRate === toRate) return input;
-  const ratio = toRate / fromRate;
-  const outLen = Math.round(input.length * ratio);
-  const out = new Int16Array(outLen);
-  const last = input.length - 1;
-  for (let i = 0; i < outLen; i++) {
-    const srcPos = i / ratio;
-    const i0 = Math.floor(srcPos);
-    const i1 = Math.min(i0 + 1, last);
-    const frac = srcPos - i0;
-    const v = input[i0] * (1 - frac) + input[i1] * frac;
-    out[i] = Math.max(-32768, Math.min(32767, Math.round(v)));
-  }
-  return out;
+/** Expand a turn's single window with pre-roll/tail, clamping each side
+ *  to the nearest neighbour boundary across ALL turns so a pre-roll/tail
+ *  can never bleed into another turn's region. */
+function expandWindow(
+  shot: DialogShot,
+  allShots: DialogShot[],
+): [number, number] {
+  const [start, end] = shot.window;
+  const others = allShots.filter((s) => s.idx !== shot.idx).map((s) => s.window);
+  const prevEnd = others
+    .filter(([, e]) => e <= start)
+    .reduce((m, [, e]) => Math.max(m, e), 0);
+  const nextStart = others
+    .filter(([s]) => s >= end)
+    .reduce((m, [s]) => Math.min(m, s), Number.POSITIVE_INFINITY);
+  const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (start - prevEnd) / 2));
+  const maxTail = Number.isFinite(nextStart)
+    ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - end) / 2))
+    : SYNC_TAIL_SEC;
+  return [Math.max(0, start - maxLeadIn), end + maxTail];
 }
 
-function decodeWavToMonoSamples(wav: Uint8Array): Int16Array {
-  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
-  if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) {
-    throw new Error("Not a RIFF/WAVE file");
-  }
-  let off = 12;
-  let audioFormat = 1, channels = 1, sampleRate = SAMPLE_RATE, bitsPerSample = 16;
-  let dataOff = -1, dataLen = 0;
-  while (off + 8 <= wav.byteLength) {
-    const id = dv.getUint32(off, false);
-    const size = dv.getUint32(off + 4, true);
-    if (id === 0x666d7420) {
-      audioFormat = dv.getUint16(off + 8, true);
-      channels = dv.getUint16(off + 10, true);
-      sampleRate = dv.getUint32(off + 12, true);
-      bitsPerSample = dv.getUint16(off + 22, true);
-    } else if (id === 0x64617461) {
-      dataOff = off + 8;
-      dataLen = size;
-      break;
-    }
-    off += 8 + size + (size & 1);
-  }
-  if (dataOff < 0) throw new Error("WAV missing data chunk");
-  if (audioFormat !== 1 || bitsPerSample !== 16) {
-    throw new Error(`Unsupported WAV: format=${audioFormat} bits=${bitsPerSample}`);
-  }
-  const raw = wav.subarray(dataOff, dataOff + dataLen);
-  const aligned = new Uint8Array(raw.byteLength - (raw.byteLength % 2));
-  aligned.set(raw.subarray(0, aligned.byteLength));
-  let samples = new Int16Array(aligned.buffer);
-  if (channels > 1) {
-    const monoLen = Math.floor(samples.length / channels);
-    const mono = new Int16Array(monoLen);
-    for (let i = 0; i < monoLen; i++) {
-      let sum = 0;
-      for (let c = 0; c < channels; c++) sum += samples[i * channels + c];
-      mono[i] = Math.max(-32768, Math.min(32767, Math.round(sum / channels)));
-    }
-    samples = mono;
-  }
-  if (sampleRate !== SAMPLE_RATE) samples = resampleLinear(samples, sampleRate, SAMPLE_RATE);
-  return samples;
-}
-
-function samplesToWav(samples: Int16Array): Uint8Array {
-  const dataBytes = samples.byteLength;
-  const buf = new ArrayBuffer(44 + dataBytes);
-  const v = new DataView(buf);
-  v.setUint32(0, 0x52494646, false);
-  v.setUint32(4, 36 + dataBytes, true);
-  v.setUint32(8, 0x57415645, false);
-  v.setUint32(12, 0x666d7420, false);
-  v.setUint32(16, 16, true);
-  v.setUint16(20, 1, true);
-  v.setUint16(22, 1, true);
-  v.setUint32(24, SAMPLE_RATE, true);
-  v.setUint32(28, SAMPLE_RATE * 2, true);
-  v.setUint16(32, 2, true);
-  v.setUint16(34, 16, true);
-  v.setUint32(36, 0x64617461, false);
-  v.setUint32(40, dataBytes, true);
-  new Uint8Array(buf, 44).set(
-    new Uint8Array(samples.buffer, samples.byteOffset, samples.byteLength),
-  );
-  return new Uint8Array(buf);
-}
-
-/** Cache master WAV samples across all turns in one invocation. */
-const masterSampleCache = new Map<string, Int16Array>();
-
-async function getMasterSamples(masterUrl: string): Promise<Int16Array> {
-  const cached = masterSampleCache.get(masterUrl);
-  if (cached) return cached;
-  const resp = await fetch(masterUrl);
-  if (!resp.ok) throw new Error(`fetch master wav ${resp.status}`);
-  const wavBytes = new Uint8Array(await resp.arrayBuffer());
-  const samples = decodeWavToMonoSamples(wavBytes);
-  masterSampleCache.set(masterUrl, samples);
-  return samples;
-}
-
-async function sliceWavBytes(
-  masterUrl: string,
-  startSec: number,
-  endSec: number,
-): Promise<Uint8Array> {
-  const samples = await getMasterSamples(masterUrl);
-  const startSample = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
-  const endSample = Math.min(samples.length, Math.ceil(endSec * SAMPLE_RATE));
-  if (endSample <= startSample) {
-    throw new Error(`empty slice ${startSec}-${endSec}s`);
-  }
-  return samplesToWav(samples.slice(startSample, endSample));
-}
-
-async function uploadToStorage(
-  supabase: ReturnType<typeof createClient>,
-  bucket: string,
-  path: string,
-  data: Uint8Array,
-  contentType: string,
-): Promise<string> {
-  const { error } = await supabase.storage
-    .from(bucket)
-    .upload(path, data, { contentType, upsert: true });
-  if (error) throw new Error(`upload ${bucket}/${path}: ${error.message}`);
-  const { data: pub } = supabase.storage.from(bucket).getPublicUrl(path);
-  return pub.publicUrl;
-}
-
-// ── Sync.so wrappers ────────────────────────────────────────────────────
-
-/** Expand every window of a speaker shot with pre-roll/tail, clamping each
- *  side to the nearest neighbour boundary across ALL shots (own + other
- *  speakers), so a pre-roll/tail can never bleed into someone else's
- *  spoken region or another window of the same speaker. */
-function expandWindows(
-  shot: DialogSpeakerShot,
-  allShots: DialogSpeakerShot[],
-): Array<[number, number]> {
-  // Flatten all windows from all speakers (for boundary lookup).
-  const allWindows: Array<[number, number]> = [];
-  for (const s of allShots) for (const w of s.windows) allWindows.push(w);
-  allWindows.sort((a, b) => a[0] - b[0]);
-
-  const out: Array<[number, number]> = [];
-  for (const [start, end] of shot.windows) {
-    const prevEnd = allWindows
-      .filter(([, e]) => e <= start)
-      .reduce((m, [, e]) => Math.max(m, e), 0);
-    const nextStart = allWindows
-      .filter(([s]) => s >= end)
-      .reduce((m, [s]) => Math.min(m, s), Number.POSITIVE_INFINITY);
-    const maxLeadIn = Math.min(SYNC_LEAD_IN_SEC, Math.max(0, (start - prevEnd) / 2));
-    const maxTail = Number.isFinite(nextStart)
-      ? Math.min(SYNC_TAIL_SEC, Math.max(0, (nextStart - end) / 2))
-      : SYNC_TAIL_SEC;
-    out.push([Math.max(0, start - maxLeadIn), end + maxTail]);
-  }
-  return out;
-}
-
-async function startSyncSpeakerJob(
+async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
   audioUrl: string,
-  windows: Array<[number, number]>,
+  window: [number, number],
   coords: [number, number] | null,
   temperature: number,
 ): Promise<string> {
@@ -267,7 +127,7 @@ async function startSyncSpeakerJob(
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl, segments_secs: windows },
+      { type: "video", url: videoUrl, segments_secs: [window] },
       { type: "audio", url: audioUrl },
     ],
     options,
@@ -279,13 +139,13 @@ async function startSyncSpeakerJob(
   });
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
-    // Fallback: retry without segments_secs if Sync.so rejects the windows.
+    // Fallback: retry without segments_secs if Sync.so rejects the window.
     if (
       r.status === 400 &&
       /segments? configuration is invalid|only supported for video inputs|invalid.+segment/i.test(txt)
     ) {
       console.warn(
-        `[poll-dialog-shots] segments rejected, retry without windows: ${txt.slice(0, 200)}`,
+        `[poll-dialog-shots] segment rejected, retry without window: ${txt.slice(0, 200)}`,
       );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
@@ -305,7 +165,6 @@ async function startSyncSpeakerJob(
   const data = await r.json();
   return String(data.id);
 }
-
 
 async function pollSyncJob(
   apiKey: string,
@@ -353,6 +212,148 @@ async function refundIfNeeded(
   return { ...state, refunded: true };
 }
 
+// ── ffmpeg time-slice stitch ───────────────────────────────────────────
+
+async function downloadTo(url: string, dest: string): Promise<void> {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`download ${url} → ${r.status}`);
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  await Deno.writeFile(dest, bytes);
+}
+
+/**
+ * Stitch per-turn Sync.so outputs into one final clip by time-slicing:
+ * each turn's expanded window comes from its own out_T_i.mp4, gaps come
+ * from the pristine master plate. Audio is the master WAV remuxed in at
+ * the end (single re-encode generation everywhere).
+ */
+async function stitchDialogShots(
+  supabase: ReturnType<typeof createClient>,
+  state: DialogShotsState,
+  sceneId: string,
+): Promise<string> {
+  const tmpDir = await Deno.makeTempDir({ prefix: "dialog-stitch-" });
+  try {
+    const masterPath = `${tmpDir}/master.mp4`;
+    await downloadTo(state.source_clip_url, masterPath);
+
+    // Download every shot output.
+    const shotsSorted = [...state.shots].sort(
+      (a, b) => a.window[0] - b.window[0],
+    );
+    const shotPaths: string[] = [];
+    for (const s of shotsSorted) {
+      if (!s.output_url) throw new Error(`shot ${s.idx} missing output_url`);
+      const p = `${tmpDir}/shot_${s.idx}.mp4`;
+      await downloadTo(s.output_url, p);
+      shotPaths.push(p);
+    }
+
+    const audioPath = `${tmpDir}/master.wav`;
+    await downloadTo(state.master_audio_url, audioPath);
+
+    const totalSec = state.total_sec;
+    // Build time-ordered segment list. Each segment names its source
+    // (master OR shot index) and its [t0, t1] window in absolute time.
+    // We use the EXPANDED windows (same as Sync.so saw) so the synced
+    // mouth coverage is fully captured.
+    type Seg = { src: string; t0: number; t1: number };
+    const segs: Seg[] = [];
+    let cursor = 0;
+    for (let i = 0; i < shotsSorted.length; i++) {
+      const s = shotsSorted[i];
+      const [wStart, wEnd] = expandWindow(s, shotsSorted);
+      const winStart = Math.max(cursor, wStart);
+      const winEnd = Math.min(totalSec, Math.max(winStart, wEnd));
+      if (winStart > cursor + 1e-3) {
+        segs.push({ src: masterPath, t0: cursor, t1: winStart });
+      }
+      if (winEnd > winStart + 1e-3) {
+        segs.push({ src: shotPaths[i], t0: winStart, t1: winEnd });
+      }
+      cursor = winEnd;
+    }
+    if (cursor < totalSec - 1e-3) {
+      segs.push({ src: masterPath, t0: cursor, t1: totalSec });
+    }
+
+    // ffmpeg one-shot: trim each segment from its source, concat video-only,
+    // then map master WAV as audio. Single re-encode at libx264 crf 18.
+    const args: string[] = [];
+    const inputIdxMap = new Map<string, number>();
+    for (const seg of segs) {
+      if (!inputIdxMap.has(seg.src)) {
+        inputIdxMap.set(seg.src, inputIdxMap.size);
+        args.push("-i", seg.src);
+      }
+    }
+    const audioInputIdx = inputIdxMap.size;
+    args.push("-i", audioPath);
+
+    const filterParts: string[] = [];
+    const labels: string[] = [];
+    segs.forEach((seg, i) => {
+      const inIdx = inputIdxMap.get(seg.src)!;
+      const lbl = `v${i}`;
+      filterParts.push(
+        `[${inIdx}:v]trim=start=${seg.t0.toFixed(3)}:end=${seg.t1.toFixed(3)},setpts=PTS-STARTPTS[${lbl}]`,
+      );
+      labels.push(`[${lbl}]`);
+    });
+    filterParts.push(`${labels.join("")}concat=n=${segs.length}:v=1:a=0[vout]`);
+
+    const outPath = `${tmpDir}/final.mp4`;
+    args.push(
+      "-filter_complex", filterParts.join(";"),
+      "-map", "[vout]",
+      "-map", `${audioInputIdx}:a`,
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-crf", "18",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "192k",
+      "-movflags", "+faststart",
+      "-shortest",
+      "-y", outPath,
+    );
+
+    console.log(
+      `[poll-dialog-shots] stitch: ${segs.length} segs, ${inputIdxMap.size} video inputs, total=${totalSec.toFixed(2)}s`,
+    );
+
+    const ff = await new Deno.Command("ffmpeg", {
+      args,
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    if (!ff.success) {
+      const err = new TextDecoder().decode(ff.stderr).slice(0, 1500);
+      throw new Error(`ffmpeg stitch failed: ${err.slice(0, 600)}`);
+    }
+
+    const outBytes = await Deno.readFile(outPath);
+    const finalPath = `dialog-stitched/${sceneId}_${Date.now()}.mp4`;
+    const { error: upErr } = await supabase.storage
+      .from("composer-clips")
+      .upload(finalPath, outBytes, {
+        contentType: "video/mp4",
+        upsert: true,
+      });
+    if (upErr) throw new Error(`upload final: ${upErr.message}`);
+    const { data: pub } = supabase.storage
+      .from("composer-clips")
+      .getPublicUrl(finalPath);
+    return pub.publicUrl;
+  } finally {
+    try {
+      await Deno.remove(tmpDir, { recursive: true });
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
 // ── Per-scene processor ─────────────────────────────────────────────────
 
 async function processScene(
@@ -372,8 +373,8 @@ async function processScene(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.version !== 3) {
-    // Legacy v1/v2 state — ignore; user must reset via UI to migrate.
+  if (state.version !== 4) {
+    // Legacy v1/v2/v3 state — ignore; user must reset via UI to migrate.
     return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
   if (state.status === "done" || state.status === "failed") {
@@ -391,78 +392,71 @@ async function processScene(
   let mutated = false;
   let newState: DialogShotsState = { ...state, shots };
 
-  // Determine the current "active" turn (the one we're processing this tick).
-  // Strict sequential: only ONE turn is in-flight at a time.
-  const activeIdx = shots.findIndex((s) => s.status === "lipsyncing");
-  const nextPendingIdx = shots.findIndex((s) => s.status === "pending");
-
-  // ── Step 1: poll the active turn ────────────────────────────────────
-  if (activeIdx >= 0) {
-    const shot = shots[activeIdx];
-    if (shot.sync_job_id) {
-      try {
-        const polled = await pollSyncJob(syncKey, shot.sync_job_id);
-        if (polled.status === "COMPLETED" && polled.outputUrl) {
-          shot.output_url = polled.outputUrl;
-          shot.status = "ready";
-          shot.completed_at = new Date().toISOString();
-          mutated = true;
-        } else if (["FAILED", "REJECTED", "CANCELED"].includes(polled.status)) {
-          shot.status = "failed";
-          shot.error = `sync_${polled.status}: ${polled.error ?? "unknown"}`.slice(0, 300);
-          mutated = true;
-        }
-      } catch (e) {
+  // ── Step 1: poll every in-flight shot in parallel ───────────────────
+  const inFlight = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
+  if (inFlight.length > 0) {
+    const polled = await Promise.allSettled(
+      inFlight.map((s) => pollSyncJob(syncKey, s.sync_job_id!)),
+    );
+    polled.forEach((res, i) => {
+      const shot = inFlight[i];
+      if (res.status !== "fulfilled") {
         console.warn(
           `[poll-dialog-shots] turn ${shot.idx} poll error`,
-          (e as Error).message,
+          (res.reason as Error)?.message,
         );
+        return;
       }
-    }
+      const p = res.value;
+      if (p.status === "COMPLETED" && p.outputUrl) {
+        shot.output_url = p.outputUrl;
+        shot.status = "ready";
+        shot.completed_at = new Date().toISOString();
+        mutated = true;
+      } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
+        shot.status = "failed";
+        shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        mutated = true;
+      }
+    });
   }
 
-  // ── Step 2: dispatch next pending turn IF no other turn is in-flight ──
-  const stillActive = shots.some((s) => s.status === "lipsyncing");
-  const anyFailed = shots.some((s) => s.status === "failed");
-
-  if (!stillActive && !anyFailed) {
-    const dispatchIdx = shots.findIndex((s) => s.status === "pending");
-    if (dispatchIdx >= 0) {
-      const shot = shots[dispatchIdx];
-      // Video input: the previous turn's output_url, OR the original source plate
-      // if this is turn 0.
-      const prevReady = shots
-        .filter((s) => s.idx < shot.idx && s.status === "ready" && s.output_url)
-        .pop();
-      const videoInput = prevReady?.output_url ?? state.source_clip_url;
-      try {
-        // FULL master WAV on every pass — Sync.so aligns audio to absolute
-        // time inside each `segments_secs` window. Multi-window = all of
-        // this speaker's turns animated in ONE pass on the prior video.
-        const windows = expandWindows(shot, shots);
-        const jobId = await startSyncSpeakerJob(
+  // ── Step 2: dispatch ALL pending shots IN PARALLEL ──────────────────
+  // No inter-shot dependency in v4 (every pass runs on the pristine master).
+  const pending = shots.filter((s) => s.status === "pending");
+  if (pending.length > 0) {
+    const dispatched = await Promise.allSettled(
+      pending.map(async (shot) => {
+        const win = expandWindow(shot, shots);
+        return startSyncTurnJob(
           syncKey,
-          videoInput,
+          state.source_clip_url,
           state.master_audio_url,
-          windows,
+          win,
           shot.target_coords,
           shot.temperature,
-        );
+        ).then((jobId) => ({ shot, jobId, win }));
+      }),
+    );
+    for (const res of dispatched) {
+      if (res.status === "fulfilled") {
+        const { shot, jobId, win } = res.value;
         shot.sync_job_id = jobId;
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
         mutated = true;
-        const winStr = windows
-          .map(([a, b]) => `[${a.toFixed(2)},${b.toFixed(2)}]`)
-          .join(",");
         console.log(
-          `[poll-dialog-shots] dispatched speaker ${shot.idx} (${shot.speaker_name}) job=${jobId} windows=${winStr} coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
-
-      } catch (e) {
-        shot.status = "failed";
-        shot.error = `dispatch: ${(e as Error).message}`.slice(0, 300);
-        mutated = true;
+      } else {
+        // Find which shot failed (Promise.allSettled preserves order vs pending[])
+        const idxInPending = dispatched.indexOf(res);
+        const shot = pending[idxInPending];
+        if (shot) {
+          shot.status = "failed";
+          shot.error = `dispatch: ${(res.reason as Error)?.message ?? "unknown"}`.slice(0, 300);
+          mutated = true;
+        }
       }
     }
   }
@@ -470,34 +464,63 @@ async function processScene(
   // ── Step 3: determine pipeline status ──────────────────────────────
   const allReady = shots.every((s) => s.status === "ready");
   const hasFailure = shots.some((s) => s.status === "failed");
-  const hasActive = shots.some((s) => s.status === "lipsyncing");
+  const hasActive = shots.some((s) => s.status === "lipsyncing" || s.status === "pending");
 
   let pipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady) pipelineStatus = "done";
+  if (allReady) pipelineStatus = "stitching";
   else if (hasFailure && !hasActive) pipelineStatus = "failed";
-  else if (hasActive || nextPendingIdx >= 0) pipelineStatus = "lipsyncing";
+  else if (hasActive) pipelineStatus = "lipsyncing";
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: finalise on success ────────────────────────────────────
+  // ── Step 4: all shots ready → ffmpeg time-slice stitch + remux ──────
   if (allReady) {
-    const lastUrl = shots[shots.length - 1]?.output_url ?? state.source_clip_url;
-    const nowIso = new Date().toISOString();
-    newState = { ...newState, final_url: lastUrl, finished_at: nowIso, status: "done" };
-    await supabase
-      .from("composer_scenes")
-      .update({
-        dialog_shots: newState,
-        clip_url: lastUrl,
-        lip_sync_source_clip_url: state.source_clip_url,
-        lip_sync_applied_at: nowIso,
-        lip_sync_status: "done",
-        twoshot_stage: "done",
-        clip_error: null,
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
-    return { status: "done", mutated: true };
+    try {
+      console.log(`[poll-dialog-shots] all ${shots.length} shots ready, starting stitch`);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: newState,
+          lip_sync_status: "stitching",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+
+      const finalUrl = await stitchDialogShots(supabase, state, sceneId);
+      const nowIso = new Date().toISOString();
+      newState = { ...newState, final_url: finalUrl, finished_at: nowIso, status: "done" };
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: newState,
+          clip_url: finalUrl,
+          lip_sync_source_clip_url: state.source_clip_url,
+          lip_sync_applied_at: nowIso,
+          lip_sync_status: "done",
+          twoshot_stage: "done",
+          clip_error: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      console.log(`[poll-dialog-shots] scene ${sceneId} done → ${finalUrl}`);
+      return { status: "done", mutated: true };
+    } catch (e) {
+      const errMsg = (e as Error).message;
+      console.error(`[poll-dialog-shots] stitch failed for ${sceneId}:`, errMsg);
+      newState = { ...newState, status: "failed", error: errMsg };
+      if (userId) newState = await refundIfNeeded(supabase, userId, newState);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: newState,
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `dialog_stitch_failed: ${errMsg}`.slice(0, 300),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      return { status: "failed", mutated: true };
+    }
   }
 
   // ── Step 5: terminal failure → refund + persist ─────────────────────
@@ -540,8 +563,6 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    // Match the legacy pipelines: the configured secret is `SYNC_API_KEY`.
-    // Keep alternate names as fallback so future renames don't break us.
     const syncKey =
       Deno.env.get("SYNC_API_KEY") ??
       Deno.env.get("SYNC_SO_API_KEY") ??
@@ -558,12 +579,11 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Accept scene_id from POST body OR ?scene_id query param.
     let body: any = {};
     try {
       body = await req.json();
     } catch {
-      // empty body OK (pg_cron tick)
+      /* empty body OK (pg_cron tick) */
     }
     const url = new URL(req.url);
     const querySceneId = url.searchParams.get("scene_id");
@@ -573,7 +593,6 @@ serve(async (req) => {
     if (targetSceneId) {
       sceneIds = [targetSceneId];
     } else {
-      // pg_cron sweep: find all scenes with active v2 dialog chains
       const { data: rows } = await supabase
         .from("composer_scenes")
         .select("id, dialog_shots")
@@ -581,8 +600,10 @@ serve(async (req) => {
       sceneIds = (rows ?? [])
         .filter(
           (r: any) =>
-            r?.dialog_shots?.version === 3 &&
-            ["queued", "lipsyncing"].includes(String(r.dialog_shots?.status)),
+            r?.dialog_shots?.version === 4 &&
+            ["queued", "lipsyncing", "stitching"].includes(
+              String(r.dialog_shots?.status),
+            ),
         )
         .map((r: any) => r.id);
     }
