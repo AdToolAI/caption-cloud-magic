@@ -1011,7 +1011,9 @@ serve(async (req) => {
                   // The neutral-only fallback used to produce a gray neutral
                   // two-shot that bore no relation to the user's scene — the
                   // i2v step would then drift to a totally different shot.
-                  const sceneDesc = stripDialogForAnchor(scene.aiPrompt || "");
+                  const sceneDesc = stripExtraHumansForAnchor(
+                    stripDialogForAnchor(scene.aiPrompt || ""),
+                  );
                   const framing = neutralTwoShotPrompt(
                     characterNames,
                     portraitUrls.length,
