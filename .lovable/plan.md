@@ -1,72 +1,67 @@
-# Filmreifer Lip-Sync für Dialog-Szenen
+Do I know what the issue is? Ja.
 
-## Was du erlebst
-- Die fertige Szene wirkt nicht ganz „filmreif": der Mund sieht in der 2. Hälfte weicher/unscharf aus.
-- Samuel (Sprecher 1) spricht in seinem **zweiten Satz** nicht richtig — sein Mund bewegt sich kaum, obwohl Audio läuft.
-
-## Ursachen-Analyse (verifiziert in DB + Code)
-
-Die aktuelle Pipeline (`compose-dialog-scene` + `poll-dialog-shots`) erzeugt **eine Sync.so-Pass pro Sprecher-TURN**, nicht pro Sprecher. Bei deinem Dialog (Samuel → Matthew → Samuel) heißt das:
+Der aktuelle Fehler ist diesmal kein Sync.so-Key-/Poller-Problem und auch nicht der v3-Multi-Window-Pass selbst. Die betroffene aktuelle Szene `60562d55-e95b-4746-a242-5e8a90475b52` bricht bereits im Anchor-Schritt ab:
 
 ```text
-Pass 1: Hailuo-Master  → Sync.so Samuel [0.00–2.37s]  → video_v1
-Pass 2: video_v1       → Sync.so Matthew [2.62–3.50s] → video_v2
-Pass 3: video_v2       → Sync.so Samuel [3.75–6.49s]  → final clip_url
+anchor_extra_person_detected: human count 5 > expected 2
+clip_status = failed
+lip_sync_status = pending
+twoshot_stage = anchor
 ```
 
-**Problem 1 — Re-Encode-Verlust (Filmreife):** Jeder Sync.so-Pass re-encodiert das gesamte Video. Nach 3 Passes ist die Mundregion 3× durch H.264-Kompression gelaufen → sichtbare Weichzeichnung, besonders in der 2. Hälfte.
+Das heißt: Das System wollte einen sauberen Two-Shot mit genau Samuel + Matthew erzeugen, aber der Anchor-Audit erkennt 5 menschliche Darstellungen. Dadurch wird der Clip absichtlich vor Hailuo/Sync.so gestoppt, damit kein Geld/Credits für einen falschen Lip-Sync verbrannt werden.
 
-**Problem 2 — Samuel-Turn-2 schwächelt:** Bei Pass 3 verarbeitet Sync.so ein bereits zweimal re-encodiertes Video. Samuels Gesicht bei Pixel `[936, 223]` hat durch die Vor-Passes minimal an Kantenschärfe verloren → die Lipsync-2-pro Face-VAD findet weniger Anker-Features → kaum sichtbare Mundbewegung im 2. Satz.
+## Warum das passiert
 
-**Problem 3 — Doppelte Animation desselben Sprechers wird verschwendet:** Samuel wird in Pass 1 und Pass 3 getrennt animiert. Dabei kann Sync.so problemlos **mehrere disjunkte Fenster** pro Pass verarbeiten (`segments_secs=[[a,b],[c,d]]`) — das ist genau, was die alte Two-Shot-Policy (siehe Projekt-Memory „Lipsync Pro Policy") erfolgreich nutzt.
+Die Szene enthält widersprüchliche bzw. riskante Anchor-Hinweise:
 
-## Lösung: Per-Sprecher-Passes statt Per-Turn-Passes
+- Der Prompt nennt einen sichtbaren Laptop-Screen mit AdTool-AI-Interface / Social-Media-Calendar. Solche Screens, Poster oder UI-Vorschauen können Mini-Menschen/Profilbilder erzeugen, die der Audit korrekt als zusätzliche Menschen zählt.
+- Der bestehende Sanitizer entfernt zwar den `[Dialog]`-Block und den `Featuring ...:`-Prefix, aber es bleibt eine potenziell verwirrende Charakterbeschreibung übrig, z. B. eine Zeile, die Matthew-Slot und Samuel-Name vermischt.
+- `compose-scene-anchor` und `compose-video-clips` verlangen schon exakt 2 Personen, aber der konkrete Szenenprompt fordert gleichzeitig visuelle Screen-Inhalte, die das Exact-Count-Audit triggern.
 
-Wir reduzieren auf **eine Pass pro distinct character**, mit allen Turns dieses Sprechers als Multi-Window:
+Ich habe zusätzlich die Sync.so-Dokumentation geprüft: Für Multi-Person-Clips ist manuelle Speaker Selection mit Pixelkoordinaten korrekt; Segments sind für präzise Timing-Fenster gedacht. Der aktuelle Fehler liegt vor dieser Phase, beim Bild-/Anchor-Gate.
 
-```text
-Pass 1: Hailuo-Master → Sync.so Samuel  segments=[[0,2.37],[3.75,6.49]] → video_v1
-Pass 2: video_v1      → Sync.so Matthew segments=[[2.62,3.50]]          → final clip_url
-```
+## Plan zur Reparatur
 
-Vorteile:
-- **Nur 2 Re-Encodes** statt 3 → schärferer, „filmreifer" Look.
-- **Samuel wird in EINEM Pass animiert** → beide Sätze haben dieselbe Bildqualität und konsistente Mundbewegung. Kein „2. Satz spricht nicht" mehr.
-- Skaliert: bei N Sprechern = N Passes (nicht ∑ Turns). Bei 3 Sprechern mit 6 Turns: 3 statt 6 Passes.
-- Entspricht der bewährten Two-Shot-Policy, die der Composer bereits für 2-Sprecher-Szenen nutzt.
+1. **Anchor-Sanitizer für Cinematic-Sync härten**
+   - In `compose-video-clips/index.ts` die Anchor-spezifische Prompt-Reinigung erweitern.
+   - Screen-/Poster-/Mirror-/Photo-/Calendar-/Interface-Phrasen für den Anchor neutralisieren, z. B. zu: Laptop ist vorhanden, aber der Screen ist abgewandt/unscharf/ohne erkennbare Personen oder UI.
+   - Namen aus übrig gebliebenen Charakterbeschreibungen entfernen, wenn sie nach `Featuring ...:` noch kollidieren und extra Personen triggern können.
 
-## Zusätzliche Qualitäts-Verbesserungen
+2. **Anchor-Prompt priorisieren: Personenanzahl schlägt Szenendetail**
+   - Für Cinematic-Sync-Anchors explizit machen: Wenn ein Szenendetail zusätzliche Menschen verursachen würde, muss das Detail weggelassen werden.
+   - Laptop/Cafe/Office bleiben erlaubt, aber keine sichtbaren Screens mit Menschen, keine Poster, keine Fotos, keine Background-Personen.
 
-1. **Pre-Roll / Tail leicht hochziehen**: `SYNC_LEAD_IN_SEC` von 0.12s → 0.18s, `SYNC_TAIL_SEC` von 0.08s → 0.12s (weiterhin hart gecappt auf halben Gap zum Nachbar-Turn). Gibt Sync.sos VAD mehr Onset-Kontext, besonders bei kurzen Folgesätzen.
+3. **Audit robuster, aber nicht unsicher machen**
+   - Den harten Stop bei echten Extra-Personen beibehalten.
+   - Nur die Ursache vermeiden, statt den Audit abzuschwächen. Das schützt weiter vor „falscher Charakter spricht“.
 
-2. **Temperature-Mapping pro Sprecher** (statt pro Turn): Pro Character wird die kürzeste seiner Turn-Dauern verwendet. Samuel hat min-Turn=2.37s → `temperature=0.9`; Matthew hat min-Turn=0.88s → `temperature=1.0`. Verhindert dass Samuels lange Turns überanimieren.
+4. **Bestehende fehlgeschlagene Szene sauber resetten**
+   - Für `60562d55-e95b-4746-a242-5e8a90475b52` den kaputten Anchor-State löschen:
+     - `reference_image_url`
+     - `audio_plan.twoshot.anchor_face_audit`
+     - abgeleitete FaceMap/Heartbeat/Sync-Jobs
+     - `dialog_shots`
+     - passenden Eintrag in `scene_anchor_cache`
+   - Szene wieder auf `pending` / `anchor` bzw. renderbereit setzen, damit ein frischer, sauberer Anchor erzeugt wird.
 
-3. **Dispatch-Reihenfolge deterministisch**: nach „erste Erscheinung" sortieren (Samuel zuerst, Matthew zweitens). Stabilität über Retries.
+5. **Deploy und Validierung**
+   - `compose-video-clips`, `compose-scene-anchor` und falls nötig `compose-dialog-scene` deployen.
+   - Szene neu anstoßen.
+   - Prüfen, dass der neue Anchor-Audit `faces=2/2` und `humans=2/2` meldet.
+   - Danach prüfen, dass `compose-dialog-scene` v3 mit 2 Speaker-Shots startet und `poll-dialog-shots` die Sync.so-Jobs dispatcht.
 
-## Betroffene Dateien
+## Erwartetes Ergebnis
 
-- `supabase/functions/compose-dialog-scene/index.ts`
-  - `dialog_shots.shots[]` wird neu aufgebaut: 1 Eintrag pro **Character**, mit Feldern `character_id`, `target_coords`, `windows: Array<[start,end]>` (statt einem einzelnen `startSec/endSec`), `temperature`, `status`.
-  - Optionales Legacy-Feld `turns[]` bleibt im JSONB für UI-Anzeige (Heartbeat / Debug).
+- Kein `anchor_extra_person_detected` mehr für diese Szene.
+- Der Anchor zeigt genau Samuel + Matthew, keine dritten Menschen auf Laptop/Postern/Hintergrund.
+- Danach kann die bestehende v3-Lip-Sync-Pipeline normal laufen.
+- Der zweite Satz von Samuel bleibt weiterhin durch die v3-per-speaker-Multi-Window-Logik abgedeckt.
 
-- `supabase/functions/poll-dialog-shots/index.ts`
-  - `DialogTurnShot` → `DialogSpeakerShot` mit `windows: [number, number][]`.
-  - `expandWindow()` → `expandWindows()` erweitert jedes Element des Arrays mit Lead-in/Tail, gecappt an Nachbar-Windows (eigene + fremde).
-  - `startSyncTurnJob()` → `startSyncSpeakerJob()` schickt `segments_secs: expandedWindows` (mehrere Tupel).
-  - Pipeline-Status-Logik bleibt: `pending → lipsyncing → ready` pro Speaker-Shot; nach letztem Speaker = final `clip_url`.
-  - Konstanten: `SYNC_LEAD_IN_SEC=0.18`, `SYNC_TAIL_SEC=0.12`.
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-- **Keine DB-Migration nötig** — `dialog_shots` ist JSONB.
-
-- **Frontend**: `useTwoShotAutoTrigger.ts` und die Heartbeat-Anzeige bleiben unverändert (sie lesen nur `lip_sync_status` + `clip_url`).
-
-## Test-Pfad
-
-1. Deploy `compose-dialog-scene` + `poll-dialog-shots`.
-2. Aktuelle Szene `d1012134…` zurücksetzen (`clip_url=NULL`, `lip_sync_status=pending`, `twoshot_stage='master_clip'`, `audio_plan.twoshot.syncJobs=NULL`, `dialog_shots=NULL`).
-3. `compose-dialog-scene` re-triggern — erwartet: 2 Speaker-Shots (Samuel mit 2 Windows, Matthew mit 1 Window), final clip nach ~2 Sync.so-Pass-Zyklen (≈4 min).
-4. Visuelle Verifikation: Samuels 2. Satz hat jetzt klare Mundbewegung; Bild bleibt schärfer (1 Re-Encode statt 2 für Samuels Region).
-
-## Rollback
-
-Falls Sync.so mit Multi-Window pro Pass ein Edge-Problem zeigt: feature-flag `DIALOG_MULTI_WINDOW_PER_SPEAKER=false` lässt es auf per-turn zurückfallen. Standard = true.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
