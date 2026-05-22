@@ -29,7 +29,7 @@ import {
 } from "../_shared/face-count.ts";
 import { auditAnchorIdentity } from "../_shared/identity-audit.ts";
 
-const ANCHOR_AUDIT_VERSION = 5;
+const ANCHOR_AUDIT_VERSION = 6;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -343,10 +343,6 @@ serve(async (req) => {
       if (!raw) return "";
       const cleaned = raw
         .replace(/\[\s*dialog\s*\][\s\S]*?\[\s*\/\s*dialog\s*\]/gi, "")
-        // Drop server-injected "Featuring NAME (shotType): ..." / "Featuring NAME and NAME: ..." prefixes —
-        // they often pair a slot NAME with a DIFFERENT character description in the
-        // following sentence, which the image model interprets as "render Slot-Name
-        // visually as Other-Name", producing wrong/duplicated faces.
         .replace(/^\s*featuring\s+[^:\n]{1,200}:\s*/gim, "")
         .replace(
           /^\s*[-*•]\s*[\p{L}][\p{L}\s.'\-]{0,60}\s+(says?|speaks?|tells|asks|whispers|shouts|replies|responds)\s*:?\s.*$/gimu,
@@ -367,6 +363,78 @@ serve(async (req) => {
       const meaningful = cleaned.replace(/[\s.\-,;:!?]/g, "").length >= 10;
       return meaningful ? cleaned : "";
     };
+
+    /**
+     * Anchor-Audit-Safe sanitizer: removes / neutralises scene elements that
+     * routinely cause the cinematic-sync anchor `human-count` audit to fail
+     * with `anchor_extra_person_detected` — e.g. visible laptop/phone/TV
+     * screens showing UI with people, posters/photos on walls, crowds,
+     * bystanders, background figures, mirrors reflecting people, mannequins,
+     * statues. Lipsync requires EXACTLY N humans in the anchor; any
+     * secondary depiction (even a tiny UI avatar on a screen) is counted by
+     * Gemini Vision and aborts the run before Hailuo spends credits.
+     */
+    const stripExtraHumansForAnchor = (raw: string): string => {
+      let s = raw || "";
+      const riskyTerms = [
+        "laptop screen",
+        "screen of (?:the |a )?laptop",
+        "computer screen",
+        "monitor screen",
+        "phone screen",
+        "smartphone screen",
+        "tv screen",
+        "television screen",
+        "tablet screen",
+        "ipad screen",
+        "social media calendar",
+        "social media feed",
+        "social media interface",
+        "social media post",
+        "social media dashboard",
+        "user interface",
+        "dashboard interface",
+        "app interface",
+        "tool interface",
+        "ui interface",
+        "visible interface",
+        "interface visible",
+        "interface is visible",
+        "calendar visible",
+        "calendar is visible",
+        "adtool ai interface",
+        "posters? (?:of|with|showing) (?:a |the )?(?:person|people|man|woman|figure)",
+        "photos? (?:of|with|showing) (?:a |the )?(?:person|people|man|woman|figure)",
+        "mirror reflecting",
+        "mirror reflection",
+        "mannequin",
+        "statue of (?:a |the )?(?:person|man|woman|figure)",
+        "background crowd",
+        "in the background[^.!?]{0,40}(?:people|crowd|bystander|colleague|coworker|customer|guest|figure)",
+        "passers?-?by",
+        "bystanders?",
+        "other (?:people|customers|guests|colleagues|coworkers)",
+        "colleagues? (?:nearby|in the background|in the back)",
+        "coworkers? (?:nearby|in the background|in the back)",
+      ];
+      for (const term of riskyTerms) {
+        const sentenceRe = new RegExp(
+          `[^.!?\\n]*\\b(?:${term})\\b[^.!?\\n]*[.!?]?`,
+          "gi",
+        );
+        s = s.replace(sentenceRe, "");
+      }
+      s = s
+        .replace(/\s*,\s*,/g, ",")
+        .replace(/\s*\.\s*\./g, ".")
+        .replace(/\s{2,}/g, " ")
+        .replace(/\n{2,}/g, "\n")
+        .trim();
+      const noExtraClause =
+        " The environment shows NO additional humans anywhere — no people on screens, no portraits or photos of people on walls, no posters showing people, no reflections of people, no mannequins, no statues of people, no background bystanders or coworkers, no out-of-focus crowd. Any visible laptop, phone or TV screen is turned away from camera, dim, or shows abstract patterns only (no faces, no UI with avatars).";
+      return s.length === 0 ? noExtraClause.trim() : `${s}.${noExtraClause}`;
+    };
+
 
     /**
      * Parse a dialog script ("NAME: text" per line) and return the unique
@@ -943,7 +1011,9 @@ serve(async (req) => {
                   // The neutral-only fallback used to produce a gray neutral
                   // two-shot that bore no relation to the user's scene — the
                   // i2v step would then drift to a totally different shot.
-                  const sceneDesc = stripDialogForAnchor(scene.aiPrompt || "");
+                  const sceneDesc = stripExtraHumansForAnchor(
+                    stripDialogForAnchor(scene.aiPrompt || ""),
+                  );
                   const framing = neutralTwoShotPrompt(
                     characterNames,
                     portraitUrls.length,
