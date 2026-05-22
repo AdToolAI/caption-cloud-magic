@@ -1,27 +1,29 @@
 /**
- * compose-dialog-scene — Per-turn sequential Sync.so chain initiator.
+ * compose-dialog-scene — Per-turn PARALLEL Sync.so dispatcher (v4).
  *
- * Design (May 2026 rewrite):
+ * Design (v4, May 2026):
  *  - Treats `audio_plan.twoshot.speakers[*].voicedRange.turns[]` as a flat,
  *    time-ordered list of speaker turns.
- *  - Each turn = ONE Sync.so lipsync-2-pro pass on the existing master plate
- *    (the two-shot Hailuo clip). Tight `segments_secs=[[t.startSec, t.endSec]]`
- *    + identity-matched face coordinates from cached `audio_plan.twoshot.faceMap`.
- *  - Passes run SEQUENTIALLY in `poll-dialog-shots`: the output of turn N
- *    becomes the video input of turn N+1. The final turn's output is the
- *    new `clip_url`. NO ffmpeg, NO Remotion stitching needed.
+ *  - Each turn = ONE Sync.so lipsync-2-pro pass on the ORIGINAL pristine
+ *    master plate (no chaining). Tight single-window `segments_secs=[[t]]`
+ *    + identity-matched face coordinates from cached
+ *    `audio_plan.twoshot.faceMap` + per-turn temperature (1.0 if <2s, else 0.9).
+ *  - All passes run IN PARALLEL in `poll-dialog-shots`. When all are ready,
+ *    the poller stitches them with ffmpeg by time-slicing: window i from
+ *    out_T_i, gaps from the pristine master, then remuxes the master WAV.
  *
- * Why this beats the legacy compose-twoshot-lipsync two-pass-per-speaker:
- *  - Per-turn windows are the tightest possible scope → Sync.so face VAD
- *    has minimum competing audio and animates only one mouth per pass.
- *  - Sequential chaining preserves earlier turns' animation because
- *    `sync_mode='cut_off'` leaves frames outside `segments_secs` untouched.
- *  - Identity-matched coordinates eliminate the "wrong character speaks"
- *    swap that auto_detect produces on multi-window passes.
+ * Why v4 beats v3 (per-speaker multi-window):
+ *  - v3 gave Sync.so multiple windows in one pass → provider weighted
+ *    articulation toward the first/longest window, leaving later sentences
+ *    under-animated. v4 gives every turn full Sync.so attention.
+ *  - v4 has exactly ONE re-encode generation per pixel (vs v3's chained
+ *    Pass-1→Pass-2 softening).
+ *  - v4 is faster: passes run in parallel instead of serial.
  *
- * Returns 202 after queueing turn 0. `poll-dialog-shots` (pg_cron, 1min)
- * advances the chain.
+ * Returns 202 after queueing all shots. `poll-dialog-shots` (pg_cron, 1min)
+ * dispatches/polls/stitches.
  */
+
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
