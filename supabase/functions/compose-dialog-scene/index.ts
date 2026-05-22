@@ -731,7 +731,7 @@ serve(async (req) => {
         ok: true,
         status: "queued",
         scene_id: sceneId,
-        speakers: rawShots.length,
+        turns: rawShots.length,
         cost_credits: totalCost,
       },
       202,
