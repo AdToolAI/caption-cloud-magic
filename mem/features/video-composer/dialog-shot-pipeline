@@ -1,6 +1,6 @@
 ---
-name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher)
-description: Cinematic-sync runs through compose-dialog-scene + poll-dialog-shots (v7). VIDEO chained per turn, AUDIO isolated per speaker (track_url), deterministic coords for multi-speaker. No ffmpeg/Lambda needed; the last shot's output is the final clip.
+name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v9)
+description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo that overlays each turn's output on its window and remuxes the master WAV. Final clip is NEVER the last Sync.so output.
 type: feature
 ---
 
@@ -10,29 +10,34 @@ Both auto-triggers route to `compose-dialog-scene`:
 - Client: `useTwoShotAutoTrigger` invokes `compose-dialog-scene`.
 - Server: `compose-clip-webhook` rescue-path invokes `compose-dialog-scene`.
 
-Per-shot pipeline (one shot per speaker turn from `audio_plan.twoshot.speakers[*].voicedRange.turns[]`):
+**v9 (Artlist parity, May 2026) — KEY RULES:**
+1. **NO VIDEO CHAINING.** Every Sync.so turn job uses `state.source_clip_url` (the original Hailuo master plate) as its video input. Earlier versions chained shot K onto shot K-1's output — that caused later passes to re-animate earlier speakers' mouths with the wrong audio (Charakter 2 sprach den ersten Satz von Charakter 1, dritter Satz landete beim falschen Sprecher). Chaining is now forbidden.
+2. **ISOLATED PER-SPEAKER AUDIO.** Each turn gets the speaker's `track_url` WAV (only that voice + silence elsewhere) as `audio`. Never the merged dialog mix.
+3. **PARALLEL DISPATCH, BOUNDED.** Turns are independent → `poll-dialog-shots` dispatches up to `MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK` (currently 1) new jobs per cron tick, respecting Sync.so Creator-plan concurrency. Ordering no longer matters for correctness.
+4. **DETERMINISTIC LAMBDA STITCH IS MANDATORY.** When all shots are `ready`, `poll-dialog-shots` calls `render-dialog-stitch` which dispatches the `DialogStitchVideo` Remotion composition. The final `clip_url` is written by `remotion-webhook` when Lambda finishes. There is **no fallback** to "last shot output as final clip" — that path produced wrong speaker assignments.
+5. **`render_window` PERSISTED PER SHOT.** The slightly expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbours) is computed once in `poll-dialog-shots`, persisted as `dialog_shots.shots[].render_window`, and used as BOTH the Sync.so `segments_secs` AND the Lambda overlay range. Guarantees Sync.so output range and stitch slice match byte-for-byte.
 
-1. `compose-dialog-scene` reserves credits (9 cr/s lipsync, min 9/turn), persists `composer_scenes.dialog_shots` (JSONB array). Each shot stores:
-   - `audio_url` = the SPEAKER's `track_url` (isolated WAV with only that voice + silence elsewhere). Falls back to merged master WAV only if track_url missing.
-   - `deterministic_coords = true` when scene has ≥2 distinct speakers AND face coords are available — forces `auto_detect:false + frame_number + coordinates` in Sync.so.
-   - `target_coords` from `audio_plan.twoshot.faceMap` (Gemini Vision identity match).
-   - Per-turn temperature: 1.0 if <2s, else 0.9.
+**Per-shot lifecycle:**
+```
+pending → lipsyncing (sync_job_id set) → ready (output_url set)
+                                       → failed
+(all turns ready) → stitching (state.stitch.render_id) → done (clip_url set by webhook)
+```
 
-2. `poll-dialog-shots` (pg_cron `poll-dialog-shots-every-minute`) dispatches/polls serially. Per shot it submits to Sync.so lipsync-2-pro with:
-   - **video** = chained: shot K uses shot K-1's output, shot 0 uses the original master plate. Animations accumulate into one final clip without ffmpeg.
-   - **audio** = the speaker's isolated WAV (`shot.audio_url`). NEVER the merged dialog mix — that was the root cause of "ghost speech" where the wrong character spoke another speaker's line.
-   - **segments_secs** = the turn's expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbouring turns).
-   - **mode** = `coords` for multi-speaker (deterministic) or `auto` for single-speaker / retry fallback.
-   - **sync_mode** = `cut_off`.
+**Stitch composition (`DialogStitchVideo`):**
+- Master plate plays continuously underneath, muted.
+- Per turn: `<Sequence from=startFrame durationInFrames=segDuration>` containing the Sync.so output, also muted, geometrically aligned via `startFrom=startFrame`.
+- Single `<Audio>` = master WAV.
+- One Lambda re-encode generation total (vs. N for chaining).
 
-3. When all shots are `ready`, the LAST shot's `output_url` is written to `composer_scenes.clip_url` and `lip_sync_status = 'done'`. No ffmpeg, no Lambda needed.
+**External audio policy unchanged:** `audio_plan.twoshot.useExternalAudio: true` keeps the merged master WAV authoritative for preview/export.
 
-**Why v7 fixes the ghost-speech bug (May 2026):**
-- Pre-v7 every Sync.so job received the FULL merged 8s dialog WAV. Sync.so's VAD then heard another speaker's voice during the turn window and could animate the wrong face or generate phantom mouth movements outside the window.
-- v7 sends only ONE speaker's voice per pass → Sync.so has nothing to mis-animate. Combined with `deterministic_coords`, each turn lands exactly on the correct mouth with the correct words.
+**Refund policy:**
+- Refund only on terminal failure (≥1 shot failed after retry, or stitch render failed irrecoverably).
+- While shots are `pending`/`lipsyncing` OR stitch is `pending`/`rendering`: NO refund, NO "final = last output". User sees a clean waiting state if AWS is temporarily unavailable; stitch retries on next tick.
 
-**External audio policy unchanged:** `audio_plan.twoshot.useExternalAudio: true` keeps the merged master WAV authoritative for preview/export; the final Sync.so clip's embedded audio is not used by Composer playback or `compose-video-assemble` for cinematic-sync scenes.
+**Idempotency:**
+- `render-dialog-stitch` checks `dialog_shots.stitch.render_id` and the `video_renders` row before dispatching again.
+- `poll-dialog-shots` skips stitch dispatch if `state.stitch?.render_id` is already set.
 
-Refunds happen per scene (state.cost_credits), idempotent. Failed shots auto-retry once with coords-mode fallback.
-
-**Note on legacy state:** `dialog_shots.version = 4` is preserved (no schema migration). Shots without `audio_url`/`deterministic_coords` fields are handled gracefully via fallback to merged WAV + auto mode.
+**Legacy:** `dialog_shots.version = 4` preserved (no schema migration). Pre-v9 state without `render_window` falls back to the tight `window` in both Sync.so dispatch and stitch overlay.

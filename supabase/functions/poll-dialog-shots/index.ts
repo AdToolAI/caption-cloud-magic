@@ -56,8 +56,12 @@ interface DialogShot {
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  /** Single time window for THIS turn. */
+  /** Single time window for THIS turn (tight voiced range). */
   window: [number, number];
+  /** v9 Artlist-style: slightly expanded window (lead-in/tail) used both
+   *  as Sync.so `segments_secs` and as the Lambda-stitch overlay range.
+   *  Persisting it guarantees stitch + lipsync target the IDENTICAL slice. */
+  render_window?: [number, number];
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
@@ -94,6 +98,7 @@ interface DialogShotsState {
   video_width: number;
   video_height: number;
   final_url?: string | null;
+  stitch?: { render_id: string; dispatched_at: string };
   finished_at?: string;
   error?: string;
 }
@@ -431,76 +436,67 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch the next pending shot serially (CHAINED-V7) ────
-  // v7 keeps VIDEO chaining (shot K builds visually on shot K-1's output
-  // so animations accumulate into one final clip without ffmpeg) but
-  // switches AUDIO to per-speaker isolated WAV so Sync.so only ever sees
-  // ONE voice per pass. This eliminates the ghost-speech bug where the
-  // wrong character "spoke" another speaker's line because the merged
-  // master WAV bled into the animation window.
+  // ── Step 2: dispatch pending shots (v9 Artlist-style, NO chaining) ──
+  // Every turn is lipsynced on the ORIGINAL pristine master plate with its
+  // own isolated speaker WAV. Turns are independent → no chaining, no
+  // re-encode generation stacking, no risk of a later pass overwriting an
+  // earlier speaker's mouth animation. The deterministic Lambda stitch
+  // (DialogStitchVideo) recombines them by timeline window afterwards.
   //
-  // Multi-speaker scenes additionally force deterministic coords +
-  // frame_number (no auto_detect) for hard identity routing.
+  // We still dispatch at most MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK new jobs
+  // per tick to respect the Sync.so Creator-plan concurrency budget — but
+  // turn ordering no longer matters for correctness.
   const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
   const pending = sortedShots.filter((s) => s.status === "pending");
-  const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
-  if (pending.length > 0 && activeAfterPolling.length === 0) {
-    const nextShot = pending.find((s) => {
-      if (s.idx === 0) return true;
-      const prev = sortedShots.find((x) => x.idx === s.idx - 1);
-      return prev?.status === "ready" && !!prev.output_url;
-    });
-    if (nextShot) {
-      try {
-        const prev =
-          nextShot.idx > 0
-            ? sortedShots.find((x) => x.idx === nextShot.idx - 1)
-            : null;
-        const chainedSourceUrl =
-          prev?.output_url && prev.status === "ready"
-            ? prev.output_url
-            : state.source_clip_url;
-        const win = expandWindow(nextShot, shots);
-        // v8: try auto_detect FIRST (Sync.so handles short isolated tracks
-        // reliably when the audio truly contains only one voice). Only fall
-        // back to coords on a failed-poll retry. The earlier "always force
-        // coords for multi-speaker" path produced opaque
-        // "An unknown error occurred." failures on Sync.so for unknown
-        // reasons, even with valid audio + valid coords.
-        const useCoords = !!nextShot.force_coords && !!nextShot.target_coords;
-        const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
-        const audioUrl = nextShot.audio_url || state.master_audio_url;
-        const jobId = await startSyncTurnJob(
-          syncKey,
-          chainedSourceUrl,
-          audioUrl,
-          win,
-          nextShot.target_coords,
-          nextShot.temperature,
-          nextShot.idx,
-          mode,
-        );
-        nextShot.sync_job_id = jobId;
-        nextShot.status = "lipsyncing";
-        nextShot.started_at = new Date().toISOString();
+  let dispatchedThisTick = 0;
+  for (const nextShot of pending) {
+    if (dispatchedThisTick >= MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK) break;
+    try {
+      // Always render on the ORIGINAL master plate — never on another shot's
+      // Sync.so output. Chaining caused later turns to re-animate earlier
+      // speakers' mouths with the wrong audio ("ghost speech").
+      const sourceUrl = state.source_clip_url;
+      const win = (nextShot.render_window
+        ?? expandWindow(nextShot, shots)) as [number, number];
+      nextShot.render_window = win;
+      // Try auto_detect FIRST on the isolated speaker WAV; only fall back
+      // to coords+frame_number on a failed-poll retry.
+      const useCoords = !!nextShot.force_coords && !!nextShot.target_coords;
+      const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
+      const audioUrl = nextShot.audio_url || state.master_audio_url;
+      const jobId = await startSyncTurnJob(
+        syncKey,
+        sourceUrl,
+        audioUrl,
+        win,
+        nextShot.target_coords,
+        nextShot.temperature,
+        nextShot.idx,
+        mode,
+      );
+      nextShot.sync_job_id = jobId;
+      nextShot.status = "lipsyncing";
+      nextShot.started_at = new Date().toISOString();
+      mutated = true;
+      dispatchedThisTick++;
+      console.log(
+        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+      );
+    } catch (e) {
+      if (e instanceof SyncConcurrencyDeferredError) {
+        nextShot.status = "pending";
+        nextShot.sync_job_id = undefined;
+        nextShot.last_deferred_at = new Date().toISOString();
         mutated = true;
-        console.log(
-          `[poll-dialog-shots] v8 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
         );
-      } catch (e) {
-        if (e instanceof SyncConcurrencyDeferredError) {
-          nextShot.status = "pending";
-          nextShot.sync_job_id = undefined;
-          nextShot.last_deferred_at = new Date().toISOString();
-          mutated = true;
-          console.warn(
-            `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
-          );
-        } else {
-          nextShot.status = "failed";
-          nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
-          mutated = true;
-        }
+        // Stop dispatching more on this tick — concurrency saturated.
+        break;
+      } else {
+        nextShot.status = "failed";
+        nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+        mutated = true;
       }
     }
   }
@@ -511,62 +507,67 @@ async function processScene(
   const hasActive = shots.some((s) => s.status === "lipsyncing" || s.status === "pending");
 
   let pipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady) pipelineStatus = "done";
-  else if (hasFailure && !hasActive) pipelineStatus = "failed";
-  else if (hasActive) pipelineStatus = "lipsyncing";
+  if (allReady) {
+    // Don't mark "done" until the Lambda stitch finishes — only ready for
+    // the stitch step.
+    pipelineStatus = state.stitch?.render_id ? "stitching" : "stitching";
+  } else if (hasFailure && !hasActive) {
+    pipelineStatus = "failed";
+  } else if (hasActive) {
+    pipelineStatus = "lipsyncing";
+  }
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: all shots ready → CHAINED final clip (no stitching) ─────
-  // In the CHAINED-V6 pipeline each shot was already lipsynced on top of
-  // the previous shot's output. The LAST shot's output_url therefore
-  // already contains every speaker's lipsync layered on the master plate
-  // — no ffmpeg or Lambda stitch is needed.
+  // ── Step 4: all shots ready → Artlist-style Lambda stitch ───────────
+  // We never use the last Sync.so output as the final clip. The Remotion
+  // composition `DialogStitchVideo` overlays each per-turn Sync.so output
+  // onto the original master plate, trimmed to that turn's window, and
+  // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
-    const lastShot = [...shots].sort((a, b) => b.idx - a.idx)[0];
-    const finalUrl = lastShot?.output_url;
-    if (!finalUrl) {
-      // Defensive: should never happen because allReady implies output_url.
-      newState = { ...newState, status: "failed", error: "last shot missing output_url" };
-      if (userId) newState = await refundIfNeeded(supabase, userId, newState);
+    // Idempotency guard — if a stitch render is already in flight, just
+    // persist state and wait for the webhook to write clip_url back.
+    if (state.stitch?.render_id) {
       await supabase
         .from("composer_scenes")
         .update({
           dialog_shots: newState,
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
-          clip_error: "dialog_chained_missing_final_output",
+          lip_sync_status: "stitching",
+          twoshot_stage: "dialog_stitching",
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      return { status: "failed", mutated: true };
+      return { status: "stitching", mutated: true };
     }
 
-    const nowIso = new Date().toISOString();
-    newState = {
-      ...newState,
-      status: "done",
-      final_url: finalUrl,
-      finished_at: nowIso,
-    };
-    await supabase
-      .from("composer_scenes")
-      .update({
-        clip_url: finalUrl,
-        lip_sync_source_clip_url: state.source_clip_url,
-        lip_sync_applied_at: nowIso,
-        lip_sync_status: "done",
-        twoshot_stage: "done",
-        clip_error: null,
-        dialog_shots: newState,
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
+    const dispatch = await dispatchDialogStitch(supabase, sceneId);
+    if (!dispatch.ok) {
+      // Stitch dispatch failed — do NOT fall back to "last shot output".
+      // Keep dialog_shots ready, mark status as stitching with a retry
+      // hint; the next cron tick will retry render-dialog-stitch.
+      console.warn(
+        `[poll-dialog-shots] stitch dispatch failed: ${dispatch.error} — will retry next tick`,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: newState,
+          lip_sync_status: "stitching",
+          twoshot_stage: "dialog_stitching",
+          clip_error: `dialog_stitch_dispatch: ${dispatch.error}`.slice(0, 300),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      return { status: "stitching", mutated: true };
+    }
 
     console.log(
-      `[poll-dialog-shots] CHAINED scene ${sceneId} done → ${finalUrl}`,
+      `[poll-dialog-shots] v9 scene ${sceneId} all turns ready → stitch render ${dispatch.render_id} dispatched`,
     );
-    return { status: "done", mutated: true };
+    // `render-dialog-stitch` already persists `dialog_shots.stitch.render_id`
+    // and sets `lip_sync_status='stitching'`. `remotion-webhook` writes the
+    // final clip_url + lip_sync_applied_at on completion.
+    return { status: "stitching", mutated: true };
   }
 
 

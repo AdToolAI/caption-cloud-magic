@@ -30,6 +30,9 @@ const corsHeaders = {
 interface DialogShot {
   idx: number;
   window: [number, number];
+  /** v9: slightly expanded render range (lead-in/tail). Stitch prefers this
+   *  so its overlay slice matches the Sync.so `segments_secs` exactly. */
+  render_window?: [number, number];
   status: string;
   output_url?: string;
   speaker_name?: string;
@@ -140,11 +143,14 @@ serve(async (req) => {
       totalSec,
       shots: state.shots
         .filter((s) => s.output_url)
-        .map((s) => ({
-          startSec: Math.max(0, Number(s.window?.[0]) || 0),
-          endSec: Math.min(totalSec, Number(s.window?.[1]) || totalSec),
-          outputUrl: s.output_url as string,
-        })),
+        .map((s) => {
+          const win = (s.render_window ?? s.window) as [number, number];
+          return {
+            startSec: Math.max(0, Number(win?.[0]) || 0),
+            endSec: Math.min(totalSec, Number(win?.[1]) || totalSec),
+            outputUrl: s.output_url as string,
+          };
+        }),
     };
 
     const renderId = crypto.randomUUID();
