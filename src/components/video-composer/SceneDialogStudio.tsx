@@ -1320,9 +1320,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {blocks.map((b, i) => {
               const sp = sceneCast.find((c) => c.id === b.speakerId);
               const missing = !sp?.referenceImageUrl;
-              const lineKey = dialogLineKey(i, b.text);
+              const lineKey = dialogLineKey(i, b.text, b.tonality);
               const bundle = dialogTakes[lineKey];
               const cfg = voicePerSpeaker[b.speakerId];
+              const tuning = cfg?.engine === 'elevenlabs' ? buildTuningForBlock(b) : undefined;
               return (
                 <div key={i} className="space-y-0.5">
                   <div className="flex items-start gap-2 text-[11px]">
@@ -1334,6 +1335,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       </div>
                     )}
                     <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                    {b.tonality && b.tonality !== 'neutral' && (
+                      <span
+                        className="shrink-0 inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/10 px-1 py-px text-[9px] uppercase tracking-wide text-primary"
+                        title={`Tonality: ${b.tonality}`}
+                      >
+                        {b.tonality}
+                      </span>
+                    )}
                     <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
                       {b.text}
                     </span>
@@ -1343,6 +1352,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       lineKey={lineKey}
                       text={b.text}
                       voiceCfg={cfg}
+                      voiceTuning={tuning}
                       bundle={bundle}
                       language={language}
                       projectId={projectId || scene.projectId}
