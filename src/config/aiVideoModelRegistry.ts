@@ -516,7 +516,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-happyhorse-video',
     group: 'premium',
     icon: Sparkles,
-    capabilities: { t2v: true, i2v: true, audio: false },
+    capabilities: { t2v: true, i2v: true, audio: false, nativeDialogue: true },
     durations: [3, 5, 8, 10, 12, 15],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
