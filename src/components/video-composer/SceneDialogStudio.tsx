@@ -578,38 +578,56 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         console.warn('[SceneDialogStudio] failed to clear old voiceover clips', delErr);
       }
 
-      for (const block of blocks) {
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const block = blocks[bi];
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
         const cfg = voicePerSpeaker[block.speakerId];
         if (!cfg?.voiceId) continue;
 
-        // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
-        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
-        const body = cfg.engine === 'hume'
-          ? {
-              text: block.text,
-              voiceName: cfg.voiceId,
-              provider: cfg.provider || 'HUME_AI',
-              projectId: pid,
-            }
-          : {
-              text: block.text,
-              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-              projectId: pid,
-            };
-        const { data, error } = await supabase.functions.invoke(fnName, { body });
-        if (error) throw error;
-        const audioUrl = (data as any)?.audioUrl as string | undefined;
-        if (!audioUrl) throw new Error('No audioUrl returned');
+        // ── Take-System A/B/C reuse (Phase B) ──
+        // If the user already recorded a take and pinned it as active, skip
+        // a fresh TTS call and reuse that audio. Keeps SRS/inline renders
+        // deterministic across re-renders.
+        const lineKey = dialogLineKey(bi, block.text);
+        const activeTake = getActiveTake(lineKey);
 
-        // Real audio duration — TTS service value first, browser-probe fallback.
-        // Fixes the "Matthew talks longer than Sarah even though his script
-        // is shorter" bug caused by the static `text.length / 18` heuristic.
-        const reportedDuration = Number((data as any)?.duration ?? 0);
-        const duration = reportedDuration > 0
-          ? reportedDuration
-          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        let audioUrl: string | undefined;
+        let duration: number;
+
+        if (activeTake?.audioUrl) {
+          audioUrl = activeTake.audioUrl;
+          duration = activeTake.durationSec > 0
+            ? activeTake.durationSec
+            : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
+        } else {
+          // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
+          const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const body = cfg.engine === 'hume'
+            ? {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pid,
+              }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+                projectId: pid,
+              };
+          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          if (error) throw error;
+          audioUrl = (data as any)?.audioUrl as string | undefined;
+          if (!audioUrl) throw new Error('No audioUrl returned');
+
+          // Real audio duration — TTS service value first, browser-probe fallback.
+          // Fixes the "Matthew talks longer than Sarah even though his script
+          // is shorter" bug caused by the static `text.length / 18` heuristic.
+          const reportedDuration = Number((data as any)?.duration ?? 0);
+          duration = reportedDuration > 0
+            ? reportedDuration
+            : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        }
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Unauthorized');
