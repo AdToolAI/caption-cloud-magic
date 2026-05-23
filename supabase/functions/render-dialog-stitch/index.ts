@@ -216,6 +216,7 @@ serve(async (req) => {
           totalDuration: totalSec,
           composer_scene_id: sceneId,
         },
+        subtitle_config: {},
       });
     if (insertErr) {
       console.error("[render-dialog-stitch] insert failed:", insertErr);
