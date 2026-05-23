@@ -47,6 +47,7 @@ import CollaboratorAvatars from './CollaboratorAvatars';
 import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
+import { castSignature } from '@/lib/video-composer/castSignature';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
