@@ -97,7 +97,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const staleSyncJobs = (data as any[]).filter(
           (d) =>
             d.engine_override === 'cinematic-sync' &&
-              d.dialog_shots?.version !== 4 &&
+            d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
@@ -118,6 +118,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             d.engine_override === 'cinematic-sync' &&
+            d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
