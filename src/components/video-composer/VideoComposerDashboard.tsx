@@ -1035,6 +1035,7 @@ export default function VideoComposerDashboard() {
       cinematic_preset_slug: p.cinematicPresetSlug ?? null,
       dialog_script: p.dialogScript ?? null,
       dialog_voices: (p.dialogVoices ?? null) as any,
+      dialog_takes: (p.dialogTakes ?? {}) as any,
       engine_override: p.engineOverride ?? 'auto',
       character_shots: (p.characterShots ?? null) as any,
       continuity_locked: (p as any).continuityLocked === true,
