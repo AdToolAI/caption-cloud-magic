@@ -1,0 +1,2 @@
+ALTER TABLE public.brand_characters ADD COLUMN IF NOT EXISTS voice_settings jsonb;
+COMMENT ON COLUMN public.brand_characters.voice_settings IS 'ElevenLabs voice tuning per character: { stability, similarityBoost, style, useSpeakerBoost, speed }. NULL = use ElevenLabs defaults.';
