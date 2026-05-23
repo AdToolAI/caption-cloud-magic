@@ -1462,7 +1462,8 @@ export default function SceneCard({
                       const sceneCastCount =
                         (scene.characterShots?.length ?? 0) ||
                         (scene.characterShot ? 1 : 0);
-                      if (sceneCastCount < 1) return null;
+                       if (sceneCastCount < 1) return null;
+                       if (scene.dialogMode !== true) return null;
                       const hasScript = Boolean(
                         (scene.dialogScript ?? "").trim(),
                       );
