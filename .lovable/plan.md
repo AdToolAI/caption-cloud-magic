@@ -1,53 +1,46 @@
-## Pipeline-Audit: Status vs. Artlist
+## Befund
 
-Ich habe die komplette Phase-A/B/C-Pipeline durchgegangen (DB-Spalten, Edge Functions, Persistenz-Pfade, Propagation, UI-Badges, Cast-Logik). **Das meiste sitzt korrekt** — drei echte Bugs bleiben aber.
+Wir haben **nicht** genug Information, um den richtigen Fix zu wählen. In der DB steht nur `sync_FAILED: An unknown error occurred.` — das ist unser eigener String, weil `pollSyncJob` in `poll-dialog-shots/index.ts:184` nur `data.error ?? undefined` ausliest und Sync.so dieses Feld bei FAILED häufig leer lässt. Die echten Diagnose-Felder (`errorMessage`, `error_type`, `failureReason`, evtl. nested `data.input[*].error`) werfen wir weg.
 
-### Was sauber funktioniert
-- `composer_scenes.lock_reference_url` + `dialog_mode` existieren in der DB, Daten werden bereits korrekt geschrieben (verifiziert: 2/5 letzten Dialog-Szenen haben Lock).
-- `compose-video-clips` persistiert den ersten Anchor als Lock und injiziert vorhandene Locks als primäre Portrait-Referenz in `compose-scene-anchor` (Nano Banana 2).
-- `propagateDialogLock` läuft auf allen drei Ladepfaden (initial fetch, realtime merge, lokales `setScenes`) und auf dem Persist-Pfad.
-- Dashboard-`persistScenesToDb` schreibt `lock_reference_url` mit (Zeile 812).
-- Badges (gold self / cyan inherited) + Thumbnail + Aktions-Button rendern in `SceneDialogStudio`.
-- `compose-dialog-scene` braucht den Lock **nicht** — es ist der Sync.so-Lipsync-Dispatcher auf einem bereits gerenderten Plate (kein Bug, anders als ursprünglich vermutet).
+Ohne den echten Sync.so-Body raten wir zwischen mindestens vier Möglichkeiten:
+1. **Concurrency-Limit** des Sync.so Creator-Plans ($19/mo).
+2. **Window zu kurz** für `lipsync-2-pro` (Turn 1 ≈ 1.3s expandiert).
+3. **`active_speaker_detection.coordinates`** außerhalb der Videogrenzen oder im falschen Format (Turn 1 coords=[1004,136] in 1376×768 — knapp am Rand, könnte ein Frame-spezifisches Issue sein).
+4. **`segments_secs` + lipsync-2-pro** überhaupt nicht erlaubt (es gibt einen Fallback-Pfad, aber der greift nur bei 400 mit bestimmten Textstrings).
 
-### Drei echte Bugs
-
-**Bug 1 — "Force own lock"-Button ist faktisch ein No-Op.**
-In `SceneDialogStudio.tsx` (Zeile 1332) ruft der Button bei *inherited* Locks `onUpdate({ lockReferenceUrl: undefined })` auf. Im nächsten `setScenes` läuft aber `propagateDialogLock`, das genau diesen leeren Wert wieder mit `leaderLock` füllt → die Vererbung kehrt sofort zurück. Der User kann den geerbten Lock nicht aufbrechen.
-
-**Bug 2 — Cast-Wechsel behält stale Lock.**
-Wenn der User in einer Dialog-Szene Sarah gegen Anna tauscht, bleibt `lockReferenceUrl` (= Anchor mit Sarahs Gesicht) bestehen und wird bei der nächsten Anchor-Komposition als primäre Identity-Referenz gegen Annas Portrait gemischt → Identity-Pollution. `propagateDialogLock` schützt nur *nachfolgende* Szenen (neue cast-signature = neue Gruppe), nicht die geänderte Szene selbst.
-
-**Bug 3 — `useComposerPersistence` droppt `lock_reference_url` beim Initial-Flush.**
-Beide `.update(...)`- und `.insert(...)`-Blöcke (`src/hooks/useComposerPersistence.ts` Zeile ~180 und ~220) listen `lock_reference_url` nicht auf. Beim ersten `ensureProjectPersisted`-Save kann ein bereits gesetzter Lock verloren gehen. Edge case, aber inkonsistent zum Dashboard-Pfad.
+Jede Lösung wäre eine andere Code-Änderung. Erst Diagnose, dann gezielter Fix.
 
 ---
 
-## Fix-Plan (Phase C.2 — Polish)
+## Phase 1 — Reine Diagnose (jetzt, keine Verhaltensänderung)
 
-### 1. `SceneDialogStudio.tsx` — Force-Own korrekt umsetzen
-Neuer Prop `onForceOwnLock?: () => Promise<void>` vom Dashboard. Bei Klick auf "Lock erzwingen" (inherited): triggert einen leichten Re-Run von `compose-scene-anchor` *ohne* `lockRefUrl` für **diese** Szene, persistiert das Ergebnis als neuen `lockReferenceUrl` → propagateDialogLock erkennt sie ab dann als eigene Leaderin der Sub-Gruppe.
-Alternativ (leichtere Variante, wenn kein neuer Anchor gewünscht): Button-Label klarstellen auf "Vererbung lösen" und Lock auf `null` setzen *plus* einen transienten "no-inherit"-Marker, der propagate respektiert. Empfehlung: **Re-Render-Variante** (sauber, kostet 1× Nano Banana 2 ≈ €0.04).
+### Änderung in `supabase/functions/poll-dialog-shots/index.ts`
 
-### 2. Cast-Change-Auto-Clear
-In `VideoComposerDashboard.tsx` → `setScenes`: vor `propagateDialogLock` ein kleiner Diff-Check pro Szene: wenn die alte Szene eine `cast-signature` (sortierte `characterShots[].characterId`) ≠ neue cast-signature und `lockSource === 'self'`, dann `lockReferenceUrl = undefined` (und auch `clipUrl/clipStatus` invalidieren, damit der nächste Render einen frischen Anchor zieht).
+**`pollSyncJob`** (Zeile 169-186):
+- Bei Status FAILED/REJECTED/CANCELED den **kompletten Raw-Response-Body** loggen (`console.error('[poll-dialog-shots] sync.so FAILED body:', JSON.stringify(data).slice(0,1500))`).
+- Den Fehler-String robust zusammenbauen aus `data.error ?? data.errorMessage ?? data.error_message ?? data.failureReason ?? data.failure_reason ?? data.message ?? JSON.stringify(data).slice(0,200)`.
 
-### 3. `useComposerPersistence.ts` — Spalte ergänzen
-In beiden Update- und Insert-Payloads ergänzen:
-```ts
-lock_reference_url: scene.lockReferenceUrl ?? null,
-continuity_locked: scene.continuityLocked === true,
-```
+**`startSyncTurnJob`** (Zeile 105-167):
+- **Vor** dem Fetch den Request-Payload loggen (`console.log('[poll-dialog-shots] dispatch payload turn=…:', JSON.stringify(payload))`) — gekürzt auf 800 chars.
+- **Nach** dem Fetch immer den Status loggen, auch bei OK, und bei !ok den Header `x-ratelimit-*` / `retry-after` mit ausgeben — falls Sync.so 429 oder Plan-Limits darüber signalisiert.
 
-### 4. Persist-Filter für transiente Felder
-Sicherstellen, dass `lockSource` / `lockSourceSceneIndex` nirgendwo als Spalten verschickt werden (Stichprobe ergab: aktuell sauber, weil beide Persist-Pfade nur whitelisted Felder schreiben — keine Änderung nötig, nur Vermerk im Plan).
+**Im Shot-Status** (Zeile 416-419) den jetzt verbesserten String in `shot.error` schreiben — UI bleibt dadurch automatisch aussagekräftiger.
 
-### Definition of Done
-- "Lock erzwingen" auf einer geerbten Szene rendert einen neuen Anchor und der Badge wechselt von cyan → gold.
-- Cast-Tausch (Sarah → Anna) in einer self-locked Dialog-Szene entfernt den Lock automatisch, der nächste Render zieht ein frisches Anchor-Bild mit Annas Identität.
-- Initial-Save einer Brand-new-Szene mit vorhandenem Lock erhält den Lock in der DB.
+Das ist **eine Datei**, ~25 Zeilen Diff, keine neue Logik, keine Migration, keine UI-Änderung, keine Performance-Auswirkung. Deploy → User triggert eine neue Dialog-Szene → wir lesen `supabase--edge_function_logs poll-dialog-shots`.
 
-### Technische Details
-- **Geänderte Dateien:** `src/components/video-composer/SceneDialogStudio.tsx`, `src/components/video-composer/VideoComposerDashboard.tsx`, `src/hooks/useComposerPersistence.ts`, ggf. neue Helper-Function `src/lib/video-composer/castSignature.ts`.
-- **Keine** DB-Migration, **keine** neuen Edge Functions, **keine** Credit-Änderungen.
-- Force-Own ruft `compose-scene-anchor` direkt aus dem Frontend auf (gleicher Pfad wie der bestehende manuelle Re-Anchor-Flow).
+## Phase 2 — Gezielter Fix nach Diagnose
+
+Erst wenn wir den echten Sync.so-Fehler kennen, entscheiden wir konkret:
+- `concurrency exceeded` / `429` → Serial-Pool mit Limit 2.
+- `video too short` / `duration` → Mindest-Windowlänge erzwingen + Pad-Strategie.
+- `coordinates out of bounds` → Coords vor Dispatch clampen oder Auto-Detect-Fallback.
+- `segments invalid` → Fallback ohne `segments_secs` immer aktiv.
+
+Diesen Schritt **nicht jetzt** umsetzen — sondern nach einem reproduzierten Run mit Phase-1-Logs.
+
+---
+
+## Geänderte Dateien (Phase 1)
+- `supabase/functions/poll-dialog-shots/index.ts` (nur Logging + besseres Error-Aggregat)
+
+Keine DB-Migration, keine neue Edge-Function, keine UI-Änderung, kein Credit-Effekt.
