@@ -12,6 +12,7 @@ import { UniversalCreatorVideo, UniversalCreatorVideoSchema } from './templates/
 import { SmokeTestVideo } from './templates/SmokeTestVideo';
 import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
 import { ComposedAdVideo, ComposedAdVideoSchema } from './templates/ComposedAdVideo';
+import { DialogStitchVideo, DialogStitchVideoSchema } from './templates/DialogStitchVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -467,6 +468,35 @@ export const RemotionRoot: React.FC = () => {
           backgroundMusicUrl: '',
           backgroundMusicVolume: 0.3,
           aspectRatio: '16:9',
+        }}
+      />
+      <Composition
+        id="DialogStitchVideo"
+        component={DialogStitchVideo}
+        durationInFrames={180}
+        fps={30}
+        width={1280}
+        height={720}
+        schema={DialogStitchVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          try {
+            const fps = 30;
+            const total = Math.max(0.5, Number(props.totalSec) || 6);
+            const durationInFrames = Math.max(30, Math.ceil(total * fps));
+            // Master clip dimensions are 1280x720 (Hailuo i2v default). The
+            // renderer always picks the master's native aspect, but Remotion
+            // requires multiples of 2 — 1280x720 is safe.
+            return { durationInFrames, fps, width: 1280, height: 720 };
+          } catch (err) {
+            console.error('[DialogStitchVideo calculateMetadata] fallback', err);
+            return { durationInFrames: 180, fps: 30, width: 1280, height: 720 };
+          }
+        }}
+        defaultProps={{
+          masterVideoUrl: 'https://example.com/master.mp4',
+          masterAudioUrl: 'https://example.com/master.wav',
+          totalSec: 6,
+          shots: [],
         }}
       />
     </>
