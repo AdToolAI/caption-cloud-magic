@@ -40,12 +40,15 @@ import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
+import { DialogTakeStrip } from './DialogTakeStrip';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
   ComposerScene,
   CharacterShot,
   DialogVoiceCfg,
+  DialogTakeBundle,
 } from '@/types/video-composer';
 
 interface SceneDialogStudioProps {
