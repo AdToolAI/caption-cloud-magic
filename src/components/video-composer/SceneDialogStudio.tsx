@@ -332,6 +332,25 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     onUpdate({ dialogVoices: next });
   };
 
+  /** Persist take-bundle for a single dialog line (Take-System A/B/C). */
+  const updateLineTakes = (lineKey: string, bundle: DialogTakeBundle) => {
+    const next = { ...dialogTakes };
+    if (!bundle || (bundle.takes.length === 0 && !bundle.active)) {
+      delete next[lineKey];
+    } else {
+      next[lineKey] = bundle;
+    }
+    setDialogTakes(next);
+    onUpdate({ dialogTakes: next });
+  };
+
+  /** Pull the active take's audio for a given line, if any. */
+  const getActiveTake = (lineKey: string) => {
+    const b = dialogTakes[lineKey];
+    if (!b || !b.active) return null;
+    return b.takes.find((t) => t.id === b.active) ?? null;
+  };
+
   const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
     if (engine === 'hume') {
       const fallback = humeVoices[0];
