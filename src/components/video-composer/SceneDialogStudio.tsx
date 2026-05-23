@@ -1329,7 +1329,21 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
-            onClick={() => onUpdate({ lockReferenceUrl: undefined })}
+            onClick={() => {
+              if (scene.lockSource === 'inherited') {
+                // Phase C.2 — Force-Own: break inheritance AND invalidate the
+                // existing clip so the next render composes a fresh anchor
+                // (which compose-video-clips will persist as a new self-lock).
+                onUpdate({
+                  lockReferenceUrl: undefined,
+                  noInheritLock: true,
+                  clipUrl: undefined,
+                  clipStatus: 'pending',
+                });
+              } else {
+                onUpdate({ lockReferenceUrl: undefined, noInheritLock: false });
+              }
+            }}
           >
             {scene.lockSource === 'inherited' ? t.continuityForce : t.continuityRemove}
           </Button>

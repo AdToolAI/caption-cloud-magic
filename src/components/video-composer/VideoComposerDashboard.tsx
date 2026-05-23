@@ -47,6 +47,7 @@ import CollaboratorAvatars from './CollaboratorAvatars';
 import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
+import { castSignature } from '@/lib/video-composer/castSignature';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -824,7 +825,40 @@ export default function VideoComposerDashboard() {
   }, [persistScenesToDb]);
 
   const setScenes = useCallback((scenes: ComposerScene[]) => {
-    const propagated = propagateDialogLock(scenes);
+    // Phase C.2 — Cast-Change Auto-Clear. If the cast of a self-locked dialog
+    // scene changed since the previous state, the stored lockReferenceUrl
+    // still encodes the OLD characters' identity and would pollute the next
+    // anchor compose. Drop the stale lock + invalidate the clip so the next
+    // render produces a fresh anchor matching the new cast.
+    const prevById = new Map(project.scenes.map((s) => [s.id, s] as const));
+    const cleaned = scenes.map((s) => {
+      const prev = prevById.get(s.id);
+      if (!prev) return s;
+      const prevSig = castSignature(prev);
+      const nextSig = castSignature(s);
+      const isDialog = Boolean((s.dialogScript ?? '').trim().length > 0);
+      // Only act when cast actually changed, the scene is in dialog mode,
+      // and the existing lock was self-owned (inherited locks fall away
+      // naturally because propagateDialogLock will re-evaluate groups).
+      if (
+        isDialog &&
+        prevSig &&
+        nextSig &&
+        prevSig !== nextSig &&
+        prev.lockSource === 'self' &&
+        s.lockReferenceUrl
+      ) {
+        return {
+          ...s,
+          lockReferenceUrl: undefined,
+          noInheritLock: false,
+          clipUrl: undefined,
+          clipStatus: 'pending' as const,
+        };
+      }
+      return s;
+    });
+    const propagated = propagateDialogLock(cleaned);
     setProject(prev => {
       // Schedule debounced DB flush only for already-persisted projects.
       if (prev.id) {
@@ -843,7 +877,7 @@ export default function VideoComposerDashboard() {
       }
       return { ...prev, scenes: propagated };
     });
-  }, [persistScenesToDb]);
+  }, [persistScenesToDb, project.scenes]);
 
   /**
    * Local-only scene state update. Does NOT schedule a debounced DB flush

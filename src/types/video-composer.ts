@@ -363,6 +363,13 @@ export interface ComposerScene {
   lockSource?: 'self' | 'inherited' | null;
   lockSourceSceneIndex?: number | null;
   /**
+   * Phase C.2 — Force-Own override. Transient, not persisted. When true,
+   * `propagateDialogLock` skips inheritance for this scene so the user can
+   * break out of a same-cast lock group; the next render will then compose a
+   * fresh anchor and persist its own `lockReferenceUrl` as a new self-lock.
+   */
+  noInheritLock?: boolean;
+  /**
    * Two-Shot Hook pipeline stage. Set by `compose-twoshot-audio`,
    * `compose-video-clips` (master clip) and `compose-twoshot-lipsync`:
    *   audio → anchor → master_clip → lipsync_1 → lipsync_2 → continuity → done
