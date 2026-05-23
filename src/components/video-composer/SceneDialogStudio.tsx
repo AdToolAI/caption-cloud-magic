@@ -207,6 +207,12 @@ const T = {
     srsLabel: 'Avanzado: en su lugar, déjalo como voz en off sobre una escena compartida',
     srsHint: 'Por defecto con varios hablantes (con retratos): cada hablante tiene su propio plano lip-sync. Activa el interruptor si solo quieres una escena de grupo con voz en off.',
     close: 'Cerrar',
+    continuityLocked: 'Continuidad bloqueada',
+    continuityInherited: (n: number) => `Continuidad heredada de la escena ${n}`,
+    continuityTooltip: 'Las escenas siguientes con el mismo reparto heredan este ancla de identidad automáticamente.',
+    continuityTooltipInherited: (n: number) => `La apariencia del reparto se ajusta a la escena ${n}.`,
+    continuityRemove: 'Quitar bloqueo',
+    continuityForce: 'Forzar bloqueo propio',
   },
 };
 
