@@ -628,9 +628,12 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             ? reportedDuration
             : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
         }
+        // After both branches audioUrl is guaranteed to be a string.
+        const finalAudioUrl: string = audioUrl!;
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Unauthorized');
+
 
         const { error: insErr } = await supabase
           .from('scene_audio_clips')
