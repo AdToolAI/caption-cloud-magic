@@ -1,0 +1,35 @@
+---
+name: Meta Token Auto-Refresh
+description: Daily cron auto-renews IG_PAGE_ACCESS_TOKEN in app_secrets via fb_exchange_token; admin tab in QA Cockpit; manual fallback via InstagramTokenDialog when revoked
+type: feature
+---
+
+# Meta Long-Lived Token Auto-Refresh
+
+## Architektur (Single-Tenant)
+- Meta-Integration nutzt **einen** App-weiten Token in `app_secrets.IG_PAGE_ACCESS_TOKEN` (kein per-User-Token).
+- Long-Lived Page Tokens laufen alle 60 Tage ab → ohne Auto-Refresh muss alle 2 Monate manuell ein neuer Short-Token im Graph Explorer geholt und via `InstagramTokenDialog` eingefügt werden.
+
+## Auto-Refresh-Flow (`auto-refresh-meta-tokens` Edge Function)
+1. Liest `IG_PAGE_ACCESS_TOKEN` aus `app_secrets`.
+2. `GET /v24.0/debug_token` → liest `expires_at`, `is_valid`, `scopes`.
+3. Wenn `days_remaining < 14` und Token valid → `GET /v24.0/oauth/access_token?grant_type=fb_exchange_token` → frischer 60-Tage-Token.
+4. Backup alter Token in `kv_secrets_backup` mit SHA256-Hash.
+5. Upsert neuer Token in `app_secrets`.
+6. Modi: `mode: 'status'` (read-only), `mode: 'refresh'` (default, idempotent), `force: true` (refresh auch bei >14d Restlaufzeit).
+7. Reason-Codes: `not_due_yet`, `never_expires`, `token_invalid`, `exchange_failed`, `save_failed`.
+
+## Cron-Schedule
+- pg_cron job `auto-refresh-meta-tokens-daily`, läuft `0 3 * * *` UTC.
+- Ruft Edge-Function via `net.http_post` mit `{mode:'refresh', source:'cron'}`.
+
+## Fallback bei `token_invalid`
+- Edge-Function returnt `ok: false, reason: 'token_invalid'` — refresh wird **nicht** versucht (würde scheitern).
+- User muss neuen Short-Token aus Graph Explorer holen und via `InstagramTokenDialog` (ruft `instagram-token-renew`) einfügen.
+- `instagram-token-renew` bleibt unverändert die kanonische Quelle für initiale Token-Setups.
+
+## Admin-UI
+- Tab "Meta Token" in `QACockpit.tsx` → `MetaTokenHealthTab.tsx`.
+- Zeigt: Status (gesund/refresh fällig/invalid), Ablauf, Restlaufzeit, last6, Scopes.
+- Buttons: "Check / Refresh wenn nötig" + "Force Refresh".
+- Auto-refetch alle 60s.
