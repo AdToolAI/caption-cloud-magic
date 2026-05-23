@@ -1,76 +1,95 @@
 ## Diagnose
 
-Der aktuelle Lauf ist nicht mehr beim eigentlichen Lip-Sync hängen geblieben:
+Der generische Toast ist nur das Symptom. Die echten Logs zeigen den konkreten Fehler:
 
-- Alle 3 Sync.so-Turns sind fertig und haben `output_url`.
-- Die Szene steht seitdem auf `stitching`.
-- Der Fehler ist: `dialog_stitch_dispatch: Edge Function returned a non-2xx status code`.
-- Es wurde kein `video_renders`-Eintrag für `dialog-stitch` angelegt. Das heißt: der finale Artlist-Schritt, der die fertigen Einzel-Turns in einen Master-Clip zusammensetzt, startet gar nicht sauber.
+```text
+render-dialog-stitch -> invoke-remotion-render -> AWS Lambda
+Lambda HTTP 403: {"message":"The security token included in the request is invalid."}
+```
+
+**Do I know what the issue is?** Ja.
+
+Der Lip-Sync selbst ist nicht mehr das Problem. Die einzelnen Sync.so-Turns sind fertig. Der Fehler passiert erst beim finalen Artlist-Schritt: `render-dialog-stitch` versucht den Remotion-Lambda-Render zu starten, aber AWS lehnt die Signatur ab.
+
+Wahrscheinliche Ursache:
+- Die gespeicherten AWS-Credentials sind abgelaufen, falsch rotiert oder nicht vollständig.
+- Falls es temporäre AWS/STS-Credentials sind, fehlt zusätzlich `AWS_SESSION_TOKEN`. Externe Referenz bestätigt: temporäre AWS-Credentials brauchen Access Key, Secret Key und Session Token.
+- Aktuell sind `AWS_ACCESS_KEY_ID` und `AWS_SECRET_ACCESS_KEY` vorhanden, aber kein `AWS_SESSION_TOKEN`.
 
 ## Ziel
 
-Die Pipeline soll wie Artlist robust enden:
+Die Pipeline soll nicht mehr 13+ Minuten mit einem generischen Edge-Function-Fehler hängen bleiben, sondern:
 
 ```text
-Master-Video + Master-Audio
+Sync.so-Turns fertig
         ↓
-Turn 1 Sync.so output
-Turn 2 Sync.so output
-Turn 3 Sync.so output
+Stitch-Render Credential-Check
         ↓
-finaler deterministic Stitch
+bei gültigen AWS-Credentials: Lambda startet finalen DialogStitchVideo Render
+bei ungültigen AWS-Credentials: sofort klarer Fehler + kein Retry-Spam
         ↓
-clip_url gesetzt, Lip-Sync fertig
+aktuelle Szene nach Credential-Fix ohne neue Sync.so-Kosten retten
 ```
 
-Kein Rückfall auf den letzten Sync.so-Output, kein falscher Sprecher, kein 13-Minuten-Hängen.
+## Implementierungsplan
 
-## Fix-Plan
+1. **AWS-Credential-Signing fixen**
+   - In `invoke-remotion-render` wird `AWS_SESSION_TOKEN` optional unterstützt.
+   - Wenn `AWS_SESSION_TOKEN` vorhanden ist, wird er an `AwsClient` übergeben.
+   - Dadurch funktionieren auch temporäre AWS/STS-Credentials korrekt.
 
-1. **Stitch-Dispatch-Fehler sichtbar machen**
-   - `render-dialog-stitch` soll bei jedem Fehler konkrete Details in `clip_error` und Logs schreiben.
-   - Der aktuell generische Fehler `Edge Function returned a non-2xx status code` reicht nicht für stabile Wiederherstellung.
+2. **Credential-Preflight einbauen**
+   - Vor dem eigentlichen Lambda-Invoke prüft `invoke-remotion-render`, ob die benötigten AWS-Secrets sinnvoll vorhanden sind.
+   - Bei fehlenden oder ungültigen Credentials wird ein strukturierter Fehler zurückgegeben, z. B. `aws_credentials_invalid`.
+   - Der Fehler wird nicht mehr als normale `validation` klassifiziert.
 
-2. **Idempotenten Retry reparieren**
-   - Wenn alle Shots `ready` sind und noch kein `stitch.render_id` existiert, muss jeder Poll den Stitch erneut versuchen.
-   - Wenn ein `video_renders`-Insert oder Lambda-Invoke fehlschlägt, darf der Zustand nicht in einer unklaren Zwischenlage bleiben.
+3. **Retry-Spam stoppen**
+   - `render-dialog-stitch` und `poll-dialog-shots` sollen AWS-403/Credential-Fehler als blockierten Infrastrukturzustand behandeln.
+   - Das System soll nicht jede Minute denselben Stitch neu versuchen, solange die Credentials ungültig sind.
+   - Szene bleibt rettbar, aber der Status wird eindeutig: `stitching_blocked_credentials` bzw. klarer `clip_error`.
 
-3. **Stitch-Payload an echte Szene anpassen**
-   - Aktuelle Szene hat `video_width=1376`, `video_height=768`, aber `render-dialog-stitch` erzwingt 1280x720.
-   - Ich passe den Stitch so an, dass er die gespeicherten Master-Dimensionen verwendet und nur auf gerade Werte normalisiert.
-   - Dadurch vermeiden wir Remotion-/Lambda-Validierungsfehler oder Medienalignment-Probleme.
+4. **Bessere UI-/Toast-Meldung vorbereiten**
+   - Der Frontend-Fehler soll nicht mehr nur `Edge Function returned a non-2xx status code` anzeigen.
+   - Die vorhandene Fehlerextraktion wird genutzt/erweitert, damit der User sieht: finaler Render konnte wegen ungültiger Render-Credentials nicht gestartet werden.
 
-4. **Remotion-Stitch robuster machen**
-   - `DialogStitchVideo` bekommt Zielbreite/-höhe aus Props.
-   - Overlay-Clips bleiben zeitlich synchron über `startFrom`, aber das Canvas passt zur Master-Plate.
-   - Optionaler Fallback: Wenn ein Shot-Fenster minimal außerhalb der Dauer liegt, wird es hart geklemmt statt den Render zu crashen.
+5. **Aktuelle Szene retten**
+   - Nach dem Credential-Fix wird die hängende Szene nicht komplett neu lip-synced.
+   - Nur der finale Stitch wird erneut angestoßen, weil die Sync.so-Outputs bereits fertig sind.
+   - Falls ein fehlgeschlagener `video_renders`-Eintrag existiert, wird der stale Stitch-Status bereinigt und erneut dispatcht.
 
-5. **Poller darf `stitching` nicht liegen lassen**
-   - Der Cron-Selector verarbeitet aktuell nur `lip_sync_status = 'running'`.
-   - Szenen mit `lip_sync_status = 'stitching'` müssen ebenfalls gepollt/retrybar sein, solange `lip_sync_applied_at` fehlt.
-   - Das ist wahrscheinlich der Grund, warum der Lauf nach dem ersten Stitch-Fehler nicht automatisch weitergeht.
+6. **Absicherung dokumentieren**
+   - Memory/Plan wird aktualisiert: Für Remotion-Lambda darf ein AWS-403 nicht als Sync.so- oder Dialogfehler behandelt werden.
+   - Wichtig: Kein Refund oder erneuter Sync.so-Burn bei reinen Stitch-Credential-Problemen.
 
-6. **Watchdog-Regel korrigieren**
-   - Ready-Shots + Stitch-Dispatch-Problem darf nicht nach 12 Minuten als Sync.so-Timeout behandelt werden.
-   - Der Watchdog soll `stitching` als eigenen Zustand sehen: Retry/gelb warten, erst bei definitivem Lambda-Fehler terminal scheitern.
+## Dateien, die ich im Build-Modus anfassen würde
 
-7. **Bestehende hängende Szene retten**
-   - Nach dem Code-Fix wird die aktuelle Szene `63b47104-05ca-43c7-846d-77d60777e924` erneut durch `poll-dialog-shots`/`render-dialog-stitch` angestoßen.
-   - Da alle Sync.so-Ergebnisse bereits fertig sind, müssen keine Lip-Sync-Credits erneut verbraucht werden.
-
-## Dateien
-
-- `supabase/functions/poll-dialog-shots/index.ts`
+- `supabase/functions/invoke-remotion-render/index.ts`
 - `supabase/functions/render-dialog-stitch/index.ts`
-- `src/remotion/templates/DialogStitchVideo.tsx`
-- `src/remotion/Root.tsx`
-- ggf. Watchdog-Funktion, falls sie die 12-Minuten-Fehlklassifizierung enthält
-- `mem://features/video-composer/dialog-shot-pipeline`
+- `supabase/functions/poll-dialog-shots/index.ts`
+- ggf. `src/hooks/useTwoShotAutoTrigger.ts` oder die Toast-Fehlerstelle, falls der generische Fehler dort entsteht
+- `mem/features/video-composer/dialog-shot-pipeline`
 - `.lovable/plan.md`
+
+## Benötigte externe Konfiguration
+
+Wenn die gespeicherten AWS-Credentials tatsächlich abgelaufen/falsch sind, muss zusätzlich ein Secret aktualisiert werden:
+
+- Entweder neue permanente AWS Render-Credentials für `AWS_ACCESS_KEY_ID` und `AWS_SECRET_ACCESS_KEY`
+- Oder bei temporären Credentials zusätzlich `AWS_SESSION_TOKEN`
+
+Der Code-Fix sorgt dafür, dass ein vorhandener Session Token korrekt verwendet wird und dass der Fehler künftig eindeutig angezeigt wird.
 
 ## Erwartetes Ergebnis
 
-- Bei fertigen Turns startet der finale Stitch zuverlässig.
-- Ein temporärer Lambda-/Dispatch-Fehler bleibt retrybar statt ewig bei 95% zu hängen.
-- Der fertige Clip nutzt weiterhin Master-Audio + per-speaker Overlay-Fenster, also die Artlist-Logik ohne Sprecher-Verwechslung.
-- Die aktuelle Szene kann ohne erneute Sync.so-Kosten abgeschlossen werden.
+- Der Edge-Function-Fehler wird konkret und verständlich.
+- Keine endlosen 13-Minuten-Hänger mehr bei ungültigen AWS-Credentials.
+- Die Artlist-Logik bleibt erhalten: keine Video-Chaining-Rückkehr, kein falscher Sprecher.
+- Die aktuelle Szene kann nach korrigierten Credentials durch den finalen Stitch abgeschlossen werden, ohne neue Sync.so-Kosten.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
