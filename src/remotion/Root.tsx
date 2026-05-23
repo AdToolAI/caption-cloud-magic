@@ -483,10 +483,17 @@ export const RemotionRoot: React.FC = () => {
             const fps = 30;
             const total = Math.max(0.5, Number(props.totalSec) || 6);
             const durationInFrames = Math.max(30, Math.ceil(total * fps));
-            // Master clip dimensions are 1280x720 (Hailuo i2v default). The
-            // renderer always picks the master's native aspect, but Remotion
-            // requires multiples of 2 — 1280x720 is safe.
-            return { durationInFrames, fps, width: 1280, height: 720 };
+            const even = (value: unknown, fallback: number) => {
+              const n = Number(value);
+              const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+              return safe % 2 === 0 ? safe : safe - 1;
+            };
+            return {
+              durationInFrames,
+              fps,
+              width: even((props as any).targetWidth, 1280),
+              height: even((props as any).targetHeight, 720),
+            };
           } catch (err) {
             console.error('[DialogStitchVideo calculateMetadata] fallback', err);
             return { durationInFrames: 180, fps: 30, width: 1280, height: 720 };
