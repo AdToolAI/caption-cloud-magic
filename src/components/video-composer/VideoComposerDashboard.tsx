@@ -46,6 +46,7 @@ import ShareProjectDialog from './ShareProjectDialog';
 import CollaboratorAvatars from './CollaboratorAvatars';
 import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
+import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
