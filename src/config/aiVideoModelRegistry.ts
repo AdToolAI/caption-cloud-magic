@@ -54,6 +54,13 @@ export interface ToolkitModel {
     multiRef?: boolean;
     /** Max number of reference images supported when multiRef is true. */
     maxReferences?: number;
+    /**
+     * Native dialogue: model generates video + speech + lip-sync in a single
+     * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
+     * Set true only for models that produce in-frame synchronous mouth
+     * articulation matched to the generated audio.
+     */
+    nativeDialogue?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
