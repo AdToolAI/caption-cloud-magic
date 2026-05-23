@@ -56,8 +56,12 @@ interface DialogShot {
   speaker_idx: number;
   speaker_name: string;
   character_id: string | null;
-  /** Single time window for THIS turn. */
+  /** Single time window for THIS turn (tight voiced range). */
   window: [number, number];
+  /** v9 Artlist-style: slightly expanded window (lead-in/tail) used both
+   *  as Sync.so `segments_secs` and as the Lambda-stitch overlay range.
+   *  Persisting it guarantees stitch + lipsync target the IDENTICAL slice. */
+  render_window?: [number, number];
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
