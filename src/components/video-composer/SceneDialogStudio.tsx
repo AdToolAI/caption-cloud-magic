@@ -1299,6 +1299,44 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         {isMonologue ? t.subtitleMono : t.subtitle}
       </p>
 
+      {/* Phase C.1 — Continuity Auto-Lock badge */}
+      {scene.lockReferenceUrl && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {scene.lockSource === 'inherited' ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300"
+              title={t.continuityTooltipInherited(scene.lockSourceSceneIndex ?? 0)}
+            >
+              <Lock className="h-3 w-3" />
+              {t.continuityInherited(scene.lockSourceSceneIndex ?? 0)}
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-primary/50 bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary"
+              title={t.continuityTooltip}
+            >
+              <Lock className="h-3 w-3" />
+              {t.continuityLocked}
+            </span>
+          )}
+          <img
+            src={scene.lockReferenceUrl}
+            alt="lock reference"
+            className="h-6 w-10 rounded object-cover border border-border/40"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={() => onUpdate({ lockReferenceUrl: undefined })}
+          >
+            {scene.lockSource === 'inherited' ? t.continuityForce : t.continuityRemove}
+          </Button>
+        </div>
+      )}
+
+
       {generating && genStage && (
         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-[11px] text-primary">
           <Loader2 className="h-3 w-3 animate-spin" />
