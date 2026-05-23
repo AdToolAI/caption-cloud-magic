@@ -145,6 +145,12 @@ const T = {
     srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',
     srsHint: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.',
     close: 'Schließen',
+    continuityLocked: 'Continuity gesperrt',
+    continuityInherited: (n: number) => `Continuity erbt von Szene ${n}`,
+    continuityTooltip: 'Folgeszenen mit gleichem Cast erben diesen Identity-Anker automatisch.',
+    continuityTooltipInherited: (n: number) => `Sarah/Matthew werden visuell an Szene ${n} angeglichen.`,
+    continuityRemove: 'Lock entfernen',
+    continuityForce: 'Eigenen Lock erzwingen',
   },
   en: {
     title: 'Scene Script',
