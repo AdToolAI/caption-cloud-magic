@@ -483,6 +483,13 @@ serve(async (req) => {
     // block so the TTS engine produces a natural pause between speakers — no
     // synthetic silence injection between utterances.
     const sampleBuffers: Int16Array[] = [];
+    // Per-segment PCM kept SEPARATE from `sampleBuffers` (which also contains
+    // inter-speaker pause silence). Earlier we used `sampleBuffers[i]` as the
+    // PCM for segment `i`, but indices were misaligned because pauses are
+    // pushed between utterances → speaker 2 received a 0.25s silence as its
+    // "track audio" and speaker 3 received speaker 2's PCM. That bug caused
+    // Sync.so to animate the wrong face on a silent track ("ghost speech").
+    const segmentPcm: Int16Array[] = [];
     const segments: Array<{
       speaker: string;
       speaker_slug: string;
@@ -580,6 +587,7 @@ serve(async (req) => {
       });
       cursorSamples = endSample;
       sampleBuffers.push(pcm);
+      segmentPcm.push(pcm);
     }
 
     const spokenSamples = concatSamples(sampleBuffers);
@@ -656,7 +664,7 @@ serve(async (req) => {
         existing.startSec = Math.min(existing.startSec, seg.startSec);
         existing.endSec = Math.max(existing.endSec, seg.endSec);
         existing.turns.push({ startSec: seg.startSec, endSec: seg.endSec, text_index: i });
-        existing.items.push({ segment: seg, samples: sampleBuffers[i], index: i });
+        existing.items.push({ segment: seg, samples: segmentPcm[i], index: i });
       } else {
         groups.set(key, {
           speaker: seg.speaker,
@@ -667,7 +675,7 @@ serve(async (req) => {
           startSec: seg.startSec,
           endSec: seg.endSec,
           turns: [{ startSec: seg.startSec, endSec: seg.endSec, text_index: i }],
-          items: [{ segment: seg, samples: sampleBuffers[i], index: i }],
+          items: [{ segment: seg, samples: segmentPcm[i], index: i }],
         });
       }
     }

@@ -410,11 +410,11 @@ serve(async (req) => {
     if (!userId) return json({ error: "missing_user" }, 403);
 
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
-    const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
-    const speakers = Array.isArray(twoshot.speakers)
+    let twoshot = (plan.twoshot ?? {}) as Record<string, any>;
+    let speakers = Array.isArray(twoshot.speakers)
       ? (twoshot.speakers as TwoshotSpeaker[])
       : [];
-    const masterAudioUrl = String(twoshot.url ?? "");
+    let masterAudioUrl = String(twoshot.url ?? "");
     const totalSec = Number(twoshot.totalSec ?? 0);
     const faceMap = (twoshot.faceMap ?? null) as {
       faces?: Array<{
@@ -435,6 +435,71 @@ serve(async (req) => {
         },
         422,
       );
+    }
+
+    // ── v8 staleness guard: detect the per-speaker-track bug ────────────
+    // Older `compose-twoshot-audio` builds aligned `sampleBuffers[i]` to the
+    // segment index, but `sampleBuffers` also contained inter-speaker
+    // pause-silence between utterances. The result was that the 2nd
+    // speaker's `track_url` contained the 0.25s pause as its only audio,
+    // and the 3rd speaker's track contained the 2nd speaker's PCM. Sync.so
+    // then animated the wrong face or no face at all → "ghost speech".
+    //
+    // Heuristic: a speaker whose script turns sum to ≥ TURN_DUR seconds but
+    // whose `voicedRange.voicedSec` is < ~0.4s is almost certainly a victim
+    // of the old bug. Regenerate audio (force_regenerate=true) before
+    // spending any Sync.so credits on broken tracks.
+    const STALE_VOICED_THRESHOLD = 0.4;
+    const stalePerSpeakerTrack = speakers.some((sp) => {
+      const turns = Array.isArray(sp.voicedRange?.turns) ? sp.voicedRange!.turns! : [];
+      const turnSum = turns.reduce(
+        (s, t) => s + Math.max(0, Number(t.endSec) - Number(t.startSec)),
+        0,
+      );
+      const voiced = Number((sp as any)?.voicedRange?.voicedSec) || 0;
+      return turnSum >= 0.6 && voiced > 0 && voiced < STALE_VOICED_THRESHOLD;
+    });
+    if (stalePerSpeakerTrack) {
+      console.warn(
+        `[compose-dialog-scene] scene ${sceneId} has stale per-speaker tracks ` +
+          `(voicedSec << turn duration) — regenerating audio before Sync.so dispatch.`,
+      );
+      try {
+        const regen = await fetch(`${supabaseUrl}/functions/v1/compose-twoshot-audio`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${serviceKey}`,
+          },
+          body: JSON.stringify({ scene_id: sceneId, force_regenerate: true }),
+        });
+        if (!regen.ok) {
+          const t = await regen.text().catch(() => "");
+          console.error(
+            `[compose-dialog-scene] audio regeneration failed status=${regen.status} body=${t.slice(0, 300)}`,
+          );
+        }
+      } catch (e) {
+        console.error(
+          `[compose-dialog-scene] audio regeneration crashed: ${(e as Error)?.message}`,
+        );
+      }
+      // Reload the scene so we use the freshly built audio_plan.
+      const { data: refreshed } = await supabase
+        .from("composer_scenes")
+        .select("audio_plan")
+        .eq("id", sceneId)
+        .single();
+      if (refreshed?.audio_plan) {
+        const freshPlan = refreshed.audio_plan as any;
+        const fresh = freshPlan?.twoshot;
+        if (fresh?.url && Array.isArray(fresh.speakers)) {
+          (plan as any).twoshot = fresh;
+          twoshot = fresh;
+          speakers = fresh.speakers as TwoshotSpeaker[];
+          masterAudioUrl = String(fresh.url ?? "");
+        }
+      }
     }
 
     const sourceClipUrl =
