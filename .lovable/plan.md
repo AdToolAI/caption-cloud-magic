@@ -1,38 +1,60 @@
-## Diagnose (bestätigt aus Phase-1-Logs)
+## Problem
 
-Sync.so liefert nur `"error": "An unknown error occurred."` — keine weiteren Felder. Die echte Ursache ist aber im Payload-Muster sichtbar:
+Das Lip Sync selbst schlägt aktuell nicht mehr bei Sync.so fehl: die einzelnen Turns werden erfolgreich erzeugt. Der neue Fehler passiert danach beim Zusammenfügen:
 
-- **Turn 0** (`segments_secs: [[0, ~2.3]]`) → ✅ erfolgreich
-- **Turn 1 + 2** (`segments_secs: [[2.26, 3.43]]` bzw. `[[3.44, 6.52]]`) → ❌ FAILED, beide mit `frame_number: 0`
+```text
+Spawning subprocesses is not allowed on Supabase Edge Runtime.
+```
 
-Das Problem: `active_speaker_detection.coordinates` werden bei `frame_number: 0` gesampelt — also am Anfang des Master-Videos — während Sync.so erst ab Sekunde 2.26+ überhaupt verarbeitet. An Frame 0 sitzt der Sprecher selten an genau den Pixelkoordinaten, die später aus dem Anchor extrahiert wurden. Sync.so findet keine Face an `(605,269)` bei Frame 0 → silent failure. Turn 0 funktioniert nur, weil dessen Fenster bei 0 startet.
+Ursache: `poll-dialog-shots` versucht am Ende `ffmpeg` per `Deno.Command` im Edge Runtime zu starten. Das ist dort grundsätzlich verboten. Deshalb landen Szenen nach erfolgreichen Sync.so-Turns trotzdem bei `dialog_stitch_failed`.
 
-## Fix (eine Datei, ~30 Zeilen Diff)
+## Plan
 
-`supabase/functions/poll-dialog-shots/index.ts` → `startSyncTurnJob`:
+1. **Edge-Function stabilisieren**
+   - `poll-dialog-shots` darf kein `Deno.Command("ffmpeg")` mehr nutzen.
+   - Die Funktion soll weiterhin Sync.so-Jobs serialisieren und pollen.
+   - Sobald alle Shots `ready` sind, markiert sie die Szene nicht mehr als fehlgeschlagen, sondern übergibt das Stitching an einen renderfähigen Pfad.
 
-1. **Primary: `auto_detect: true` im Turn-Fenster.** Statt fixe Coords + `frame_number: 0` schicken wir `active_speaker_detection: { auto_detect: true }` zusammen mit den per-Turn `segments_secs`. Sync.so erkennt dann den Sprecher selbst innerhalb des Fensters — robust gegen leichte Camera-Moves, exakt das was die [Lipsync-Pro-Policy](mem://architecture/lipsync/sync-so-pro-model-policy) für Auto-Detect bereits als Fallback vorsieht.
+2. **Stitching über Remotion/Lambda statt Edge-ffmpeg**
+   - Neue Remotion-Komposition für Dialog-Stitching hinzufügen.
+   - Sie rendert aus:
+     - Master-Video für Lücken,
+     - pro-Turn Sync.so-Output für die jeweiligen Zeitfenster,
+     - Master-WAV als finale Audiospur.
+   - Damit ersetzen wir das verbotene Edge-ffmpeg durch den bereits vorhandenen Lambda-Renderpfad.
 
-2. **Fallback bei `auto_detect`-Failure: Coords + korrekter `frame_number`.** Falls Sync.so im ersten Versuch trotzdem failed (z.B. zwei Gesichter im Frame, kein klares Voiced-Signal), retry mit den bisherigen Coords aus FaceMap, aber `frame_number = round(turn.startSec * fps)` (24fps Hailuo-Default, optional aus Master-Clip-Probe). Damit sampelt Sync.so Coords im Turn-Fenster statt am Video-Anfang.
+3. **Neue interne Stitch-Edge-Function hinzufügen**
+   - Eine kleine Funktion startet den Lambda-Render mit der neuen Komposition.
+   - Sie legt einen `video_renders`-Eintrag an und nutzt den bestehenden `invoke-remotion-render` + `remotion-webhook` Flow.
+   - `poll-dialog-shots` ruft diese Funktion an, sobald alle Shots bereit sind.
 
-3. **Diagnostik beibehalten.** Phase-1-Logging bleibt aktiv — falls auch der Fallback failed, sehen wir es sofort.
+4. **Webhook aktualisieren**
+   - `remotion-webhook` erkennt `source: 'dialog-stitch'`.
+   - Bei Erfolg aktualisiert er die passende `composer_scenes`-Zeile:
+     - `clip_url = finalOutputUrl`
+     - `lip_sync_applied_at = now()`
+     - `lip_sync_status = 'done'`
+     - `twoshot_stage = 'done'`
+     - `dialog_shots.status = 'done'`
+   - Bei Fehler setzt er `lip_sync_status = 'failed'`, speichert die Fehlermeldung und erstattet idempotent über den vorhandenen `refunded`-Status.
 
-## Was sich NICHT ändert
+5. **Recovery für bereits fehlgeschlagene Szenen**
+   - Szenen, die schon `dialog_stitch_failed: Spawning subprocesses...` haben und deren Shots alle `ready` sind, können ohne erneutes Sync.so erneut in den neuen Stitch-Pfad geschickt werden.
+   - Das vermeidet unnötige neue Provider-Kosten.
 
-- Kein Concurrency-Pool (alle 3 Turns weiter parallel — Concurrency war nicht die Ursache, Turn 0 lief ja parallel zu 1+2 und kam durch).
-- Keine Window-Mindestlänge, keine Padding-Strategie (Längen waren ausreichend).
-- Keine UI-Änderung, keine DB-Migration, keine Credit-Logik (idempotenter Refund existiert bereits).
-- `compose-twoshot-lipsync`/`compose-dialog-scene` bleiben unverändert.
+6. **Deploy & Verifikation**
+   - Betroffene Edge Functions deployen.
+   - `poll-dialog-shots` erneut auf eine betroffene Szene ausführen.
+   - Logs prüfen: keine Edge-ffmpeg-Fehler mehr, stattdessen Lambda-Stitch-Render gestartet.
 
-## Verifikation
+## Technische Dateien
 
-1. Edge Function deployen.
-2. User triggert eine 3-Turn-Dialog-Szene neu.
-3. `supabase--edge_function_logs poll-dialog-shots` lesen: erwartet `auto_detect=true` Pfad, alle 3 Turns ready.
-4. Falls noch Failures: Fallback-Pfad mit `frame_number=…` greift automatisch, wir sehen den ursprünglichen Sync.so-Response.
+- `supabase/functions/poll-dialog-shots/index.ts`
+- neue Funktion: `supabase/functions/render-dialog-stitch/index.ts`
+- `supabase/functions/remotion-webhook/index.ts`
+- neue Remotion-Komposition/Template in `src/remotion`
+- `src/remotion/Root.tsx`
 
-## Geänderte Dateien
+## Wichtig
 
-- `supabase/functions/poll-dialog-shots/index.ts` (nur `startSyncTurnJob` + neuer 1× Retry mit Fallback-Coords).
-
-Keine neue Edge Function, keine DB-Migration, keine UI-Änderung.
+Das ist kein Sync.so-Plan-Upgrade-Problem. Ein Sync.so-Upgrade würde diesen Fehler nicht beheben, weil der Crash in unserem Stitching-Schritt passiert.
