@@ -91,6 +91,7 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let sceneIdForDiagnostics: string | undefined;
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -98,6 +99,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
+    sceneIdForDiagnostics = sceneId;
     if (!sceneId) return json({ error: "sceneId is required" }, 400);
 
     const { data: scene, error: sceneErr } = await supabase
@@ -309,16 +311,14 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[render-dialog-stitch] fatal", e);
-    const body = await req.clone().json().catch(() => ({}));
-    const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
-    if (sceneId) {
+    if (sceneIdForDiagnostics) {
       try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, serviceKey);
         await markSceneError(
           supabase,
-          sceneId,
+          sceneIdForDiagnostics,
           null,
           e instanceof Error ? e.message : "unknown fatal",
         );
