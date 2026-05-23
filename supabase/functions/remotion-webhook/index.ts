@@ -37,9 +37,11 @@ serve(async (req) => {
     const isDirectorsCut = source === 'directors-cut';
     const isComposer = source === 'composer';
     const isLongForm = source === 'sora-long-form';
+    const isDialogStitch = source === 'dialog-stitch';
     const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
+    const composerSceneId = customData?.composer_scene_id;
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
@@ -173,7 +175,47 @@ serve(async (req) => {
         }
       }
 
-      if (isDirectorsCut && renderJobId) {
+      if (isDialogStitch) {
+        // ── Dialog-stitch render (cinematic-sync N-speaker pipeline) ──
+        // Lambda-side replacement for the forbidden Edge-Runtime ffmpeg.
+        // Writes the stitched clip back onto composer_scenes and marks
+        // lip_sync_applied_at so the composer treats the scene as done.
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'completed',
+            video_url: finalOutputUrl,
+            error_message: null,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        if (composerSceneId) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          const nowIso = new Date().toISOString();
+          await supabaseAdmin.from('composer_scenes').update({
+            clip_url: finalOutputUrl,
+            lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
+            lip_sync_applied_at: nowIso,
+            lip_sync_status: 'done',
+            twoshot_stage: 'done',
+            clip_error: null,
+            dialog_shots: {
+              ...prevState,
+              status: 'done',
+              final_url: finalOutputUrl,
+              finished_at: nowIso,
+            },
+            updated_at: nowIso,
+          }).eq('id', composerSceneId);
+          console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
+        } else {
+          console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
+        }
+      } else if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
           status: 'completed', output_url: finalOutputUrl, error_message: null,
@@ -458,7 +500,49 @@ serve(async (req) => {
 
       console.log(`🔍 Error fingerprint: ${errorFingerprint}`);
 
-      if (isDirectorsCut && renderJobId) {
+      if (isDialogStitch) {
+        // ── Dialog-stitch failure path: mark scene failed + refund credits
+        //    idempotently via dialog_shots.refunded. Sync.so per-turn costs
+        //    were charged up-front by compose-dialog-scene.
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'failed',
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        if (composerSceneId) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots, project_id')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          let refundedFlag = !!prevState.refunded;
+          const refundCredits = Number(prevState.cost_credits) || 0;
+          if (!refundedFlag && refundCredits > 0 && userId) {
+            try {
+              await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: refundCredits });
+              refundedFlag = true;
+            } catch (e) {
+              console.warn('💋 [dialog-stitch] refund failed', (e as Error).message);
+            }
+          }
+          await supabaseAdmin.from('composer_scenes').update({
+            lip_sync_status: 'failed',
+            twoshot_stage: 'failed',
+            clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
+            dialog_shots: {
+              ...prevState,
+              status: 'failed',
+              error: errorMessage.slice(0, 500),
+              refunded: refundedFlag,
+            },
+            updated_at: new Date().toISOString(),
+          }).eq('id', composerSceneId);
+          console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
+        }
+      } else if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
           status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString(),

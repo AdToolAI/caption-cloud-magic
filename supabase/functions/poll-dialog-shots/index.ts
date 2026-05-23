@@ -310,146 +310,36 @@ async function refundIfNeeded(
   return { ...state, refunded: true };
 }
 
-// ── ffmpeg time-slice stitch ───────────────────────────────────────────
-
-async function downloadTo(url: string, dest: string): Promise<void> {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`download ${url} → ${r.status}`);
-  const bytes = new Uint8Array(await r.arrayBuffer());
-  await Deno.writeFile(dest, bytes);
-}
-
-/**
- * Stitch per-turn Sync.so outputs into one final clip by time-slicing:
- * each turn's expanded window comes from its own out_T_i.mp4, gaps come
- * from the pristine master plate. Audio is the master WAV remuxed in at
- * the end (single re-encode generation everywhere).
- */
-async function stitchDialogShots(
+// ── Lambda-side stitch (replaces forbidden Edge-Runtime ffmpeg) ────────
+//
+// poll-dialog-shots used to run `ffmpeg` via Deno.Command to time-slice
+// per-turn outputs against the master plate and remux the WAV. Supabase
+// Edge Runtime forbids spawning subprocesses ("Spawning subprocesses is
+// not allowed on Supabase Edge Runtime."), so the stitch step now runs
+// inside AWS Lambda via the DialogStitchVideo Remotion composition.
+//
+// We just delegate to render-dialog-stitch, which:
+//   1. creates a video_renders row,
+//   2. invokes Remotion Lambda with the composition,
+//   3. lets remotion-webhook write the final clip_url back to the scene.
+async function dispatchDialogStitch(
   supabase: ReturnType<typeof createClient>,
-  state: DialogShotsState,
   sceneId: string,
-): Promise<string> {
-  const tmpDir = await Deno.makeTempDir({ prefix: "dialog-stitch-" });
-  try {
-    const masterPath = `${tmpDir}/master.mp4`;
-    await downloadTo(state.source_clip_url, masterPath);
-
-    // Download every shot output.
-    const shotsSorted = [...state.shots].sort(
-      (a, b) => a.window[0] - b.window[0],
-    );
-    const shotPaths: string[] = [];
-    for (const s of shotsSorted) {
-      if (!s.output_url) throw new Error(`shot ${s.idx} missing output_url`);
-      const p = `${tmpDir}/shot_${s.idx}.mp4`;
-      await downloadTo(s.output_url, p);
-      shotPaths.push(p);
-    }
-
-    const audioPath = `${tmpDir}/master.wav`;
-    await downloadTo(state.master_audio_url, audioPath);
-
-    const totalSec = state.total_sec;
-    // Build time-ordered segment list. Each segment names its source
-    // (master OR shot index) and its [t0, t1] window in absolute time.
-    // We use the EXPANDED windows (same as Sync.so saw) so the synced
-    // mouth coverage is fully captured.
-    type Seg = { src: string; t0: number; t1: number };
-    const segs: Seg[] = [];
-    let cursor = 0;
-    for (let i = 0; i < shotsSorted.length; i++) {
-      const s = shotsSorted[i];
-      const [wStart, wEnd] = expandWindow(s, shotsSorted);
-      const winStart = Math.max(cursor, wStart);
-      const winEnd = Math.min(totalSec, Math.max(winStart, wEnd));
-      if (winStart > cursor + 1e-3) {
-        segs.push({ src: masterPath, t0: cursor, t1: winStart });
-      }
-      if (winEnd > winStart + 1e-3) {
-        segs.push({ src: shotPaths[i], t0: winStart, t1: winEnd });
-      }
-      cursor = winEnd;
-    }
-    if (cursor < totalSec - 1e-3) {
-      segs.push({ src: masterPath, t0: cursor, t1: totalSec });
-    }
-
-    // ffmpeg one-shot: trim each segment from its source, concat video-only,
-    // then map master WAV as audio. Single re-encode at libx264 crf 18.
-    const args: string[] = [];
-    const inputIdxMap = new Map<string, number>();
-    for (const seg of segs) {
-      if (!inputIdxMap.has(seg.src)) {
-        inputIdxMap.set(seg.src, inputIdxMap.size);
-        args.push("-i", seg.src);
-      }
-    }
-    const audioInputIdx = inputIdxMap.size;
-    args.push("-i", audioPath);
-
-    const filterParts: string[] = [];
-    const labels: string[] = [];
-    segs.forEach((seg, i) => {
-      const inIdx = inputIdxMap.get(seg.src)!;
-      const lbl = `v${i}`;
-      filterParts.push(
-        `[${inIdx}:v]trim=start=${seg.t0.toFixed(3)}:end=${seg.t1.toFixed(3)},setpts=PTS-STARTPTS[${lbl}]`,
-      );
-      labels.push(`[${lbl}]`);
-    });
-    filterParts.push(`${labels.join("")}concat=n=${segs.length}:v=1:a=0[vout]`);
-
-    const outPath = `${tmpDir}/final.mp4`;
-    args.push(
-      "-filter_complex", filterParts.join(";"),
-      "-map", "[vout]",
-      "-map", `${audioInputIdx}:a`,
-      "-c:v", "libx264",
-      "-preset", "veryfast",
-      "-crf", "18",
-      "-pix_fmt", "yuv420p",
-      "-c:a", "aac",
-      "-b:a", "192k",
-      "-movflags", "+faststart",
-      "-shortest",
-      "-y", outPath,
-    );
-
-    console.log(
-      `[poll-dialog-shots] stitch: ${segs.length} segs, ${inputIdxMap.size} video inputs, total=${totalSec.toFixed(2)}s`,
-    );
-
-    const ff = await new Deno.Command("ffmpeg", {
-      args,
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    if (!ff.success) {
-      const err = new TextDecoder().decode(ff.stderr).slice(0, 1500);
-      throw new Error(`ffmpeg stitch failed: ${err.slice(0, 600)}`);
-    }
-
-    const outBytes = await Deno.readFile(outPath);
-    const finalPath = `dialog-stitched/${sceneId}_${Date.now()}.mp4`;
-    const { error: upErr } = await supabase.storage
-      .from("composer-clips")
-      .upload(finalPath, outBytes, {
-        contentType: "video/mp4",
-        upsert: true,
-      });
-    if (upErr) throw new Error(`upload final: ${upErr.message}`);
-    const { data: pub } = supabase.storage
-      .from("composer-clips")
-      .getPublicUrl(finalPath);
-    return pub.publicUrl;
-  } finally {
-    try {
-      await Deno.remove(tmpDir, { recursive: true });
-    } catch {
-      /* ignore */
-    }
+): Promise<{ ok: true; render_id: string } | { ok: false; error: string }> {
+  const { data, error } = await supabase.functions.invoke(
+    "render-dialog-stitch",
+    { body: { sceneId } },
+  );
+  if (error) {
+    return { ok: false, error: error.message ?? "invoke failed" };
   }
+  if (data && (data as any).render_id) {
+    return { ok: true, render_id: String((data as any).render_id) };
+  }
+  return {
+    ok: false,
+    error: `unexpected response: ${JSON.stringify(data).slice(0, 200)}`,
+  };
 }
 
 // ── Per-scene processor ─────────────────────────────────────────────────
@@ -595,40 +485,41 @@ async function processScene(
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: all shots ready → ffmpeg time-slice stitch + remux ──────
+  // ── Step 4: all shots ready → dispatch Lambda stitch ────────────────
+  // Edge Runtime cannot spawn ffmpeg, so the actual stitching runs as a
+  // Remotion Lambda render against the DialogStitchVideo composition.
+  // remotion-webhook writes clip_url + lip_sync_applied_at back to the
+  // scene when the render completes; this function just kicks it off.
   if (allReady) {
-    try {
-      console.log(`[poll-dialog-shots] all ${shots.length} shots ready, starting stitch`);
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          lip_sync_status: "stitching",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+    // Idempotency: if we already dispatched a stitch render for this scene,
+    // don't trigger again — just keep waiting for the webhook.
+    if ((state as any).stitch?.render_id) {
+      console.log(
+        `[poll-dialog-shots] scene ${sceneId} stitch already dispatched (render_id=${(state as any).stitch.render_id}); waiting for webhook`,
+      );
+      return { status: "stitching", mutated };
+    }
 
-      const finalUrl = await stitchDialogShots(supabase, newState, sceneId);
-      const nowIso = new Date().toISOString();
-      newState = { ...newState, final_url: finalUrl, finished_at: nowIso, status: "done" };
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          clip_url: finalUrl,
-          lip_sync_source_clip_url: state.source_clip_url,
-          lip_sync_applied_at: nowIso,
-          lip_sync_status: "done",
-          twoshot_stage: "done",
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-      console.log(`[poll-dialog-shots] scene ${sceneId} done → ${finalUrl}`);
-      return { status: "done", mutated: true };
-    } catch (e) {
-      const errMsg = (e as Error).message;
-      console.error(`[poll-dialog-shots] stitch failed for ${sceneId}:`, errMsg);
+    console.log(
+      `[poll-dialog-shots] all ${shots.length} shots ready for scene ${sceneId}, dispatching Lambda stitch`,
+    );
+    await supabase
+      .from("composer_scenes")
+      .update({
+        dialog_shots: newState,
+        lip_sync_status: "stitching",
+        twoshot_stage: "dialog_stitching",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sceneId);
+
+    const dispatched = await dispatchDialogStitch(supabase, sceneId);
+    if (!dispatched.ok) {
+      const errMsg = dispatched.error;
+      console.error(
+        `[poll-dialog-shots] dispatch stitch failed for ${sceneId}:`,
+        errMsg,
+      );
       newState = { ...newState, status: "failed", error: errMsg };
       if (userId) newState = await refundIfNeeded(supabase, userId, newState);
       await supabase
@@ -637,12 +528,17 @@ async function processScene(
           dialog_shots: newState,
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: `dialog_stitch_failed: ${errMsg}`.slice(0, 300),
+          clip_error: `dialog_stitch_dispatch_failed: ${errMsg}`.slice(0, 300),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       return { status: "failed", mutated: true };
     }
+
+    console.log(
+      `[poll-dialog-shots] scene ${sceneId} stitch dispatched render_id=${dispatched.render_id}`,
+    );
+    return { status: "stitching", mutated: true };
   }
 
   // ── Step 5: terminal failure → refund + persist ─────────────────────
