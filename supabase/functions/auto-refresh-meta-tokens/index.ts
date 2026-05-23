@@ -26,11 +26,15 @@ Deno.serve(async (req) => {
     }
     const mode: 'status' | 'refresh' = body.mode || url.searchParams.get('mode') || 'refresh';
     const force: boolean = body.force === true || url.searchParams.get('force') === 'true';
+    // target: 'global' (legacy single owner token), 'users' (per-user social_connections), 'both'
+    const target: 'global' | 'users' | 'both' =
+      (body.target || url.searchParams.get('target') || 'both') as any;
 
     const APP_ID = Deno.env.get('META_APP_ID');
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
 
     if (!APP_ID || !APP_SECRET) {
       return json({ ok: false, error: 'META_APP_ID/META_APP_SECRET fehlt' }, 500);
