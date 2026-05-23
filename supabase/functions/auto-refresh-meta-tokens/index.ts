@@ -1,10 +1,11 @@
-// Auto-Refresh Meta Long-Lived Page Token
-// - Liest IG_PAGE_ACCESS_TOKEN aus app_secrets
-// - Debugged Restlaufzeit via /debug_token
-// - Re-Exchanged via fb_exchange_token wenn < THRESHOLD_DAYS Tage Restlaufzeit
-// - Idempotent: mehrfaches Ausführen pro Tag schadet nicht
-// - Mode 'status': nur Info zurückgeben, nicht refreshen
+// Auto-Refresh Meta Long-Lived Tokens
+// - Global owner page token in app_secrets (IG_PAGE_ACCESS_TOKEN)
+// - Per-user FB Page + IG Business tokens in social_connections.access_token_hash
+// Both paths use fb_exchange_token if a token has < THRESHOLD_DAYS days left.
+// Mode 'status' returns info only; default 'refresh' attempts re-exchange.
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
+import { decryptToken, encryptToken } from '../_shared/crypto.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
