@@ -152,36 +152,46 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Publish error:', error);
-    const errorMessage = 'Failed to publish post';
 
-    // Try to update post with error
-    try {
-      const { postId } = await req.json();
-      if (postId) {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
+    const isMeta = error instanceof MetaPublishError;
+    const errorCode = isMeta ? error.code : 'PUBLISH_FAILED';
+    const reconnectRequired = isMeta ? error.reconnectRequired : false;
+    const userMessage = error?.message
+      ? String(error.message).slice(0, 500)
+      : 'Failed to publish post';
+
+    // Persist friendly error on the post row
+    if (capturedPostId) {
+      try {
         await supabase
           .from('posts')
-          .update({ error_message: errorMessage })
-          .eq('id', postId);
+          .update({
+            error_message: userMessage,
+            status: 'failed',
+          })
+          .eq('id', capturedPostId);
+      } catch (e) {
+        console.error('Error updating post error:', e);
       }
-    } catch (e) {
-      console.error('Error updating post error:', e);
     }
 
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({
+        error: userMessage,
+        code: errorCode,
+        reconnectRequired,
+        ...(isMeta && error.fbCode ? { fbCode: error.fbCode, fbSubcode: error.fbSubcode, fbTraceId: error.fbTraceId } : {}),
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: reconnectRequired ? 401 : 502,
       }
     );
   }
 }));
+
 
 // Platform-specific publishing functions
 
