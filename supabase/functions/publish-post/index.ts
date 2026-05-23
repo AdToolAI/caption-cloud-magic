@@ -33,10 +33,13 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let capturedPostId: string | null = null;
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+
 
     // Input validation
     const requestSchema = z.object({
