@@ -932,6 +932,7 @@ export default function VideoComposerDashboard() {
           cinematic_preset_slug: baseScene.cinematicPresetSlug ?? null,
           dialog_script: baseScene.dialogScript ?? null,
           dialog_voices: (baseScene.dialogVoices ?? null) as any,
+          dialog_takes: (baseScene.dialogTakes ?? {}) as any,
           engine_override: baseScene.engineOverride ?? 'auto',
           character_shots: (baseScene.characterShots ?? null) as any,
         } as any)
