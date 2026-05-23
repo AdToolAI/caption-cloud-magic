@@ -45,6 +45,28 @@ export const COMPOSER_AVAILABLE_MODELS: ToolkitModel[] = [
   IMAGE_TOOLKIT_MODEL,
 ];
 
+/**
+ * Clip sources whose underlying provider family supports professional native
+ * dialogue + lip-sync end-to-end. Used by the SceneCard "Dialog & Lip-Sync"
+ * toggle to gate the model picker and auto-fall back when the user switches
+ * dialogue on while a non-dialogue model (e.g. Hailuo, Seedance, Pika) is
+ * selected.
+ */
+export const NATIVE_DIALOGUE_CLIP_SOURCES: ReadonlyArray<ClipSource> = [
+  'ai-kling',
+  'ai-veo',
+  'ai-happyhorse',
+];
+
+/** Composer dropdown models filtered to the dialog-capable subset. */
+export const COMPOSER_DIALOG_MODELS: ToolkitModel[] = COMPOSER_AVAILABLE_MODELS.filter(
+  (m) => m.capabilities?.nativeDialogue === true,
+);
+
+/** Cheapest dialog-capable fallback when the user toggles dialogue on. */
+export const DIALOG_FALLBACK_CLIP_SOURCE: ClipSource = 'ai-happyhorse';
+export const DIALOG_FALLBACK_CLIP_QUALITY: ClipQuality = 'standard';
+
 /** Map a toolkit modelId → composer (clipSource, clipQuality). */
 export function modelIdToSource(modelId: string): { clipSource: ClipSource; clipQuality: ClipQuality } {
   if (modelId === IMAGE_TOOLKIT_MODEL.id) {
