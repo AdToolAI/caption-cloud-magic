@@ -1,72 +1,85 @@
 ## Ziel
-Meta (Instagram + Facebook) Long-Lived Tokens **automatisch** alle ~50 Tage erneuern, bevor sie nach 60 Tagen ablaufen — keine manuelle Token-Eingabe mehr nötig.
 
-## Was wir bereits haben (wiederverwenden)
-- `instagram-token-renew` — Edge-Function, die per `fb_exchange_token` aus einem Token einen 60-Tage Long-Lived Page-Token erzeugt. **Wird zur Kernlogik wiederverwendet.**
-- `token-expiry-notifier` — Daily Cron, mailt User bei <7d Restlaufzeit.
-- `social_connections` Tabelle mit `provider`, `account_id`, `access_token_hash`, `token_expires_at`.
-- `instagram_token_backups` — Audit-Log für Token-Wechsel.
+Jeder verbundene User kann auf **seinen eigenen** Facebook-Page und Instagram-Business-Account posten — nicht mehr nur App-Admins/Test-User. Dafür muss die zentrale Dispatcher-Function `publish-post` repariert und um echte Multi-Tenancy + alle Medienformate erweitert werden.
 
-## Was fehlt und gebaut wird
+## Was bereits steht (nicht anfassen)
 
-### 1. Neue Edge-Function `auto-refresh-meta-tokens`
-- Daily Cron-Trigger.
-- Liest aus `social_connections` alle Rows mit `provider IN ('instagram','facebook')` und `token_expires_at < now() + 14 days`.
-- Für jede Row:
-  1. Token entschlüsseln (gleicher Mechanismus wie `instagram-publish` / `facebook-page-sync`).
-  2. `GET /v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=…&client_secret=…&fb_exchange_token=<current_long_lived>` — Meta erlaubt Re-Exchange innerhalb der 60-Tage-Gültigkeit und gibt einen frischen 60-Tage-Token zurück.
-  3. Bei Erfolg: neuen Token verschlüsseln + speichern, `token_expires_at = now() + 60d`, Audit-Eintrag in `instagram_token_backups`.
-  4. Bei `error.code 190` (Token revoked/invalid/Passwort geändert): `account_metadata.connection_status = 'needs_reauth'`, sofortige Mail an User (nicht erst nach Ablauf warten).
-  5. Bei anderen Fehlern: Retry-Counter +1, max 3 Retries über Folgetage, dann ebenfalls Notification.
-- Idempotent: zweimal am gleichen Tag laufen lassen schadet nicht.
-- Service-Role-Client, kein JWT nötig.
+- OAuth-Flow (`instagram-oauth-start` → `oauth-callback`) + Page-Picker (`facebook-list-pages`, `facebook-select-page`) speichern verschlüsselte Long-Lived Page-Tokens in `social_connections.access_token_hash`.
+- `auto-refresh-meta-tokens` Cron erneuert globale Tokens, aber per-User Tokens müssen wir separat verlängern.
+- `meta-page-discovery` (Graph v24) verifiziert IG-Business-Account-Verknüpfung.
 
-### 2. Hardcoded PAGE_ID rausziehen aus `instagram-token-renew`
-- Zeile 21 (`const PAGE_ID = '797827560073785'`) → multi-tenant-Bug.
-- Stattdessen `account_id` aus `social_connections` lesen oder per Request-Body übergeben.
-- Bestehender manueller Flow (User pastes Token im Dialog) bleibt als **Fallback** funktional, falls Auto-Refresh fehlschlägt.
+## Was zu bauen ist
 
-### 3. pg_cron Job
-- Job `auto-refresh-meta-tokens-daily`, Schedule `0 3 * * *` (3 Uhr nachts UTC).
-- Ruft die neue Edge-Function per `net.http_post` auf (Standard-Pattern, wie bei `qa-watchdog` / `poll-dialog-shots`).
+### 1. `publish-post` — zentrale Dispatcher reparieren
 
-### 4. Admin-Sichtbarkeit (klein)
-- Neuer Tab/Sektion im QA-Cockpit: **„Social Token Health"** mit Liste aller Connections, Tagen bis Ablauf, letztem Refresh-Versuch + Status (✅ refreshed / ⚠️ needs_reauth / ❌ failed).
-- Manueller „Refresh now"-Button pro Row, der die neue Edge-Function für genau diese Connection triggert.
+Komplette `publishToInstagram` und `publishToFacebook` ersetzen:
 
-### 5. Audit & Observability
-- Jeder Refresh-Versuch → Insert in `instagram_token_backups` (existiert schon) mit Feldern: `old_expires_at`, `new_expires_at`, `result` (success|revoked|error), `error_message`.
-- Sentry-Tag `meta_token_refresh` für Alerts bei Fehlerquote >20%.
+- **Token-Lookup korrekt:** `social_connections` per `user_id + provider` (kein erfundenes `status`-Feld), Token via `decryptToken()` aus `_shared/crypto.ts` lesen (statt `atob()`).
+- **Graph API v24** durchgehend (Memory: Meta v24 ist Standard).
+- **Account-ID korrekt:**
+  - Instagram: `account_id` = IG-Business-Account-ID (wird beim Page-Select gesetzt)
+  - Facebook: `account_id` = FB-Page-ID, Token = Page Access Token (kein User-Token).
+- **Token-Health-Check** vorher: bei Expiry < 7 Tage → versuche `fb_exchange_token`, sonst Fehler `TOKEN_EXPIRED` mit klarer Reconnect-Aufforderung.
+- **Fehler-Mapping:** Meta-Errorcodes (190 Token, 100 Param, 200 Permission, 368 Rate-Limit) → benutzerfreundliche Messages in `posts.error_message`.
 
-## Out of Scope (bewusst weggelassen)
-- **System-User-Tokens** (never-expiring) — würde Business-Manager-Setup pro Kunde erfordern. Kann später als Premium-Option nachgereicht werden.
-- Auto-Refresh für TikTok/X/LinkedIn/YouTube — separate Token-Modelle, eigener Plan später.
-- Token-Encryption-Migration — wir benutzen die existierende Verschlüsselungs-Helper-Function unverändert.
+### 2. Medienformate vollständig
 
-## Datei-Übersicht
+| Plattform | Format | Endpoint | Trigger |
+|---|---|---|---|
+| Instagram | Single Image | `/media` `image_url` | post.media_type='image' |
+| Instagram | Reel/Video | `/media` `media_type=REELS, video_url` + Status-Polling | `video_url` vorhanden |
+| Instagram | Story | `/media` `media_type=STORIES` | `post.is_story` |
+| Instagram | Carousel | N× child container → `media_type=CAROUSEL, children=...` | `media_urls[]` length>1 |
+| Facebook | Text+Link | `/{page_id}/feed` `message`, `link` | nur Text/Link |
+| Facebook | Photo | `/{page_id}/photos` `url`, `caption` | image_url, kein video |
+| Facebook | Video/Reel | `/{page_id}/videos` `file_url`, `description` + Status-Polling | video_url vorhanden |
 
-```text
-supabase/functions/
-├── auto-refresh-meta-tokens/index.ts      [NEU]   ~200 LOC
-└── instagram-token-renew/index.ts         [EDIT]  PAGE_ID dynamisch
+Container-Status-Polling teilen wir mit `instagram-publish` über einen neuen Helper `_shared/meta-publish.ts` (graphPost/graphGet/waitUntilFinished, `decryptUserToken(userId, provider)`).
 
-supabase/migrations/
-└── <ts>_auto_refresh_meta_cron.sql        [NEU]   pg_cron job
+### 3. Legacy aufräumen
 
-src/components/admin/
-└── SocialTokenHealthCard.tsx              [NEU]   ~150 LOC
+- `publish-to-instagram` (alt, globaler Token): umstellen auf `_shared/meta-publish.ts` mit Token-Lookup per `user_id` (passed in via body). Falls kein User → globaler Fallback nur für admin/dev.
+- `instagram-publish` (Testseite `/instagram-publishing`): bleibt für **Owner-Debug** mit globalem Token, klar als "Test/Diagnose-Tool" markiert.
+- `publish-to-instagram` aus dem App-Flow entfernen — alle Calls gehen über `publish-post`.
 
-src/pages/AdminQACockpit.tsx               [EDIT]  Tab integrieren
+### 4. Per-User Token-Refresh
 
-mem/features/social-integrations/
-└── meta-auto-refresh                      [NEU]   Memory-Eintrag
-```
+`auto-refresh-meta-tokens` Cron erweitern: Loop über alle `social_connections` mit provider in (facebook, instagram), bei `token_expires_at < now()+14d` → `fb_exchange_token` mit dem entschlüsselten User-Token, neuen 60-Tage-Token verschlüsselt zurückschreiben, Backup in `token_backups`.
 
-## Test-Strategie
-1. Nach Deploy: `curl_edge_functions` mit Test-Connection-Row (`token_expires_at = now() + 7d`) → erwarte neuen Token, neues Expiry.
-2. Mit absichtlich invalidem Token → erwarte `needs_reauth` Status + Mail.
-3. Cron-Job-Lauf nach 24h → check `instagram_token_backups` für Audit-Eintrag.
-4. Existierender manueller Flow im `InstagramTokenDialog.tsx` muss weiterhin funktionieren (Regression).
+### 5. UI — Connection-Status & Reconnect-Prompt
 
-## Aufwand
-~1.5h Implementierung + Test. Keine UI-Änderungen nötig außer Admin-Tab. Keine Schema-Änderungen (nur Cron-Job).
+`/integrations` (oder Social Connections Karte): wenn `publish-post` `TOKEN_EXPIRED` zurückgibt, Banner mit "Verbindung erneuern" Button → öffnet `instagram-oauth-start` bzw. Facebook-OAuth.
+
+### 6. Test-Plan (manuell durch User)
+
+Vor Roll-out auf alle User:
+1. Zweit-Account verbinden (nicht App-Admin, nicht Tester) → IG Single Image
+2. Selber Account → FB Page Photo
+3. Selber Account → IG Reel (Video) — Polling muss FINISHED erreichen
+4. Token bewusst ablaufen lassen oder revoken → Banner muss erscheinen
+5. Reconnect-Flow durchgehen → erneuter Post muss klappen
+
+## Technische Details
+
+**Neue Datei** `supabase/functions/_shared/meta-publish.ts`
+- `getMetaConnection(supabase, userId, provider)` — liest+entschlüsselt
+- `graphPost / graphGet` — v24
+- `waitForContainer(creationId, token, maxMs=120000)` — Status-Polling für IG Reels & FB Videos
+- `mapMetaError(err)` — Fehlercode → User-Message + boolean isReconnectRequired
+
+**Schema-Anpassung:** keine Migration nötig — `social_connections` hat schon `token_expires_at` und `account_metadata` (JSONB) für extra IG/FB-Details.
+
+**Edge-Function-Deployment:** `publish-post`, `auto-refresh-meta-tokens`, `publish-to-instagram` neu deployen.
+
+**Keine neuen Secrets** nötig — alles läuft über per-User Tokens. `IG_PAGE_ACCESS_TOKEN` bleibt nur als Owner-Debug-Fallback bestehen.
+
+## Out of scope
+
+- TikTok/LinkedIn/X/YouTube Publishing (sind separate Functions, funktionieren bereits per-User).
+- Story-Insights/Analytics (kommt über `instagram-graph-sync`, schon vorhanden).
+- Calendar/Autopilot-Scheduling UI (ruft schon `publish-post` auf — wird automatisch profitieren).
+
+## Risiken
+
+- **Token-Verschlüsselungs-Migration:** falls alte `social_connections` noch base64-Tokens haben (aus Vor-OAuth-Zeit), fallback im Helper: `try decrypt → catch → atob`. Migrations-Skript optional.
+- **Rate-Limits (Meta App-Level):** v24 App Usage Header beobachten — bei Code 4/17/32 Backoff 60s und Retry.
