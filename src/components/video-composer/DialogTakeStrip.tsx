@@ -163,6 +163,7 @@ export function DialogTakeStrip({
             text,
             voiceId: voiceCfg.isCustom ? voiceCfg.elevenlabsVoiceId : voiceCfg.voiceId,
             projectId,
+            ...(voiceTuning ?? {}),
           };
       const { data, error } = await supabase.functions.invoke(fnName, { body });
       if (error) throw error;
