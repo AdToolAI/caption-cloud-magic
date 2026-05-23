@@ -107,6 +107,7 @@ export function DialogTakeStrip({
   lineKey,
   text,
   voiceCfg,
+  voiceTuning,
   bundle,
   language,
   projectId,
