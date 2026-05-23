@@ -1,46 +1,38 @@
-## Befund
+## Diagnose (bestätigt aus Phase-1-Logs)
 
-Wir haben **nicht** genug Information, um den richtigen Fix zu wählen. In der DB steht nur `sync_FAILED: An unknown error occurred.` — das ist unser eigener String, weil `pollSyncJob` in `poll-dialog-shots/index.ts:184` nur `data.error ?? undefined` ausliest und Sync.so dieses Feld bei FAILED häufig leer lässt. Die echten Diagnose-Felder (`errorMessage`, `error_type`, `failureReason`, evtl. nested `data.input[*].error`) werfen wir weg.
+Sync.so liefert nur `"error": "An unknown error occurred."` — keine weiteren Felder. Die echte Ursache ist aber im Payload-Muster sichtbar:
 
-Ohne den echten Sync.so-Body raten wir zwischen mindestens vier Möglichkeiten:
-1. **Concurrency-Limit** des Sync.so Creator-Plans ($19/mo).
-2. **Window zu kurz** für `lipsync-2-pro` (Turn 1 ≈ 1.3s expandiert).
-3. **`active_speaker_detection.coordinates`** außerhalb der Videogrenzen oder im falschen Format (Turn 1 coords=[1004,136] in 1376×768 — knapp am Rand, könnte ein Frame-spezifisches Issue sein).
-4. **`segments_secs` + lipsync-2-pro** überhaupt nicht erlaubt (es gibt einen Fallback-Pfad, aber der greift nur bei 400 mit bestimmten Textstrings).
+- **Turn 0** (`segments_secs: [[0, ~2.3]]`) → ✅ erfolgreich
+- **Turn 1 + 2** (`segments_secs: [[2.26, 3.43]]` bzw. `[[3.44, 6.52]]`) → ❌ FAILED, beide mit `frame_number: 0`
 
-Jede Lösung wäre eine andere Code-Änderung. Erst Diagnose, dann gezielter Fix.
+Das Problem: `active_speaker_detection.coordinates` werden bei `frame_number: 0` gesampelt — also am Anfang des Master-Videos — während Sync.so erst ab Sekunde 2.26+ überhaupt verarbeitet. An Frame 0 sitzt der Sprecher selten an genau den Pixelkoordinaten, die später aus dem Anchor extrahiert wurden. Sync.so findet keine Face an `(605,269)` bei Frame 0 → silent failure. Turn 0 funktioniert nur, weil dessen Fenster bei 0 startet.
 
----
+## Fix (eine Datei, ~30 Zeilen Diff)
 
-## Phase 1 — Reine Diagnose (jetzt, keine Verhaltensänderung)
+`supabase/functions/poll-dialog-shots/index.ts` → `startSyncTurnJob`:
 
-### Änderung in `supabase/functions/poll-dialog-shots/index.ts`
+1. **Primary: `auto_detect: true` im Turn-Fenster.** Statt fixe Coords + `frame_number: 0` schicken wir `active_speaker_detection: { auto_detect: true }` zusammen mit den per-Turn `segments_secs`. Sync.so erkennt dann den Sprecher selbst innerhalb des Fensters — robust gegen leichte Camera-Moves, exakt das was die [Lipsync-Pro-Policy](mem://architecture/lipsync/sync-so-pro-model-policy) für Auto-Detect bereits als Fallback vorsieht.
 
-**`pollSyncJob`** (Zeile 169-186):
-- Bei Status FAILED/REJECTED/CANCELED den **kompletten Raw-Response-Body** loggen (`console.error('[poll-dialog-shots] sync.so FAILED body:', JSON.stringify(data).slice(0,1500))`).
-- Den Fehler-String robust zusammenbauen aus `data.error ?? data.errorMessage ?? data.error_message ?? data.failureReason ?? data.failure_reason ?? data.message ?? JSON.stringify(data).slice(0,200)`.
+2. **Fallback bei `auto_detect`-Failure: Coords + korrekter `frame_number`.** Falls Sync.so im ersten Versuch trotzdem failed (z.B. zwei Gesichter im Frame, kein klares Voiced-Signal), retry mit den bisherigen Coords aus FaceMap, aber `frame_number = round(turn.startSec * fps)` (24fps Hailuo-Default, optional aus Master-Clip-Probe). Damit sampelt Sync.so Coords im Turn-Fenster statt am Video-Anfang.
 
-**`startSyncTurnJob`** (Zeile 105-167):
-- **Vor** dem Fetch den Request-Payload loggen (`console.log('[poll-dialog-shots] dispatch payload turn=…:', JSON.stringify(payload))`) — gekürzt auf 800 chars.
-- **Nach** dem Fetch immer den Status loggen, auch bei OK, und bei !ok den Header `x-ratelimit-*` / `retry-after` mit ausgeben — falls Sync.so 429 oder Plan-Limits darüber signalisiert.
+3. **Diagnostik beibehalten.** Phase-1-Logging bleibt aktiv — falls auch der Fallback failed, sehen wir es sofort.
 
-**Im Shot-Status** (Zeile 416-419) den jetzt verbesserten String in `shot.error` schreiben — UI bleibt dadurch automatisch aussagekräftiger.
+## Was sich NICHT ändert
 
-Das ist **eine Datei**, ~25 Zeilen Diff, keine neue Logik, keine Migration, keine UI-Änderung, keine Performance-Auswirkung. Deploy → User triggert eine neue Dialog-Szene → wir lesen `supabase--edge_function_logs poll-dialog-shots`.
+- Kein Concurrency-Pool (alle 3 Turns weiter parallel — Concurrency war nicht die Ursache, Turn 0 lief ja parallel zu 1+2 und kam durch).
+- Keine Window-Mindestlänge, keine Padding-Strategie (Längen waren ausreichend).
+- Keine UI-Änderung, keine DB-Migration, keine Credit-Logik (idempotenter Refund existiert bereits).
+- `compose-twoshot-lipsync`/`compose-dialog-scene` bleiben unverändert.
 
-## Phase 2 — Gezielter Fix nach Diagnose
+## Verifikation
 
-Erst wenn wir den echten Sync.so-Fehler kennen, entscheiden wir konkret:
-- `concurrency exceeded` / `429` → Serial-Pool mit Limit 2.
-- `video too short` / `duration` → Mindest-Windowlänge erzwingen + Pad-Strategie.
-- `coordinates out of bounds` → Coords vor Dispatch clampen oder Auto-Detect-Fallback.
-- `segments invalid` → Fallback ohne `segments_secs` immer aktiv.
+1. Edge Function deployen.
+2. User triggert eine 3-Turn-Dialog-Szene neu.
+3. `supabase--edge_function_logs poll-dialog-shots` lesen: erwartet `auto_detect=true` Pfad, alle 3 Turns ready.
+4. Falls noch Failures: Fallback-Pfad mit `frame_number=…` greift automatisch, wir sehen den ursprünglichen Sync.so-Response.
 
-Diesen Schritt **nicht jetzt** umsetzen — sondern nach einem reproduzierten Run mit Phase-1-Logs.
+## Geänderte Dateien
 
----
+- `supabase/functions/poll-dialog-shots/index.ts` (nur `startSyncTurnJob` + neuer 1× Retry mit Fallback-Coords).
 
-## Geänderte Dateien (Phase 1)
-- `supabase/functions/poll-dialog-shots/index.ts` (nur Logging + besseres Error-Aggregat)
-
-Keine DB-Migration, keine neue Edge-Function, keine UI-Änderung, kein Credit-Effekt.
+Keine neue Edge Function, keine DB-Migration, keine UI-Änderung.

@@ -59,7 +59,15 @@ interface DialogShot {
   error?: string;
   started_at?: string;
   completed_at?: string;
+  /** How many times we have already redispatched this shot after a FAILED
+   *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
+   *  retry falls back to fixed coords + frame_number aligned to the turn. */
+  retry_count?: number;
+  /** When true, the next dispatch MUST use the coords+frame_number fallback
+   *  path instead of auto_detect. Set by the FAILED→retry handler. */
+  force_coords?: boolean;
 }
+
 
 interface DialogShotsState {
   version: 4;
@@ -102,6 +110,11 @@ function expandWindow(
   return [Math.max(0, start - maxLeadIn), end + maxTail];
 }
 
+/** Default fps assumption for Hailuo i2v master clips. Used to map a turn's
+ *  start time to a `frame_number` so Sync.so samples coords INSIDE the
+ *  turn window, not at frame 0 of the master video. */
+const ASSUMED_MASTER_FPS = 24;
+
 async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
@@ -110,16 +123,26 @@ async function startSyncTurnJob(
   coords: [number, number] | null,
   temperature: number,
   turnIdx?: number,
+  /** 'auto' = let Sync.so detect the active speaker inside the segment
+   *  window (robust against camera moves, recommended primary).
+   *  'coords' = use fixed pixel coords + frame_number aligned to the
+   *  turn start (deterministic fallback when auto_detect fails). */
+  mode: "auto" | "coords" = "auto",
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature,
   };
-  if (coords) {
+  if (mode === "coords" && coords) {
+    // Sample coords WITHIN the turn window — frame 0 of the master video
+    // is virtually never where the speaker sits during a later turn, which
+    // is exactly what produced "An unknown error occurred." from Sync.so
+    // for all non-first turns.
+    const frameNumber = Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
     options.active_speaker_detection = {
       auto_detect: false,
-      frame_number: 0,
+      frame_number: frameNumber,
       coordinates: coords,
     };
   } else {
@@ -134,8 +157,9 @@ async function startSyncTurnJob(
     options,
   };
   console.log(
-    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
+    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
   );
+
   let r = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
     headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
@@ -470,10 +494,29 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        shot.status = "failed";
-        shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        // 1× retry: if this was the first attempt (auto_detect) and we
+        // have FaceMap coords available, redispatch with coords mode
+        // (deterministic fallback) instead of giving up. Empirically
+        // fixes the "An unknown error occurred." silent-fail on Sync.so
+        // for turns whose window does not start at t=0.
+        const canRetry =
+          (shot.retry_count ?? 0) < 1 && shot.target_coords && !shot.force_coords;
+        if (canRetry) {
+          shot.retry_count = (shot.retry_count ?? 0) + 1;
+          shot.force_coords = true;
+          shot.status = "pending";
+          shot.sync_job_id = undefined;
+          shot.error = undefined;
+          console.warn(
+            `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with coords fallback (attempt ${shot.retry_count})`,
+          );
+        } else {
+          shot.status = "failed";
+          shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        }
         mutated = true;
       }
+
     });
   }
 
@@ -484,6 +527,7 @@ async function processScene(
     const dispatched = await Promise.allSettled(
       pending.map(async (shot) => {
         const win = expandWindow(shot, shots);
+        const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
         return startSyncTurnJob(
           syncKey,
           state.source_clip_url,
@@ -492,19 +536,22 @@ async function processScene(
           shot.target_coords,
           shot.temperature,
           shot.idx,
-        ).then((jobId) => ({ shot, jobId, win }));
+          mode,
+        ).then((jobId) => ({ shot, jobId, win, mode }));
       }),
     );
+
     for (const res of dispatched) {
       if (res.status === "fulfilled") {
-        const { shot, jobId, win } = res.value;
+        const { shot, jobId, win, mode } = res.value;
         shot.sync_job_id = jobId;
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
+
       } else {
         // Find which shot failed (Promise.allSettled preserves order vs pending[])
         const idxInPending = dispatched.indexOf(res);
