@@ -59,7 +59,15 @@ interface DialogShot {
   error?: string;
   started_at?: string;
   completed_at?: string;
+  /** How many times we have already redispatched this shot after a FAILED
+   *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
+   *  retry falls back to fixed coords + frame_number aligned to the turn. */
+  retry_count?: number;
+  /** When true, the next dispatch MUST use the coords+frame_number fallback
+   *  path instead of auto_detect. Set by the FAILED→retry handler. */
+  force_coords?: boolean;
 }
+
 
 interface DialogShotsState {
   version: 4;
