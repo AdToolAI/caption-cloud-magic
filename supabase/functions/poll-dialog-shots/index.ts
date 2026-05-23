@@ -431,31 +431,36 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch the next pending shot serially ─────────────────
-  // v7 (NO-CHAIN, PER-SPEAKER AUDIO):
-  // Every shot is dispatched against the ORIGINAL pristine master plate
-  // (no chaining on previous Sync.so outputs). Each shot uses ONLY its
-  // speaker's isolated WAV (`shot.audio_url`), never the merged dialog
-  // mix — this is what stops the wrong face from "speaking" another
-  // speaker's lines, and what stops Sync.so from hallucinating audio
-  // outside the turn window.
+  // ── Step 2: dispatch the next pending shot serially (CHAINED-V7) ────
+  // v7 keeps VIDEO chaining (shot K builds visually on shot K-1's output
+  // so animations accumulate into one final clip without ffmpeg) but
+  // switches AUDIO to per-speaker isolated WAV so Sync.so only ever sees
+  // ONE voice per pass. This eliminates the ghost-speech bug where the
+  // wrong character "spoke" another speaker's line because the merged
+  // master WAV bled into the animation window.
   //
   // Multi-speaker scenes additionally force deterministic coords +
-  // frame_number (no auto_detect) so identity routing is never wrong.
-  //
-  // Serial (one new job per tick) to respect Sync.so concurrency limits.
+  // frame_number (no auto_detect) for hard identity routing.
   const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
   const pending = sortedShots.filter((s) => s.status === "pending");
   const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (pending.length > 0 && activeAfterPolling.length === 0) {
-    const nextShot = pending[0];
+    const nextShot = pending.find((s) => {
+      if (s.idx === 0) return true;
+      const prev = sortedShots.find((x) => x.idx === s.idx - 1);
+      return prev?.status === "ready" && !!prev.output_url;
+    });
     if (nextShot) {
       try {
+        const prev =
+          nextShot.idx > 0
+            ? sortedShots.find((x) => x.idx === nextShot.idx - 1)
+            : null;
+        const chainedSourceUrl =
+          prev?.output_url && prev.status === "ready"
+            ? prev.output_url
+            : state.source_clip_url;
         const win = expandWindow(nextShot, shots);
-        // v7: deterministic_coords (multi-speaker scenes) or force_coords
-        // (retry path) → coords mode. Single-speaker scenes default to
-        // auto so Sync.so can still find the face if FaceMap coords are
-        // off by a few pixels.
         const useCoords =
           (nextShot.deterministic_coords || nextShot.force_coords) &&
           !!nextShot.target_coords;
@@ -463,7 +468,7 @@ async function processScene(
         const audioUrl = nextShot.audio_url || state.master_audio_url;
         const jobId = await startSyncTurnJob(
           syncKey,
-          state.source_clip_url,
+          chainedSourceUrl,
           audioUrl,
           win,
           nextShot.target_coords,
@@ -476,7 +481,7 @@ async function processScene(
         nextShot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] v7 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+          `[poll-dialog-shots] v7 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
