@@ -506,48 +506,23 @@ async function processScene(
   const hasActive = shots.some((s) => s.status === "lipsyncing" || s.status === "pending");
 
   let pipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady) pipelineStatus = "stitching";
+  if (allReady) pipelineStatus = "done";
   else if (hasFailure && !hasActive) pipelineStatus = "failed";
   else if (hasActive) pipelineStatus = "lipsyncing";
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: all shots ready → dispatch Lambda stitch ────────────────
-  // Edge Runtime cannot spawn ffmpeg, so the actual stitching runs as a
-  // Remotion Lambda render against the DialogStitchVideo composition.
-  // remotion-webhook writes clip_url + lip_sync_applied_at back to the
-  // scene when the render completes; this function just kicks it off.
+  // ── Step 4: all shots ready → CHAINED final clip (no stitching) ─────
+  // In the CHAINED-V6 pipeline each shot was already lipsynced on top of
+  // the previous shot's output. The LAST shot's output_url therefore
+  // already contains every speaker's lipsync layered on the master plate
+  // — no ffmpeg or Lambda stitch is needed.
   if (allReady) {
-    // Idempotency: if we already dispatched a stitch render for this scene,
-    // don't trigger again — just keep waiting for the webhook.
-    if ((state as any).stitch?.render_id) {
-      console.log(
-        `[poll-dialog-shots] scene ${sceneId} stitch already dispatched (render_id=${(state as any).stitch.render_id}); waiting for webhook`,
-      );
-      return { status: "stitching", mutated };
-    }
-
-    console.log(
-      `[poll-dialog-shots] all ${shots.length} shots ready for scene ${sceneId}, dispatching Lambda stitch`,
-    );
-    await supabase
-      .from("composer_scenes")
-      .update({
-        dialog_shots: newState,
-        lip_sync_status: "stitching",
-        twoshot_stage: "dialog_stitching",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", sceneId);
-
-    const dispatched = await dispatchDialogStitch(supabase, sceneId);
-    if (!dispatched.ok) {
-      const errMsg = dispatched.error;
-      console.error(
-        `[poll-dialog-shots] dispatch stitch failed for ${sceneId}:`,
-        errMsg,
-      );
-      newState = { ...newState, status: "failed", error: errMsg };
+    const lastShot = [...shots].sort((a, b) => b.idx - a.idx)[0];
+    const finalUrl = lastShot?.output_url;
+    if (!finalUrl) {
+      // Defensive: should never happen because allReady implies output_url.
+      newState = { ...newState, status: "failed", error: "last shot missing output_url" };
       if (userId) newState = await refundIfNeeded(supabase, userId, newState);
       await supabase
         .from("composer_scenes")
@@ -555,18 +530,40 @@ async function processScene(
           dialog_shots: newState,
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: `dialog_stitch_dispatch_failed: ${errMsg}`.slice(0, 300),
+          clip_error: "dialog_chained_missing_final_output",
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       return { status: "failed", mutated: true };
     }
 
+    const nowIso = new Date().toISOString();
+    newState = {
+      ...newState,
+      status: "done",
+      final_url: finalUrl,
+      finished_at: nowIso,
+    };
+    await supabase
+      .from("composer_scenes")
+      .update({
+        clip_url: finalUrl,
+        lip_sync_source_clip_url: state.source_clip_url,
+        lip_sync_applied_at: nowIso,
+        lip_sync_status: "done",
+        twoshot_stage: "done",
+        clip_error: null,
+        dialog_shots: newState,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+
     console.log(
-      `[poll-dialog-shots] scene ${sceneId} stitch dispatched render_id=${dispatched.render_id}`,
+      `[poll-dialog-shots] CHAINED scene ${sceneId} done → ${finalUrl}`,
     );
-    return { status: "stitching", mutated: true };
+    return { status: "done", mutated: true };
   }
+
 
   // ── Step 5: terminal failure → refund + persist ─────────────────────
   if (pipelineStatus === "failed") {
