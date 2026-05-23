@@ -662,7 +662,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               sceneId,
               projectId: pid,
               imageUrl: c.referenceImageUrl,
-              audioUrl,
+              audioUrl: finalAudioUrl,
               aspectRatio: '9:16',
               resolution: '720p',
               composerCharacterId: c.id,
