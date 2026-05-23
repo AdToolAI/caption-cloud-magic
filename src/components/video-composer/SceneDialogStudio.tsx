@@ -380,6 +380,33 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
   const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
 
+  // ── Voice Auto-Bind (Phase A) ─────────────────────────────────────────
+  // When a speaker appears for the first time and has no voice yet, inherit
+  // the brand character's default_voice_id. Keeps users out of the trap of
+  // hearing the wrong voice because they forgot to pick one per scene.
+  useEffect(() => {
+    if (speakers.length === 0) return;
+    let patched: Record<string, DialogVoiceCfg> | null = null;
+    for (const sp of speakers) {
+      const cur = voicePerSpeaker[sp.id];
+      if (cur?.voiceId) continue;
+      const defaultId = defaultVoiceByCharId[sp.id];
+      if (!defaultId) continue;
+      patched = patched ?? { ...voicePerSpeaker };
+      patched[sp.id] = {
+        engine: 'elevenlabs',
+        voiceId: defaultId,
+        voiceName: sp.name,
+      };
+    }
+    if (patched) {
+      setVoicePerSpeaker(patched);
+      onUpdate({ dialogVoices: patched });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speakers, defaultVoiceByCharId]);
+
+
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
   const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
   const totalCost = blocks.length * estimateCost(4, true);
