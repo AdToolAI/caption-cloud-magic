@@ -42,7 +42,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // 1) Aktuellen Token laden
+    // If target === 'users', skip the global owner-token flow entirely.
+    if (target === 'users') {
+      const userResult = await refreshUserConnections(supabase, APP_ID, APP_SECRET, force, mode);
+      return json({ ok: true, action: mode, target, users: userResult });
+    }
+
+
     const { data: secret, error: loadErr } = await supabase
       .from('app_secrets')
       .select('encrypted_value, updated_at')
