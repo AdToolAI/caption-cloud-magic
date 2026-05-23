@@ -1,106 +1,62 @@
-## Phase C — Continuity Auto-Lock + Tonality-Marker + Voice-Profil-Editor
+## Phase C.1 — Continuity Auto-Lock im Dialog-Modus
 
-Drei Bausteine, die den Dialog-Pipeline-Loop schließen: Charakter bleibt visuell konsistent, Performance pro Zeile wird steuerbar, Brand-Voice ist tatsächlich „Brand".
-
----
-
-### Baustein 1 — Continuity Auto-Lock im Dialog-Modus
-
-**Problem:** Bei Multi-Take/Multi-Scene Dialogen driftet der Hailuo-Plate optisch (Kleidung, Frisur, Licht), obwohl wir denselben Avatar nutzen. Continuity-Drift gibt's, wird im Dialog-Modus aber nicht automatisch genutzt.
-
-**Lösung:**
-- In `compose-dialog-scene`: nach dem ersten erfolgreichen Plate-Render wird der `lastFrameUrl` (bzw. Mid-Frame via Client-Hook `useFrameContinuity`) als **Lock-Reference** in `composer_scenes.lock_reference_url` gespeichert (sofern `dialogMode=true` und Szene noch keinen Lock hat).
-- Folgeszenen mit demselben Cast bekommen diesen Frame automatisch als zusätzliche i2v-Referenz in den Hailuo-Payload injiziert (zweite Image-Slot, neben dem Scene-Anchor).
-- UI: Im `SceneDialogStudio` ein neues Badge **„Continuity locked"** mit Toggle (User kann Lock per Szene rauswerfen oder neu setzen). Bei Lock-Bruch (z.B. anderer Cast) wird Lock auto-cleared.
-
-**Dateien:**
-- `src/components/video-composer/SceneDialogStudio.tsx` — Badge + Toggle
-- `src/hooks/useFrameContinuity.ts` — kleine Erweiterung: `extractFirstThirdFrame` (für stabilere Lock-Ref als Last-Frame)
-- `src/components/video-composer/VideoComposerDashboard.tsx` — auto-Propagation des Locks an Folgeszenen mit gleichem Cast
-- `supabase/functions/compose-dialog-scene/index.ts` — wenn `lockReferenceUrl` mitgesendet → als zweite `referenceImages[]` an Hailuo
-
-**Edge-Function-Touchpoint:** ja, eine Datei, additive Logik.
+Fokussierter Nachzieh-Patch für den fehlenden Baustein 1 aus Phase C. Ziel: Sarah/Matthew driften nicht mehr optisch zwischen Dialog-Szenen mit gleichem Cast — Artlist-parity vollständig.
 
 ---
 
-### Baustein 2 — Tonality-Marker pro Zeile
+### 1) Edge Function `compose-dialog-scene` — Lock-Persistierung + Re-Use
 
-**Problem:** Alle Dialog-Zeilen klingen gleich (gleiches ElevenLabs `voice_settings`), egal ob Flüstern, Schreien oder ruhig erzählend. Im Werbespot tödlich.
+- Akzeptiert neues optionales Feld `lockReferenceUrl: string | null` im Request-Body.
+- **Wenn `lockReferenceUrl` vorhanden:** wird vor dem Plate-Render als zweite `referenceImages[]`-Slot in den Hailuo-i2v-Payload injiziert (zusätzlich zum bestehenden Scene-Anchor — Slot 1 = Komposition, Slot 2 = Identity-Lock).
+- **Wenn KEIN Lock und Szene ist erster Dialog mit diesem Cast:** nach erstem erfolgreichen Plate-Render wird `lastFrameUrl` (bereits aus dem Hailuo-Output bekannt) in `composer_scenes.lock_reference_url` per Service-Role-Client persistiert.
+- Idempotent: existiert die Spalte schon, wird nicht überschrieben.
 
-**Lösung:**
-- Skript-Syntax-Erweiterung in `parseDialogScript.ts`:
-  ```
-  Sarah [whisper]: Komm näher...
-  Matthew [shouting]: PASS AUF!
-  Sarah: Das war knapp.   ← kein Marker = default
-  ```
-- 8 Presets im neuen `src/config/dialogTonalityPresets.ts`:
-  `neutral, whisper, shouting, excited, calm, serious, playful, sad`
-  Jeder mappt auf ein ElevenLabs-Tuning (stability/style/speed) – analog `adTonalityVoiceMap`.
-- `DialogBlock` bekommt `tonality?: DialogTonalityId`.
-- TTS-Synth in `SceneDialogStudio.tsx` übergibt das Tuning pro Zeile an `generate-voiceover`.
-- Take-Key (Phase B) wird invalidiert, wenn sich Tonality ändert → automatischer Re-Roll möglich, alte Takes bleiben in der Historie.
-- UI: pro Block ein kleiner Tonality-Pill-Dropdown (Default folgt dem Skript-Marker, kann pro Block überschrieben werden).
+### 2) DB — Spalte sicherstellen
 
-**Dateien:**
-- `src/config/dialogTonalityPresets.ts` (neu)
-- `src/lib/talking-head/parseDialogScript.ts` — Regex erweitern, `tonality` extrahieren
-- `src/lib/talking-head/dialogTakeKey.ts` — Tonality in den Hash mit aufnehmen
-- `src/components/video-composer/SceneDialogStudio.tsx` — Pill + Tuning-Übergabe
-- `src/components/video-composer/DialogTakeStrip.tsx` — Tonality-Pill an aktivem Take anzeigen
+- `composer_scenes.lock_reference_url` wird vom Composer bereits gelesen/geschrieben (Zeilen 364/495/811/1042 in `VideoComposerDashboard`). Falls die Spalte fehlt: Mini-Migration `ALTER TABLE composer_scenes ADD COLUMN IF NOT EXISTS lock_reference_url text`.
+- Vorab geprüft via existierender Lese-Pfade. Migration wird nur ausgelöst, wenn Spalte tatsächlich fehlt.
 
-**Edge-Function-Touchpoint:** keine — `generate-voiceover` akzeptiert `voice_settings` bereits.
+### 3) Auto-Propagation in `VideoComposerDashboard.tsx`
 
----
+Neue reine Helper-Funktion `propagateDialogLock(scenes)`:
+- Iteriert Szenen in Reihenfolge, gruppiert nach `dialogMode === true` + Cast-Signatur (sortierte `castCharacterIds`).
+- Erste Szene jeder Gruppe, die `lockReferenceUrl` besitzt → Lock wird auf alle folgenden Szenen derselben Gruppe propagiert, sofern diese noch keinen eigenen Lock haben.
+- Cast-Wechsel ⇒ Gruppe endet, Lock gilt für die neue Gruppe nicht.
+- Aufruf: nach jedem `compose-dialog-scene`-Response und beim initialen Scene-Load.
 
-### Baustein 3 — Voice-Profil-Editor pro Brand Character
+### 4) UI — `SceneDialogStudio.tsx`
 
-**Problem:** `default_voice_id` reicht nicht — eine Stimme klingt je nach `stability/similarity/style/speed` komplett anders. Heute hat jeder Character nur die nackte Voice-ID.
+Direkt unter der Cast-Pill-Zeile ein neuer Status-Block (nur sichtbar wenn `dialogMode === true`):
 
-**Lösung:**
-- Neue Spalte `brand_characters.voice_settings` (jsonb, nullable), Struktur:
-  ```ts
-  { stability:0.5, similarityBoost:0.75, style:0.3, useSpeakerBoost:true, speed:1.0 }
-  ```
-- Auf `/avatars/:id` neue Karte **„Voice Profile"**:
-  4 Slider + 1 Toggle + ein „Preview"-Button, der einen 5-Sek-Test mit der gewählten Voice + Settings synthetisiert.
-- Im Composer (`SceneDialogStudio`): wenn Character ein `voice_settings` hat, wird es als Default in den TTS-Call injiziert. Tonality-Marker aus Baustein 2 wird auf dem Brand-Setting **multiplikativ** (clampt auf [0,1]) als Modulation appliziert, sodass Brand-Identität nie komplett überschrieben wird.
-- Gold-„Brand-Voice"-Badge aus Phase A wird zu „Brand-Voice + Profile" wenn `voice_settings` vorhanden.
+- **Badge "Continuity gesperrt"** (Gold, mit Lock-Icon) sobald `scene.lockReferenceUrl` existiert; Tooltip zeigt Thumbnail-Preview des Lock-Frames.
+- **Badge "Continuity erbt von Szene N"** (Cyan, dezenter) wenn der Lock per Propagation aus einer früheren Szene stammt — Erkennung über neues, transientes Feld `lockSource: 'self' | 'inherited'`, das `propagateDialogLock` zurückgibt.
+- **Toggle "Lock entfernen"** → setzt `lockReferenceUrl = null` (nur für eigene Locks, nicht für geerbte; bei geerbten zeigt der Button stattdessen "Eigenen Lock erzwingen", der die Propagation für diese Szene unterbricht).
+- **Auto-Clear:** Wechselt der User den Cast einer Szene, wird `lockReferenceUrl` automatisch gelöscht (Hook in den bestehenden Cast-Change-Handler).
 
-**Dateien:**
-- DB-Migration: `ALTER TABLE brand_characters ADD COLUMN voice_settings jsonb`
-- `src/components/avatars/VoiceProfileCard.tsx` (neu)
-- `src/pages/AvatarDetail.tsx` (bzw. die existierende Detail-Seite) — Karte einhängen
-- `src/lib/voice-studio/resolveDialogVoice.ts` — `resolveCharacterVoiceProfile(character)` + `mergeWithTonality(profile, tonality)`
-- `src/components/video-composer/SceneDialogStudio.tsx` — Profile-Merge vor TTS-Call
+### 5) Persistenz
 
-**Edge-Function-Touchpoint:** keine.
+- Bereits funktional via `useComposerPersistence` (snake_case-Mapping existiert). Kein Hook-Edit nötig — nur sicherstellen, dass das transiente `lockSource` NICHT persistiert wird (nur Runtime).
 
 ---
 
-### Was bewusst NICHT in Phase C landet
+### Bewusst NICHT enthalten
 
-- Auto-Tonality-Detection aus Skript-Text via LLM → später (Phase D)
-- Pro-Take individuelle Tonality-Overrides → Phase D
-- Voice-Cloning UI im Editor → bleibt im bestehenden Voice Studio
-
----
+- Manuelles Hochladen eines eigenen Lock-Frames (kommt ggf. später)
+- Lock-Propagation über Nicht-Dialog-Szenen hinweg (Composer hat dafür schon Continuity Guardian)
+- Mehrere Lock-Slots pro Charakter
 
 ### Akzeptanzkriterien
 
-1. Sobald in einer Dialog-Szene der erste Plate gerendert ist, sehe ich ein **„Continuity locked"** Badge; die nächste Dialog-Szene mit demselben Cast bekommt die Lock-Reference automatisch ohne mein Zutun.
-2. Schreibe ich `Sarah [whisper]: ...`, klingt die Zeile hörbar leiser/intimer als eine Default-Zeile von Sarah, ohne dass ich an Settings drehe.
-3. Ändere ich auf `/avatars/:id` Sarahs `stability` von 0.5 auf 0.8, klingen **alle** neu gerenderten Dialog-Takes von Sarah ruhiger — alte gepinnte Takes bleiben unverändert.
-4. Ein Lock wird automatisch gelöscht, wenn ich den Cast einer Szene komplett austausche.
-5. Take-Keys aus Phase B invalidieren korrekt, wenn ich nur die Tonality einer Zeile ändere (Text bleibt gleich).
-
----
+1. Erste Dialog-Szene mit Sarah+Matthew rendert → "Continuity gesperrt" Badge erscheint sofort nach Plate-Render.
+2. Nächste Dialog-Szene mit gleichem Cast zeigt automatisch "Continuity erbt von Szene N" und Hailuo-Plate behält Kleidung/Frisur/Licht (visuell verifizierbar).
+3. Cast-Wechsel in Szene 3 (Sarah raus, Lisa rein) → Lock-Badge verschwindet automatisch, Folgeszenen mit Lisa+Matthew bilden neue Gruppe.
+4. Klick auf "Lock entfernen" in Quell-Szene → Folgeszenen verlieren geerbten Lock im selben Tick.
 
 ### Aufwand
 
-- 1 DB-Migration (additive Spalte)
-- 1 Edge-Function-Edit (`compose-dialog-scene`, additiv)
-- ~6 Frontend-Dateien + 1 neuer Config + 1 neue Karte
-- 0 neue Edge Functions, 0 Credit-Änderungen
+- 1 Edge-Function-Edit (`compose-dialog-scene`, additiv, ~20 LOC)
+- 1 evtl. Mini-Migration (falls Spalte fehlt)
+- 3 Frontend-Dateien (Dashboard Helper, SceneDialogStudio Badge/Toggle, Cast-Change-Handler)
+- 0 neue Edge Functions, 0 Credit-Änderungen, 0 neue API-Keys
 
 Soll ich loslegen?
