@@ -338,6 +338,12 @@ interface DialogShot {
   target_coords: [number, number] | null;
   /** Per-turn temperature: short turns (<2s) get 1.0 for max articulation. */
   temperature: number;
+  /** v7: ISOLATED per-speaker audio (only this speaker's voice + silence
+   *  elsewhere). Falls back to merged master WAV only for single-speaker. */
+  audio_url: string;
+  /** v7: when true (multi-speaker scenes), poll-dialog-shots MUST use
+   *  deterministic coords + frame_number, not auto_detect. */
+  deterministic_coords: boolean;
   status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
   /** Output URL of THIS turn's Sync.so pass (full-length MP4 with only this window animated). */
