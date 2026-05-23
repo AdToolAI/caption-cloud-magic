@@ -176,6 +176,12 @@ const T = {
     srsLabel: 'Advanced: keep it as voiceover over one shared scene instead',
     srsHint: 'Default with multiple speakers (with portraits): each speaker gets their own lip-sync cut. Toggle on if you only want a group scene with voiceover.',
     close: 'Close',
+    continuityLocked: 'Continuity locked',
+    continuityInherited: (n: number) => `Continuity inherited from Scene ${n}`,
+    continuityTooltip: 'Following scenes with the same cast inherit this identity anchor automatically.',
+    continuityTooltipInherited: (n: number) => `Cast appearance is matched to Scene ${n}.`,
+    continuityRemove: 'Remove lock',
+    continuityForce: 'Force own lock',
   },
   es: {
     title: 'Guion de escena',
