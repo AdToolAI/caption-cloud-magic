@@ -1522,7 +1522,7 @@ export default function SceneCard({
 
               <SceneStudioSectionHeader tab="audio" language={lang} />
               {/* Scene Dialog Studio — write a screenplay; auto-spawn shot-reverse-shot lip-sync clips. */}
-              {scene.clipSource.startsWith("ai-") && characters && (
+              {scene.clipSource.startsWith("ai-") && characters && scene.dialogMode === true && (
                 <SceneDialogStudio
                   ref={dialogStudioRef}
                   open={dialogStudioOpen}
