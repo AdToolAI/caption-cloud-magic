@@ -1262,6 +1262,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {speakers.map((sp) => {
               const cfg = voicePerSpeaker[sp.id];
               const isHume = cfg?.engine === 'hume';
+              const brandDefault = defaultVoiceByCharId[sp.id];
+              const isBrandVoice = !!brandDefault && cfg?.voiceId === brandDefault && cfg?.engine !== 'hume';
+              const brandLookupId = sceneCast.find((c) => c.id === sp.id)?.brandCharacterId ?? sp.id;
               return (
                 <div
                   key={sp.id}
@@ -1276,7 +1279,41 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                   ) : (
                     <div className="h-7 w-7 rounded bg-muted" />
                   )}
-                  <div className="text-xs font-medium truncate">{sp.name}</div>
+                  <div className="text-xs font-medium truncate flex items-center gap-1.5">
+                    <span className="truncate">{sp.name}</span>
+                    {isBrandVoice && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/10 px-1 py-px text-[9px] uppercase tracking-wide text-primary"
+                        title={
+                          language === 'de'
+                            ? 'Standard-Stimme aus der Avatar-Bibliothek'
+                            : language === 'es'
+                            ? 'Voz por defecto de la biblioteca de avatares'
+                            : 'Default voice from Avatar Library'
+                        }
+                      >
+                        <Lock className="h-2.5 w-2.5" />
+                        Brand
+                      </span>
+                    )}
+                    {!brandDefault && (
+                      <Link
+                        to={`/avatars/${brandLookupId}`}
+                        className="inline-flex items-center gap-0.5 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[9px] uppercase tracking-wide text-amber-400 hover:bg-amber-500/20"
+                        title={
+                          language === 'de'
+                            ? 'Keine Standard-Stimme — im Avatar setzen'
+                            : language === 'es'
+                            ? 'Sin voz por defecto — configura en el avatar'
+                            : 'No default voice — set in avatar'
+                        }
+                      >
+                        <AlertCircle className="h-2.5 w-2.5" />
+                        Setup
+                      </Link>
+                    )}
+                  </div>
+
 
                   {/* Engine selector */}
                   <Select
