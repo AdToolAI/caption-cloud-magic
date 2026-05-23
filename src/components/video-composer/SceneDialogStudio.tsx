@@ -973,7 +973,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         synthed.push({
           block,
           character: c,
-          audioUrl,
+          audioUrl: audioUrl!,
           durationSec,
           engine: cfg.engine,
         });
