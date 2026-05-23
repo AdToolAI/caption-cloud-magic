@@ -1,18 +1,38 @@
 ---
 name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher)
-description: Composer cinematic-sync runs through compose-dialog-scene + poll-dialog-shots (per-turn Hailuo plate + per-turn Sync.so lipsync + ffmpeg concat) for 1..N speakers. Replaces legacy compose-twoshot-lipsync / compose-lipsync-scene.
+description: Cinematic-sync runs through compose-dialog-scene + poll-dialog-shots (v7). VIDEO chained per turn, AUDIO isolated per speaker (track_url), deterministic coords for multi-speaker. No ffmpeg/Lambda needed; the last shot's output is the final clip.
 type: feature
 ---
 
 Trigger: `engine_override = 'cinematic-sync'` on a composer_scene.
 
-Both auto-triggers reroute to the new function:
-- Client: `useTwoShotAutoTrigger` invokes `compose-dialog-scene` (no more speakers>=2 split).
+Both auto-triggers route to `compose-dialog-scene`:
+- Client: `useTwoShotAutoTrigger` invokes `compose-dialog-scene`.
 - Server: `compose-clip-webhook` rescue-path invokes `compose-dialog-scene`.
 
 Per-shot pipeline (one shot per speaker turn from `audio_plan.twoshot.speakers[*].voicedRange.turns[]`):
-1. `compose-dialog-scene` reserves credits up-front (HAILUO_FLAT 25 + 9 cr/s lipsync), persists `composer_scenes.dialog_shots` (JSONB array), fires Hailuo i2v in parallel with each speaker's portrait as first frame, returns 202.
-2. `poll-dialog-shots` runs every minute via pg_cron job `poll-dialog-shots-every-minute`. It also serves as the Replicate webhook for individual shot predictions. Per shot it: slices master WAV via ffmpeg → Sync.so lipsync-2-pro → marks ready.
-3. Once all shots are `ready` it stitches via `ffmpeg concat` + remux against the master WAV and writes the final `clip_url` (Composer-compatible).
 
-Refunds happen per shot (not per scene). Failed shots can be retried individually without re-rendering the scene.
+1. `compose-dialog-scene` reserves credits (9 cr/s lipsync, min 9/turn), persists `composer_scenes.dialog_shots` (JSONB array). Each shot stores:
+   - `audio_url` = the SPEAKER's `track_url` (isolated WAV with only that voice + silence elsewhere). Falls back to merged master WAV only if track_url missing.
+   - `deterministic_coords = true` when scene has ≥2 distinct speakers AND face coords are available — forces `auto_detect:false + frame_number + coordinates` in Sync.so.
+   - `target_coords` from `audio_plan.twoshot.faceMap` (Gemini Vision identity match).
+   - Per-turn temperature: 1.0 if <2s, else 0.9.
+
+2. `poll-dialog-shots` (pg_cron `poll-dialog-shots-every-minute`) dispatches/polls serially. Per shot it submits to Sync.so lipsync-2-pro with:
+   - **video** = chained: shot K uses shot K-1's output, shot 0 uses the original master plate. Animations accumulate into one final clip without ffmpeg.
+   - **audio** = the speaker's isolated WAV (`shot.audio_url`). NEVER the merged dialog mix — that was the root cause of "ghost speech" where the wrong character spoke another speaker's line.
+   - **segments_secs** = the turn's expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbouring turns).
+   - **mode** = `coords` for multi-speaker (deterministic) or `auto` for single-speaker / retry fallback.
+   - **sync_mode** = `cut_off`.
+
+3. When all shots are `ready`, the LAST shot's `output_url` is written to `composer_scenes.clip_url` and `lip_sync_status = 'done'`. No ffmpeg, no Lambda needed.
+
+**Why v7 fixes the ghost-speech bug (May 2026):**
+- Pre-v7 every Sync.so job received the FULL merged 8s dialog WAV. Sync.so's VAD then heard another speaker's voice during the turn window and could animate the wrong face or generate phantom mouth movements outside the window.
+- v7 sends only ONE speaker's voice per pass → Sync.so has nothing to mis-animate. Combined with `deterministic_coords`, each turn lands exactly on the correct mouth with the correct words.
+
+**External audio policy unchanged:** `audio_plan.twoshot.useExternalAudio: true` keeps the merged master WAV authoritative for preview/export; the final Sync.so clip's embedded audio is not used by Composer playback or `compose-video-assemble` for cinematic-sync scenes.
+
+Refunds happen per scene (state.cost_credits), idempotent. Failed shots auto-retry once with coords-mode fallback.
+
+**Note on legacy state:** `dialog_shots.version = 4` is preserved (no schema migration). Shots without `audio_url`/`deterministic_coords` fields are handled gracefully via fallback to merged WAV + auto mode.
