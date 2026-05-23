@@ -37,7 +37,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
-import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
+import {
+  resolveDialogVoice,
+  resolveCharacterVoiceProfile,
+  mergeWithTonality,
+  type VoiceTuning,
+} from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
