@@ -40,12 +40,15 @@ import { useHumeVoices } from '@/hooks/useHumeVoices';
 import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
+import { DialogTakeStrip } from './DialogTakeStrip';
 import { Sparkles as SparklesIcon, Play } from 'lucide-react';
 import type {
   ComposerCharacter,
   ComposerScene,
   CharacterShot,
   DialogVoiceCfg,
+  DialogTakeBundle,
 } from '@/types/video-composer';
 
 interface SceneDialogStudioProps {
@@ -289,6 +292,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
+  const [dialogTakes, setDialogTakes] = useState<Record<string, DialogTakeBundle>>(
+    (scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {},
+  );
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genStage, setGenStage] = useState<string | null>(null);
@@ -301,6 +307,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   useEffect(() => {
     setScript(scene.dialogScript ?? '');
     setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
+    setDialogTakes((scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
@@ -323,6 +330,25 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     };
     setVoicePerSpeaker(next);
     onUpdate({ dialogVoices: next });
+  };
+
+  /** Persist take-bundle for a single dialog line (Take-System A/B/C). */
+  const updateLineTakes = (lineKey: string, bundle: DialogTakeBundle) => {
+    const next = { ...dialogTakes };
+    if (!bundle || (bundle.takes.length === 0 && !bundle.active)) {
+      delete next[lineKey];
+    } else {
+      next[lineKey] = bundle;
+    }
+    setDialogTakes(next);
+    onUpdate({ dialogTakes: next });
+  };
+
+  /** Pull the active take's audio for a given line, if any. */
+  const getActiveTake = (lineKey: string) => {
+    const b = dialogTakes[lineKey];
+    if (!b || !b.active) return null;
+    return b.takes.find((t) => t.id === b.active) ?? null;
   };
 
   const handleEngineChange = (speakerId: string, engine: 'elevenlabs' | 'hume') => {
@@ -552,41 +578,62 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         console.warn('[SceneDialogStudio] failed to clear old voiceover clips', delErr);
       }
 
-      for (const block of blocks) {
+      for (let bi = 0; bi < blocks.length; bi++) {
+        const block = blocks[bi];
         const c = sceneCast.find((x) => x.id === block.speakerId);
         if (!c) continue;
         const cfg = voicePerSpeaker[block.speakerId];
         if (!cfg?.voiceId) continue;
 
-        // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
-        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
-        const body = cfg.engine === 'hume'
-          ? {
-              text: block.text,
-              voiceName: cfg.voiceId,
-              provider: cfg.provider || 'HUME_AI',
-              projectId: pid,
-            }
-          : {
-              text: block.text,
-              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-              projectId: pid,
-            };
-        const { data, error } = await supabase.functions.invoke(fnName, { body });
-        if (error) throw error;
-        const audioUrl = (data as any)?.audioUrl as string | undefined;
-        if (!audioUrl) throw new Error('No audioUrl returned');
+        // ── Take-System A/B/C reuse (Phase B) ──
+        // If the user already recorded a take and pinned it as active, skip
+        // a fresh TTS call and reuse that audio. Keeps SRS/inline renders
+        // deterministic across re-renders.
+        const lineKey = dialogLineKey(bi, block.text);
+        const activeTake = getActiveTake(lineKey);
 
-        // Real audio duration — TTS service value first, browser-probe fallback.
-        // Fixes the "Matthew talks longer than Sarah even though his script
-        // is shorter" bug caused by the static `text.length / 18` heuristic.
-        const reportedDuration = Number((data as any)?.duration ?? 0);
-        const duration = reportedDuration > 0
-          ? reportedDuration
-          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        let audioUrl: string | undefined;
+        let duration: number;
+
+        if (activeTake?.audioUrl) {
+          audioUrl = activeTake.audioUrl;
+          duration = activeTake.durationSec > 0
+            ? activeTake.durationSec
+            : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
+        } else {
+          // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
+          const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const body = cfg.engine === 'hume'
+            ? {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pid,
+              }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+                projectId: pid,
+              };
+          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          if (error) throw error;
+          audioUrl = (data as any)?.audioUrl as string | undefined;
+          if (!audioUrl) throw new Error('No audioUrl returned');
+
+          // Real audio duration — TTS service value first, browser-probe fallback.
+          // Fixes the "Matthew talks longer than Sarah even though his script
+          // is shorter" bug caused by the static `text.length / 18` heuristic.
+          const reportedDuration = Number((data as any)?.duration ?? 0);
+          duration = reportedDuration > 0
+            ? reportedDuration
+            : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        }
+        // After both branches audioUrl is guaranteed to be a string.
+        const finalAudioUrl: string = audioUrl!;
 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Unauthorized');
+
 
         const { error: insErr } = await supabase
           .from('scene_audio_clips')
@@ -597,7 +644,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             kind: 'voiceover',
             source: 'ai',
             prompt: `${c.name}: ${block.text}`,
-            url: audioUrl,
+            url: finalAudioUrl,
             start_offset: Math.round(cumulativeOffset * 100) / 100,
             duration: Math.round(duration * 100) / 100,
             volume: 1.0,
@@ -615,7 +662,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
               sceneId,
               projectId: pid,
               imageUrl: c.referenceImageUrl,
-              audioUrl,
+              audioUrl: finalAudioUrl,
               aspectRatio: '9:16',
               resolution: '720p',
               composerCharacterId: c.id,
@@ -634,7 +681,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           text: block.text,
           engine: cfg.engine,
           voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-          audioUrl,
+          audioUrl: finalAudioUrl,
         });
         cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
@@ -890,31 +937,46 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : `Generating voice ${i + 1}/${blocks.length} (${c.name})…`,
         );
         const cfg = voicePerSpeaker[block.speakerId]!;
-        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
-        const body = cfg.engine === 'hume'
-          ? {
-              text: block.text,
-              voiceName: cfg.voiceId,
-              provider: cfg.provider || 'HUME_AI',
-              projectId: pidForSrs,
-            }
-          : {
-              text: block.text,
-              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-              projectId: pidForSrs,
-            };
-        const { data, error } = await supabase.functions.invoke(fnName, { body });
-        if (error) throw error;
-        const audioUrl = (data as any)?.audioUrl as string | undefined;
-        if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
-        const reportedDuration = Number((data as any)?.duration ?? 0);
-        const durationSec = reportedDuration > 0
-          ? reportedDuration
-          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+
+        // Take-System A/B/C reuse (Phase B) — skip TTS if user has an active take.
+        const lineKey = dialogLineKey(i, block.text);
+        const activeTake = getActiveTake(lineKey);
+
+        let audioUrl: string | undefined;
+        let durationSec: number;
+
+        if (activeTake?.audioUrl) {
+          audioUrl = activeTake.audioUrl;
+          durationSec = activeTake.durationSec > 0
+            ? activeTake.durationSec
+            : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
+        } else {
+          const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const body = cfg.engine === 'hume'
+            ? {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pidForSrs,
+              }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+                projectId: pidForSrs,
+              };
+          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          if (error) throw error;
+          audioUrl = (data as any)?.audioUrl as string | undefined;
+          if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
+          const reportedDuration = Number((data as any)?.duration ?? 0);
+          durationSec = reportedDuration > 0
+            ? reportedDuration
+            : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        }
         synthed.push({
           block,
           character: c,
-          audioUrl,
+          audioUrl: audioUrl!,
           durationSec,
           engine: cfg.engine,
         });
@@ -1224,19 +1286,35 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {blocks.map((b, i) => {
               const sp = sceneCast.find((c) => c.id === b.speakerId);
               const missing = !sp?.referenceImageUrl;
+              const lineKey = dialogLineKey(i, b.text);
+              const bundle = dialogTakes[lineKey];
+              const cfg = voicePerSpeaker[b.speakerId];
               return (
-                <div key={i} className="flex items-start gap-2 text-[11px]">
-                  {sp?.referenceImageUrl ? (
-                    <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
-                  ) : (
-                    <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
-                      <ImageOff className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                  )}
-                  <span className="font-semibold shrink-0">{b.speakerName}:</span>
-                  <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
-                    {b.text}
-                  </span>
+                <div key={i} className="space-y-0.5">
+                  <div className="flex items-start gap-2 text-[11px]">
+                    {sp?.referenceImageUrl ? (
+                      <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
+                        <ImageOff className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                    <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
+                      {b.text}
+                    </span>
+                  </div>
+                  <div className="pl-7">
+                    <DialogTakeStrip
+                      lineKey={lineKey}
+                      text={b.text}
+                      voiceCfg={cfg}
+                      bundle={bundle}
+                      language={language}
+                      projectId={projectId || scene.projectId}
+                      onChange={(next) => updateLineTakes(lineKey, next)}
+                    />
+                  </div>
                 </div>
               );
             })}
