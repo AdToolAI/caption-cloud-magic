@@ -500,7 +500,49 @@ serve(async (req) => {
 
       console.log(`🔍 Error fingerprint: ${errorFingerprint}`);
 
-      if (isDirectorsCut && renderJobId) {
+      if (isDialogStitch) {
+        // ── Dialog-stitch failure path: mark scene failed + refund credits
+        //    idempotently via dialog_shots.refunded. Sync.so per-turn costs
+        //    were charged up-front by compose-dialog-scene.
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'failed',
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        if (composerSceneId) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots, project_id')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          let refundedFlag = !!prevState.refunded;
+          const refundCredits = Number(prevState.cost_credits) || 0;
+          if (!refundedFlag && refundCredits > 0 && userId) {
+            try {
+              await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: refundCredits });
+              refundedFlag = true;
+            } catch (e) {
+              console.warn('💋 [dialog-stitch] refund failed', (e as Error).message);
+            }
+          }
+          await supabaseAdmin.from('composer_scenes').update({
+            lip_sync_status: 'failed',
+            twoshot_stage: 'failed',
+            clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
+            dialog_shots: {
+              ...prevState,
+              status: 'failed',
+              error: errorMessage.slice(0, 500),
+              refunded: refundedFlag,
+            },
+            updated_at: new Date().toISOString(),
+          }).eq('id', composerSceneId);
+          console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
+        }
+      } else if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
           status: 'failed', error_message: errorMessage, completed_at: new Date().toISOString(),
