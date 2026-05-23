@@ -162,6 +162,7 @@ const AvatarDetail = () => {
                       });
                     }}
                   />
+                  <VoiceProfileCard avatarId={avatar.id} avatar={avatar} />
                 </div>
               </div>
 

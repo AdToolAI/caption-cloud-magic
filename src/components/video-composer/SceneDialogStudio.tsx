@@ -37,7 +37,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { parseDialogScript, uniqueSpeakers } from '@/lib/talking-head/parseDialogScript';
 import { applyDialogToPrompt, INTER_SPEAKER_GAP_SEC } from '@/lib/motion-studio/applyDialogToPrompt';
 import { useHumeVoices } from '@/hooks/useHumeVoices';
-import { resolveDialogVoice } from '@/lib/voice-studio/resolveDialogVoice';
+import {
+  resolveDialogVoice,
+  resolveCharacterVoiceProfile,
+  mergeWithTonality,
+  type VoiceTuning,
+} from '@/lib/voice-studio/resolveDialogVoice';
 import { sortVoicesPremiumFirst, type VoiceMeta } from '@/lib/elevenlabs-voices';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
 import { dialogLineKey } from '@/lib/talking-head/dialogTakeKey';
@@ -235,6 +240,34 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     }
     return out;
   }, [sceneCast, accessibleChars]);
+
+  // Phase C — Brand voice tuning profile per ComposerCharacter.id.
+  // Read from brand_characters.voice_settings; merged with per-line tonality
+  // markers at TTS time via mergeWithTonality(). When absent, callers fall
+  // back to ElevenLabs defaults inside generate-voiceover.
+  const voiceProfileByCharId = useMemo<Record<string, VoiceTuning | null>>(() => {
+    const out: Record<string, VoiceTuning | null> = {};
+    for (const c of sceneCast) {
+      const lookupId = c.brandCharacterId ?? c.id;
+      const brand = accessibleChars.find((b) => b.id === lookupId);
+      out[c.id] = resolveCharacterVoiceProfile(brand as any);
+    }
+    return out;
+  }, [sceneCast, accessibleChars]);
+
+  /** Build the merged voice_settings payload for one dialog block. */
+  const buildTuningForBlock = (block: { speakerId: string; tonality?: string }) => {
+    const base = voiceProfileByCharId[block.speakerId] ?? null;
+    const merged = mergeWithTonality(base, (block.tonality as any) ?? null);
+    return {
+      stability: merged.stability,
+      similarityBoost: merged.similarityBoost,
+      style: merged.style,
+      useSpeakerBoost: merged.useSpeakerBoost,
+      speed: merged.speed,
+    };
+  };
+
 
 
   // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
@@ -585,11 +618,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         const cfg = voicePerSpeaker[block.speakerId];
         if (!cfg?.voiceId) continue;
 
-        // ── Take-System A/B/C reuse (Phase B) ──
-        // If the user already recorded a take and pinned it as active, skip
-        // a fresh TTS call and reuse that audio. Keeps SRS/inline renders
-        // deterministic across re-renders.
-        const lineKey = dialogLineKey(bi, block.text);
+        // ── Take-System A/B/C reuse (Phase B + C: tonality-aware key) ──
+        const lineKey = dialogLineKey(bi, block.text, block.tonality);
         const activeTake = getActiveTake(lineKey);
 
         let audioUrl: string | undefined;
@@ -603,6 +633,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         } else {
           // Engine-aware: Hume → generate-voiceover-hume, ElevenLabs → generate-voiceover.
           const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const tuning = cfg.engine === 'elevenlabs' ? buildTuningForBlock(block) : undefined;
           const body = cfg.engine === 'hume'
             ? {
                 text: block.text,
@@ -614,6 +645,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 text: block.text,
                 voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
                 projectId: pid,
+                ...(tuning ?? {}),
               };
           const { data, error } = await supabase.functions.invoke(fnName, { body });
           if (error) throw error;
@@ -938,8 +970,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         );
         const cfg = voicePerSpeaker[block.speakerId]!;
 
-        // Take-System A/B/C reuse (Phase B) — skip TTS if user has an active take.
-        const lineKey = dialogLineKey(i, block.text);
+        // Take-System A/B/C reuse (Phase B + C: tonality-aware key).
+        const lineKey = dialogLineKey(i, block.text, block.tonality);
         const activeTake = getActiveTake(lineKey);
 
         let audioUrl: string | undefined;
@@ -952,6 +984,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
         } else {
           const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const tuning = cfg.engine === 'elevenlabs' ? buildTuningForBlock(block) : undefined;
           const body = cfg.engine === 'hume'
             ? {
                 text: block.text,
@@ -963,6 +996,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 text: block.text,
                 voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
                 projectId: pidForSrs,
+                ...(tuning ?? {}),
               };
           const { data, error } = await supabase.functions.invoke(fnName, { body });
           if (error) throw error;
@@ -1286,9 +1320,10 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {blocks.map((b, i) => {
               const sp = sceneCast.find((c) => c.id === b.speakerId);
               const missing = !sp?.referenceImageUrl;
-              const lineKey = dialogLineKey(i, b.text);
+              const lineKey = dialogLineKey(i, b.text, b.tonality);
               const bundle = dialogTakes[lineKey];
               const cfg = voicePerSpeaker[b.speakerId];
+              const tuning = cfg?.engine === 'elevenlabs' ? buildTuningForBlock(b) : undefined;
               return (
                 <div key={i} className="space-y-0.5">
                   <div className="flex items-start gap-2 text-[11px]">
@@ -1300,6 +1335,14 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       </div>
                     )}
                     <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                    {b.tonality && b.tonality !== 'neutral' && (
+                      <span
+                        className="shrink-0 inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/10 px-1 py-px text-[9px] uppercase tracking-wide text-primary"
+                        title={`Tonality: ${b.tonality}`}
+                      >
+                        {b.tonality}
+                      </span>
+                    )}
                     <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
                       {b.text}
                     </span>
@@ -1309,6 +1352,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                       lineKey={lineKey}
                       text={b.text}
                       voiceCfg={cfg}
+                      voiceTuning={tuning}
                       bundle={bundle}
                       language={language}
                       projectId={projectId || scene.projectId}

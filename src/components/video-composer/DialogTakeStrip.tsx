@@ -31,6 +31,14 @@ interface DialogTakeStripProps {
   lineKey: string;
   text: string;
   voiceCfg: DialogVoiceCfg | undefined;
+  /** Phase C — merged Brand-Voice profile + tonality (ElevenLabs only). */
+  voiceTuning?: {
+    stability?: number;
+    similarityBoost?: number;
+    style?: number;
+    useSpeakerBoost?: boolean;
+    speed?: number;
+  };
   bundle: DialogTakeBundle | undefined;
   language: 'de' | 'en' | 'es';
   projectId?: string;
@@ -99,6 +107,7 @@ export function DialogTakeStrip({
   lineKey,
   text,
   voiceCfg,
+  voiceTuning,
   bundle,
   language,
   projectId,
@@ -154,6 +163,7 @@ export function DialogTakeStrip({
             text,
             voiceId: voiceCfg.isCustom ? voiceCfg.elevenlabsVoiceId : voiceCfg.voiceId,
             projectId,
+            ...(voiceTuning ?? {}),
           };
       const { data, error } = await supabase.functions.invoke(fnName, { body });
       if (error) throw error;
