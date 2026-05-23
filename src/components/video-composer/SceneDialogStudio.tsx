@@ -210,6 +210,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
+  const { data: accessibleChars = [] } = useAccessibleCharacters();
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
@@ -219,6 +220,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         .filter((c): c is ComposerCharacter => !!c),
     [cast, characters],
   );
+
+  // Brand-default voice per ComposerCharacter.id — pulled from the Avatar Library.
+  // Used for one-tap auto-binding when a speaker first enters the scene.
+  const defaultVoiceByCharId = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const c of sceneCast) {
+      const lookupId = c.brandCharacterId ?? c.id;
+      const brand = accessibleChars.find((b) => b.id === lookupId);
+      if (brand?.default_voice_id) out[c.id] = brand.default_voice_id;
+    }
+    return out;
+  }, [sceneCast, accessibleChars]);
+
 
   // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
   const [elVoices, setElVoices] = useState<VoiceMeta[]>([]);
