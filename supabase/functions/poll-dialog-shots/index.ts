@@ -572,25 +572,48 @@ async function processScene(
       }
     }
 
+    // Credential-blocked cooldown: if a previous tick saw AWS_INVALID, hold off
+    // re-dispatching for 10 minutes so we don't spam Lambda once per minute.
+    const blockedAt = (newState as any).stitch_blocked_at as string | undefined;
+    const blockedCode = (newState as any).stitch_blocked_code as string | undefined;
+    if (blockedCode === "aws_credentials_invalid" && blockedAt) {
+      const ageMs = Date.now() - Date.parse(blockedAt);
+      if (Number.isFinite(ageMs) && ageMs < 10 * 60 * 1000) {
+        return { status: "stitching_blocked_credentials", mutated };
+      }
+    }
+
     const dispatch = await dispatchDialogStitch(supabase, sceneId);
     if (!dispatch.ok) {
-      // Stitch dispatch failed — do NOT fall back to "last shot output".
-      // Keep dialog_shots ready, mark status as stitching with a retry
-      // hint; the next cron tick will retry render-dialog-stitch.
+      const isCredBlock = dispatch.code === "aws_credentials_invalid";
       console.warn(
-        `[poll-dialog-shots] stitch dispatch failed: ${dispatch.error} — will retry next tick`,
+        `[poll-dialog-shots] stitch dispatch failed${isCredBlock ? " (CREDENTIALS BLOCKED)" : ""}: ${dispatch.error}`,
       );
+      const patched: any = {
+        ...newState,
+        stitch_error: dispatch.error.slice(0, 500),
+      };
+      if (isCredBlock) {
+        patched.stitch_blocked_at = new Date().toISOString();
+        patched.stitch_blocked_code = "aws_credentials_invalid";
+      }
+      const clipErrorMsg = isCredBlock
+        ? "render_credentials_invalid: AWS Render-Credentials sind ungültig oder abgelaufen. Bitte AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY (ggf. AWS_SESSION_TOKEN) erneuern."
+        : `dialog_stitch_dispatch: ${dispatch.error}`;
       await supabase
         .from("composer_scenes")
         .update({
-          dialog_shots: newState,
+          dialog_shots: patched,
           lip_sync_status: "stitching",
           twoshot_stage: "dialog_stitching",
-          clip_error: `dialog_stitch_dispatch: ${dispatch.error}`.slice(0, 300),
+          clip_error: clipErrorMsg.slice(0, 300),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
-      return { status: "stitching", mutated: true };
+      return {
+        status: isCredBlock ? "stitching_blocked_credentials" : "stitching",
+        mutated: true,
+      };
     }
 
     console.log(
