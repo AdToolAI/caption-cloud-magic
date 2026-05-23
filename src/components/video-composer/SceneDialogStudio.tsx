@@ -934,27 +934,42 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : `Generating voice ${i + 1}/${blocks.length} (${c.name})…`,
         );
         const cfg = voicePerSpeaker[block.speakerId]!;
-        const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
-        const body = cfg.engine === 'hume'
-          ? {
-              text: block.text,
-              voiceName: cfg.voiceId,
-              provider: cfg.provider || 'HUME_AI',
-              projectId: pidForSrs,
-            }
-          : {
-              text: block.text,
-              voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-              projectId: pidForSrs,
-            };
-        const { data, error } = await supabase.functions.invoke(fnName, { body });
-        if (error) throw error;
-        const audioUrl = (data as any)?.audioUrl as string | undefined;
-        if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
-        const reportedDuration = Number((data as any)?.duration ?? 0);
-        const durationSec = reportedDuration > 0
-          ? reportedDuration
-          : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+
+        // Take-System A/B/C reuse (Phase B) — skip TTS if user has an active take.
+        const lineKey = dialogLineKey(i, block.text);
+        const activeTake = getActiveTake(lineKey);
+
+        let audioUrl: string | undefined;
+        let durationSec: number;
+
+        if (activeTake?.audioUrl) {
+          audioUrl = activeTake.audioUrl;
+          durationSec = activeTake.durationSec > 0
+            ? activeTake.durationSec
+            : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
+        } else {
+          const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const body = cfg.engine === 'hume'
+            ? {
+                text: block.text,
+                voiceName: cfg.voiceId,
+                provider: cfg.provider || 'HUME_AI',
+                projectId: pidForSrs,
+              }
+            : {
+                text: block.text,
+                voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
+                projectId: pidForSrs,
+              };
+          const { data, error } = await supabase.functions.invoke(fnName, { body });
+          if (error) throw error;
+          audioUrl = (data as any)?.audioUrl as string | undefined;
+          if (!audioUrl) throw new Error(`No audioUrl returned for ${c.name}`);
+          const reportedDuration = Number((data as any)?.duration ?? 0);
+          durationSec = reportedDuration > 0
+            ? reportedDuration
+            : await probeAudioDuration(audioUrl, Math.max(1.5, block.text.length / 18));
+        }
         synthed.push({
           block,
           character: c,
