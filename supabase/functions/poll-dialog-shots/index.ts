@@ -109,6 +109,7 @@ async function startSyncTurnJob(
   window: [number, number],
   coords: [number, number] | null,
   temperature: number,
+  turnIdx?: number,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
@@ -132,13 +133,31 @@ async function startSyncTurnJob(
     ],
     options,
   };
+  console.log(
+    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
+  );
   let r = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
     headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+  // Always surface rate-limit headers so we can detect plan throttling.
+  const rl = {
+    limit: r.headers.get("x-ratelimit-limit"),
+    remaining: r.headers.get("x-ratelimit-remaining"),
+    reset: r.headers.get("x-ratelimit-reset"),
+    retryAfter: r.headers.get("retry-after"),
+  };
+  if (rl.limit || rl.remaining || rl.retryAfter) {
+    console.log(
+      `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} status=${r.status} rate-limit=${JSON.stringify(rl)}`,
+    );
+  }
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
+    console.error(
+      `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} FAILED status=${r.status} body=${txt.slice(0, 1500)}`,
+    );
     // Fallback: retry without segments_secs if Sync.so rejects the window.
     if (
       r.status === 400 &&
@@ -156,6 +175,9 @@ async function startSyncTurnJob(
       });
       if (!r.ok) {
         const t2 = await r.text().catch(() => "");
+        console.error(
+          `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} fallback-FAILED status=${r.status} body=${t2.slice(0, 1500)}`,
+        );
         throw new Error(`sync.so create ${r.status}: ${t2.slice(0, 300)}`);
       }
     } else {
@@ -163,6 +185,9 @@ async function startSyncTurnJob(
     }
   }
   const data = await r.json();
+  console.log(
+    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} OK job_id=${data.id} status=${data.status ?? "?"}`,
+  );
   return String(data.id);
 }
 
@@ -175,13 +200,44 @@ async function pollSyncJob(
   });
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
+    console.error(
+      `[poll-dialog-shots] POLL ${jobId} http-error status=${r.status} body=${txt.slice(0, 600)}`,
+    );
     return { status: "FAILED", error: `poll ${r.status}: ${txt.slice(0, 200)}` };
   }
   const data = await r.json();
+  const status = String(data.status ?? "UNKNOWN");
+  // On FAILED/REJECTED/CANCELED, dump the FULL body so we can finally diagnose
+  // Sync.so's opaque "unknown error" responses.
+  if (["FAILED", "REJECTED", "CANCELED"].includes(status)) {
+    console.error(
+      `[poll-dialog-shots] POLL ${jobId} terminal=${status} body=${JSON.stringify(data).slice(0, 1500)}`,
+    );
+  }
+  // Robust error extraction — Sync.so spreads error info across many shapes.
+  const inputErrors = Array.isArray(data.input)
+    ? data.input
+        .map((i: any, idx: number) => (i?.error ? `input[${idx}]:${i.error}` : null))
+        .filter(Boolean)
+        .join("; ")
+    : "";
+  const errorMsg =
+    data.error ??
+    data.errorMessage ??
+    data.error_message ??
+    data.failureReason ??
+    data.failure_reason ??
+    data.error_detail ??
+    data.errorDetail ??
+    data.message ??
+    (inputErrors || undefined) ??
+    (["FAILED", "REJECTED", "CANCELED"].includes(status)
+      ? `body:${JSON.stringify(data).slice(0, 240)}`
+      : undefined);
   return {
-    status: String(data.status ?? "UNKNOWN"),
+    status,
     outputUrl: data.outputUrl ?? data.output_url ?? undefined,
-    error: data.error ?? undefined,
+    error: errorMsg,
   };
 }
 
@@ -435,6 +491,7 @@ async function processScene(
           win,
           shot.target_coords,
           shot.temperature,
+          shot.idx,
         ).then((jobId) => ({ shot, jobId, win }));
       }),
     );
