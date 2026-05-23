@@ -1120,28 +1120,141 @@ export default function SceneCard({
                       </div>
                     )}
 
-                    {sourceMode === "ai" && (
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">
-                          {lang === "de"
-                            ? "KI-Modell · Qualität & Preis im Dropdown"
-                            : lang === "es"
-                              ? "Modelo IA"
-                              : "AI Model"}
-                        </Label>
-                        <ModelSelector
-                          value={currentModelId}
-                          onChange={(modelId) => {
-                            const next = modelIdToSource(modelId);
-                            onUpdate({
-                              clipSource: next.clipSource,
-                              clipQuality: next.clipQuality,
-                            });
-                          }}
-                          currency="EUR"
-                          models={COMPOSER_AVAILABLE_MODELS}
-                          className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
-                        />
+                    {sourceMode === "ai" && (() => {
+                      const dialogMode = scene.dialogMode === true;
+                      const modelsForPicker = dialogMode
+                        ? COMPOSER_DIALOG_MODELS
+                        : COMPOSER_AVAILABLE_MODELS;
+                      const toggleOnLabel =
+                        lang === "de"
+                          ? "Dialog & Lip-Sync"
+                          : lang === "es"
+                            ? "Diálogo y Lip-Sync"
+                            : "Dialog & Lip-Sync";
+                      const toggleHint =
+                        lang === "de"
+                          ? "Nur Modelle mit professionellem nativem Dialog & Lippensync (Kling 3, Veo 3.1, HappyHorse 1.0)."
+                          : lang === "es"
+                            ? "Solo modelos con diálogo nativo y lip-sync profesional (Kling 3, Veo 3.1, HappyHorse 1.0)."
+                            : "Only models with professional native dialog & lip-sync (Kling 3, Veo 3.1, HappyHorse 1.0).";
+                      return (
+                        <div className="space-y-2">
+                          {/* Dialog & Lip-Sync toggle — James-Bond-2028 gold accent */}
+                          <div
+                            className={cn(
+                              "flex items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 transition-all",
+                              dialogMode
+                                ? "border-amber-400/50 bg-amber-500/[0.06] shadow-[inset_2px_0_0_0_hsl(43_90%_60%/0.7)]"
+                                : "border-border/40 bg-card/40",
+                            )}
+                            title={toggleHint}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <MessageSquareQuote
+                                className={cn(
+                                  "h-3.5 w-3.5 shrink-0",
+                                  dialogMode ? "text-amber-300" : "text-muted-foreground",
+                                )}
+                              />
+                              <div className="flex flex-col min-w-0">
+                                <span
+                                  className={cn(
+                                    "text-[11px] font-medium leading-tight",
+                                    dialogMode ? "text-amber-200" : "text-foreground",
+                                  )}
+                                >
+                                  {toggleOnLabel}
+                                </span>
+                                <span className="text-[9px] text-muted-foreground leading-tight truncate">
+                                  {dialogMode
+                                    ? lang === "de"
+                                      ? "3 Modelle · Skript & Lip-Sync aktiv"
+                                      : lang === "es"
+                                        ? "3 modelos · Guion y lip-sync activos"
+                                        : "3 models · Script & lip-sync active"
+                                    : lang === "de"
+                                      ? "B-Roll-Modus · 11 Modelle verfügbar"
+                                      : lang === "es"
+                                        ? "Modo B-roll · 11 modelos disponibles"
+                                        : "B-roll mode · 11 models available"}
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={dialogMode}
+                              onClick={() => {
+                                const next = !dialogMode;
+                                const updates: Partial<ComposerScene> = { dialogMode: next };
+                                if (next) {
+                                  const ok = (NATIVE_DIALOGUE_CLIP_SOURCES as ReadonlyArray<string>).includes(
+                                    scene.clipSource,
+                                  );
+                                  if (!ok) {
+                                    updates.clipSource = DIALOG_FALLBACK_CLIP_SOURCE;
+                                    updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
+                                    toast({
+                                      title:
+                                        lang === "de"
+                                          ? "Modell auf HappyHorse 1.0 gewechselt"
+                                          : lang === "es"
+                                            ? "Modelo cambiado a HappyHorse 1.0"
+                                            : "Switched to HappyHorse 1.0",
+                                      description:
+                                        lang === "de"
+                                          ? "Für Dialog & Lip-Sync sind nur Kling 3, Veo 3.1 und HappyHorse 1.0 verfügbar. Günstigste Option vorausgewählt."
+                                          : lang === "es"
+                                            ? "Para diálogo y lip-sync solo están disponibles Kling 3, Veo 3.1 y HappyHorse 1.0. Se eligió la más económica."
+                                            : "Dialog & lip-sync supports only Kling 3, Veo 3.1 and HappyHorse 1.0. Cheapest option preselected.",
+                                    });
+                                  }
+                                }
+                                onUpdate(updates);
+                              }}
+                              className={cn(
+                                "relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                                dialogMode
+                                  ? "bg-amber-500/70 ring-1 ring-amber-300/60"
+                                  : "bg-muted ring-1 ring-border",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "inline-block h-3.5 w-3.5 transform rounded-full bg-background transition-transform shadow-sm",
+                                  dialogMode ? "translate-x-5" : "translate-x-0.5",
+                                )}
+                              />
+                            </button>
+                          </div>
+
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground">
+                              {lang === "de"
+                                ? dialogMode
+                                  ? "KI-Modell · Dialog-fähig (3)"
+                                  : "KI-Modell · Qualität & Preis im Dropdown"
+                                : lang === "es"
+                                  ? dialogMode
+                                    ? "Modelo IA · con diálogo (3)"
+                                    : "Modelo IA"
+                                  : dialogMode
+                                    ? "AI Model · dialog-capable (3)"
+                                    : "AI Model"}
+                            </Label>
+                            <ModelSelector
+                              value={currentModelId}
+                              onChange={(modelId) => {
+                                const next = modelIdToSource(modelId);
+                                onUpdate({
+                                  clipSource: next.clipSource,
+                                  clipQuality: next.clipQuality,
+                                });
+                              }}
+                              currency="EUR"
+                              models={modelsForPicker}
+                              className="h-11 bg-card/60 backdrop-blur-sm border-border/60 hover:border-primary/40 transition-colors text-xs"
+                            />
                         {(() => {
                           const selectedModel = AI_VIDEO_TOOLKIT_MODELS.find(
                             (m) => m.id === currentModelId,
