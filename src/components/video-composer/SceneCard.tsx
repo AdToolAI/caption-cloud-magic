@@ -100,6 +100,10 @@ import { clipSourceToModelKey } from "@/lib/motion-studio/promptTokenLimits";
 import { ModelSelector } from "@/components/ai-video/ModelSelector";
 import {
   COMPOSER_AVAILABLE_MODELS,
+  COMPOSER_DIALOG_MODELS,
+  NATIVE_DIALOGUE_CLIP_SOURCES,
+  DIALOG_FALLBACK_CLIP_SOURCE,
+  DIALOG_FALLBACK_CLIP_QUALITY,
   modelIdToSource,
   sourceToModelId,
 } from "@/lib/video-composer/modelMapping";
