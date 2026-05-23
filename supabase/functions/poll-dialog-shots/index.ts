@@ -428,47 +428,74 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch the next pending shot serially ──────────────────
-  // No inter-shot dependency in v4, but Sync.so Creator concurrency is low.
-  // Dispatching one new turn per tick prevents 429s from becoming failures.
-  const pending = shots.filter((s) => s.status === "pending");
+  // ── Step 2: dispatch the next pending shot serially (CHAINED) ───────
+  // CHAINED-V6 (AWS-bundle-lockout workaround):
+  // Each shot K uses shot K-1's output_url as its source video instead of
+  // the original master plate. The final shot's output_url is therefore
+  // already the fully-stitched multi-speaker dialog clip — no Lambda
+  // stitching step required, no new Remotion bundle needed.
+  //
+  // Cost: one extra video re-encode generation per turn (Sync.so already
+  // re-encodes anyway, so this is +0 encoder generations compared to the
+  // abandoned ffmpeg stitch path).
+  //
+  // Strictly serial: shot K must wait for shot K-1 to be `ready` before it
+  // can dispatch, because its source video does not exist yet otherwise.
+  const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
+  const pending = sortedShots.filter((s) => s.status === "pending");
   const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (pending.length > 0 && activeAfterPolling.length === 0) {
-    for (const shot of pending.slice(0, MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK)) {
+    // Find the next shot whose immediate predecessor (idx-1) is ready
+    // (or idx===0, which always uses the original master plate).
+    const nextShot = pending.find((s) => {
+      if (s.idx === 0) return true;
+      const prev = sortedShots.find((x) => x.idx === s.idx - 1);
+      return prev?.status === "ready" && !!prev.output_url;
+    });
+    if (nextShot) {
       try {
-        const win = expandWindow(shot, shots);
-        const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
+        // CHAINED source selection
+        const prev =
+          nextShot.idx > 0
+            ? sortedShots.find((x) => x.idx === nextShot.idx - 1)
+            : null;
+        const chainedSourceUrl =
+          prev?.output_url && prev.status === "ready"
+            ? prev.output_url
+            : state.source_clip_url;
+        const win = expandWindow(nextShot, shots);
+        const mode: "auto" | "coords" = nextShot.force_coords ? "coords" : "auto";
         const jobId = await startSyncTurnJob(
           syncKey,
-          state.source_clip_url,
+          chainedSourceUrl,
           state.master_audio_url,
           win,
-          shot.target_coords,
-          shot.temperature,
-          shot.idx,
+          nextShot.target_coords,
+          nextShot.temperature,
+          nextShot.idx,
           mode,
         );
-        shot.sync_job_id = jobId;
-        shot.status = "lipsyncing";
-        shot.started_at = new Date().toISOString();
+        nextShot.sync_job_id = jobId;
+        nextShot.status = "lipsyncing";
+        nextShot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] CHAINED dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} source=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
-          shot.status = "pending";
-          shot.sync_job_id = undefined;
-          shot.last_deferred_at = new Date().toISOString();
+          nextShot.status = "pending";
+          nextShot.sync_job_id = undefined;
+          nextShot.last_deferred_at = new Date().toISOString();
           mutated = true;
           console.warn(
-            `[poll-dialog-shots] turn ${shot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+            `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
           );
-          break;
+        } else {
+          nextShot.status = "failed";
+          nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+          mutated = true;
         }
-        shot.status = "failed";
-        shot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
-        mutated = true;
       }
     }
   }
