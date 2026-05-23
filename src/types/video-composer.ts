@@ -516,6 +516,36 @@ export interface AudioPlan {
   twoshot?: AudioPlanTwoshot;
 }
 
+/**
+ * Take-System A/B/C — one rendered voiceover take for a single dialog line.
+ *
+ * Stored inside `DialogTakeBundle.takes`. Each take is an immutable record of
+ * the TTS render: same line + same voice on a different day produces a new
+ * take, not an overwrite. Up to 3 takes per line (A/B/C).
+ */
+export interface DialogTake {
+  id: string;
+  audioUrl: string;
+  durationSec: number;
+  engine: 'elevenlabs' | 'hume';
+  voiceId: string;
+  voiceName?: string;
+  /** Optional ElevenLabs custom-voice id when `isCustom` was true at render. */
+  elevenlabsVoiceId?: string;
+  isCustom?: boolean;
+  provider?: string;
+  /** ISO timestamp when this take was generated. */
+  createdAt: string;
+  /** Short label (e.g. "A", "B", "C"). Derived from index, persisted for clarity. */
+  label?: string;
+}
+
+export interface DialogTakeBundle {
+  /** Take id to use when rendering this line, or null = fall back to live TTS. */
+  active: string | null;
+  takes: DialogTake[];
+}
+
 export type SubtitlePosition = 'top' | 'bottom';
 
 export interface SubtitlesStyle {
