@@ -149,7 +149,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-veo-video',
     group: 'audio',
     icon: Volume2,
-    capabilities: { t2v: true, i2v: true, audio: true },
+    capabilities: { t2v: true, i2v: true, audio: true, nativeDialogue: true },
     durations: [4, 6, 8],
     resolution: '1080p',
     aspectRatios: ['16:9', '9:16'],
