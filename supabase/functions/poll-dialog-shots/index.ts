@@ -1,13 +1,13 @@
 /**
- * poll-dialog-shots — v4 PARALLEL per-turn Sync.so dispatcher + ffmpeg stitch.
+ * poll-dialog-shots — v5 SERIAL per-turn Sync.so dispatcher + ffmpeg stitch.
  *
  * v4 design:
  *  - Each turn = ONE Sync.so lipsync-2-pro pass on the ORIGINAL pristine
  *    master plate (no chaining). Tight single-window `segments_secs=[[t]]`
  *    + identity-matched face coords + per-turn temperature.
- *  - ALL pending shots are dispatched in parallel (Sync.so Creator plan
- *    permits concurrent jobs; no inter-shot dependency).
- *  - Per-tick: poll every in-flight shot, dispatch any still-pending shot.
+ *  - Only one new Sync.so turn is dispatched per scene/tick and only when no
+ *    other turn is in flight. This keeps Creator-plan concurrency stable.
+ *  - Per-tick: poll every in-flight shot, then dispatch the next pending shot.
  *  - On `allReady`: stitch with ffmpeg by time-slicing — window i from
  *    out_T_i, gaps from the pristine master — then remux the master WAV.
  *  - Result: every sentence has identical Sync.so attention, only ONE
@@ -36,6 +36,14 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
+const MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK = 1;
+
+class SyncConcurrencyDeferredError extends Error {
+  constructor(message: string, readonly retryAfter?: string | null) {
+    super(message);
+    this.name = "SyncConcurrencyDeferredError";
+  }
+}
 
 /** Pre-roll/tail for `segments_secs` (Sync.so VAD onset + frame-grid rounding).
  *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
@@ -59,6 +67,7 @@ interface DialogShot {
   error?: string;
   started_at?: string;
   completed_at?: string;
+  last_deferred_at?: string;
   /** How many times we have already redispatched this shot after a FAILED
    *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
    *  retry falls back to fixed coords + frame_number aligned to the turn. */
@@ -179,6 +188,15 @@ async function startSyncTurnJob(
   }
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
+    if (r.status === 429) {
+      console.warn(
+        `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} deferred_due_to_concurrency retryAfter=${rl.retryAfter ?? "?"} body=${txt.slice(0, 500)}`,
+      );
+      throw new SyncConcurrencyDeferredError(
+        `sync.so concurrency limit: ${txt.slice(0, 240)}`,
+        rl.retryAfter,
+      );
+    }
     console.error(
       `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} FAILED status=${r.status} body=${txt.slice(0, 1500)}`,
     );
@@ -520,15 +538,17 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch ALL pending shots IN PARALLEL ──────────────────
-  // No inter-shot dependency in v4 (every pass runs on the pristine master).
+  // ── Step 2: dispatch the next pending shot serially ──────────────────
+  // No inter-shot dependency in v4, but Sync.so Creator concurrency is low.
+  // Dispatching one new turn per tick prevents 429s from becoming failures.
   const pending = shots.filter((s) => s.status === "pending");
-  if (pending.length > 0) {
-    const dispatched = await Promise.allSettled(
-      pending.map(async (shot) => {
+  const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
+  if (pending.length > 0 && activeAfterPolling.length === 0) {
+    for (const shot of pending.slice(0, MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK)) {
+      try {
         const win = expandWindow(shot, shots);
         const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
-        return startSyncTurnJob(
+        const jobId = await startSyncTurnJob(
           syncKey,
           state.source_clip_url,
           state.master_audio_url,
@@ -537,13 +557,7 @@ async function processScene(
           shot.temperature,
           shot.idx,
           mode,
-        ).then((jobId) => ({ shot, jobId, win, mode }));
-      }),
-    );
-
-    for (const res of dispatched) {
-      if (res.status === "fulfilled") {
-        const { shot, jobId, win, mode } = res.value;
+        );
         shot.sync_job_id = jobId;
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
@@ -551,16 +565,20 @@ async function processScene(
         console.log(
           `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
-
-      } else {
-        // Find which shot failed (Promise.allSettled preserves order vs pending[])
-        const idxInPending = dispatched.indexOf(res);
-        const shot = pending[idxInPending];
-        if (shot) {
-          shot.status = "failed";
-          shot.error = `dispatch: ${(res.reason as Error)?.message ?? "unknown"}`.slice(0, 300);
+      } catch (e) {
+        if (e instanceof SyncConcurrencyDeferredError) {
+          shot.status = "pending";
+          shot.sync_job_id = undefined;
+          shot.last_deferred_at = new Date().toISOString();
           mutated = true;
+          console.warn(
+            `[poll-dialog-shots] turn ${shot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          );
+          break;
         }
+        shot.status = "failed";
+        shot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+        mutated = true;
       }
     }
   }
@@ -590,7 +608,7 @@ async function processScene(
         })
         .eq("id", sceneId);
 
-      const finalUrl = await stitchDialogShots(supabase, state, sceneId);
+      const finalUrl = await stitchDialogShots(supabase, newState, sceneId);
       const nowIso = new Date().toISOString();
       newState = { ...newState, final_url: finalUrl, finished_at: nowIso, status: "done" };
       await supabase
