@@ -169,8 +169,8 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
           .from('posts')
           .update({
             error_message: userMessage,
-            status: 'failed',
           })
+
           .eq('id', capturedPostId);
       } catch (e) {
         console.error('Error updating post error:', e);
