@@ -30,6 +30,9 @@ const corsHeaders = {
 interface DialogShot {
   idx: number;
   window: [number, number];
+  /** v9: slightly expanded render range (lead-in/tail). Stitch prefers this
+   *  so its overlay slice matches the Sync.so `segments_secs` exactly. */
+  render_window?: [number, number];
   status: string;
   output_url?: string;
   speaker_name?: string;
