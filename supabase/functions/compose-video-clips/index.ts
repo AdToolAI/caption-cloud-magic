@@ -1463,11 +1463,7 @@ serve(async (req) => {
                     `[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`,
                   );
                 }
-                  const errTxt = await anchorResp.text().catch(() => "");
-                  console.warn(
-                    `[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`,
-                  );
-                }
+
               } catch (anchorErr) {
                 console.warn(
                   `[compose-video-clips] universal anchor scene ${scene.id} exception:`,
