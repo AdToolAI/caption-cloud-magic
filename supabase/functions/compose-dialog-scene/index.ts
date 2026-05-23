@@ -553,6 +553,7 @@ serve(async (req) => {
       character_id: string | null;
       start: number;
       end: number;
+      audio_url: string;
     }
     const rawTurns: RawTurn[] = [];
     speakers.forEach((sp, sIdx) => {
@@ -564,6 +565,12 @@ serve(async (req) => {
       if (turns.length === 0) return;
       const charId = String(sp.character_id ?? "").toLowerCase() || null;
       const speakerName = String(sp.speaker ?? `Speaker ${sIdx + 1}`);
+      // v7: prefer per-speaker isolated WAV (`track_url`) so each Sync.so
+      // job only sees ONE voice. The merged master WAV used to bleed other
+      // speakers into a turn's audio, which made Sync.so animate the wrong
+      // face and produced "ghost speech" on silent turns.
+      const speakerAudio =
+        String((sp as any).track_url ?? "").trim() || masterAudioUrl;
       for (const t of turns) {
         const start = Number(t.startSec);
         const end = Math.max(start + MIN_TURN_DUR_SEC, Number(t.endSec));
@@ -573,9 +580,16 @@ serve(async (req) => {
           character_id: charId,
           start,
           end,
+          audio_url: speakerAudio,
         });
       }
     });
+
+    // Pre-compute multi-speaker flag so every shot knows whether to force
+    // deterministic coords (mandatory) or may fall back to auto_detect
+    // (single-speaker only).
+    const distinctSpeakerCount = new Set(rawTurns.map((t) => t.speaker_idx)).size;
+    const requireDeterministic = distinctSpeakerCount >= 2;
 
     const rawShots: DialogShot[] = rawTurns
       .sort((a, b) => a.start - b.start)
@@ -592,15 +606,12 @@ serve(async (req) => {
           window: [t.start, t.end] as [number, number],
           durSec: dur,
           target_coords: coords,
-          // Per-turn temperature — no pass-level compromise. Short turns
-          // (<2s) get max articulation (1.0); longer turns 0.9.
           temperature: dur < 2.0 ? 1.0 : 0.9,
+          audio_url: t.audio_url,
+          deterministic_coords: requireDeterministic && !!coords,
           status: "pending",
         };
       });
-
-
-    if (rawShots.length === 0) {
       await supabase
         .from("composer_scenes")
         .update({
