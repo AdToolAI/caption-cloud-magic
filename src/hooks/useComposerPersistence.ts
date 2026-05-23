@@ -189,6 +189,7 @@ export function useComposerPersistence() {
               character_shots: (scene.characterShots ?? (scene.characterShot ? [scene.characterShot] : [])) as any,
               dialog_script: scene.dialogScript ?? null,
               dialog_voices: (scene.dialogVoices ?? {}) as any,
+              dialog_mode: scene.dialogMode ?? false,
               engine_override: scene.engineOverride ?? 'auto',
               director_modifiers: (scene.directorModifiers ?? {}) as any,
               shot_director: (scene.shotDirector ?? {}) as any,
