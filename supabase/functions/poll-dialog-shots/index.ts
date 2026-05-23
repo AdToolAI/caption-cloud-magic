@@ -428,47 +428,74 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch the next pending shot serially ──────────────────
-  // No inter-shot dependency in v4, but Sync.so Creator concurrency is low.
-  // Dispatching one new turn per tick prevents 429s from becoming failures.
-  const pending = shots.filter((s) => s.status === "pending");
+  // ── Step 2: dispatch the next pending shot serially (CHAINED) ───────
+  // CHAINED-V6 (AWS-bundle-lockout workaround):
+  // Each shot K uses shot K-1's output_url as its source video instead of
+  // the original master plate. The final shot's output_url is therefore
+  // already the fully-stitched multi-speaker dialog clip — no Lambda
+  // stitching step required, no new Remotion bundle needed.
+  //
+  // Cost: one extra video re-encode generation per turn (Sync.so already
+  // re-encodes anyway, so this is +0 encoder generations compared to the
+  // abandoned ffmpeg stitch path).
+  //
+  // Strictly serial: shot K must wait for shot K-1 to be `ready` before it
+  // can dispatch, because its source video does not exist yet otherwise.
+  const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
+  const pending = sortedShots.filter((s) => s.status === "pending");
   const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (pending.length > 0 && activeAfterPolling.length === 0) {
-    for (const shot of pending.slice(0, MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK)) {
+    // Find the next shot whose immediate predecessor (idx-1) is ready
+    // (or idx===0, which always uses the original master plate).
+    const nextShot = pending.find((s) => {
+      if (s.idx === 0) return true;
+      const prev = sortedShots.find((x) => x.idx === s.idx - 1);
+      return prev?.status === "ready" && !!prev.output_url;
+    });
+    if (nextShot) {
       try {
-        const win = expandWindow(shot, shots);
-        const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
+        // CHAINED source selection
+        const prev =
+          nextShot.idx > 0
+            ? sortedShots.find((x) => x.idx === nextShot.idx - 1)
+            : null;
+        const chainedSourceUrl =
+          prev?.output_url && prev.status === "ready"
+            ? prev.output_url
+            : state.source_clip_url;
+        const win = expandWindow(nextShot, shots);
+        const mode: "auto" | "coords" = nextShot.force_coords ? "coords" : "auto";
         const jobId = await startSyncTurnJob(
           syncKey,
-          state.source_clip_url,
+          chainedSourceUrl,
           state.master_audio_url,
           win,
-          shot.target_coords,
-          shot.temperature,
-          shot.idx,
+          nextShot.target_coords,
+          nextShot.temperature,
+          nextShot.idx,
           mode,
         );
-        shot.sync_job_id = jobId;
-        shot.status = "lipsyncing";
-        shot.started_at = new Date().toISOString();
+        nextShot.sync_job_id = jobId;
+        nextShot.status = "lipsyncing";
+        nextShot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] CHAINED dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} source=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
-          shot.status = "pending";
-          shot.sync_job_id = undefined;
-          shot.last_deferred_at = new Date().toISOString();
+          nextShot.status = "pending";
+          nextShot.sync_job_id = undefined;
+          nextShot.last_deferred_at = new Date().toISOString();
           mutated = true;
           console.warn(
-            `[poll-dialog-shots] turn ${shot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+            `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
           );
-          break;
+        } else {
+          nextShot.status = "failed";
+          nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+          mutated = true;
         }
-        shot.status = "failed";
-        shot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
-        mutated = true;
       }
     }
   }
@@ -479,48 +506,23 @@ async function processScene(
   const hasActive = shots.some((s) => s.status === "lipsyncing" || s.status === "pending");
 
   let pipelineStatus: DialogShotsState["status"] = state.status;
-  if (allReady) pipelineStatus = "stitching";
+  if (allReady) pipelineStatus = "done";
   else if (hasFailure && !hasActive) pipelineStatus = "failed";
   else if (hasActive) pipelineStatus = "lipsyncing";
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: all shots ready → dispatch Lambda stitch ────────────────
-  // Edge Runtime cannot spawn ffmpeg, so the actual stitching runs as a
-  // Remotion Lambda render against the DialogStitchVideo composition.
-  // remotion-webhook writes clip_url + lip_sync_applied_at back to the
-  // scene when the render completes; this function just kicks it off.
+  // ── Step 4: all shots ready → CHAINED final clip (no stitching) ─────
+  // In the CHAINED-V6 pipeline each shot was already lipsynced on top of
+  // the previous shot's output. The LAST shot's output_url therefore
+  // already contains every speaker's lipsync layered on the master plate
+  // — no ffmpeg or Lambda stitch is needed.
   if (allReady) {
-    // Idempotency: if we already dispatched a stitch render for this scene,
-    // don't trigger again — just keep waiting for the webhook.
-    if ((state as any).stitch?.render_id) {
-      console.log(
-        `[poll-dialog-shots] scene ${sceneId} stitch already dispatched (render_id=${(state as any).stitch.render_id}); waiting for webhook`,
-      );
-      return { status: "stitching", mutated };
-    }
-
-    console.log(
-      `[poll-dialog-shots] all ${shots.length} shots ready for scene ${sceneId}, dispatching Lambda stitch`,
-    );
-    await supabase
-      .from("composer_scenes")
-      .update({
-        dialog_shots: newState,
-        lip_sync_status: "stitching",
-        twoshot_stage: "dialog_stitching",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", sceneId);
-
-    const dispatched = await dispatchDialogStitch(supabase, sceneId);
-    if (!dispatched.ok) {
-      const errMsg = dispatched.error;
-      console.error(
-        `[poll-dialog-shots] dispatch stitch failed for ${sceneId}:`,
-        errMsg,
-      );
-      newState = { ...newState, status: "failed", error: errMsg };
+    const lastShot = [...shots].sort((a, b) => b.idx - a.idx)[0];
+    const finalUrl = lastShot?.output_url;
+    if (!finalUrl) {
+      // Defensive: should never happen because allReady implies output_url.
+      newState = { ...newState, status: "failed", error: "last shot missing output_url" };
       if (userId) newState = await refundIfNeeded(supabase, userId, newState);
       await supabase
         .from("composer_scenes")
@@ -528,18 +530,40 @@ async function processScene(
           dialog_shots: newState,
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: `dialog_stitch_dispatch_failed: ${errMsg}`.slice(0, 300),
+          clip_error: "dialog_chained_missing_final_output",
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       return { status: "failed", mutated: true };
     }
 
+    const nowIso = new Date().toISOString();
+    newState = {
+      ...newState,
+      status: "done",
+      final_url: finalUrl,
+      finished_at: nowIso,
+    };
+    await supabase
+      .from("composer_scenes")
+      .update({
+        clip_url: finalUrl,
+        lip_sync_source_clip_url: state.source_clip_url,
+        lip_sync_applied_at: nowIso,
+        lip_sync_status: "done",
+        twoshot_stage: "done",
+        clip_error: null,
+        dialog_shots: newState,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+
     console.log(
-      `[poll-dialog-shots] scene ${sceneId} stitch dispatched render_id=${dispatched.render_id}`,
+      `[poll-dialog-shots] CHAINED scene ${sceneId} done → ${finalUrl}`,
     );
-    return { status: "stitching", mutated: true };
+    return { status: "done", mutated: true };
   }
+
 
   // ── Step 5: terminal failure → refund + persist ─────────────────────
   if (pipelineStatus === "failed") {

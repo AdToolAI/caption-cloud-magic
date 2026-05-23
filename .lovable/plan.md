@@ -1,60 +1,45 @@
-## Problem
+## Ergebnis der Prüfung
 
-Das Lip Sync selbst schlägt aktuell nicht mehr bei Sync.so fehl: die einzelnen Turns werden erfolgreich erzeugt. Der neue Fehler passiert danach beim Zusammenfügen:
+Der Screenshot zeigt `InvalidAccessKeyId` beim lokalen Befehl `npx remotion lambda sites create ...`. Das ist ein lokaler AWS-Credential-/Account-Zugriffsfehler auf deinem Rechner. Die gehostete Backend-Umgebung ist erreichbar und die Remotion-Secrets sind grundsätzlich vorhanden.
 
-```text
-Spawning subprocesses is not allowed on Supabase Edge Runtime.
-```
+Der eigentliche aktuelle App-Fehler ist: Die zuletzt eingebaute `DialogStitchVideo`-Composition liegt nur im Code, aber nicht im live verwendeten Remotion-S3-Bundle. Um sie ins Bundle zu bringen, bräuchte man normalerweise gültigen AWS-Zugriff zum Upload. Genau daran scheitert dein lokaler Befehl.
 
-Ursache: `poll-dialog-shots` versucht am Ende `ffmpeg` per `Deno.Command` im Edge Runtime zu starten. Das ist dort grundsätzlich verboten. Deshalb landen Szenen nach erfolgreichen Sync.so-Turns trotzdem bei `dialog_stitch_failed`.
+## Einschätzung
+
+Wir müssen nicht zwingend warten, bis du dich wieder in AWS einloggen kannst. Es gibt einen sicheren Workaround: Wir vermeiden vorerst komplett die neue `DialogStitchVideo`-Composition und verwenden eine bereits live im bestehenden Bundle vorhandene Composition.
 
 ## Plan
 
-1. **Edge-Function stabilisieren**
-   - `poll-dialog-shots` darf kein `Deno.Command("ffmpeg")` mehr nutzen.
-   - Die Funktion soll weiterhin Sync.so-Jobs serialisieren und pollen.
-   - Sobald alle Shots `ready` sind, markiert sie die Szene nicht mehr als fehlgeschlagen, sondern übergibt das Stitching an einen renderfähigen Pfad.
+1. **Kurzfristiger Fix ohne AWS-Login**
+   - `render-dialog-stitch` wird so geändert, dass es nicht mehr `DialogStitchVideo` rendert.
+   - Stattdessen nutzt es `DirectorsCutVideo`, weil diese Composition bereits im live verwendeten Remotion-Bundle vorhanden ist.
+   - Wir bauen die Dialog-Timeline als Szenenliste:
+     - Lücken kommen aus dem Master-Video.
+     - Sprecher-Fenster kommen aus den fertigen Sync.so-Output-Videos.
+     - `voiceoverUrl` bleibt die Master-WAV-Spur.
+   - Dadurch ist kein neuer Remotion-Bundle-Upload nötig.
 
-2. **Stitching über Remotion/Lambda statt Edge-ffmpeg**
-   - Neue Remotion-Komposition für Dialog-Stitching hinzufügen.
-   - Sie rendert aus:
-     - Master-Video für Lücken,
-     - pro-Turn Sync.so-Output für die jeweiligen Zeitfenster,
-     - Master-WAV als finale Audiospur.
-   - Damit ersetzen wir das verbotene Edge-ffmpeg durch den bereits vorhandenen Lambda-Renderpfad.
+2. **Webhook unverändert weiterverwenden**
+   - `remotion-webhook` kann `source: 'dialog-stitch'` bereits verarbeiten.
+   - Nach erfolgreichem Render schreibt er weiterhin `clip_url`, `lip_sync_status = done`, `twoshot_stage = done` zurück.
 
-3. **Neue interne Stitch-Edge-Function hinzufügen**
-   - Eine kleine Funktion startet den Lambda-Render mit der neuen Komposition.
-   - Sie legt einen `video_renders`-Eintrag an und nutzt den bestehenden `invoke-remotion-render` + `remotion-webhook` Flow.
-   - `poll-dialog-shots` ruft diese Funktion an, sobald alle Shots bereit sind.
+3. **Fehlerhafte Szenen wieder reaktivieren**
+   - Die zwei zuletzt fehlgeschlagenen Szenen mit `dialog_stitch_dispatch_failed` werden wieder auf `stitching/running` gesetzt, sofern alle Shots `ready` und `output_url` vorhanden sind.
+   - Es wird kein neuer Sync.so-Job gestartet, also keine unnötigen neuen Lipsync-Kosten.
 
-4. **Webhook aktualisieren**
-   - `remotion-webhook` erkennt `source: 'dialog-stitch'`.
-   - Bei Erfolg aktualisiert er die passende `composer_scenes`-Zeile:
-     - `clip_url = finalOutputUrl`
-     - `lip_sync_applied_at = now()`
-     - `lip_sync_status = 'done'`
-     - `twoshot_stage = 'done'`
-     - `dialog_shots.status = 'done'`
-   - Bei Fehler setzt er `lip_sync_status = 'failed'`, speichert die Fehlermeldung und erstattet idempotent über den vorhandenen `refunded`-Status.
+4. **Edge Functions deployen und testen**
+   - `render-dialog-stitch` deployen.
+   - Optional `poll-dialog-shots` nur dann deployen, falls wir Kommentare/kleine Statuslogik anpassen.
+   - Danach `poll-dialog-shots` gezielt für eine betroffene Szene anstoßen und Logs prüfen.
 
-5. **Recovery für bereits fehlgeschlagene Szenen**
-   - Szenen, die schon `dialog_stitch_failed: Spawning subprocesses...` haben und deren Shots alle `ready` sind, können ohne erneutes Sync.so erneut in den neuen Stitch-Pfad geschickt werden.
-   - Das vermeidet unnötige neue Provider-Kosten.
+## Technische Details
 
-6. **Deploy & Verifikation**
-   - Betroffene Edge Functions deployen.
-   - `poll-dialog-shots` erneut auf eine betroffene Szene ausführen.
-   - Logs prüfen: keine Edge-ffmpeg-Fehler mehr, stattdessen Lambda-Stitch-Render gestartet.
+- Kein AWS-Login vom Nutzer nötig.
+- Kein `remotion lambda sites create` nötig.
+- Kein neues S3-Site-Bundle nötig.
+- Der Workaround nutzt vorhandene Lambda/Remotion-Infrastruktur und das bestehende `DirectorsCutVideo`-Template.
+- Sobald dein AWS-Zugriff wieder funktioniert, können wir später optional sauber auf die spezialisierte `DialogStitchVideo`-Composition umstellen und das Bundle korrekt deployen.
 
-## Technische Dateien
+## Warum das sicherer ist
 
-- `supabase/functions/poll-dialog-shots/index.ts`
-- neue Funktion: `supabase/functions/render-dialog-stitch/index.ts`
-- `supabase/functions/remotion-webhook/index.ts`
-- neue Remotion-Komposition/Template in `src/remotion`
-- `src/remotion/Root.tsx`
-
-## Wichtig
-
-Das ist kein Sync.so-Plan-Upgrade-Problem. Ein Sync.so-Upgrade würde diesen Fehler nicht beheben, weil der Crash in unserem Stitching-Schritt passiert.
+Der letzte Ansatz war technisch sauber, aber abhängig von einem neuen Remotion-Bundle. Weil der Bundle-Upload aktuell durch AWS-Credentials blockiert ist, ist der schnellste stabile Weg, eine vorhandene live Composition zweckzuentfremden, statt auf AWS-Support zu warten.
