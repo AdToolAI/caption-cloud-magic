@@ -16,6 +16,8 @@ Both auto-triggers route to `compose-dialog-scene`:
 3. **PARALLEL DISPATCH, BOUNDED.** Turns are independent → `poll-dialog-shots` dispatches up to `MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK` (currently 1) new jobs per cron tick, respecting Sync.so Creator-plan concurrency. Ordering no longer matters for correctness.
 4. **DETERMINISTIC LAMBDA STITCH IS MANDATORY.** When all shots are `ready`, `poll-dialog-shots` calls `render-dialog-stitch` which dispatches the `DialogStitchVideo` Remotion composition. The final `clip_url` is written by `remotion-webhook` when Lambda finishes. There is **no fallback** to "last shot output as final clip" — that path produced wrong speaker assignments.
 5. **`render_window` PERSISTED PER SHOT.** The slightly expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbours) is computed once in `poll-dialog-shots`, persisted as `dialog_shots.shots[].render_window`, and used as BOTH the Sync.so `segments_secs` AND the Lambda overlay range. Guarantees Sync.so output range and stitch slice match byte-for-byte.
+6. **STITCHING IS RETRYABLE.** `lip_sync_status='stitching'` must be included in poll/watchdog selectors until `lip_sync_applied_at` exists. A transient `render-dialog-stitch` / Lambda dispatch failure is NOT a Sync.so timeout and must not refund or mark final failure unless Lambda returns a terminal webhook error.
+7. **MASTER DIMENSIONS WIN.** `render-dialog-stitch` passes `video_width/video_height` from `dialog_shots` into `DialogStitchVideo` (even-number normalized). Do not hard-code 1280×720 when the master plate is another even size such as 1376×768.
 
 **Per-shot lifecycle:**
 ```
@@ -38,6 +40,6 @@ pending → lipsyncing (sync_job_id set) → ready (output_url set)
 
 **Idempotency:**
 - `render-dialog-stitch` checks `dialog_shots.stitch.render_id` and the `video_renders` row before dispatching again.
-- `poll-dialog-shots` skips stitch dispatch if `state.stitch?.render_id` is already set.
+- `poll-dialog-shots` skips stitch dispatch only if the referenced `video_renders` row is `pending`, `rendering`, or `completed`; missing/failed stale stitch rows are cleared and retried.
 
 **Legacy:** `dialog_shots.version = 4` preserved (no schema migration). Pre-v9 state without `render_window` falls back to the tight `window` in both Sync.so dispatch and stitch overlay.

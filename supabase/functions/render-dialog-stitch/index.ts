@@ -46,11 +46,44 @@ interface DialogShotsState {
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
+  video_width?: number;
+  video_height?: number;
   refunded?: boolean;
   stitch?: {
     render_id: string;
     dispatched_at: string;
   };
+}
+
+function evenDimension(value: unknown, fallback: number): number {
+  const n = Number(value);
+  const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+  return safe % 2 === 0 ? safe : safe - 1;
+}
+
+async function markSceneError(
+  supabase: ReturnType<typeof createClient>,
+  sceneId: string,
+  state: DialogShotsState | null,
+  message: string,
+) {
+  const patch: Record<string, unknown> = {
+    lip_sync_status: "stitching",
+    twoshot_stage: "dialog_stitching",
+    clip_error: `dialog_stitch_dispatch: ${message}`.slice(0, 300),
+    updated_at: new Date().toISOString(),
+  };
+  if (state) {
+    patch.dialog_shots = {
+      ...state,
+      status: "stitching",
+      stitch_error: message.slice(0, 500),
+    };
+  }
+  await supabase
+    .from("composer_scenes")
+    .update(patch)
+    .eq("id", sceneId);
 }
 
 function json(body: unknown, status = 200) {
@@ -65,6 +98,7 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  let sceneIdForDiagnostics: string | undefined;
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -72,6 +106,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
+    sceneIdForDiagnostics = sceneId;
     if (!sceneId) return json({ error: "sceneId is required" }, 400);
 
     const { data: scene, error: sceneErr } = await supabase
@@ -131,16 +166,15 @@ serve(async (req) => {
     const fps = 30;
     const totalSec = Number(state.total_sec) || 6;
     const durationInFrames = Math.max(30, Math.ceil(totalSec * fps));
-    // Master plate is Hailuo i2v default 1280x720 in this pipeline. We do
-    // NOT probe — the DialogStitchVideo composition fixes the canvas at
-    // 1280x720 (matches master and shot outputs from Sync.so).
-    const width = 1280;
-    const height = 720;
+    const width = evenDimension(state.video_width, 1280);
+    const height = evenDimension(state.video_height, 720);
 
     const inputProps = {
       masterVideoUrl: state.source_clip_url,
       masterAudioUrl: state.master_audio_url,
       totalSec,
+      targetWidth: width,
+      targetHeight: height,
       shots: state.shots
         .filter((s) => s.output_url)
         .map((s) => {
@@ -182,9 +216,11 @@ serve(async (req) => {
           totalDuration: totalSec,
           composer_scene_id: sceneId,
         },
+        subtitle_config: {},
       });
     if (insertErr) {
       console.error("[render-dialog-stitch] insert failed:", insertErr);
+      await markSceneError(supabase, sceneId, state, `insert render: ${insertErr.message}`);
       return json({ error: `insert render: ${insertErr.message}` }, 500);
     }
 
@@ -196,7 +232,10 @@ serve(async (req) => {
       type: "start",
       serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "",
       composition: "DialogStitchVideo",
-      inputProps,
+      inputProps: {
+        type: "payload",
+        payload: JSON.stringify(inputProps),
+      },
       codec: "h264",
       imageFormat: "jpeg",
       maxRetries: 1,
@@ -251,26 +290,32 @@ serve(async (req) => {
       })
       .eq("id", sceneId);
 
-    const { data: invokeResult, error: invokeErr } = await supabase.functions
-      .invoke("invoke-remotion-render", {
-        body: {
-          lambdaPayload,
-          pendingRenderId: renderId,
-          userId,
-        },
-      });
+    const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
+    });
+    const invokeRaw = await invokeResp.text().catch(() => "");
+    let invokeResult: unknown = null;
+    try { invokeResult = invokeRaw ? JSON.parse(invokeRaw) : null; } catch { invokeResult = invokeRaw; }
 
-    if (invokeErr) {
-      console.error("[render-dialog-stitch] invoke failed:", invokeErr);
+    if (!invokeResp.ok) {
+      const invokeMessage = typeof invokeResult === "object" && invokeResult && "error" in invokeResult
+        ? String((invokeResult as any).error)
+        : invokeRaw;
+      console.error("[render-dialog-stitch] invoke failed:", invokeResp.status, invokeMessage);
       await supabase
         .from("video_renders")
         .update({
           status: "failed",
-          error_message: `invoke failed: ${invokeErr.message}`.slice(0, 500),
+          error_message: `invoke failed ${invokeResp.status}: ${invokeMessage}`.slice(0, 500),
           completed_at: new Date().toISOString(),
         })
         .eq("render_id", renderId);
-      return json({ error: `invoke: ${invokeErr.message}` }, 500);
+      const retryState: DialogShotsState = { ...state, status: "stitching" };
+      delete retryState.stitch;
+      await markSceneError(supabase, sceneId, retryState, `invoke ${invokeResp.status}: ${invokeMessage}`);
+      return json({ error: `invoke ${invokeResp.status}: ${invokeMessage}` }, 500);
     }
 
     return json({
@@ -280,6 +325,21 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[render-dialog-stitch] fatal", e);
+    if (sceneIdForDiagnostics) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, serviceKey);
+        await markSceneError(
+          supabase,
+          sceneIdForDiagnostics,
+          null,
+          e instanceof Error ? e.message : "unknown fatal",
+        );
+      } catch {
+        // best-effort diagnostics only
+      }
+    }
     return json(
       { error: e instanceof Error ? e.message : "unknown" },
       500,

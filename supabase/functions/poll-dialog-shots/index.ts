@@ -334,12 +334,18 @@ async function dispatchDialogStitch(
   supabase: ReturnType<typeof createClient>,
   sceneId: string,
 ): Promise<{ ok: true; render_id: string } | { ok: false; error: string }> {
-  const { data, error } = await supabase.functions.invoke(
-    "render-dialog-stitch",
-    { body: { sceneId } },
-  );
-  if (error) {
-    return { ok: false, error: error.message ?? "invoke failed" };
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const resp = await fetch(`${supabaseUrl}/functions/v1/render-dialog-stitch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+    body: JSON.stringify({ sceneId }),
+  });
+  const raw = await resp.text().catch(() => "");
+  let data: any = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
+  if (!resp.ok) {
+    return { ok: false, error: `render-dialog-stitch ${resp.status}: ${(data?.error ?? raw).toString().slice(0, 260)}` };
   }
   if (data && (data as any).render_id) {
     return { ok: true, render_id: String((data as any).render_id) };
@@ -526,8 +532,27 @@ async function processScene(
   // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
     // Idempotency guard — if a stitch render is already in flight, just
-    // persist state and wait for the webhook to write clip_url back.
+    // persist state and wait for the webhook to write clip_url back. If the
+    // previous dispatch failed or never created a render row, clear the stale
+    // render_id and retry below — otherwise a scene can sit at 95% forever.
     if (state.stitch?.render_id) {
+      const { data: existingRender } = await supabase
+        .from("video_renders")
+        .select("status")
+        .eq("render_id", state.stitch.render_id)
+        .maybeSingle();
+      const renderStatus = String(existingRender?.status ?? "missing");
+      if (!["pending", "rendering", "completed"].includes(renderStatus)) {
+        console.warn(
+          `[poll-dialog-shots] stale stitch render ${state.stitch.render_id} status=${renderStatus}; retrying dispatch`,
+        );
+        newState = {
+          ...newState,
+          stitch: undefined,
+          status: "stitching",
+          error: `stale_stitch_render:${renderStatus}`,
+        } as DialogShotsState;
+      } else {
       await supabase
         .from("composer_scenes")
         .update({
@@ -538,6 +563,7 @@ async function processScene(
         })
         .eq("id", sceneId);
       return { status: "stitching", mutated: true };
+      }
     }
 
     const dispatch = await dispatchDialogStitch(supabase, sceneId);
@@ -644,7 +670,7 @@ serve(async (req) => {
       const { data: rows } = await supabase
         .from("composer_scenes")
         .select("id, dialog_shots")
-        .eq("lip_sync_status", "running");
+        .in("lip_sync_status", ["running", "stitching"]);
       sceneIds = (rows ?? [])
         .filter(
           (r: any) =>
