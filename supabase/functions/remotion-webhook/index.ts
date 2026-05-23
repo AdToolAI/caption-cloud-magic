@@ -175,7 +175,47 @@ serve(async (req) => {
         }
       }
 
-      if (isDirectorsCut && renderJobId) {
+      if (isDialogStitch) {
+        // ── Dialog-stitch render (cinematic-sync N-speaker pipeline) ──
+        // Lambda-side replacement for the forbidden Edge-Runtime ffmpeg.
+        // Writes the stitched clip back onto composer_scenes and marks
+        // lip_sync_applied_at so the composer treats the scene as done.
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'completed',
+            video_url: finalOutputUrl,
+            error_message: null,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        if (composerSceneId) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          const nowIso = new Date().toISOString();
+          await supabaseAdmin.from('composer_scenes').update({
+            clip_url: finalOutputUrl,
+            lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
+            lip_sync_applied_at: nowIso,
+            lip_sync_status: 'done',
+            twoshot_stage: 'done',
+            clip_error: null,
+            dialog_shots: {
+              ...prevState,
+              status: 'done',
+              final_url: finalOutputUrl,
+              finished_at: nowIso,
+            },
+            updated_at: nowIso,
+          }).eq('id', composerSceneId);
+          console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
+        } else {
+          console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
+        }
+      } else if (isDirectorsCut && renderJobId) {
         const { data: renderJob } = await supabaseAdmin.from('director_cut_renders').select('user_id, credits_used').eq('id', renderJobId).single();
         await supabaseAdmin.from('director_cut_renders').update({
           status: 'completed', output_url: finalOutputUrl, error_message: null,
