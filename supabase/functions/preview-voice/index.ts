@@ -11,14 +11,17 @@ serve(async (req) => {
   }
 
   try {
-    const { text, voiceId, speed = 1.0 } = await req.json();
-
-    console.log('[preview-voice] Request received:', {
+    const body = await req.json();
+    const {
+      text,
       voiceId,
-      textLength: text?.length,
-      speed,
-      hasElevenLabsKey: !!Deno.env.get('ELEVENLABS_API_KEY')
-    });
+      speed: rawSpeed = 1.0,
+      stability = 0.5,
+      similarityBoost = 0.75,
+      style = 0.0,
+      useSpeakerBoost = true,
+    } = body ?? {};
+    const speed = Math.max(0.7, Math.min(1.2, Number(rawSpeed) || 1.0));
 
     if (!text || !voiceId) {
       throw new Error('Text and voiceId are required');
@@ -29,9 +32,6 @@ serve(async (req) => {
       throw new Error('ELEVENLABS_API_KEY not configured');
     }
 
-    console.log('[preview-voice] Generating voice preview:', { voiceId, textLength: text.length, speed });
-
-    // Call ElevenLabs API
     const response = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
       {
@@ -42,13 +42,14 @@ serve(async (req) => {
           'xi-api-key': elevenLabsApiKey,
         },
         body: JSON.stringify({
-          text: text.substring(0, 500), // Limit for preview
+          text: text.substring(0, 500),
           model_id: 'eleven_multilingual_v2',
           voice_settings: {
-            stability: 0.5,
-            similarity_boost: 0.75,
-            style: 0.0,
-            use_speaker_boost: true,
+            stability: Math.max(0, Math.min(1, Number(stability))),
+            similarity_boost: Math.max(0, Math.min(1, Number(similarityBoost))),
+            style: Math.max(0, Math.min(1, Number(style))),
+            use_speaker_boost: !!useSpeakerBoost,
+            speed,
           },
         }),
       }
