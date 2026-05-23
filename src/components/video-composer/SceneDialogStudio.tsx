@@ -644,7 +644,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             kind: 'voiceover',
             source: 'ai',
             prompt: `${c.name}: ${block.text}`,
-            url: audioUrl,
+            url: finalAudioUrl,
             start_offset: Math.round(cumulativeOffset * 100) / 100,
             duration: Math.round(duration * 100) / 100,
             volume: 1.0,
