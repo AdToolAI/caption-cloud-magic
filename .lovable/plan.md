@@ -1,83 +1,32 @@
-## Diagnose
+# Cinematic-Sync Dialog Pipeline — v9 Artlist Parity (implementiert)
 
-Logs + DB-State zeigen, dass die Audio-Trennung jetzt sauber ist (Samuel/Matthew haben eigene isolierte WAVs, FaceMap erkennt links/rechts korrekt). Trotzdem ist das Ergebnis kaputt, weil `poll-dialog-shots` aktuell **VIDEO-Chaining** macht:
+## Was war kaputt
+`poll-dialog-shots` hat trotz isolierter Sprecher-Audios **VIDEO-Chaining** gemacht (Turn 1 auf Output von Turn 0, Turn 2 auf Output von Turn 1) und am Ende einfach den letzten Sync.so-Output als finalen Clip gesetzt. Dadurch hat jeder spätere Sync.so-Pass die Lippen von früheren Sprechern mit fremdem Audio re-animiert → Charakter 2 hat den ersten Satz von Charakter 1 „gesprochen", dritter Satz landete beim falschen Sprecher.
 
-- Turn 0 (Samuel) → läuft auf Master-Plate
-- Turn 1 (Matthew) → läuft auf Sync.so-Output von Turn 0
-- Turn 2 (Samuel) → läuft auf Sync.so-Output von Turn 1
-- Finaler Clip = einfach Output von Turn 2
+## Was Artlist macht — und was jetzt auch hier passiert
+1. Master-Voiceover bleibt unveränderlich.
+2. Jeder Sprecher-Turn = ein isolierter Sync.so-Pass auf der **originalen** Master-Plate, mit nur seiner eigenen Stimme.
+3. Deterministischer Stitch in Lambda: pro Turn-Fenster wird der passende Sync.so-Output über die Master-Plate gelegt; Master-WAV ist die einzige Audiospur.
+4. Reihenfolge stammt aus unserer Timeline, nicht aus Provider-Verkettung.
 
-Sync.so bekommt also bei Turn 1/2 ein Video, in dem schon Mundbewegungen drinstecken, und re-animiert/überschreibt sie teilweise. Genau dadurch:
+## Code-Änderungen
+- `supabase/functions/poll-dialog-shots/index.ts`
+  - Chaining entfernt → jeder Turn nutzt `state.source_clip_url` (Original-Master).
+  - Parallele Dispatches (bis `MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK`), Concurrency-Limit beibehalten.
+  - `render_window` (Lead-in 0.18s / Tail 0.12s) pro Shot persistiert → identisch in Sync.so-`segments_secs` und Stitch-Overlay.
+  - „Letzter Output = final clip"-Fallback gelöscht. `allReady` → ruft `render-dialog-stitch` und wartet auf `remotion-webhook`.
+  - Idempotenz via `dialog_shots.stitch.render_id`; Refund nur bei terminal failed.
+- `supabase/functions/render-dialog-stitch/index.ts` → übergibt `render_window` (Fallback: `window`) an die Composition.
+- `mem/features/video-composer/dialog-shot-pipeline` → komplette Doku auf v9 aktualisiert.
 
-- Charakter 2 „spricht" den ersten Satz von Charakter 1 (Mund aus Turn 0 wird in Turn 1 mit Matthew-Audio neu interpretiert).
-- Der dritte Satz landet beim falschen Sprecher (Turn 2 überschreibt das Fenster von Turn 1 mit).
-- Es entsteht Audio-Drift, weil jede Stufe re-encodet.
-
-Artlist macht **nie** Chained-Provider-Stacking. Artlist macht:
-
-1. Eine Master-Timeline.
-2. Master-Voiceover ist unveränderlich.
-3. Pro Sprecher-Turn ein isolierter Lipsync-Pass auf der **originalen** Master-Plate.
-4. Ein deterministischer Stitch, der per Timeline-Fenster nur die Mundregion des richtigen Outputs einsetzt.
-5. Single canonical audio remux am Ende.
-
-## Ziel
-
-Cinematic-Sync exakt auf diesen Artlist-Pfad umstellen.
-
-## Plan
-
-### 1. Chaining entfernen
-`poll-dialog-shots` darf bei der Sync.so-Dispatch nicht mehr `prev.output_url` als `chainedSourceUrl` verwenden. Jeder Turn bekommt immer `state.source_clip_url` (Original-Hailuo-Master).
-
-Damit kann Turn N nie mehr die Lippen von Turn N-1 verändern.
-
-### 2. Parallele statt serielle Turns
-Da Turns sich nicht mehr aufeinander aufbauen, können sie parallel an Sync.so geschickt werden (max 1 neuer Dispatch pro Tick bleibt für Creator-Plan-Limit). Reihenfolge spielt nicht mehr für Korrektheit eine Rolle, nur noch für Concurrency.
-
-### 3. Finaler Schritt = Stitch, nicht „letzter Output"
-Den Fallback `clip_url = last shot.output_url` entfernen. Stattdessen sobald `allReady`:
-
-- `state.status = 'stitching'`
-- `render-dialog-stitch` aufrufen (existiert bereits, nutzt `DialogStitchVideo` Remotion Composition)
-- `remotion-webhook` schreibt finales `clip_url` zurück
-
-Die Stitch-Composition macht genau Artlist-Style:
-- Master-Video durchgehend
-- Pro Turn ein `<Sequence>` mit dem zugehörigen Sync.so-Output, **getrimmt aufs Turn-Fenster**, geometrisch deckungsgleich
-- Eine einzige Audiospur = Master-WAV
-
-### 4. AWS-Resilienz
+## AWS-Resilienz
 Falls AWS/Lambda temporär nicht verfügbar:
-
-- `dialog_shots` mit allen `ready` Outputs bleibt persistiert.
-- `lip_sync_status = 'stitching'`, kein Refund.
-- Auto-Retry über Watchdog/Polling, sobald AWS wieder antwortet.
-- Kein „kaputter Provider-Output als final" mehr — User sieht entweder den korrekten Stitch oder einen klaren Wartezustand.
-
-### 5. Stitch-Window leicht erweitern
-Im Stitch werden statt der nackten `window`-Werte die gleichen leicht expandierten Fenster (Lead-in/Tail wie in Sync.so-Dispatch) verwendet, damit Schnittkanten nicht den Wortanfang/das Wortende des Mundes abschneiden. Diese Werte werden pro Shot als `render_window` in `dialog_shots` mitgespeichert.
-
-### 6. Idempotenz & Refund
-- Stitch-Dispatch bleibt idempotent über `dialog_shots.stitch.render_id`.
-- Refund nur bei terminal failed (≥1 Shot definitiv failed nach Retry, oder Stitch-Render-Lambda definitiv failed).
-- Solange Shots `pending`/`lipsyncing` oder Stitch `pending`/`rendering` ist: kein Refund, kein „final = letzter Output".
-
-### 7. Doku aktualisieren
-`mem://features/video-composer/dialog-shot-pipeline` und `.lovable/plan.md` werden auf den neuen Pfad gesetzt (per-turn auf Original-Master, Lambda-Stitch ist Pflichtschritt, kein Video-Chaining mehr).
-
-## Geänderte Dateien
-
-- `supabase/functions/poll-dialog-shots/index.ts` — Chaining raus, parallele Dispatches, Stitch-Trigger statt Last-Output-Fallback, `render_window` persistieren.
-- `supabase/functions/render-dialog-stitch/index.ts` — `render_window` priorisieren, sonst `window`.
-- `src/remotion/templates/DialogStitchVideo.tsx` — nutzt `render_window` falls vorhanden.
-- `mem://features/video-composer/dialog-shot-pipeline` — aktualisiert auf Artlist-Pfad.
-- `.lovable/plan.md` — finaler Statusbericht.
+- Alle `ready` Shots bleiben persistiert.
+- `lip_sync_status = stitching`, **kein** falscher Endclip, **kein** Refund.
+- Cron-Tick retried `render-dialog-stitch` automatisch.
 
 ## Erwartetes Ergebnis
-
-- Samuel spricht nur seine Sätze, Matthew nur seinen Satz.
+- Samuel spricht nur Samuel-Sätze, Matthew nur seinen Satz.
 - Keine Lippenüberlagerung zwischen Turns.
-- Reihenfolge stammt aus unserer Timeline, nicht aus Provider-Verkettung.
-- Master-Audio im finalen Clip = exakt das, was du im Preview hörst.
-- AWS-Ausfall führt zu sauberem Wartezustand statt falschem Endclip.
+- Master-Audio im finalen Clip = exakt das Preview-Audio.
+- User muss eine betroffene Szene 1× neu rendern (alter `dialog_shots`-State enthält keine `render_window`-Werte; ist abwärtskompatibel, profitiert aber von Reset).
