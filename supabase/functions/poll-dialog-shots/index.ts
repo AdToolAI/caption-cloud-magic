@@ -461,9 +461,13 @@ async function processScene(
             ? prev.output_url
             : state.source_clip_url;
         const win = expandWindow(nextShot, shots);
-        const useCoords =
-          (nextShot.deterministic_coords || nextShot.force_coords) &&
-          !!nextShot.target_coords;
+        // v8: try auto_detect FIRST (Sync.so handles short isolated tracks
+        // reliably when the audio truly contains only one voice). Only fall
+        // back to coords on a failed-poll retry. The earlier "always force
+        // coords for multi-speaker" path produced opaque
+        // "An unknown error occurred." failures on Sync.so for unknown
+        // reasons, even with valid audio + valid coords.
+        const useCoords = !!nextShot.force_coords && !!nextShot.target_coords;
         const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
         const audioUrl = nextShot.audio_url || state.master_audio_url;
         const jobId = await startSyncTurnJob(
@@ -481,7 +485,7 @@ async function processScene(
         nextShot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] v7 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+          `[poll-dialog-shots] v8 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
