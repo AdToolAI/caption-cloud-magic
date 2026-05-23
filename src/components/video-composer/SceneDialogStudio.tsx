@@ -1286,19 +1286,35 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {blocks.map((b, i) => {
               const sp = sceneCast.find((c) => c.id === b.speakerId);
               const missing = !sp?.referenceImageUrl;
+              const lineKey = dialogLineKey(i, b.text);
+              const bundle = dialogTakes[lineKey];
+              const cfg = voicePerSpeaker[b.speakerId];
               return (
-                <div key={i} className="flex items-start gap-2 text-[11px]">
-                  {sp?.referenceImageUrl ? (
-                    <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
-                  ) : (
-                    <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
-                      <ImageOff className="h-3 w-3 text-muted-foreground" />
-                    </div>
-                  )}
-                  <span className="font-semibold shrink-0">{b.speakerName}:</span>
-                  <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
-                    {b.text}
-                  </span>
+                <div key={i} className="space-y-0.5">
+                  <div className="flex items-start gap-2 text-[11px]">
+                    {sp?.referenceImageUrl ? (
+                      <img src={sp.referenceImageUrl} alt={b.speakerName} className="h-5 w-5 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="h-5 w-5 rounded bg-muted flex items-center justify-center shrink-0">
+                        <ImageOff className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                    )}
+                    <span className="font-semibold shrink-0">{b.speakerName}:</span>
+                    <span className={`flex-1 truncate ${missing ? 'text-muted-foreground line-through' : ''}`}>
+                      {b.text}
+                    </span>
+                  </div>
+                  <div className="pl-7">
+                    <DialogTakeStrip
+                      lineKey={lineKey}
+                      text={b.text}
+                      voiceCfg={cfg}
+                      bundle={bundle}
+                      language={language}
+                      projectId={projectId || scene.projectId}
+                      onChange={(next) => updateLineTakes(lineKey, next)}
+                    />
+                  </div>
                 </div>
               );
             })}
