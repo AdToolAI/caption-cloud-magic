@@ -17,6 +17,7 @@ import { LiveSweepTab } from "@/pages/admin/LiveSweepTab";
 import { DeepSweepTab } from "@/pages/admin/DeepSweepTab";
 import { WatchdogTab } from "@/pages/admin/WatchdogTab";
 import { ProbesTab } from "@/pages/admin/ProbesTab";
+import { MetaTokenHealthTab } from "@/pages/admin/MetaTokenHealthTab";
 import { IncidentManager } from "@/components/admin/qa-cockpit/IncidentManager";
 
 
@@ -340,6 +341,10 @@ export default function QACockpit() {
               <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
               Status
             </TabsTrigger>
+            <TabsTrigger value="meta-token" className="text-[#F5C76A]">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1.5" />
+              Meta Token
+            </TabsTrigger>
             <TabsTrigger value="bugs">Bug Inbox</TabsTrigger>
             <TabsTrigger value="missions">Missionen</TabsTrigger>
             <TabsTrigger value="budget">Budget</TabsTrigger>
@@ -374,6 +379,11 @@ export default function QACockpit() {
           {/* STATUS PAGE INCIDENT MANAGER */}
           <TabsContent value="incidents">
             <IncidentManager />
+          </TabsContent>
+
+          {/* META TOKEN HEALTH */}
+          <TabsContent value="meta-token">
+            <MetaTokenHealthTab />
           </TabsContent>
 
           {/* LIVE RUNS */}
