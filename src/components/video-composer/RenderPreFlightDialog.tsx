@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
 import { NATIVE_DIALOGUE_CLIP_SOURCES } from '@/lib/video-composer/modelMapping';
-import { parseDialogScript } from '@/lib/talking-head/parseDialogScript';
+
 
 /**
  * Phase 4 — Render-All Pre-Flight-Check
