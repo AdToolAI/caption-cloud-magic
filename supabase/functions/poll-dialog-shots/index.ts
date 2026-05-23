@@ -543,14 +543,15 @@ async function processScene(
 
     for (const res of dispatched) {
       if (res.status === "fulfilled") {
-        const { shot, jobId, win } = res.value;
+        const { shot, jobId, win, mode } = res.value;
         shot.sync_job_id = jobId;
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
+          `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
+
       } else {
         // Find which shot failed (Promise.allSettled preserves order vs pending[])
         const idxInPending = dispatched.indexOf(res);
