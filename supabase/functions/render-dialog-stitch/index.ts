@@ -143,11 +143,14 @@ serve(async (req) => {
       totalSec,
       shots: state.shots
         .filter((s) => s.output_url)
-        .map((s) => ({
-          startSec: Math.max(0, Number(s.window?.[0]) || 0),
-          endSec: Math.min(totalSec, Number(s.window?.[1]) || totalSec),
-          outputUrl: s.output_url as string,
-        })),
+        .map((s) => {
+          const win = (s.render_window ?? s.window) as [number, number];
+          return {
+            startSec: Math.max(0, Number(win?.[0]) || 0),
+            endSec: Math.min(totalSec, Number(win?.[1]) || totalSec),
+            outputUrl: s.output_url as string,
+          };
+        }),
     };
 
     const renderId = crypto.randomUUID();
