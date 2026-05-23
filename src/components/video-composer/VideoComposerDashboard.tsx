@@ -511,7 +511,7 @@ export default function VideoComposerDashboard() {
         });
         const merged = [...dbScenes, ...localOnly]
           .map((s, i) => ({ ...s, orderIndex: i }));
-        return { ...prev, scenes: merged };
+        return { ...prev, scenes: propagateDialogLock(merged) };
       });
     } catch (err) {
       console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
