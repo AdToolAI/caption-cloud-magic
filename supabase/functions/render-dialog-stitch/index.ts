@@ -229,9 +229,14 @@ serve(async (req) => {
 
     const lambdaPayload: Record<string, unknown> = {
       type: "start",
+      _payloadMode: "strict-minimal",
       serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "",
       composition: "DialogStitchVideo",
-      inputProps,
+      inputProps: {
+        type: "payload",
+        payload: JSON.stringify(inputProps),
+      },
+      version: "4.0.424",
       codec: "h264",
       imageFormat: "jpeg",
       maxRetries: 1,
