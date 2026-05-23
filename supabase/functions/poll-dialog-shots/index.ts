@@ -527,6 +527,7 @@ async function processScene(
     const dispatched = await Promise.allSettled(
       pending.map(async (shot) => {
         const win = expandWindow(shot, shots);
+        const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
         return startSyncTurnJob(
           syncKey,
           state.source_clip_url,
@@ -535,9 +536,11 @@ async function processScene(
           shot.target_coords,
           shot.temperature,
           shot.idx,
-        ).then((jobId) => ({ shot, jobId, win }));
+          mode,
+        ).then((jobId) => ({ shot, jobId, win, mode }));
       }),
     );
+
     for (const res of dispatched) {
       if (res.status === "fulfilled") {
         const { shot, jobId, win } = res.value;
