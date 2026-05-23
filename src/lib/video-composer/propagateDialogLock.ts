@@ -80,7 +80,16 @@ export function propagateDialogLock(scenes: ComposerScene[]): PropagatedScene[] 
     }
 
     // Same cast as leader.
-    if (s.lockReferenceUrl) {
+    if (s.noInheritLock) {
+      // Phase C.2 — user explicitly broke inheritance. Treat this scene as
+      // the new sub-group leader (with no lock yet) so downstream same-cast
+      // scenes can inherit from its future self-lock, not the old leader.
+      leaderSig = sig;
+      leaderIdx = i;
+      leaderLock = s.lockReferenceUrl ?? null;
+      s.lockSource = s.lockReferenceUrl ? 'self' : null;
+      s.lockSourceSceneIndex = null;
+    } else if (s.lockReferenceUrl) {
       // Has its own lock — stays self, becomes new leader for downstream.
       s.lockSource = 'self';
       s.lockSourceSceneIndex = null;
