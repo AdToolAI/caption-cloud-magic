@@ -388,7 +388,7 @@ export default function VideoComposerDashboard() {
           return local && local.clipStatus !== s.clipStatus;
         });
 
-        setProject(prev => ({ ...prev, scenes: dbScenes }));
+        setProject(prev => ({ ...prev, scenes: propagateDialogLock(dbScenes) }));
 
         toast({
           title: t('videoComposer.draftRestored'),
