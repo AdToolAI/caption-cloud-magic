@@ -188,6 +188,15 @@ async function startSyncTurnJob(
   }
   if (!r.ok) {
     const txt = await r.text().catch(() => "");
+    if (r.status === 429) {
+      console.warn(
+        `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} deferred_due_to_concurrency retryAfter=${rl.retryAfter ?? "?"} body=${txt.slice(0, 500)}`,
+      );
+      throw new SyncConcurrencyDeferredError(
+        `sync.so concurrency limit: ${txt.slice(0, 240)}`,
+        rl.retryAfter,
+      );
+    }
     console.error(
       `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} FAILED status=${r.status} body=${txt.slice(0, 1500)}`,
     );
