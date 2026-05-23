@@ -333,7 +333,7 @@ async function refundIfNeeded(
 async function dispatchDialogStitch(
   supabase: ReturnType<typeof createClient>,
   sceneId: string,
-): Promise<{ ok: true; render_id: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; render_id: string } | { ok: false; error: string; code?: string }> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const resp = await fetch(`${supabaseUrl}/functions/v1/render-dialog-stitch`, {
@@ -345,7 +345,13 @@ async function dispatchDialogStitch(
   let data: any = null;
   try { data = raw ? JSON.parse(raw) : null; } catch { data = null; }
   if (!resp.ok) {
-    return { ok: false, error: `render-dialog-stitch ${resp.status}: ${(data?.error ?? raw).toString().slice(0, 260)}` };
+    const errStr = (data?.error ?? raw).toString();
+    const code =
+      data?.code === "aws_credentials_missing" ||
+      /security token included in the request is invalid|unrecognizedclientexception|invalidsignatureexception|expiredtoken|http 403|aws_credentials/i.test(errStr)
+        ? "aws_credentials_invalid"
+        : undefined;
+    return { ok: false, error: `render-dialog-stitch ${resp.status}: ${errStr.slice(0, 260)}`, code };
   }
   if (data && (data as any).render_id) {
     return { ok: true, render_id: String((data as any).render_id) };
