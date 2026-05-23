@@ -1432,18 +1432,37 @@ serve(async (req) => {
                   const aj = await anchorResp.json().catch(() => ({}));
                   if (aj?.composedUrl) {
                     scene.referenceImageUrl = aj.composedUrl;
+                    // Phase C.1 — persist the freshly composed anchor as the
+                    // dialog continuity-lock when:
+                    //  - the scene is a dialog scene (has script), AND
+                    //  - no lock is already set on this row.
+                    // Future same-cast dialog scenes will inherit this via
+                    // the client-side propagateDialogLock() helper.
+                    const isDialogScene =
+                      typeof scene.dialogScript === "string" &&
+                      scene.dialogScript.trim().length > 0;
+                    const updatePayload: Record<string, unknown> = {
+                      reference_image_url: aj.composedUrl,
+                      updated_at: new Date().toISOString(),
+                    };
+                    if (isDialogScene && !scene.lockReferenceUrl) {
+                      updatePayload.lock_reference_url = aj.composedUrl;
+                      scene.lockReferenceUrl = aj.composedUrl;
+                    }
                     await supabaseAdmin
                       .from("composer_scenes")
-                      .update({
-                        reference_image_url: aj.composedUrl,
-                        updated_at: new Date().toISOString(),
-                      })
+                      .update(updatePayload)
                       .eq("id", scene.id);
                     console.log(
-                      `[compose-video-clips] universal anchor scene ${scene.id}: composed → ${aj.composedUrl.slice(0, 80)}…`,
+                      `[compose-video-clips] universal anchor scene ${scene.id}: composed → ${aj.composedUrl.slice(0, 80)}…${isDialogScene && updatePayload.lock_reference_url ? " (continuity-lock persisted)" : ""}`,
                     );
                   }
                 } else {
+                  const errTxt = await anchorResp.text().catch(() => "");
+                  console.warn(
+                    `[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`,
+                  );
+                }
                   const errTxt = await anchorResp.text().catch(() => "");
                   console.warn(
                     `[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`,
