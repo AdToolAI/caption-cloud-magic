@@ -491,6 +491,7 @@ async function processScene(
           win,
           shot.target_coords,
           shot.temperature,
+          shot.idx,
         ).then((jobId) => ({ shot, jobId, win }));
       }),
     );
