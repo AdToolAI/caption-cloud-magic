@@ -229,14 +229,12 @@ serve(async (req) => {
 
     const lambdaPayload: Record<string, unknown> = {
       type: "start",
-      _payloadMode: "strict-minimal",
       serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "",
       composition: "DialogStitchVideo",
       inputProps: {
         type: "payload",
         payload: JSON.stringify(inputProps),
       },
-      version: "4.0.424",
       codec: "h264",
       imageFormat: "jpeg",
       maxRetries: 1,
@@ -291,29 +289,32 @@ serve(async (req) => {
       })
       .eq("id", sceneId);
 
-    const { data: invokeResult, error: invokeErr } = await supabase.functions
-      .invoke("invoke-remotion-render", {
-        body: {
-          lambdaPayload,
-          pendingRenderId: renderId,
-          userId,
-        },
-      });
+    const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+      body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
+    });
+    const invokeRaw = await invokeResp.text().catch(() => "");
+    let invokeResult: unknown = null;
+    try { invokeResult = invokeRaw ? JSON.parse(invokeRaw) : null; } catch { invokeResult = invokeRaw; }
 
-    if (invokeErr) {
-      console.error("[render-dialog-stitch] invoke failed:", invokeErr);
+    if (!invokeResp.ok) {
+      const invokeMessage = typeof invokeResult === "object" && invokeResult && "error" in invokeResult
+        ? String((invokeResult as any).error)
+        : invokeRaw;
+      console.error("[render-dialog-stitch] invoke failed:", invokeResp.status, invokeMessage);
       await supabase
         .from("video_renders")
         .update({
           status: "failed",
-          error_message: `invoke failed: ${invokeErr.message}`.slice(0, 500),
+          error_message: `invoke failed ${invokeResp.status}: ${invokeMessage}`.slice(0, 500),
           completed_at: new Date().toISOString(),
         })
         .eq("render_id", renderId);
       const retryState: DialogShotsState = { ...state, status: "stitching" };
       delete retryState.stitch;
-      await markSceneError(supabase, sceneId, retryState, `invoke: ${invokeErr.message}`);
-      return json({ error: `invoke: ${invokeErr.message}` }, 500);
+      await markSceneError(supabase, sceneId, retryState, `invoke ${invokeResp.status}: ${invokeMessage}`);
+      return json({ error: `invoke ${invokeResp.status}: ${invokeMessage}` }, 500);
     }
 
     return json({
