@@ -664,7 +664,7 @@ serve(async (req) => {
         existing.startSec = Math.min(existing.startSec, seg.startSec);
         existing.endSec = Math.max(existing.endSec, seg.endSec);
         existing.turns.push({ startSec: seg.startSec, endSec: seg.endSec, text_index: i });
-        existing.items.push({ segment: seg, samples: sampleBuffers[i], index: i });
+        existing.items.push({ segment: seg, samples: segmentPcm[i], index: i });
       } else {
         groups.set(key, {
           speaker: seg.speaker,
@@ -675,7 +675,7 @@ serve(async (req) => {
           startSec: seg.startSec,
           endSec: seg.endSec,
           turns: [{ startSec: seg.startSec, endSec: seg.endSec, text_index: i }],
-          items: [{ segment: seg, samples: sampleBuffers[i], index: i }],
+          items: [{ segment: seg, samples: segmentPcm[i], index: i }],
         });
       }
     }
