@@ -1,13 +1,13 @@
 /**
- * poll-dialog-shots — v4 PARALLEL per-turn Sync.so dispatcher + ffmpeg stitch.
+ * poll-dialog-shots — v5 SERIAL per-turn Sync.so dispatcher + ffmpeg stitch.
  *
  * v4 design:
  *  - Each turn = ONE Sync.so lipsync-2-pro pass on the ORIGINAL pristine
  *    master plate (no chaining). Tight single-window `segments_secs=[[t]]`
  *    + identity-matched face coords + per-turn temperature.
- *  - ALL pending shots are dispatched in parallel (Sync.so Creator plan
- *    permits concurrent jobs; no inter-shot dependency).
- *  - Per-tick: poll every in-flight shot, dispatch any still-pending shot.
+ *  - Only one new Sync.so turn is dispatched per scene/tick and only when no
+ *    other turn is in flight. This keeps Creator-plan concurrency stable.
+ *  - Per-tick: poll every in-flight shot, then dispatch the next pending shot.
  *  - On `allReady`: stitch with ffmpeg by time-slicing — window i from
  *    out_T_i, gaps from the pristine master — then remux the master WAV.
  *  - Result: every sentence has identical Sync.so attention, only ONE
@@ -36,6 +36,14 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
+const MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK = 1;
+
+class SyncConcurrencyDeferredError extends Error {
+  constructor(message: string, readonly retryAfter?: string | null) {
+    super(message);
+    this.name = "SyncConcurrencyDeferredError";
+  }
+}
 
 /** Pre-roll/tail for `segments_secs` (Sync.so VAD onset + frame-grid rounding).
  *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
@@ -59,6 +67,7 @@ interface DialogShot {
   error?: string;
   started_at?: string;
   completed_at?: string;
+  last_deferred_at?: string;
   /** How many times we have already redispatched this shot after a FAILED
    *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
    *  retry falls back to fixed coords + frame_number aligned to the turn. */
