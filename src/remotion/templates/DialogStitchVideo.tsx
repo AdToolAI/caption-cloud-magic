@@ -34,6 +34,8 @@ export const DialogStitchVideoSchema = z.object({
   masterVideoUrl: z.string().url(),
   masterAudioUrl: z.string().url(),
   totalSec: z.number().positive(),
+  targetWidth: z.number().positive().optional(),
+  targetHeight: z.number().positive().optional(),
   shots: z.array(ShotSchema),
 });
 
@@ -70,10 +72,12 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
           a length-matched MP4 even though only the selected segment was
           processed), so we just trim each overlay to the turn window. */}
       {sortedShots.map((shot, idx) => {
-        const startFrame = Math.max(0, Math.floor(shot.startSec * fps));
+        const safeStartSec = Math.max(0, Math.min(totalSec, shot.startSec));
+        const safeEndSec = Math.max(safeStartSec, Math.min(totalSec, shot.endSec));
+        const startFrame = Math.max(0, Math.floor(safeStartSec * fps));
         const endFrame = Math.min(
           durationInFrames,
-          Math.ceil(shot.endSec * fps),
+          Math.ceil(safeEndSec * fps),
         );
         const segDuration = Math.max(1, endFrame - startFrame);
         if (segDuration <= 0) return null;
