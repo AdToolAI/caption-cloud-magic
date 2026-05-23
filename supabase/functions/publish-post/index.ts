@@ -3,6 +3,15 @@ import { createHmac } from "https://deno.land/std@0.177.0/node/crypto.ts";
 import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 import { withTelemetry } from '../_shared/telemetry.ts';
 import { getRedisCache } from "../_shared/redis-cache.ts";
+import {
+  getMetaConnection,
+  ensureFreshToken,
+  publishInstagram,
+  publishFacebook,
+  buildCaption,
+  MetaPublishError,
+} from '../_shared/meta-publish.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,10 +33,13 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let capturedPostId: string | null = null;
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+
 
     // Input validation
     const requestSchema = z.object({
@@ -45,8 +57,10 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
     }
 
     const { postId } = validation.data;
+    capturedPostId = postId;
 
     console.log('Publishing post:', postId);
+
 
     // Get post data
     const { data: post, error: postError } = await supabase
@@ -138,132 +152,111 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
       }
     );
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Publish error:', error);
-    const errorMessage = 'Failed to publish post';
 
-    // Try to update post with error
-    try {
-      const { postId } = await req.json();
-      if (postId) {
-        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
-        
+    const isMeta = error instanceof MetaPublishError;
+    const errorCode = isMeta ? error.code : 'PUBLISH_FAILED';
+    const reconnectRequired = isMeta ? error.reconnectRequired : false;
+    const userMessage = error?.message
+      ? String(error.message).slice(0, 500)
+      : 'Failed to publish post';
+
+    // Persist friendly error on the post row
+    if (capturedPostId) {
+      try {
         await supabase
           .from('posts')
-          .update({ error_message: errorMessage })
-          .eq('id', postId);
+          .update({
+            error_message: userMessage,
+          })
+
+          .eq('id', capturedPostId);
+      } catch (e) {
+        console.error('Error updating post error:', e);
       }
-    } catch (e) {
-      console.error('Error updating post error:', e);
     }
 
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({
+        error: userMessage,
+        code: errorCode,
+        reconnectRequired,
+        ...(isMeta && error.fbCode ? { fbCode: error.fbCode, fbSubcode: error.fbSubcode, fbTraceId: error.fbTraceId } : {}),
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: reconnectRequired ? 401 : 502,
       }
     );
   }
 }));
 
+
 // Platform-specific publishing functions
 
+// ---- Meta helpers: extract media intent from post row ----
+function extractMediaUrls(post: any): string[] {
+  const arr = Array.isArray(post.media_urls) ? post.media_urls : [];
+  return arr.filter((u: any) => typeof u === 'string' && u.length > 0);
+}
+
+function pickVideoUrl(post: any): string | null {
+  const all = extractMediaUrls(post);
+  const v = all.find((u) => /\.(mp4|mov|m4v|webm)(\?|$)/i.test(u));
+  if (v) return v;
+  if (post.image_url && /\.(mp4|mov|m4v|webm)(\?|$)/i.test(post.image_url)) return post.image_url;
+  return null;
+}
+
+function pickHashtags(post: any): string[] {
+  const t = post.tags;
+  if (Array.isArray(t)) return t.filter((x: any) => typeof x === 'string');
+  return [];
+}
+
 async function publishToInstagram(post: any, supabase: any) {
-  // Get Instagram connection
-  const { data: connection } = await supabase
-    .from('social_connections')
-    .select('*')
-    .eq('provider', 'instagram')
-    .eq('user_id', post.user_id)
-    .eq('status', 'active')
-    .single();
+  let conn = await getMetaConnection(supabase, post.user_id, 'instagram');
+  conn = await ensureFreshToken(supabase, conn);
 
-  if (!connection) {
-    throw new Error('No active Instagram connection found');
-  }
+  const caption = buildCaption(post.caption || '', pickHashtags(post));
+  const mediaUrls = extractMediaUrls(post);
+  const videoUrl = pickVideoUrl(post);
+  const isStory = !!(post.tags && Array.isArray(post.tags) && post.tags.includes('__story__'));
 
-  const accessToken = atob(connection.access_token);
-  const accountId = connection.account_id;
-
-  // Create media container
-  const containerUrl = `https://graph.facebook.com/v18.0/${accountId}/media`;
-  const containerParams = new URLSearchParams({
-    caption: post.caption,
-    access_token: accessToken,
+  return await publishInstagram({
+    igUserId: conn.account_id,
+    accessToken: conn.access_token,
+    caption,
+    imageUrl: post.image_url || null,
+    videoUrl,
+    mediaUrls: mediaUrls.length > 1 ? mediaUrls : undefined,
+    isStory,
   });
-
-  if (post.image_url) {
-    containerParams.append('image_url', post.image_url);
-  }
-
-  const containerResponse = await fetch(`${containerUrl}?${containerParams}`, {
-    method: 'POST',
-  });
-
-  const containerData = await containerResponse.json();
-  if (!containerResponse.ok) {
-    throw new Error(`Instagram API error: ${JSON.stringify(containerData)}`);
-  }
-
-  // Publish the container
-  const publishUrl = `https://graph.facebook.com/v18.0/${accountId}/media_publish`;
-  const publishParams = new URLSearchParams({
-    creation_id: containerData.id,
-    access_token: accessToken,
-  });
-
-  const publishResponse = await fetch(`${publishUrl}?${publishParams}`, {
-    method: 'POST',
-  });
-
-  const publishData = await publishResponse.json();
-  if (!publishResponse.ok) {
-    throw new Error(`Instagram publish error: ${JSON.stringify(publishData)}`);
-  }
-
-  return publishData;
 }
 
 async function publishToFacebook(post: any, supabase: any) {
-  const { data: connection } = await supabase
-    .from('social_connections')
-    .select('*')
-    .eq('provider', 'facebook')
-    .eq('user_id', post.user_id)
-    .eq('status', 'active')
-    .single();
+  let conn = await getMetaConnection(supabase, post.user_id, 'facebook');
+  conn = await ensureFreshToken(supabase, conn);
 
-  if (!connection) {
-    throw new Error('No active Facebook connection found');
-  }
+  const message = buildCaption(post.caption || '', pickHashtags(post));
+  const videoUrl = pickVideoUrl(post);
+  // For pure text+link posts, treat image_url as a link if it's not an image/video
+  const imageUrl = post.image_url && !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(post.image_url)
+    ? post.image_url
+    : null;
 
-  const accessToken = atob(connection.access_token);
-  const pageId = connection.account_id;
-
-  const url = `https://graph.facebook.com/v18.0/${pageId}/feed`;
-  const params = new URLSearchParams({
-    message: post.caption,
-    access_token: accessToken,
+  return await publishFacebook({
+    pageId: conn.account_id,
+    accessToken: conn.access_token,
+    message,
+    imageUrl,
+    videoUrl,
+    linkUrl: null,
   });
-
-  if (post.image_url) {
-    params.append('link', post.image_url);
-  }
-
-  const response = await fetch(`${url}?${params}`, {
-    method: 'POST',
-  });
-
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(`Facebook API error: ${JSON.stringify(data)}`);
-  }
-
-  return data;
 }
+
+
 
 async function publishToTikTok(post: any, supabase: any) {
   throw new Error('TikTok publishing requires video upload - not yet implemented');

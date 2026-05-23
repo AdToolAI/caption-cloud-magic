@@ -1,10 +1,11 @@
-// Auto-Refresh Meta Long-Lived Page Token
-// - Liest IG_PAGE_ACCESS_TOKEN aus app_secrets
-// - Debugged Restlaufzeit via /debug_token
-// - Re-Exchanged via fb_exchange_token wenn < THRESHOLD_DAYS Tage Restlaufzeit
-// - Idempotent: mehrfaches Ausführen pro Tag schadet nicht
-// - Mode 'status': nur Info zurückgeben, nicht refreshen
+// Auto-Refresh Meta Long-Lived Tokens
+// - Global owner page token in app_secrets (IG_PAGE_ACCESS_TOKEN)
+// - Per-user FB Page + IG Business tokens in social_connections.access_token_hash
+// Both paths use fb_exchange_token if a token has < THRESHOLD_DAYS days left.
+// Mode 'status' returns info only; default 'refresh' attempts re-exchange.
 import { createClient } from 'npm:@supabase/supabase-js@2.75.0';
+import { decryptToken, encryptToken } from '../_shared/crypto.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +26,15 @@ Deno.serve(async (req) => {
     }
     const mode: 'status' | 'refresh' = body.mode || url.searchParams.get('mode') || 'refresh';
     const force: boolean = body.force === true || url.searchParams.get('force') === 'true';
+    // target: 'global' (legacy single owner token), 'users' (per-user social_connections), 'both'
+    const target: 'global' | 'users' | 'both' =
+      (body.target || url.searchParams.get('target') || 'both') as any;
 
     const APP_ID = Deno.env.get('META_APP_ID');
     const APP_SECRET = Deno.env.get('META_APP_SECRET');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
 
     if (!APP_ID || !APP_SECRET) {
       return json({ ok: false, error: 'META_APP_ID/META_APP_SECRET fehlt' }, 500);
@@ -37,7 +42,13 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
-    // 1) Aktuellen Token laden
+    // If target === 'users', skip the global owner-token flow entirely.
+    if (target === 'users') {
+      const userResult = await refreshUserConnections(supabase, APP_ID, APP_SECRET, force, mode);
+      return json({ ok: true, action: mode, target, users: userResult });
+    }
+
+
     const { data: secret, error: loadErr } = await supabase
       .from('app_secrets')
       .select('encrypted_value, updated_at')
@@ -82,9 +93,25 @@ Deno.serve(async (req) => {
       app_id_match: debug.app_id === APP_ID,
     };
 
+    // If target=both, fan out per-user sweep in background so we don't block
+    // the cron response on N HTTP roundtrips to Meta.
+    if (target === 'both') {
+      try {
+        // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+        EdgeRuntime.waitUntil(
+          refreshUserConnections(supabase, APP_ID, APP_SECRET, force, mode)
+            .then((r) => console.log('[auto-refresh-meta] user-sweep done:', JSON.stringify(r)))
+            .catch((e) => console.error('[auto-refresh-meta] user-sweep error:', e?.message))
+        );
+      } catch (e) {
+        console.warn('[auto-refresh-meta] could not schedule user-sweep:', e);
+      }
+    }
+
     if (mode === 'status') {
       return json({ ok: true, action: 'status', status });
     }
+
 
     // 3) Refresh-Entscheidung
     if (!isValid) {
@@ -209,3 +236,122 @@ function json(payload: any, status = 200) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
+
+// =====================================================================
+// Per-user Meta connection refresh sweep
+// Iterates social_connections (facebook + instagram), and for each row
+// with token_expires_at within THRESHOLD_DAYS, attempts fb_exchange_token.
+// On success: writes new encrypted token + new expiry. On failure: logs.
+// =====================================================================
+async function refreshUserConnections(
+  supabase: any,
+  APP_ID: string,
+  APP_SECRET: string,
+  force: boolean,
+  mode: 'status' | 'refresh'
+): Promise<{ scanned: number; refreshed: number; failed: number; skipped: number; details: any[] }> {
+  const details: any[] = [];
+  let scanned = 0, refreshed = 0, failed = 0, skipped = 0;
+
+  const { data: rows, error } = await supabase
+    .from('social_connections')
+    .select('id, user_id, provider, account_id, access_token_hash, token_expires_at')
+    .in('provider', ['facebook', 'instagram']);
+
+  if (error) {
+    console.error('[auto-refresh-meta] user-sweep load failed:', error.message);
+    return { scanned: 0, refreshed: 0, failed: 0, skipped: 0, details: [{ error: error.message }] };
+  }
+
+  const nowMs = Date.now();
+  const dueMs = nowMs + THRESHOLD_DAYS * 86_400_000;
+
+  for (const row of rows || []) {
+    scanned++;
+    const tag = `${row.provider}/${row.account_id}`;
+    try {
+      if (!row.access_token_hash) { skipped++; details.push({ tag, skipped: 'no_token' }); continue; }
+      if (!force && row.token_expires_at) {
+        const expMs = new Date(row.token_expires_at).getTime();
+        if (expMs > dueMs) { skipped++; continue; }
+      }
+
+      // Decrypt current
+      let plain: string;
+      try { plain = await decryptToken(row.access_token_hash); }
+      catch {
+        try { plain = atob(row.access_token_hash); }
+        catch { failed++; details.push({ tag, error: 'decrypt_failed' }); continue; }
+      }
+
+      if (mode === 'status') {
+        // For status mode just probe expiry via debug_token
+        const dbgRes = await fetch(`https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(plain)}&access_token=${APP_ID}|${APP_SECRET}`);
+        const dbg = (await dbgRes.json())?.data || {};
+        details.push({
+          tag,
+          is_valid: !!dbg.is_valid,
+          expires_at: dbg.expires_at ? new Date(dbg.expires_at * 1000).toISOString() : null,
+        });
+        continue;
+      }
+
+      // Exchange
+      const exUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(plain)}`;
+      const exRes = await fetch(exUrl);
+      const exData = await exRes.json();
+      if (!exRes.ok || !exData?.access_token) {
+        failed++;
+        details.push({ tag, error: exData?.error?.message || 'exchange_failed', code: exData?.error?.code });
+        continue;
+      }
+
+      const newToken = exData.access_token as string;
+      const expiresIn = Number(exData.expires_in) || 60 * 24 * 3600;
+      const newExpires = new Date(nowMs + expiresIn * 1000).toISOString();
+
+      // Backup old
+      try {
+        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
+        const tokenHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        await supabase.from('kv_secrets_backup').insert({
+          name: `social_connection:${row.id}`,
+          encrypted_value: row.access_token_hash,
+          token_hash: tokenHash,
+          token_last6: plain.slice(-6),
+          expires_at: row.token_expires_at,
+          scopes: [],
+          created_by: 'auto-refresh-meta-tokens/user-sweep',
+        });
+      } catch (e: any) {
+        console.warn('[auto-refresh-meta] user-sweep backup non-critical fail:', e?.message);
+      }
+
+      const encrypted = await encryptToken(newToken);
+      const { error: upErr } = await supabase
+        .from('social_connections')
+        .update({
+          access_token_hash: encrypted,
+          token_expires_at: newExpires,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+
+      if (upErr) {
+        failed++;
+        details.push({ tag, error: `db_update_failed: ${upErr.message}` });
+        continue;
+      }
+
+      refreshed++;
+      details.push({ tag, refreshed: true, new_expires_at: newExpires });
+    } catch (e: any) {
+      failed++;
+      details.push({ tag, error: e?.message || 'unexpected' });
+    }
+  }
+
+  console.log(`[auto-refresh-meta] user-sweep: scanned=${scanned} refreshed=${refreshed} failed=${failed} skipped=${skipped}`);
+  return { scanned, refreshed, failed, skipped, details };
+}
+
