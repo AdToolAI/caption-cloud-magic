@@ -19,8 +19,13 @@ import {
   Type as TypeIcon,
   Clock,
   Link2Off,
+  MessageSquare,
+  Users,
+  Mic,
 } from 'lucide-react';
 import type { ComposerScene } from '@/types/video-composer';
+import { NATIVE_DIALOGUE_CLIP_SOURCES } from '@/lib/video-composer/modelMapping';
+
 
 /**
  * Phase 4 — Render-All Pre-Flight-Check
@@ -135,6 +140,87 @@ function analyzeScenes(scenes: ComposerScene[]): Finding[] {
         title: `Szene ${idx}: Hoher Drift (${drift.toFixed(0)}/100)`,
         detail: 'Drift-Ampel meldet visuellen Bruch zur Vorgänger-Szene.',
       });
+    }
+
+    // ── Dialog-mode specific checks (Phase A) ────────────────────────────
+    if (s.dialogMode) {
+      const cast = s.characterShots ?? [];
+      const scriptText = (s.dialogScript ?? '').trim();
+
+      // Blocker: dialog mode without cast → Hailuo plate has no portrait anchor
+      if (cast.length === 0) {
+        out.push({
+          id: `${s.id}-dlg-cast`,
+          severity: 'blocker',
+          sceneIndex: idx,
+          icon: <Users className="h-3.5 w-3.5" />,
+          title: `Szene ${idx}: Dialog-Modus ohne Cast`,
+          detail: 'Kein Sprecher zugewiesen — Lip-Sync kann nicht generiert werden.',
+        });
+      }
+
+      // Blocker: dialog mode without script → Sync.so gets 0s VO
+      if (!scriptText) {
+        out.push({
+          id: `${s.id}-dlg-script`,
+          severity: 'blocker',
+          sceneIndex: idx,
+          icon: <MessageSquare className="h-3.5 w-3.5" />,
+          title: `Szene ${idx}: Dialog-Modus ohne Skript`,
+          detail: 'Skript ist leer — kein Text zum Sprechen vorhanden.',
+        });
+      }
+
+      // Warning: clipSource not in the 7 native-dialogue models
+      if (!NATIVE_DIALOGUE_CLIP_SOURCES.includes(s.clipSource as any)) {
+        out.push({
+          id: `${s.id}-dlg-model`,
+          severity: 'warning',
+          sceneIndex: idx,
+          icon: <Mic className="h-3.5 w-3.5" />,
+          title: `Szene ${idx}: Modell nicht dialog-fähig`,
+          detail: `${s.clipSource} unterstützt keinen nativen Dialog — beim Start wird auf HappyHorse umgeschaltet.`,
+        });
+      }
+
+      // Warning: speaker in script not in cast
+      if (scriptText && cast.length > 0) {
+        const castIds = new Set(cast.map((c) => c.characterId));
+        // Pseudo-parse: pass minimal ComposerCharacter shape so parseDialogScript can match by name.
+        // We only have characterShots here (ids) — try a name-agnostic scan instead.
+        const speakerNames = Array.from(
+          scriptText.matchAll(/^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*[:—-]/gm),
+        ).map((m) => m[1].trim().toLowerCase());
+        const uniqueNames = Array.from(new Set(speakerNames));
+        // We can't resolve names → ids here without ComposerCharacter[], so this
+        // becomes a soft hint: if script speakers > cast count, almost certainly
+        // some speaker is missing from the cast.
+        if (uniqueNames.length > cast.length) {
+          out.push({
+            id: `${s.id}-dlg-orphan`,
+            severity: 'warning',
+            sceneIndex: idx,
+            icon: <Users className="h-3.5 w-3.5" />,
+            title: `Szene ${idx}: Sprecher fehlt im Cast`,
+            detail: `Skript hat ${uniqueNames.length} Sprecher, aber nur ${cast.length} im Cast — fehlende Person zuweisen.`,
+          });
+        }
+
+        // Warning: very long dialog vs short plate (Hailuo ~6-10s).
+        // ~18 chars/sec spoken; if script chars > durationSec * 18 + 30% buffer → cut-off likely.
+        const dur = s.durationSeconds ?? 6;
+        const expectedVoSec = Math.ceil(scriptText.length / 18);
+        if (expectedVoSec > dur * 1.3) {
+          out.push({
+            id: `${s.id}-dlg-overflow`,
+            severity: 'warning',
+            sceneIndex: idx,
+            icon: <Clock className="h-3.5 w-3.5" />,
+            title: `Szene ${idx}: Skript zu lang für Plate`,
+            detail: `Skript ~${expectedVoSec}s, Szene nur ${dur}s — Sync.so schneidet ab. Szene verlängern oder Skript kürzen.`,
+          });
+        }
+      }
     }
   });
 

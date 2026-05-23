@@ -14,7 +14,9 @@
  */
 
 import { forwardRef, useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -208,6 +210,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const { generate, estimateCost } = useTalkingHead();
   const { voices: customVoices } = useCustomVoices();
   const { voices: humeVoices } = useHumeVoices();
+  const { data: accessibleChars = [] } = useAccessibleCharacters();
 
   // Build the cast subset of ComposerCharacters that are actually in this scene
   const sceneCast = useMemo<ComposerCharacter[]>(
@@ -217,6 +220,19 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         .filter((c): c is ComposerCharacter => !!c),
     [cast, characters],
   );
+
+  // Brand-default voice per ComposerCharacter.id — pulled from the Avatar Library.
+  // Used for one-tap auto-binding when a speaker first enters the scene.
+  const defaultVoiceByCharId = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {};
+    for (const c of sceneCast) {
+      const lookupId = c.brandCharacterId ?? c.id;
+      const brand = accessibleChars.find((b) => b.id === lookupId);
+      if (brand?.default_voice_id) out[c.id] = brand.default_voice_id;
+    }
+    return out;
+  }, [sceneCast, accessibleChars]);
+
 
   // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
   const [elVoices, setElVoices] = useState<VoiceMeta[]>([]);
@@ -363,6 +379,33 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
 
   const blocks = useMemo(() => parseDialogScript(script, sceneCast), [script, sceneCast]);
   const speakers = useMemo(() => uniqueSpeakers(blocks, sceneCast), [blocks, sceneCast]);
+
+  // ── Voice Auto-Bind (Phase A) ─────────────────────────────────────────
+  // When a speaker appears for the first time and has no voice yet, inherit
+  // the brand character's default_voice_id. Keeps users out of the trap of
+  // hearing the wrong voice because they forgot to pick one per scene.
+  useEffect(() => {
+    if (speakers.length === 0) return;
+    let patched: Record<string, DialogVoiceCfg> | null = null;
+    for (const sp of speakers) {
+      const cur = voicePerSpeaker[sp.id];
+      if (cur?.voiceId) continue;
+      const defaultId = defaultVoiceByCharId[sp.id];
+      if (!defaultId) continue;
+      patched = patched ?? { ...voicePerSpeaker };
+      patched[sp.id] = {
+        engine: 'elevenlabs',
+        voiceId: defaultId,
+        voiceName: sp.name,
+      };
+    }
+    if (patched) {
+      setVoicePerSpeaker(patched);
+      onUpdate({ dialogVoices: patched });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [speakers, defaultVoiceByCharId]);
+
 
   const totalChars = blocks.reduce((sum, b) => sum + b.text.length, 0);
   const estimatedDurationSec = Math.max(3, Math.ceil(totalChars / 18));
@@ -1219,6 +1262,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             {speakers.map((sp) => {
               const cfg = voicePerSpeaker[sp.id];
               const isHume = cfg?.engine === 'hume';
+              const brandDefault = defaultVoiceByCharId[sp.id];
+              const isBrandVoice = !!brandDefault && cfg?.voiceId === brandDefault && cfg?.engine !== 'hume';
+              const brandLookupId = sceneCast.find((c) => c.id === sp.id)?.brandCharacterId ?? sp.id;
               return (
                 <div
                   key={sp.id}
@@ -1233,7 +1279,41 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                   ) : (
                     <div className="h-7 w-7 rounded bg-muted" />
                   )}
-                  <div className="text-xs font-medium truncate">{sp.name}</div>
+                  <div className="text-xs font-medium truncate flex items-center gap-1.5">
+                    <span className="truncate">{sp.name}</span>
+                    {isBrandVoice && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded border border-primary/40 bg-primary/10 px-1 py-px text-[9px] uppercase tracking-wide text-primary"
+                        title={
+                          language === 'de'
+                            ? 'Standard-Stimme aus der Avatar-Bibliothek'
+                            : language === 'es'
+                            ? 'Voz por defecto de la biblioteca de avatares'
+                            : 'Default voice from Avatar Library'
+                        }
+                      >
+                        <Lock className="h-2.5 w-2.5" />
+                        Brand
+                      </span>
+                    )}
+                    {!brandDefault && (
+                      <Link
+                        to={`/avatars/${brandLookupId}`}
+                        className="inline-flex items-center gap-0.5 rounded border border-amber-500/40 bg-amber-500/10 px-1 py-px text-[9px] uppercase tracking-wide text-amber-400 hover:bg-amber-500/20"
+                        title={
+                          language === 'de'
+                            ? 'Keine Standard-Stimme — im Avatar setzen'
+                            : language === 'es'
+                            ? 'Sin voz por defecto — configura en el avatar'
+                            : 'No default voice — set in avatar'
+                        }
+                      >
+                        <AlertCircle className="h-2.5 w-2.5" />
+                        Setup
+                      </Link>
+                    )}
+                  </div>
+
 
                   {/* Engine selector */}
                   <Select
