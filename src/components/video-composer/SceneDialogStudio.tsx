@@ -292,6 +292,9 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   const [voicePerSpeaker, setVoicePerSpeaker] = useState<Record<string, DialogVoiceCfg>>(
     normalizeVoiceMap(scene.dialogVoices),
   );
+  const [dialogTakes, setDialogTakes] = useState<Record<string, DialogTakeBundle>>(
+    (scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {},
+  );
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genStage, setGenStage] = useState<string | null>(null);
