@@ -307,6 +307,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
   useEffect(() => {
     setScript(scene.dialogScript ?? '');
     setVoicePerSpeaker(normalizeVoiceMap(scene.dialogVoices));
+    setDialogTakes((scene.dialogTakes as Record<string, DialogTakeBundle> | undefined) ?? {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
