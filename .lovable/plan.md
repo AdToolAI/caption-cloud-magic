@@ -1,80 +1,121 @@
-## Diagnose
+## Die Regel in einem Satz
+**Lip-Sync-Toggle = Master-Schalter für alles, was mit gesprochenem Wort zu tun hat.** Skript, Sprecher-Auswahl, Voice-Settings und das Filtern der Modelle hängen alle daran.
 
-Du beschreibst: **Erster Satz von Charakter 1 = saubere Lippenbewegung, alle weiteren Sätze (auch von Charakter 1) = kaum sichtbar.** Das ist KEIN Audio-/Identity-Problem und auch kein Provider-Ausfall — es ist eine Eigenheit der aktuellen v3-Pipeline.
-
-**Was v3 macht (poll-dialog-shots):**
-- Ein Sync.so-Pass **pro Sprecher**, in dem ALLE Turns dieses Sprechers als `segments_secs: [[w1],[w2],[w3]]` mitgegeben werden.
-- Pass 1 (Sprecher A) → Pass 2 (Sprecher B) **chained** auf Pass-1-Output.
-
-**Warum nur der erste Satz stark animiert wird:**
-1. `sync/lipsync-2-pro` mit Multi-Window-`segments_secs` gewichtet seine VAD-/Phonem-Energie überproportional auf das **erste/längste** Fenster im selben Pass. Spätere Fenster im gleichen Pass bekommen deutlich schwächere Mundamplitude — ein bekanntes Verhalten, wenn man mehrere disjunkte Fenster in einen Pass packt.
-2. Die `temperature` wird einmal pro Pass gewählt (1.0 bei min-Turn<2s, sonst 0.9). Bei gemischten Längen ist das ein Kompromiss, der für die kurzen Folge-Fenster nicht reicht.
-3. Pass 2 läuft auf Pass-1-Output → das einzige Fenster, das Charakter A's "guten" ersten Satz noch zeigt, ist sein erstes; Folge-Fenster waren schon im Pass-1-Output schwach und werden von Pass 2 nur durchgereicht (cut_off außerhalb seiner Fenster).
-
-Das v2-Modell (per Turn ein eigener Pass, chained) hatte das umgekehrte Problem: jeder Turn stark animiert, aber kumulative Re-Encodes machten das Bild weich. **Wir wollen beides: starke Animation pro Turn UND nur eine einzige Re-Encode-Generation.**
-
-## Plan — v4: Per-Turn-Parallel + ffmpeg-Stitch
-
-### Architektur
+## Zwei klare UI-Zustände
 
 ```text
-master plate (pristine MP4)
-        │
-        ├── Sync.so Pass T0  (window=[t0_start,t0_end], coords=speakerA)  ──► out_T0.mp4
-        ├── Sync.so Pass T1  (window=[t1_start,t1_end], coords=speakerB)  ──► out_T1.mp4
-        ├── Sync.so Pass T2  (window=[t2_start,t2_end], coords=speakerA)  ──► out_T2.mp4
-        └── ... (alle Turns parallel, jeder auf der ORIGINALEN Plate)
-                            │
-                            ▼
-              ffmpeg concat by time-slice:
-              [0..t0.end] from out_T0  +  [t0.end..t1.end] from out_T1  + ...
-              → 1 Re-Encode-Generation everywhere, jede Mundbewegung volle Sync.so-Aufmerksamkeit
-                            │
-                            ▼
-                     remux mit master WAV → final clip_url
+TOGGLE = AUS  →  B-ROLL MODUS (Default)
+  Sichtbar:    Prompt, Stil, Look, Cast (optional als Statisten), Audio-Mute
+  Versteckt:   Skript-Editor, Sprecher-Zuordnung, Voice-Pickers,
+               Dialog-Vorschau, Lip-Sync-Provider-Hinweis
+  Modelle:     Alle 11 verfügbar
+  Audio:       Stille oder Hintergrundmusik (im Composer-Audio-Track)
+  Use-Case:    Action, Landschaft, Produkt-Shots, Atmosphäre
+
+TOGGLE = AN   →  DIALOG MODUS
+  Sichtbar:    Prompt, Skript-Editor (NEU sichtbar), Sprecher-Picker
+               (1..N Charaktere), Sprache, Cast-Refs, Lip-Sync-Badge
+  Versteckt:   Audio-Mute-Option (Dialog kommt aus dem Modell)
+  Modelle:     Nur 3 — HappyHorse / Kling 3.0 / Veo 3.1
+  Audio:       Vom Modell generiert + perfekt lippensynchron
+  Use-Case:    Testimonials, Interviews, Werbespots, Erklärvideos
+                — auch mit nur 1 Sprecher!
 ```
 
-### Konkrete Änderungen
+## Warum auch 1 Sprecher den Toggle braucht
+Ein Monolog ohne Lip-Sync sieht aus wie:
+- Stumme Person + Untertitel = unprofessionell
+- Person + überlagerte Stimme ohne Mundbewegung = "Voiceover-Anmutung", nicht filmisch
 
-1. **`compose-dialog-scene/index.ts` → `version: 4`**
-   - `DialogShot` repräsentiert wieder **einen einzelnen Turn** (nicht einen Sprecher-Bündel):
-     - `idx`, `speaker_idx`, `speaker_name`, `character_id`
-     - `window: [start, end]` (genau ein Fenster pro Shot)
-     - `target_coords` (Pixel-Center des Sprechers)
-     - `temperature` (pro Turn: 1.0 wenn dur<2.0s, sonst 0.9 — KEIN Pass-Kompromiss mehr)
-     - `status`, `sync_job_id`, `output_url`, `started_at`, `completed_at`, `error`
-   - Credits: `9 cr/s × ceil(turnDur)` pro Turn aufaddiert.
+Mit dem Toggle wird **immer** das Modell genutzt, das Audio + Lippen in einem Pass generiert — egal ob 1, 2 oder 3 Sprecher.
 
-2. **`poll-dialog-shots/index.ts` — Parallel-Dispatch**
-   - **Pro Tick:** alle `pending`-Shots gleichzeitig dispatchen (kein "nur einer in-flight"-Gate mehr). Sync.so Creator-Plan erlaubt parallele Jobs, und es gibt keine Abhängigkeit mehr zwischen Turns.
-   - Pro Shot: `startSyncSpeakerJob(masterPlateUrl, masterWavUrl, [shot.window], shot.coords, shot.temperature)` — `videoUrl` ist IMMER `state.source_clip_url` (pristine master), niemals ein vorheriger Output.
-   - Pre-Roll/Tail (`expandWindows`) bleibt, clamped gegen alle anderen Turn-Boundaries.
-   - Polling pro Shot wie bisher.
+## Komponenten-Sichtbarkeit (konkret)
 
-3. **Neue ffmpeg-Stitch-Phase (in `poll-dialog-shots`, wenn `allReady`)**
-   - Baue eine zeitsortierte Segment-Liste, die Lücken (Stille zwischen Turns) der pristinen Master-Plate zuordnet und Turn-Fenster dem jeweiligen `out_T{i}.mp4`.
-   - `ffmpeg` mit `concat demuxer` + `-c:v libx264 -preset veryfast -crf 18` zur Stitch-Datei, danach **`-c:v copy -c:a aac`** Remux mit `state.master_audio_url`.
-   - Upload als `final_url` → `clip_url`, `lip_sync_status='done'`, `twoshot_stage='done'`.
-   - Falls ffmpeg im Edge-Function-Runtime nicht verfügbar/zuverlässig ist (zu prüfen): Fallback auf eine kleine `stitch-dialog-shots` Edge-Function mit Deno-FFmpeg-WASM oder Aufruf eines bereits vorhandenen Stitch-Helpers (gibt es im Composer-Pfad — kurz checken in `_shared/`).
+| UI-Element                           | Toggle AUS | Toggle AN |
+|--------------------------------------|------------|-----------|
+| Prompt-Editor                        | sichtbar   | sichtbar  |
+| **Skript / Dialog-Editor**           | versteckt  | sichtbar  |
+| **Sprecher-Zuordnung (Cast → Line)** | versteckt  | sichtbar  |
+| **Sprache-Picker (DE/EN/ES)**        | versteckt  | sichtbar  |
+| Cast-Picker (Brand-Characters)       | sichtbar   | sichtbar  |
+| Cinematic Style Presets              | sichtbar   | sichtbar  |
+| Shot Director Slots                  | sichtbar   | sichtbar  |
+| Modell-Picker                        | 11 Modelle | 3 Modelle |
+| Voice-Settings (für Phase B später)  | versteckt  | versteckt (bis Phase B) |
+| Audio-Mute-Schalter                  | sichtbar   | versteckt |
+| Lip-Sync-Hinweis-Badge               | versteckt  | sichtbar  |
+| Preis-Badge                          | normal     | „Dialog-Tarif" Hinweis |
 
-4. **DB-Reset der aktuellen Szene** (`60562d55-…` bzw. die zuletzt fehlgeschlagene)
-   - `dialog_shots = NULL`, `twoshot_stage = 'master_clip'`, `lip_sync_status = 'pending'`, `clip_url` zurück auf `lip_sync_source_clip_url` (oder die pristine Master-Plate-URL aus `audio_plan.twoshot.source_clip_url`).
-   - Damit re-triggert sich `compose-dialog-scene` v4.
+## Skript-Editor Verhalten
 
-5. **Deploy & Validierung**
-   - Deploy: `compose-dialog-scene`, `poll-dialog-shots` (+ optional `stitch-dialog-shots`).
-   - Logging pro Shot: `dispatched turn {idx} speaker={name} window=[a,b] coords=… temp=…`.
-   - Erwartung: alle Turns READY in ~1–2 Polling-Zyklen (parallel statt seriell), Stitch in <30s, finaler Clip zeigt **gleich starke Mundbewegung** auf jedem Satz.
+```text
+Bei Toggle AN → erstmaliges Öffnen:
+  → Skript-Editor erscheint mit Placeholder:
+    "[Speaker]: Was möchten Sie sagen?"
+  → Cast-Picker schlägt automatisch alle Cast-Mitglieder
+    der Szene als Sprecher vor.
 
-### Was bleibt unverändert
+Bei Toggle AUS → falls bereits Skript vorhanden:
+  → Skript wird NICHT gelöscht, nur versteckt.
+  → Hinweis-Toast: "Skript bleibt gespeichert. 
+                    Aktiviere Lip-Sync, um es zu nutzen."
+  → Beim Render wird Skript ignoriert (B-Roll-Modus).
 
-- Anchor-Sanitizer und Face-Audit (`compose-video-clips` / `compose-scene-anchor`) — die Stage davor.
-- Audio-Pipeline (`compose-twoshot-audio`, Sample-akkurate WAVs, voicedRange.turns) — unverändert.
-- Refund-Logik (idempotent pro Scene-State).
-- Sync.so-Coords aus FaceMap (Identity-Match via Gemini), `auto_detect: false`.
+Bei Toggle AN → mit existierendem Skript:
+  → Skript erscheint wieder vorausgefüllt.
+  → Sprecher-Zuordnung wird beibehalten.
+```
 
-### Erwartetes Ergebnis
+## Auto-Detection beim Laden bestehender Szenen
+Damit Altdaten sauber migrieren:
 
-- Jeder einzelne Turn wird mit voller Sync.so-Aufmerksamkeit + optimaler Temperature animiert → **alle Sätze gleich filmreif**.
-- Nur **eine** Re-Encode-Generation pro Pixel im finalen Clip → keine Weichzeichnung mehr.
-- Pipeline ist schneller (parallel statt seriell) und fehlertoleranter (Fail eines einzelnen Turns blockiert nicht die anderen).
+```text
+Szene hat dialog_script != null  →  dialog_mode = true
+Szene hat audio_plan.twoshot     →  dialog_mode = true
+Szene hat engine_override        →  dialog_mode = true
+  in ('cinematic-sync',
+      'native-dialogue')
+Alles andere                     →  dialog_mode = false
+```
+
+## Cast-Mitglieder beim Toggle-Wechsel
+- **AUS → AN**: Cast bleibt; werden alle als verfügbare Sprecher angeboten. Wenn 0 Cast vorhanden → Hinweis "Füge mindestens 1 Charakter hinzu, um Dialog zu sprechen".
+- **AN → AUS**: Cast bleibt (Statisten-Rolle), Skript wird versteckt aber nicht gelöscht.
+
+## Komponenten-Änderungen (technisch, Phase 1)
+
+### `src/components/composer/SceneCard.tsx`
+- Lip-Sync-Toggle prominent oben (über/neben Modell-Picker)
+- Bedingte Renderblöcke für Skript-Editor, Sprecher-Picker, Sprach-Picker
+- Modell-Picker-Optionen via `useMemo(() => allModels.filter(m => dialogMode ? m.capabilities.nativeDialogue : true))`
+- Auto-Switch + Toast wenn dialogMode aktiviert und aktuelles Modell inkompatibel
+
+### `src/components/composer/SceneScriptEditor.tsx` (neu/refactored)
+- Gekapselt, sichtbar nur wenn `dialogMode === true`
+- Sprecher-Zuordnung per Dropdown pro Zeile
+- Sprach-Picker (DE/EN/ES) am Kopf des Editors
+
+### Datenbank
+- `composer_scenes.dialog_mode` (boolean, default false)
+- Migration: bestehende Szenen mit Skript → `dialog_mode = true`
+
+### Modell-Config
+- `nativeDialogue: true` Flag in den Configs von HappyHorse, Kling 3.0 Omni, Veo 3.1
+- Alle anderen explizit `false`
+
+## Vorteile dieser Trennung
+
+1. **Klare User-Intention**: Kunde wählt zuerst, was er machen will (B-Roll oder Dialog), dann erst Details.
+2. **Keine fehlerträchtigen Halbzustände**: Es gibt keine Szene mehr mit Skript + Hailuo (würde aktuell schlechte Lip-Sync-Versuche provozieren).
+3. **Cleaner Composer**: 70% der Szenen sind B-Roll → schlanke UI ohne irrelevante Skript-Felder.
+4. **Premium-Positionierung**: Dialog-Modus = Premium-Tarif (€0.28+/s), B-Roll = Standard-Tarif.
+5. **Eindeutige Erfolgs-Erwartung**: Wenn Toggle AN, garantieren wir Audio + Lippen synchron — keine Diskussion mehr.
+
+## Definition of Done für diese Erweiterung
+- Toggle „Dialog & Lip-Sync" sichtbar in jeder SceneCard
+- Skript-Editor + Sprecher-Picker + Sprach-Picker nur sichtbar wenn Toggle AN
+- Bei Toggle AN: Modell-Picker zeigt nur 3 Dialog-Modelle
+- Auto-Switch + Toast bei inkompatiblem Modell
+- Skript wird beim Ausschalten gespeichert, nicht gelöscht
+- Bestehende Szenen migrieren automatisch korrekt
+- Cast-Picker bleibt in beiden Modi nutzbar

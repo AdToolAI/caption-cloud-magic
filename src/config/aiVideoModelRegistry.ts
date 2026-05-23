@@ -54,6 +54,13 @@ export interface ToolkitModel {
     multiRef?: boolean;
     /** Max number of reference images supported when multiRef is true. */
     maxReferences?: number;
+    /**
+     * Native dialogue: model generates video + speech + lip-sync in a single
+     * pass. Required for the Composer's Dialog/Lip-Sync mode (Artlist-style).
+     * Set true only for models that produce in-frame synchronous mouth
+     * articulation matched to the generated audio.
+     */
+    nativeDialogue?: boolean;
   };
   /** Allowed durations in seconds (used to render the slider/select). */
   durations: number[];
@@ -89,7 +96,7 @@ export const AI_VIDEO_TOOLKIT_MODELS: ToolkitModel[] = [
     edgeFunction: 'generate-kling-video',
     group: 'recommended',
     icon: Film,
-    capabilities: { t2v: true, i2v: true, v2v: true, audio: true },
+    capabilities: { t2v: true, i2v: true, v2v: true, audio: true, nativeDialogue: true },
     durations: [3, 5, 8, 10, 15],
     resolution: '720p',
     aspectRatios: sharedAspect,

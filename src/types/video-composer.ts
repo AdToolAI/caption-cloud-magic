@@ -209,7 +209,15 @@ export interface ComposerScene {
    * classic Hailuo/etc. clip without lip-sync. `sync-polish` runs Hailuo +
    * Sync.so polish pass after generation. Persisted as `engine_override`.
    */
-  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish' | 'cinematic-sync';
+  engineOverride?: 'auto' | 'heygen' | 'broll' | 'sync-polish' | 'cinematic-sync' | 'native-dialogue';
+  /**
+   * Master switch for dialog & lip-sync UI in the composer.
+   * When true: script editor + speaker picker are shown, model picker
+   * is filtered to native-dialogue-capable models only (HappyHorse / Kling 3 / Veo 3.1).
+   * When false: B-roll mode — all 11 models available, no script UI.
+   * Persisted as `dialog_mode`.
+   */
+  dialogMode?: boolean;
   /**
    * Override: when true, send the character portrait directly as i2v first-frame
    * instead of composing a scene-aware anchor. Use only when the user explicitly

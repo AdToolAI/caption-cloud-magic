@@ -5515,6 +5515,7 @@ export type Database = {
           cost_euros: number
           created_at: string
           dialog_locked_at: string | null
+          dialog_mode: boolean
           dialog_script: string | null
           dialog_shots: Json | null
           dialog_voices: Json
@@ -5594,6 +5595,7 @@ export type Database = {
           cost_euros?: number
           created_at?: string
           dialog_locked_at?: string | null
+          dialog_mode?: boolean
           dialog_script?: string | null
           dialog_shots?: Json | null
           dialog_voices?: Json
@@ -5673,6 +5675,7 @@ export type Database = {
           cost_euros?: number
           created_at?: string
           dialog_locked_at?: string | null
+          dialog_mode?: boolean
           dialog_script?: string | null
           dialog_shots?: Json | null
           dialog_voices?: Json
