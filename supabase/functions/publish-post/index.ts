@@ -57,8 +57,10 @@ Deno.serve(withTelemetry('publish-post', async (req) => {
     }
 
     const { postId } = validation.data;
+    capturedPostId = postId;
 
     console.log('Publishing post:', postId);
+
 
     // Get post data
     const { data: post, error: postError } = await supabase
