@@ -1,121 +1,72 @@
-## Die Regel in einem Satz
-**Lip-Sync-Toggle = Master-Schalter für alles, was mit gesprochenem Wort zu tun hat.** Skript, Sprecher-Auswahl, Voice-Settings und das Filtern der Modelle hängen alle daran.
+## Phase A — Voice Auto-Bind + Dialog Pre-Flight
 
-## Zwei klare UI-Zustände
+Ziel: ~80% der schlechten Dialog-Renders verhindern, ohne die Pipeline umzubauen. Zwei kleine, in sich geschlossene Bausteine.
 
-```text
-TOGGLE = AUS  →  B-ROLL MODUS (Default)
-  Sichtbar:    Prompt, Stil, Look, Cast (optional als Statisten), Audio-Mute
-  Versteckt:   Skript-Editor, Sprecher-Zuordnung, Voice-Pickers,
-               Dialog-Vorschau, Lip-Sync-Provider-Hinweis
-  Modelle:     Alle 11 verfügbar
-  Audio:       Stille oder Hintergrundmusik (im Composer-Audio-Track)
-  Use-Case:    Action, Landschaft, Produkt-Shots, Atmosphäre
+---
 
-TOGGLE = AN   →  DIALOG MODUS
-  Sichtbar:    Prompt, Skript-Editor (NEU sichtbar), Sprecher-Picker
-               (1..N Charaktere), Sprache, Cast-Refs, Lip-Sync-Badge
-  Versteckt:   Audio-Mute-Option (Dialog kommt aus dem Modell)
-  Modelle:     Nur 3 — HappyHorse / Kling 3.0 / Veo 3.1
-  Audio:       Vom Modell generiert + perfekt lippensynchron
-  Use-Case:    Testimonials, Interviews, Werbespots, Erklärvideos
-                — auch mit nur 1 Sprecher!
-```
+### Baustein 1 — Voice Auto-Bind
 
-## Warum auch 1 Sprecher den Toggle braucht
-Ein Monolog ohne Lip-Sync sieht aus wie:
-- Stumme Person + Untertitel = unprofessionell
-- Person + überlagerte Stimme ohne Mundbewegung = "Voiceover-Anmutung", nicht filmisch
+**Problem:** Sprecher wird im `SceneDialogStudio` ausgewählt, aber die hinterlegte `default_voice_id` des Brand Characters wird nicht automatisch übernommen. User muss pro Szene & pro Sprecher manuell die Stimme nochmal setzen → vergessen → Default-Stimme → Marken-Inkonsistenz.
 
-Mit dem Toggle wird **immer** das Modell genutzt, das Audio + Lippen in einem Pass generiert — egal ob 1, 2 oder 3 Sprecher.
+**Lösung:**
+- Beim Hinzufügen eines Sprechers (Cast → Dialog) automatisch `scene.dialogVoices[characterId]` mit der `default_voice_id` des Charakters vorbelegen (sofern leer).
+- Wenn die Voice fehlt: dezenter Hinweis "Kein Standard-Voice — bitte wählen" + Quick-Link zum Charakter (`/avatars/:id`).
+- Visuelles Lock-Badge an der Voice-Zeile, wenn sie vom Brand Character geerbt wurde (Gold, "Brand-Voice"). User kann pro Szene überschreiben (Override behält dann Vorrang).
 
-## Komponenten-Sichtbarkeit (konkret)
+**Dateien (Lesen + kleine Edits):**
+- `src/components/video-composer/SceneDialogStudio.tsx` — Auto-Bind beim Cast-Add, Lock-Badge
+- `src/hooks/useAccessibleCharacters.ts` (bzw. `useUnifiedMentionLibrary`) — sicherstellen dass `default_voice_id` mitgeliefert wird
+- `src/lib/voice-studio/resolveDialogVoice.ts` — kleine Helper-Erweiterung `resolveCharacterDefaultVoice(character)`
 
-| UI-Element                           | Toggle AUS | Toggle AN |
-|--------------------------------------|------------|-----------|
-| Prompt-Editor                        | sichtbar   | sichtbar  |
-| **Skript / Dialog-Editor**           | versteckt  | sichtbar  |
-| **Sprecher-Zuordnung (Cast → Line)** | versteckt  | sichtbar  |
-| **Sprache-Picker (DE/EN/ES)**        | versteckt  | sichtbar  |
-| Cast-Picker (Brand-Characters)       | sichtbar   | sichtbar  |
-| Cinematic Style Presets              | sichtbar   | sichtbar  |
-| Shot Director Slots                  | sichtbar   | sichtbar  |
-| Modell-Picker                        | 11 Modelle | 3 Modelle |
-| Voice-Settings (für Phase B später)  | versteckt  | versteckt (bis Phase B) |
-| Audio-Mute-Schalter                  | sichtbar   | versteckt |
-| Lip-Sync-Hinweis-Badge               | versteckt  | sichtbar  |
-| Preis-Badge                          | normal     | „Dialog-Tarif" Hinweis |
+**Edge-Function-Touchpoint:** keine. Reine Frontend-Vorbelegung; `compose-dialog-scene` bekommt den vollen `dialogVoices[]`-Payload wie gehabt.
 
-## Skript-Editor Verhalten
+---
 
-```text
-Bei Toggle AN → erstmaliges Öffnen:
-  → Skript-Editor erscheint mit Placeholder:
-    "[Speaker]: Was möchten Sie sagen?"
-  → Cast-Picker schlägt automatisch alle Cast-Mitglieder
-    der Szene als Sprecher vor.
+### Baustein 2 — Dialog-Pre-Flight Erweiterung
 
-Bei Toggle AUS → falls bereits Skript vorhanden:
-  → Skript wird NICHT gelöscht, nur versteckt.
-  → Hinweis-Toast: "Skript bleibt gespeichert. 
-                    Aktiviere Lip-Sync, um es zu nutzen."
-  → Beim Render wird Skript ignoriert (B-Roll-Modus).
+**Problem:** Der bestehende `RenderPreFlightDialog` (Phase 4) prüft Szenen-Basics (leerer Prompt, Drift, Continuity). **Dialog-Modus** hat aber eigene tödliche Failure-Modes, die er heute übersieht:
+1. `dialogMode = true`, aber **kein Cast** → Render läuft → Hailuo-Plate ohne Sprecher → Refund.
+2. `dialogMode = true`, aber **kein Skript** (`dialogScript` leer) → Sync.so bekommt 0s VO → Failure.
+3. `dialogMode = true`, aber **clipSource nicht in den 7 Native-Dialog-Modellen** (kann passieren wenn Toggle nachträglich aus/an).
+4. Sprecher im Skript erwähnt (`@Anna:`), aber **nicht im Cast** der Szene.
+5. Skript-Zeile > ~12 s VO bei 5 s Plate (Hailuo-Limit) → Sync.so `cut_off` greift → User bekommt abgeschnittenen Dialog.
 
-Bei Toggle AN → mit existierendem Skript:
-  → Skript erscheint wieder vorausgefüllt.
-  → Sprecher-Zuordnung wird beibehalten.
-```
+**Lösung:** `analyzeScenes()` in `RenderPreFlightDialog.tsx` um 5 neue Findings erweitern (alle als `warning` außer #1+#2 = `blocker`).
 
-## Auto-Detection beim Laden bestehender Szenen
-Damit Altdaten sauber migrieren:
+**Dateien:**
+- `src/components/video-composer/RenderPreFlightDialog.tsx` — neue Checks, Icons, deutsche Texte (DE/EN/ES via vorhandenem i18n-Pattern in der Datei selbst nicht nötig — Datei ist aktuell DE-only, bleibt konsistent)
+- `src/lib/video-composer/modelMapping.ts` — re-use `NATIVE_DIALOGUE_CLIP_SOURCES` für Check #3
+- `src/types/video-composer.ts` — keine Änderung nötig
 
-```text
-Szene hat dialog_script != null  →  dialog_mode = true
-Szene hat audio_plan.twoshot     →  dialog_mode = true
-Szene hat engine_override        →  dialog_mode = true
-  in ('cinematic-sync',
-      'native-dialogue')
-Alles andere                     →  dialog_mode = false
-```
+**Edge-Function-Touchpoint:** keine.
 
-## Cast-Mitglieder beim Toggle-Wechsel
-- **AUS → AN**: Cast bleibt; werden alle als verfügbare Sprecher angeboten. Wenn 0 Cast vorhanden → Hinweis "Füge mindestens 1 Charakter hinzu, um Dialog zu sprechen".
-- **AN → AUS**: Cast bleibt (Statisten-Rolle), Skript wird versteckt aber nicht gelöscht.
+---
 
-## Komponenten-Änderungen (technisch, Phase 1)
+### Was bewusst NICHT in Phase A landet
 
-### `src/components/composer/SceneCard.tsx`
-- Lip-Sync-Toggle prominent oben (über/neben Modell-Picker)
-- Bedingte Renderblöcke für Skript-Editor, Sprecher-Picker, Sprach-Picker
-- Modell-Picker-Optionen via `useMemo(() => allModels.filter(m => dialogMode ? m.capabilities.nativeDialogue : true))`
-- Auto-Switch + Toast wenn dialogMode aktiviert und aktuelles Modell inkompatibel
+- **Take-System A/B/C** → Phase B
+- **Continuity Auto-Lock im Dialog-Modus** → Phase C
+- **Tonality-Marker pro Zeile** (`[whisper]`, `[shouting]`) → Phase C
+- **Voice-Profil-Editor mit ElevenLabs `voice_settings` pro Character** → Phase C
+- Keine DB-Migration, keine neuen Edge Functions, keine Credit-Änderungen
 
-### `src/components/composer/SceneScriptEditor.tsx` (neu/refactored)
-- Gekapselt, sichtbar nur wenn `dialogMode === true`
-- Sprecher-Zuordnung per Dropdown pro Zeile
-- Sprach-Picker (DE/EN/ES) am Kopf des Editors
+---
 
-### Datenbank
-- `composer_scenes.dialog_mode` (boolean, default false)
-- Migration: bestehende Szenen mit Skript → `dialog_mode = true`
+### Akzeptanzkriterien
 
-### Modell-Config
-- `nativeDialogue: true` Flag in den Configs von HappyHorse, Kling 3.0 Omni, Veo 3.1
-- Alle anderen explizit `false`
+1. Wenn ich im Dialog-Modus einen Sprecher zur Szene hinzufüge, ist die Stimme **vorbelegt** und mit Gold-"Brand-Voice"-Badge markiert.
+2. Wenn ein Charakter keine `default_voice_id` hat, sehe ich einen klickbaren Hinweis zur Charakter-Seite.
+3. Wenn ich „Render All & Stitch" klicke und eine Dialog-Szene **leeren Cast** oder **leeres Skript** hat → Render ist **geblockt** mit klarer Fehlermeldung.
+4. Wenn ich `dialogMode=true` mit z.B. `ai-hailuo` (außerhalb der 7) habe → Warnung im Pre-Flight (Render-Button bleibt aktiv, da Auto-Switch greift).
+5. Wenn ich im Skript `@Anna:` schreibe, Anna aber nicht im Cast ist → Warnung mit Szenen-Nummer.
 
-## Vorteile dieser Trennung
+---
 
-1. **Klare User-Intention**: Kunde wählt zuerst, was er machen will (B-Roll oder Dialog), dann erst Details.
-2. **Keine fehlerträchtigen Halbzustände**: Es gibt keine Szene mehr mit Skript + Hailuo (würde aktuell schlechte Lip-Sync-Versuche provozieren).
-3. **Cleaner Composer**: 70% der Szenen sind B-Roll → schlanke UI ohne irrelevante Skript-Felder.
-4. **Premium-Positionierung**: Dialog-Modus = Premium-Tarif (€0.28+/s), B-Roll = Standard-Tarif.
-5. **Eindeutige Erfolgs-Erwartung**: Wenn Toggle AN, garantieren wir Audio + Lippen synchron — keine Diskussion mehr.
+### Aufwand
 
-## Definition of Done für diese Erweiterung
-- Toggle „Dialog & Lip-Sync" sichtbar in jeder SceneCard
-- Skript-Editor + Sprecher-Picker + Sprach-Picker nur sichtbar wenn Toggle AN
-- Bei Toggle AN: Modell-Picker zeigt nur 3 Dialog-Modelle
-- Auto-Switch + Toast bei inkompatiblem Modell
-- Skript wird beim Ausschalten gespeichert, nicht gelöscht
-- Bestehende Szenen migrieren automatisch korrekt
-- Cast-Picker bleibt in beiden Modi nutzbar
+- ~3 Frontend-Dateien
+- 0 Edge Functions
+- 0 DB-Migrations
+- 1 Implementierungs-Runde
+
+Soll ich loslegen?
