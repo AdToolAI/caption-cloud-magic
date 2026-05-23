@@ -241,6 +241,34 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
     return out;
   }, [sceneCast, accessibleChars]);
 
+  // Phase C — Brand voice tuning profile per ComposerCharacter.id.
+  // Read from brand_characters.voice_settings; merged with per-line tonality
+  // markers at TTS time via mergeWithTonality(). When absent, callers fall
+  // back to ElevenLabs defaults inside generate-voiceover.
+  const voiceProfileByCharId = useMemo<Record<string, VoiceTuning | null>>(() => {
+    const out: Record<string, VoiceTuning | null> = {};
+    for (const c of sceneCast) {
+      const lookupId = c.brandCharacterId ?? c.id;
+      const brand = accessibleChars.find((b) => b.id === lookupId);
+      out[c.id] = resolveCharacterVoiceProfile(brand as any);
+    }
+    return out;
+  }, [sceneCast, accessibleChars]);
+
+  /** Build the merged voice_settings payload for one dialog block. */
+  const buildTuningForBlock = (block: { speakerId: string; tonality?: string }) => {
+    const base = voiceProfileByCharId[block.speakerId] ?? null;
+    const merged = mergeWithTonality(base, (block.tonality as any) ?? null);
+    return {
+      stability: merged.stability,
+      similarityBoost: merged.similarityBoost,
+      style: merged.style,
+      useSpeakerBoost: merged.useSpeakerBoost,
+      speed: merged.speed,
+    };
+  };
+
+
 
   // ── Full ElevenLabs library (loaded from list-voices) + active custom voices ──
   const [elVoices, setElVoices] = useState<VoiceMeta[]>([]);
