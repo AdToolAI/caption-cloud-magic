@@ -145,6 +145,12 @@ const T = {
     srsLabel: 'Erweitert: Stattdessen als Voiceover über eine gemeinsame Szene legen',
     srsHint: 'Standard bei mehreren Sprechern mit Portrait: jeder Sprecher bekommt seinen eigenen Lip-Sync-Cut. Schalter aktivieren, wenn du nur eine Gruppen-Szene mit Voiceover willst.',
     close: 'Schließen',
+    continuityLocked: 'Continuity gesperrt',
+    continuityInherited: (n: number) => `Continuity erbt von Szene ${n}`,
+    continuityTooltip: 'Folgeszenen mit gleichem Cast erben diesen Identity-Anker automatisch.',
+    continuityTooltipInherited: (n: number) => `Sarah/Matthew werden visuell an Szene ${n} angeglichen.`,
+    continuityRemove: 'Lock entfernen',
+    continuityForce: 'Eigenen Lock erzwingen',
   },
   en: {
     title: 'Scene Script',
@@ -170,6 +176,12 @@ const T = {
     srsLabel: 'Advanced: keep it as voiceover over one shared scene instead',
     srsHint: 'Default with multiple speakers (with portraits): each speaker gets their own lip-sync cut. Toggle on if you only want a group scene with voiceover.',
     close: 'Close',
+    continuityLocked: 'Continuity locked',
+    continuityInherited: (n: number) => `Continuity inherited from Scene ${n}`,
+    continuityTooltip: 'Following scenes with the same cast inherit this identity anchor automatically.',
+    continuityTooltipInherited: (n: number) => `Cast appearance is matched to Scene ${n}.`,
+    continuityRemove: 'Remove lock',
+    continuityForce: 'Force own lock',
   },
   es: {
     title: 'Guion de escena',
@@ -195,6 +207,12 @@ const T = {
     srsLabel: 'Avanzado: en su lugar, déjalo como voz en off sobre una escena compartida',
     srsHint: 'Por defecto con varios hablantes (con retratos): cada hablante tiene su propio plano lip-sync. Activa el interruptor si solo quieres una escena de grupo con voz en off.',
     close: 'Cerrar',
+    continuityLocked: 'Continuidad bloqueada',
+    continuityInherited: (n: number) => `Continuidad heredada de la escena ${n}`,
+    continuityTooltip: 'Las escenas siguientes con el mismo reparto heredan este ancla de identidad automáticamente.',
+    continuityTooltipInherited: (n: number) => `La apariencia del reparto se ajusta a la escena ${n}.`,
+    continuityRemove: 'Quitar bloqueo',
+    continuityForce: 'Forzar bloqueo propio',
   },
 };
 
@@ -1280,6 +1298,44 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       <p className="text-[10px] text-muted-foreground -mt-1">
         {isMonologue ? t.subtitleMono : t.subtitle}
       </p>
+
+      {/* Phase C.1 — Continuity Auto-Lock badge */}
+      {scene.lockReferenceUrl && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {scene.lockSource === 'inherited' ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-400/40 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-medium text-cyan-300"
+              title={t.continuityTooltipInherited(scene.lockSourceSceneIndex ?? 0)}
+            >
+              <Lock className="h-3 w-3" />
+              {t.continuityInherited(scene.lockSourceSceneIndex ?? 0)}
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1 rounded-md border border-primary/50 bg-primary/15 px-2 py-0.5 text-[10px] font-medium text-primary"
+              title={t.continuityTooltip}
+            >
+              <Lock className="h-3 w-3" />
+              {t.continuityLocked}
+            </span>
+          )}
+          <img
+            src={scene.lockReferenceUrl}
+            alt="lock reference"
+            className="h-6 w-10 rounded object-cover border border-border/40"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-[10px] text-muted-foreground hover:text-foreground"
+            onClick={() => onUpdate({ lockReferenceUrl: undefined })}
+          >
+            {scene.lockSource === 'inherited' ? t.continuityForce : t.continuityRemove}
+          </Button>
+        </div>
+      )}
+
 
       {generating && genStage && (
         <div className="flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-2 py-1.5 text-[11px] text-primary">

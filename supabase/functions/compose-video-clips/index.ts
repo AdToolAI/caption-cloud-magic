@@ -1374,10 +1374,22 @@ serve(async (req) => {
             if (remapped.length >= 1) castShots = remapped;
           }
           if (castShots.length >= 1 && !looksComposed) {
-            const portraitUrls = castShots
+            const portraitsFromCast = castShots
               .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
-              .filter((u): u is string => typeof u === "string" && u.length > 0)
-              .slice(0, 4);
+              .filter((u): u is string => typeof u === "string" && u.length > 0);
+            // Phase C.1 — Continuity Auto-Lock: prepend the dialog-mode
+            // continuity-lock frame (composed anchor of a previous same-cast
+            // dialog scene) so Nano Banana 2 anchors the new composition to
+            // the same Sarah/Matthew identity, wardrobe, and lighting.
+            const lockRefUrl =
+              scene.lockReferenceUrl && typeof scene.lockReferenceUrl === "string"
+                ? scene.lockReferenceUrl.trim()
+                : "";
+            const portraitUrls = (
+              lockRefUrl
+                ? [lockRefUrl, ...portraitsFromCast.filter((u) => u !== lockRefUrl)]
+                : portraitsFromCast
+            ).slice(0, 4);
             const characterNames = castShots
               .map((cs) => charById.get(cs.characterId)?.name)
               .filter(
@@ -1420,15 +1432,29 @@ serve(async (req) => {
                   const aj = await anchorResp.json().catch(() => ({}));
                   if (aj?.composedUrl) {
                     scene.referenceImageUrl = aj.composedUrl;
+                    // Phase C.1 — persist the freshly composed anchor as the
+                    // dialog continuity-lock when:
+                    //  - the scene is a dialog scene (has script), AND
+                    //  - no lock is already set on this row.
+                    // Future same-cast dialog scenes will inherit this via
+                    // the client-side propagateDialogLock() helper.
+                    const isDialogScene =
+                      typeof scene.dialogScript === "string" &&
+                      scene.dialogScript.trim().length > 0;
+                    const updatePayload: Record<string, unknown> = {
+                      reference_image_url: aj.composedUrl,
+                      updated_at: new Date().toISOString(),
+                    };
+                    if (isDialogScene && !scene.lockReferenceUrl) {
+                      updatePayload.lock_reference_url = aj.composedUrl;
+                      scene.lockReferenceUrl = aj.composedUrl;
+                    }
                     await supabaseAdmin
                       .from("composer_scenes")
-                      .update({
-                        reference_image_url: aj.composedUrl,
-                        updated_at: new Date().toISOString(),
-                      })
+                      .update(updatePayload)
                       .eq("id", scene.id);
                     console.log(
-                      `[compose-video-clips] universal anchor scene ${scene.id}: composed → ${aj.composedUrl.slice(0, 80)}…`,
+                      `[compose-video-clips] universal anchor scene ${scene.id}: composed → ${aj.composedUrl.slice(0, 80)}…${isDialogScene && updatePayload.lock_reference_url ? " (continuity-lock persisted)" : ""}`,
                     );
                   }
                 } else {
@@ -1437,6 +1463,7 @@ serve(async (req) => {
                     `[compose-video-clips] universal anchor scene ${scene.id}: compose-scene-anchor failed ${anchorResp.status} ${errTxt.slice(0, 200)}`,
                   );
                 }
+
               } catch (anchorErr) {
                 console.warn(
                   `[compose-video-clips] universal anchor scene ${scene.id} exception:`,

@@ -354,6 +354,15 @@ export interface ComposerScene {
   continuityLocked?: boolean;
   lockReferenceUrl?: string;
   /**
+   * Phase C.1 runtime-only annotations from `propagateDialogLock`. Not
+   * persisted; the snake_case persistence mapper ignores them.
+   *  - 'self'      → this scene owns its lockReferenceUrl
+   *  - 'inherited' → lock came from an earlier same-cast dialog scene
+   *  - null        → no lock active
+   */
+  lockSource?: 'self' | 'inherited' | null;
+  lockSourceSceneIndex?: number | null;
+  /**
    * Two-Shot Hook pipeline stage. Set by `compose-twoshot-audio`,
    * `compose-video-clips` (master clip) and `compose-twoshot-lipsync`:
    *   audio → anchor → master_clip → lipsync_1 → lipsync_2 → continuity → done

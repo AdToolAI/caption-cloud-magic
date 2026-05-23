@@ -46,6 +46,7 @@ import ShareProjectDialog from './ShareProjectDialog';
 import CollaboratorAvatars from './CollaboratorAvatars';
 import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
+import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -387,7 +388,7 @@ export default function VideoComposerDashboard() {
           return local && local.clipStatus !== s.clipStatus;
         });
 
-        setProject(prev => ({ ...prev, scenes: dbScenes }));
+        setProject(prev => ({ ...prev, scenes: propagateDialogLock(dbScenes) }));
 
         toast({
           title: t('videoComposer.draftRestored'),
@@ -510,7 +511,7 @@ export default function VideoComposerDashboard() {
         });
         const merged = [...dbScenes, ...localOnly]
           .map((s, i) => ({ ...s, orderIndex: i }));
-        return { ...prev, scenes: merged };
+        return { ...prev, scenes: propagateDialogLock(merged) };
       });
     } catch (err) {
       console.warn('[VideoComposerDashboard] refetchScenesFromDb failed:', err);
@@ -823,10 +824,11 @@ export default function VideoComposerDashboard() {
   }, [persistScenesToDb]);
 
   const setScenes = useCallback((scenes: ComposerScene[]) => {
+    const propagated = propagateDialogLock(scenes);
     setProject(prev => {
       // Schedule debounced DB flush only for already-persisted projects.
       if (prev.id) {
-        pendingScenesRef.current = scenes;
+        pendingScenesRef.current = propagated;
         if (scenesPersistTimerRef.current) {
           window.clearTimeout(scenesPersistTimerRef.current);
         }
@@ -839,7 +841,7 @@ export default function VideoComposerDashboard() {
           }
         }, 600);
       }
-      return { ...prev, scenes };
+      return { ...prev, scenes: propagated };
     });
   }, [persistScenesToDb]);
 
@@ -855,7 +857,7 @@ export default function VideoComposerDashboard() {
       scenesPersistTimerRef.current = null;
     }
     pendingScenesRef.current = null;
-    setProject(prev => ({ ...prev, scenes }));
+    setProject(prev => ({ ...prev, scenes: propagateDialogLock(scenes) }));
   }, []);
 
   /**
