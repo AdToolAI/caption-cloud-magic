@@ -5518,6 +5518,7 @@ export type Database = {
           dialog_mode: boolean
           dialog_script: string | null
           dialog_shots: Json | null
+          dialog_takes: Json
           dialog_voices: Json
           director_modifiers: Json | null
           duration_seconds: number
@@ -5598,6 +5599,7 @@ export type Database = {
           dialog_mode?: boolean
           dialog_script?: string | null
           dialog_shots?: Json | null
+          dialog_takes?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
@@ -5678,6 +5680,7 @@ export type Database = {
           dialog_mode?: boolean
           dialog_script?: string | null
           dialog_shots?: Json | null
+          dialog_takes?: Json
           dialog_voices?: Json
           director_modifiers?: Json | null
           duration_seconds?: number
