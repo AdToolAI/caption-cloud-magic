@@ -494,10 +494,29 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        shot.status = "failed";
-        shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        // 1× retry: if this was the first attempt (auto_detect) and we
+        // have FaceMap coords available, redispatch with coords mode
+        // (deterministic fallback) instead of giving up. Empirically
+        // fixes the "An unknown error occurred." silent-fail on Sync.so
+        // for turns whose window does not start at t=0.
+        const canRetry =
+          (shot.retry_count ?? 0) < 1 && shot.target_coords && !shot.force_coords;
+        if (canRetry) {
+          shot.retry_count = (shot.retry_count ?? 0) + 1;
+          shot.force_coords = true;
+          shot.status = "pending";
+          shot.sync_job_id = undefined;
+          shot.error = undefined;
+          console.warn(
+            `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with coords fallback (attempt ${shot.retry_count})`,
+          );
+        } else {
+          shot.status = "failed";
+          shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        }
         mutated = true;
       }
+
     });
   }
 
