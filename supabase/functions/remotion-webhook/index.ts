@@ -37,9 +37,11 @@ serve(async (req) => {
     const isDirectorsCut = source === 'directors-cut';
     const isComposer = source === 'composer';
     const isLongForm = source === 'sora-long-form';
+    const isDialogStitch = source === 'dialog-stitch';
     const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
+    const composerSceneId = customData?.composer_scene_id;
 
     console.log('📋 Webhook details:', { type, renderId, pendingRenderId, outName, userId, isDirectorsCut, isLongForm, progressIdFromWebhook });
 
