@@ -587,6 +587,7 @@ serve(async (req) => {
       });
       cursorSamples = endSample;
       sampleBuffers.push(pcm);
+      segmentPcm.push(pcm);
     }
 
     const spokenSamples = concatSamples(sampleBuffers);
