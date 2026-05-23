@@ -93,9 +93,25 @@ Deno.serve(async (req) => {
       app_id_match: debug.app_id === APP_ID,
     };
 
+    // If target=both, fan out per-user sweep in background so we don't block
+    // the cron response on N HTTP roundtrips to Meta.
+    if (target === 'both') {
+      try {
+        // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+        EdgeRuntime.waitUntil(
+          refreshUserConnections(supabase, APP_ID, APP_SECRET, force, mode)
+            .then((r) => console.log('[auto-refresh-meta] user-sweep done:', JSON.stringify(r)))
+            .catch((e) => console.error('[auto-refresh-meta] user-sweep error:', e?.message))
+        );
+      } catch (e) {
+        console.warn('[auto-refresh-meta] could not schedule user-sweep:', e);
+      }
+    }
+
     if (mode === 'status') {
       return json({ ok: true, action: 'status', status });
     }
+
 
     // 3) Refresh-Entscheidung
     if (!isValid) {
