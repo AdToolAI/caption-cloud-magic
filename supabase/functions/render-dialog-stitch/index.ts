@@ -67,15 +67,22 @@ async function markSceneError(
   state: DialogShotsState | null,
   message: string,
 ) {
+  const patch: Record<string, unknown> = {
+    lip_sync_status: "stitching",
+    twoshot_stage: "dialog_stitching",
+    clip_error: `dialog_stitch_dispatch: ${message}`.slice(0, 300),
+    updated_at: new Date().toISOString(),
+  };
+  if (state) {
+    patch.dialog_shots = {
+      ...state,
+      status: "stitching",
+      stitch_error: message.slice(0, 500),
+    };
+  }
   await supabase
     .from("composer_scenes")
-    .update({
-      lip_sync_status: "stitching",
-      twoshot_stage: "dialog_stitching",
-      clip_error: `dialog_stitch_dispatch: ${message}`.slice(0, 300),
-      dialog_shots: state ? { ...state, status: "stitching", stitch_error: message.slice(0, 500) } : state,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", sceneId);
 }
 
