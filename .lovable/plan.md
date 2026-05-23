@@ -1,45 +1,58 @@
-## Ergebnis der Prüfung
+Do I know what the issue is? Ja.
 
-Der Screenshot zeigt `InvalidAccessKeyId` beim lokalen Befehl `npx remotion lambda sites create ...`. Das ist ein lokaler AWS-Credential-/Account-Zugriffsfehler auf deinem Rechner. Die gehostete Backend-Umgebung ist erreichbar und die Remotion-Secrets sind grundsätzlich vorhanden.
+Das Problem ist nicht AWS und nicht dein Account. Der Fehler sitzt in der aktuellen Lip-Sync-Logik: Der kurzfristige Chaining-Workaround schickt bei jedem einzelnen Sprecher-Turn weiterhin die komplette gemischte Voiceover-WAV an Sync.so und nutzt nur ein Video-Zeitfenster. Sync.so empfiehlt für sauberes Lip-Sync aber klare, einzelne Sprecher-Audios. Dadurch bekommt Turn 2 zwar das Videofenster von Matthew, aber die Audiospur enthält weiterhin Samuel + Matthew + Samuel. Zusätzlich wird der letzte Sync.so-Output direkt als finales Video übernommen, inklusive der von Sync.so neu erzeugten/embedded Audioartefakte. Genau deshalb entstehen falsche Sprecherzuordnung, fehlende Mundbewegung und „dazugedichtetes“ unverständliches Audio.
 
-Der eigentliche aktuelle App-Fehler ist: Die zuletzt eingebaute `DialogStitchVideo`-Composition liegt nur im Code, aber nicht im live verwendeten Remotion-S3-Bundle. Um sie ins Bundle zu bringen, bräuchte man normalerweise gültigen AWS-Zugriff zum Upload. Genau daran scheitert dein lokaler Befehl.
+Technisch auffällig in den Logs:
+- Turn 1 Matthew wurde mit `segments_secs=[2.308,5.060]` gestartet, aber als Audio kam die volle 8s Master-WAV.
+- Turn 2 Samuel wurde danach auf den Output von Turn 1 gekettet, wieder mit voller Master-WAV.
+- `target_coords` werden im Auto-Modus nur geloggt, aber nicht deterministisch genutzt, weil `auto_detect: true` aktiv ist.
+- Der finale `clip_url` ist der letzte Sync.so-Result-Link, nicht ein sauberer Remux gegen die originale Master-WAV.
 
-## Einschätzung
+Plan:
 
-Wir müssen nicht zwingend warten, bis du dich wieder in AWS einloggen kannst. Es gibt einen sicheren Workaround: Wir vermeiden vorerst komplett die neue `DialogStitchVideo`-Composition und verwenden eine bereits live im bestehenden Bundle vorhandene Composition.
+1. Broken Chaining abschalten
+   - `poll-dialog-shots` darf nicht mehr Shot K auf Shot K-1 ausführen.
+   - Jeder Turn wird wieder gegen die originale Master-Plate gerechnet, damit kein Fehler von vorherigen Sync.so-Outputs weitervererbt wird.
 
-## Plan
+2. Pro Turn echtes Einzelsatz-Audio verwenden
+   - Für jeden Sprecher-Turn wird ein eigenes WAV-Segment genutzt bzw. erzeugt, das nur diesen Satz enthält.
+   - Kein Sync.so-Job bekommt mehr die komplette gemischte Dialogspur als Input.
+   - Pausen und Gesamtaudio bleiben nur für Preview/Final-Remux relevant, nicht für die einzelnen Lip-Sync-Jobs.
 
-1. **Kurzfristiger Fix ohne AWS-Login**
-   - `render-dialog-stitch` wird so geändert, dass es nicht mehr `DialogStitchVideo` rendert.
-   - Stattdessen nutzt es `DirectorsCutVideo`, weil diese Composition bereits im live verwendeten Remotion-Bundle vorhanden ist.
-   - Wir bauen die Dialog-Timeline als Szenenliste:
-     - Lücken kommen aus dem Master-Video.
-     - Sprecher-Fenster kommen aus den fertigen Sync.so-Output-Videos.
-     - `voiceoverUrl` bleibt die Master-WAV-Spur.
-   - Dadurch ist kein neuer Remotion-Bundle-Upload nötig.
+3. Deterministisches Face Targeting erzwingen
+   - Für Multi-Speaker-Turns `auto_detect: false` verwenden.
+   - `coordinates` + `frame_number` aus der FaceMap nutzen, damit Matthew nur Matthew und Samuel nur Samuel bekommt.
+   - Auto-Detect bleibt nur Fallback für Single-Speaker oder explizite Retry-Fälle.
 
-2. **Webhook unverändert weiterverwenden**
-   - `remotion-webhook` kann `source: 'dialog-stitch'` bereits verarbeiten.
-   - Nach erfolgreichem Render schreibt er weiterhin `clip_url`, `lip_sync_status = done`, `twoshot_stage = done` zurück.
+4. Finalisierung ohne AWS-Login ermöglichen
+   - Kurzfristig: den letzten Sync.so-Output nicht mehr als finales Video mit Audio verwenden.
+   - Saubere Zwischenlösung: finaler Clip bleibt stumm/lip-synced und die App spielt/übergibt weiterhin `audio_plan.twoshot.url` als externe Master-Audioquelle, sodass kein Sync.so-Murmel-Audio im fertigen Dialog landet.
+   - Sobald AWS wieder verfügbar ist: Remotion-Stitching aktivieren, damit pro Turn die richtigen visuellen Fenster zusammengesetzt und mit der Master-WAV gerendert werden.
 
-3. **Fehlerhafte Szenen wieder reaktivieren**
-   - Die zwei zuletzt fehlgeschlagenen Szenen mit `dialog_stitch_dispatch_failed` werden wieder auf `stitching/running` gesetzt, sofern alle Shots `ready` und `output_url` vorhanden sind.
-   - Es wird kein neuer Sync.so-Job gestartet, also keine unnötigen neuen Lipsync-Kosten.
+5. Debug- und Schutzlogik ergänzen
+   - In `dialog_shots` speichern: welcher Audio-URL pro Turn verwendet wurde, ob Face-Coords deterministisch genutzt wurden, und ob der finale Clip embedded Audio enthält.
+   - Bei Multi-Speaker + fehlendem Turn-Audio hart abbrechen und Credits idempotent zurückerstatten statt einen unsauberen Fallback zu verwenden.
 
-4. **Edge Functions deployen und testen**
-   - `render-dialog-stitch` deployen.
-   - Optional `poll-dialog-shots` nur dann deployen, falls wir Kommentare/kleine Statuslogik anpassen.
-   - Danach `poll-dialog-shots` gezielt für eine betroffene Szene anstoßen und Logs prüfen.
+6. Bestehende fehlerhafte Szene behandeln
+   - Die aktuelle Szene nicht blind erneut auf derselben kaputten Chaining-Pipeline laufen lassen.
+   - Nach dem Fix kann sie gezielt zurückgesetzt werden, aber nur wenn du bestätigst, dass dafür neue Sync.so-Kosten/Credits anfallen dürfen.
 
-## Technische Details
+Betroffene Dateien:
+- `supabase/functions/poll-dialog-shots/index.ts`
+- `supabase/functions/compose-dialog-scene/index.ts`
+- optional: `supabase/functions/compose-twoshot-audio/index.ts` oder die Audio-Erzeugungsfunktion, falls Turn-WAVs dort noch nicht sauber einzeln persistiert werden
+- Projekt-Memory aktualisieren, weil die aktuelle Memory noch den alten/inkonsistenten Ansatz beschreibt
 
-- Kein AWS-Login vom Nutzer nötig.
-- Kein `remotion lambda sites create` nötig.
-- Kein neues S3-Site-Bundle nötig.
-- Der Workaround nutzt vorhandene Lambda/Remotion-Infrastruktur und das bestehende `DirectorsCutVideo`-Template.
-- Sobald dein AWS-Zugriff wieder funktioniert, können wir später optional sauber auf die spezialisierte `DialogStitchVideo`-Composition umstellen und das Bundle korrekt deployen.
+Erwartetes Ergebnis:
+- Kein zweiter Charakter spricht mehr fremde Zeilen.
+- Kein unverständliches Sync.so-Audio wird als finale Audiospur übernommen.
+- Mundbewegung wird pro Satz und pro Gesicht gezielt erzeugt.
+- Der Fix funktioniert ohne deinen AWS-Login; AWS ist nur für den späteren perfekten finalen Stitch/Export nötig.
 
-## Warum das sicherer ist
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-Der letzte Ansatz war technisch sauber, aber abhängig von einem neuen Remotion-Bundle. Weil der Bundle-Upload aktuell durch AWS-Credentials blockiert ist, ist der schnellste stabile Weg, eine vorhandene live Composition zweckzuentfremden, statt auf AWS-Support zu warten.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>

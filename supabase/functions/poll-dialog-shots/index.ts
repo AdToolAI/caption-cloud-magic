@@ -61,6 +61,12 @@ interface DialogShot {
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
+  /** v7: ISOLATED per-speaker audio (only this speaker's voice + silence
+   *  elsewhere). Fixes "ghost-speech" where Sync.so animated the wrong
+   *  face because the merged WAV contained other speakers' voices. */
+  audio_url?: string;
+  /** v7: when true, MUST dispatch with coords + frame_number (no auto). */
+  deterministic_coords?: boolean;
   status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
   output_url?: string;
@@ -68,12 +74,9 @@ interface DialogShot {
   started_at?: string;
   completed_at?: string;
   last_deferred_at?: string;
-  /** How many times we have already redispatched this shot after a FAILED
-   *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
-   *  retry falls back to fixed coords + frame_number aligned to the turn. */
   retry_count?: number;
   /** When true, the next dispatch MUST use the coords+frame_number fallback
-   *  path instead of auto_detect. Set by the FAILED→retry handler. */
+   *  path instead of auto_detect. */
   force_coords?: boolean;
 }
 
@@ -428,25 +431,20 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch the next pending shot serially (CHAINED) ───────
-  // CHAINED-V6 (AWS-bundle-lockout workaround):
-  // Each shot K uses shot K-1's output_url as its source video instead of
-  // the original master plate. The final shot's output_url is therefore
-  // already the fully-stitched multi-speaker dialog clip — no Lambda
-  // stitching step required, no new Remotion bundle needed.
+  // ── Step 2: dispatch the next pending shot serially (CHAINED-V7) ────
+  // v7 keeps VIDEO chaining (shot K builds visually on shot K-1's output
+  // so animations accumulate into one final clip without ffmpeg) but
+  // switches AUDIO to per-speaker isolated WAV so Sync.so only ever sees
+  // ONE voice per pass. This eliminates the ghost-speech bug where the
+  // wrong character "spoke" another speaker's line because the merged
+  // master WAV bled into the animation window.
   //
-  // Cost: one extra video re-encode generation per turn (Sync.so already
-  // re-encodes anyway, so this is +0 encoder generations compared to the
-  // abandoned ffmpeg stitch path).
-  //
-  // Strictly serial: shot K must wait for shot K-1 to be `ready` before it
-  // can dispatch, because its source video does not exist yet otherwise.
+  // Multi-speaker scenes additionally force deterministic coords +
+  // frame_number (no auto_detect) for hard identity routing.
   const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
   const pending = sortedShots.filter((s) => s.status === "pending");
   const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (pending.length > 0 && activeAfterPolling.length === 0) {
-    // Find the next shot whose immediate predecessor (idx-1) is ready
-    // (or idx===0, which always uses the original master plate).
     const nextShot = pending.find((s) => {
       if (s.idx === 0) return true;
       const prev = sortedShots.find((x) => x.idx === s.idx - 1);
@@ -454,7 +452,6 @@ async function processScene(
     });
     if (nextShot) {
       try {
-        // CHAINED source selection
         const prev =
           nextShot.idx > 0
             ? sortedShots.find((x) => x.idx === nextShot.idx - 1)
@@ -464,11 +461,15 @@ async function processScene(
             ? prev.output_url
             : state.source_clip_url;
         const win = expandWindow(nextShot, shots);
-        const mode: "auto" | "coords" = nextShot.force_coords ? "coords" : "auto";
+        const useCoords =
+          (nextShot.deterministic_coords || nextShot.force_coords) &&
+          !!nextShot.target_coords;
+        const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
+        const audioUrl = nextShot.audio_url || state.master_audio_url;
         const jobId = await startSyncTurnJob(
           syncKey,
           chainedSourceUrl,
-          state.master_audio_url,
+          audioUrl,
           win,
           nextShot.target_coords,
           nextShot.temperature,
@@ -480,7 +481,7 @@ async function processScene(
         nextShot.started_at = new Date().toISOString();
         mutated = true;
         console.log(
-          `[poll-dialog-shots] CHAINED dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} source=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+          `[poll-dialog-shots] v7 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=${chainedSourceUrl === state.source_clip_url ? "master" : `turn${nextShot.idx - 1}`} audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
