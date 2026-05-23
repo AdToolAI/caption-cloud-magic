@@ -612,6 +612,8 @@ serve(async (req) => {
           status: "pending",
         };
       });
+
+    if (rawShots.length === 0) {
       await supabase
         .from("composer_scenes")
         .update({
