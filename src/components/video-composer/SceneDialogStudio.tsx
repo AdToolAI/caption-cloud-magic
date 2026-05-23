@@ -681,7 +681,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
           text: block.text,
           engine: cfg.engine,
           voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
-          audioUrl,
+          audioUrl: finalAudioUrl,
         });
         cumulativeOffset += duration + INTER_SPEAKER_GAP_SEC; // small breath between speakers
         okCount += 1;
