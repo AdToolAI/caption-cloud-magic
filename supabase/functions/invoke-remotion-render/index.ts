@@ -433,8 +433,9 @@ serve(async (req) => {
       }
 
       // r39A: Always classify and persist error_category on immediate failure
-      const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'unknown' => {
+      const classifyImmediate = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'aws_credentials_invalid' | 'unknown' => {
         const lower = msg.toLowerCase();
+        if (/security token included in the request is invalid|unrecognizedclientexception|invalidsignatureexception|expiredtoken|http 403/i.test(lower)) return 'aws_credentials_invalid';
         if (/rate exceeded|concurrency limit|throttl|429|toomanyrequests/i.test(lower)) return 'rate_limit';
         if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(lower)) return 'audio_corruption';
         if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
