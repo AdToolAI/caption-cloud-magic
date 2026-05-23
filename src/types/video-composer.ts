@@ -204,6 +204,21 @@ export interface ComposerScene {
    */
   dialogVoices?: Record<string, string | DialogVoiceCfg>;
   /**
+   * Take-System A/B/C — per-line voiceover takes (Phase B).
+   *
+   * Map of `lineKey -> DialogTakeBundle`, where `lineKey` is built via
+   * `dialogLineKey(index, text)` so that re-ordering or editing a line
+   * naturally invalidates its takes.
+   *
+   * Up to 3 takes per line. The bundle's `active` field points to the
+   * take whose `audioUrl` should be used when rendering this scene.
+   * When no active take exists, SceneDialogStudio falls back to live
+   * TTS synthesis just like before Phase B.
+   *
+   * Persisted as `composer_scenes.dialog_takes` (JSONB).
+   */
+  dialogTakes?: Record<string, DialogTakeBundle>;
+  /**
    * Render-Engine override. `auto` (default) lets `recommendEngineForScene()`
    * decide. `heygen` forces HeyGen Photo-Avatar lip-sync. `broll` forces the
    * classic Hailuo/etc. clip without lip-sync. `sync-polish` runs Hailuo +
