@@ -491,13 +491,13 @@ serve(async (req) => {
         .eq("id", sceneId)
         .single();
       if (refreshed?.audio_plan) {
-        const fresh = (refreshed.audio_plan as any)?.twoshot;
+        const freshPlan = refreshed.audio_plan as any;
+        const fresh = freshPlan?.twoshot;
         if (fresh?.url && Array.isArray(fresh.speakers)) {
           (plan as any).twoshot = fresh;
-          (twoshot as any).url = fresh.url;
-          (twoshot as any).speakers = fresh.speakers;
-          (speakers as any).length = 0;
-          for (const sp of fresh.speakers as any[]) (speakers as any).push(sp);
+          twoshot = fresh;
+          speakers = fresh.speakers as TwoshotSpeaker[];
+          masterAudioUrl = String(fresh.url ?? "");
         }
       }
     }
