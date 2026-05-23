@@ -110,6 +110,11 @@ function expandWindow(
   return [Math.max(0, start - maxLeadIn), end + maxTail];
 }
 
+/** Default fps assumption for Hailuo i2v master clips. Used to map a turn's
+ *  start time to a `frame_number` so Sync.so samples coords INSIDE the
+ *  turn window, not at frame 0 of the master video. */
+const ASSUMED_MASTER_FPS = 24;
+
 async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
@@ -118,16 +123,26 @@ async function startSyncTurnJob(
   coords: [number, number] | null,
   temperature: number,
   turnIdx?: number,
+  /** 'auto' = let Sync.so detect the active speaker inside the segment
+   *  window (robust against camera moves, recommended primary).
+   *  'coords' = use fixed pixel coords + frame_number aligned to the
+   *  turn start (deterministic fallback when auto_detect fails). */
+  mode: "auto" | "coords" = "auto",
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature,
   };
-  if (coords) {
+  if (mode === "coords" && coords) {
+    // Sample coords WITHIN the turn window — frame 0 of the master video
+    // is virtually never where the speaker sits during a later turn, which
+    // is exactly what produced "An unknown error occurred." from Sync.so
+    // for all non-first turns.
+    const frameNumber = Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
     options.active_speaker_detection = {
       auto_detect: false,
-      frame_number: 0,
+      frame_number: frameNumber,
       coordinates: coords,
     };
   } else {
@@ -142,8 +157,9 @@ async function startSyncTurnJob(
     options,
   };
   console.log(
-    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
+    `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
   );
+
   let r = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
     headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
