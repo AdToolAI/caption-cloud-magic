@@ -532,8 +532,27 @@ async function processScene(
   // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
     // Idempotency guard — if a stitch render is already in flight, just
-    // persist state and wait for the webhook to write clip_url back.
+    // persist state and wait for the webhook to write clip_url back. If the
+    // previous dispatch failed or never created a render row, clear the stale
+    // render_id and retry below — otherwise a scene can sit at 95% forever.
     if (state.stitch?.render_id) {
+      const { data: existingRender } = await supabase
+        .from("video_renders")
+        .select("status")
+        .eq("render_id", state.stitch.render_id)
+        .maybeSingle();
+      const renderStatus = String(existingRender?.status ?? "missing");
+      if (!["pending", "rendering", "completed"].includes(renderStatus)) {
+        console.warn(
+          `[poll-dialog-shots] stale stitch render ${state.stitch.render_id} status=${renderStatus}; retrying dispatch`,
+        );
+        newState = {
+          ...newState,
+          stitch: undefined,
+          status: "stitching",
+          error: `stale_stitch_render:${renderStatus}`,
+        } as DialogShotsState;
+      } else {
       await supabase
         .from("composer_scenes")
         .update({
@@ -544,6 +563,7 @@ async function processScene(
         })
         .eq("id", sceneId);
       return { status: "stitching", mutated: true };
+      }
     }
 
     const dispatch = await dispatchDialogStitch(supabase, sceneId);
