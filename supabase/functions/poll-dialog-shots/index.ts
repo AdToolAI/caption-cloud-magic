@@ -98,6 +98,7 @@ interface DialogShotsState {
   video_width: number;
   video_height: number;
   final_url?: string | null;
+  stitch?: { render_id: string; dispatched_at: string };
   finished_at?: string;
   error?: string;
 }
