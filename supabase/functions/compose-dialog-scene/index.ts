@@ -410,11 +410,11 @@ serve(async (req) => {
     if (!userId) return json({ error: "missing_user" }, 403);
 
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
-    const twoshot = (plan.twoshot ?? {}) as Record<string, any>;
-    const speakers = Array.isArray(twoshot.speakers)
+    let twoshot = (plan.twoshot ?? {}) as Record<string, any>;
+    let speakers = Array.isArray(twoshot.speakers)
       ? (twoshot.speakers as TwoshotSpeaker[])
       : [];
-    const masterAudioUrl = String(twoshot.url ?? "");
+    let masterAudioUrl = String(twoshot.url ?? "");
     const totalSec = Number(twoshot.totalSec ?? 0);
     const faceMap = (twoshot.faceMap ?? null) as {
       faces?: Array<{
