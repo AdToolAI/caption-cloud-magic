@@ -46,11 +46,37 @@ interface DialogShotsState {
   master_audio_url: string;
   total_sec: number;
   cost_credits: number;
+  video_width?: number;
+  video_height?: number;
   refunded?: boolean;
   stitch?: {
     render_id: string;
     dispatched_at: string;
   };
+}
+
+function evenDimension(value: unknown, fallback: number): number {
+  const n = Number(value);
+  const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+  return safe % 2 === 0 ? safe : safe - 1;
+}
+
+async function markSceneError(
+  supabase: ReturnType<typeof createClient>,
+  sceneId: string,
+  state: DialogShotsState | null,
+  message: string,
+) {
+  await supabase
+    .from("composer_scenes")
+    .update({
+      lip_sync_status: "stitching",
+      twoshot_stage: "dialog_stitching",
+      clip_error: `dialog_stitch_dispatch: ${message}`.slice(0, 300),
+      dialog_shots: state ? { ...state, status: "stitching", stitch_error: message.slice(0, 500) } : state,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", sceneId);
 }
 
 function json(body: unknown, status = 200) {
@@ -131,16 +157,15 @@ serve(async (req) => {
     const fps = 30;
     const totalSec = Number(state.total_sec) || 6;
     const durationInFrames = Math.max(30, Math.ceil(totalSec * fps));
-    // Master plate is Hailuo i2v default 1280x720 in this pipeline. We do
-    // NOT probe — the DialogStitchVideo composition fixes the canvas at
-    // 1280x720 (matches master and shot outputs from Sync.so).
-    const width = 1280;
-    const height = 720;
+    const width = evenDimension(state.video_width, 1280);
+    const height = evenDimension(state.video_height, 720);
 
     const inputProps = {
       masterVideoUrl: state.source_clip_url,
       masterAudioUrl: state.master_audio_url,
       totalSec,
+      targetWidth: width,
+      targetHeight: height,
       shots: state.shots
         .filter((s) => s.output_url)
         .map((s) => {
