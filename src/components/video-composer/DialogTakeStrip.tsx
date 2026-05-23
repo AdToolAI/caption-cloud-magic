@@ -31,6 +31,14 @@ interface DialogTakeStripProps {
   lineKey: string;
   text: string;
   voiceCfg: DialogVoiceCfg | undefined;
+  /** Phase C — merged Brand-Voice profile + tonality (ElevenLabs only). */
+  voiceTuning?: {
+    stability?: number;
+    similarityBoost?: number;
+    style?: number;
+    useSpeakerBoost?: boolean;
+    speed?: number;
+  };
   bundle: DialogTakeBundle | undefined;
   language: 'de' | 'en' | 'es';
   projectId?: string;
