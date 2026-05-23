@@ -57,7 +57,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
+          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -72,12 +72,32 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const hasRecordedProviderJob = (d: any) => {
           const plan = d.audio_plan as any;
           const jobs = plan?.twoshot?.syncJobs?.jobs;
-          return hasSyncSoJob(d) || !!plan?.twoshot?.heartbeat?.syncJobId || (Array.isArray(jobs) && jobs.length > 0);
+          const dialogJobs = d.dialog_shots?.version === 4 && Array.isArray(d.dialog_shots?.shots)
+            ? d.dialog_shots.shots.some((s: any) => s?.sync_job_id || s?.status === 'ready' || s?.status === 'lipsyncing')
+            : false;
+          return hasSyncSoJob(d) || dialogJobs || !!plan?.twoshot?.heartbeat?.syncJobId || (Array.isArray(jobs) && jobs.length > 0);
         };
+
+        const dialogShotRows = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'cinematic-sync' &&
+            d.dialog_shots?.version === 4 &&
+            !d.lip_sync_applied_at &&
+            (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching') &&
+            ['queued', 'lipsyncing', 'stitching'].includes(String(d.dialog_shots?.status)) &&
+            !inflight.current.has(`poll-dialog:${d.id}`),
+        );
+        for (const d of dialogShotRows) {
+          inflight.current.add(`poll-dialog:${d.id}`);
+          supabase.functions
+            .invoke('poll-dialog-shots', { body: { scene_id: d.id } })
+            .finally(() => setTimeout(() => inflight.current.delete(`poll-dialog:${d.id}`), 30_000));
+        }
 
         const staleSyncJobs = (data as any[]).filter(
           (d) =>
             d.engine_override === 'cinematic-sync' &&
+              d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
