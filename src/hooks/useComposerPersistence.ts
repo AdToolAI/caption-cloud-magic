@@ -261,6 +261,8 @@ export function useComposerPersistence() {
               hybrid_target_scene_id: scene.hybridTargetSceneId ?? null,
               audio_plan: (scene.audioPlan ?? null) as any,
               dialog_locked_at: scene.dialogLockedAt ?? null,
+              lock_reference_url: scene.lockReferenceUrl ?? null,
+              continuity_locked: scene.continuityLocked === true,
             } as any)
             .select('id')
             .single();
