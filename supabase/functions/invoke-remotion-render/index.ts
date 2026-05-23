@@ -161,10 +161,28 @@ serve(async (req) => {
     const payloadBytes = new TextEncoder().encode(rawJson).length;
     console.log(`📦 Payload size: ${payloadBytes} bytes`);
 
-    // ✅ Initialize AWS client
+    // ✅ Initialize AWS client (supports temporary STS credentials via AWS_SESSION_TOKEN)
+    const awsAccessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID');
+    const awsSecretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY');
+    const awsSessionToken = Deno.env.get('AWS_SESSION_TOKEN') || undefined;
+    if (!awsAccessKeyId || !awsSecretAccessKey) {
+      const msg = 'aws_credentials_missing: AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY not set';
+      console.error(`❌ ${msg}`);
+      await supabase.from('video_renders').update({
+        status: 'failed',
+        error_message: msg,
+        completed_at: new Date().toISOString(),
+      }).eq('render_id', pendingRenderId);
+      return new Response(
+        JSON.stringify({ error: msg, code: 'aws_credentials_missing' }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    console.log(`🔑 AWS creds: accessKeyId=${awsAccessKeyId.slice(0, 4)}…${awsAccessKeyId.slice(-4)} sessionToken=${awsSessionToken ? 'yes' : 'no'}`);
     const aws = new AwsClient({
-      accessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID')!,
-      secretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY')!,
+      accessKeyId: awsAccessKeyId,
+      secretAccessKey: awsSecretAccessKey,
+      sessionToken: awsSessionToken,
       region: AWS_REGION,
     });
 
