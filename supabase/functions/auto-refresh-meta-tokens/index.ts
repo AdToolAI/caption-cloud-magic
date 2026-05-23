@@ -236,3 +236,122 @@ function json(payload: any, status = 200) {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
+
+// =====================================================================
+// Per-user Meta connection refresh sweep
+// Iterates social_connections (facebook + instagram), and for each row
+// with token_expires_at within THRESHOLD_DAYS, attempts fb_exchange_token.
+// On success: writes new encrypted token + new expiry. On failure: logs.
+// =====================================================================
+async function refreshUserConnections(
+  supabase: any,
+  APP_ID: string,
+  APP_SECRET: string,
+  force: boolean,
+  mode: 'status' | 'refresh'
+): Promise<{ scanned: number; refreshed: number; failed: number; skipped: number; details: any[] }> {
+  const details: any[] = [];
+  let scanned = 0, refreshed = 0, failed = 0, skipped = 0;
+
+  const { data: rows, error } = await supabase
+    .from('social_connections')
+    .select('id, user_id, provider, account_id, access_token_hash, token_expires_at')
+    .in('provider', ['facebook', 'instagram']);
+
+  if (error) {
+    console.error('[auto-refresh-meta] user-sweep load failed:', error.message);
+    return { scanned: 0, refreshed: 0, failed: 0, skipped: 0, details: [{ error: error.message }] };
+  }
+
+  const nowMs = Date.now();
+  const dueMs = nowMs + THRESHOLD_DAYS * 86_400_000;
+
+  for (const row of rows || []) {
+    scanned++;
+    const tag = `${row.provider}/${row.account_id}`;
+    try {
+      if (!row.access_token_hash) { skipped++; details.push({ tag, skipped: 'no_token' }); continue; }
+      if (!force && row.token_expires_at) {
+        const expMs = new Date(row.token_expires_at).getTime();
+        if (expMs > dueMs) { skipped++; continue; }
+      }
+
+      // Decrypt current
+      let plain: string;
+      try { plain = await decryptToken(row.access_token_hash); }
+      catch {
+        try { plain = atob(row.access_token_hash); }
+        catch { failed++; details.push({ tag, error: 'decrypt_failed' }); continue; }
+      }
+
+      if (mode === 'status') {
+        // For status mode just probe expiry via debug_token
+        const dbgRes = await fetch(`https://graph.facebook.com/v24.0/debug_token?input_token=${encodeURIComponent(plain)}&access_token=${APP_ID}|${APP_SECRET}`);
+        const dbg = (await dbgRes.json())?.data || {};
+        details.push({
+          tag,
+          is_valid: !!dbg.is_valid,
+          expires_at: dbg.expires_at ? new Date(dbg.expires_at * 1000).toISOString() : null,
+        });
+        continue;
+      }
+
+      // Exchange
+      const exUrl = `https://graph.facebook.com/v24.0/oauth/access_token?grant_type=fb_exchange_token&client_id=${APP_ID}&client_secret=${APP_SECRET}&fb_exchange_token=${encodeURIComponent(plain)}`;
+      const exRes = await fetch(exUrl);
+      const exData = await exRes.json();
+      if (!exRes.ok || !exData?.access_token) {
+        failed++;
+        details.push({ tag, error: exData?.error?.message || 'exchange_failed', code: exData?.error?.code });
+        continue;
+      }
+
+      const newToken = exData.access_token as string;
+      const expiresIn = Number(exData.expires_in) || 60 * 24 * 3600;
+      const newExpires = new Date(nowMs + expiresIn * 1000).toISOString();
+
+      // Backup old
+      try {
+        const hashBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(plain));
+        const tokenHash = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+        await supabase.from('kv_secrets_backup').insert({
+          name: `social_connection:${row.id}`,
+          encrypted_value: row.access_token_hash,
+          token_hash: tokenHash,
+          token_last6: plain.slice(-6),
+          expires_at: row.token_expires_at,
+          scopes: [],
+          created_by: 'auto-refresh-meta-tokens/user-sweep',
+        });
+      } catch (e: any) {
+        console.warn('[auto-refresh-meta] user-sweep backup non-critical fail:', e?.message);
+      }
+
+      const encrypted = await encryptToken(newToken);
+      const { error: upErr } = await supabase
+        .from('social_connections')
+        .update({
+          access_token_hash: encrypted,
+          token_expires_at: newExpires,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', row.id);
+
+      if (upErr) {
+        failed++;
+        details.push({ tag, error: `db_update_failed: ${upErr.message}` });
+        continue;
+      }
+
+      refreshed++;
+      details.push({ tag, refreshed: true, new_expires_at: newExpires });
+    } catch (e: any) {
+      failed++;
+      details.push({ tag, error: e?.message || 'unexpected' });
+    }
+  }
+
+  console.log(`[auto-refresh-meta] user-sweep: scanned=${scanned} refreshed=${refreshed} failed=${failed} skipped=${skipped}`);
+  return { scanned, refreshed, failed, skipped, details };
+}
+
