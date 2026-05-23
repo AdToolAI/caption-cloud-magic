@@ -66,6 +66,7 @@ serve(async (req) => {
 
   const summary = {
     polled: 0,
+    polledDialogShots: 0,
     refundedPresync: 0,
     refundedSyncTimeout: 0,
     recoveredPreflight: 0,
@@ -83,11 +84,11 @@ serve(async (req) => {
     const { data: scenes, error } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, lip_sync_status, lip_sync_applied_at, clip_url, clip_error, replicate_prediction_id, twoshot_stage, audio_plan, updated_at, engine_override",
+        "id, project_id, lip_sync_status, lip_sync_applied_at, clip_url, clip_error, replicate_prediction_id, twoshot_stage, audio_plan, dialog_shots, updated_at, engine_override",
       )
       .eq("engine_override", "cinematic-sync")
       .is("lip_sync_applied_at", null)
-      .in("lip_sync_status", ["running", "pending"])
+      .in("lip_sync_status", ["running", "pending", "stitching"])
       .order("updated_at", { ascending: false })
       .limit(50);
 
@@ -108,6 +109,27 @@ serve(async (req) => {
       const hasHeartbeat = !!twoshot?.heartbeat?.syncJobId;
       const stage = String(s.twoshot_stage ?? "");
       const hasAnyRecordedProviderJob = hasSyncJob || hasHeartbeat || jobs.length > 0;
+      const dialogState = (s as any).dialog_shots;
+      const isDialogShotPipeline = dialogState?.version === 4;
+
+      // ── v9 Artlist pipeline: server-side poll/retry, including stitching ─
+      // A scene with all turns ready can sit at `lip_sync_status='stitching'`
+      // after a transient Lambda dispatch failure. Never classify that as a
+      // Sync.so timeout; just invoke poll-dialog-shots again until it starts
+      // render-dialog-stitch or receives a terminal Lambda webhook.
+      if (
+        isDialogShotPipeline &&
+        ["running", "stitching"].includes(String(s.lip_sync_status)) &&
+        ["queued", "lipsyncing", "stitching"].includes(String(dialogState?.status))
+      ) {
+        try {
+          await invokeFn("poll-dialog-shots", { scene_id: s.id });
+          summary.polledDialogShots++;
+        } catch (e) {
+          summary.errors.push(`poll_dialog ${s.id}: ${(e as Error).message}`);
+        }
+        continue;
+      }
 
       // ── Job 0: ZOMBIE STATE — lipsync_* stage but no real provider job.
       // This is the "stuck at 95%" symptom: client reset status to pending
