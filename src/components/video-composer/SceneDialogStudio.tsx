@@ -970,8 +970,8 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
         );
         const cfg = voicePerSpeaker[block.speakerId]!;
 
-        // Take-System A/B/C reuse (Phase B) — skip TTS if user has an active take.
-        const lineKey = dialogLineKey(i, block.text);
+        // Take-System A/B/C reuse (Phase B + C: tonality-aware key).
+        const lineKey = dialogLineKey(i, block.text, block.tonality);
         const activeTake = getActiveTake(lineKey);
 
         let audioUrl: string | undefined;
@@ -984,6 +984,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
             : await probeAudioDuration(activeTake.audioUrl, Math.max(1.5, block.text.length / 18));
         } else {
           const fnName = cfg.engine === 'hume' ? 'generate-voiceover-hume' : 'generate-voiceover';
+          const tuning = cfg.engine === 'elevenlabs' ? buildTuningForBlock(block) : undefined;
           const body = cfg.engine === 'hume'
             ? {
                 text: block.text,
@@ -995,6 +996,7 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
                 text: block.text,
                 voiceId: cfg.isCustom ? cfg.elevenlabsVoiceId : cfg.voiceId,
                 projectId: pidForSrs,
+                ...(tuning ?? {}),
               };
           const { data, error } = await supabase.functions.invoke(fnName, { body });
           if (error) throw error;
