@@ -2245,6 +2245,7 @@ export type Database = {
           user_id: string
           visual_identity_json: Json | null
           voice_sample_url: string | null
+          voice_settings: Json | null
         }
         Insert: {
           archived_at?: string | null
@@ -2288,6 +2289,7 @@ export type Database = {
           user_id: string
           visual_identity_json?: Json | null
           voice_sample_url?: string | null
+          voice_settings?: Json | null
         }
         Update: {
           archived_at?: string | null
@@ -2331,6 +2333,7 @@ export type Database = {
           user_id?: string
           visual_identity_json?: Json | null
           voice_sample_url?: string | null
+          voice_settings?: Json | null
         }
         Relationships: [
           {

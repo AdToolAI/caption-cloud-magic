@@ -5,6 +5,10 @@
  *   Sarah: Hi! Welcome to our store.
  *   Matthew: Thanks Sarah, what do you recommend?
  *
+ * Phase C — Tonality markers (optional, after the speaker name):
+ *   Sarah [whisper]: Come closer…
+ *   Matthew [shouting]: WATCH OUT!
+ *
  * Returns one DialogBlock per matched line. Continuation lines (without a
  * "NAME:" prefix) are appended to the previous block's text.
  *
@@ -17,6 +21,10 @@
  */
 
 import type { ComposerCharacter } from '@/types/video-composer';
+import {
+  normalizeTonalityMarker,
+  type DialogTonalityId,
+} from '@/config/dialogTonalityPresets';
 
 export interface DialogBlock {
   speakerId: string;
@@ -26,9 +34,13 @@ export interface DialogBlock {
   durationSec?: number;
   /** Cumulative start offset within the scene, in seconds (0-based). */
   startSec?: number;
+  /** Optional per-line tonality marker. Drives ElevenLabs voice_settings modulation. */
+  tonality?: DialogTonalityId;
 }
 
-const LINE_RE = /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*[:—-]\s*(.+)$/;
+/** Matches `Name [tonality]?: text`. Tonality bracket is optional. */
+const LINE_RE =
+  /^\s*([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _.-]{0,40})\s*(?:\[([^\]]{1,32})\])?\s*[:—-]\s*(.+)$/;
 
 export function parseDialogScript(
   script: string,
@@ -49,7 +61,8 @@ export function parseDialogScript(
     const m = LINE_RE.exec(line);
     if (m) {
       const speakerName = m[1].trim();
-      const text = m[2].trim();
+      const tonalityRaw = m[2]?.trim();
+      const text = m[3].trim();
       const spk = speakerName.toLowerCase();
       const spkFirst = spk.split(/\s+/)[0];
       const c = cast.find((x) => {
@@ -63,7 +76,8 @@ export function parseDialogScript(
         );
       });
       if (c) {
-        current = { speakerId: c.id, speakerName: c.name, text };
+        const tonality = normalizeTonalityMarker(tonalityRaw);
+        current = { speakerId: c.id, speakerName: c.name, text, tonality };
         blocks.push(current);
         continue;
       }
