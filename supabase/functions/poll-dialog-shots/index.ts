@@ -485,40 +485,41 @@ async function processScene(
 
   newState = { ...newState, shots, status: pipelineStatus };
 
-  // ── Step 4: all shots ready → ffmpeg time-slice stitch + remux ──────
+  // ── Step 4: all shots ready → dispatch Lambda stitch ────────────────
+  // Edge Runtime cannot spawn ffmpeg, so the actual stitching runs as a
+  // Remotion Lambda render against the DialogStitchVideo composition.
+  // remotion-webhook writes clip_url + lip_sync_applied_at back to the
+  // scene when the render completes; this function just kicks it off.
   if (allReady) {
-    try {
-      console.log(`[poll-dialog-shots] all ${shots.length} shots ready, starting stitch`);
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          lip_sync_status: "stitching",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+    // Idempotency: if we already dispatched a stitch render for this scene,
+    // don't trigger again — just keep waiting for the webhook.
+    if ((state as any).stitch?.render_id) {
+      console.log(
+        `[poll-dialog-shots] scene ${sceneId} stitch already dispatched (render_id=${(state as any).stitch.render_id}); waiting for webhook`,
+      );
+      return { status: "stitching", mutated };
+    }
 
-      const finalUrl = await stitchDialogShots(supabase, newState, sceneId);
-      const nowIso = new Date().toISOString();
-      newState = { ...newState, final_url: finalUrl, finished_at: nowIso, status: "done" };
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: newState,
-          clip_url: finalUrl,
-          lip_sync_source_clip_url: state.source_clip_url,
-          lip_sync_applied_at: nowIso,
-          lip_sync_status: "done",
-          twoshot_stage: "done",
-          clip_error: null,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
-      console.log(`[poll-dialog-shots] scene ${sceneId} done → ${finalUrl}`);
-      return { status: "done", mutated: true };
-    } catch (e) {
-      const errMsg = (e as Error).message;
-      console.error(`[poll-dialog-shots] stitch failed for ${sceneId}:`, errMsg);
+    console.log(
+      `[poll-dialog-shots] all ${shots.length} shots ready for scene ${sceneId}, dispatching Lambda stitch`,
+    );
+    await supabase
+      .from("composer_scenes")
+      .update({
+        dialog_shots: newState,
+        lip_sync_status: "stitching",
+        twoshot_stage: "dialog_stitching",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sceneId);
+
+    const dispatched = await dispatchDialogStitch(supabase, sceneId);
+    if (!dispatched.ok) {
+      const errMsg = dispatched.error;
+      console.error(
+        `[poll-dialog-shots] dispatch stitch failed for ${sceneId}:`,
+        errMsg,
+      );
       newState = { ...newState, status: "failed", error: errMsg };
       if (userId) newState = await refundIfNeeded(supabase, userId, newState);
       await supabase
@@ -527,12 +528,17 @@ async function processScene(
           dialog_shots: newState,
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: `dialog_stitch_failed: ${errMsg}`.slice(0, 300),
+          clip_error: `dialog_stitch_dispatch_failed: ${errMsg}`.slice(0, 300),
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       return { status: "failed", mutated: true };
     }
+
+    console.log(
+      `[poll-dialog-shots] scene ${sceneId} stitch dispatched render_id=${dispatched.render_id}`,
+    );
+    return { status: "stitching", mutated: true };
   }
 
   // ── Step 5: terminal failure → refund + persist ─────────────────────
