@@ -538,15 +538,17 @@ async function processScene(
     });
   }
 
-  // ── Step 2: dispatch ALL pending shots IN PARALLEL ──────────────────
-  // No inter-shot dependency in v4 (every pass runs on the pristine master).
+  // ── Step 2: dispatch the next pending shot serially ──────────────────
+  // No inter-shot dependency in v4, but Sync.so Creator concurrency is low.
+  // Dispatching one new turn per tick prevents 429s from becoming failures.
   const pending = shots.filter((s) => s.status === "pending");
-  if (pending.length > 0) {
-    const dispatched = await Promise.allSettled(
-      pending.map(async (shot) => {
+  const activeAfterPolling = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
+  if (pending.length > 0 && activeAfterPolling.length === 0) {
+    for (const shot of pending.slice(0, MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK)) {
+      try {
         const win = expandWindow(shot, shots);
         const mode: "auto" | "coords" = shot.force_coords ? "coords" : "auto";
-        return startSyncTurnJob(
+        const jobId = await startSyncTurnJob(
           syncKey,
           state.source_clip_url,
           state.master_audio_url,
@@ -555,13 +557,7 @@ async function processScene(
           shot.temperature,
           shot.idx,
           mode,
-        ).then((jobId) => ({ shot, jobId, win, mode }));
-      }),
-    );
-
-    for (const res of dispatched) {
-      if (res.status === "fulfilled") {
-        const { shot, jobId, win, mode } = res.value;
+        );
         shot.sync_job_id = jobId;
         shot.status = "lipsyncing";
         shot.started_at = new Date().toISOString();
@@ -569,16 +565,20 @@ async function processScene(
         console.log(
           `[poll-dialog-shots] dispatched turn ${shot.idx} speaker=${shot.speaker_name} mode=${mode} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(shot.target_coords)} temp=${shot.temperature}`,
         );
-
-      } else {
-        // Find which shot failed (Promise.allSettled preserves order vs pending[])
-        const idxInPending = dispatched.indexOf(res);
-        const shot = pending[idxInPending];
-        if (shot) {
-          shot.status = "failed";
-          shot.error = `dispatch: ${(res.reason as Error)?.message ?? "unknown"}`.slice(0, 300);
+      } catch (e) {
+        if (e instanceof SyncConcurrencyDeferredError) {
+          shot.status = "pending";
+          shot.sync_job_id = undefined;
+          shot.last_deferred_at = new Date().toISOString();
           mutated = true;
+          console.warn(
+            `[poll-dialog-shots] turn ${shot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          );
+          break;
         }
+        shot.status = "failed";
+        shot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+        mutated = true;
       }
     }
   }
@@ -608,7 +608,7 @@ async function processScene(
         })
         .eq("id", sceneId);
 
-      const finalUrl = await stitchDialogShots(supabase, state, sceneId);
+      const finalUrl = await stitchDialogShots(supabase, newState, sceneId);
       const nowIso = new Date().toISOString();
       newState = { ...newState, final_url: finalUrl, finished_at: nowIso, status: "done" };
       await supabase
