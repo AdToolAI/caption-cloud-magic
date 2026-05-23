@@ -1374,10 +1374,22 @@ serve(async (req) => {
             if (remapped.length >= 1) castShots = remapped;
           }
           if (castShots.length >= 1 && !looksComposed) {
-            const portraitUrls = castShots
+            const portraitsFromCast = castShots
               .map((cs) => charById.get(cs.characterId)?.referenceImageUrl)
-              .filter((u): u is string => typeof u === "string" && u.length > 0)
-              .slice(0, 4);
+              .filter((u): u is string => typeof u === "string" && u.length > 0);
+            // Phase C.1 — Continuity Auto-Lock: prepend the dialog-mode
+            // continuity-lock frame (composed anchor of a previous same-cast
+            // dialog scene) so Nano Banana 2 anchors the new composition to
+            // the same Sarah/Matthew identity, wardrobe, and lighting.
+            const lockRefUrl =
+              scene.lockReferenceUrl && typeof scene.lockReferenceUrl === "string"
+                ? scene.lockReferenceUrl.trim()
+                : "";
+            const portraitUrls = (
+              lockRefUrl
+                ? [lockRefUrl, ...portraitsFromCast.filter((u) => u !== lockRefUrl)]
+                : portraitsFromCast
+            ).slice(0, 4);
             const characterNames = castShots
               .map((cs) => charById.get(cs.characterId)?.name)
               .filter(
