@@ -483,6 +483,13 @@ serve(async (req) => {
     // block so the TTS engine produces a natural pause between speakers — no
     // synthetic silence injection between utterances.
     const sampleBuffers: Int16Array[] = [];
+    // Per-segment PCM kept SEPARATE from `sampleBuffers` (which also contains
+    // inter-speaker pause silence). Earlier we used `sampleBuffers[i]` as the
+    // PCM for segment `i`, but indices were misaligned because pauses are
+    // pushed between utterances → speaker 2 received a 0.25s silence as its
+    // "track audio" and speaker 3 received speaker 2's PCM. That bug caused
+    // Sync.so to animate the wrong face on a silent track ("ghost speech").
+    const segmentPcm: Int16Array[] = [];
     const segments: Array<{
       speaker: string;
       speaker_slug: string;
