@@ -1,45 +1,83 @@
-Ich habe den aktuellen Fehlerpfad geprüft. Es ist nicht AWS als Hauptursache. Zwei konkrete Bugs sind sichtbar:
+## Diagnose
 
-1. In `compose-twoshot-audio` werden die per-Speaker WAVs falsch zusammengebaut, weil `sampleBuffers[i]` verwendet wird, obwohl dort auch Pausen eingefügt sind. Dadurch bekommt z. B. Matthew nur eine 0,25s-Pause als Track, und Samuels Track kann Matthews Satz enthalten. Das erklärt exakt: falscher Sprecher, kein Lip-Sync beim zweiten Charakter, dazugedichtetes/kaputtes Audio.
-2. Die neue Dialog-Pipeline erzwingt bei Multi-Speaker direkt Sync.so `coords`-Mode. Der aktuelle Job scheitert schon beim ersten Turn mit Sync.so `An unknown error occurred`, obwohl Audio/Video-URLs erreichbar sind. Vorherige erfolgreiche Jobs liefen offenbar ohne diesen harten `coords`-Zwang.
+Logs + DB-State zeigen, dass die Audio-Trennung jetzt sauber ist (Samuel/Matthew haben eigene isolierte WAVs, FaceMap erkennt links/rechts korrekt). Trotzdem ist das Ergebnis kaputt, weil `poll-dialog-shots` aktuell **VIDEO-Chaining** macht:
 
-Plan zur Behebung:
+- Turn 0 (Samuel) → läuft auf Master-Plate
+- Turn 1 (Matthew) → läuft auf Sync.so-Output von Turn 0
+- Turn 2 (Samuel) → läuft auf Sync.so-Output von Turn 1
+- Finaler Clip = einfach Output von Turn 2
 
-1. Per-Speaker Audio korrekt reparieren
-   - In `compose-twoshot-audio` die TTS-Samples getrennt von den Pausen speichern.
-   - Jede Dialog-Zeile bekommt ihr echtes PCM-Audio, nicht versehentlich eine Pause oder den Satz eines anderen Sprechers.
-   - Die erzeugten `track_url` WAVs enthalten dann exakt nur die Sätze dieses Sprechers an den richtigen Zeitpositionen.
+Sync.so bekommt also bei Turn 1/2 ein Video, in dem schon Mundbewegungen drinstecken, und re-animiert/überschreibt sie teilweise. Genau dadurch:
 
-2. Alte kaputte Audio-Metadaten sicher erkennen
-   - Wenn ein Speaker-Track nur 0,25s Voice enthält, obwohl sein Turn länger ist, wird die Pipeline nicht mehr weitergeschickt.
-   - Stattdessen wird sauber abgebrochen und erst nach neu erzeugtem Audio weitergemacht.
+- Charakter 2 „spricht" den ersten Satz von Charakter 1 (Mund aus Turn 0 wird in Turn 1 mit Matthew-Audio neu interpretiert).
+- Der dritte Satz landet beim falschen Sprecher (Turn 2 überschreibt das Fenster von Turn 1 mit).
+- Es entsteht Audio-Drift, weil jede Stufe re-encodet.
 
-3. Sync.so-Dispatch robuster machen
-   - Für Multi-Speaker nicht mehr direkt hart mit `coords` starten.
-   - Erst `auto_detect:true` mit strengem Turn-Fenster und korrektem isoliertem Sprecher-Audio versuchen.
-   - Nur wenn Sync.so scheitert oder kein brauchbarer Output entsteht, einmal auf `coords` fallbacken.
-   - Dadurch vermeiden wir den aktuellen Sync.so-`unknown error`, behalten aber eine deterministische Reserve.
+Artlist macht **nie** Chained-Provider-Stacking. Artlist macht:
 
-4. FaceMap-Persistenz reparieren
-   - Wenn `compose-dialog-scene` eine FaceMap neu baut, darf sie danach nicht wieder durch ein älteres `audio_plan` überschrieben werden.
-   - Die aktualisierte FaceMap bleibt im Scene-State erhalten, damit Folge-Retries dieselben Koordinaten verwenden.
+1. Eine Master-Timeline.
+2. Master-Voiceover ist unveränderlich.
+3. Pro Sprecher-Turn ein isolierter Lipsync-Pass auf der **originalen** Master-Plate.
+4. Ein deterministischer Stitch, der per Timeline-Fenster nur die Mundregion des richtigen Outputs einsetzt.
+5. Single canonical audio remux am Ende.
 
-5. Race-/Mehrfachdispatch absichern
-   - `poll-dialog-shots` soll nicht denselben pending Turn mehrfach starten, wenn Cron, Resume und manuelle Trigger gleichzeitig laufen.
-   - Ein Turn darf nur einen aktiven Sync.so Job haben.
+## Ziel
 
-6. Credits absichern
-   - Bei terminal fehlgeschlagenem Dialog-State wird die bestehende Refund-Logik zuverlässig getriggert.
-   - Die aktuell kaputte Szene kann danach gezielt zurückgesetzt werden, aber nur mit frisch erzeugtem Audio, nicht mit den fehlerhaften Tracks.
+Cinematic-Sync exakt auf diesen Artlist-Pfad umstellen.
 
-7. Validierung
-   - Nach dem Fix die Edge Functions deployen.
-   - Den aktuellen Scene-State prüfen: fehlerhafte `dialog_shots`/Audio-Plan nicht blind weiterverwenden.
-   - Einen neuen Lip-Sync-Lauf so testen, dass in den Logs sichtbar ist: `audio=ISOLATED`, Matthew-Track > 0,25s, kein mehrfacher Dispatch für denselben Turn, Sync.so nicht direkt im erzwungenen coords-Modus.
+## Plan
 
-Erwartetes Ergebnis:
-- Matthew bekommt wieder sein echtes Audio statt einer Pause.
-- Samuel bekommt nicht mehr Matthews Satz in seinem Track.
-- Sync.so erhält pro Turn sauberes Sprecher-Audio.
-- Der aktuelle `unknown error` wird durch weniger brittle Dispatch-Logik reduziert.
-- AWS ist dafür nicht zwingend nötig; AWS bleibt nur relevant für späteres perfektes Artlist-Level Final-Stitching/Remuxing.
+### 1. Chaining entfernen
+`poll-dialog-shots` darf bei der Sync.so-Dispatch nicht mehr `prev.output_url` als `chainedSourceUrl` verwenden. Jeder Turn bekommt immer `state.source_clip_url` (Original-Hailuo-Master).
+
+Damit kann Turn N nie mehr die Lippen von Turn N-1 verändern.
+
+### 2. Parallele statt serielle Turns
+Da Turns sich nicht mehr aufeinander aufbauen, können sie parallel an Sync.so geschickt werden (max 1 neuer Dispatch pro Tick bleibt für Creator-Plan-Limit). Reihenfolge spielt nicht mehr für Korrektheit eine Rolle, nur noch für Concurrency.
+
+### 3. Finaler Schritt = Stitch, nicht „letzter Output"
+Den Fallback `clip_url = last shot.output_url` entfernen. Stattdessen sobald `allReady`:
+
+- `state.status = 'stitching'`
+- `render-dialog-stitch` aufrufen (existiert bereits, nutzt `DialogStitchVideo` Remotion Composition)
+- `remotion-webhook` schreibt finales `clip_url` zurück
+
+Die Stitch-Composition macht genau Artlist-Style:
+- Master-Video durchgehend
+- Pro Turn ein `<Sequence>` mit dem zugehörigen Sync.so-Output, **getrimmt aufs Turn-Fenster**, geometrisch deckungsgleich
+- Eine einzige Audiospur = Master-WAV
+
+### 4. AWS-Resilienz
+Falls AWS/Lambda temporär nicht verfügbar:
+
+- `dialog_shots` mit allen `ready` Outputs bleibt persistiert.
+- `lip_sync_status = 'stitching'`, kein Refund.
+- Auto-Retry über Watchdog/Polling, sobald AWS wieder antwortet.
+- Kein „kaputter Provider-Output als final" mehr — User sieht entweder den korrekten Stitch oder einen klaren Wartezustand.
+
+### 5. Stitch-Window leicht erweitern
+Im Stitch werden statt der nackten `window`-Werte die gleichen leicht expandierten Fenster (Lead-in/Tail wie in Sync.so-Dispatch) verwendet, damit Schnittkanten nicht den Wortanfang/das Wortende des Mundes abschneiden. Diese Werte werden pro Shot als `render_window` in `dialog_shots` mitgespeichert.
+
+### 6. Idempotenz & Refund
+- Stitch-Dispatch bleibt idempotent über `dialog_shots.stitch.render_id`.
+- Refund nur bei terminal failed (≥1 Shot definitiv failed nach Retry, oder Stitch-Render-Lambda definitiv failed).
+- Solange Shots `pending`/`lipsyncing` oder Stitch `pending`/`rendering` ist: kein Refund, kein „final = letzter Output".
+
+### 7. Doku aktualisieren
+`mem://features/video-composer/dialog-shot-pipeline` und `.lovable/plan.md` werden auf den neuen Pfad gesetzt (per-turn auf Original-Master, Lambda-Stitch ist Pflichtschritt, kein Video-Chaining mehr).
+
+## Geänderte Dateien
+
+- `supabase/functions/poll-dialog-shots/index.ts` — Chaining raus, parallele Dispatches, Stitch-Trigger statt Last-Output-Fallback, `render_window` persistieren.
+- `supabase/functions/render-dialog-stitch/index.ts` — `render_window` priorisieren, sonst `window`.
+- `src/remotion/templates/DialogStitchVideo.tsx` — nutzt `render_window` falls vorhanden.
+- `mem://features/video-composer/dialog-shot-pipeline` — aktualisiert auf Artlist-Pfad.
+- `.lovable/plan.md` — finaler Statusbericht.
+
+## Erwartetes Ergebnis
+
+- Samuel spricht nur seine Sätze, Matthew nur seinen Satz.
+- Keine Lippenüberlagerung zwischen Turns.
+- Reihenfolge stammt aus unserer Timeline, nicht aus Provider-Verkettung.
+- Master-Audio im finalen Clip = exakt das, was du im Preview hörst.
+- AWS-Ausfall führt zu sauberem Wartezustand statt falschem Endclip.
