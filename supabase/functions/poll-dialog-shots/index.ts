@@ -61,6 +61,12 @@ interface DialogShot {
   durSec: number;
   target_coords: [number, number] | null;
   temperature: number;
+  /** v7: ISOLATED per-speaker audio (only this speaker's voice + silence
+   *  elsewhere). Fixes "ghost-speech" where Sync.so animated the wrong
+   *  face because the merged WAV contained other speakers' voices. */
+  audio_url?: string;
+  /** v7: when true, MUST dispatch with coords + frame_number (no auto). */
+  deterministic_coords?: boolean;
   status: "pending" | "lipsyncing" | "ready" | "failed";
   sync_job_id?: string;
   output_url?: string;
@@ -68,12 +74,9 @@ interface DialogShot {
   started_at?: string;
   completed_at?: string;
   last_deferred_at?: string;
-  /** How many times we have already redispatched this shot after a FAILED
-   *  Sync.so response. Capped at 1: first attempt uses auto_detect, the
-   *  retry falls back to fixed coords + frame_number aligned to the turn. */
   retry_count?: number;
   /** When true, the next dispatch MUST use the coords+frame_number fallback
-   *  path instead of auto_detect. Set by the FAILED→retry handler. */
+   *  path instead of auto_detect. */
   force_coords?: boolean;
 }
 
