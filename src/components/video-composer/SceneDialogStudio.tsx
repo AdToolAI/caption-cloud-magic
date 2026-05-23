@@ -14,7 +14,9 @@
  */
 
 import { forwardRef, useEffect, useMemo, useState } from 'react';
-import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mic, Sparkles, User, Loader2, ImageOff, Volume2, X, Lock, AlertCircle } from 'lucide-react';
+import { useAccessibleCharacters } from '@/hooks/useAccessibleCharacters';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
