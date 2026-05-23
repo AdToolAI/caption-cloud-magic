@@ -210,6 +210,7 @@ serve(async (req) => {
       });
     if (insertErr) {
       console.error("[render-dialog-stitch] insert failed:", insertErr);
+      await markSceneError(supabase, sceneId, state, `insert render: ${insertErr.message}`);
       return json({ error: `insert render: ${insertErr.message}` }, 500);
     }
 
@@ -295,6 +296,9 @@ serve(async (req) => {
           completed_at: new Date().toISOString(),
         })
         .eq("render_id", renderId);
+      const retryState: DialogShotsState = { ...state, status: "stitching" };
+      delete retryState.stitch;
+      await markSceneError(supabase, sceneId, retryState, `invoke: ${invokeErr.message}`);
       return json({ error: `invoke: ${invokeErr.message}` }, 500);
     }
 
@@ -305,6 +309,23 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[render-dialog-stitch] fatal", e);
+    const body = await req.clone().json().catch(() => ({}));
+    const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
+    if (sceneId) {
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supabase = createClient(supabaseUrl, serviceKey);
+        await markSceneError(
+          supabase,
+          sceneId,
+          null,
+          e instanceof Error ? e.message : "unknown fatal",
+        );
+      } catch {
+        // best-effort diagnostics only
+      }
+    }
     return json(
       { error: e instanceof Error ? e.message : "unknown" },
       500,
