@@ -84,7 +84,7 @@ export const useGettingStartedProgress = () => {
         {
           key: "social_connected",
           done: (socialRes.count ?? 0) > 0,
-          route: "/hub/social-management",
+          route: "/integrations",
         },
         {
           key: "post_planned",
