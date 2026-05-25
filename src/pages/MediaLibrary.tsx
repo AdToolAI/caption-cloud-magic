@@ -72,6 +72,19 @@ export default function MediaLibrary() {
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
+  // Pagination: how many cards we actually render
+  const [visibleCount, setVisibleCount] = useState(60);
+  const PAGE_SIZE = 60;
+
+  // Debounced reload to absorb realtime bursts (auto-cleanup deletes etc.)
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => {
+      loadMedia();
+    }, 800);
+  }, []);
+
   const handleSaveToAlbum = async (item: NormalizedMediaItem) => {
     if (!user) return;
     const { data, error } = await supabase
