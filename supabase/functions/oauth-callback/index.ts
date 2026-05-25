@@ -393,7 +393,7 @@ async function getMetaAccountInfo(accessToken: string, provider: string) {
   // Facebook handling: Store User Access Token, defer page selection to UI
   // Get basic user info for the connection record
   const fbUserResponse = await fetch(
-    'https://graph.facebook.com/v18.0/me?fields=id,name',
+    'https://graph.facebook.com/v24.0/me?fields=id,name',
     { headers: { 'Authorization': `Bearer ${accessToken}` } }
   );
 
