@@ -1139,7 +1139,7 @@ export default function MediaLibrary() {
       <>
       {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredMedia.map((item) => {
+        {filteredMedia.slice(0, visibleCount).map((item) => {
           return (
             <Card key={item.id} className="overflow-hidden">
               <div className="aspect-square bg-muted flex items-center justify-center relative group">
