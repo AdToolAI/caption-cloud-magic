@@ -1398,5 +1398,6 @@ export default function MediaLibrary() {
         }}
       />
     </div>
+    </TooltipProvider>
   );
 }
