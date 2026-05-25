@@ -1,56 +1,59 @@
-## Problem
+## Ziel
+Während der aktiven Testphase (`trial_status = 'active'`) bekommen User Vollzugriff auf **alle** Features — keine "Upgrade Required"-Modals mehr, Brand Kit, API-Connections, Kalender, AI-Video, X/Twitter, Carousel, Coach, Campaigns, BioOptimizer, ImageCaptionPairing usw. sind freigeschaltet. Die Upgrade-Prompts greifen erst, wenn der Trial abläuft (Grace Period / Expired).
 
-Die User-Mediathek enthält 500/500 Videos (Limit erreicht). Aktuell rendert `src/pages/MediaLibrary.tsx` im Tab „Alle" **alle gefilterten Videos auf einmal** — pro Karte ein echtes `<video preload="metadata">`-Element plus eigener `TooltipProvider` mit 7+ Tooltips. Bei 500 Videos heißt das:
+## Hintergrund
+- Trial-User bekommen heute schon `plan_code = 'enterprise'` in `wallets` (DB-Check bestätigt: 3 aktive Trials laufen alle als enterprise).
+- Trotzdem ploppt im Screenshot ein **PlanLimitDialog** "API Connections requires a Pro or higher plan" auf — d.h. einzelne Gates prüfen **nicht** das tatsächliche `plan_code`, sondern öffnen den Dialog hart, oder lesen einen veralteten Plan-Status.
+- Es gibt zwei zentrale Gate-Mechanismen:
+  1. `useFeatureGate` → triggert `SmartUpgradeModal` über `useUpgradeTrigger`
+  2. `PlanLimitDialog` (statische Variante, wird in 7 Seiten direkt geöffnet)
+- Dazu kommen die Helpers in `src/lib/entitlements.ts` (`canUseTeamFeatures`, `canUseWhiteLabel`, `canUseApi`, `canUseXTwitter`, `canUseAIVideoGeneration`, `canQuickCalendarPost`), die rein auf `PlanId` schauen und Trial nicht kennen.
 
-- 500 parallele Video-Metadaten-Requests an den CDN beim Tab-Wechsel → Netzwerk/Decoder-Stau, Browser friert ein.
-- ~3.500 Tooltip-Portale im DOM → React + Radix werden träge.
-- Jeder Realtime-Event (`media_assets`, `content_items`, `video_creations`) ruft das komplette `loadMedia()` neu auf und re-rendert die ganze Liste.
+## Was geändert wird (Frontend only)
 
-Das deckt sich mit „reagiert sehr langsam und hat sich aufgehängt".
+### 1. Neuer zentraler Helper `useTrialAccess`
+Neue Datei `src/hooks/useTrialAccess.ts`:
+- Liest `useTrialStatus()` + `useCredits()`
+- Liefert `hasFullAccess: boolean` = `trial.status === 'active'` **oder** `plan_code in ['pro','enterprise']`
+- Wird in allen Gates verwendet.
 
-## Lösung (nur Frontend, Mediathek-Seite)
+### 2. `useFeatureGate` Trial-Bypass
+`src/hooks/useFeatureGate.ts`:
+- Vor dem Plan-Rank-Check: wenn `trial.status === 'active'` → sofort `return true`.
+- Verhindert SmartUpgradeModal für Sora/Pro-Features während Trial.
 
-### 1. Pagination / „Mehr laden" für das Grid
+### 3. `PlanLimitDialog` Auto-Bypass
+`src/components/performance/PlanLimitDialog.tsx`:
+- Im Component selbst `useTrialAccess` lesen.
+- Wenn `hasFullAccess === true` und `open === true` → `useEffect` ruft `onOpenChange(false)` und Dialog rendert `null`.
+- Dadurch wirken alle 7 Aufrufstellen (BioOptimizer, BrandKit, Calendar, Campaigns, Carousel, Coach, ImageCaptionPairing, ConnectionsTab) automatisch mit, ohne dass jede Seite angepasst werden muss.
 
-In `src/pages/MediaLibrary.tsx`:
+### 4. `UpgradeModal` (alte Variante) Auto-Bypass
+`src/components/UpgradeModal.tsx`:
+- Gleiche Logik wie PlanLimitDialog (Sicherheit, falls noch Aufrufe existieren).
 
-- Neue State-Variable `visibleCount` (Start: **60**).
-- Im Grid statt `filteredMedia.map(...)` nur `filteredMedia.slice(0, visibleCount).map(...)`.
-- Unter dem Grid Button **„Mehr laden (X von Y)"**, der `visibleCount += 60` setzt.
-- `visibleCount` bei jeder Filter-/Tab-/Such-Änderung auf 60 zurücksetzen (im bestehenden `applyFilters`-Effect).
+### 5. `useUpgradeTrigger` Trial-Bypass
+`src/hooks/useUpgradeTrigger.tsx`:
+- In `trigger()` zu Beginn: wenn `trial.status === 'active'` **und** `source !== 'trial-progress'` **und** `source !== 'trial_expired'` → no-op (`return`).
+- Trial-Progress-Banner ("noch 14 Tage") bleibt sichtbar — der User soll ja konvertieren, aber nicht durch Feature-Walls blockiert werden.
 
-### 2. Lazy Video-Thumbnails
+### 6. Entitlements-Helper trial-aware machen (optional, defensiv)
+`src/lib/entitlements.ts`:
+- Neue Variante exportieren: `useEntitlement(feature)` Hook, der intern `useTrialAccess` kombiniert.
+- Bestehende reine PlanId-Funktionen bleiben (kein Breaking Change) — aber überall, wo sie direkt UI-Sichtbarkeit steuern, prüfen wir, ob Trial-User schon korrekt durchkommen (in den meisten Fällen ja, weil `plan_code='enterprise'`).
 
-Neuer kleiner Wrapper `LazyVideoThumb` (inline in der Datei oder als `src/components/media-library/LazyVideoThumb.tsx`):
+### 7. Sicherheits-Check Brand Kit
+`src/pages/BrandKit.tsx` Zeile ~915 öffnet `PlanLimitDialog` — durch Schritt 3 automatisch entschärft. Zusätzlich verifizieren wir, dass die Brand-Kit-Erstellung selbst nicht auf einem zusätzlichen Server-Gate hängt (kurzer Read-Only-Check).
 
-- Standard: leeres `<div>` mit Play-Icon + grauem Hintergrund (kein Netzwerk-Request).
-- `IntersectionObserver`: erst beim Sichtbarwerden ein `<video preload="metadata" muted playsInline>` mounten, das nur den ersten Frame zieht (Poster).
-- Auf Hover/Click → Modal-Player (vorhandenes `selectedVideo`-Modal weiterverwenden).
+## Was **nicht** geändert wird
+- Keine DB-Migration (Trial-User haben bereits `plan_code='enterprise'`).
+- Keine Backend-/Edge-Function-Änderungen — Credits-Wallet und RLS bleiben unangetastet.
+- Trial-Banner ("14 Tage verbleibend") bleibt sichtbar, damit Konversion getriggert wird.
+- Nach Trial-Ende (`grace` / `expired`) greifen alle Gates wieder wie bisher.
 
-Damit lädt der Browser maximal die ~12 sichtbaren Karten statt 500.
-
-### 3. Ein einzelner TooltipProvider
-
-`<TooltipProvider>` einmal um die gesamte Seite legen (im Return ganz außen), nicht pro Karte. Spart ~500 Provider-Instanzen.
-
-### 4. Realtime entschärfen
-
-- `loadMedia()` mit einem 800 ms-Debounce wrappen (kleiner `useRef`-Timer), damit Bursts von Realtime-Events (z. B. Auto-Cleanup, der mehrere Rows löscht) nicht 5× hintereinander komplett neu laden.
-- Toast „🎉 Neue Medien hinzugefügt!" nur bei `INSERT` mit `source IN ('ai','ai_generator','campaign')` zeigen, nicht bei jedem Update.
-
-### 5. Memoization
-
-- `getSourceBadge` und `getFileIcon` als `useCallback` / `useMemo`-Map.
-- Karte als kleine `React.memo`-Komponente `MediaCard` extrahieren (in derselben Datei), damit Re-Renders durch Selection-Checkbox nicht das ganze Grid neu zeichnen.
-
-## Nicht im Scope
-
-- Keine DB-Migrationen, kein Backend-Change.
-- Albums-/Cloud-Tab bleibt unverändert (haben eigene Komponenten).
-- Echte Virtualisierung (react-window) bewusst weggelassen — Pagination + Lazy-Videos lösen das Problem ohne neue Dependency.
-
-## Erwartetes Ergebnis
-
-- Initialer Mediathek-Aufruf rendert 60 Karten ohne aktive Videos → flüssig.
-- Scroll/„Mehr laden" lädt Video-Frames nur für sichtbare Karten.
-- Realtime-Updates lösen keine Render-Stürme mehr aus.
+## Verifikation
+1. Als aktiver Trial-User auf `/performance` → "Verbinden" klicken → kein Upgrade-Modal, OAuth-Flow startet.
+2. Auf `/brand-kit` → Brand Kit kann gespeichert werden ohne Modal.
+3. Auf `/calendar`, `/carousel`, `/coach`, `/campaigns`, `/bio-optimizer`, `/image-caption-pairing` → keine Plan-Limit-Modals.
+4. Als `expired`-User → Modals erscheinen wieder.
+5. Konsole prüfen, dass kein "trial-progress"-Modal versehentlich unterdrückt wird.

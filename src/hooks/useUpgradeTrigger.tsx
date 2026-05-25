@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 import { PlanId } from "@/config/pricing";
+import { useTrialStatus } from "@/hooks/useTrialStatus";
 
 /**
  * Centralized upgrade trigger system for contextual conversion prompts.
@@ -77,8 +78,19 @@ const markShown = (source: UpgradeTriggerSource): void => {
 
 export const UpgradeTriggerProvider = ({ children }: { children: ReactNode }) => {
   const [active, setActive] = useState<UpgradeTriggerPayload | null>(null);
+  const trial = useTrialStatus();
 
   const trigger = useCallback((payload: UpgradeTriggerPayload) => {
+    // Active trial: suppress feature-walls & feature-discovery prompts so users
+    // can fully explore the product. Trial-progress nudges still fire.
+    if (
+      trial.status === "active" &&
+      payload.source !== "trial_progress" &&
+      payload.source !== "manual"
+    ) {
+      return;
+    }
+
     if (isInCooldown(payload.source)) {
       return;
     }
@@ -94,7 +106,7 @@ export const UpgradeTriggerProvider = ({ children }: { children: ReactNode }) =>
     });
 
     setActive(payload);
-  }, []);
+  }, [trial.status]);
 
   const dismiss = useCallback(() => {
     if (active) {
