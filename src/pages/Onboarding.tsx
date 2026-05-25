@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,6 +41,28 @@ export default function Onboarding() {
   const { t, language, setLanguage } = useTranslation();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [checkingStatus, setCheckingStatus] = useState(true);
+
+  // Guard: if onboarding already done, redirect to /home
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const [profileRes, onboardingRes] = await Promise.all([
+        supabase.from("profiles").select("onboarding_completed").eq("id", user.id).maybeSingle(),
+        supabase.from("onboarding_profiles" as any).select("user_id").eq("user_id", user.id).maybeSingle(),
+      ]);
+      if (cancelled) return;
+      const alreadyDone = (profileRes.data as any)?.onboarding_completed === true || !!onboardingRes.data;
+      if (alreadyDone) {
+        toast.info("Onboarding ist bereits abgeschlossen");
+        navigate("/home", { replace: true });
+      } else {
+        setCheckingStatus(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user, navigate]);
 
   const languages = [
     { code: "en", name: "English", flag: "🇬🇧" },
@@ -147,6 +169,14 @@ export default function Onboarding() {
       setLoading(false);
     }
   };
+
+  if (checkingStatus) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-primary/10 flex items-center justify-center p-4">

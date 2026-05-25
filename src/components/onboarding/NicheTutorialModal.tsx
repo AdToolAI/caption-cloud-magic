@@ -58,16 +58,19 @@ export function NicheTutorialModal({ onComplete }: NicheTutorialModalProps) {
     setStep(3);
 
     try {
-      // Save onboarding profile
-      await supabase.from("onboarding_profiles").upsert({
-        user_id: user.id,
-        niche,
-        business_type: businessType,
-        platforms: selectedPlatforms,
-        posting_goal: postingGoal,
-        posts_per_week: postsPerWeek,
-        experience_level: experienceLevel,
-      }, { onConflict: "user_id" });
+      // Save onboarding profile + mark profile.onboarding_completed in parallel
+      await Promise.all([
+        supabase.from("onboarding_profiles").upsert({
+          user_id: user.id,
+          niche,
+          business_type: businessType,
+          platforms: selectedPlatforms,
+          posting_goal: postingGoal,
+          posts_per_week: postsPerWeek,
+          experience_level: experienceLevel,
+        }, { onConflict: "user_id" }),
+        supabase.from("profiles").update({ onboarding_completed: true }).eq("id", user.id),
+      ]);
 
       // Call starter-plan + first-video-prompts in parallel.
       // first-video-prompts is fire-and-forget — failures fall back to defaults in the hook.
