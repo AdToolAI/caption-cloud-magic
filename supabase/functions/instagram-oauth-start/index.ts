@@ -152,43 +152,49 @@ Deno.serve(async (req) => {
       throw stateError;
     }
 
-    // Instagram Business Login via Facebook OAuth — these are the scopes Meta expects
-    // for instagram_basic + instagram_content_publish review.
+    // Instagram Business Login via Facebook OAuth — only request scopes
+    // that are actually approved in the Meta App. Un-approved scopes
+    // (e.g. `business_management` without App Review) cause Meta to
+    // short-circuit the dialog with "Feature unavailable".
     const scopes = [
       'instagram_basic',
       'instagram_content_publish',
       'pages_show_list',
       'pages_read_engagement',
-      'business_management',
     ].join(',');
+
+    // Optional: Facebook Login for Business configuration ID.
+    // If META_LOGIN_CONFIG_ID is set, use the Business Login flow
+    // (scopes are defined inside the configuration in the Meta dashboard).
+    const configId = Deno.env.get('META_LOGIN_CONFIG_ID') || null;
 
     const authUrl = new URL('https://www.facebook.com/v24.0/dialog/oauth');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('state', state);
-    // Push Meta into the CONSENT path (not the login/identity path).
-    //   - `rerequest`: forces Meta to show the permission selection dialog
-    //     instead of falling back to the cached "Continue as ..." short-circuit.
-    //   - fresh `auth_nonce`: bypasses Meta's session cache.
-    //   - `display=page`: full-page consent UX (Meta App Review screencast).
-    // We deliberately do NOT use `reauthenticate` here — that only forces a
-    // password re-entry, but Meta still skips the scope dialog if it remembers
-    // the app grant. The matching hard-reset in instagram-oauth-revoke is what
-    // makes `rerequest` actually surface the consent screen again.
-    authUrl.searchParams.set('auth_type', 'rerequest');
-    authUrl.searchParams.set('auth_nonce', crypto.randomUUID().replace(/-/g, ''));
-    authUrl.searchParams.set('display', 'page');
+    if (configId) {
+      authUrl.searchParams.set('config_id', configId);
+    } else {
+      authUrl.searchParams.set('scope', scopes);
+    }
+    // Only use rerequest when the caller explicitly opts in (App Review
+    // recording). Outside of that, leave Meta on its default path —
+    // aggressive extras like `auth_nonce` and `display=page` can themselves
+    // trigger the "Feature unavailable" maintenance screen.
+    if (forReview) {
+      authUrl.searchParams.set('auth_type', 'rerequest');
+    }
 
     const finalAuthUrl = authUrl.toString();
     console.log('[instagram-oauth-start] Authorize URL built', {
       user_id: user.id,
       forReview,
+      redirect_uri: redirectUri,
+      uses_config_id: !!configId,
+      scopes: configId ? null : scopes,
       auth_type: authUrl.searchParams.get('auth_type'),
-      display: authUrl.searchParams.get('display'),
-      has_nonce: !!authUrl.searchParams.get('auth_nonce'),
-      url_preview: finalAuthUrl.slice(0, 140) + '…',
+      url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
 
     return new Response(
