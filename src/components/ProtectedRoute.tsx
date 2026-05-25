@@ -8,12 +8,14 @@ interface ProtectedRouteProps {
   children: ReactNode;
   requireRole?: AppRole;
   requireAuth?: boolean;
+  redirectTo?: string;
 }
 
 export const ProtectedRoute = ({ 
   children, 
   requireRole,
-  requireAuth = true 
+  requireAuth = true,
+  redirectTo = '/auth',
 }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { hasRole, loading: rolesLoading } = useUserRoles();
@@ -27,9 +29,9 @@ export const ProtectedRoute = ({
     );
   }
 
-  // Redirect to auth if user is not logged in and auth is required
+  // Redirect if user is not logged in and auth is required
   if (requireAuth && !user) {
-    return <Navigate to="/auth" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   // Check if user has required role
