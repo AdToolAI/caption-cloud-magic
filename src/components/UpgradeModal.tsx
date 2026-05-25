@@ -28,6 +28,13 @@ export const UpgradeModal = ({
   requiredPlan = 'basic'
 }: UpgradeModalProps) => {
   const navigate = useNavigate();
+  const { hasFullAccess } = useTrialAccess();
+
+  useEffect(() => {
+    if (open && hasFullAccess) onOpenChange(false);
+  }, [open, hasFullAccess, onOpenChange]);
+
+  if (hasFullAccess) return null;
   const { t } = useTranslation();
   const plan = pricingPlans[requiredPlan];
 
