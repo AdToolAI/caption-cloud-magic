@@ -1,31 +1,20 @@
-## Problem
+## Ziel
+Konto `info@useadtool.ai` zurücksetzen, damit du den kompletten Signup- und Email-Verifizierungs-Flow erneut testen kannst.
 
-Neue Nutzer bekommen bei der Registrierung eine E-Mail mit Absender/Titel **„caption-cloud-magic"** statt **AdTool AI**. Grund: Im Projekt gibt es noch **keine eigenen Auth-E-Mail-Templates** — Supabase versendet die Default-Bestätigungs-Mails, in denen der interne Projektname auftaucht.
+## Status in der DB
+- User existiert: `c697c171-2f68-45b4-9f16-85e056c9c154`
+- `email_confirmed_at`: `NULL` (Email war nie bestätigt)
+- Erstellt: 25.05.2026
 
-## Lösung
+## Vorgehen
+Da das Konto ohnehin nie verifiziert wurde, ist der sauberste Reset das vollständige Löschen des Users. Danach kannst du dich mit derselben Email frisch registrieren und bekommst eine neue Verifizierungs-Mail.
 
-Eigene, AdTool-AI-gebrandete Auth-E-Mail-Templates aufsetzen, die alle Auth-Mails (Signup-Bestätigung, Passwort-Reset, Magic-Link, Invite, E-Mail-Wechsel, Reauth) im Look & Feel der App versenden.
+1. **Lösche** den Auth-User `info@useadtool.ai` aus `auth.users`.
+   - Alle abhängigen Daten (profiles, user_roles, wallet etc.) werden über `ON DELETE CASCADE` automatisch mit entfernt.
+2. **Kontrolle**: Re-Query auf `auth.users` um sicherzustellen, dass die Zeile weg ist.
+3. Du kannst dich danach unter `/auth` neu registrieren — der `auth-email-hook` schickt dann die neue AdTool-AI-gebrandete Verifizierungs-Mail über `notify.useadtool.ai`.
 
-## Schritte
+## Hinweis
+Alternative wäre, nur `email_confirmed_at` zurückzusetzen — das würde aber keine neue Mail auslösen und du müsstest "Mail erneut senden" anstoßen. Komplettes Löschen ist für deinen Test-Use-Case eindeutiger.
 
-1. **Auth-E-Mail-Templates scaffolden** (6 Templates + `auth-email-hook` Edge Function)
-2. **Branding anwenden** auf Basis von `src/index.css` (Primary, Background, Foreground, Radius) und `Brand`-Komponente (Sparkles-Icon + „AdTool AI" Wortmarke):
-   - Body-Background: weiß (`#ffffff`) — Pflicht
-   - Buttons: Primary-Farbe aus Design-System
-   - Headings/Text in Foreground/Muted-Foreground
-   - Font-Stack passend zur App
-   - Mehrsprachig: DE als Default (App-Default), zusätzlich EN + ES (gemäß Core-Memory zur Lokalisierung)
-   - Absender-/Anrede-Name: **AdTool AI**
-   - Footer: „AdTool AI Team", Link zu `useadtool.ai`
-3. **Deploy** der `auth-email-hook` Edge Function
-4. **Aktivierung** läuft automatisch über die bereits konfigurierte Sender-Domain
-
-## Out of Scope
-
-- Keine Änderungen am Auth-Flow selbst (Signup/Login)
-- Keine neuen transactional Emails (nur Auth)
-- Keine DNS-/Domain-Änderungen — bestehende Sender-Domain wird verwendet
-
-## Ergebnis
-
-Neue Anmeldungen erhalten eine Bestätigungs-E-Mail mit Betreff/Inhalt im AdTool-AI-Branding statt „caption-cloud-magic".
+Bestätige die Implementierung und ich führe das Löschen aus.
