@@ -154,7 +154,7 @@ export default function MediaLibrary() {
           filter: `workspace_id=eq.${workspaceId}`
         },
         (payload) => {
-          loadMedia();
+          scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
               title: "🎉 Neue Medien hinzugefügt!",
