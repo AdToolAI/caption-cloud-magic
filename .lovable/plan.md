@@ -1,55 +1,21 @@
-## Befund
-
-Die App ist laut Screenshot live und approved, aber der aktuelle Facebook-OAuth-Start fordert mehr Berechtigungen an, als im Screenshot genehmigt/erneuert sind.
-
-Approved/Renewed im Screenshot:
-- `instagram_content_publish`
-- `instagram_basic`
-- `pages_manage_posts`
-- `pages_show_list`
-- `pages_read_engagement`
-
-Aktuell im Facebook-Flow zusätzlich angefordert:
-- `pages_manage_metadata`
-- `pages_read_user_content`
-- `pages_manage_engagement`
-- `business_management`
-
-Diese Zusatz-Scopes können genau die gleiche Meta-Meldung auslösen, obwohl die App grundsätzlich live/approved ist. Zusätzlich cached Meta App-Grants pro Facebook-Konto sehr aggressiv; ein Reset/Reauth muss sauberer angestoßen werden.
-
 ## Plan
 
-1. **Facebook-OAuth auf minimale genehmigte Scopes reduzieren**
-   - In `facebook-oauth-start` nur die wirklich benötigten und laut Screenshot genehmigten Facebook-Scopes verwenden:
-     - `pages_show_list`
-     - `pages_read_engagement`
-     - `pages_manage_posts`
-   - Die riskanten Zusatz-Scopes entfernen:
-     - `pages_manage_metadata`
-     - `pages_read_user_content`
-     - `pages_manage_engagement`
-     - `business_management`
+Die neue Meldung kommt nicht von Facebook/Meta, sondern aus unserer eigenen App: Beim Klick auf „Verbinden“ blockiert `ConnectionsTab` Free-Accounts mit dem `PlanLimitDialog`. Gleichzeitig zeigt die UI oben aber einen aktiven Enterprise-Trial an. Das ist ein Widerspruch.
 
-2. **Facebook-Reconnect mit sauberem Reset erzwingen**
-   - Beim Facebook-Start zusätzlich `auth_type=rerequest` beibehalten.
-   - Optional `forceReconsent` aus dem Frontend an die Function durchreichen, damit bei erneuten Verbindungsversuchen explizit ein frischer Consent-Pfad genutzt wird.
-   - Bestehende alte Facebook-Verbindungszeile vor dem Start weiterhin löschen, damit kein lokaler stale state übrig bleibt.
+## Änderung
 
-3. **Callback-URLs/Versionen konsistent halten**
-   - `oauth-callback` bleibt auf Graph API `v24.0`.
-   - Keine Rückkehr zu `v18.0` im Login-Flow.
+1. **Plan-Gate für Integrationen korrigieren**
+   - In `src/components/performance/ConnectionsTab.tsx` die Verbindungssperre so anpassen, dass aktive Trial-Nutzer nicht mehr als Free-Nutzer geblockt werden.
+   - Social Connections während des aktiven Trials erlauben, wie es `useTrialAccess()` bereits vorsieht.
 
-4. **Veröffentlichungs-/Deploy-Schritt**
-   - Die geänderte `facebook-oauth-start` Function neu deployen.
-   - Danach im Browser testen: Der Facebook-Redirect muss `facebook.com/v24.0/dialog/oauth` enthalten und nur die minimalen Facebook-Scopes anfordern.
+2. **Plan-Anzeige vereinheitlichen**
+   - `fetchUserPlan()` in `ConnectionsTab` liest aktuell nur `profiles.plan`; die Integrationsseite selbst nutzt zusätzlich `test_mode_plan`.
+   - Das wird vereinheitlicht, damit Trial/Test/Enterprise-Status nicht als `free` in der Connection-Logik landet.
 
-## Wichtig außerhalb des Codes
+3. **Dialog bleibt für echte Free-Nutzer erhalten**
+   - Der Upgrade-Dialog wird nicht entfernt, sondern nur dann gezeigt, wenn wirklich kein Trial/paid Zugriff besteht.
+   - Danach kann der Facebook OAuth Flow wieder bis zur Meta-Weiterleitung laufen.
 
-Falls Meta trotz reduzierter Scopes weiter die gleiche Meldung zeigt, muss der App-Grant zusätzlich auf Facebook-Seite zurückgesetzt werden:
+## Erwartetes Ergebnis
 
-- Facebook öffnen mit dem betroffenen Konto
-- Einstellungen → Apps und Websites
-- AdTool AI Integration entfernen
-- Danach in einem Inkognito-Fenster erneut verbinden
-
-Der Code kann alte Grants best-effort per API löschen, aber Meta blockiert das manchmal, wenn der alte Token bereits ungültig ist.
+Beim Klick auf „Facebook verbinden“ erscheint nicht mehr der Upgrade-Dialog, sondern der zuvor reparierte Facebook OAuth-Start wird ausgeführt.

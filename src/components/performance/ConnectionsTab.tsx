@@ -173,14 +173,16 @@ export const ConnectionsTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Read both `plan` and `test_mode_plan` so admin/test overrides and
+      // active trials don't get downgraded to "free" inside the gate below.
       const { data } = await supabase
         .from('profiles')
-        .select('plan')
+        .select('plan, test_mode_plan')
         .eq('id', user.id)
         .single();
 
       if (data) {
-        setUserPlan(data.plan || 'free');
+        setUserPlan((data.test_mode_plan as string) || (data.plan as string) || 'free');
       }
     } catch (error) {
       console.error('Error fetching user plan:', error);
@@ -246,23 +248,24 @@ export const ConnectionsTab = () => {
       origin: window.location.origin,
     });
     
-    // Check plan limits (skipped during active trial / paid plans)
-    if (!hasFullAccess) {
+    // Check plan limits (skipped during active trial / paid plans / test-mode plans)
+    const planIsPaid = userPlan === 'pro' || userPlan === 'enterprise' || userPlan === 'basic';
+    if (!hasFullAccess && !planIsPaid) {
       if (userPlan === 'free') {
-        console.log('User on FREE plan, showing upgrade dialog');
+        console.log('User on FREE plan (no trial), showing upgrade dialog');
         setShowUpgradeDialog(true);
         return;
       }
+    }
 
-      if (userPlan === 'pro' && connections.length >= 3) {
-        console.log('User on PRO plan but has 3 connections already');
-        toast({
-          title: t('common.error'),
-          description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
-          variant: "destructive"
-        });
-        return;
-      }
+    if (userPlan === 'pro' && connections.length >= 3 && !hasFullAccess) {
+      console.log('User on PRO plan but has 3 connections already');
+      toast({
+        title: t('common.error'),
+        description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
+        variant: "destructive"
+      });
+      return;
     }
 
     console.log('Plan check passed, proceeding...', { hasFullAccess });
