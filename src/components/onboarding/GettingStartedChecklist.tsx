@@ -218,45 +218,55 @@ export const GettingStartedChecklist = () => {
                 const Icon = stepIcons[step.key];
                 const label = labels[step.key];
 
-                return (
-                  <li key={step.key}>
-                    <Link
-                      to={step.route}
+                const content = (
+                  <>
+                    <span
                       className={cn(
-                        "group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all",
+                        "h-6 w-6 shrink-0 rounded-full flex items-center justify-center transition-all",
                         step.done
-                          ? "bg-primary/5 text-muted-foreground"
-                          : "hover:bg-muted/50 text-foreground"
+                          ? "bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.5)]"
+                          : "border-2 border-border group-hover:border-primary/60"
                       )}
                     >
-                      <span
-                        className={cn(
-                          "h-6 w-6 shrink-0 rounded-full flex items-center justify-center transition-all",
-                          step.done
-                            ? "bg-primary text-primary-foreground shadow-[0_0_10px_hsl(var(--primary)/0.5)]"
-                            : "border-2 border-border group-hover:border-primary/60"
-                        )}
-                      >
-                        {step.done ? (
-                          <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                        ) : (
-                          <Icon className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
-                        )}
-                      </span>
-
-                      <span
-                        className={cn(
-                          "text-xs font-medium flex-1 truncate",
-                          step.done && "line-through opacity-60"
-                        )}
-                      >
-                        {label}
-                      </span>
-
-                      {!step.done && (
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                      {step.done ? (
+                        <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                      ) : (
+                        <Icon className="h-3 w-3 text-muted-foreground group-hover:text-primary transition-colors" />
                       )}
-                    </Link>
+                    </span>
+
+                    <span
+                      className={cn(
+                        "text-xs font-medium flex-1 truncate",
+                        step.done && "line-through opacity-60"
+                      )}
+                    >
+                      {label}
+                    </span>
+
+                    {!step.done && (
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+                    )}
+                  </>
+                );
+
+                return (
+                  <li key={step.key}>
+                    {step.done ? (
+                      <div
+                        aria-disabled="true"
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 bg-primary/5 text-muted-foreground cursor-default"
+                      >
+                        {content}
+                      </div>
+                    ) : (
+                      <Link
+                        to={step.route}
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:bg-muted/50 text-foreground"
+                      >
+                        {content}
+                      </Link>
+                    )}
                   </li>
                 );
               })}
