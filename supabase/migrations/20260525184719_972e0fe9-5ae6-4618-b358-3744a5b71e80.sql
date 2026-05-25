@@ -1,0 +1,1 @@
+DELETE FROM auth.users WHERE email = 'info@useadtool.ai' AND email_confirmed_at IS NULL;
