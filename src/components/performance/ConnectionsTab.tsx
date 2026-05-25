@@ -173,14 +173,16 @@ export const ConnectionsTab = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Read both `plan` and `test_mode_plan` so admin/test overrides and
+      // active trials don't get downgraded to "free" inside the gate below.
       const { data } = await supabase
         .from('profiles')
-        .select('plan')
+        .select('plan, test_mode_plan')
         .eq('id', user.id)
         .single();
 
       if (data) {
-        setUserPlan(data.plan || 'free');
+        setUserPlan((data.test_mode_plan as string) || (data.plan as string) || 'free');
       }
     } catch (error) {
       console.error('Error fetching user plan:', error);
