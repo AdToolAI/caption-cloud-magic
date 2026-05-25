@@ -138,14 +138,13 @@ Deno.serve(async (req) => {
       throw stateError;
     }
 
+    // Only request scopes that are actually approved for this Meta App
+    // (see Meta App Review → Permissions). Requesting un-approved scopes
+    // causes Meta to short-circuit the dialog with "Feature unavailable".
     const scopes = [
       'pages_show_list',
       'pages_read_engagement',
-      'pages_manage_metadata',
-      'pages_read_user_content',
       'pages_manage_posts',
-      'pages_manage_engagement',
-      'business_management',
     ].join(',');
 
     const authUrl = new URL('https://www.facebook.com/v24.0/dialog/oauth');
