@@ -183,7 +183,7 @@ function AppLayout() {
                     <Route path="/" element={user ? <Navigate to="/home" replace /> : <Index />} />
                     
                     {/* Main pages */}
-                    <Route path="/home" element={<Home />} />
+                    <Route path="/home" element={<ProtectedRoute redirectTo="/"><Home /></ProtectedRoute>} />
                     <Route path="/hub/:hubKey" element={<HubPage />} />
                     <Route path="/auth" element={<Auth />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
