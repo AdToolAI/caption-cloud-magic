@@ -147,20 +147,32 @@ Deno.serve(async (req) => {
       'pages_manage_posts',
     ].join(',');
 
+    // Optional: Facebook Login for Business configuration ID.
+    // If the Meta App was migrated to "Facebook Login for Business",
+    // the legacy scope-based dialog is rejected and a `config_id` MUST
+    // be sent instead. Set META_LOGIN_CONFIG_ID as a secret to enable.
+    const configId = Deno.env.get('META_LOGIN_CONFIG_ID') || null;
+
     const authUrl = new URL('https://www.facebook.com/v24.0/dialog/oauth');
     authUrl.searchParams.set('client_id', clientId);
     authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', scopes);
     authUrl.searchParams.set('state', state);
-    authUrl.searchParams.set('auth_type', 'rerequest');
-    authUrl.searchParams.set('auth_nonce', crypto.randomUUID().replace(/-/g, ''));
-    authUrl.searchParams.set('display', 'page');
+    if (configId) {
+      // Business Login flow — scopes are defined inside the configuration.
+      authUrl.searchParams.set('config_id', configId);
+    } else {
+      // Classic Facebook Login — pass scopes inline.
+      authUrl.searchParams.set('scope', scopes);
+    }
 
     const finalAuthUrl = authUrl.toString();
     console.log('[facebook-oauth-start] Authorize URL built', {
       user_id: user.id,
-      url_preview: finalAuthUrl.slice(0, 140) + '…',
+      redirect_uri: redirectUri,
+      uses_config_id: !!configId,
+      scopes: configId ? null : scopes,
+      url_preview: finalAuthUrl.slice(0, 200) + '…',
     });
 
     return new Response(
