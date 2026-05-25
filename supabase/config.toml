@@ -810,3 +810,6 @@ verify_jwt = false
 [functions.twoshot-lipsync-watchdog]
 verify_jwt = false
 timeout_sec = 120
+
+[functions.auth-email-hook]
+verify_jwt = false
