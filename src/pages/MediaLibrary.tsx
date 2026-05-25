@@ -247,6 +247,7 @@ export default function MediaLibrary() {
 
   useEffect(() => {
     applyFilters();
+    setVisibleCount(PAGE_SIZE);
   }, [media, searchQuery, filterType, categoryFilter, cloudFiles]);
 
   // Auto-load cloud files when cloud tab is selected
