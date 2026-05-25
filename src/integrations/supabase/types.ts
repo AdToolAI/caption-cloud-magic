@@ -7053,40 +7053,64 @@ export type Database = {
       }
       email_send_log: {
         Row: {
-          category: string
           created_at: string
-          error: string | null
-          from_email: string
+          error_message: string | null
           id: string
-          resend_id: string | null
+          message_id: string | null
+          metadata: Json | null
+          recipient_email: string
           status: string
-          subject: string
-          template: string | null
-          to_email: string
+          template_name: string
         }
         Insert: {
-          category: string
           created_at?: string
-          error?: string | null
-          from_email: string
+          error_message?: string | null
           id?: string
-          resend_id?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email: string
           status: string
-          subject: string
-          template?: string | null
-          to_email: string
+          template_name: string
         }
         Update: {
-          category?: string
           created_at?: string
-          error?: string | null
-          from_email?: string
+          error_message?: string | null
           id?: string
-          resend_id?: string | null
+          message_id?: string | null
+          metadata?: Json | null
+          recipient_email?: string
           status?: string
-          subject?: string
-          template?: string | null
-          to_email?: string
+          template_name?: string
+        }
+        Relationships: []
+      }
+      email_send_state: {
+        Row: {
+          auth_email_ttl_minutes: number
+          batch_size: number
+          id: number
+          retry_after_until: string | null
+          send_delay_ms: number
+          transactional_email_ttl_minutes: number
+          updated_at: string
+        }
+        Insert: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_email_ttl_minutes?: number
+          batch_size?: number
+          id?: number
+          retry_after_until?: string | null
+          send_delay_ms?: number
+          transactional_email_ttl_minutes?: number
+          updated_at?: string
         }
         Relationships: []
       }
@@ -7108,6 +7132,30 @@ export type Database = {
           email?: string
           reason?: string
           suppressed_at?: string
+        }
+        Relationships: []
+      }
+      email_unsubscribe_tokens: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          token: string
+          used_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          token: string
+          used_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          token?: string
+          used_at?: string | null
         }
         Relationships: []
       }
@@ -13392,6 +13440,30 @@ export type Database = {
           },
         ]
       }
+      suppressed_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          metadata: Json | null
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          metadata?: Json | null
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string
+        }
+        Relationships: []
+      }
       synthetic_probe_runs: {
         Row: {
           error_message: string | null
@@ -16856,6 +16928,10 @@ export type Database = {
         Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
         Returns: number
       }
+      delete_email: {
+        Args: { message_id: number; queue_name: string }
+        Returns: boolean
+      }
       enforce_user_video_library_limits: {
         Args: {
           _max_storage_mb?: number
@@ -16866,6 +16942,10 @@ export type Database = {
       }
       enforce_video_creations_limit_for_user: {
         Args: { _max_videos?: number; _user_id: string }
+        Returns: number
+      }
+      enqueue_email: {
+        Args: { payload: Json; queue_name: string }
         Returns: number
       }
       get_ai_superuser_id: { Args: never; Returns: string }
@@ -16981,6 +17061,15 @@ export type Database = {
           similarity: number
         }[]
       }
+      move_to_dlq: {
+        Args: {
+          dlq_name: string
+          message_id: number
+          payload: Json
+          source_queue: string
+        }
+        Returns: number
+      }
       owns_composer_project: { Args: { _project_id: string }; Returns: boolean }
       purchase_character: {
         Args: {
@@ -16998,6 +17087,14 @@ export type Database = {
       qa_record_spend: {
         Args: { _amount_cents: number; _category: string }
         Returns: undefined
+      }
+      read_email_batch: {
+        Args: { batch_size: number; queue_name: string; vt: number }
+        Returns: {
+          message: Json
+          msg_id: number
+          read_ct: number
+        }[]
       }
       record_streak_activity: {
         Args: { p_user_id: string }
