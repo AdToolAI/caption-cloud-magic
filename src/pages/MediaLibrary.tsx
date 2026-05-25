@@ -1350,6 +1350,19 @@ export default function MediaLibrary() {
         })}
       </div>
 
+      {visibleCount < filteredMedia.length && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          >
+            Mehr laden ({visibleCount} von {filteredMedia.length})
+          </Button>
+        </div>
+      )}
+
+
+
       {filteredMedia.length === 0 && !loading && categoryFilter !== 'cloud' && (
         <Card className="p-12">
           <div className="text-center">
