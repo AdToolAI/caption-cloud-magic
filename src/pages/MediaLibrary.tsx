@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { LazyVideoThumb } from "@/components/media-library/LazyVideoThumb";
 import { DEMO_VIDEO, isDemoVideo } from "@/constants/demo-video";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
