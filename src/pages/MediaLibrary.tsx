@@ -1318,7 +1318,8 @@ export default function MediaLibrary() {
                       </TooltipTrigger>
                       <TooltipContent>Löschen</TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
+                  </>
+
                 </div>
               </div>
               <CardContent className="p-3">
