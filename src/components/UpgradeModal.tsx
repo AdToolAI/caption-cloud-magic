@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Sparkles } from "lucide-react";
 import {
@@ -9,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { pricingPlans, PlanType } from "@/config/pricing";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
 import { useTranslation } from "@/hooks/useTranslation";
 import { trackEvent, ANALYTICS_EVENTS } from "@/lib/analytics";
 

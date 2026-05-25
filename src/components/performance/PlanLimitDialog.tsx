@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Lock, Zap, TrendingUp, HardDrive } from "lucide-react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { pricingPlans } from "@/config/pricing";
 import { getCurrencyForLanguage } from "@/lib/currency";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
 
 interface PlanLimitDialogProps {
   open: boolean;
@@ -15,6 +17,14 @@ export const PlanLimitDialog = ({ open, onOpenChange, feature }: PlanLimitDialog
   const { t, language } = useTranslation();
   const currency = getCurrencyForLanguage(language);
   const symbol = currency === 'USD' ? '$' : '€';
+  const { hasFullAccess } = useTrialAccess();
+
+  // Trial / paid users: never show an upgrade wall.
+  useEffect(() => {
+    if (open && hasFullAccess) onOpenChange(false);
+  }, [open, hasFullAccess, onOpenChange]);
+
+  if (hasFullAccess) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
