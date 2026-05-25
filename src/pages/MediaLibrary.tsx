@@ -214,7 +214,7 @@ export default function MediaLibrary() {
         },
         (payload) => {
           console.log('🎥 Neues Video hinzugefügt:', payload);
-          loadMedia();
+          scheduleReload();
           toast({
             title: "🎬 Neues AI-Video verfügbar!",
             description: "Dein AI-Video wurde zur Mediathek hinzugefügt"
@@ -232,7 +232,7 @@ export default function MediaLibrary() {
         (payload) => {
           // Triggered when the 500-video auto-cleanup removes oldest entries.
           console.log('🧹 Video aus Mediathek entfernt (Auto-Cleanup):', payload);
-          loadMedia();
+          scheduleReload();
         }
       )
       .subscribe();
