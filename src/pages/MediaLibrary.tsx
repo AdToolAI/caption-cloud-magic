@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { LazyVideoThumb } from "@/components/media-library/LazyVideoThumb";
 import { DEMO_VIDEO, isDemoVideo } from "@/constants/demo-video";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -71,6 +72,19 @@ export default function MediaLibrary() {
   const [saveToAlbumImageId, setSaveToAlbumImageId] = useState<string | null>(null);
   const { connection: cloudConnection, cloudFiles, listCloudFiles, uploadToCloud, deleteFromCloud, syncing: cloudSyncing } = useCloudStorage();
 
+  // Pagination: how many cards we actually render
+  const [visibleCount, setVisibleCount] = useState(60);
+  const PAGE_SIZE = 60;
+
+  // Debounced reload to absorb realtime bursts (auto-cleanup deletes etc.)
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleReload = useCallback(() => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => {
+      loadMedia();
+    }, 800);
+  }, []);
+
   const handleSaveToAlbum = async (item: NormalizedMediaItem) => {
     if (!user) return;
     const { data, error } = await supabase
@@ -140,7 +154,7 @@ export default function MediaLibrary() {
           filter: `workspace_id=eq.${workspaceId}`
         },
         (payload) => {
-          loadMedia();
+          scheduleReload();
           if (payload.eventType === 'INSERT') {
             toast({
               title: "🎉 Neue Medien hinzugefügt!",
@@ -171,7 +185,7 @@ export default function MediaLibrary() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
-          loadMedia();
+          scheduleReload();
           loadStorageQuota();
         }
       )
@@ -200,7 +214,7 @@ export default function MediaLibrary() {
         },
         (payload) => {
           console.log('🎥 Neues Video hinzugefügt:', payload);
-          loadMedia();
+          scheduleReload();
           toast({
             title: "🎬 Neues AI-Video verfügbar!",
             description: "Dein AI-Video wurde zur Mediathek hinzugefügt"
@@ -218,7 +232,7 @@ export default function MediaLibrary() {
         (payload) => {
           // Triggered when the 500-video auto-cleanup removes oldest entries.
           console.log('🧹 Video aus Mediathek entfernt (Auto-Cleanup):', payload);
-          loadMedia();
+          scheduleReload();
         }
       )
       .subscribe();
@@ -233,6 +247,7 @@ export default function MediaLibrary() {
 
   useEffect(() => {
     applyFilters();
+    setVisibleCount(PAGE_SIZE);
   }, [media, searchQuery, filterType, categoryFilter, cloudFiles]);
 
   // Auto-load cloud files when cloud tab is selected
@@ -902,6 +917,7 @@ export default function MediaLibrary() {
   };
 
   return (
+    <TooltipProvider>
     <div className="container py-8 space-y-6">
       {/* Hidden file input */}
       <input
@@ -1123,7 +1139,7 @@ export default function MediaLibrary() {
       <>
       {/* Media Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filteredMedia.map((item) => {
+        {filteredMedia.slice(0, visibleCount).map((item) => {
           return (
             <Card key={item.id} className="overflow-hidden">
               <div className="aspect-square bg-muted flex items-center justify-center relative group">
@@ -1145,12 +1161,8 @@ export default function MediaLibrary() {
                 </div>
 
                 {item.type === 'video' && item.url ? (
-                  <video
+                  <LazyVideoThumb
                     src={item.url}
-                    className="object-cover w-full h-full cursor-pointer"
-                    muted
-                    playsInline
-                    preload="metadata"
                     onClick={() => setSelectedVideo(item.url)}
                   />
                 ) : item.type === 'image' && item.url ? (
@@ -1170,7 +1182,8 @@ export default function MediaLibrary() {
                 
                 {/* Action Overlay */}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                  <TooltipProvider>
+                  <>
+
                     {item.type === 'video' && item.url && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -1305,7 +1318,8 @@ export default function MediaLibrary() {
                       </TooltipTrigger>
                       <TooltipContent>Löschen</TooltipContent>
                     </Tooltip>
-                  </TooltipProvider>
+                  </>
+
                 </div>
               </div>
               <CardContent className="p-3">
@@ -1335,6 +1349,19 @@ export default function MediaLibrary() {
           );
         })}
       </div>
+
+      {visibleCount < filteredMedia.length && (
+        <div className="flex justify-center pt-2">
+          <Button
+            variant="outline"
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          >
+            Mehr laden ({visibleCount} von {filteredMedia.length})
+          </Button>
+        </div>
+      )}
+
+
 
       {filteredMedia.length === 0 && !loading && categoryFilter !== 'cloud' && (
         <Card className="p-12">
@@ -1382,5 +1409,6 @@ export default function MediaLibrary() {
         }}
       />
     </div>
+    </TooltipProvider>
   );
 }
