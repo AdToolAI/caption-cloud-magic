@@ -16,14 +16,11 @@ import { de } from 'date-fns/locale';
 
 type Row = {
   id: string;
-  to_email: string;
-  from_email: string;
-  subject: string;
-  template: string | null;
-  category: string;
-  status: 'sent' | 'failed' | 'suppressed';
-  resend_id: string | null;
-  error: string | null;
+  recipient_email: string;
+  template_name: string | null;
+  status: 'sent' | 'failed' | 'suppressed' | 'pending' | 'dlq' | 'bounced' | 'complained';
+  message_id: string | null;
+  error_message: string | null;
   created_at: string;
 };
 
@@ -32,6 +29,7 @@ interface Props {
 }
 
 const PAGE_SIZE = 50;
+const client = supabase as any;
 
 export function EmailLogTable({ range }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -54,16 +52,16 @@ export function EmailLogTable({ range }: Props) {
       else if (range === '7d') since.setDate(since.getDate() - 7);
       else since.setDate(since.getDate() - 30);
 
-      let q = supabase
+      let q = client
         .from('email_send_log')
         .select('*', { count: 'exact' })
         .gte('created_at', since.toISOString())
         .order('created_at', { ascending: false })
         .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
-      if (templateFilter !== 'all') q = q.eq('template', templateFilter);
+      if (templateFilter !== 'all') q = q.eq('template_name', templateFilter);
       if (statusFilter !== 'all') q = q.eq('status', statusFilter);
-      if (search.trim()) q = q.ilike('to_email', `%${search.trim()}%`);
+      if (search.trim()) q = q.ilike('recipient_email', `%${search.trim()}%`);
 
       const { data, count, error } = await q;
       if (cancelled) return;
@@ -85,14 +83,14 @@ export function EmailLogTable({ range }: Props) {
     const loadTemplates = async () => {
       const since = new Date();
       since.setDate(since.getDate() - 30);
-      const { data } = await supabase
+      const { data } = await client
         .from('email_send_log')
-        .select('template')
+        .select('template_name')
         .gte('created_at', since.toISOString())
-        .not('template', 'is', null)
+        .not('template_name', 'is', null)
         .limit(1000);
       const set = new Set<string>();
-      (data ?? []).forEach((r: any) => { if (r.template) set.add(r.template); });
+      (data ?? []).forEach((r: any) => { if (r.template_name) set.add(r.template_name); });
       setTemplates(Array.from(set).sort());
     };
     loadTemplates();
@@ -164,12 +162,12 @@ export function EmailLogTable({ range }: Props) {
                     <TableCell className="text-xs text-muted-foreground">
                       {format(new Date(r.created_at), 'dd.MM. HH:mm:ss', { locale: de })}
                     </TableCell>
-                    <TableCell className="font-mono text-xs">{r.template ?? '–'}</TableCell>
-                    <TableCell className="text-xs">{r.to_email}</TableCell>
-                    <TableCell className="text-xs max-w-[260px] truncate" title={r.subject}>{r.subject}</TableCell>
-                    <TableCell>{statusBadge(r.status)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate" title={r.error ?? r.resend_id ?? ''}>
-                      {r.error ?? r.resend_id ?? '–'}
+                    <TableCell className="font-mono text-xs">{r.template_name ?? '–'}</TableCell>
+                    <TableCell className="text-xs">{r.recipient_email}</TableCell>
+                    <TableCell className="text-xs max-w-[260px] truncate">–</TableCell>
+                    <TableCell>{statusBadge(r.status as any)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground max-w-[260px] truncate" title={r.error_message ?? r.message_id ?? ''}>
+                      {r.error_message ?? r.message_id ?? '–'}
                     </TableCell>
                   </TableRow>
                 ))}

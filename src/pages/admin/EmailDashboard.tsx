@@ -34,15 +34,16 @@ export function EmailDashboard() {
       const sinceIso = since.toISOString();
 
       // Send-Log counts (head:true = count-only)
+      const client = supabase as any;
       const [sentRes, suppRes, failRes, suppListRes] = await Promise.all([
-        supabase.from('email_send_log').select('*', { count: 'exact', head: true })
+        client.from('email_send_log').select('*', { count: 'exact', head: true })
           .gte('created_at', sinceIso).eq('status', 'sent'),
-        supabase.from('email_send_log').select('*', { count: 'exact', head: true })
+        client.from('email_send_log').select('*', { count: 'exact', head: true })
           .gte('created_at', sinceIso).eq('status', 'suppressed'),
-        supabase.from('email_send_log').select('*', { count: 'exact', head: true })
-          .gte('created_at', sinceIso).eq('status', 'failed'),
+        client.from('email_send_log').select('*', { count: 'exact', head: true })
+          .gte('created_at', sinceIso).in('status', ['failed', 'dlq']),
         // Fetch suppressions in window with email + reason for filtering
-        supabase.from('email_suppression_list')
+        client.from('email_suppression_list')
           .select('email, reason')
           .gte('suppressed_at', sinceIso)
           .limit(2000),
