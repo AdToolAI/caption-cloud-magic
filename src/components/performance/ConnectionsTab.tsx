@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
+import { useTrialAccess } from "@/hooks/useTrialAccess";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
+  const { hasFullAccess } = useTrialAccess();
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
@@ -244,24 +246,26 @@ export const ConnectionsTab = () => {
       origin: window.location.origin,
     });
     
-    // Check plan limits
-    if (userPlan === 'free') {
-      console.log('User on FREE plan, showing upgrade dialog');
-      setShowUpgradeDialog(true);
-      return;
+    // Check plan limits (skipped during active trial / paid plans)
+    if (!hasFullAccess) {
+      if (userPlan === 'free') {
+        console.log('User on FREE plan, showing upgrade dialog');
+        setShowUpgradeDialog(true);
+        return;
+      }
+
+      if (userPlan === 'pro' && connections.length >= 3) {
+        console.log('User on PRO plan but has 3 connections already');
+        toast({
+          title: t('common.error'),
+          description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
-    if (userPlan === 'pro' && connections.length >= 3) {
-      console.log('User on PRO plan but has 3 connections already');
-      toast({
-        title: t('common.error'),
-        description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    console.log('Plan check passed, proceeding...');
+    console.log('Plan check passed, proceeding...', { hasFullAccess });
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
