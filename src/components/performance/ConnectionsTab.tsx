@@ -415,6 +415,31 @@ export const ConnectionsTab = () => {
         return;
       }
 
+      // Facebook: Use backend OAuth flow on Graph API v24 (v18 triggers Meta "Feature unavailable")
+      if (providerId === 'facebook') {
+        try {
+          const { data: session } = await supabase.auth.getSession();
+          const { data, error } = await supabase.functions.invoke('facebook-oauth-start', {
+            body: { returnTo: window.location.href },
+            headers: {
+              Authorization: `Bearer ${session.session?.access_token}`,
+            },
+          });
+
+          if (error) throw error;
+          const url = data?.authUrl || data?.url;
+          if (!url) throw new Error('No auth URL received');
+          window.location.href = url;
+        } catch (error: any) {
+          toast({
+            title: t('common.error'),
+            description: error.message || 'Failed to start Facebook connection',
+            variant: 'destructive',
+          });
+        }
+        return;
+      }
+
       // Generate CSRF token and timestamp
       const csrf = crypto.randomUUID();
       const timestamp = Date.now();
