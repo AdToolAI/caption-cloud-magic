@@ -248,23 +248,24 @@ export const ConnectionsTab = () => {
       origin: window.location.origin,
     });
     
-    // Check plan limits (skipped during active trial / paid plans)
-    if (!hasFullAccess) {
+    // Check plan limits (skipped during active trial / paid plans / test-mode plans)
+    const planIsPaid = userPlan === 'pro' || userPlan === 'enterprise' || userPlan === 'basic';
+    if (!hasFullAccess && !planIsPaid) {
       if (userPlan === 'free') {
-        console.log('User on FREE plan, showing upgrade dialog');
+        console.log('User on FREE plan (no trial), showing upgrade dialog');
         setShowUpgradeDialog(true);
         return;
       }
+    }
 
-      if (userPlan === 'pro' && connections.length >= 3) {
-        console.log('User on PRO plan but has 3 connections already');
-        toast({
-          title: t('common.error'),
-          description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
-          variant: "destructive"
-        });
-        return;
-      }
+    if (userPlan === 'pro' && connections.length >= 3 && !hasFullAccess) {
+      console.log('User on PRO plan but has 3 connections already');
+      toast({
+        title: t('common.error'),
+        description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
+        variant: "destructive"
+      });
+      return;
     }
 
     console.log('Plan check passed, proceeding...', { hasFullAccess });
