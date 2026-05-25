@@ -917,6 +917,7 @@ export default function MediaLibrary() {
   };
 
   return (
+    <TooltipProvider>
     <div className="container py-8 space-y-6">
       {/* Hidden file input */}
       <input
