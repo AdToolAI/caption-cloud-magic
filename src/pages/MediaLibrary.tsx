@@ -185,7 +185,7 @@ export default function MediaLibrary() {
           filter: `user_id=eq.${user.id}`
         },
         () => {
-          loadMedia();
+          scheduleReload();
           loadStorageQuota();
         }
       )
