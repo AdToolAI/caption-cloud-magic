@@ -1,38 +1,31 @@
 ## Problem
 
-`https://useadtool.ai/home` führt für ausgeloggte Besucher zu einer fast leeren/kaputten Seite (siehe Screenshot: nur Header + Hero-Headline, dann schwarze Fläche). Grund:
-
-- `/home` rendert `<Home />` — das interne Dashboard, das auf eingeloggte User + Supabase-Daten (Posts, Strategy, Welcome-Bonus, Posting-Times …) angewiesen ist.
-- Die Route ist in `src/App.tsx:186` **nicht** mit `<ProtectedRoute>` umschlossen, anders als praktisch alle anderen App-Routen (`/account/delete`, `/brand-characters`, `/library`, …).
-- Folge: Ohne Session laufen die Hooks ins Leere, Sections rendern leer → "Abstellseite".
-
-Externe Backlinks, alte Bookmarks und Google-Snippets, die auf `/home` zeigen, landen damit auf einer toten Seite statt auf der Marketing-Startseite `/`.
+Neue Nutzer bekommen bei der Registrierung eine E-Mail mit Absender/Titel **„caption-cloud-magic"** statt **AdTool AI**. Grund: Im Projekt gibt es noch **keine eigenen Auth-E-Mail-Templates** — Supabase versendet die Default-Bestätigungs-Mails, in denen der interne Projektname auftaucht.
 
 ## Lösung
 
-Eine Zeile in `src/App.tsx`: `/home` schützen und ausgeloggte Besucher transparent auf die Landing-Page `/` umleiten.
+Eigene, AdTool-AI-gebrandete Auth-E-Mail-Templates aufsetzen, die alle Auth-Mails (Signup-Bestätigung, Passwort-Reset, Magic-Link, Invite, E-Mail-Wechsel, Reauth) im Look & Feel der App versenden.
 
-### Änderung in `src/App.tsx` (Zeile 186)
+## Schritte
 
-```tsx
-<Route
-  path="/home"
-  element={
-    <ProtectedRoute redirectTo="/">
-      <Home />
-    </ProtectedRoute>
-  }
-/>
-```
-
-Damit:
-- **Ausgeloggt** → `/home` → Redirect auf `/` (Landing `<Index />`)
-- **Eingeloggt** → `/home` → Dashboard wie bisher
-- Bestehender Flow `/` → `/home` für eingeloggte User (Zeile 183) bleibt unverändert → keine Redirect-Loop.
-
-Falls `ProtectedRoute` aktuell hart auf `/auth` redirected (statt konfigurierbar): kurz `src/components/ProtectedRoute.tsx` prüfen und ggf. ein optionales `redirectTo`-Prop ergänzen (Default `/auth`), damit `/home` speziell auf `/` zurückfällt — Marketing-Besucher sollen nicht direkt auf der Login-Maske landen.
+1. **Auth-E-Mail-Templates scaffolden** (6 Templates + `auth-email-hook` Edge Function)
+2. **Branding anwenden** auf Basis von `src/index.css` (Primary, Background, Foreground, Radius) und `Brand`-Komponente (Sparkles-Icon + „AdTool AI" Wortmarke):
+   - Body-Background: weiß (`#ffffff`) — Pflicht
+   - Buttons: Primary-Farbe aus Design-System
+   - Headings/Text in Foreground/Muted-Foreground
+   - Font-Stack passend zur App
+   - Mehrsprachig: DE als Default (App-Default), zusätzlich EN + ES (gemäß Core-Memory zur Lokalisierung)
+   - Absender-/Anrede-Name: **AdTool AI**
+   - Footer: „AdTool AI Team", Link zu `useadtool.ai`
+3. **Deploy** der `auth-email-hook` Edge Function
+4. **Aktivierung** läuft automatisch über die bereits konfigurierte Sender-Domain
 
 ## Out of Scope
 
-- Kein Umbau an `Home.tsx`, kein neues Routing, keine SEO-Änderung.
-- `canonical="/home"` im Dashboard bleibt — Crawler folgen der Redirect-Kette ohnehin nicht hinein, weil `/home` nicht in `sitemap.xml` steht.
+- Keine Änderungen am Auth-Flow selbst (Signup/Login)
+- Keine neuen transactional Emails (nur Auth)
+- Keine DNS-/Domain-Änderungen — bestehende Sender-Domain wird verwendet
+
+## Ergebnis
+
+Neue Anmeldungen erhalten eine Bestätigungs-E-Mail mit Betreff/Inhalt im AdTool-AI-Branding statt „caption-cloud-magic".
