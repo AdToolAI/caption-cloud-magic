@@ -1161,12 +1161,8 @@ export default function MediaLibrary() {
                 </div>
 
                 {item.type === 'video' && item.url ? (
-                  <video
+                  <LazyVideoThumb
                     src={item.url}
-                    className="object-cover w-full h-full cursor-pointer"
-                    muted
-                    playsInline
-                    preload="metadata"
                     onClick={() => setSelectedVideo(item.url)}
                   />
                 ) : item.type === 'image' && item.url ? (
