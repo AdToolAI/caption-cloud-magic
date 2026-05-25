@@ -36,7 +36,7 @@ const EMAIL_TEMPLATES: Record<string, React.ComponentType<any>> = {
 }
 
 // Configuration
-const SITE_NAME = "caption-cloud-magic"
+const SITE_NAME = "AdTool AI"
 const SENDER_DOMAIN = "notify.useadtool.ai"
 const ROOT_DOMAIN = "useadtool.ai"
 const FROM_DOMAIN = "useadtool.ai" // Domain shown in From address (may be root or sender subdomain)
