@@ -234,7 +234,7 @@ export function ImageGenerator() {
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
-          prompt: prompt.trim(),
+          prompt: effectivePrompt,
           style,
           aspectRatio,
           quality: 'fast',
@@ -251,12 +251,13 @@ export function ImageGenerator() {
     // Premium tier — Replicate via €-Wallet
     const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
       body: {
-        prompt: prompt.trim(),
+        prompt: effectivePrompt,
         tier,
         aspectRatio,
         style,
         referenceImageUrl: editMode ? referenceImage : undefined,
-        styleReferenceUrl: styleReference || undefined,
+        styleReferenceUrl: mode === 'restyle' ? (styleReference || undefined) : undefined,
+        strength: mode === 'transform' ? strength : undefined,
         brandKit: brandKitPayload,
       }
     });
