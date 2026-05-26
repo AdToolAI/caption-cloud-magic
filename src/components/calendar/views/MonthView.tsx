@@ -180,7 +180,7 @@ export function MonthView({
                       {dayPosts.length} {t("calendar.mobile.events")}
                     </div>
                   </div>
-                  {!readOnly && (
+                  {(
                     <Button
                       variant="outline"
                       size="sm"
