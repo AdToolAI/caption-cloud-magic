@@ -463,10 +463,21 @@ export function ImageGenerator() {
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardContent className="p-6 space-y-5">
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <Wand2 className="h-4 w-4 text-primary" />
-              {t('picStudio.prompt')}
-            </Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="flex items-center gap-2">
+                <Wand2 className="h-4 w-4 text-primary" />
+                {t('picStudio.prompt')}
+              </Label>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs"
+                onClick={() => setHelperOpen(true)}
+              >
+                <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                ✨ Prompt-Helfer
+              </Button>
+            </div>
             <Textarea
               placeholder={t('picStudio.promptPlaceholder')}
               value={prompt}
