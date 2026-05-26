@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils';
 interface ScheduleQuickFormProps {
   workspaceId: string;
   onSuccess?: (eventId: string) => void;
+  /** When set, the date is locked and only the time-of-day is editable. */
+  lockedDate?: Date;
+  /** Render without the outer Card chrome (for embedding in dialogs). */
+  embedded?: boolean;
 }
 
 const PLATFORMS = [
@@ -38,15 +42,25 @@ const PLATFORMS = [
   { id: 'youtube_shorts', label: 'YT Shorts', icon: Youtube, color: 'from-red-500 to-red-700', activeColor: 'bg-[#FF0000] text-white shadow-[0_0_15px_rgba(255,0,0,0.4)]' },
 ];
 
-export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
+const pad = (n: number) => n.toString().padStart(2, '0');
+const toDatetimeLocal = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded }: ScheduleQuickFormProps) {
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [when, setWhen] = useState(() => {
-    const date = new Date(Date.now() + 60 * 60 * 1000);
-    return date.toISOString().slice(0, 16);
+    if (lockedDate) {
+      const d = new Date(lockedDate);
+      d.setHours(9, 0, 0, 0);
+      return toDatetimeLocal(d);
+    }
+    return toDatetimeLocal(new Date(Date.now() + 60 * 60 * 1000));
   });
+  const [time, setTime] = useState(() => (lockedDate ? '09:00' : ''));
+
   const [channels, setChannels] = useState<string[]>(['instagram']);
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
