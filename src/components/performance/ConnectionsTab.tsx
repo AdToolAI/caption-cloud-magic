@@ -228,47 +228,27 @@ export const ConnectionsTab = () => {
   const handleConnect = async (
     providerId: string,
     providerName: string,
-    options: { forceReconsent?: boolean; forReview?: boolean } = {}
   ) => {
     // Diagnostic instrumentation — makes it possible to see in the browser
     // console exactly which path Instagram OAuth took (frontend builder vs.
     // backend `instagram-oauth-start`) and whether we are running on the
-    // preview or the published environment. Critical for Meta App Review
-    // root-cause analysis when Meta keeps short-circuiting the consent.
+    // preview or the published environment.
     const isPreviewHost = /id-preview--|lovableproject\.com|sandbox\.lovable\.dev/i.test(window.location.hostname);
     console.log('=== handleConnect START ===', {
       providerId,
       providerName,
       userPlan,
       connectionsCount: connections.length,
-      forReview: !!options.forReview,
-      forceReconsent: !!options.forceReconsent,
       host: window.location.hostname,
       env: isPreviewHost ? 'preview' : 'published',
       origin: window.location.origin,
     });
-    
-    // Check plan limits (skipped during active trial / paid plans / test-mode plans)
-    const planIsPaid = userPlan === 'pro' || userPlan === 'enterprise' || userPlan === 'basic';
-    if (!hasFullAccess && !planIsPaid) {
-      if (userPlan === 'free') {
-        console.log('User on FREE plan (no trial), showing upgrade dialog');
-        setShowUpgradeDialog(true);
-        return;
-      }
-    }
 
-    if (userPlan === 'pro' && connections.length >= 3 && !hasFullAccess) {
-      console.log('User on PRO plan but has 3 connections already');
-      toast({
-        title: t('common.error'),
-        description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
-        variant: "destructive"
-      });
-      return;
-    }
+    // No plan-based gating: Meta scopes are on Advanced Access for all users,
+    // and all other providers (TikTok/LinkedIn/X/YouTube) work the same for
+    // every authenticated user. Only requirement is that the user is logged in.
 
-    console.log('Plan check passed, proceeding...', { hasFullAccess });
+
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
