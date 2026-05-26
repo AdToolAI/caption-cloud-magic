@@ -251,7 +251,7 @@ export function MonthView({
           return (
             <motion.div
               key={day.toISOString()}
-              onClick={() => !readOnly && isCurrentMonth && onDateClick?.(day)}
+              onClick={() => isCurrentMonth && onDateClick?.(day)}
               onDragOver={isCurrentMonth ? handleDragOver : undefined}
               onDrop={isCurrentMonth ? (e) => handleDrop(e, day) : undefined}
               whileHover={isCurrentMonth ? { scale: 1.03 } : undefined}
@@ -288,7 +288,7 @@ export function MonthView({
                       {dayPosts.length}
                     </Badge>
                   )}
-                  {!readOnly && isCurrentMonth && (
+                  {isCurrentMonth && (
                     <Button
                       variant="ghost"
                       size="icon"

@@ -188,7 +188,7 @@ export function WeekView({
                   <Card
                     key={`${day.toISOString()}-${hour}`}
                     className="min-h-[60px] p-1 hover:bg-accent/50 cursor-pointer transition-colors"
-                    onClick={() => !readOnly && onDateClick?.(slotDate)}
+                    onClick={() => onDateClick?.(slotDate)}
                   >
                     <div className="space-y-1">
                       {timePosts.map((post) => (
