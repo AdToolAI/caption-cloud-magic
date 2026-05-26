@@ -31,12 +31,11 @@ export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
-  const { hasFullAccess } = useTrialAccess();
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showTokenDialog, setShowTokenDialog] = useState(false);
+
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
