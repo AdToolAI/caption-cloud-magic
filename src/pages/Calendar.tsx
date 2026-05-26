@@ -622,7 +622,6 @@ export default function Calendar() {
             <CalendarToolbar
               currentView={currentView}
               onViewChange={setCurrentView}
-              onFilter={handleFilter}
               onAddNote={handleAddNote}
               onCreateEvent={handleCreateEvent}
               onShare={handleShare}
@@ -642,10 +641,38 @@ export default function Calendar() {
                 setSelectedEventIds(draftEventIds);
               }}
               onDeselectAll={() => setSelectedEventIds([])}
+              filterSlot={
+                <CalendarFilterPopover
+                  filters={calendarFilters.filters}
+                  options={calendarFilters.options}
+                  saved={calendarFilters.saved}
+                  activeCount={calendarFilters.activeCount}
+                  onToggle={calendarFilters.toggle}
+                  onUpdate={calendarFilters.update}
+                  onReset={calendarFilters.reset}
+                  onSave={calendarFilters.saveCurrent}
+                  onLoad={calendarFilters.loadSaved}
+                  onDelete={calendarFilters.deleteSaved}
+                  ownerNames={ownerNames}
+                />
+              }
             />
             
             <NotificationBadge onClick={() => setShowNotifications(true)} />
           </div>
+
+          {/* Filter bar with chips + quick presets */}
+          <CalendarFilterBar
+            filters={calendarFilters.filters}
+            activeCount={calendarFilters.activeCount}
+            totalCount={events.length}
+            filteredCount={calendarFilters.filteredEvents.length}
+            ownerNames={ownerNames}
+            onUpdate={calendarFilters.update}
+            onToggle={calendarFilters.toggle}
+            onReset={calendarFilters.reset}
+            onApplyPreset={calendarFilters.applyPreset}
+          />
 
           {/* Metrics Dashboard - Compact (expandable) */}
           {showMetricsDashboard && events.length > 0 && (
