@@ -25,7 +25,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CampaignTab } from "./CampaignTab";
 import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { supabase } from "@/integrations/supabase/client";
@@ -86,6 +86,20 @@ const localeMap = { en: enUS, de, es } as const;
 
 export function PlannerV2({ className }: PlannerV2Props) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'posts';
+  const initialOpenTemplates = searchParams.get('newCampaign') === '1';
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  useEffect(() => {
+    if (initialOpenTemplates || searchParams.get('tab')) {
+      // Clean URL after consuming the params so refresh doesn't reopen the dialog.
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      next.delete('newCampaign');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const dateFnsLocale = localeMap[language] || enUS;
@@ -373,7 +387,7 @@ export function PlannerV2({ className }: PlannerV2Props) {
         </div>
       </Card>
 
-      <Tabs defaultValue="posts" className="mb-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
         <TabsList className="mb-4">
           <TabsTrigger value="posts" className="gap-2">
             <FileText className="h-4 w-4" />
@@ -686,7 +700,7 @@ export function PlannerV2({ className }: PlannerV2Props) {
         </TabsContent>
 
         <TabsContent value="campaigns">
-          <CampaignTab workspaceId={workspaceId} />
+          <CampaignTab workspaceId={workspaceId} initialOpenTemplates={initialOpenTemplates} />
         </TabsContent>
       </Tabs>
     </div>
