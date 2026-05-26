@@ -175,8 +175,17 @@ serve(async (req) => {
 
     if (eventsError) {
       console.error("❌ Events creation error:", eventsError);
-      throw eventsError;
+      return new Response(
+        JSON.stringify({
+          error: "Events konnten nicht erstellt werden",
+          code: eventsError.code || "EVENTS_INSERT_FAILED",
+          details: eventsError.message,
+          hint: eventsError.hint || null,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
 
     console.log(`✅ Successfully created ${createdEvents?.length} events from template "${template.name}"`);
 
