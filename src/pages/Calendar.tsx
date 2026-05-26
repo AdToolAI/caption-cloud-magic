@@ -841,6 +841,10 @@ export default function Calendar() {
         date={prefillDate}
         workspaceId={selectedWorkspace || ''}
         onSuccess={invalidateEvents}
+        onEventClick={(eventId) => {
+          setSelectedEventId(eventId);
+          setShowEventDrawer(true);
+        }}
       />
     </div>
   );
