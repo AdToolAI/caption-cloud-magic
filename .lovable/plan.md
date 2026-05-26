@@ -1,55 +1,98 @@
-## Ziel
+## Filter-Funktion ausbauen — Advanced Filter Panel
 
-Die drei statischen Dropdowns (`Workspace · Mandant · Marke`) im Calendar-Header durch einen **adaptiven Context-Switcher** ersetzen, der sich an die tatsächliche Account-Struktur des Nutzers anpasst. Die Filterlogik dahinter (`workspace_id`, `client_id`, `brand_kit_id`) bleibt 1:1 erhalten — geändert wird nur die UI-Schicht.
+Aktuell zeigt der Filter-Button nur einen Toast ("Filter-Funktion kommt bald"). Ziel: ein vollwertiges, sichtbares Filter-System für den intelligenten Kalender, das in **allen Views** (Monat/Woche/Liste/Kanban/Heatmap) live wirkt — ohne den Header zu überladen.
 
-## Verhalten je Account-Typ
+### UX-Konzept
 
-| Fall | Was wird angezeigt |
-|---|---|
-| 1 Workspace · 0 Clients · ≤1 Brand (Solo) | Nur ein dezenter Brand-Chip mit Logo/Name (oder gar nichts, wenn keine Brand). Kein Dropdown. |
-| 1 Workspace · 0 Clients · >1 Brand | Ein einziger Pill `🎨 [Brand] ▾` (Brand-Switch). |
-| ≥1 Client (Agentur) | Pill `👤 [Mandant] ▾`. Wahl eines Mandanten filtert die Brand-Liste automatisch (Kaskade). Brand-Pill erscheint nur wenn der Mandant >1 Brand hat. |
-| Mehrere Workspaces | Workspace-Switch wandert in ein kleines Icon-Menü (⚙ links neben dem Context-Pill). |
-| Power-User | Rechts ein `Sliders`-Icon öffnet ein Popover mit allen drei klassischen Selects + "Filter zurücksetzen". |
+Statt eines simplen Dialogs bauen wir einen **inline Filter-Bar mit Chip-Logik**, der unter der Toolbar erscheint, wenn der Filter aktiv ist. Das passt zum James-Bond-2028-Design (Gold-Akzente, Glassmorphism) und ist deutlich nützlicher als ein Modal.
 
-Ergebnis: Der Header ist im Normalfall ~60 % schlanker, Solo-User sehen keine leeren Agentur-Filter mehr.
+```text
+[Toolbar: Monat Woche Liste Kanban Heatmap]  [Filter ▾] [+ Neu]
+└─ wenn aktiv ─────────────────────────────────────────────────
+   🔵 Status: Geplant ×   📱 Kanal: Instagram, TikTok ×   
+   👤 Owner: Du ×   🏷 Tag: launch ×   [Alle löschen]  3 aktiv
+```
 
-## Komponenten
+### Filter-Dimensionen (alle Multi-Select)
 
-**Neu:**
-- `src/components/calendar/ContextSwitcher.tsx` — Hauptkomponente. Bekommt `workspaces`, `clients`, `brands`, aktuelle Auswahl und Setter. Entscheidet selbst, welche Pills sie rendert (Logik s. Tabelle oben).
-- `src/components/calendar/ContextSwitcherPopover.tsx` — "Mehr Filter"-Popover mit den 3 vollen Selects als Fallback/Power-Mode.
-- `src/components/calendar/ContextPill.tsx` — Wiederverwendbarer Glassmorphism-Pill im Bond-2028-Stil (gold border, cyan hover-glow, ChevronDown, optionales Icon).
+1. **Status** — draft, briefing, in_progress, review, approved, scheduled, published, failed (Farb-Chips wie im Kanban)
+2. **Kanal** — Instagram, TikTok, YouTube, Facebook, LinkedIn, X (mit Plattform-Icons)
+3. **Owner / Assignee** — aus workspace_members
+4. **Tags / Hashtags** — Freitext-Combobox aus distinct(tags) der Events
+5. **Kampagne** — Dropdown aus campaigns
+6. **Zeitraum-Preset** — Heute, Diese Woche, Diesen Monat, Nächste 7/30 Tage, Eigener Bereich
+7. **Medien-Typ** — Bild, Video, Carousel, Text-only (aus assets_json abgeleitet)
+8. **Suche** — Volltext über title + caption + brief (debounced 300ms)
 
-**Geändert:**
-- `src/components/calendar/CalendarHeader.tsx` — Block mit den drei `<Select>`-Elementen ersetzt durch `<ContextSwitcher ... />`. Sync-/Integrations-Buttons rechts bleiben unverändert.
+### Quick-Filter-Presets (Speed-Layer)
 
-**Unverändert:** `Calendar.tsx` (State + Query-Keys), alle Filterlogik, alle Child-Views.
+Pills direkt in der Filter-Bar:
+- "Meine Posts" → owner = current user
+- "Diese Woche" → date range = current week
+- "Braucht Review" → status ∈ {review}
+- "Failed" → status = failed (rot pulsierend, wenn >0)
+- "Drafts" → status ∈ {draft, briefing, in_progress}
 
-## Technische Details
+Sowie **gespeicherte Filter** (max 5, in localStorage pro Workspace), z.B. "Q3-Launch IG-only".
 
-- **Auto-Selection beim Mount:** Wenn nach dem Laden `selectedBrand === ""` und es genau 1 Brand gibt → auto-set. Analog für Workspace (war schon so) und Client (nur wenn genau 1 vorhanden).
-- **Mandant→Brand-Kaskade:** Wenn `clients.length > 0` und ein Mandant ausgewählt wird, filtere die Brand-Liste auf `brand.client_id === selectedClient` (Feld existiert; falls nicht, kein Filter — degradiert sauber).
-- **Pill-States:** `default` (neutral), `active` (gold border + leichter cyan glow), `disabled` (opacity 0.4). Hover: subtle scale + cyan ring (Bond-Tokens, keine Hardcoded-Farben).
-- **Mobile:** Pills wrappen wie bisher (`flex-wrap`); Popover wird zum `Sheet`.
-- **Keine i18n-Änderungen** — bestehende Keys `calendar.selectWorkspace/Client/Brand` werden für die Labels im Popover wiederverwendet; neue Pill-Labels lesen direkt `workspace.name` / `client.name` / `brand.brand_name`.
+### Architektur
 
-## Animation (Bond 2028)
+**Neue Dateien**
+- `src/components/calendar/filters/CalendarFilterBar.tsx` — Inline-Bar mit aktiven Chips + Quick-Presets
+- `src/components/calendar/filters/CalendarFilterPopover.tsx` — Popover mit 8 Filter-Sektionen (öffnet aus dem Filter-Button der Toolbar)
+- `src/components/calendar/filters/FilterChip.tsx` — Glassmorphism-Chip mit ×-Remove
+- `src/components/calendar/filters/SavedFilters.tsx` — Speichern/Laden in localStorage
+- `src/hooks/useCalendarFilters.ts` — State + Logik (filter object, applyFilters(events), reset, save/load)
+- `src/lib/calendar/filter-engine.ts` — pure Funktion `applyFilters(events, filters): Event[]`
 
-- Pill-Wechsel: `framer-motion` `layout` für sanften Reflow beim Einblenden/Verstecken.
-- Aktive Pill: dünner animierter Gold-Underline (cyan→gold Gradient), 800 ms loop.
+**Geänderte Dateien**
+- `src/pages/Calendar.tsx` — `handleFilter`-Toast entfernen, `useCalendarFilters` einbinden, `filteredEvents` an Views durchreichen, `<CalendarFilterBar />` über Toolbar einblenden wenn `activeFilterCount > 0`
+- `src/components/calendar/CalendarToolbar.tsx` — Filter-Button öffnet jetzt das `CalendarFilterPopover` statt `onFilter`-Callback; Badge mit aktiver Filter-Anzahl auf dem Filter-Icon
+- `src/lib/translations.ts` — neue Keys für DE/EN/ES: `calendar.filters.*`
 
-## Out of Scope (Stage 2, falls gewünscht)
+### Filter-State-Shape
 
-- "⌘K"-Quick-Switcher für Brand/Mandant
-- Persistente "Last used context" in localStorage pro User
-- Multi-Brand-Selektion (gleichzeitige Mehrfachfilterung)
-- Anwendung des gleichen Switchers auf andere Module (Analytics, Planner)
+```ts
+type CalendarFilters = {
+  search: string;
+  statuses: string[];
+  channels: string[];
+  owners: string[];
+  tags: string[];
+  campaignId: string | null;
+  mediaTypes: ('image' | 'video' | 'carousel' | 'text')[];
+  dateRange: { from: Date | null; to: Date | null } | null;
+};
+```
 
-## Akzeptanzkriterien
+URL-Sync via `useSearchParams` (z.B. `?status=scheduled,review&channel=instagram`) — dadurch teilbar und persistent über Reloads.
 
-1. Solo-User mit 1 Brand sieht **gar keinen** Workspace/Mandant-Dropdown — nur den Brand-Chip (oder nichts).
-2. Agentur-User mit 3 Mandanten sieht 1 Mandant-Pill; Brand-Pill nur wenn der gewählte Mandant >1 Brand hat.
-3. Power-User kann jederzeit über das Sliders-Icon das volle Filter-Popover öffnen.
-4. Alle bestehenden Query-Keys (`['calendar-events', selectedWorkspace, selectedClient, selectedBrand]`) erhalten weiterhin korrekte Werte → keine Cache-Brüche.
-5. Mobile bleibt nutzbar (Pills wrappen, Popover wird zu Sheet).
+### Visuelles Verhalten
+
+- Filter-Icon in Toolbar bekommt **gold-pulsierenden Badge** mit Zahl (analog Notification-Badge)
+- Aktive Chips: gold border + cyan hover-glow (passend zu ContextSwitcher)
+- "Alle löschen" rechts in der Bar, mit subtilem fade-in
+- Empty-State im Kalender ändert sich zu: "Keine Posts entsprechen deinen Filtern" + Button "Filter zurücksetzen"
+- Heatmap respektiert Filter (Aggregation läuft auf gefilterten Events)
+- Mobile: Filter-Bar wird zur horizontal scrollbaren Pill-Row; Popover wird zum `Sheet`
+
+### Performance
+
+- `useMemo` für `filteredEvents` (Re-compute nur bei Filter- oder Event-Change)
+- Tag-Combobox lazy-loaded aus distinct DB-Query (cached 5min via react-query)
+- Search debounced 300ms
+
+### Out of Scope (Stage 2)
+- Server-seitige Filter (aktuell client-side, da Events bereits geladen sind — bei >5000 Events später nach Supabase pushen)
+- Smart-Filter via AI ("zeig mir underperforming IG-Posts der letzten 2 Wochen")
+- Team-shared Saved Filters (DB-backed)
+
+### Acceptance Criteria
+1. Klick auf Filter-Button öffnet Popover mit allen 8 Dimensionen (kein Toast mehr)
+2. Aktive Filter erscheinen als entfernbare Chips über dem Kalender
+3. Filter wirken live in allen 5 Views inkl. Heatmap
+4. Quick-Presets ("Meine Posts", "Diese Woche", ...) funktionieren mit 1 Klick
+5. Saved Filters lassen sich anlegen, laden, löschen (max 5)
+6. Filter-State ist in URL gespiegelt und überlebt Reload
+7. Mobile bleibt nutzbar (Sheet statt Popover, scrollbare Chip-Row)
+8. Vollständig in DE/EN/ES lokalisiert

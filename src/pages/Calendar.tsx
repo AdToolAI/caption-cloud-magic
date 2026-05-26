@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -41,6 +41,9 @@ import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { NotificationBadge } from "@/components/calendar/NotificationBadge";
 import { BulkScheduleDialog } from "@/components/calendar/BulkScheduleDialog";
 import { RecurringRuleDialog } from "@/components/calendar/RecurringRuleDialog";
+import { useCalendarFilters } from "@/hooks/useCalendarFilters";
+import { CalendarFilterPopover } from "@/components/calendar/filters/CalendarFilterPopover";
+import { CalendarFilterBar } from "@/components/calendar/filters/CalendarFilterBar";
 
 interface CalendarEvent {
   id: string;
@@ -265,6 +268,19 @@ export default function Calendar() {
 
   const loading = workspacesLoading || eventsLoading;
 
+  // Advanced filter system
+  const filterScope = selectedWorkspace ?? null;
+  const calendarFilters = useCalendarFilters(events as any, filterScope);
+  const ownerNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    (workspaceMembers as any[]).forEach((m) => {
+      const id = m.user_id ?? m.id;
+      const name = m.profiles?.email || m.profiles?.full_name || id;
+      if (id) map[id] = name;
+    });
+    return map;
+  }, [workspaceMembers]);
+
   useEffect(() => {
     if (user) {
       fetchUserPlan();
@@ -424,9 +440,6 @@ export default function Calendar() {
     }
   };
 
-  const handleFilter = () => {
-    toast.info(t("calendar.messages.filterComingSoon"));
-  };
 
   const handleShare = () => {
     toast.info(t("calendar.messages.shareComingSoon"));
@@ -500,7 +513,7 @@ export default function Calendar() {
 
   const renderView = () => {
     // Transform events to Post format that views expect
-    const transformedPosts = events.map(event => ({
+    const transformedPosts = (calendarFilters.filteredEvents as typeof events).map(event => ({
       id: event.id,
       title: event.title,
       channels: event.channels,
@@ -606,7 +619,6 @@ export default function Calendar() {
             <CalendarToolbar
               currentView={currentView}
               onViewChange={setCurrentView}
-              onFilter={handleFilter}
               onAddNote={handleAddNote}
               onCreateEvent={handleCreateEvent}
               onShare={handleShare}
@@ -626,10 +638,38 @@ export default function Calendar() {
                 setSelectedEventIds(draftEventIds);
               }}
               onDeselectAll={() => setSelectedEventIds([])}
+              filterSlot={
+                <CalendarFilterPopover
+                  filters={calendarFilters.filters}
+                  options={calendarFilters.options}
+                  saved={calendarFilters.saved}
+                  activeCount={calendarFilters.activeCount}
+                  onToggle={calendarFilters.toggle}
+                  onUpdate={calendarFilters.update}
+                  onReset={calendarFilters.reset}
+                  onSave={calendarFilters.saveCurrent}
+                  onLoad={calendarFilters.loadSaved}
+                  onDelete={calendarFilters.deleteSaved}
+                  ownerNames={ownerNames}
+                />
+              }
             />
             
             <NotificationBadge onClick={() => setShowNotifications(true)} />
           </div>
+
+          {/* Filter bar with chips + quick presets */}
+          <CalendarFilterBar
+            filters={calendarFilters.filters}
+            activeCount={calendarFilters.activeCount}
+            totalCount={events.length}
+            filteredCount={calendarFilters.filteredEvents.length}
+            ownerNames={ownerNames}
+            onUpdate={calendarFilters.update}
+            onToggle={calendarFilters.toggle}
+            onReset={calendarFilters.reset}
+            onApplyPreset={calendarFilters.applyPreset}
+          />
 
           {/* Metrics Dashboard - Compact (expandable) */}
           {showMetricsDashboard && events.length > 0 && (

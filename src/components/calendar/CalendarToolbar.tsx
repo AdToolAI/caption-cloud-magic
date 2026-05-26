@@ -20,7 +20,7 @@ export interface CalendarToolbarProps {
   onCreateEvent?: () => void;
   onAddNote: () => void;
   onExport: (format: 'csv' | 'pdf' | 'ics' | 'metrics') => void;
-  onFilter: () => void;
+  onFilter?: () => void;
   onShare: () => void;
   onOpenAutoSchedule?: () => void;
   onOpenCampaignTemplates?: () => void;
@@ -31,6 +31,8 @@ export interface CalendarToolbarProps {
   selectedEventsCount?: number;
   onSelectAllDrafts?: () => void;
   onDeselectAll?: () => void;
+  /** Slot for the rich filter popover (rendered in toolbar). */
+  filterSlot?: React.ReactNode;
 }
 
 export function CalendarToolbar({
@@ -51,6 +53,7 @@ export function CalendarToolbar({
   selectedEventsCount = 0,
   onSelectAllDrafts,
   onDeselectAll,
+  filterSlot,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
@@ -85,9 +88,13 @@ export function CalendarToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="z-50 bg-popover">
-              <DropdownMenuItem onClick={onFilter}>
-                <Filter className="w-4 h-4 mr-2" /> {t("calendar.actions.filter")}
-              </DropdownMenuItem>
+              {filterSlot ? (
+                <div className="px-2 py-1.5">{filterSlot}</div>
+              ) : onFilter ? (
+                <DropdownMenuItem onClick={onFilter}>
+                  <Filter className="w-4 h-4 mr-2" /> {t("calendar.actions.filter")}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
                 <StickyNote className="w-4 h-4 mr-2" /> {t("calendar.actions.addNote")}
               </DropdownMenuItem>
@@ -165,14 +172,18 @@ export function CalendarToolbar({
             </Button>
           )}
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onFilter}
-            className="h-8 px-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
-          >
-            <Filter className="w-3.5 h-3.5" />
-          </Button>
+          {filterSlot ?? (
+            onFilter ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onFilter}
+                className="h-8 px-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
+              >
+                <Filter className="w-3.5 h-3.5" />
+              </Button>
+            ) : null
+          )}
           
           {onOpenAutoSchedule && selectedEventsCount > 0 && (
             <Button 
