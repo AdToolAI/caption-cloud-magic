@@ -15,6 +15,7 @@ interface Props {
   variantsCount: 1 | 4;
   cost: number;
   currencySymbol: string;
+  hasReference?: boolean;
   onSwitchTier: (tier: QualityTier) => void;
   onOpenHelper: () => void;
   onSetVariants: (n: 1 | 4) => void;
@@ -25,7 +26,7 @@ interface Props {
  * Catches risky combinations BEFORE credits are spent.
  */
 export function PreflightCheck({
-  mode, tier, prompt, variantsCount, cost, currencySymbol,
+  mode, tier, prompt, variantsCount, cost, currencySymbol, hasReference = false,
   onSwitchTier, onOpenHelper, onSetVariants,
 }: Props) {
   const tips: { icon: 'warn' | 'info'; text: string; action?: { label: string; run: () => void } }[] = [];
@@ -61,6 +62,14 @@ export function PreflightCheck({
       icon: 'info',
       text: `Dein Prompt ist sehr kurz (${wordCount} Wörter). Der Prompt-Helfer baut daraus einen ausführlichen Master-Prompt.`,
       action: { label: 'Prompt-Helfer öffnen', run: onOpenHelper },
+    });
+  }
+
+  // 4) Nano Banana strict safety filter — warn when ultra tier + reference image
+  if (tier === 'ultra' && hasReference) {
+    tips.push({
+      icon: 'info',
+      text: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird die Generierung oft blockiert — dann statt Referenz das Motiv im Prompt beschreiben oder „Pro" wählen.',
     });
   }
 

@@ -265,13 +265,15 @@ export function ImageGenerator() {
     if (error) {
       const fnError: any = error;
       if (fnError.context && typeof fnError.context.json === 'function') {
-        const body = await fnError.context.json();
+        const body = await fnError.context.json().catch(() => null);
         if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
           const err: any = new Error(body.error);
           err.needsPurchase = true;
           throw err;
         }
-        throw new Error(body?.error || fnError.message);
+        const err: any = new Error(body?.error || fnError.message);
+        err.code = body?.code;
+        throw err;
       }
       throw error;
     }
@@ -300,6 +302,7 @@ export function ImageGenerator() {
       const results = await Promise.allSettled(tasks);
 
       let successCount = 0;
+      let safetyFilteredMsg: string | null = null;
       for (const r of results) {
         if (r.status === 'fulfilled' && r.value) {
           await handleGenerationSuccess(r.value);
@@ -311,12 +314,22 @@ export function ImageGenerator() {
             setReplicateLoading(false);
             return;
           }
+          if ((r.reason as any)?.code === 'SAFETY_FILTERED') {
+            safetyFilteredMsg = r.reason.message;
+          }
           console.error('[ImageGenerator] variant failed:', r.reason);
         }
       }
 
       if (successCount === 0) {
-        toast.error('Bildgenerierung fehlgeschlagen');
+        if (safetyFilteredMsg) {
+          toast.warning('Sicherheitsfilter ausgelöst', {
+            description: safetyFilteredMsg,
+            duration: 12000,
+          });
+        } else {
+          toast.error('Bildgenerierung fehlgeschlagen');
+        }
       } else if (variantsCount > 1) {
         toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
       }
@@ -722,6 +735,7 @@ export function ImageGenerator() {
             variantsCount={variantsCount}
             cost={cost}
             currencySymbol={currencySymbol}
+            hasReference={!!referenceImage}
             onSwitchTier={(t) => setTier(t as QualityTier)}
             onOpenHelper={() => setHelperOpen(true)}
             onSetVariants={setVariantsCount}
