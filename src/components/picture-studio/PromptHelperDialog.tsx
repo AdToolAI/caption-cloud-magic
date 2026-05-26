@@ -141,7 +141,11 @@ export function PromptHelperDialog({
             {referenceImageUrl && (
               <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20 text-xs">
                 <ImageIcon className="h-4 w-4 text-primary shrink-0" />
-                <span>Dein Referenzbild wird mitanalysiert.</span>
+                <span>
+                  {autoEnhance
+                    ? 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.'
+                    : 'Dein Referenzbild wird mitanalysiert.'}
+                </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
               </div>
             )}
