@@ -88,9 +88,13 @@ export function CalendarToolbar({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="z-50 bg-popover">
-              <DropdownMenuItem onClick={onFilter}>
-                <Filter className="w-4 h-4 mr-2" /> {t("calendar.actions.filter")}
-              </DropdownMenuItem>
+              {filterSlot ? (
+                <div className="px-2 py-1.5">{filterSlot}</div>
+              ) : onFilter ? (
+                <DropdownMenuItem onClick={onFilter}>
+                  <Filter className="w-4 h-4 mr-2" /> {t("calendar.actions.filter")}
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem onClick={onAddNote} disabled={readOnly}>
                 <StickyNote className="w-4 h-4 mr-2" /> {t("calendar.actions.addNote")}
               </DropdownMenuItem>
