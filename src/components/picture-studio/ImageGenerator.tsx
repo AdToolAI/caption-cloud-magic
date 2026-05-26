@@ -533,32 +533,63 @@ export function ImageGenerator() {
             </div>
           </div>
 
-          {/* Phase C — Style Reference + Brand-Kit Lock */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Style Reference Slot */}
-            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-primary" />
-                  Style Reference
-                  <span className="text-[10px] text-muted-foreground">(Fast/Ultra)</span>
-                </Label>
-                {styleReference && (
+          {/* MODE SWITCH — replaces the old dual-slot UI */}
+          <div className="space-y-2">
+            <Label className="text-xs">Modus</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(PICTURE_MODES) as PictureMode[]).map((m) => {
+                const meta = PICTURE_MODES[m];
+                const active = mode === m;
+                return (
                   <button
-                    onClick={() => setStyleReference(null)}
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    className={`p-3 rounded-lg border text-left transition-all ${
+                      active
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border/50 bg-background/30 hover:border-border'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm mb-0.5">{meta.label}</div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{meta.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SINGLE REFERENCE SLOT — only shown when the mode needs one */}
+          {PICTURE_MODES[mode].needsReference && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1.5">
+                  {mode === 'transform' ? (
+                    <><ImageIcon className="h-3.5 w-3.5 text-primary" /> Vorlage-Bild (wird verwandelt)</>
+                  ) : (
+                    <><Palette className="h-3.5 w-3.5 text-primary" /> Stil-Referenz (Farben/Mood)</>
+                  )}
+                </Label>
+                {(mode === 'transform' ? referenceImage : styleReference) && (
+                  <button
+                    onClick={() => mode === 'transform' ? setReferenceImage(null) : setStyleReference(null)}
                     className="text-[10px] text-muted-foreground hover:text-destructive"
                   >
                     Entfernen
                   </button>
                 )}
               </div>
-              {styleReference ? (
+              {(mode === 'transform' ? referenceImage : styleReference) ? (
                 <button
                   type="button"
-                  onClick={() => styleRefInputRef.current?.click()}
-                  className="relative block w-full h-16 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
+                  className="relative block w-full h-24 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
                 >
-                  <img src={styleReference} className="h-full w-full object-cover" alt="Style Reference" />
+                  <img
+                    src={mode === 'transform' ? referenceImage! : styleReference!}
+                    className="h-full w-full object-cover"
+                    alt="Reference"
+                  />
                   <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="h-4 w-4" />
                   </div>
@@ -567,121 +598,131 @@ export function ImageGenerator() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full h-16 border-dashed"
-                  onClick={() => styleRefInputRef.current?.click()}
+                  className="w-full h-24 border-dashed"
+                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
-                  Style-Bild hochladen
+                  Bild hochladen
                 </Button>
               )}
-              <input
-                ref={styleRefInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleStyleRefUpload}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Übernimmt Farbpalette & Ästhetik des Referenzbilds
-              </p>
-            </div>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+              <input ref={styleRefInputRef} type="file" accept="image/*" className="hidden" onChange={handleStyleRefUpload} />
 
-            {/* Brand-Kit Toggle */}
-            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Palette className="h-3.5 w-3.5 text-primary" />
-                  Brand-Kit Lock
-                </Label>
-                <Switch
-                  checked={useBrandKit}
-                  onCheckedChange={setUseBrandKit}
-                  disabled={!activeBrandKit}
-                />
-              </div>
-              {activeBrandKit ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[activeBrandKit.primary_color, activeBrandKit.secondary_color, activeBrandKit.accent_color]
-                      .filter(Boolean)
-                      .slice(0, 3)
-                      .map((c, i) => (
-                        <div
-                          key={i}
-                          className="h-5 w-5 rounded-full border border-border/50"
-                          style={{ backgroundColor: c as string }}
-                        />
-                      ))}
+              {/* Strength slider — transform mode only */}
+              {mode === 'transform' && referenceImage && (
+                <div className="pt-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Stärke der Veränderung</span>
+                    <span className="font-mono">{strength}%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
-                  </p>
+                  <Slider
+                    value={[strength]}
+                    onValueChange={([v]) => setStrength(v)}
+                    min={0}
+                    max={100}
+                    step={5}
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>nah am Original</span>
+                    <span>nur Inspiration</span>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
-                </p>
               )}
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Injiziert Brand-Farben + Mood ins Prompt
-              </p>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
-              <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
+              {/* Realistic-Reproduction one-click — transform mode only */}
+              {mode === 'transform' && referenceImage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleRealisticReproduction}
+                >
+                  <Camera className="h-3.5 w-3.5 mr-1.5" />
+                  📸 Bild realistisch & detailliert reproduzieren
+                </Button>
+              )}
             </div>
-            {editMode && (
+          )}
+
+          {/* Brand-Kit Toggle */}
+          <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Palette className="h-3.5 w-3.5 text-primary" />
+                Brand-Kit Lock
+              </Label>
+              <Switch
+                checked={useBrandKit}
+                onCheckedChange={setUseBrandKit}
+                disabled={!activeBrandKit}
+              />
+            </div>
+            {activeBrandKit ? (
               <div className="flex items-center gap-2">
-                {referenceImage ? (
-                  <div className="relative group/ref">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="relative block h-12 w-12 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
-                      title={t('picStudio.uploadImage')}
-                    >
-                      <img src={referenceImage} className="h-full w-full object-cover" alt="Reference" />
-                      <div className="absolute inset-0 bg-background/70 opacity-0 group-hover/ref:opacity-100 transition-opacity flex items-center justify-center">
-                        <Upload className="h-4 w-4 text-foreground" />
-                      </div>
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); setReferenceImage(null); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center z-10">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="h-3.5 w-3.5 mr-1" /> {t('picStudio.uploadImage')}
-                  </Button>
-                )}
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+                <div className="flex gap-1">
+                  {[activeBrandKit.primary_color, activeBrandKit.secondary_color, activeBrandKit.accent_color]
+                    .filter(Boolean)
+                    .slice(0, 3)
+                    .map((c, i) => (
+                      <div key={i} className="h-5 w-5 rounded-full border border-border/50" style={{ backgroundColor: c as string }} />
+                    ))}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
+                </p>
               </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+              </p>
             )}
+          </div>
 
-            {/* Variations Toggle */}
-            <div className="flex items-center gap-2 ml-auto">
-              <Label className="text-sm text-muted-foreground">Varianten:</Label>
-              <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
-                {([1, 4] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setVariantsCount(n)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      variantsCount === n
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
-                  </button>
-                ))}
-              </div>
+          {/* Variants */}
+          <div className="flex items-center gap-2 ml-auto">
+            <Label className="text-sm text-muted-foreground">Varianten:</Label>
+            <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
+              {([1, 4] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setVariantsCount(n)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    variantsCount === n
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Prompt Helper trigger */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setHelperOpen(true)}
+          >
+            <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
+            ✨ Prompt-Helfer öffnen
+          </Button>
+
+          {/* Pre-flight check */}
+          <PreflightCheck
+            mode={mode}
+            tier={tier}
+            prompt={prompt}
+            variantsCount={variantsCount}
+            cost={cost}
+            currencySymbol={currencySymbol}
+            onSwitchTier={(t) => setTier(t as QualityTier)}
+            onOpenHelper={() => setHelperOpen(true)}
+            onSetVariants={setVariantsCount}
+          />
+
 
           <Button
             className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
