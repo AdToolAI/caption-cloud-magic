@@ -566,6 +566,18 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
           }}
         />
       )}
+      {workspaceId && (
+        <CampaignTemplateDialog
+          open={showTemplateDialog}
+          onClose={() => setShowTemplateDialog(false)}
+          workspaceId={workspaceId}
+          onGenerated={() => {
+            setShowTemplateDialog(false);
+            toast.success(t('planner.contentGenerated') || 'Kampagne erstellt');
+            fetchCampaigns();
+          }}
+        />
+      )}
     </div>
   );
 }
