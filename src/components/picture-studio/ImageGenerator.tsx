@@ -323,9 +323,17 @@ export function ImageGenerator() {
 
       if (successCount === 0) {
         if (safetyFilteredMsg) {
+          const canRetryFast = tier !== 'fast';
           toast.warning('Sicherheitsfilter ausgelöst', {
-            description: safetyFilteredMsg,
-            duration: 12000,
+            description: safetyFilteredMsg + (canRetryFast ? ' Tipp: „Fast" (Seedream 4) hat tolerantere Filter.' : ''),
+            duration: 14000,
+            action: canRetryFast ? {
+              label: 'Mit Fast erneut',
+              onClick: () => {
+                setTier('fast');
+                setTimeout(() => { void handleGenerate(); }, 50);
+              },
+            } : undefined,
           });
         } else {
           toast.error('Bildgenerierung fehlgeschlagen');
