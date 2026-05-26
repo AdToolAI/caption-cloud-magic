@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { Loader2, Sparkles, Wand2, ChevronDown, ChevronUp, Instagram, Music, Linkedin, Facebook, Twitter, Youtube, Send } from 'lucide-react';
 import { MediaUploader } from '@/components/composer/MediaUploader';
+import { TimeWheelInput } from '@/components/calendar/TimeWheelInput';
 import { uploadMediaToSupabase } from '@/lib/mediaUpload';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -456,13 +457,11 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
                       {lockedDate.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
                     </span>
                   </Label>
-                  <Input
-                    id="time"
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
+                  <TimeWheelInput
+                    value={time || '09:00'}
+                    onChange={setTime}
                     disabled={busy}
-                    className="bg-muted/20 border-white/10 focus:border-primary/50"
+                    recommended="19:00"
                   />
                 </>
               ) : (
