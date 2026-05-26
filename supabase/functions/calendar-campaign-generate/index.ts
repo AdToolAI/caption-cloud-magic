@@ -133,15 +133,21 @@ serve(async (req) => {
     const templateEvents = Array.isArray(template.events_json) ? template.events_json : [];
     console.log(`📊 Processing ${templateEvents.length} template events`);
 
-    for (const eventTemplate of templateEvents) {
+    for (let i = 0; i < templateEvents.length; i++) {
+      const eventTemplate = templateEvents[i];
       const eventDate = new Date(startDateObj);
       eventDate.setDate(eventDate.getDate() + (eventTemplate.day || 0));
+
+      // Append a zero-width unique marker so the per-workspace content_hash
+      // unique index never collides across campaign runs of the same template.
+      const uniqMarker = `\u200B[cmp:${campaignId}#${i}]`;
+      const briefBase = eventTemplate.brief || eventTemplate.caption_outline || "";
 
       const eventData: any = {
         workspace_id,
         campaign_id: campaignId,
         title: eventTemplate.title || "Untitled Post",
-        brief: eventTemplate.brief || eventTemplate.caption_outline || "",
+        brief: `${briefBase}${uniqMarker}`,
         caption: "",
         channels: eventTemplate.channels || ["instagram"],
         hashtags: eventTemplate.hashtags || [],
@@ -157,6 +163,7 @@ serve(async (req) => {
 
       eventsToCreate.push(eventData);
     }
+
 
     console.log(`📝 Inserting ${eventsToCreate.length} events into database...`);
 
