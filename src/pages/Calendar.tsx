@@ -533,16 +533,8 @@ export default function Calendar() {
     const commonProps = {
       posts: transformedPosts as any,
       onPostClick: (post: any) => {
-        // Toggle selection for draft events
-        if (post.status === 'draft') {
-          setSelectedEventIds(prev => 
-            prev.includes(post.id) 
-              ? prev.filter(id => id !== post.id)
-              : [...prev, post.id]
-          );
-        } else {
-          handleEventClick(post);
-        }
+        // Always open the editor drawer on post click
+        handleEventClick(post);
       },
       readOnly: !hasCalendarAccess(),
       selectedEventIds,
