@@ -32,6 +32,7 @@ import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestio
 import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSettingsDialog";
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
 import { CalendarHeroHeader } from "@/components/calendar/CalendarHeroHeader";
+import { CalendarBackgroundAurora } from "@/components/calendar/CalendarBackgroundAurora";
 
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
@@ -591,8 +592,9 @@ export default function Calendar() {
   };
 
   return (
-    <div data-testid="calendar-page" className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 container mx-auto px-4 py-6">
+    <div data-testid="calendar-page" className="relative min-h-screen flex flex-col bg-background">
+      <CalendarBackgroundAurora />
+      <main className="relative flex-1 container mx-auto px-4 py-6">
         <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />
 
         {/* Compact Layout - reduced spacing */}
@@ -691,8 +693,24 @@ export default function Calendar() {
               {t("calendar.empty.noWorkspace")}
             </div>
           ) : (
-            <div className="backdrop-blur-xl bg-card/60 border border-white/10 shadow-[0_0_30px_rgba(255,255,255,0.03)] rounded-2xl p-6">
-              {renderView()}
+            <div className="relative rounded-2xl overflow-hidden">
+              {/* Outer glass shell with double-border + gold corner accents */}
+              <div className="absolute inset-0 rounded-2xl pointer-events-none">
+                <div className="absolute inset-0 rounded-2xl border border-primary/15" />
+                <div className="absolute inset-[1px] rounded-2xl border border-white/5" />
+                {/* corner gold ticks */}
+                <span className="absolute top-0 left-0 w-6 h-px bg-gradient-to-r from-primary/60 to-transparent" />
+                <span className="absolute top-0 left-0 h-6 w-px bg-gradient-to-b from-primary/60 to-transparent" />
+                <span className="absolute top-0 right-0 w-6 h-px bg-gradient-to-l from-primary/60 to-transparent" />
+                <span className="absolute top-0 right-0 h-6 w-px bg-gradient-to-b from-primary/60 to-transparent" />
+                <span className="absolute bottom-0 left-0 w-6 h-px bg-gradient-to-r from-primary/60 to-transparent" />
+                <span className="absolute bottom-0 left-0 h-6 w-px bg-gradient-to-t from-primary/60 to-transparent" />
+                <span className="absolute bottom-0 right-0 w-6 h-px bg-gradient-to-l from-primary/60 to-transparent" />
+                <span className="absolute bottom-0 right-0 h-6 w-px bg-gradient-to-t from-primary/60 to-transparent" />
+              </div>
+              <div className="backdrop-blur-2xl bg-card/50 rounded-2xl p-6 shadow-[0_30px_80px_-30px_hsla(43,90%,68%,0.18)]">
+                {renderView()}
+              </div>
             </div>
           )}
 

@@ -66,8 +66,9 @@ export function CalendarFilterBar({
     <div className="space-y-2">
       {/* Quick presets */}
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">
-          {L('savedFilters').toString()}:
+        <span className="inline-flex items-center gap-1.5 mr-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground/80 font-semibold">
+          <span className="inline-block w-1 h-1 rotate-45 bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />
+          {L('savedFilters').toString()}
         </span>
         {presets.map((p) => {
           const Icon = p.icon;
@@ -76,7 +77,7 @@ export function CalendarFilterBar({
               key={p.label}
               onClick={() => onApplyPreset(p.patch)}
               disabled={Object.keys(p.patch).length === 0}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] bg-muted/30 border border-white/10 text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors disabled:opacity-30"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium backdrop-blur-md bg-card/40 border border-white/10 text-muted-foreground hover:border-primary/50 hover:text-primary hover:bg-primary/10 hover:shadow-[0_0_12px_hsla(43,90%,68%,0.2)] hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-30 disabled:hover:translate-y-0"
             >
               <Icon className="w-3 h-3" />
               {p.label}
