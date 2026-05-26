@@ -8,6 +8,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { PostChip } from "./PostChip";
 
 interface Post {
   id: string;
