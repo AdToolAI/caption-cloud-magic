@@ -19,7 +19,7 @@ import { MonthView } from "@/components/calendar/views/MonthView";
 import { WeekView } from "@/components/calendar/views/WeekView";
 import { ListView } from "@/components/calendar/views/ListView";
 import { KanbanView } from "@/components/calendar/views/KanbanView";
-import { TimelineView } from "@/components/calendar/views/TimelineView";
+import { HeatmapView } from "@/components/calendar/views/HeatmapView";
 import { EventDetailDialog } from "@/components/calendar/EventDetailDialog";
 import { EventCreateDialog } from "@/components/calendar/EventCreateDialog";
 import { EventDrawer } from "@/components/calendar/EventDrawer";
