@@ -1,97 +1,55 @@
-# Plan: „Zeitleiste" → **Heatmap-Radar** im Content Command Center
+## Ziel
 
-Die aktuelle Zeitleiste (ein abgeschnittener horizontaler Monats-Stream mit hässlicher weißer Scrollbar und nur einer leeren „Kampagnen"-Zeile) wird durch einen **Heatmap-Radar** ersetzt — die wertvollste, sofort sichtbare Pipeline-Ansicht in einer 7×24-Matrix.
+Die drei statischen Dropdowns (`Workspace · Mandant · Marke`) im Calendar-Header durch einen **adaptiven Context-Switcher** ersetzen, der sich an die tatsächliche Account-Struktur des Nutzers anpasst. Die Filterlogik dahinter (`workspace_id`, `client_id`, `brand_kit_id`) bleibt 1:1 erhalten — geändert wird nur die UI-Schicht.
 
-## Was der User sieht
+## Verhalten je Account-Typ
 
-Ein vollflächiges Glass-Panel im Bond-2028-Look:
+| Fall | Was wird angezeigt |
+|---|---|
+| 1 Workspace · 0 Clients · ≤1 Brand (Solo) | Nur ein dezenter Brand-Chip mit Logo/Name (oder gar nichts, wenn keine Brand). Kein Dropdown. |
+| 1 Workspace · 0 Clients · >1 Brand | Ein einziger Pill `🎨 [Brand] ▾` (Brand-Switch). |
+| ≥1 Client (Agentur) | Pill `👤 [Mandant] ▾`. Wahl eines Mandanten filtert die Brand-Liste automatisch (Kaskade). Brand-Pill erscheint nur wenn der Mandant >1 Brand hat. |
+| Mehrere Workspaces | Workspace-Switch wandert in ein kleines Icon-Menü (⚙ links neben dem Context-Pill). |
+| Power-User | Rechts ein `Sliders`-Icon öffnet ein Popover mit allen drei klassischen Selects + "Filter zurücksetzen". |
 
-```text
-        00 01 02 … 08 09 10 11 12 13 14 15 … 23
-Mo      ·  ·  ·    ·  ●  ◐  ·  ·  ◐  ·  ·     ·
-Di      ·  ·  ·    ◐  ·  ●● ·  ·  ·  ◐  ·     ·
-Mi      ·  ·  ·    ·  ·  ●  ·  ·  ·  ·  ●     ·
-Do      ·  ·  ·    ◐  ·  ●  ·  ·  ◐  ·  ·     ·
-Fr      ·  ·  ·    ·  ·  ●  ·  ·  ·  ●● ·     ·
-Sa      ·  ·  ·    ·  ·  ·  ·  ·  ·  ·  ·     ·
-So      ·  ·  ·    ·  ·  ·  ·  ·  ·  ·  ·     ·
-```
+Ergebnis: Der Header ist im Normalfall ~60 % schlanker, Solo-User sehen keine leeren Agentur-Filter mehr.
 
-**3 visuelle Layer überlagert:**
-1. **Cyan-Glow (Hintergrund)** — Optimale Posting-Zeiten aus `usePostingTimes` (Score → Helligkeit)
-2. **Gold-Dots (Vordergrund)** — Geplante Posts. Ein Dot pro Post, mehrere stapeln sich (●● = 2 Posts, Größe wächst)
-3. **Rotes Pulse-Ring** — Konflikte (≥3 Posts in 1h-Slot)
-
-**Toolbar oben:**
-- Channel-Toggle (Instagram/TikTok/LinkedIn/X/Facebook/YouTube/all) — filtert beide Layer
-- Range-Switch: „Diese Woche" / „Nächste 4 Wochen" (aggregiert) / „Nur Mo–Fr"
-- Legende: Gold=Geplant · Cyan=Optimal · Rot=Konflikt
-- Counter: „X Posts geplant · Y goldene Slots ungenutzt"
-
-**Interaktion:**
-- **Hover Zelle** → Floating Card mit: Wochentag+Uhrzeit, alle Posts in diesem Slot (Thumbnail+Caption-Preview), Score-Reasons der Posting-Times
-- **Click leere Cyan-Zelle** → öffnet Day-Cockpit für nächstes konkretes Datum dieses Slots, vorbefüllt mit Uhrzeit (greift in `handleDateClick` ein)
-- **Click Gold-Dot** → öffnet bestehenden Post zur Bearbeitung
-- **Right-Click** → „Best Slot vorschlagen lassen" (jumped zur hellsten freien Cyan-Zelle)
-
-## Insight-Strip (unter der Heatmap)
-
-Drei Bond-Glass-Cards generiert aus dem Datenabgleich:
-1. **„Goldene Lücke"** — Bester ungenutzter Slot diese Woche (z.B. „Mi 19:00 — Score 94, keine Posts geplant") + CTA „Slot nutzen"
-2. **„Konflikt-Warnung"** — Wenn ≥1 Slot mit Stau („Fr 11:00: 3 Posts gleichzeitig") + CTA „Verteilen"
-3. **„Channel-Balance"** — Pie-Mini: Verteilung der geplanten Posts pro Kanal + Hinweis bei Schieflage
-
-## Bond-2028-Optik
-
-- Glass-Panel mit vertikaler Gold-Glow-Akzentlinie links (Enterprise-Pattern)
-- Achsen-Labels in **Playfair Display Small-Caps** (Wochentag) + **JetBrains Mono Tabular** (Stunden)
-- Zellen 28×28px mit 4px Gap, abgerundete Ecken
-- Cyan-Layer: `radial-gradient` mit Score-modulierter Opacity (0.05 – 0.45)
-- Gold-Dots: Glow-Shadow + subtiler 3s-Pulse bei Konflikten
-- Hover: Zelle hebt sich (scale 1.08), Gold-Outline-Ring
-- Empty-State: wenn 0 Posts → großes „Erstelle deinen ersten Post, um die Heatmap zu füllen" mit Cyan-Layer trotzdem sichtbar (zeigt die Slot-Empfehlung als Mehrwert sofort)
-- **Keine horizontale Scrollbar** — Heatmap passt by-design in den Viewport (responsive: bei <900px werden Stunden zu 3h-Buckets gruppiert)
-
-## Technisch
+## Komponenten
 
 **Neu:**
-- `src/components/calendar/views/HeatmapView.tsx` — Hauptkomponente
-- `src/components/calendar/heatmap/HeatmapGrid.tsx` — 7×24 Grid-Rendering
-- `src/components/calendar/heatmap/HeatmapCellPopover.tsx` — Hover-Detail
-- `src/components/calendar/heatmap/HeatmapInsightStrip.tsx` — 3 Insight-Cards
-- `src/lib/calendar/heatmap-aggregation.ts` — Pure-Function-Aggregation (Posts → Day×Hour-Bucket, Posting-Times → Score-Bucket, Konflikt-Detection)
+- `src/components/calendar/ContextSwitcher.tsx` — Hauptkomponente. Bekommt `workspaces`, `clients`, `brands`, aktuelle Auswahl und Setter. Entscheidet selbst, welche Pills sie rendert (Logik s. Tabelle oben).
+- `src/components/calendar/ContextSwitcherPopover.tsx` — "Mehr Filter"-Popover mit den 3 vollen Selects als Fallback/Power-Mode.
+- `src/components/calendar/ContextPill.tsx` — Wiederverwendbarer Glassmorphism-Pill im Bond-2028-Stil (gold border, cyan hover-glow, ChevronDown, optionales Icon).
 
 **Geändert:**
-- `src/pages/Calendar.tsx` — `case "timeline"` → `case "heatmap"` rendert `<HeatmapView>`; Tab-Label „Zeitleiste" → „Heatmap"; Icon `Timer` → `LayoutGrid`/`Activity`
-- `src/components/calendar/CalendarToolbar.tsx` — Tab-Key + Label tauschen
+- `src/components/calendar/CalendarHeader.tsx` — Block mit den drei `<Select>`-Elementen ersetzt durch `<ContextSwitcher ... />`. Sync-/Integrations-Buttons rechts bleiben unverändert.
 
-**Wiederverwendet:**
-- `usePostingTimes({ platform, days: 14 })` — bereits vorhanden, liefert Score+Reasons pro Slot
-- `posts`-Array aus `transformedPosts` (gleiches Format wie Kanban)
-- `handleDateClick(date)` — bereits implementiert für „leeren Slot klicken"
-- Bond-2028-Tokens aus `index.css` (`--primary`, `--accent`, Glass-Klassen)
+**Unverändert:** `Calendar.tsx` (State + Query-Keys), alle Filterlogik, alle Child-Views.
 
-**Entfernt/Deprecated:**
-- `TimelineView.tsx` bleibt im Repo (Code-Wiederverwendung möglich), aber aus dem Tab-Switch raus
+## Technische Details
 
-**Daten-Flow:**
-```text
-posts (workspace, range)
-  ├─→ aggregateToBuckets(posts) → Map<"Mon-09", Post[]>
-  └─→ detectConflicts(buckets, threshold=3) → ConflictSet
+- **Auto-Selection beim Mount:** Wenn nach dem Laden `selectedBrand === ""` und es genau 1 Brand gibt → auto-set. Analog für Workspace (war schon so) und Client (nur wenn genau 1 vorhanden).
+- **Mandant→Brand-Kaskade:** Wenn `clients.length > 0` und ein Mandant ausgewählt wird, filtere die Brand-Liste auf `brand.client_id === selectedClient` (Feld existiert; falls nicht, kein Filter — degradiert sauber).
+- **Pill-States:** `default` (neutral), `active` (gold border + leichter cyan glow), `disabled` (opacity 0.4). Hover: subtle scale + cyan ring (Bond-Tokens, keine Hardcoded-Farben).
+- **Mobile:** Pills wrappen wie bisher (`flex-wrap`); Popover wird zum `Sheet`.
+- **Keine i18n-Änderungen** — bestehende Keys `calendar.selectWorkspace/Client/Brand` werden für die Labels im Popover wiederverwendet; neue Pill-Labels lesen direkt `workspace.name` / `client.name` / `brand.brand_name`.
 
-usePostingTimes(activeChannel)
-  └─→ slotsToScoreMap(days) → Map<"Mon-09", { score, reasons }>
+## Animation (Bond 2028)
 
-→ HeatmapGrid bekommt: { bucketMap, scoreMap, conflicts, onCellClick, onPostClick }
-```
+- Pill-Wechsel: `framer-motion` `layout` für sanften Reflow beim Einblenden/Verstecken.
+- Aktive Pill: dünner animierter Gold-Underline (cyan→gold Gradient), 800 ms loop.
 
-**Out-of-Scope (Stage 2):**
-- Drag-to-move Posts in andere Zellen
-- Multi-Channel-Overlay (mehrere Channels gleichzeitig stacked)
-- Export der Heatmap als PNG
-- AI-„Auto-Verteilen": Konflikte automatisch in goldene Lücken schieben
+## Out of Scope (Stage 2, falls gewünscht)
 
-## Ergebnis
+- "⌘K"-Quick-Switcher für Brand/Mandant
+- Persistente "Last used context" in localStorage pro User
+- Multi-Brand-Selektion (gleichzeitige Mehrfachfilterung)
+- Anwendung des gleichen Switchers auf andere Module (Analytics, Planner)
 
-Aus der nutzlosen Kampagnen-Linie wird ein **strategisches Pipeline-Cockpit**: Auf einen Blick siehst du *wann* du postest, *wann du posten solltest*, *wo du dich selbst kannibalisierst* — und mit einem Klick füllst du die goldenen Lücken. Sofortiger Mehrwert auch für leere Boards, weil die Posting-Times-Empfehlungen direkt anzeigen, *wo der erste Post hin sollte*.
+## Akzeptanzkriterien
+
+1. Solo-User mit 1 Brand sieht **gar keinen** Workspace/Mandant-Dropdown — nur den Brand-Chip (oder nichts).
+2. Agentur-User mit 3 Mandanten sieht 1 Mandant-Pill; Brand-Pill nur wenn der gewählte Mandant >1 Brand hat.
+3. Power-User kann jederzeit über das Sliders-Icon das volle Filter-Popover öffnen.
+4. Alle bestehenden Query-Keys (`['calendar-events', selectedWorkspace, selectedClient, selectedBrand]`) erhalten weiterhin korrekte Werte → keine Cache-Brüche.
+5. Mobile bleibt nutzbar (Pills wrappen, Popover wird zu Sheet).
