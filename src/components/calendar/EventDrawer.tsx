@@ -17,6 +17,7 @@ import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, P
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { PostComposerPanel } from "./PostComposerPanel";
 
 interface EventDrawerProps {
   open: boolean;
@@ -135,6 +136,20 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
     }
   };
 
+  const handlePatch = async (patch: Record<string, any>) => {
+    if (!eventId) return;
+    const { error } = await supabase
+      .from("calendar_events")
+      .update(patch as any)
+      .eq("id", eventId);
+    if (error) {
+      toast.error(t("calendar.drawer.updateFailed"));
+    } else {
+      setEvent({ ...event, ...patch });
+      onUpdate?.();
+    }
+  };
+
   const handleDuplicate = async () => {
     if (!event) return;
 
@@ -193,7 +208,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
   return (
     <>
       <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-5xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center justify-between">
               <span>{event?.title || t("calendar.drawer.eventDetails")}</span>
@@ -228,234 +243,38 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="details" className="space-y-4 mt-4">
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.title")}</Label>
+              <TabsContent value="details" className="mt-2">
+                <div className="space-y-3">
                   <Input
                     value={event?.title || ""}
-                    onChange={(e) => handleUpdate("title", e.target.value)}
+                    onChange={(e) => setEvent({ ...event, title: e.target.value })}
                     onBlur={() => handleUpdate("title", event?.title)}
+                    placeholder={t("calendarDrawer.title")}
+                    className="text-lg font-semibold bg-card/40 border-white/10"
                   />
-                </div>
 
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={event?.status}
-                    onValueChange={(value) => handleUpdate("status", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="briefing">Briefing</SelectItem>
-                      <SelectItem value="in_progress">In Bearbeitung</SelectItem>
-                      <SelectItem value="review">Review</SelectItem>
-                      <SelectItem value="pending_approval">Wartet auf Freigabe</SelectItem>
-                      <SelectItem value="approved">Freigegeben</SelectItem>
-                      <SelectItem value="scheduled">Geplant</SelectItem>
-                      <SelectItem value="published">Veröffentlicht</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.briefing")}</Label>
-                  <Textarea
-                    value={event?.brief || ""}
-                    onChange={(e) => setEvent({ ...event, brief: e.target.value })}
-                    onBlur={() => handleUpdate("brief", event?.brief)}
-                    rows={4}
-                    placeholder={t("calendarDrawer.briefingPlaceholder")}
+                  <PostComposerPanel
+                    event={event}
+                    onUpdate={handleUpdate}
+                    onPatch={handlePatch}
                   />
-                </div>
 
-                {/* KI Post Generator Button */}
-                <div className="flex items-center gap-2 py-2">
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <Button
-                            onClick={handleGenerateWithAI}
-                            disabled={!event?.brief || isGenerating}
-                            className="gap-2"
-                            variant="outline"
-                          >
-                            {isGenerating ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Sparkles className="w-4 h-4" />
-                            )}
-                            {isGenerating ? t("calendarDrawer.generating") : t("calendarDrawer.generateWithAI")}
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {!event?.brief ? t("calendarDrawer.fillBriefingFirst") : t("calendarDrawer.generatesFromBriefing")}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.caption")}</Label>
-                  <Textarea
-                    value={event?.caption || ""}
-                    onChange={(e) => setEvent({ ...event, caption: e.target.value })}
-                    onBlur={() => handleUpdate("caption", event?.caption)}
-                    rows={6}
-                    placeholder={t("calendarDrawer.captionPlaceholder")}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.channels")}</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: "instagram", name: "Instagram", icon: "📸", color: "bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400", textColor: "text-white" },
-                      { id: "facebook", name: "Facebook", icon: "📘", color: "bg-[#1877F2]", textColor: "text-white" },
-                      { id: "linkedin", name: "LinkedIn", icon: "💼", color: "bg-[#0A8A0A]", textColor: "text-white" },
-                      { id: "tiktok", name: "TikTok", icon: "🎵", color: "bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 border-2 border-cyan-400", textColor: "text-white" },
-                      { id: "youtube", name: "YouTube", icon: "🎬", color: "bg-[#FF0000]", textColor: "text-white" },
-                    ].map((platform) => {
-                      const isActive = event?.channels?.includes(platform.id);
-                      return (
-                        <button
-                          key={platform.id}
-                          type="button"
-                          onClick={() => {
-                            const current = event?.channels || [];
-                            // Prevent removing the last platform
-                            if (current.includes(platform.id) && current.length === 1) {
-                              toast.error(t("calendarDrawer.atLeastOnePlatform"));
-                              return;
-                            }
-                            const updated = current.includes(platform.id)
-                              ? current.filter((c: string) => c !== platform.id)
-                              : [...current, platform.id];
-                            handleUpdate("channels", updated);
-                          }}
-                          className={cn(
-                            "px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200",
-                            isActive 
-                              ? `${platform.color} ${platform.textColor} shadow-lg` 
-                              : "bg-muted/50 text-muted-foreground border border-dashed border-muted-foreground/30 hover:border-muted-foreground/60"
-                          )}
-                        >
-                          {platform.icon} {platform.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.hashtags")}</Label>
-                  <Input
-                    value={event?.hashtags?.join(", ") || ""}
-                    onChange={(e) => setEvent({ ...event, hashtags: e.target.value.split(",").map((t: string) => t.trim()).filter(Boolean) })}
-                    onBlur={() => handleUpdate("hashtags", event?.hashtags || [])}
-                    placeholder={t("calendarDrawer.hashtagsPlaceholder")}
-                  />
-                  {event?.hashtags?.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {event.hashtags.map((tag: string, i: number) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                          {tag.startsWith("#") ? tag : `#${tag}`}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>{t("calendarDrawer.scheduledTime")}</Label>
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <Input
-                      type="datetime-local"
-                      value={event?.start_at ? new Date(event.start_at).toISOString().slice(0, 16) : ""}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleUpdate("start_at", new Date(e.target.value).toISOString());
-                        }
-                      }}
-                      className="max-w-[220px]"
-                    />
-                  </div>
-                </div>
-
-                {/* Media Preview Section */}
-                {event?.assets_json && Array.isArray(event.assets_json) && event.assets_json.length > 0 && (
-                  <div className="space-y-3">
-                    <Label className="flex items-center gap-2">
-                      <Play className="w-4 h-4" />
-                      {t("calendarDrawer.mediaPreview")}
-                    </Label>
-                    <div className="grid gap-3">
-                      {event.assets_json.map((asset: any, index: number) => {
-                        const url = asset?.url || asset;
-                        const isVideo = asset?.type === "video" || 
-                          (typeof url === "string" && (url.includes(".mp4") || url.includes(".webm") || url.includes(".mov")));
-                        
-                        return (
-                          <div key={index} className="relative rounded-lg overflow-hidden border bg-muted/50">
-                            {isVideo ? (
-                              <video
-                                src={url}
-                                controls
-                                className="w-full max-h-[300px] object-contain"
-                                preload="metadata"
-                              />
-                            ) : (
-                              <img
-                                src={url}
-                                alt={`Media ${index + 1}`}
-                                className="w-full max-h-[300px] object-contain"
-                              />
-                            )}
-                            <Badge 
-                              variant="secondary" 
-                              className="absolute top-2 left-2 gap-1"
-                            >
-                              {isVideo ? <Play className="w-3 h-3" /> : <ImageIcon className="w-3 h-3" />}
-                              {isVideo ? t("calendarDrawer.video") : t("calendarDrawer.image")}
-                            </Badge>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-4">
-                  <Button variant="outline" onClick={handleDuplicate}>
-                    <Copy className="w-4 h-4 mr-2" />
-                    {t("calendar.drawer.duplicate")}
-                  </Button>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          onClick={() => setApprovalDialogOpen(true)}
-                        >
-                          <UserCheck className="w-4 h-4 mr-2" />
-                          {t("calendar.drawer.requestApproval")}
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-[250px]">
-                        <p>{t("calendarDrawer.approvalTooltip")}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {onDelete && (
-                    <Button variant="destructive" onClick={handleDelete}>
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      {t("calendar.drawer.delete")}
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-white/5">
+                    <Button variant="outline" size="sm" onClick={handleDuplicate}>
+                      <Copy className="w-3.5 h-3.5 mr-1.5" />
+                      {t("calendar.drawer.duplicate")}
                     </Button>
-                  )}
+                    <Button variant="outline" size="sm" onClick={() => setApprovalDialogOpen(true)}>
+                      <UserCheck className="w-3.5 h-3.5 mr-1.5" />
+                      {t("calendar.drawer.requestApproval")}
+                    </Button>
+                    {onDelete && (
+                      <Button variant="destructive" size="sm" onClick={handleDelete}>
+                        <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                        {t("calendar.drawer.delete")}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </TabsContent>
 

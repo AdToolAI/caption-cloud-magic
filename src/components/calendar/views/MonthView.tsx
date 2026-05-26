@@ -8,6 +8,7 @@ import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { PostChip } from "./PostChip";
 
 interface Post {
   id: string;
@@ -381,38 +382,24 @@ export function MonthView({
                 {dayPosts.slice(0, 3).map((post) => {
                   const channels = Array.isArray(post.channels) ? post.channels : [post.channels];
                   const isSelected = selectedEventIds.includes(post.id);
-                  const platformStyle = getPlatformStyle(channels);
                   return (
-                    <div
+                    <PostChip
                       key={post.id}
+                      id={post.id}
+                      title={post.title}
+                      channels={channels}
+                      status={post.status}
+                      selected={isSelected}
+                      selectable={selectableStatuses.includes(post.status)}
+                      dragging={draggedPostId === post.id}
                       draggable={!readOnly}
                       onDragStart={(e) => handleDragStart(e, post.id)}
                       onDragEnd={handleDragEnd}
-                      className={cn(
-                        "text-[10px] px-2 py-1 rounded-md transition-all duration-200 border backdrop-blur-sm",
-                        !readOnly && "cursor-grab active:cursor-grabbing",
-                        readOnly && "cursor-pointer",
-                        platformStyle.bg,
-                        platformStyle.border,
-                        platformStyle.text,
-                        platformStyle.glow,
-                        "font-medium hover:scale-[1.02]",
-                        selectableStatuses.includes(post.status) && "hover:ring-1 hover:ring-gold/60",
-                        isSelected && "ring-1 ring-gold ring-offset-1 ring-offset-background",
-                        draggedPostId === post.id && "opacity-50 scale-95"
-                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         onPostClick(post);
                       }}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs flex-shrink-0">
-                          {channels.length > 0 ? getPlatformIcon(channels[0]) : "📝"}
-                        </span>
-                        <span className="truncate font-semibold">{post.title}</span>
-                      </div>
-                    </div>
+                    />
                   );
                 })}
                 {dayPosts.length > 3 && (
