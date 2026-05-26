@@ -1,13 +1,7 @@
 import { useState, useEffect } from "react";
-import { ChevronRight, Calendar, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Calendar, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ContextSwitcher } from "./ContextSwitcher";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -100,64 +94,18 @@ export function CalendarHeader({
       "flex gap-3 px-4 py-3 backdrop-blur-xl bg-card/60 border border-white/10 rounded-xl",
       isMobile ? "flex-col" : "items-center justify-between"
     )}>
-      <div className={cn(
-        "flex gap-2",
-        isMobile ? "flex-col w-full" : "items-center"
-      )}>
-        <Select value={workspaceId || undefined} onValueChange={onWorkspaceChange}>
-          <SelectTrigger className={cn(
-            "h-9 bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
-            isMobile ? "w-full" : "w-[160px]"
-          )}>
-            <SelectValue placeholder={t("calendar.selectWorkspace")} />
-          </SelectTrigger>
-          <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
-            {workspaces.map((workspace) => (
-              <SelectItem key={workspace.id} value={workspace.id}>
-                {workspace.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <ContextSwitcher
+        workspaceId={workspaceId}
+        clientId={clientId}
+        brandId={brandId}
+        workspaces={workspaces}
+        clients={clients}
+        brands={brands}
+        onWorkspaceChange={onWorkspaceChange}
+        onClientChange={onClientChange}
+        onBrandChange={onBrandChange}
+      />
 
-        {!isMobile && <ChevronRight className="w-3 h-3 text-primary/60" />}
-
-        <Select value={clientId || undefined} onValueChange={onClientChange} disabled={!workspaceId}>
-          <SelectTrigger className={cn(
-            "h-9 bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
-            isMobile ? "w-full" : "w-[160px]"
-          )}>
-            <SelectValue placeholder={t("calendar.selectClient")} />
-          </SelectTrigger>
-          <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
-            <SelectItem value="all">{t("calendar.allClients")}</SelectItem>
-            {clients.map((client) => (
-              <SelectItem key={client.id} value={client.id}>
-                {client.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {!isMobile && <ChevronRight className="w-3 h-3 text-primary/60" />}
-
-        <Select value={brandId || undefined} onValueChange={onBrandChange} disabled={!workspaceId}>
-          <SelectTrigger className={cn(
-            "h-9 bg-muted/30 border-white/10 hover:border-primary/40 focus:border-primary/60 transition-all duration-200",
-            isMobile ? "w-full" : "w-[160px]"
-          )}>
-            <SelectValue placeholder={t("calendar.selectBrand")} />
-          </SelectTrigger>
-          <SelectContent className="backdrop-blur-xl bg-popover/95 border-white/10">
-            <SelectItem value="all">{t("calendar.allBrands")}</SelectItem>
-            {brands.map((brand) => (
-              <SelectItem key={brand.id} value={brand.id}>
-                {brand.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
       {workspaceId && (
         <div className={cn(
