@@ -141,18 +141,27 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
         }];
       }
 
+      // When date is locked, compose ISO from lockedDate + time-of-day
+      let datetimeLocalISO = when;
+      if (lockedDate) {
+        const [hh, mm] = (time || '09:00').split(':').map(Number);
+        const d = new Date(lockedDate);
+        d.setHours(hh || 0, mm || 0, 0, 0);
+        datetimeLocalISO = toDatetimeLocal(d);
+      }
+
       const event = await createEvent({
         workspaceId,
         title,
         caption,
         channels,
-        datetimeLocalISO: when,
+        datetimeLocalISO,
         timezone: 'Europe/Berlin',
         media: mediaUrls,
       });
 
       const localeStr = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
-      toast.success(`${t('calendar.postScheduledFor')} ${new Date(when).toLocaleString(localeStr)} — ${channels.length} ${t('calendar.onPlatforms')}`);
+      toast.success(`${t('calendar.postScheduledFor')} ${new Date(datetimeLocalISO).toLocaleString(localeStr)} — ${channels.length} ${t('calendar.onPlatforms')}`);
       
       setTitle('');
       setCaption('');
@@ -160,7 +169,10 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
       setMediaPreviewUrl('');
       setMediaPreviewType(null);
       setIsPrefilled(false);
-      setWhen(new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
+      if (!lockedDate) {
+        setWhen(toDatetimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
+      }
+
       
       onSuccess?.(event.id);
     } catch (error: any) {
