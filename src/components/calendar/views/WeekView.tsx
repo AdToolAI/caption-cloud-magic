@@ -114,7 +114,7 @@ export function WeekView({
             return (
               <Card key={hour} className="p-3">
                 <div className="text-sm text-muted-foreground mb-2">
-                  {format(addHours(new Date(0), hour), "HH:mm")}
+                  {`${String(hour).padStart(2, '0')}:00`}
                 </div>
                 {timePosts.map((post) => (
                   <div
@@ -177,7 +177,7 @@ export function WeekView({
                 key={`hour-${hour}`}
                 className="sticky left-0 bg-background z-10 text-sm text-muted-foreground p-2 text-right"
               >
-                {format(addHours(new Date(0), hour), "HH:mm")}
+                {`${String(hour).padStart(2, '0')}:00`}
               </div>
               {days.map((day) => {
                 const timePosts = getPostsForDateTime(day, hour);
