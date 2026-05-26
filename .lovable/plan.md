@@ -1,20 +1,28 @@
-# Fix: Roh sichtbare `${t('...')}` Strings im Intelligenten Kalender
+## Day Cockpit Modal
 
-## Problem
-Im Card „Schnell-Planung" auf `/calendar` werden Labels wie `$Schnell-Planung`, `$Titel (optional)`, `${t('calendar.internalTitle')}` und `$Caption / Post-Text` **als Text** angezeigt. Ursache: In `src/components/calendar/ScheduleQuickForm.tsx` stehen Template-Literal-Ausdrücke wie `${t('calendar.quickSchedule')}` direkt im JSX-Body / in `placeholder="..."` Attributen — ohne umschließende `{ ... }` JSX-Expression-Braces. React behandelt sie deshalb als statischen String, der mit `$` beginnt.
+Schnell-Planung + Warteschlange werden in EIN großes Modal vereint, das beim Klick auf einen Kalendertag öffnet. Datum ist gelockt — nur Uhrzeit wählbar. Design im Bond-2028-Stil, 3 KI-generierte Varianten zur Auswahl.
 
-## Scope (1 Datei)
-`src/components/calendar/ScheduleQuickForm.tsx` — betroffene Zeilen (laut grep): **242, 244, 248, 257, 260, 271** (und ggf. weitere im selben Block, die ich beim Bearbeiten mitprüfe).
+### Was passiert
+- Klick auf Tag (z.B. `26`) → Modal "Day Cockpit" öffnet sich
+- Links: Schnell-Planung (Titel, Caption, AI, Upload, **nur Uhrzeit-Picker**, Plattformen)
+- Rechts: Warteschlange (nur Posts dieses Tages, sortiert nach Uhrzeit)
+- Alte Inline-Panels unter dem Kalender verschwinden
 
-## Fix-Pattern
-- JSX-Text: `${t('calendar.quickSchedule')}` → `{t('calendar.quickSchedule')}`
-- Mit Emoji-Prefix: `🎨 ${t('calendar.importedFromGenerator')}` → `🎨 {t('calendar.importedFromGenerator')}`
-- Attribut: `placeholder="${t('calendar.internalTitle')}"` → `placeholder={t('calendar.internalTitle')}`
+### Design-Prozess
+1. Ich generiere **3 Mood-Variants** mit Nano Banana 2 / Gemini 3 Pro Image:
+   - **A "Mission Briefing"** — goldene Datums-Plakette, Dossier-Sektoren, Cyan-Scanlinien
+   - **B "Holographic Cockpit"** — 3D-Tilt-Glasplatten, Gold-Partikel, schwebend
+   - **C "Editorial Noir"** — riesiges Playfair-Datum, Magazine-Layout, viel Whitespace
+2. Du wählst eine Variante via Bild-Picker
+3. Ich baue exakt diese Variante in Tailwind + Framer Motion
 
-## Verification
-- Datei nach Edit per `rg -n "\\\$\\{t\\("` re-grepen → 0 Treffer in der Datei (Zeile 141 bleibt korrekt, weil sie innerhalb eines echten Template-Strings in `toast.success(\`...\`)` steht).
-- Build läuft auto; danach kurz die Seite anschauen.
+### Technik (kurz)
+- Neu: `src/components/calendar/DayCockpitDialog.tsx` (Radix Dialog, 2-Spalten-Grid)
+- Refactor `ScheduleQuickForm.tsx`: Prop `lockedDate?: Date` → versteckt Datum-Input, zeigt nur `<TimePicker>`
+- Refactor Kalender-Grid: `onClick` pro Tageszelle öffnet Modal mit `selectedDate`
+- Warteschlange via `useCalendarEvents` mit `from`/`to` auf den Tag gefiltert
+- Lokalisierung DE/EN/ES
+- Keine DB-/Edge-Function-/Publish-Logik-Änderungen
 
-## Nicht angefasst
-- Keine Übersetzungs-Keys hinzugefügt/geändert (`src/lib/translations.ts` bleibt unberührt — die Keys existieren bereits).
-- Kein Redesign, kein Logik-Change, keine anderen Tabs/Komponenten.
+### Offene Frage
+Soll das Modal beim Öffnen **direkt die Form zeigen** (häufigster Fall: neuer Post), oder **erst die Warteschlange** und Form via "+ Neuer Post"-Button? Ich tendiere zu Form direkt sichtbar (links), Warteschlange immer rechts daneben — beides parallel ohne Klick.
