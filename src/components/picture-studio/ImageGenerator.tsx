@@ -735,6 +735,7 @@ export function ImageGenerator() {
             variantsCount={variantsCount}
             cost={cost}
             currencySymbol={currencySymbol}
+            hasReference={!!referenceImage}
             onSwitchTier={(t) => setTier(t as QualityTier)}
             onOpenHelper={() => setHelperOpen(true)}
             onSetVariants={setVariantsCount}
