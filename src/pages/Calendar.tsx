@@ -441,7 +441,7 @@ export default function Calendar() {
   };
 
   const handleFilter = () => {
-    toast.info(t("calendar.messages.filterComingSoon"));
+    // No-op: filter UI is now a popover rendered directly in the toolbar.
   };
 
   const handleShare = () => {
