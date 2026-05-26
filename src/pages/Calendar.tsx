@@ -650,10 +650,10 @@ export default function Calendar() {
             </div>
           )}
 
-          {/* Day Cockpit hint — Schnell-Planung & Warteschlange leben jetzt im Tages-Modal (Klick auf einen Tag) */}
-          {selectedWorkspace && (
+          {/* Day Cockpit hint — only on date-based views */}
+          {selectedWorkspace && (currentView === "month" || currentView === "week") && (
             <div className="mt-8 text-center text-xs text-muted-foreground/70 tracking-wider uppercase">
-              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → {t('calendar.dateClickHint') || 'Klick auf einen Tag'}
+              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → Klick auf einen Tag
             </div>
           )}
 
