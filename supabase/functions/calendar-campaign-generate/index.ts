@@ -91,9 +91,19 @@ serve(async (req) => {
 
     console.log("✅ Template found:", template.name);
 
+    // Compute campaign date range from template
+    const startDateObj = new Date(start_date);
+    const templateEventsPreview = Array.isArray(template.events_json) ? template.events_json : [];
+    const maxDayOffset = templateEventsPreview.reduce(
+      (max: number, ev: any) => Math.max(max, Number(ev?.day || 0)),
+      0
+    );
+    const campaignEndDate = new Date(startDateObj);
+    campaignEndDate.setDate(campaignEndDate.getDate() + maxDayOffset + 1);
+
     // Create campaign record (if campaigns table exists, otherwise skip)
     console.log("📝 Creating campaign record...");
-    
+
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
       .insert({
@@ -104,7 +114,10 @@ serve(async (req) => {
         tone: "professional",
         duration_weeks: Math.ceil(template.duration_days / 7),
         platform: ["instagram", "facebook"],
-        post_frequency: template.events_json?.length || 5
+        post_frequency: template.events_json?.length || 5,
+        starts_at: startDateObj.toISOString(),
+        ends_at: campaignEndDate.toISOString(),
+        pauses_strategy: true,
       })
       .select()
       .single();
@@ -123,11 +136,34 @@ serve(async (req) => {
     const campaignId = campaign.id;
     console.log("✅ Campaign created:", campaignId);
 
+    // Auto-pause Strategy Mode for the campaign window and dismiss colliding pending strategy posts
+    try {
+      await supabase.from("strategy_mode_pauses").insert({
+        user_id: userId,
+        campaign_id: campaignId,
+        starts_at: startDateObj.toISOString(),
+        ends_at: campaignEndDate.toISOString(),
+        reason: "campaign_override",
+      });
+      await supabase
+        .from("strategy_posts")
+        .update({ status: "dismissed" })
+        .eq("user_id", userId)
+        .eq("status", "pending")
+        .gte("scheduled_at", startDateObj.toISOString())
+        .lte("scheduled_at", campaignEndDate.toISOString());
+      console.log("✅ Strategy mode paused for campaign window");
+    } catch (e) {
+      console.warn("Strategy pause creation failed (non-fatal):", e);
+    }
+
+
 
     // Generate events from template
     console.log("📅 Generating events from template...");
     
-    const startDateObj = new Date(start_date);
+    // startDateObj already computed above
+
     const eventsToCreate = [];
 
     const templateEvents = Array.isArray(template.events_json) ? template.events_json : [];
