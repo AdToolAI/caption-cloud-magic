@@ -172,7 +172,7 @@ export function PromptHelperDialog({
               </div>
             </div>
 
-            <Button onClick={handleGenerate} disabled={loading || !userText.trim()} className="w-full">
+            <Button onClick={() => handleGenerate()} disabled={loading || !userText.trim()} className="w-full">
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analysiere…</>
                        : <><Sparkles className="h-4 w-4 mr-2" /> Prompt bauen</>}
             </Button>
