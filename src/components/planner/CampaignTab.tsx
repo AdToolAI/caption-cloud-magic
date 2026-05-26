@@ -229,7 +229,8 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
             <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{t('planner.createCampaigns')}</p>
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               <Button 
-                onClick={() => navigate("/templates")} 
+                onClick={() => setShowTemplateDialog(true)} 
+                disabled={!workspaceId}
                 className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.4)] transition-all duration-300"
               >
                 <Rocket className="h-4 w-4" />
