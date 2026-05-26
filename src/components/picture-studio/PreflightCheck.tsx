@@ -15,6 +15,7 @@ interface Props {
   variantsCount: 1 | 4;
   cost: number;
   currencySymbol: string;
+  hasReference?: boolean;
   onSwitchTier: (tier: QualityTier) => void;
   onOpenHelper: () => void;
   onSetVariants: (n: 1 | 4) => void;
