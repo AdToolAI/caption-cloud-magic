@@ -35,6 +35,8 @@ import { CalendarHeroHeader } from "@/components/calendar/CalendarHeroHeader";
 import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
+import { DayCockpitDialog } from "@/components/calendar/DayCockpitDialog";
+
 import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { NotificationBadge } from "@/components/calendar/NotificationBadge";
 import { BulkScheduleDialog } from "@/components/calendar/BulkScheduleDialog";
@@ -121,6 +123,8 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDayCockpit, setShowDayCockpit] = useState(false);
+
   const [showEventDrawer, setShowEventDrawer] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [prefillDate, setPrefillDate] = useState<Date | null>(null);
@@ -348,8 +352,9 @@ export default function Calendar() {
       return;
     }
     setPrefillDate(date);
-    setShowCreateDialog(true);
+    setShowDayCockpit(true);
   };
+
 
   const handleEventMove = async (eventId: string, newDate: Date) => {
     if (!hasCalendarAccess()) {
@@ -645,20 +650,13 @@ export default function Calendar() {
             </div>
           )}
 
-          {/* Secondary Cards Below - Glassmorphism */}
+          {/* Day Cockpit hint — Schnell-Planung & Warteschlange leben jetzt im Tages-Modal (Klick auf einen Tag) */}
           {selectedWorkspace && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-              <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] overflow-hidden">
-                <ScheduleQuickForm 
-                  workspaceId={selectedWorkspace}
-                  onSuccess={() => invalidateEvents()}
-                />
-              </div>
-              <div className="backdrop-blur-xl bg-card/60 border border-white/10 rounded-2xl shadow-[0_0_20px_rgba(255,255,255,0.03)] overflow-hidden">
-                <PublishingStatusPanel workspaceId={selectedWorkspace} />
-              </div>
+            <div className="mt-8 text-center text-xs text-muted-foreground/70 tracking-wider uppercase">
+              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → {t('calendar.dateClickHint') || 'Klick auf einen Tag'}
             </div>
           )}
+
         </div>
       </main>
 

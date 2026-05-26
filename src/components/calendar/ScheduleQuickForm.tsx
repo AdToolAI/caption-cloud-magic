@@ -27,6 +27,10 @@ import { cn } from '@/lib/utils';
 interface ScheduleQuickFormProps {
   workspaceId: string;
   onSuccess?: (eventId: string) => void;
+  /** When set, the date is locked and only the time-of-day is editable. */
+  lockedDate?: Date;
+  /** Render without the outer Card chrome (for embedding in dialogs). */
+  embedded?: boolean;
 }
 
 const PLATFORMS = [
@@ -38,15 +42,25 @@ const PLATFORMS = [
   { id: 'youtube_shorts', label: 'YT Shorts', icon: Youtube, color: 'from-red-500 to-red-700', activeColor: 'bg-[#FF0000] text-white shadow-[0_0_15px_rgba(255,0,0,0.4)]' },
 ];
 
-export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormProps) {
+const pad = (n: number) => n.toString().padStart(2, '0');
+const toDatetimeLocal = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded }: ScheduleQuickFormProps) {
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
   const [when, setWhen] = useState(() => {
-    const date = new Date(Date.now() + 60 * 60 * 1000);
-    return date.toISOString().slice(0, 16);
+    if (lockedDate) {
+      const d = new Date(lockedDate);
+      d.setHours(9, 0, 0, 0);
+      return toDatetimeLocal(d);
+    }
+    return toDatetimeLocal(new Date(Date.now() + 60 * 60 * 1000));
   });
+  const [time, setTime] = useState(() => (lockedDate ? '09:00' : ''));
+
   const [channels, setChannels] = useState<string[]>(['instagram']);
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
@@ -127,18 +141,27 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
         }];
       }
 
+      // When date is locked, compose ISO from lockedDate + time-of-day
+      let datetimeLocalISO = when;
+      if (lockedDate) {
+        const [hh, mm] = (time || '09:00').split(':').map(Number);
+        const d = new Date(lockedDate);
+        d.setHours(hh || 0, mm || 0, 0, 0);
+        datetimeLocalISO = toDatetimeLocal(d);
+      }
+
       const event = await createEvent({
         workspaceId,
         title,
         caption,
         channels,
-        datetimeLocalISO: when,
+        datetimeLocalISO,
         timezone: 'Europe/Berlin',
         media: mediaUrls,
       });
 
       const localeStr = language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US';
-      toast.success(`${t('calendar.postScheduledFor')} ${new Date(when).toLocaleString(localeStr)} — ${channels.length} ${t('calendar.onPlatforms')}`);
+      toast.success(`${t('calendar.postScheduledFor')} ${new Date(datetimeLocalISO).toLocaleString(localeStr)} — ${channels.length} ${t('calendar.onPlatforms')}`);
       
       setTitle('');
       setCaption('');
@@ -146,7 +169,10 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
       setMediaPreviewUrl('');
       setMediaPreviewType(null);
       setIsPrefilled(false);
-      setWhen(new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
+      if (!lockedDate) {
+        setWhen(toDatetimeLocal(new Date(Date.now() + 60 * 60 * 1000)));
+      }
+
       
       onSuccess?.(event.id);
     } catch (error: any) {
@@ -202,56 +228,9 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
-      <Card 
-        id="quick-schedule-form" 
-        className="relative overflow-hidden backdrop-blur-xl bg-card/60 border-white/10"
-      >
-        {/* Shimmer border effect */}
-        <div className="absolute inset-0 rounded-xl p-[1px] overflow-hidden pointer-events-none">
-          <div 
-            className="absolute inset-0 rounded-xl"
-            style={{
-              background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.3) 25%, hsl(var(--primary) / 0.6) 50%, hsl(var(--primary) / 0.3) 75%, transparent 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer-border 3s ease-in-out infinite',
-              mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-              maskComposite: 'exclude',
-              WebkitMaskComposite: 'xor',
-              padding: '1px',
-            }}
-          />
-        </div>
+  const formInner = (
+    <form onSubmit={handleSubmit} className="space-y-5">
 
-        <style>{`
-          @keyframes shimmer-border {
-            0%, 100% { background-position: -200% 0; }
-            50% { background-position: 200% 0; }
-          }
-        `}</style>
-
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
-                {t('calendar.quickSchedule')}
-              </CardTitle>
-              <CardDescription>{t('calendar.createAndSchedule')}</CardDescription>
-            </div>
-            {isPrefilled && (
-              <Badge variant="secondary" className="text-xs">
-                🎨 {t('calendar.importedFromGenerator')}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title">{t('calendar.titleOptional')}</Label>
@@ -452,18 +431,40 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
             {/* Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-            {/* Date/Time */}
+            {/* Date/Time — when lockedDate is set, show only a time picker */}
             <div className="space-y-2">
-              <Label htmlFor="when">{t("calendarSchedule.publishDateTime")}</Label>
-              <Input
-                id="when"
-                type="datetime-local"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-                disabled={busy}
-                className="bg-muted/20 border-white/10 focus:border-primary/50"
-              />
+              {lockedDate ? (
+                <>
+                  <Label htmlFor="time">
+                    {t("calendarSchedule.publishDateTime")}
+                    <span className="ml-2 text-xs text-primary/80">
+                      {lockedDate.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                    </span>
+                  </Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    disabled={busy}
+                    className="bg-muted/20 border-white/10 focus:border-primary/50"
+                  />
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="when">{t("calendarSchedule.publishDateTime")}</Label>
+                  <Input
+                    id="when"
+                    type="datetime-local"
+                    value={when}
+                    onChange={(e) => setWhen(e.target.value)}
+                    disabled={busy}
+                    className="bg-muted/20 border-white/10 focus:border-primary/50"
+                  />
+                </>
+              )}
             </div>
+
 
             {/* Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
@@ -518,8 +519,68 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
                 )}
               </Button>
             </motion.div>
-          </form>
-        </CardContent>
+    </form>
+  );
+
+  if (embedded) {
+    return (
+      <div id="quick-schedule-form">
+        {isPrefilled && (
+          <Badge variant="secondary" className="text-xs mb-3">
+            🎨 {t('calendar.importedFromGenerator')}
+          </Badge>
+        )}
+        {formInner}
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <Card
+        id="quick-schedule-form"
+        className="relative overflow-hidden backdrop-blur-xl bg-card/60 border-white/10"
+      >
+        <div className="absolute inset-0 rounded-xl p-[1px] overflow-hidden pointer-events-none">
+          <div
+            className="absolute inset-0 rounded-xl"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.3) 25%, hsl(var(--primary) / 0.6) 50%, hsl(var(--primary) / 0.3) 75%, transparent 100%)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer-border 3s ease-in-out infinite',
+              mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+              maskComposite: 'exclude',
+              WebkitMaskComposite: 'xor',
+              padding: '1px',
+            }}
+          />
+        </div>
+        <style>{`
+          @keyframes shimmer-border {
+            0%, 100% { background-position: -200% 0; }
+            50% { background-position: 200% 0; }
+          }
+        `}</style>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
+                {t('calendar.quickSchedule')}
+              </CardTitle>
+              <CardDescription>{t('calendar.createAndSchedule')}</CardDescription>
+            </div>
+            {isPrefilled && (
+              <Badge variant="secondary" className="text-xs">
+                🎨 {t('calendar.importedFromGenerator')}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>{formInner}</CardContent>
       </Card>
     </motion.div>
   );
