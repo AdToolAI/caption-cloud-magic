@@ -97,7 +97,7 @@ serve(async (req) => {
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
       .insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: userId,
         title: campaign_name,
         goal: template.name,
         topic: template.description || "",
@@ -109,13 +109,20 @@ serve(async (req) => {
       .select()
       .single();
 
-    const campaignId = campaign?.id || null;
-    
     if (campaignError) {
-      console.warn("⚠️ Campaign creation failed (non-critical):", campaignError);
-    } else {
-      console.log("✅ Campaign created:", campaignId);
+      console.error("❌ Campaign creation failed:", campaignError);
+      return new Response(
+        JSON.stringify({
+          error: "Kampagne konnte nicht erstellt werden",
+          code: "CAMPAIGN_INSERT_FAILED",
+          details: campaignError.message,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+    const campaignId = campaign.id;
+    console.log("✅ Campaign created:", campaignId);
+
 
     // Generate events from template
     console.log("📅 Generating events from template...");
