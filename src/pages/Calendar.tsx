@@ -510,6 +510,9 @@ export default function Calendar() {
       campaign_id: event.campaign_id,
       owner_id: event.owner_id,
       brief: event.brief,
+      assets_json: (event as any).assets_json,
+      assignees: (event as any).assignees,
+      tags: (event as any).tags,
     }));
 
     const commonProps = {
