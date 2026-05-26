@@ -121,6 +121,8 @@ export default function Calendar() {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDayCockpit, setShowDayCockpit] = useState(false);
+
   const [showEventDrawer, setShowEventDrawer] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [prefillDate, setPrefillDate] = useState<Date | null>(null);
