@@ -136,6 +136,20 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
     }
   };
 
+  const handlePatch = async (patch: Record<string, any>) => {
+    if (!eventId) return;
+    const { error } = await supabase
+      .from("calendar_events")
+      .update(patch as any)
+      .eq("id", eventId);
+    if (error) {
+      toast.error(t("calendar.drawer.updateFailed"));
+    } else {
+      setEvent({ ...event, ...patch });
+      onUpdate?.();
+    }
+  };
+
   const handleDuplicate = async () => {
     if (!event) return;
 
