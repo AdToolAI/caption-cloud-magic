@@ -1,99 +1,58 @@
-# Picture Studio — Klarheit, Kosten-Schutz & Prompt-Generator
+## Problem
 
-## Das Problem (was du gesehen hast)
+Edge-Function-Logs zeigen den echten Grund:
 
-Im Picture Studio gibt es **zwei verschiedene Bild-Slots**, die nebeneinander existieren:
-
-1. **Style Reference** *(Fast/Ultra)* — übernimmt nur Farbe/Stimmung
-2. **Image-to-Image Toggle** — nimmt das Bild als Vorlage
-
-Drei Probleme:
-- **Verwirrend:** Zwei Slots gleichzeitig, niemand weiß was was tut.
-- **Modell-Mismatch:** Du hattest **Pro (Imagen 4 Ultra)** — Imagen kann kein gutes i2i mit so vielen Personen. Nano Banana 2 (Ultra) wäre richtig.
-- **Schwacher Prompt:** "Please make a detailed realistic Scene out of it" sagt dem Modell nicht, **was** es behalten soll (Komposition, Personen, Licht, Hügel im Hintergrund, Kreuze in der Mitte). Ohne diese Details halluziniert jedes Modell — wie dein "Elara Vance"-Grabstein zeigt.
-
-Drei Hebel, einer ist der wichtigste: **der Prompt**.
-
-## Was ich ändern möchte
-
-### 1. Aus zwei Slots wird **eine Modus-Wahl**
-
-3-Wege-Switch oben:
-```text
-[ Neues Bild ]   [ Bild verwandeln (i2i) ]   [ Stil übernehmen ]
-   Text → Bild     Dein Bild als Vorlage      Farben/Mood aus Ref
 ```
-Pro Modus nur **ein** Upload-Slot, nie beide.
+Replicate error: Prediction failed: The input or output was flagged
+as sensitive. Please try again with different inputs. (E005)
+Tier=ultra Model=google/nano-banana
+```
 
-### 2. **Smart Model Picker** — modus-abhängig
+Nano-Banana hat das Referenzbild (Menschenmenge / biblische Szene) als „sensitiv" eingestuft und blockiert. Die UI zeigt nur das generische **„Bildgenerierung fehlgeschlagen"** — der Kunde weiß nicht, was zu tun ist. Credits wurden korrekt **nicht** abgezogen (Deduct läuft erst nach Success), aber das ist für den User unsichtbar.
 
-Modelle die im gewählten Modus schwach sind werden ausgegraut, mit Vorschlag "Auf Nano Banana 2 wechseln? *($0.20 statt $0.32 für besseres Ergebnis)*". Keine Blockade, nur Hinweis.
+## Lösung — 3 kleine Änderungen
 
-### 3. **Universeller Prompt-Generator** ⭐ (Kern-Feature)
+### 1. Edge Function `generate-image-replicate` — Safety-Filter erkennen
 
-Über dem Prompt-Feld ein neuer Button: **"✨ Prompt-Helfer"** (öffnet ein Dialog).
+Im `catch (replicateError)` (Zeile 220) den Fehlertext auf `E005` / `flagged` / `sensitive` prüfen und einen klaren Code zurückgeben:
 
-**Wie er funktioniert:**
+```ts
+const msg = String(replicateError?.message ?? '');
+const isSafety = /E005|flagged as sensitive|safety/i.test(msg);
 
-1. **Eingabe-Box:** "Sag mir mit deinen Worten was du willst" *(beliebige Sprache, beliebige Länge)*
-   - Beispiel-Input: *"Mach das Bild rechts realistisch und detailliert"*
+return new Response(JSON.stringify({
+  error: isSafety
+    ? 'Das Referenzbild oder der Prompt wurde vom Sicherheitsfilter blockiert. Bitte nutze ein anderes Referenzbild oder formuliere den Prompt um.'
+    : `Bildgenerierung fehlgeschlagen: ${msg}`,
+  code: isSafety ? 'SAFETY_FILTERED' : 'REPLICATE_ERROR',
+  hint: isSafety ? 'try_other_reference_or_tier_pro_text_only' : undefined,
+}), { status: isSafety ? 422 : 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+```
 
-2. **Wenn ein Referenzbild da ist → wird es mitanalysiert** *(Gemini 2.5 Flash Vision, einmaliger Call, ~$0.001)*
-   - Modell sieht: Hügel, Kreuze, Menschenmenge, Sandboden, Zypressen, Licht
-   - Modell weiß: User will diese Szene **erhalten**, nur Stil ändern
+Kein Credit-Refund nötig (Deduct erfolgt erst nach Success — bereits korrekt).
 
-3. **Optionale Schnell-Filter** (Chips, kein Pflichtfeld):
-   - Ziel: *Werbung · Social · Portrait · Szene · Produkt · Kunst · Sonstiges*
-   - Stil: *Fotorealistisch · Cinematisch · Illustration · 3D · Anime · Aquarell · …*
-   - Stimmung: *Episch · Ruhig · Dramatisch · Hell · Düster · …*
-   - Auf Wunsch leer lassen — die KI rät aus dem Referenzbild + Text
+### 2. Frontend `ImageGenerator.tsx` — bessere Fehlermeldung
 
-4. **Output:** EIN englischer Master-Prompt nach bewährter Photo-Struktur:
-   ```text
-   [Subject] + [Composition preserved from reference] + [Style] +
-   [Lighting] + [Camera/Lens] + [Detail level] + [Negative hints]
-   ```
-   Plus 2 kürzere Alternativ-Varianten zum Vergleich.
+In `generateOne` (Zeile 265–277) auch bei erfolgreicher HTTP-Response den `code` lesen und im `handleGenerate`-Catch eine spezifische Toast-Meldung mit Action-Hint zeigen:
 
-5. **Auto-Empfehlung mitgeliefert:** Welches Modell + welcher Modus + welche Strength am besten passt. **Ein Klick** übernimmt alles ins Hauptformular.
+- **SAFETY_FILTERED** → Toast (lang, Variante `warning`):
+  „Sicherheitsfilter ausgelöst — Referenzbild oder Prompt enthält Inhalte, die das Modell nicht generieren darf (häufig bei vielen Personen, religiösen oder gewaltvollen Motiven). Tipps: anderes Referenzbild wählen, Motiv beschreiben statt vorzulegen, oder Tier **„Pro"** ohne Referenz testen."
+- Sonst: bisherige generische Meldung.
 
-**Warum universell:** Der Generator kennt **alle 4 Modelle** (Gemini, Seedream, Imagen, Nano Banana 2), ihre Stärken/Schwächen und ihre Prompt-Eigenheiten. Für Imagen formuliert er anders als für Nano Banana — gleicher User-Wunsch, modell-optimierter Output.
+Außerdem: bei Promise.allSettled wird der konkrete Fehler aktuell verschluckt, wenn ≥1 Variante scheitert — wenn **alle** scheitern und es `SAFETY_FILTERED` war, die Safety-Toast statt der generischen zeigen.
 
-**Wo er sonst noch hin kann (Phase 2):** Der `generatePrompt`-Edge-Function-Endpoint ist generisch — kann später vom AI Video Toolkit, Composer und Magic Edit wiederverwendet werden (1 Function, viele Konsumenten).
+### 3. Optional (klein) — Hinweis im PreflightCheck
 
-### 4. **Pre-Flight-Check** vor dem Generate-Klick
+Wenn `tier='ultra'` (Nano Banana) + Referenzbild gesetzt: dezenten Hinweis ergänzen: „Nano Banana hat strikte Inhaltsfilter — bei Menschenmengen, Politik oder religiösen Motiven nutze ggf. ‚Pro' ohne Referenz."
 
-Kleiner Banner über dem Button wenn etwas riskant:
-- "⚠️ 50+ Personen im Referenzbild + Imagen 4 = oft halluziniert. Nano Banana 2 nehmen?"
-- "💡 4 Varianten = $0.32. Mit 1 Variante starten und nur skalieren wenn das Ergebnis stimmt."
-- "💡 Dein Prompt ist sehr kurz — Prompt-Helfer öffnen?"
+## Was NICHT geändert wird
 
-### 5. **Strength-Slider für i2i** (nur i2i-Modus)
-0 % = Original fast unverändert, 100 % = nur Inspiration. Default 70 %. Genau dein Pain Point — du wolltest "das Bild rechts" mit minimaler Veränderung.
+- Kein Auto-Retry auf anderes Modell (Imagen 4 Ultra unterstützt kein `image_input`, also nicht hilfreich)
+- Keine Pricing- / Wallet-Logik
+- Keine UI-Restrukturierung
 
-### 6. **"Realistic Reproduction"-Ein-Klick** (i2i-Modus)
-Setzt automatisch: Nano Banana 2 + Strength 40 % + Realistisch-Style + Prompt-Suffix `"photorealistic, ultra-detailed, preserve composition and all subjects from reference"` + 1 Variante.
+## Dateien
 
-## Technische Details
-
-- **Neue Edge Function:** `generate-image-prompt` — Input: `{ userText, referenceImageUrl?, targetModel, mode, optionalFilters }` — Output: `{ masterPrompt, alternatives[], recommendedModel, recommendedMode, recommendedStrength, reasoning }`. Nutzt Lovable AI Gateway mit `google/gemini-3-flash-preview` (Vision-fähig, günstig, gut im Strukturieren).
-- **Neue Komponente:** `src/components/picture-studio/PromptHelperDialog.tsx`
-- **`ImageGenerator.tsx` Refactor:** `editMode: boolean` → `mode: 'create' | 'transform' | 'restyle'`
-- **Neue Komponente:** `src/components/picture-studio/PreflightCheck.tsx`
-- **Modell-Capabilities-Map:** `src/config/pictureStudioModels.ts` (welches Modell kann i2i wie gut, Prompt-Style, optimale Use-Cases)
-- **`imageGeneratorCache.ts`** erweitern um `mode` und `strength`
-- **Strength** wird an `generate-image-v2` durchgereicht — Modelle die es nicht unterstützen ignorieren es (kein Breaking Change)
-
-## Was **nicht** angefasst wird
-- Magic Edit Tab, Album-Manager, Batch-Generate
-- Bestehende Bilder & Backend-Tables
-- RLS & Storage
-
-## Erwartetes Ergebnis für deinen Fall
-1. Du wählst **"Bild verwandeln"**, lädst die Kreuzigungs-Szene hoch.
-2. Klick auf **"✨ Prompt-Helfer"**, tippst: *"realistisch und detailliert"*.
-3. Helfer analysiert das Bild, schlägt vor: **Nano Banana 2 + Strength 35 %** mit Prompt:
-   > *"Cinematic photorealistic recreation of the crucifixion scene from reference: preserve all 50+ figures, three crosses on the hilltop, Jerusalem skyline in background, cypress trees, sandy terrain, period-accurate Roman and Judean garments. 85mm lens, golden-hour side-lighting, ultra-detailed faces, shallow depth of field, IMAX color grading. Composition identical to reference."*
-4. Ein Klick → übernommen → generiert → **$0.20 für 1 Variante** statt $0.32 für 4 Fehlversuche.
-
-Sag Bescheid wenn ich starten soll, oder ob einzelne Punkte raus/anders sollen.
+- `supabase/functions/generate-image-replicate/index.ts` (Catch-Block + Response)
+- `src/components/picture-studio/ImageGenerator.tsx` (Toast-Mapping in `handleGenerate`)
+- `src/components/picture-studio/PreflightCheck.tsx` (1 Hinweis-Zeile)
