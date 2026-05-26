@@ -103,7 +103,13 @@ export function ImageGenerator() {
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
   const [tier, setTier] = useState<QualityTier>('standard');
   const [editMode, setEditMode] = useState(cached?.editMode ?? false);
+  // New mode model (replaces editMode boolean). Legacy editMode is migrated.
+  const initialMode: PictureMode =
+    cached?.mode ?? (cached?.editMode ? 'transform' : 'create');
+  const [mode, setMode] = useState<PictureMode>(initialMode);
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [styleReference, setStyleReference] = useState<string | null>(cached?.styleReference ?? null);
+  const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
 
@@ -112,9 +118,12 @@ export function ImageGenerator() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
   const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
-  const [styleReference, setStyleReference] = useState<string | null>(null);
   const [useBrandKit, setUseBrandKit] = useState(false);
   const [ciScores, setCiScores] = useState<Record<string, number>>({});
+  const [helperOpen, setHelperOpen] = useState(false);
+
+  // Derived: legacy editMode = "we have a reference + we want to transform"
+  const editMode = mode === 'transform';
 
   const loading = replicateLoading;
   const baseCost = TIER_COSTS[tier];
@@ -131,20 +140,36 @@ export function ImageGenerator() {
       aspectRatio,
       quality: tier === 'standard' || tier === 'fast' ? 'fast' : 'pro',
       editMode,
+      mode,
+      strength,
       referenceImage,
+      styleReference,
       generatedImages,
     });
-  }, [prompt, style, aspectRatio, tier, editMode, referenceImage, generatedImages]);
+  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, styleReference, generatedImages]);
+
+  // When the mode changes, clean up slots that aren't relevant for it.
+  useEffect(() => {
+    if (mode === 'create') {
+      // create: no reference of any kind
+      setReferenceImage(null);
+      setStyleReference(null);
+    } else if (mode === 'transform') {
+      // transform: only the i2i slot matters
+      setStyleReference(null);
+    } else if (mode === 'restyle') {
+      // restyle: only the style reference matters
+      setReferenceImage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setReferenceImage(reader.result as string);
-      setEditMode(true);
-    };
+    reader.onloadend = () => setReferenceImage(reader.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -164,6 +189,46 @@ export function ImageGenerator() {
     accentColor: activeBrandKit.accent_color || undefined,
     mood: activeBrandKit.mood || undefined,
   } : null;
+
+  // Build the effective prompt: for transform-mode, append a preservation
+  // suffix based on the strength slider, so downstream models (which mostly
+  // don't expose a numeric "strength" param) honor user intent via language.
+  const effectivePrompt = useMemo(() => {
+    const base = prompt.trim();
+    if (mode !== 'transform' || !referenceImage) return base;
+    if (strength <= 35) {
+      return `${base}\n\nPreserve the exact composition, subjects, layout and lighting of the reference image. Only refine style and details — do not move, add, or remove subjects.`;
+    }
+    if (strength <= 65) {
+      return `${base}\n\nKeep the overall composition and main subjects of the reference image. Adjust style, lighting and atmosphere as described.`;
+    }
+    return `${base}\n\nUse the reference image as loose inspiration only.`;
+  }, [prompt, mode, referenceImage, strength]);
+
+  /** "Realistic Reproduction" one-click for the transform mode. */
+  const handleRealisticReproduction = () => {
+    setTier('ultra');
+    setStrength(40);
+    setStyle('realistic');
+    setVariantsCount(1);
+    setPrompt((p) => {
+      const base = p.trim();
+      const suffix = 'photorealistic, ultra-detailed, preserve composition and all subjects from reference, natural light, sharp focus, IMAX color grading';
+      if (base.toLowerCase().includes('photorealistic')) return base;
+      return base ? `${base}, ${suffix}` : `Photorealistic recreation of the reference scene, ${suffix}`;
+    });
+    toast.success('Realistic-Reproduction-Preset gesetzt');
+  };
+
+  const handleHelperApply = (result: PromptHelperResult, chosenPrompt: string) => {
+    setPrompt(chosenPrompt);
+    setTier(result.recommendedTier as ModelTier);
+    setMode(result.recommendedMode);
+    if (result.recommendedMode === 'transform') {
+      setStrength(result.recommendedStrength);
+    }
+    toast.success(`Prompt übernommen — Modell: ${result.recommendedTier}`);
+  };
 
   const generateOne = async (): Promise<any | null> => {
     if (tier === 'standard') {
