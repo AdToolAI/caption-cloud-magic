@@ -564,8 +564,13 @@ export default function Calendar() {
             onCreateInColumn={() => handleDateClick(new Date())}
           />
         );
-      case "timeline":
-        return <TimelineView {...commonProps} />;
+      case "heatmap":
+        return (
+          <HeatmapView
+            {...commonProps}
+            onDateClick={handleDateClick}
+          />
+        );
       default:
         return null;
     }
