@@ -1,21 +1,30 @@
-## Problem
-Klick auf einen Tag im Smart Calendar löst nichts aus — der Day Cockpit Dialog erscheint nicht.
+## Ziel
+Wenn in der Wochenansicht ein bestimmter Time-Slot angeklickt wird, soll genau diese Uhrzeit im Day-Cockpit/Schnell-Planungsfenster vorausgefüllt sein — nicht immer 09:00 Uhr.
 
 ## Ursache
-Im `Calendar.tsx` wird der Dialog **bedingt gemountet**:
-```tsx
-{selectedWorkspace && prefillDate && (
-  <DayCockpitDialog open={showDayCockpit} ... />
-)}
+`WeekView` übergibt bereits ein korrektes `Date`-Objekt inklusive Stunde an `handleDateClick`. Im `ScheduleQuickForm` wird diese Uhrzeit aber verworfen:
+
+```ts
+if (lockedDate) {
+  d.setHours(9, 0, 0, 0);
+}
+const [time, setTime] = useState(() => (lockedDate ? '09:00' : ''));
 ```
-Radix Dialogs müssen permanent gemountet sein und nur via `open`-Prop gesteuert werden. Wird ein Dialog gleichzeitig gemountet **und** mit `open=true` initialisiert, triggert Radix die Open-Transition in einigen Setups nicht zuverlässig — der Portal-Content wird nie sichtbar. Ergebnis: Klick → State ändert sich → aber kein UI-Feedback.
 
-## Fix
-1. **Dialog permanent mounten** in `src/pages/Calendar.tsx` — Bedingung entfernen, stattdessen `date={prefillDate}` und `workspaceId={selectedWorkspace || ''}` direkt durchreichen (der Dialog rendert sowieso nur, wenn `open=true`).
-2. **Defensiver Guard** in `DayCockpitDialog.tsx` — wenn `!date || !workspaceId`, gar nichts rendern bzw. Dialog leer halten.
-3. **Verifikation**: nach dem Fix `/calendar` öffnen, auf einen Tag klicken → Cockpit-Modal muss erscheinen mit gelocktem Datum links und Tages-Queue rechts. Console-Logs / Runtime-Errors checken.
+Dadurch erscheint im Cockpit immer 09:00 Uhr, egal welcher Slot gewählt wurde.
 
-## Scope
-- 1 Datei geändert: `src/pages/Calendar.tsx` (5 Zeilen)
-- 1 Datei minimal gehärtet: `src/components/calendar/DayCockpitDialog.tsx` (Early-Return wenn date null)
-- Keine DB-, Edge-Function-, oder Logik-Änderungen.
+## Umsetzung
+1. `ScheduleQuickForm.tsx` anpassen:
+   - Bei `lockedDate` die vorhandene Uhrzeit aus `lockedDate` übernehmen.
+   - `time` initial aus `lockedDate` formatieren, z. B. `19:00`.
+   - Optional per `useEffect` synchronisieren, damit ein neuer Klick auf einen anderen Time-Slot bei geöffnetem/erneut geöffnetem Cockpit die Uhrzeit aktualisiert.
+
+2. Bestehende Monatsansicht bleibt unverändert sinnvoll:
+   - Klick auf einen Tag ohne konkrete Uhrzeit bleibt weiterhin Default 09:00 Uhr, sofern die Monatsansicht ein Datum um 00:00 liefert.
+
+3. Keine Backend- oder Datenbankänderungen.
+
+## Ergebnis
+- Wochenansicht: Klick auf 19:00 → Cockpit zeigt 19:00.
+- Wochenansicht: Klick auf 14:00 → Cockpit zeigt 14:00.
+- Monatsansicht: Klick auf Tag → bleibt bei 09:00 als Standardzeit.
