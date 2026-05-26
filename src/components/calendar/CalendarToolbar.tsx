@@ -74,7 +74,7 @@ export function CalendarToolbar({
               <SelectItem value="week">📆 {t("calendar.views.week")}</SelectItem>
               <SelectItem value="list">📋 {t("calendar.views.list")}</SelectItem>
               <SelectItem value="kanban">📊 {t("calendar.views.kanban")}</SelectItem>
-              <SelectItem value="timeline">⏱️ {t("calendar.views.timeline")}</SelectItem>
+              <SelectItem value="heatmap">🔥 Heatmap</SelectItem>
             </SelectContent>
           </Select>
 
