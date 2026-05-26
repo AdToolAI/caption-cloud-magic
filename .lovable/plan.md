@@ -1,70 +1,97 @@
-# Plan: Kanban-Board auf echtes 2028-Niveau heben
+# Plan: „Zeitleiste" → **Heatmap-Radar** im Content Command Center
 
-## Beobachtete Probleme (aus Screenshot)
-1. **Keine Karten** — User hat noch keine Events mit Pipeline-Status. Das Board zeigt 4× „Keine Karten" was lieblos wirkt.
-2. **Hässliche weiße Browser-Scrollbar** quer unter den Spalten — sofortiger 2006-Look.
-3. **Roh-Übersetzungs-Keys sichtbar**: `common.search`, vermutlich auch andere (`calendar.kanban.*`).
-4. **Optik wirkt billig**: 
-   - Spaltenköpfe als blanke farbige Linien-Outlines ohne Tiefe
-   - Toolbar-Buttons („Kanäle", „Board") wirken wie Standard-Shadcn
-   - Drop-Zonen sind dunkle leere Rechtecke ohne Bond-Charakter
-   - Keine Gold-Akzente, kein Glow, keine Serif-Headlines wo es zählt
-5. **Letzte Spalte abgeschnitten** („Freig…") — Layout schiebt über den Container hinaus.
+Die aktuelle Zeitleiste (ein abgeschnittener horizontaler Monats-Stream mit hässlicher weißer Scrollbar und nur einer leeren „Kampagnen"-Zeile) wird durch einen **Heatmap-Radar** ersetzt — die wertvollste, sofort sichtbare Pipeline-Ansicht in einer 7×24-Matrix.
 
-## Lösung
+## Was der User sieht
 
-### A. Optik komplett auf James-Bond-2028 ziehen
-- **Header-Strip oben über dem Board**: dünner Gold→Cyan-Verlauf, links Status-Legende mit Mini-Dots, rechts Live-Counter „X Posts in Pipeline".
-- **Spaltenköpfe** als kompakte Glass-Pills mit:
-  - Vertikaler Gold-Glow-Akzent links (analog Enterprise-Pattern aus mem)
-  - Status-Name in **Playfair Display** Small-Caps, nicht in der Akzentfarbe sondern in Foreground mit subtilem Glow
-  - Count + WIP rechts als monospaced Tabular-Number-Chip
-  - Dezenter Backdrop-Blur, kein farbiger Border-Frame
-- **Drop-Zonen** mit feiner Punkt-Grid-Textur (CSS radial-gradient) im Hintergrund statt platter Fläche — bewegt sich subtil beim Hover.
-- **Empty State** schöner:
-  - Gold-Outlined-Plus-Icon, „Erste Karte erstellen"-CTA pro Spalte
-  - Animierter Gold-Shimmer am Rand (subtil, 8s loop)
-  - Mikro-Hinweis: „Karten von hier nach rechts ziehen, um Status zu ändern"
-- **Toolbar** mit Glass-Background, alle Buttons im Ghost-Style mit Gold-Hover, **keine Outline-Buttons**.
+Ein vollflächiges Glass-Panel im Bond-2028-Look:
 
-### B. Scrollbar fixen
-- Container nicht horizontal überlaufen lassen; statt nativem Scroll:
-  - Spalten in **CSS-Grid mit `auto-fit`** packen, sodass sie sich den verfügbaren Platz teilen (min 240px, max 1fr)
-  - Bei >5 sichtbaren Spalten: Spaltenbreite reduziert auf min 200px
-  - Falls Overflow nötig (sehr schmaler Viewport): native Scrollbar via `scrollbar-width: none` + Webkit-Hide komplett ausblenden, stattdessen die bereits vorhandenen Chevron-Buttons als einzige Scroll-Methode
-- Letzte Spalte „Freigegeben" wieder vollständig sichtbar, da Grid responsive füllt.
-- Default-Setup: Standardmäßig nur **5 Kern-Spalten sichtbar** (Briefing, In Arbeit, Review, Zur Freigabe, Veröffentlicht). `Approved` + `Scheduled` standardmäßig ausgeblendet (über Board-Menü einblendbar).
+```text
+        00 01 02 … 08 09 10 11 12 13 14 15 … 23
+Mo      ·  ·  ·    ·  ●  ◐  ·  ·  ◐  ·  ·     ·
+Di      ·  ·  ·    ◐  ·  ●● ·  ·  ·  ◐  ·     ·
+Mi      ·  ·  ·    ·  ·  ●  ·  ·  ·  ·  ●     ·
+Do      ·  ·  ·    ◐  ·  ●  ·  ·  ◐  ·  ·     ·
+Fr      ·  ·  ·    ·  ·  ●  ·  ·  ·  ●● ·     ·
+Sa      ·  ·  ·    ·  ·  ·  ·  ·  ·  ·  ·     ·
+So      ·  ·  ·    ·  ·  ·  ·  ·  ·  ·  ·     ·
+```
 
-### C. Übersetzungen aufräumen
-- Statt `t('common.search')` (Key existiert nicht → wird roh angezeigt): direkte Strings „Suchen…", „Kanäle", „Board" verwenden. Diese Komponente ist bereits stark mit deutschen Fallbacks durchsetzt — komplette i18n hier ist Phase 2.
-- Alle sichtbaren Strings als saubere DE-Defaults setzen, damit nichts mehr roh erscheint.
+**3 visuelle Layer überlagert:**
+1. **Cyan-Glow (Hintergrund)** — Optimale Posting-Zeiten aus `usePostingTimes` (Score → Helligkeit)
+2. **Gold-Dots (Vordergrund)** — Geplante Posts. Ein Dot pro Post, mehrere stapeln sich (●● = 2 Posts, Größe wächst)
+3. **Rotes Pulse-Ring** — Konflikte (≥3 Posts in 1h-Slot)
 
-### D. „Keine Karten"-Wirklichkeitsfix
-- Wenn das gesamte Board leer ist (nicht nur eine Spalte): **board-übergreifender Onboarding-State** mittig:
-  - Großes Gold-Icon (Kanban-Stack)
-  - „Dein Content-Board ist bereit"
-  - Subtext: „Erstelle den ersten Post, um deine Pipeline zu starten"
-  - Großer Gold-CTA „+ Erster Post" → öffnet Day-Cockpit für heute
-  - Darunter dünne, leere Geist-Spalten als Vorschau (50% opacity)
-- Wenn einzelne Spalten leer: dezenter Empty-State (1 Icon + 1 Zeile), nicht 3-zeilig wie aktuell.
+**Toolbar oben:**
+- Channel-Toggle (Instagram/TikTok/LinkedIn/X/Facebook/YouTube/all) — filtert beide Layer
+- Range-Switch: „Diese Woche" / „Nächste 4 Wochen" (aggregiert) / „Nur Mo–Fr"
+- Legende: Gold=Geplant · Cyan=Optimal · Rot=Konflikt
+- Counter: „X Posts geplant · Y goldene Slots ungenutzt"
 
-### E. Spalten visuell aufwerten
-- Pro Status eigene **Mood-Glow-Farbe** als sehr subtiler Radial-Gradient am Spaltenkopf (nicht als Border)
-- Drag-Hover-State: gesamte Spalte glüht innen mit Gold (statt nur Inset-Ring)
-- Karten beim Drag: 3D-Tilt + Drop-Shadow in Gold
+**Interaktion:**
+- **Hover Zelle** → Floating Card mit: Wochentag+Uhrzeit, alle Posts in diesem Slot (Thumbnail+Caption-Preview), Score-Reasons der Posting-Times
+- **Click leere Cyan-Zelle** → öffnet Day-Cockpit für nächstes konkretes Datum dieses Slots, vorbefüllt mit Uhrzeit (greift in `handleDateClick` ein)
+- **Click Gold-Dot** → öffnet bestehenden Post zur Bearbeitung
+- **Right-Click** → „Best Slot vorschlagen lassen" (jumped zur hellsten freien Cyan-Zelle)
 
-## Out-of-Scope (jetzt nicht)
-- Echte Assignee-Avatare aus `profiles`-Tabelle (zeigen aktuell Initial-Bubbles)
-- Realtime-Cursor anderer User
-- Custom Spalten-Definitionen pro Workspace
+## Insight-Strip (unter der Heatmap)
+
+Drei Bond-Glass-Cards generiert aus dem Datenabgleich:
+1. **„Goldene Lücke"** — Bester ungenutzter Slot diese Woche (z.B. „Mi 19:00 — Score 94, keine Posts geplant") + CTA „Slot nutzen"
+2. **„Konflikt-Warnung"** — Wenn ≥1 Slot mit Stau („Fr 11:00: 3 Posts gleichzeitig") + CTA „Verteilen"
+3. **„Channel-Balance"** — Pie-Mini: Verteilung der geplanten Posts pro Kanal + Hinweis bei Schieflage
+
+## Bond-2028-Optik
+
+- Glass-Panel mit vertikaler Gold-Glow-Akzentlinie links (Enterprise-Pattern)
+- Achsen-Labels in **Playfair Display Small-Caps** (Wochentag) + **JetBrains Mono Tabular** (Stunden)
+- Zellen 28×28px mit 4px Gap, abgerundete Ecken
+- Cyan-Layer: `radial-gradient` mit Score-modulierter Opacity (0.05 – 0.45)
+- Gold-Dots: Glow-Shadow + subtiler 3s-Pulse bei Konflikten
+- Hover: Zelle hebt sich (scale 1.08), Gold-Outline-Ring
+- Empty-State: wenn 0 Posts → großes „Erstelle deinen ersten Post, um die Heatmap zu füllen" mit Cyan-Layer trotzdem sichtbar (zeigt die Slot-Empfehlung als Mehrwert sofort)
+- **Keine horizontale Scrollbar** — Heatmap passt by-design in den Viewport (responsive: bei <900px werden Stunden zu 3h-Buckets gruppiert)
 
 ## Technisch
-- Nur `KanbanView.tsx` anfassen (kein neues File)
-- CSS-Grid statt `flex overflow-x-auto`
-- Webkit-Scrollbar mit `[&::-webkit-scrollbar]:hidden` ausblenden, falls Overflow doch passiert
-- Standardspalten in `loadSettings()` Default-Hidden-Liste: `["approved", "scheduled"]`
-- Strings deutsch hartkodiert (i18n später)
-- Keine DB-/Edge-Function-Änderungen
+
+**Neu:**
+- `src/components/calendar/views/HeatmapView.tsx` — Hauptkomponente
+- `src/components/calendar/heatmap/HeatmapGrid.tsx` — 7×24 Grid-Rendering
+- `src/components/calendar/heatmap/HeatmapCellPopover.tsx` — Hover-Detail
+- `src/components/calendar/heatmap/HeatmapInsightStrip.tsx` — 3 Insight-Cards
+- `src/lib/calendar/heatmap-aggregation.ts` — Pure-Function-Aggregation (Posts → Day×Hour-Bucket, Posting-Times → Score-Bucket, Konflikt-Detection)
+
+**Geändert:**
+- `src/pages/Calendar.tsx` — `case "timeline"` → `case "heatmap"` rendert `<HeatmapView>`; Tab-Label „Zeitleiste" → „Heatmap"; Icon `Timer` → `LayoutGrid`/`Activity`
+- `src/components/calendar/CalendarToolbar.tsx` — Tab-Key + Label tauschen
+
+**Wiederverwendet:**
+- `usePostingTimes({ platform, days: 14 })` — bereits vorhanden, liefert Score+Reasons pro Slot
+- `posts`-Array aus `transformedPosts` (gleiches Format wie Kanban)
+- `handleDateClick(date)` — bereits implementiert für „leeren Slot klicken"
+- Bond-2028-Tokens aus `index.css` (`--primary`, `--accent`, Glass-Klassen)
+
+**Entfernt/Deprecated:**
+- `TimelineView.tsx` bleibt im Repo (Code-Wiederverwendung möglich), aber aus dem Tab-Switch raus
+
+**Daten-Flow:**
+```text
+posts (workspace, range)
+  ├─→ aggregateToBuckets(posts) → Map<"Mon-09", Post[]>
+  └─→ detectConflicts(buckets, threshold=3) → ConflictSet
+
+usePostingTimes(activeChannel)
+  └─→ slotsToScoreMap(days) → Map<"Mon-09", { score, reasons }>
+
+→ HeatmapGrid bekommt: { bucketMap, scoreMap, conflicts, onCellClick, onPostClick }
+```
+
+**Out-of-Scope (Stage 2):**
+- Drag-to-move Posts in andere Zellen
+- Multi-Channel-Overlay (mehrere Channels gleichzeitig stacked)
+- Export der Heatmap als PNG
+- AI-„Auto-Verteilen": Konflikte automatisch in goldene Lücken schieben
 
 ## Ergebnis
-Aus dem aktuell sterilen Board wird eine echte „Content Command Bridge": volle Bond-Optik mit Glow & Serif-Headlines, keine hässliche Scrollbar, kein roher i18n-Key, ein einladender Onboarding-State wenn leer — und alle Spalten passen sauber in den Container.
+
+Aus der nutzlosen Kampagnen-Linie wird ein **strategisches Pipeline-Cockpit**: Auf einen Blick siehst du *wann* du postest, *wann du posten solltest*, *wo du dich selbst kannibalisierst* — und mit einem Klick füllst du die goldenen Lücken. Sofortiger Mehrwert auch für leere Boards, weil die Posting-Times-Empfehlungen direkt anzeigen, *wo der erste Post hin sollte*.
