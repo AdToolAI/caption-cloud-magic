@@ -711,16 +711,8 @@ export function ImageGenerator() {
             </div>
           </div>
 
-          {/* Prompt Helper trigger */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => setHelperOpen(true)}
-          >
-            <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
-            ✨ Prompt-Helfer öffnen
-          </Button>
+
+
 
           {/* Pre-flight check */}
           <PreflightCheck
