@@ -55,7 +55,7 @@ export function PostChip({
   onDragEnd,
 }: PostChipProps) {
   const primary = (channels[0] || "").toLowerCase();
-  const p = (PLATFORM as Record<string, typeof PLATFORM.instagram>)[primary] ?? FALLBACK;
+  const p = PLATFORM[primary] ?? FALLBACK;
   const extras = channels.slice(1, 3);
   const isPulsing = PULSING_STATUSES.has(status);
 
@@ -132,7 +132,7 @@ export function PostChip({
         {extras.length > 0 && (
           <span className="flex -space-x-1 flex-shrink-0">
             {extras.map((c) => {
-              const cp = (PLATFORM as Record<string, typeof PLATFORM.instagram>)[c.toLowerCase()] ?? FALLBACK;
+              const cp = PLATFORM[c.toLowerCase()] ?? FALLBACK;
               return (
                 <span
                   key={c}
