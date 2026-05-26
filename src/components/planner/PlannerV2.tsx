@@ -700,7 +700,7 @@ export function PlannerV2({ className }: PlannerV2Props) {
         </TabsContent>
 
         <TabsContent value="campaigns">
-          <CampaignTab workspaceId={workspaceId} />
+          <CampaignTab workspaceId={workspaceId} initialOpenTemplates={initialOpenTemplates} />
         </TabsContent>
       </Tabs>
     </div>
