@@ -53,6 +53,7 @@ export function CalendarToolbar({
   selectedEventsCount = 0,
   onSelectAllDrafts,
   onDeselectAll,
+  filterSlot,
 }: CalendarToolbarProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
