@@ -1124,11 +1124,9 @@ export const ConnectionsTab = () => {
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
-                        {/* Dedicated Meta App Review path for Instagram. Uses
-                            the same backend hard-reset flow but warns the
-                            user up-front to record on the published URL in
                       </div>
                     )}
+
                   </CardContent>
                 </Card>
               );
