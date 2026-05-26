@@ -87,6 +87,17 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
   const dayNumber = date ? date.getDate().toString().padStart(2, '0') : '--';
   const monthShort = date ? date.toLocaleDateString(dateLocale, { month: 'short' }).toUpperCase() : '';
 
+  if (!date || !workspaceId) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-sm bg-[#050816] border border-primary/20">
+          <VisuallyHidden><DialogTitle>Loading</DialogTitle></VisuallyHidden>
+          <p className="text-sm text-white/60 py-6 text-center">Lade Tagesübersicht…</p>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
