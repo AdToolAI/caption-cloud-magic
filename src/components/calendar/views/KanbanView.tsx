@@ -513,35 +513,39 @@ function Column({
   const overLimit = limit != null && count > limit;
 
   return (
-    <div className="flex-shrink-0 w-[300px] snap-start">
+    <div className="flex flex-col min-w-0">
       {/* Header */}
       <div
-        className="mb-3 flex items-center justify-between rounded-lg px-3 py-2 border border-white/5"
+        className="relative mb-2.5 flex items-center justify-between rounded-lg px-3 py-2 overflow-hidden"
         style={{
-          background: "linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))",
-          borderLeft: `2px solid ${col.accent}`,
-          boxShadow: `0 0 18px -8px ${col.accent}`,
+          background: `radial-gradient(120% 200% at 0% 50%, ${col.accent}14, transparent 60%), linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01))`,
         }}
       >
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="font-serif text-sm tracking-wide truncate" style={{ color: col.accent }}>
-            {label}
-          </h3>
+        <span
+          className="absolute left-0 top-1.5 bottom-1.5 w-[2px] rounded-full"
+          style={{ background: col.accent, boxShadow: `0 0 12px ${col.accent}` }}
+        />
+        <div className="flex items-center gap-2 min-w-0 pl-1.5">
+          <h3 className="font-serif text-[13px] tracking-[0.04em] truncate text-foreground/95">{label}</h3>
         </div>
         <div className="flex items-center gap-1.5">
           {limit ? (
-            <Badge
-              variant={overLimit ? "destructive" : "secondary"}
-              className="h-5 px-1.5 text-[10px] tabular-nums"
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 h-5 px-1.5 rounded-md text-[10px] font-mono tabular-nums border",
+                overLimit
+                  ? "border-red-500/40 bg-red-500/10 text-red-300"
+                  : "border-white/10 bg-white/[0.04] text-muted-foreground"
+              )}
               title={`WIP-Limit ${count}/${limit}`}
             >
               {count}/{limit}
-              {overLimit && <AlertTriangle className="ml-1 h-3 w-3" />}
-            </Badge>
+              {overLimit && <AlertTriangle className="h-3 w-3" />}
+            </span>
           ) : (
-            <Badge variant="secondary" className="h-5 px-1.5 text-[10px] tabular-nums">
+            <span className="inline-flex h-5 min-w-5 items-center justify-center px-1.5 rounded-md text-[10px] font-mono tabular-nums border border-white/10 bg-white/[0.04] text-muted-foreground">
               {count}
-            </Badge>
+            </span>
           )}
         </div>
       </div>
@@ -550,18 +554,31 @@ function Column({
       <div
         ref={setNodeRef}
         className={cn(
-          "space-y-2 min-h-[260px] p-2 rounded-xl border border-white/5 transition-colors",
-          "bg-background/30 backdrop-blur-sm",
-          isOver && "ring-2 ring-offset-0",
-          isOver && "bg-background/50"
+          "relative space-y-2 min-h-[280px] p-2 rounded-xl border transition-all",
+          "border-white/[0.06] bg-white/[0.015]",
+          isOver && "bg-white/[0.04]"
         )}
-        style={isOver ? { boxShadow: `inset 0 0 0 1px ${col.accent}66` } : undefined}
+        style={{
+          backgroundImage:
+            "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)",
+          backgroundSize: "14px 14px",
+          ...(isOver
+            ? {
+                boxShadow: `inset 0 0 0 1px ${col.accent}55, 0 0 32px -8px ${col.accent}55`,
+                borderColor: `${col.accent}40`,
+              }
+            : {}),
+        }}
       >
         {posts.length === 0 ? (
-          <div className="h-[200px] flex flex-col items-center justify-center text-center text-xs text-muted-foreground/60 select-none">
-            <ImageIcon className="h-6 w-6 mb-2 opacity-40" />
-            <div>Keine Karten</div>
-            <div className="mt-0.5 opacity-70">Ziehe Karten hierher</div>
+          <div className="h-[220px] flex flex-col items-center justify-center text-center select-none">
+            <div
+              className="h-9 w-9 rounded-full border border-white/10 flex items-center justify-center mb-2"
+              style={{ background: `${col.accent}10` }}
+            >
+              <Plus className="h-4 w-4 text-muted-foreground/60" />
+            </div>
+            <div className="text-[11px] text-muted-foreground/70 tracking-wide">leer</div>
           </div>
         ) : (
           posts.map((p) => (
