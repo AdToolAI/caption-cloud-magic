@@ -440,9 +440,6 @@ export default function Calendar() {
     }
   };
 
-  const handleFilter = () => {
-    // No-op: filter UI is now a popover rendered directly in the toolbar.
-  };
 
   const handleShare = () => {
     toast.info(t("calendar.messages.shareComingSoon"));
