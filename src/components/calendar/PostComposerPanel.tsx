@@ -25,13 +25,48 @@ interface PostComposerPanelProps {
 }
 
 const PLATFORMS = [
-  { id: "instagram", name: "Instagram", icon: "📷", limit: 2200, glow: "236,72,153" },
-  { id: "facebook",  name: "Facebook",  icon: "👍", limit: 63206, glow: "24,119,242" },
-  { id: "linkedin",  name: "LinkedIn",  icon: "💼", limit: 3000,  glow: "10,138,10" },
-  { id: "tiktok",    name: "TikTok",    icon: "🎵", limit: 2200,  glow: "34,211,238" },
-  { id: "youtube",   name: "YouTube",   icon: "▶️", limit: 5000,  glow: "255,0,0" },
-  { id: "x",         name: "X",         icon: "𝕏",  limit: 280,   glow: "200,200,200" },
+  { id: "instagram", name: "Instagram", icon: "📷", limit: 2200, color: "#ec4899", rgb: "236,72,153" },
+  { id: "facebook",  name: "Facebook",  icon: "👍", limit: 63206, color: "#1877f2", rgb: "24,119,242" },
+  { id: "linkedin",  name: "LinkedIn",  icon: "💼", limit: 3000,  color: "#22d3ee", rgb: "34,211,238" },
+  { id: "tiktok",    name: "TikTok",    icon: "🎵", limit: 2200,  color: "#22d3ee", rgb: "34,211,238" },
+  { id: "youtube",   name: "YouTube",   icon: "▶️", limit: 5000,  color: "#ef4444", rgb: "239,68,68" },
+  { id: "x",         name: "X",         icon: "𝕏",  limit: 280,   color: "#cbd5e1", rgb: "203,213,225" },
 ];
+
+// Edle Glas-Karten-Sektion mit Gold-Akzent-Kante
+function Section({
+  title,
+  icon,
+  children,
+  accent = "default",
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+  accent?: "default" | "primary" | "indigo";
+}) {
+  const accentBar =
+    accent === "primary"
+      ? "bg-gradient-to-b from-[hsl(var(--primary))]/80 via-[hsl(var(--primary))]/30 to-transparent"
+      : accent === "indigo"
+      ? "bg-gradient-to-b from-indigo-400/80 via-indigo-400/30 to-transparent"
+      : "bg-gradient-to-b from-white/30 via-white/10 to-transparent";
+  return (
+    <section
+      className="relative rounded-xl border border-white/[0.06] bg-[#0b0f1a]/70 backdrop-blur-md p-4"
+      style={{ boxShadow: "0 1px 0 0 rgba(255,255,255,0.03) inset" }}
+    >
+      <span className={cn("absolute left-0 top-3 bottom-3 w-[1.5px] rounded-r-full", accentBar)} />
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <h3 className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[hsl(var(--primary))]/80">
+          {title}
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 const TONALITIES = [
   { id: "professional", label: "Professionell" },
