@@ -803,6 +803,16 @@ export function ImageGenerator() {
         onDelete={handleDeleteImage}
         onUpscaled={handleUpscaled}
       />
+
+      <PromptHelperDialog
+        open={helperOpen}
+        onOpenChange={setHelperOpen}
+        initialUserText={prompt}
+        currentMode={mode}
+        currentTier={tier as QualityTier}
+        referenceImageUrl={mode === 'transform' ? referenceImage : mode === 'restyle' ? styleReference : null}
+        onApply={handleHelperApply}
+      />
     </div>
   );
 }
