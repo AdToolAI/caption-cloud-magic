@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,9 @@ interface Props {
   currentMode: PictureMode;
   currentTier: QualityTier;
   referenceImageUrl?: string | null;
+  /** When true and a reference image is present, auto-runs the helper in
+   *  "Bild übernehmen & verbessern" mode (deep vision analysis + transform/ultra). */
+  autoEnhance?: boolean;
   onApply: (result: PromptHelperResult, chosenPrompt: string) => void;
 }
 
@@ -35,9 +38,12 @@ const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
+const ENHANCE_DEFAULT_TEXT =
+  "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.";
+
 export function PromptHelperDialog({
   open, onOpenChange, initialUserText = '',
-  currentMode, currentTier, referenceImageUrl, onApply,
+  currentMode, currentTier, referenceImageUrl, autoEnhance, onApply,
 }: Props) {
   const [userText, setUserText] = useState(initialUserText);
   const [goal, setGoal] = useState<string | null>(null);
@@ -45,10 +51,12 @@ export function PromptHelperDialog({
   const [mood, setMood] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PromptHelperResult | null>(null);
+  const autoFiredRef = useRef(false);
 
-  const reset = () => { setResult(null); };
+  const reset = () => { setResult(null); autoFiredRef.current = false; };
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (overrideText?: string) => {
+    const text = (overrideText ?? userText).trim();
     if (!userText.trim()) {
       toast.error("Bitte beschreib in deinen Worten was du willst.");
       return;
