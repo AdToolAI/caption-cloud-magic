@@ -16,7 +16,26 @@ serve(async (req) => {
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Resolve authenticated user from incoming JWT
+    const authHeader = req.headers.get("Authorization") || "";
+    let userId: string | null = null;
+    if (authHeader.startsWith("Bearer ")) {
+      const userClient = createClient(supabaseUrl, anonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      const { data: userData } = await userClient.auth.getUser();
+      userId = userData?.user?.id ?? null;
+    }
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: "Nicht eingeloggt", code: "UNAUTHORIZED" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
 
     const body = await req.json();
     console.log("📦 Request body:", body);
@@ -78,7 +97,7 @@ serve(async (req) => {
     const { data: campaign, error: campaignError } = await supabase
       .from("campaigns")
       .insert({
-        user_id: (await supabase.auth.getUser()).data.user?.id,
+        user_id: userId,
         title: campaign_name,
         goal: template.name,
         topic: template.description || "",
@@ -90,13 +109,20 @@ serve(async (req) => {
       .select()
       .single();
 
-    const campaignId = campaign?.id || null;
-    
     if (campaignError) {
-      console.warn("⚠️ Campaign creation failed (non-critical):", campaignError);
-    } else {
-      console.log("✅ Campaign created:", campaignId);
+      console.error("❌ Campaign creation failed:", campaignError);
+      return new Response(
+        JSON.stringify({
+          error: "Kampagne konnte nicht erstellt werden",
+          code: "CAMPAIGN_INSERT_FAILED",
+          details: campaignError.message,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+    const campaignId = campaign.id;
+    console.log("✅ Campaign created:", campaignId);
+
 
     // Generate events from template
     console.log("📅 Generating events from template...");
@@ -107,15 +133,21 @@ serve(async (req) => {
     const templateEvents = Array.isArray(template.events_json) ? template.events_json : [];
     console.log(`📊 Processing ${templateEvents.length} template events`);
 
-    for (const eventTemplate of templateEvents) {
+    for (let i = 0; i < templateEvents.length; i++) {
+      const eventTemplate = templateEvents[i];
       const eventDate = new Date(startDateObj);
       eventDate.setDate(eventDate.getDate() + (eventTemplate.day || 0));
+
+      // Append a zero-width unique marker so the per-workspace content_hash
+      // unique index never collides across campaign runs of the same template.
+      const uniqMarker = `\u200B[cmp:${campaignId}#${i}]`;
+      const briefBase = eventTemplate.brief || eventTemplate.caption_outline || "";
 
       const eventData: any = {
         workspace_id,
         campaign_id: campaignId,
         title: eventTemplate.title || "Untitled Post",
-        brief: eventTemplate.brief || eventTemplate.caption_outline || "",
+        brief: `${briefBase}${uniqMarker}`,
         caption: "",
         channels: eventTemplate.channels || ["instagram"],
         hashtags: eventTemplate.hashtags || [],
@@ -132,6 +164,7 @@ serve(async (req) => {
       eventsToCreate.push(eventData);
     }
 
+
     console.log(`📝 Inserting ${eventsToCreate.length} events into database...`);
 
     // Insert events
@@ -142,8 +175,17 @@ serve(async (req) => {
 
     if (eventsError) {
       console.error("❌ Events creation error:", eventsError);
-      throw eventsError;
+      return new Response(
+        JSON.stringify({
+          error: "Events konnten nicht erstellt werden",
+          code: eventsError.code || "EVENTS_INSERT_FAILED",
+          details: eventsError.message,
+          hint: eventsError.hint || null,
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
 
     console.log(`✅ Successfully created ${createdEvents?.length} events from template "${template.name}"`);
 

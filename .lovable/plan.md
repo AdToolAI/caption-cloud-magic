@@ -1,35 +1,29 @@
 ## Problem
 
-Im Content Planner → Tab **"Kampagnen"** zeigt der leere Zustand einen Button **"Zu den Templates"**, der auf `/templates` navigiert. Diese Route ist in `src/App.tsx:311` auf `<ComingSoon />` gemappt → "Demnächst"-Screen.
+`Kampagne generieren` schlägt mit "Edge Function returned a non-2xx status code" fehl. Edge-Function-Logs zeigen zwei zusammenhängende Bugs:
 
-Es existiert aber bereits ein voll funktionsfähiger **`CampaignTemplateDialog`** (`src/components/calendar/CampaignTemplateDialog.tsx`), der Templates aus `calendar_campaign_templates` lädt, Namen + Startdatum abfragt und eine komplette Kampagne (Schedule-Blocks) generiert. Dieser Dialog wird heute nur aus dem Kalender geöffnet.
+1. **`campaigns.user_id` NOT NULL Violation** — Die Function erstellt den Service-Role-Client **ohne** das User-JWT weiterzugeben. Deshalb liefert `supabase.auth.getUser()` `null`, und der Insert in `campaigns` setzt `user_id = null` → Constraint-Verletzung (heute nur als Warning geloggt).
+2. **`idx_calendar_events_content_hash` Unique Violation (23505)** — Beim zweiten Versuch (gleicher Workspace + gleiches Template) erzeugen die Events identische `content_hash`-Werte (vermutlich aus `workspace_id + title + brief` via DB-Trigger). Das bricht den Insert komplett ab → 500.
 
 ## Lösung
 
-Den bestehenden Dialog direkt in den Planner-Kampagnen-Tab einbauen, statt auf eine Coming-Soon-Seite zu schicken. Kein neues Backend nötig — alles ist bereits da.
+### 1. `supabase/functions/calendar-campaign-generate/index.ts`
 
-### Änderungen
+- **Auth-User korrekt ermitteln**: Authorization-Header lesen, zweiten Supabase-Client mit `global.headers.Authorization` erzeugen und `getUser()` darauf aufrufen. User-ID dann beim `campaigns.insert` mitgeben. Wenn kein User → 401.
+- **Eindeutigkeit der Events sicherstellen**, damit `content_hash` nicht kollidiert:
+  - Beim Aufbau jedes `eventData` einen unsichtbaren Eindeutigkeits-Marker an `brief` anhängen, z.B. ` \u200B[cmp:${campaignId}#${index}]` (Zero-Width-Space + Kampagnen-ID + Index). Damit ändert sich der gehashte Content pro Kampagnen-Run, der Text bleibt für den User unverändert.
+  - Fallback: Wenn `campaignId` null ist, `crypto.randomUUID()` als Marker verwenden.
+- **Saubere Fehlerausgabe**: Bei `eventsError` Code/Details strukturiert zurückgeben (statt nur `throw`), damit das Frontend eine lesbare Meldung statt "non-2xx" zeigt. Wenn `campaign`-Insert fehlschlägt → 500 mit klarer Message (nicht mehr "non-critical").
 
-**1. `src/components/planner/CampaignTab.tsx`**
-- State `showTemplateDialog` ergänzen.
-- Button "Zu den Templates" im Empty-State + ein neuer **"+ Neue Kampagne"**-Button oben in der Liste (wenn schon Kampagnen existieren) öffnen den `CampaignTemplateDialog` inline statt zu `/templates` zu navigieren.
-- Nach `onGenerated` → `fetchCampaigns()` + Erfolgs-Toast.
-- Import: `CampaignTemplateDialog` aus `@/components/calendar/CampaignTemplateDialog`.
+### 2. Kein DB-Migrations-Bedarf
 
-**2. `src/App.tsx`**
-- Route `/templates` → von `<ComingSoon />` auf eine sinnvolle Lösung umstellen. Da `/templates` semantisch auf Kampagnen-Templates verweist (kommt aus dem Planner-Flow), redirecten wir auf `/planner?tab=campaigns&newCampaign=1`. Die Planner-Seite öffnet bei `newCampaign=1` automatisch den Dialog.
+Der Unique-Index bleibt bestehen (dient anderem Dedup-Zweck im Planner). Wir umgehen ihn nur sauber, indem pro Kampagnen-Run unterschiedlicher Content erzeugt wird.
 
-**3. `src/components/planner/PlannerV2.tsx`**
-- URL-Param `tab` und `newCampaign` lesen → entsprechenden Tab aktivieren und `showTemplateDialog` initial auf `true` setzen, damit Deep-Links / der Redirect funktionieren.
+### 3. Frontend (`CampaignTemplateDialog.tsx`) — keine Änderung nötig
 
-### Technische Details
+Der bestehende `try/catch` zeigt bereits `error.message` an, sobald die Function strukturierte Fehler statt 500 zurückgibt.
 
-- `CampaignTemplateDialog` braucht `workspaceId` (in `CampaignTab` bereits als Prop vorhanden) und optional `brandKitId`.
-- `onGenerated` callback re-fetched die Kampagnen-Liste — kein Reload nötig.
-- `calendar_campaign_templates` Tabelle existiert bereits und enthält Public + Workspace-Templates; Dialog filtert per Tabs (All / My / Public).
-- Keine DB-Migration, keine Edge Functions, keine neuen Übersetzungen nötig — `t('planner.goToTemplates')` etc. bleiben unverändert.
+## Out of Scope
 
-### Out-of-Scope
-
-- Erstellen eigener Custom-Templates aus dem Planner (Dialog kann das aktuell nicht, der Kalender auch nicht — separates Feature).
-- Andere `ComingSoon`-Routen (`/image-generator`, `/carousel-builder`, etc.) — nur `/templates` betrifft den Kampagnen-Flow.
+- Refactor des `campaigns`-Schemas oder des `calendar_events`-Hash-Triggers.
+- Andere Templates/Flows.
