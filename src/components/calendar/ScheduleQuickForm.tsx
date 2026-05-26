@@ -239,13 +239,13 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
-                ${t('calendar.quickSchedule')}
+                {t('calendar.quickSchedule')}
               </CardTitle>
-              <CardDescription>${t('calendar.createAndSchedule')}</CardDescription>
+              <CardDescription>{t('calendar.createAndSchedule')}</CardDescription>
             </div>
             {isPrefilled && (
               <Badge variant="secondary" className="text-xs">
-                🎨 ${t('calendar.importedFromGenerator')}
+                🎨 {t('calendar.importedFromGenerator')}
               </Badge>
             )}
           </div>
@@ -254,10 +254,10 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div className="space-y-2">
-              <Label htmlFor="title">${t('calendar.titleOptional')}</Label>
+              <Label htmlFor="title">{t('calendar.titleOptional')}</Label>
               <Input
                 id="title"
-                placeholder="${t('calendar.internalTitle')}"
+                placeholder={t('calendar.internalTitle')}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={busy}
@@ -268,7 +268,7 @@ export function ScheduleQuickForm({ workspaceId, onSuccess }: ScheduleQuickFormP
             {/* Caption */}
             <div className="space-y-2">
               <Label htmlFor="caption">
-                ${t('calendar.captionPostText')}
+                {t('calendar.captionPostText')}
                 <span className="ml-2 text-xs text-muted-foreground">
                   {caption.length} / {captionMaxLength}
                 </span>
