@@ -585,5 +585,3 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
     </motion.div>
   );
 }
-
-}
