@@ -1156,12 +1156,6 @@ export const ConnectionsTab = () => {
         onSuccess={fetchConnections}
       />
 
-      <PlanLimitDialog
-        open={showUpgradeDialog}
-        onOpenChange={setShowUpgradeDialog}
-        feature="API Connections"
-      />
-
       <InstagramTokenDialog
         open={showTokenDialog}
         onOpenChange={setShowTokenDialog}
@@ -1174,16 +1168,13 @@ export const ConnectionsTab = () => {
         onPageSelected={fetchConnections}
         mode={pageSelectMode}
         onReconnect={() => {
-          // Force a fresh consent dialog (auth_type=rerequest + new nonce
-          // inside handleConnect) so Meta cannot silently reuse the previous
-          // grant and skip the page-selection step.
           handleConnect(
             pageSelectMode,
             pageSelectMode === 'instagram' ? 'Instagram' : 'Facebook',
-            { forceReconsent: true }
           );
         }}
       />
+
     </div>
   );
 };
