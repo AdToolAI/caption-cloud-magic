@@ -162,7 +162,8 @@ serve(async (req) => {
     // Generate events from template
     console.log("📅 Generating events from template...");
     
-    const startDateObj = new Date(start_date);
+    // startDateObj already computed above
+
     const eventsToCreate = [];
 
     const templateEvents = Array.isArray(template.events_json) ? template.events_json : [];
