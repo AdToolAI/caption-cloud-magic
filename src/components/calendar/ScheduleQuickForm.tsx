@@ -51,15 +51,30 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
   const { t, language } = useTranslation();
   const [title, setTitle] = useState('');
   const [caption, setCaption] = useState('');
+  const initialTime = (d?: Date) => {
+    if (!d) return '09:00';
+    const h = d.getHours();
+    const m = d.getMinutes();
+    if (h === 0 && m === 0) return '09:00';
+    return `${pad(h)}:${pad(m)}`;
+  };
   const [when, setWhen] = useState(() => {
     if (lockedDate) {
       const d = new Date(lockedDate);
-      d.setHours(9, 0, 0, 0);
+      const [hh, mm] = initialTime(lockedDate).split(':').map(Number);
+      d.setHours(hh, mm, 0, 0);
       return toDatetimeLocal(d);
     }
     return toDatetimeLocal(new Date(Date.now() + 60 * 60 * 1000));
   });
-  const [time, setTime] = useState(() => (lockedDate ? '09:00' : ''));
+  const [time, setTime] = useState(() => (lockedDate ? initialTime(lockedDate) : ''));
+
+  // Sync time when lockedDate changes (e.g. user clicks a different week-view slot)
+  useEffect(() => {
+    if (!lockedDate) return;
+    setTime(initialTime(lockedDate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedDate?.getTime()]);
 
   const [channels, setChannels] = useState<string[]>(['instagram']);
   const [selectedMedia, setSelectedMedia] = useState<File[]>([]);
