@@ -98,7 +98,8 @@ export default function Calendar() {
   // View State - with localStorage persistence
   const [currentView, setCurrentView] = useState<ViewType>(() => {
     const saved = localStorage.getItem('calendar-view');
-    return (saved as ViewType) || "month";
+    const valid: ViewType[] = ["month", "week", "list", "kanban", "heatmap"];
+    return (valid.includes(saved as ViewType) ? (saved as ViewType) : "month");
   });
 
   // Sync view changes to localStorage
