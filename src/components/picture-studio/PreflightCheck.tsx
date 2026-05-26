@@ -67,9 +67,14 @@ export function PreflightCheck({
 
   // 4) Nano Banana strict safety filter — warn when ultra tier + reference image
   if (tier === 'ultra' && hasReference) {
+    const fastModel = PICTURE_MODELS.fast;
     tips.push({
       icon: 'info',
-      text: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird die Generierung oft blockiert — dann statt Referenz das Motiv im Prompt beschreiben oder „Pro" wählen.',
+      text: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird oft blockiert. „Fast" (Seedream 4) hat tolerantere Filter und ist bei i2i meist die sichere Wahl.',
+      action: {
+        label: `Auf ${fastModel.label} wechseln (${currencySymbol}${(fastModel.cost * variantsCount).toFixed(2)})`,
+        run: () => onSwitchTier('fast'),
+      },
     });
   }
 
