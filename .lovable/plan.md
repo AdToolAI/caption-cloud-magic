@@ -1,28 +1,21 @@
-## Day Cockpit Modal
+## Problem
+Klick auf einen Tag im Smart Calendar löst nichts aus — der Day Cockpit Dialog erscheint nicht.
 
-Schnell-Planung + Warteschlange werden in EIN großes Modal vereint, das beim Klick auf einen Kalendertag öffnet. Datum ist gelockt — nur Uhrzeit wählbar. Design im Bond-2028-Stil, 3 KI-generierte Varianten zur Auswahl.
+## Ursache
+Im `Calendar.tsx` wird der Dialog **bedingt gemountet**:
+```tsx
+{selectedWorkspace && prefillDate && (
+  <DayCockpitDialog open={showDayCockpit} ... />
+)}
+```
+Radix Dialogs müssen permanent gemountet sein und nur via `open`-Prop gesteuert werden. Wird ein Dialog gleichzeitig gemountet **und** mit `open=true` initialisiert, triggert Radix die Open-Transition in einigen Setups nicht zuverlässig — der Portal-Content wird nie sichtbar. Ergebnis: Klick → State ändert sich → aber kein UI-Feedback.
 
-### Was passiert
-- Klick auf Tag (z.B. `26`) → Modal "Day Cockpit" öffnet sich
-- Links: Schnell-Planung (Titel, Caption, AI, Upload, **nur Uhrzeit-Picker**, Plattformen)
-- Rechts: Warteschlange (nur Posts dieses Tages, sortiert nach Uhrzeit)
-- Alte Inline-Panels unter dem Kalender verschwinden
+## Fix
+1. **Dialog permanent mounten** in `src/pages/Calendar.tsx` — Bedingung entfernen, stattdessen `date={prefillDate}` und `workspaceId={selectedWorkspace || ''}` direkt durchreichen (der Dialog rendert sowieso nur, wenn `open=true`).
+2. **Defensiver Guard** in `DayCockpitDialog.tsx` — wenn `!date || !workspaceId`, gar nichts rendern bzw. Dialog leer halten.
+3. **Verifikation**: nach dem Fix `/calendar` öffnen, auf einen Tag klicken → Cockpit-Modal muss erscheinen mit gelocktem Datum links und Tages-Queue rechts. Console-Logs / Runtime-Errors checken.
 
-### Design-Prozess
-1. Ich generiere **3 Mood-Variants** mit Nano Banana 2 / Gemini 3 Pro Image:
-   - **A "Mission Briefing"** — goldene Datums-Plakette, Dossier-Sektoren, Cyan-Scanlinien
-   - **B "Holographic Cockpit"** — 3D-Tilt-Glasplatten, Gold-Partikel, schwebend
-   - **C "Editorial Noir"** — riesiges Playfair-Datum, Magazine-Layout, viel Whitespace
-2. Du wählst eine Variante via Bild-Picker
-3. Ich baue exakt diese Variante in Tailwind + Framer Motion
-
-### Technik (kurz)
-- Neu: `src/components/calendar/DayCockpitDialog.tsx` (Radix Dialog, 2-Spalten-Grid)
-- Refactor `ScheduleQuickForm.tsx`: Prop `lockedDate?: Date` → versteckt Datum-Input, zeigt nur `<TimePicker>`
-- Refactor Kalender-Grid: `onClick` pro Tageszelle öffnet Modal mit `selectedDate`
-- Warteschlange via `useCalendarEvents` mit `from`/`to` auf den Tag gefiltert
-- Lokalisierung DE/EN/ES
-- Keine DB-/Edge-Function-/Publish-Logik-Änderungen
-
-### Offene Frage
-Soll das Modal beim Öffnen **direkt die Form zeigen** (häufigster Fall: neuer Post), oder **erst die Warteschlange** und Form via "+ Neuer Post"-Button? Ich tendiere zu Form direkt sichtbar (links), Warteschlange immer rechts daneben — beides parallel ohne Klick.
+## Scope
+- 1 Datei geändert: `src/pages/Calendar.tsx` (5 Zeilen)
+- 1 Datei minimal gehärtet: `src/components/calendar/DayCockpitDialog.tsx` (Early-Return wenn date null)
+- Keine DB-, Edge-Function-, oder Logik-Änderungen.

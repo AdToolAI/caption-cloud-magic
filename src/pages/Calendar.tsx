@@ -779,15 +779,13 @@ export default function Calendar() {
       />
 
       {/* Day Cockpit — combined Quick Schedule + Queue */}
-      {selectedWorkspace && prefillDate && (
-        <DayCockpitDialog
-          open={showDayCockpit}
-          onOpenChange={setShowDayCockpit}
-          date={prefillDate}
-          workspaceId={selectedWorkspace}
-          onSuccess={invalidateEvents}
-        />
-      )}
+      <DayCockpitDialog
+        open={showDayCockpit}
+        onOpenChange={setShowDayCockpit}
+        date={prefillDate}
+        workspaceId={selectedWorkspace || ''}
+        onSuccess={invalidateEvents}
+      />
     </div>
   );
 }
