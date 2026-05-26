@@ -65,6 +65,14 @@ export function PreflightCheck({
     });
   }
 
+  // 4) Nano Banana strict safety filter — warn when ultra tier + reference image
+  if (tier === 'ultra' && hasReference) {
+    tips.push({
+      icon: 'info',
+      text: 'Hinweis: „Ultra" (Nano Banana) hat strikte Inhaltsfilter. Bei Menschenmengen, religiösen, politischen oder gewaltvollen Referenzbildern wird die Generierung oft blockiert — dann statt Referenz das Motiv im Prompt beschreiben oder „Pro" wählen.',
+    });
+  }
+
   if (tips.length === 0) return null;
 
   return (
