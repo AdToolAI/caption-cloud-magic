@@ -35,6 +35,8 @@ import { CalendarHeroHeader } from "@/components/calendar/CalendarHeroHeader";
 import { PublishingStatusPanel } from "@/components/calendar/PublishingStatusPanel";
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
+import { DayCockpitDialog } from "@/components/calendar/DayCockpitDialog";
+
 import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { NotificationBadge } from "@/components/calendar/NotificationBadge";
 import { BulkScheduleDialog } from "@/components/calendar/BulkScheduleDialog";
