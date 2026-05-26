@@ -1127,37 +1127,6 @@ export const ConnectionsTab = () => {
                         {/* Dedicated Meta App Review path for Instagram. Uses
                             the same backend hard-reset flow but warns the
                             user up-front to record on the published URL in
-                            an incognito window with a fresh Meta session. */}
-                        {provider.id === 'instagram' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full gap-2"
-                              onClick={() =>
-                                handleConnect(provider.id, provider.name, {
-                                  forReview: true,
-                                  forceReconsent: true,
-                                })
-                              }
-                            >
-                              <Instagram className="h-3 w-3" />
-                              Instagram für Review verbinden
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed px-1">
-                              Für die Meta-App-Review-Aufnahme bitte die{" "}
-                              <a
-                                href="https://caption-cloud-magic.lovable.app/integrations"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline underline-offset-2 hover:text-foreground"
-                              >
-                                veröffentlichte App-URL
-                              </a>{" "}
-                              in einem Inkognito-Fenster mit ausgeloggter Meta-Sitzung verwenden.
-                            </p>
-                          </>
-                        )}
                       </div>
                     )}
                   </CardContent>
@@ -1167,6 +1136,7 @@ export const ConnectionsTab = () => {
           </div>
         </CardContent>
       </Card>
+
 
       {/* CSV Upload Section */}
       <Card>
