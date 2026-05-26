@@ -41,6 +41,9 @@ import { NotificationCenter } from "@/components/calendar/NotificationCenter";
 import { NotificationBadge } from "@/components/calendar/NotificationBadge";
 import { BulkScheduleDialog } from "@/components/calendar/BulkScheduleDialog";
 import { RecurringRuleDialog } from "@/components/calendar/RecurringRuleDialog";
+import { useCalendarFilters } from "@/hooks/useCalendarFilters";
+import { CalendarFilterPopover } from "@/components/calendar/filters/CalendarFilterPopover";
+import { CalendarFilterBar } from "@/components/calendar/filters/CalendarFilterBar";
 
 interface CalendarEvent {
   id: string;
