@@ -446,7 +446,7 @@ function Column({
   readOnly?: boolean;
   selectedEventIds: string[];
   label: string;
-  locale: Locale;
+  locale: any;
 }) {
   const { setNodeRef } = useDroppable({ id: `col:${col.key}` });
   const count = posts.length;
@@ -548,7 +548,7 @@ function DraggableCard({
   readOnly?: boolean;
   selected: boolean;
   onClick: () => void;
-  locale: Locale;
+  locale: any;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: post.id,
@@ -581,7 +581,7 @@ function KanbanCard({
   selected?: boolean;
   dragging?: boolean;
   dragHandleProps?: any;
-  locale: Locale;
+  locale: any;
 }) {
   const thumb = getThumbnail(post);
   const start = post.start_at ? new Date(post.start_at) : null;
