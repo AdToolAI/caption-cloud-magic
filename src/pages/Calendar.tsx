@@ -32,6 +32,7 @@ import { HolidaySuggestionsDialog } from "@/components/calendar/HolidaySuggestio
 import { IntegrationSettingsDialog } from "@/components/calendar/IntegrationSettingsDialog";
 import { CalendarMetricsDashboard } from "@/components/calendar/CalendarMetricsDashboard";
 import { CalendarHeroHeader } from "@/components/calendar/CalendarHeroHeader";
+import { CalendarBackgroundAurora } from "@/components/calendar/CalendarBackgroundAurora";
 
 import { exportToCSV, exportToPDF, exportToICS, exportMetricsToCSV } from "@/lib/calendarExport";
 import { ScheduleQuickForm } from "@/components/calendar/ScheduleQuickForm";
@@ -591,8 +592,9 @@ export default function Calendar() {
   };
 
   return (
-    <div data-testid="calendar-page" className="min-h-screen flex flex-col bg-background">
-      <main className="flex-1 container mx-auto px-4 py-6">
+    <div data-testid="calendar-page" className="relative min-h-screen flex flex-col bg-background">
+      <CalendarBackgroundAurora />
+      <main className="relative flex-1 container mx-auto px-4 py-6">
         <Breadcrumbs category="optimize" feature={t('calendar.smartCalendar')} />
 
         {/* Compact Layout - reduced spacing */}
