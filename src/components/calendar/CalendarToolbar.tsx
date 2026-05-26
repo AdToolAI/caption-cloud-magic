@@ -172,14 +172,18 @@ export function CalendarToolbar({
             </Button>
           )}
           
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={onFilter}
-            className="h-8 px-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
-          >
-            <Filter className="w-3.5 h-3.5" />
-          </Button>
+          {filterSlot ?? (
+            onFilter ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onFilter}
+                className="h-8 px-2 bg-muted/30 border-white/10 hover:border-primary/40 hover:bg-primary/10"
+              >
+                <Filter className="w-3.5 h-3.5" />
+              </Button>
+            ) : null
+          )}
           
           {onOpenAutoSchedule && selectedEventsCount > 0 && (
             <Button 
