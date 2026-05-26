@@ -45,8 +45,7 @@ import {
   Music2,
   Twitter,
   AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
+  LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 
