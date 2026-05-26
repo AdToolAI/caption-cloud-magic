@@ -83,14 +83,6 @@ export default function Integrations() {
     }
   };
 
-  const planLimits = {
-    free: { connections: 0, label: t('socialIntegrations.noConnections') },
-    pro: { connections: 3, label: t('socialIntegrations.upTo3') },
-    enterprise: { connections: Infinity, label: t('socialIntegrations.unlimited') }
-  };
-
-  const currentLimit = planLimits[userPlan as keyof typeof planLimits] || planLimits.free;
-
   return (
     <PageWrapper>
       <SEO
@@ -122,35 +114,6 @@ export default function Integrations() {
               </div>
             </div>
           </div>
-        </Card>
-
-        {/* Plan Limits Info */}
-        <Card className="p-6 bg-card/50 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">{t('socialIntegrations.currentPlan')}</h3>
-              <p className="text-sm text-muted-foreground">
-                {currentLimit.label}
-              </p>
-            </div>
-            <Badge variant="secondary" className="text-base px-4 py-2">
-              {userPlan.toUpperCase()}
-            </Badge>
-          </div>
-          
-          {userPlan === "free" && (
-            <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
-             <p className="text-sm text-muted-foreground mb-2">
-                💡 {t('socialIntegrations.proHint')}
-              </p>
-              <a 
-                href="/pricing" 
-                className="text-sm text-primary hover:underline font-medium"
-              >
-                {t('socialIntegrations.upgradeNow')}
-              </a>
-            </div>
-          )}
         </Card>
 
         {/* Connections Tab */}

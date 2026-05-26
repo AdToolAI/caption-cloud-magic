@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
-import { useTrialAccess } from "@/hooks/useTrialAccess";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
-import { PlanLimitDialog } from "./PlanLimitDialog";
+
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
@@ -31,12 +31,11 @@ export const ConnectionsTab = () => {
   const { t } = useTranslation();
   const { toast } = useToast();
   const { emit } = useEventEmitter();
-  const { hasFullAccess } = useTrialAccess();
   const [connections, setConnections] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showCSVUpload, setShowCSVUpload] = useState(false);
-  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false);
   const [showTokenDialog, setShowTokenDialog] = useState(false);
+
   const [syncError, setSyncError] = useState<Record<string, boolean>>({});
   const [userPlan, setUserPlan] = useState<string>('free');
   const [xCallbackError, setXCallbackError] = useState<string | null>(null);
@@ -228,47 +227,27 @@ export const ConnectionsTab = () => {
   const handleConnect = async (
     providerId: string,
     providerName: string,
-    options: { forceReconsent?: boolean; forReview?: boolean } = {}
   ) => {
     // Diagnostic instrumentation — makes it possible to see in the browser
     // console exactly which path Instagram OAuth took (frontend builder vs.
     // backend `instagram-oauth-start`) and whether we are running on the
-    // preview or the published environment. Critical for Meta App Review
-    // root-cause analysis when Meta keeps short-circuiting the consent.
+    // preview or the published environment.
     const isPreviewHost = /id-preview--|lovableproject\.com|sandbox\.lovable\.dev/i.test(window.location.hostname);
     console.log('=== handleConnect START ===', {
       providerId,
       providerName,
       userPlan,
       connectionsCount: connections.length,
-      forReview: !!options.forReview,
-      forceReconsent: !!options.forceReconsent,
       host: window.location.hostname,
       env: isPreviewHost ? 'preview' : 'published',
       origin: window.location.origin,
     });
-    
-    // Check plan limits (skipped during active trial / paid plans / test-mode plans)
-    const planIsPaid = userPlan === 'pro' || userPlan === 'enterprise' || userPlan === 'basic';
-    if (!hasFullAccess && !planIsPaid) {
-      if (userPlan === 'free') {
-        console.log('User on FREE plan (no trial), showing upgrade dialog');
-        setShowUpgradeDialog(true);
-        return;
-      }
-    }
 
-    if (userPlan === 'pro' && connections.length >= 3 && !hasFullAccess) {
-      console.log('User on PRO plan but has 3 connections already');
-      toast({
-        title: t('common.error'),
-        description: 'Pro plan allows up to 3 connections. Disconnect one to add another.',
-        variant: "destructive"
-      });
-      return;
-    }
+    // No plan-based gating: Meta scopes are on Advanced Access for all users,
+    // and all other providers (TikTok/LinkedIn/X/YouTube) work the same for
+    // every authenticated user. Only requirement is that the user is logged in.
 
-    console.log('Plan check passed, proceeding...', { hasFullAccess });
+
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -296,22 +275,6 @@ export const ConnectionsTab = () => {
       // We deliberately bypass the local frontend OAuth URL builder below
       // for Instagram so there is exactly ONE source of truth for IG OAuth.
       if (providerId === 'instagram') {
-        // Review-mode: explicit warning + harder reauth intent so the App
-        // Reviewer's screencast captures the FULL Meta dialog (not the
-        // cached "Continue as ..." short-circuit).
-        if (options.forReview) {
-          const proceed = window.confirm(
-            'Meta App Review – Instagram-Aufnahme\n\n' +
-            'Damit Meta den vollständigen Berechtigungsdialog zeigt:\n\n' +
-            '1. Öffne die VERÖFFENTLICHTE App-URL (nicht die Preview).\n' +
-            '2. Logge dich vorher KOMPLETT bei Facebook/Meta aus.\n' +
-            '3. Nutze ein INKOGNITO-Fenster.\n' +
-            '4. Starte die Bildschirmaufnahme JETZT.\n\n' +
-            'Fortfahren und Instagram-Verbindung starten?'
-          );
-          if (!proceed) return;
-        }
-
         try {
           const { data: session } = await supabase.auth.getSession();
           if (!session.session?.access_token) {
@@ -324,7 +287,6 @@ export const ConnectionsTab = () => {
           }
 
           console.log('[ConnectionsTab] → invoking instagram-oauth-start', {
-            forReview: !!options.forReview,
             returnTo: window.location.href,
           });
 
@@ -334,7 +296,6 @@ export const ConnectionsTab = () => {
             },
             body: {
               returnTo: window.location.href,
-              forReview: !!options.forReview,
             },
           });
 
@@ -360,6 +321,7 @@ export const ConnectionsTab = () => {
         }
         return;
       }
+
 
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
@@ -1161,42 +1123,9 @@ export const ConnectionsTab = () => {
                         <Button onClick={() => handleConnect(provider.id, provider.name)} className="w-full">
                           {t('performance.connections.connect')}
                         </Button>
-                        {/* Dedicated Meta App Review path for Instagram. Uses
-                            the same backend hard-reset flow but warns the
-                            user up-front to record on the published URL in
-                            an incognito window with a fresh Meta session. */}
-                        {provider.id === 'instagram' && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full gap-2"
-                              onClick={() =>
-                                handleConnect(provider.id, provider.name, {
-                                  forReview: true,
-                                  forceReconsent: true,
-                                })
-                              }
-                            >
-                              <Instagram className="h-3 w-3" />
-                              Instagram für Review verbinden
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed px-1">
-                              Für die Meta-App-Review-Aufnahme bitte die{" "}
-                              <a
-                                href="https://caption-cloud-magic.lovable.app/integrations"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline underline-offset-2 hover:text-foreground"
-                              >
-                                veröffentlichte App-URL
-                              </a>{" "}
-                              in einem Inkognito-Fenster mit ausgeloggter Meta-Sitzung verwenden.
-                            </p>
-                          </>
-                        )}
                       </div>
                     )}
+
                   </CardContent>
                 </Card>
               );
@@ -1204,6 +1133,7 @@ export const ConnectionsTab = () => {
           </div>
         </CardContent>
       </Card>
+
 
       {/* CSV Upload Section */}
       <Card>
@@ -1225,12 +1155,6 @@ export const ConnectionsTab = () => {
         onSuccess={fetchConnections}
       />
 
-      <PlanLimitDialog
-        open={showUpgradeDialog}
-        onOpenChange={setShowUpgradeDialog}
-        feature="API Connections"
-      />
-
       <InstagramTokenDialog
         open={showTokenDialog}
         onOpenChange={setShowTokenDialog}
@@ -1243,16 +1167,13 @@ export const ConnectionsTab = () => {
         onPageSelected={fetchConnections}
         mode={pageSelectMode}
         onReconnect={() => {
-          // Force a fresh consent dialog (auth_type=rerequest + new nonce
-          // inside handleConnect) so Meta cannot silently reuse the previous
-          // grant and skip the page-selection step.
           handleConnect(
             pageSelectMode,
             pageSelectMode === 'instagram' ? 'Instagram' : 'Facebook',
-            { forceReconsent: true }
           );
         }}
       />
+
     </div>
   );
 };
