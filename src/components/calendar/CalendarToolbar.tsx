@@ -135,8 +135,9 @@ export function CalendarToolbar({
             <TabsTrigger value="kanban" className="h-8 px-3 text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
               {t("calendar.views.kanban")}
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="h-8 px-3 text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
-              {t("calendar.views.timeline")}
+            <TabsTrigger value="heatmap" className="h-8 px-3 text-xs gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
+              <Flame className="w-3.5 h-3.5" />
+              Heatmap
             </TabsTrigger>
           </TabsList>
         </Tabs>
