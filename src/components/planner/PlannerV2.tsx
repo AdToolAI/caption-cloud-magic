@@ -86,6 +86,20 @@ const localeMap = { en: enUS, de, es } as const;
 
 export function PlannerV2({ className }: PlannerV2Props) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'campaigns' ? 'campaigns' : 'posts';
+  const initialOpenTemplates = searchParams.get('newCampaign') === '1';
+  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  useEffect(() => {
+    if (initialOpenTemplates || searchParams.get('tab')) {
+      // Clean URL after consuming the params so refresh doesn't reopen the dialog.
+      const next = new URLSearchParams(searchParams);
+      next.delete('tab');
+      next.delete('newCampaign');
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { user } = useAuth();
   const { t, language } = useTranslation();
   const dateFnsLocale = localeMap[language] || enUS;
