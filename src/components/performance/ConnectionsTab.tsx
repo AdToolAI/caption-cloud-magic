@@ -276,22 +276,6 @@ export const ConnectionsTab = () => {
       // We deliberately bypass the local frontend OAuth URL builder below
       // for Instagram so there is exactly ONE source of truth for IG OAuth.
       if (providerId === 'instagram') {
-        // Review-mode: explicit warning + harder reauth intent so the App
-        // Reviewer's screencast captures the FULL Meta dialog (not the
-        // cached "Continue as ..." short-circuit).
-        if (options.forReview) {
-          const proceed = window.confirm(
-            'Meta App Review – Instagram-Aufnahme\n\n' +
-            'Damit Meta den vollständigen Berechtigungsdialog zeigt:\n\n' +
-            '1. Öffne die VERÖFFENTLICHTE App-URL (nicht die Preview).\n' +
-            '2. Logge dich vorher KOMPLETT bei Facebook/Meta aus.\n' +
-            '3. Nutze ein INKOGNITO-Fenster.\n' +
-            '4. Starte die Bildschirmaufnahme JETZT.\n\n' +
-            'Fortfahren und Instagram-Verbindung starten?'
-          );
-          if (!proceed) return;
-        }
-
         try {
           const { data: session } = await supabase.auth.getSession();
           if (!session.session?.access_token) {
@@ -304,7 +288,6 @@ export const ConnectionsTab = () => {
           }
 
           console.log('[ConnectionsTab] → invoking instagram-oauth-start', {
-            forReview: !!options.forReview,
             returnTo: window.location.href,
           });
 
@@ -314,7 +297,6 @@ export const ConnectionsTab = () => {
             },
             body: {
               returnTo: window.location.href,
-              forReview: !!options.forReview,
             },
           });
 
@@ -340,6 +322,7 @@ export const ConnectionsTab = () => {
         }
         return;
       }
+
 
       // TikTok: Use new backend OAuth flow
       if (providerId === 'tiktok') {
