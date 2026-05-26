@@ -348,8 +348,9 @@ export default function Calendar() {
       return;
     }
     setPrefillDate(date);
-    setShowCreateDialog(true);
+    setShowDayCockpit(true);
   };
+
 
   const handleEventMove = async (eventId: string, newDate: Date) => {
     if (!hasCalendarAccess()) {
