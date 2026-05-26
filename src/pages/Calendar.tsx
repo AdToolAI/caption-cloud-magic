@@ -561,6 +561,7 @@ export default function Calendar() {
           <KanbanView
             {...commonProps}
             onStatusChange={handleStatusChange as any}
+            onCreateInColumn={() => handleDateClick(new Date())}
           />
         );
       case "timeline":
