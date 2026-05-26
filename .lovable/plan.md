@@ -1,41 +1,78 @@
-## Zwei Probleme
+# Plan: Kanban-Board zum echten Content-Workflow ausbauen
 
-### 1. Uhrzeit um 1 Stunde versetzt
-In `WeekView.tsx` wird das Stunden-Label so erzeugt:
+## Status heute
+`KanbanView.tsx` rendert 7 Status-Spalten (Briefing → Published) mit funktionierendem Drag&Drop, ist aber praktisch leer und nutzlos:
+- Keine Karten erstellbar direkt aus dem Board (nur über "Neu"-Button oben)
+- Keine WIP-Limits, keine Filter, keine Assignee-Anzeige, keine Thumbnails
+- Übersetzungs-Key `calendar.dateClickHint` wird roh angezeigt
+- Spalten sind nur grau, keine Bond-2028-Optik
+- Nur 5 Spalten sichtbar (Scroll-Hint), letzte 2 (Scheduled/Published) versteckt
+- Keine Sortierung innerhalb einer Spalte, kein Bulk-Move, kein Inline-Edit
 
-```ts
-format(addHours(new Date(0), hour), "HH:mm")
-```
+## Ziel
+Ein echtes Content-Command-Board im "James-Bond-2028"-Stil, das eine Agentur/Creator-Pipeline tatsächlich abbildet: vom Briefing bis zur Veröffentlichung — mit Quick-Create, Assignees, Thumbnails, WIP-Limits, Filtern und nahtloser Verbindung zu Studios.
 
-`new Date(0)` ist UTC-Mitternacht — in Berlin (Sommerzeit) entspricht das `02:00` lokal. `addHours(..., hour)` plus `format` rechnet alles in lokaler Zeit. Das Label ist also gegenüber dem Index `hour` um 1–2 Stunden verschoben.
+## Umfang (nur Frontend, keine Schema-Änderungen)
 
-Geklickt wird aber mit dem unverschobenen Index:
-```ts
-slotDate.setHours(hour, 0, 0, 0);
-```
+### 1. Kanban-Spalten redesignen (Bond 2028)
+- Glassmorphic-Spalten mit dezentem Gold/Cyan-Akzent pro Status (statt flacher `bg-gray-500`-Dots)
+- Sticky Spaltenkopf: Titel + Count + WIP-Limit-Badge (z.B. "In Arbeit 3/5", rot wenn überschritten)
+- Spaltenfarben aus `statusColors` als linker Border-Glow (vertikale Gold-Linie analog Enterprise-Pattern)
+- Horizontal-Scroll mit Snap, plus Buttons links/rechts zum Durchblättern
+- Leere Spalte zeigt einen kontext-passenden Empty-State ("Ziehe Karten hierher" + Icon)
 
-Folge: Label „04:00“ entspricht intern `hour=3` → Cockpit zeigt korrekt „03:00“. Genau dein Symptom.
+### 2. Reichhaltige Post-Karten
+- Thumbnail (erstes `assets_json`-Bild oder Video-Poster) als 16:9-Cover oben
+- Channel-Icons (echte Lucide-/Brand-Icons statt Text-Badges)
+- Assignee-Avatare (Stack, max 3) + Rest-Counter
+- Geplanter Termin mit relativer Zeit ("in 3 Tagen", "überfällig" rot)
+- Footer-Row: Tag-Chips, Kommentar-/Approval-Counter
+- Hover: 3-Dot-Menü → Bearbeiten, Duplizieren, In Studio öffnen, Löschen
+- Drag-Handle links sichtbar (Grip-Icon), Karte glüht beim Drag
 
-**Fix:** Label deterministisch aus dem Stunden-Index erzeugen, ohne `Date`/Timezone:
-```ts
-`${String(hour).padStart(2, '0')}:00`
-```
-Damit stimmen Label-Klick und gesetzte Stunde 1:1 überein — in jeder Zeitzone, auch bei DST-Wechsel.
+### 3. Quick-Create direkt in der Spalte
+- "+"-Button am Spaltenfuß → Inline-Mini-Composer (Titel + Kanäle + Datum) → erstellt Event mit dem Status der Spalte
+- Re-use vom bestehenden `ScheduleQuickForm` (lockedDate optional, lockedStatus neu)
 
-### 2. Uhrzeit-Picker im Cockpit modernisieren
-Aktuell: schlichter `<input type="time">` im „James-Bond-2028“-Cockpit — wirkt wie ein Browser-Default aus dem Windows-XP-Zeitalter.
+### 4. Board-Toolbar
+- Filter-Chips: Mandant, Marke, Kanal, Assignee, Tag (Multi-Select)
+- Suche (debounced) über Titel/Brief/Hashtags
+- Sortier-Dropdown pro Spalte: Datum aufsteigend/absteigend, zuletzt geändert, manuell
+- Bulk-Modus: Mehrfachauswahl → "Status ändern", "Löschen", "Veröffentlichen"
+- "Spalten anpassen"-Menü: Status-Spalten ein-/ausblenden (gespeichert in `localStorage`)
 
-Neues Design im Cockpit-Stil (Deep Black + Gold/Cyan, Glassmorphism, Playfair für Ziffern):
-- Große Tabular-Nums-Anzeige `HH:MM` in Playfair Display, mit weichem Gold-Glow.
-- Zwei Glas-Stepper darunter (Stunde / Minute), jeweils mit ▲/▼ Buttons; Minuten in 5-Minuten-Rasterung.
-- Schnell-Chips für gängige Posting-Zeiten (`09:00 · 12:00 · 17:00 · 19:00 · 21:00`) — ein Klick übernimmt die Zeit.
-- Optionaler „Best Time“-Hinweis (UI only, keine Logik-Änderung): kleine cyanfarbene Badge unter dem Picker, derzeit statischer Platzhalter „Empfohlen: 19:00“.
-- Versteckter, accessible `<input type="time">` bleibt im DOM für Tastatur-/Screenreader-Eingabe.
+### 5. WIP-Limits & Workflow-Regeln
+- Pro Spalte konfigurierbares Limit (Default: Briefing ∞, In Arbeit 5, Review 5, Zur Freigabe 8, Approved ∞, Scheduled ∞, Published ∞)
+- Beim Drop in volle Spalte: Warn-Toast, Drop trotzdem erlaubt (soft limit)
+- Bei Drag von `published` zurück: Confirm-Dialog ("Bereits veröffentlicht — wirklich zurücksetzen?")
+- Übergang in `scheduled` ohne `start_at` blockieren → öffnet `ScheduleQuickForm` automatisch
 
-Komponente: neue `TimeWheelInput.tsx` unter `src/components/calendar/`, eingesetzt im lockedDate-Zweig von `ScheduleQuickForm.tsx`. Bestehendes `time`-State bleibt unverändert (`"HH:MM"`) — nur die Eingabe-UI wird ausgetauscht. Keine Backend-, RLS- oder Edge-Function-Änderungen.
+### 6. Aktivität & Verbindung zu Studios
+- Karte-Click → bestehendes Day-Cockpit/Edit-Sheet (statt nur read-only)
+- Kontext-Menü "In Studio öffnen" routet nach Mediatyp (Bild → Picture Studio, Video → Composer/Universal)
+- "Briefing → In Arbeit"-Drop kann optional Auto-Director vorschlagen (kleiner CTA in der Karte, kein Auto-Spawn)
 
-## Scope
-- `src/components/calendar/views/WeekView.tsx` — 1-Zeilen-Fix Label.
-- `src/components/calendar/views/MonthView.tsx` — falls dort dieselbe `addHours`-Logik existiert: gleicher Fix (prüfen).
-- `src/components/calendar/TimeWheelInput.tsx` — neue Komponente.
-- `src/components/calendar/ScheduleQuickForm.tsx` — Input gegen `TimeWheelInput` tauschen, nur im `lockedDate`-Zweig.
+### 7. Fixes nebenbei
+- `calendar.dateClickHint` und alle anderen Kanban-Keys in DE/EN/ES Übersetzungen vervollständigen
+- Footer-Hint nur in Month/Week zeigen, nicht im Kanban
+- Mobile: Spalten als horizontale Snap-Karusells, Touch-Drag via `@dnd-kit` (statt nativem HTML5-Drag, das mobil bricht)
+
+## Technische Details
+- Drag&Drop-Lib: auf `@dnd-kit/core` + `@dnd-kit/sortable` umstellen (sauberes Touch-Support, Reorder innerhalb Spalte)
+- Neue Komponenten:
+  - `KanbanColumn.tsx` (Header, Liste, Quick-Add-Footer)
+  - `KanbanCard.tsx` (Thumbnail, Meta, Actions)
+  - `KanbanToolbar.tsx` (Filter, Suche, Bulk, Spalten-Toggle)
+  - `KanbanQuickAdd.tsx` (Inline-Mini-Form)
+- `KanbanView.tsx` wird zum Orchestrator (State: filter, search, hiddenColumns, sortMode, bulkSelection)
+- WIP-Limits + versteckte Spalten + Sort-Mode in `localStorage` unter `kanban:settings:<workspaceId>`
+- Bestehende Props (`posts`, `onPostClick`, `onStatusChange`) bleiben, neue optional dazu
+- Keine DB-Migration nötig — Status, Assignees, Tags, assets_json, channels existieren bereits in `calendar_events`
+
+## Out-of-Scope (bewusst nicht jetzt)
+- Custom-Status-Spalten pro Workspace (braucht DB-Spalte)
+- Echte Realtime-Collab-Cursor im Board
+- Swimlanes nach Mandant/Marke (kann später als View-Toggle nachgereicht werden)
+
+## Ergebnis
+Aus der heute leeren Karten-Wand wird ein produktives Pipeline-Board, auf dem Teams Content vom Briefing bis zum Live-Post in einer Ansicht sehen, sortieren, übergeben und veröffentlichen können — ohne den Calendar verlassen zu müssen.

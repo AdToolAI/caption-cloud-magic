@@ -510,6 +510,9 @@ export default function Calendar() {
       campaign_id: event.campaign_id,
       owner_id: event.owner_id,
       brief: event.brief,
+      assets_json: (event as any).assets_json,
+      assignees: (event as any).assignees,
+      tags: (event as any).tags,
     }));
 
     const commonProps = {
@@ -558,6 +561,7 @@ export default function Calendar() {
           <KanbanView
             {...commonProps}
             onStatusChange={handleStatusChange as any}
+            onCreateInColumn={() => handleDateClick(new Date())}
           />
         );
       case "timeline":
@@ -646,10 +650,10 @@ export default function Calendar() {
             </div>
           )}
 
-          {/* Day Cockpit hint — Schnell-Planung & Warteschlange leben jetzt im Tages-Modal (Klick auf einen Tag) */}
-          {selectedWorkspace && (
+          {/* Day Cockpit hint — only on date-based views */}
+          {selectedWorkspace && (currentView === "month" || currentView === "week") && (
             <div className="mt-8 text-center text-xs text-muted-foreground/70 tracking-wider uppercase">
-              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → {t('calendar.dateClickHint') || 'Klick auf einen Tag'}
+              {t('calendar.quickSchedule')} & {t('calendar.publishQueue')} → Klick auf einen Tag
             </div>
           )}
 
