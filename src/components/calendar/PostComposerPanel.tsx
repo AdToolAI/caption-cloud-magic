@@ -281,38 +281,41 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 mt-4">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 mt-4">
       {/* LEFT — Composer */}
-      <div className="space-y-5">
-        {/* Briefing collapsible */}
-        <Collapsible open={briefOpen} onOpenChange={setBriefOpen}>
-          <CollapsibleTrigger asChild>
-            <button className="flex items-center justify-between w-full text-left text-sm font-semibold text-foreground/80 hover:text-primary transition">
-              <span className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-primary" /> Briefing
-              </span>
-              <ChevronDown className={cn("h-4 w-4 transition", briefOpen && "rotate-180")} />
-            </button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2">
-            <Textarea
-              value={brief}
-              onChange={(e) => setBrief(e.target.value)}
-              onBlur={() => onUpdate("brief", brief)}
-              rows={3}
-              placeholder="Was soll der Post aussagen?"
-              className="bg-card/40 border-white/10"
-            />
-          </CollapsibleContent>
-        </Collapsible>
+      <div className="space-y-4">
+        {/* Briefing (collapsible glass section) */}
+        <Section title="Briefing" accent="primary" icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]" />}>
+          <Collapsible open={briefOpen} onOpenChange={setBriefOpen}>
+            <CollapsibleTrigger asChild>
+              <button className="flex items-center justify-between w-full text-left text-xs text-muted-foreground hover:text-[hsl(var(--primary))] transition">
+                <span>{briefOpen ? "Ausblenden" : "Briefing bearbeiten"}</span>
+                <ChevronDown className={cn("h-3.5 w-3.5 transition", briefOpen && "rotate-180")} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <Textarea
+                value={brief}
+                onChange={(e) => setBrief(e.target.value)}
+                onBlur={() => onUpdate("brief", brief)}
+                rows={3}
+                placeholder="Was soll der Post aussagen?"
+                className="bg-[#050816]/60 border-white/10 focus:border-[hsl(var(--primary))]/40 text-sm"
+              />
+            </CollapsibleContent>
+          </Collapsible>
+        </Section>
 
-        {/* Action bar */}
-        <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-primary/20 bg-gradient-to-r from-primary/5 via-purple-500/5 to-primary/5 backdrop-blur-md shadow-[0_0_20px_-8px_hsla(43,90%,68%,0.4)]">
+        {/* AI Action Bar */}
+        <div
+          className="flex flex-wrap items-center gap-2 p-3 rounded-xl border border-[hsl(var(--primary))]/20 bg-[#0b0f1a]/70 backdrop-blur-md"
+          style={{ boxShadow: "0 0 28px -10px hsla(43,90%,68%,0.35), inset 0 0 0 1px rgba(255,255,255,0.02)" }}
+        >
           <Button
             onClick={handleGenerate}
             disabled={generating || !brief?.trim()}
             size="sm"
-            className="bg-gradient-to-r from-primary to-amber-500 text-black font-semibold hover:opacity-90"
+            className="bg-[hsl(var(--primary))] text-black font-semibold hover:bg-[hsl(var(--primary))]/90 shadow-[0_0_18px_-4px_hsla(43,90%,68%,0.7)]"
           >
             {generating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
             Generieren
@@ -320,16 +323,16 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
           <select
             value={tonality}
             onChange={(e) => setTonality(e.target.value)}
-            className="text-xs h-8 rounded-md bg-card/60 border border-white/10 px-2"
+            className="text-xs h-8 rounded-md bg-[#050816]/60 border border-white/10 px-2 text-foreground/90 focus:border-[hsl(var(--primary))]/40 outline-none"
           >
-            {TONALITIES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+            {TONALITIES.map((t) => <option key={t.id} value={t.id} className="bg-[#050816]">{t.label}</option>)}
           </select>
           <Button
             onClick={handleRewrite}
             disabled={rewriting || !caption}
             size="sm"
             variant="outline"
-            className="border-purple-500/40 hover:bg-purple-500/10"
+            className="border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-[hsl(var(--primary))]/40"
           >
             {rewriting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1.5" />}
             Umschreiben
@@ -338,8 +341,7 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
         {/* Hooks */}
         {Object.keys(hooks).length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Hook auswählen</Label>
+          <Section title="Hook auswählen" icon={<Sparkles className="h-3.5 w-3.5 text-[hsl(var(--primary))]/70" />}>
             <div className="grid gap-2">
               {Object.entries(hooks).map(([key, value]) => (
                 <button
@@ -348,23 +350,23 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                   className={cn(
                     "text-left p-3 rounded-lg border text-sm transition-all",
                     selectedHook === value
-                      ? "border-primary bg-primary/10 shadow-[0_0_15px_-4px_hsla(43,90%,68%,0.5)]"
-                      : "border-white/10 bg-card/40 hover:border-primary/40"
+                      ? "border-[hsl(var(--primary))]/60 bg-[hsl(var(--primary))]/10 shadow-[0_0_18px_-6px_hsla(43,90%,68%,0.6)]"
+                      : "border-white/[0.06] bg-[#050816]/40 hover:border-[hsl(var(--primary))]/30"
                   )}
                 >
-                  <span className="text-[10px] font-bold text-primary mr-2">{key}</span>
+                  <span className="text-[10px] font-bold text-[hsl(var(--primary))] mr-2">{key}</span>
                   {value}
                 </button>
               ))}
             </div>
-          </div>
+          </Section>
         )}
 
         {/* Caption */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Caption</Label>
-            <span className={cn("text-[10px] tabular-nums", overLimit ? "text-destructive" : "text-muted-foreground")}>
+        <Section title="Caption" icon={<Wand2 className="h-3.5 w-3.5 text-[hsl(var(--primary))]/70" />}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] text-muted-foreground">Plattform-Limit: {PLATFORMS.find(p=>p.id===previewPlatform)?.name}</span>
+            <span className={cn("text-[10px] tabular-nums font-mono", overLimit ? "text-destructive" : "text-muted-foreground")}>
               {caption.length} / {currentLimit}
             </span>
           </div>
@@ -373,28 +375,27 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
             onChange={(e) => setCaption(e.target.value)}
             onBlur={() => onUpdate("caption", caption)}
             rows={7}
-            className="bg-card/40 border-white/10 font-mono text-sm"
+            className="bg-[#050816]/60 border-white/10 focus:border-[hsl(var(--primary))]/40 font-mono text-sm leading-relaxed"
             placeholder="Schreibe oder generiere die Caption…"
           />
           {overLimit && (
-            <p className="text-xs text-destructive flex items-center gap-1">
+            <p className="text-xs text-destructive flex items-center gap-1 mt-2">
               <AlertTriangle className="h-3 w-3" /> Überschreitet {PLATFORMS.find(p=>p.id===previewPlatform)?.name}-Limit
             </p>
           )}
-        </div>
+        </Section>
 
         {/* Hashtag groups */}
         {Object.keys(hashtagGroups).length > 0 && (
-          <div className="space-y-2">
-            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Hashtag-Gruppen</Label>
+          <Section title="Hashtag-Gruppen">
             <Tabs defaultValue={Object.keys(hashtagGroups)[0]}>
-              <TabsList className="bg-card/40">
+              <TabsList className="bg-[#050816]/60 border border-white/[0.06]">
                 {Object.keys(hashtagGroups).map((g) => (
-                  <TabsTrigger key={g} value={g} className="text-xs capitalize">{g}</TabsTrigger>
+                  <TabsTrigger key={g} value={g} className="text-xs capitalize data-[state=active]:bg-[hsl(var(--primary))]/15 data-[state=active]:text-[hsl(var(--primary))]">{g}</TabsTrigger>
                 ))}
               </TabsList>
               {Object.entries(hashtagGroups).map(([g, tags]) => (
-                <TabsContent key={g} value={g} className="flex flex-wrap gap-1.5 mt-2">
+                <TabsContent key={g} value={g} className="flex flex-wrap gap-1.5 mt-3">
                   {(tags as string[]).map((t) => {
                     const tag = t.startsWith("#") ? t : `#${t}`;
                     const active = hashtags.includes(tag);
@@ -405,8 +406,8 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                         className={cn(
                           "text-xs px-2 py-1 rounded-md border transition",
                           active
-                            ? "bg-primary/15 border-primary/50 text-primary"
-                            : "bg-card/40 border-white/10 hover:border-primary/30"
+                            ? "bg-[hsl(var(--primary))]/15 border-[hsl(var(--primary))]/50 text-[hsl(var(--primary))]"
+                            : "bg-[#050816]/40 border-white/[0.06] hover:border-[hsl(var(--primary))]/30"
                         )}
                       >
                         {tag}
@@ -416,21 +417,18 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                 </TabsContent>
               ))}
             </Tabs>
-          </div>
+            {hashtags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-white/[0.05]">
+                {hashtags.map((t, i) => (
+                  <Badge key={i} variant="secondary" className="text-[10px] bg-white/[0.04] border border-white/[0.06]">{t}</Badge>
+                ))}
+              </div>
+            )}
+          </Section>
         )}
 
-        {/* Active hashtags */}
-        {hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {hashtags.map((t, i) => (
-              <Badge key={i} variant="secondary" className="text-[10px]">{t}</Badge>
-            ))}
-          </div>
-        )}
-
-        {/* Channels */}
-        <div className="space-y-2">
-          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Plattformen</Label>
+        {/* Channels — Lightsaber Toggles */}
+        <Section title="Plattformen">
           <div className="flex flex-wrap gap-2">
             {PLATFORMS.map((p) => {
               const active = channels.includes(p.id);
@@ -440,52 +438,52 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                   type="button"
                   onClick={() => toggleChannel(p.id)}
                   className={cn(
-                    "px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border",
+                    "relative px-3 py-1.5 rounded-lg text-xs font-medium transition-all border bg-[#050816]/60",
                     active
-                      ? "text-white border-transparent"
-                      : "bg-card/40 text-muted-foreground border-white/10 hover:border-primary/30"
+                      ? "text-white border-white/[0.08]"
+                      : "text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
                   )}
                   style={active ? {
-                    background: `linear-gradient(120deg, rgba(${p.glow},0.9), rgba(${p.glow},0.6))`,
-                    boxShadow: `0 0 14px rgba(${p.glow},0.45)`,
+                    boxShadow: `inset 2px 0 0 0 ${p.color}, 0 0 16px -4px rgba(${p.rgb},0.55)`,
                   } : undefined}
                 >
-                  {p.icon} {p.name}
+                  <span className="mr-1.5">{p.icon}</span>{p.name}
                 </button>
               );
             })}
           </div>
-        </div>
+        </Section>
 
-        {/* Schedule */}
-        <div className="space-y-2 p-4 rounded-xl border border-indigo-400/30 bg-indigo-500/5">
-          <Label className="text-xs uppercase tracking-wider text-indigo-300 flex items-center gap-1.5">
-            <Clock className="h-3 w-3" /> Auto-Publish Zeitpunkt
-          </Label>
+        {/* Schedule + Auto-Publish */}
+        <Section title="Auto-Publish Zeitpunkt" accent="indigo" icon={<Clock className="h-3.5 w-3.5 text-indigo-300" />}>
           <Input
             type="datetime-local"
             value={startAt}
             onChange={(e) => saveSchedule(e.target.value)}
-            className="bg-card/40 border-white/10 max-w-xs"
+            className="bg-[#050816]/60 border-white/10 focus:border-indigo-400/40 max-w-xs font-mono"
           />
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-3">
             <Switch checked={autoPublish} onCheckedChange={setAutoPublish} />
             <span className="text-xs text-muted-foreground">
               Automatisch veröffentlichen wenn Status = <span className="text-indigo-300 font-semibold">scheduled</span>
             </span>
           </div>
-        </div>
+        </Section>
 
-        {/* Footer CTA */}
-        <div className="flex flex-wrap gap-2 pt-2 sticky bottom-0 bg-background/80 backdrop-blur-md py-3 -mx-1 px-1 border-t border-white/5">
-          <Button onClick={handleSaveDraft} variant="outline" size="sm">
+        {/* Footer CTA — sticky */}
+        <div
+          className="flex flex-wrap items-center gap-2 pt-3 sticky bottom-0 -mx-1 px-1 py-3 border-t border-white/[0.06]"
+          style={{ background: "linear-gradient(180deg, rgba(5,8,22,0.4) 0%, rgba(5,8,22,0.95) 60%)", backdropFilter: "blur(10px)" }}
+        >
+          <Button onClick={handleSaveDraft} variant="outline" size="sm"
+            className="border-white/10 bg-white/[0.02] hover:bg-white/[0.05]">
             <Save className="h-3.5 w-3.5 mr-1.5" /> Entwurf speichern
           </Button>
-          <motion.div whileHover={{ scale: 1.02 }}>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="ml-auto">
             <Button
               onClick={handleReadyToPublish}
               size="sm"
-              className="bg-gradient-to-r from-emerald-500 via-primary to-amber-500 text-black font-bold shadow-[0_0_20px_-4px_hsla(43,90%,68%,0.6)]"
+              className="bg-[hsl(var(--primary))] text-black font-bold shadow-[0_0_22px_-4px_hsla(43,90%,68%,0.7)] hover:bg-[hsl(var(--primary))]/90"
             >
               <Rocket className="h-3.5 w-3.5 mr-1.5" /> Bereit zum Auto-Publish
             </Button>
@@ -495,8 +493,12 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
 
       {/* RIGHT — Live preview */}
       <div className="space-y-3">
-        <Label className="text-xs uppercase tracking-wider text-muted-foreground">Live-Vorschau</Label>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[10px] uppercase tracking-[0.18em] font-semibold text-[hsl(var(--primary))]/80">
+            Live-Vorschau
+          </h3>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
           {channels.map((c) => {
             const p = PLATFORMS.find((x) => x.id === c);
             if (!p) return null;
@@ -506,12 +508,11 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
                 key={c}
                 onClick={() => setPreviewPlatform(c)}
                 className={cn(
-                  "text-[10px] px-2 py-1 rounded-md border transition",
-                  active ? "text-white border-transparent" : "bg-card/40 border-white/10 text-muted-foreground"
+                  "text-[10px] px-2 py-1 rounded-md border bg-[#050816]/60 transition",
+                  active ? "text-white border-white/[0.08]" : "text-muted-foreground border-white/[0.06] hover:border-white/[0.15]"
                 )}
                 style={active ? {
-                  background: `linear-gradient(120deg, rgba(${p.glow},0.9), rgba(${p.glow},0.5))`,
-                  boxShadow: `0 0 10px rgba(${p.glow},0.4)`,
+                  boxShadow: `inset 2px 0 0 0 ${p.color}, 0 0 10px -2px rgba(${p.rgb},0.5)`,
                 } : undefined}
               >
                 {p.icon} {p.name}
@@ -519,7 +520,10 @@ export function PostComposerPanel({ event, onUpdate, onPatch }: PostComposerPane
             );
           })}
         </div>
-        <div className="rounded-xl overflow-hidden border border-white/10 bg-card/30 backdrop-blur-md">
+        <div
+          className="rounded-2xl overflow-hidden border border-white/[0.06] bg-[#0b0f1a]/70 backdrop-blur-md"
+          style={{ boxShadow: "0 24px 60px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(245,199,106,0.04)" }}
+        >
           {renderPreview()}
         </div>
       </div>
