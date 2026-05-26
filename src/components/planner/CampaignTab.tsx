@@ -94,6 +94,8 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
       setShowTemplateDialog(true);
     }
   }, [initialOpenTemplates, workspaceId]);
+
+  const dayNames = [
     t('planner.monday'), t('planner.tuesday'), t('planner.wednesday'),
     t('planner.thursday'), t('planner.friday'), t('planner.saturday'), t('planner.sunday')
   ];
