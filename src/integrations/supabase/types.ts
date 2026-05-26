@@ -3827,10 +3827,13 @@ export type Database = {
           audience: string | null
           created_at: string
           duration_weeks: number
+          ends_at: string | null
           goal: string
           id: string
+          pauses_strategy: boolean
           platform: Json
           post_frequency: number
+          starts_at: string | null
           summary: string | null
           title: string
           tone: string
@@ -3843,10 +3846,13 @@ export type Database = {
           audience?: string | null
           created_at?: string
           duration_weeks: number
+          ends_at?: string | null
           goal: string
           id?: string
+          pauses_strategy?: boolean
           platform?: Json
           post_frequency?: number
+          starts_at?: string | null
           summary?: string | null
           title: string
           tone: string
@@ -3859,10 +3865,13 @@ export type Database = {
           audience?: string | null
           created_at?: string
           duration_weeks?: number
+          ends_at?: string | null
           goal?: string
           id?: string
+          pauses_strategy?: boolean
           platform?: Json
           post_frequency?: number
+          starts_at?: string | null
           summary?: string | null
           title?: string
           tone?: string
@@ -13001,6 +13010,44 @@ export type Database = {
           },
         ]
       }
+      strategy_mode_pauses: {
+        Row: {
+          campaign_id: string | null
+          created_at: string
+          ends_at: string
+          id: string
+          reason: string
+          starts_at: string
+          user_id: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          created_at?: string
+          ends_at: string
+          id?: string
+          reason?: string
+          starts_at: string
+          user_id: string
+        }
+        Update: {
+          campaign_id?: string | null
+          created_at?: string
+          ends_at?: string
+          id?: string
+          reason?: string
+          starts_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_mode_pauses_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategy_posts: {
         Row: {
           auto_publish: boolean | null
@@ -13075,6 +13122,41 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: []
+      }
+      strategy_seeds: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          id: string
+          insights: Json
+          source_campaign_id: string | null
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          insights?: Json
+          source_campaign_id?: string | null
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          id?: string
+          insights?: Json
+          source_campaign_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_seeds_source_campaign_id_fkey"
+            columns: ["source_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       streak_milestones: {
         Row: {
