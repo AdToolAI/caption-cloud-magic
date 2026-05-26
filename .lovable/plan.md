@@ -1,78 +1,70 @@
-# Plan: Kanban-Board zum echten Content-Workflow ausbauen
+# Plan: Kanban-Board auf echtes 2028-Niveau heben
 
-## Status heute
-`KanbanView.tsx` rendert 7 Status-Spalten (Briefing → Published) mit funktionierendem Drag&Drop, ist aber praktisch leer und nutzlos:
-- Keine Karten erstellbar direkt aus dem Board (nur über "Neu"-Button oben)
-- Keine WIP-Limits, keine Filter, keine Assignee-Anzeige, keine Thumbnails
-- Übersetzungs-Key `calendar.dateClickHint` wird roh angezeigt
-- Spalten sind nur grau, keine Bond-2028-Optik
-- Nur 5 Spalten sichtbar (Scroll-Hint), letzte 2 (Scheduled/Published) versteckt
-- Keine Sortierung innerhalb einer Spalte, kein Bulk-Move, kein Inline-Edit
+## Beobachtete Probleme (aus Screenshot)
+1. **Keine Karten** — User hat noch keine Events mit Pipeline-Status. Das Board zeigt 4× „Keine Karten" was lieblos wirkt.
+2. **Hässliche weiße Browser-Scrollbar** quer unter den Spalten — sofortiger 2006-Look.
+3. **Roh-Übersetzungs-Keys sichtbar**: `common.search`, vermutlich auch andere (`calendar.kanban.*`).
+4. **Optik wirkt billig**: 
+   - Spaltenköpfe als blanke farbige Linien-Outlines ohne Tiefe
+   - Toolbar-Buttons („Kanäle", „Board") wirken wie Standard-Shadcn
+   - Drop-Zonen sind dunkle leere Rechtecke ohne Bond-Charakter
+   - Keine Gold-Akzente, kein Glow, keine Serif-Headlines wo es zählt
+5. **Letzte Spalte abgeschnitten** („Freig…") — Layout schiebt über den Container hinaus.
 
-## Ziel
-Ein echtes Content-Command-Board im "James-Bond-2028"-Stil, das eine Agentur/Creator-Pipeline tatsächlich abbildet: vom Briefing bis zur Veröffentlichung — mit Quick-Create, Assignees, Thumbnails, WIP-Limits, Filtern und nahtloser Verbindung zu Studios.
+## Lösung
 
-## Umfang (nur Frontend, keine Schema-Änderungen)
+### A. Optik komplett auf James-Bond-2028 ziehen
+- **Header-Strip oben über dem Board**: dünner Gold→Cyan-Verlauf, links Status-Legende mit Mini-Dots, rechts Live-Counter „X Posts in Pipeline".
+- **Spaltenköpfe** als kompakte Glass-Pills mit:
+  - Vertikaler Gold-Glow-Akzent links (analog Enterprise-Pattern aus mem)
+  - Status-Name in **Playfair Display** Small-Caps, nicht in der Akzentfarbe sondern in Foreground mit subtilem Glow
+  - Count + WIP rechts als monospaced Tabular-Number-Chip
+  - Dezenter Backdrop-Blur, kein farbiger Border-Frame
+- **Drop-Zonen** mit feiner Punkt-Grid-Textur (CSS radial-gradient) im Hintergrund statt platter Fläche — bewegt sich subtil beim Hover.
+- **Empty State** schöner:
+  - Gold-Outlined-Plus-Icon, „Erste Karte erstellen"-CTA pro Spalte
+  - Animierter Gold-Shimmer am Rand (subtil, 8s loop)
+  - Mikro-Hinweis: „Karten von hier nach rechts ziehen, um Status zu ändern"
+- **Toolbar** mit Glass-Background, alle Buttons im Ghost-Style mit Gold-Hover, **keine Outline-Buttons**.
 
-### 1. Kanban-Spalten redesignen (Bond 2028)
-- Glassmorphic-Spalten mit dezentem Gold/Cyan-Akzent pro Status (statt flacher `bg-gray-500`-Dots)
-- Sticky Spaltenkopf: Titel + Count + WIP-Limit-Badge (z.B. "In Arbeit 3/5", rot wenn überschritten)
-- Spaltenfarben aus `statusColors` als linker Border-Glow (vertikale Gold-Linie analog Enterprise-Pattern)
-- Horizontal-Scroll mit Snap, plus Buttons links/rechts zum Durchblättern
-- Leere Spalte zeigt einen kontext-passenden Empty-State ("Ziehe Karten hierher" + Icon)
+### B. Scrollbar fixen
+- Container nicht horizontal überlaufen lassen; statt nativem Scroll:
+  - Spalten in **CSS-Grid mit `auto-fit`** packen, sodass sie sich den verfügbaren Platz teilen (min 240px, max 1fr)
+  - Bei >5 sichtbaren Spalten: Spaltenbreite reduziert auf min 200px
+  - Falls Overflow nötig (sehr schmaler Viewport): native Scrollbar via `scrollbar-width: none` + Webkit-Hide komplett ausblenden, stattdessen die bereits vorhandenen Chevron-Buttons als einzige Scroll-Methode
+- Letzte Spalte „Freigegeben" wieder vollständig sichtbar, da Grid responsive füllt.
+- Default-Setup: Standardmäßig nur **5 Kern-Spalten sichtbar** (Briefing, In Arbeit, Review, Zur Freigabe, Veröffentlicht). `Approved` + `Scheduled` standardmäßig ausgeblendet (über Board-Menü einblendbar).
 
-### 2. Reichhaltige Post-Karten
-- Thumbnail (erstes `assets_json`-Bild oder Video-Poster) als 16:9-Cover oben
-- Channel-Icons (echte Lucide-/Brand-Icons statt Text-Badges)
-- Assignee-Avatare (Stack, max 3) + Rest-Counter
-- Geplanter Termin mit relativer Zeit ("in 3 Tagen", "überfällig" rot)
-- Footer-Row: Tag-Chips, Kommentar-/Approval-Counter
-- Hover: 3-Dot-Menü → Bearbeiten, Duplizieren, In Studio öffnen, Löschen
-- Drag-Handle links sichtbar (Grip-Icon), Karte glüht beim Drag
+### C. Übersetzungen aufräumen
+- Statt `t('common.search')` (Key existiert nicht → wird roh angezeigt): direkte Strings „Suchen…", „Kanäle", „Board" verwenden. Diese Komponente ist bereits stark mit deutschen Fallbacks durchsetzt — komplette i18n hier ist Phase 2.
+- Alle sichtbaren Strings als saubere DE-Defaults setzen, damit nichts mehr roh erscheint.
 
-### 3. Quick-Create direkt in der Spalte
-- "+"-Button am Spaltenfuß → Inline-Mini-Composer (Titel + Kanäle + Datum) → erstellt Event mit dem Status der Spalte
-- Re-use vom bestehenden `ScheduleQuickForm` (lockedDate optional, lockedStatus neu)
+### D. „Keine Karten"-Wirklichkeitsfix
+- Wenn das gesamte Board leer ist (nicht nur eine Spalte): **board-übergreifender Onboarding-State** mittig:
+  - Großes Gold-Icon (Kanban-Stack)
+  - „Dein Content-Board ist bereit"
+  - Subtext: „Erstelle den ersten Post, um deine Pipeline zu starten"
+  - Großer Gold-CTA „+ Erster Post" → öffnet Day-Cockpit für heute
+  - Darunter dünne, leere Geist-Spalten als Vorschau (50% opacity)
+- Wenn einzelne Spalten leer: dezenter Empty-State (1 Icon + 1 Zeile), nicht 3-zeilig wie aktuell.
 
-### 4. Board-Toolbar
-- Filter-Chips: Mandant, Marke, Kanal, Assignee, Tag (Multi-Select)
-- Suche (debounced) über Titel/Brief/Hashtags
-- Sortier-Dropdown pro Spalte: Datum aufsteigend/absteigend, zuletzt geändert, manuell
-- Bulk-Modus: Mehrfachauswahl → "Status ändern", "Löschen", "Veröffentlichen"
-- "Spalten anpassen"-Menü: Status-Spalten ein-/ausblenden (gespeichert in `localStorage`)
+### E. Spalten visuell aufwerten
+- Pro Status eigene **Mood-Glow-Farbe** als sehr subtiler Radial-Gradient am Spaltenkopf (nicht als Border)
+- Drag-Hover-State: gesamte Spalte glüht innen mit Gold (statt nur Inset-Ring)
+- Karten beim Drag: 3D-Tilt + Drop-Shadow in Gold
 
-### 5. WIP-Limits & Workflow-Regeln
-- Pro Spalte konfigurierbares Limit (Default: Briefing ∞, In Arbeit 5, Review 5, Zur Freigabe 8, Approved ∞, Scheduled ∞, Published ∞)
-- Beim Drop in volle Spalte: Warn-Toast, Drop trotzdem erlaubt (soft limit)
-- Bei Drag von `published` zurück: Confirm-Dialog ("Bereits veröffentlicht — wirklich zurücksetzen?")
-- Übergang in `scheduled` ohne `start_at` blockieren → öffnet `ScheduleQuickForm` automatisch
+## Out-of-Scope (jetzt nicht)
+- Echte Assignee-Avatare aus `profiles`-Tabelle (zeigen aktuell Initial-Bubbles)
+- Realtime-Cursor anderer User
+- Custom Spalten-Definitionen pro Workspace
 
-### 6. Aktivität & Verbindung zu Studios
-- Karte-Click → bestehendes Day-Cockpit/Edit-Sheet (statt nur read-only)
-- Kontext-Menü "In Studio öffnen" routet nach Mediatyp (Bild → Picture Studio, Video → Composer/Universal)
-- "Briefing → In Arbeit"-Drop kann optional Auto-Director vorschlagen (kleiner CTA in der Karte, kein Auto-Spawn)
-
-### 7. Fixes nebenbei
-- `calendar.dateClickHint` und alle anderen Kanban-Keys in DE/EN/ES Übersetzungen vervollständigen
-- Footer-Hint nur in Month/Week zeigen, nicht im Kanban
-- Mobile: Spalten als horizontale Snap-Karusells, Touch-Drag via `@dnd-kit` (statt nativem HTML5-Drag, das mobil bricht)
-
-## Technische Details
-- Drag&Drop-Lib: auf `@dnd-kit/core` + `@dnd-kit/sortable` umstellen (sauberes Touch-Support, Reorder innerhalb Spalte)
-- Neue Komponenten:
-  - `KanbanColumn.tsx` (Header, Liste, Quick-Add-Footer)
-  - `KanbanCard.tsx` (Thumbnail, Meta, Actions)
-  - `KanbanToolbar.tsx` (Filter, Suche, Bulk, Spalten-Toggle)
-  - `KanbanQuickAdd.tsx` (Inline-Mini-Form)
-- `KanbanView.tsx` wird zum Orchestrator (State: filter, search, hiddenColumns, sortMode, bulkSelection)
-- WIP-Limits + versteckte Spalten + Sort-Mode in `localStorage` unter `kanban:settings:<workspaceId>`
-- Bestehende Props (`posts`, `onPostClick`, `onStatusChange`) bleiben, neue optional dazu
-- Keine DB-Migration nötig — Status, Assignees, Tags, assets_json, channels existieren bereits in `calendar_events`
-
-## Out-of-Scope (bewusst nicht jetzt)
-- Custom-Status-Spalten pro Workspace (braucht DB-Spalte)
-- Echte Realtime-Collab-Cursor im Board
-- Swimlanes nach Mandant/Marke (kann später als View-Toggle nachgereicht werden)
+## Technisch
+- Nur `KanbanView.tsx` anfassen (kein neues File)
+- CSS-Grid statt `flex overflow-x-auto`
+- Webkit-Scrollbar mit `[&::-webkit-scrollbar]:hidden` ausblenden, falls Overflow doch passiert
+- Standardspalten in `loadSettings()` Default-Hidden-Liste: `["approved", "scheduled"]`
+- Strings deutsch hartkodiert (i18n später)
+- Keine DB-/Edge-Function-Änderungen
 
 ## Ergebnis
-Aus der heute leeren Karten-Wand wird ein produktives Pipeline-Board, auf dem Teams Content vom Briefing bis zum Live-Post in einer Ansicht sehen, sortieren, übergeben und veröffentlichen können — ohne den Calendar verlassen zu müssen.
+Aus dem aktuell sterilen Board wird eine echte „Content Command Bridge": volle Bond-Optik mit Glow & Serif-Headlines, keine hässliche Scrollbar, kein roher i18n-Key, ein einladender Onboarding-State wenn leer — und alle Spalten passen sauber in den Container.
