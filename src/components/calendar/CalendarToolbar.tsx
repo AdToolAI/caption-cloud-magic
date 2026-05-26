@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings, Library, Lock } from "lucide-react";
+import { Plus, StickyNote, Download, Filter, Share2, Calendar, MoreVertical, Sparkles, Rocket, Ban, PartyPopper, FileText, FileSpreadsheet, FileDown, Settings, Library, Lock, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { canQuickCalendarPost } from "@/lib/entitlements";
 import { QuickPostUpsellModal } from "@/components/pricing/QuickPostUpsellModal";
 
-export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
+export type ViewType = "month" | "week" | "list" | "kanban" | "heatmap";
 
 export interface CalendarToolbarProps {
   currentView: ViewType;
@@ -74,7 +74,7 @@ export function CalendarToolbar({
               <SelectItem value="week">📆 {t("calendar.views.week")}</SelectItem>
               <SelectItem value="list">📋 {t("calendar.views.list")}</SelectItem>
               <SelectItem value="kanban">📊 {t("calendar.views.kanban")}</SelectItem>
-              <SelectItem value="timeline">⏱️ {t("calendar.views.timeline")}</SelectItem>
+              <SelectItem value="heatmap">🔥 Heatmap</SelectItem>
             </SelectContent>
           </Select>
 
@@ -135,8 +135,9 @@ export function CalendarToolbar({
             <TabsTrigger value="kanban" className="h-8 px-3 text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
               {t("calendar.views.kanban")}
             </TabsTrigger>
-            <TabsTrigger value="timeline" className="h-8 px-3 text-xs data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
-              {t("calendar.views.timeline")}
+            <TabsTrigger value="heatmap" className="h-8 px-3 text-xs gap-1.5 data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:shadow-[0_0_10px_hsla(43,90%,68%,0.2)] transition-all duration-200">
+              <Flame className="w-3.5 h-3.5" />
+              Heatmap
             </TabsTrigger>
           </TabsList>
         </Tabs>
