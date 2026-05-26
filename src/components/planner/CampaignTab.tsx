@@ -215,37 +215,65 @@ export function CampaignTab({ workspaceId, initialOpenTemplates = false }: Campa
 
   if (campaigns.length === 0) {
     return (
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-        <Card className="p-10 text-center backdrop-blur-xl bg-card/60 border-white/10 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 pointer-events-none" />
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring" }} className="relative z-10">
-            <div className="relative mx-auto mb-6 w-20 h-20">
-              <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
-              <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-white/10 flex items-center justify-center">
-                <Package className="h-10 w-10 text-primary" />
+      <>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <Card className="p-10 text-center backdrop-blur-xl bg-card/60 border-white/10 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-cyan-500/5 pointer-events-none" />
+            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: "spring" }} className="relative z-10">
+              <div className="relative mx-auto mb-6 w-20 h-20">
+                <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-cyan-500/20 border border-white/10 flex items-center justify-center">
+                  <Package className="h-10 w-10 text-primary" />
+                </div>
               </div>
-            </div>
-            <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">{t('planner.noCampaigns')}</h3>
-            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{t('planner.createCampaigns')}</p>
-            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-              <Button 
-                onClick={() => setShowTemplateDialog(true)} 
-                disabled={!workspaceId}
-                className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.4)] transition-all duration-300"
-              >
-                <Rocket className="h-4 w-4" />
-                {t('planner.goToTemplates')}
-                <Sparkles className="h-3 w-3" />
-              </Button>
+              <h3 className="text-xl font-semibold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">{t('planner.noCampaigns')}</h3>
+              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{t('planner.createCampaigns')}</p>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button 
+                  onClick={() => setShowTemplateDialog(true)} 
+                  disabled={!workspaceId}
+                  className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-[0_0_20px_rgba(var(--primary),0.3)] hover:shadow-[0_0_30px_rgba(var(--primary),0.4)] transition-all duration-300"
+                >
+                  <Rocket className="h-4 w-4" />
+                  {t('planner.goToTemplates')}
+                  <Sparkles className="h-3 w-3" />
+                </Button>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        </Card>
-      </motion.div>
+          </Card>
+        </motion.div>
+        {workspaceId && (
+          <CampaignTemplateDialog
+            open={showTemplateDialog}
+            onClose={() => setShowTemplateDialog(false)}
+            workspaceId={workspaceId}
+            onGenerated={() => {
+              setShowTemplateDialog(false);
+              toast.success(t('planner.contentGenerated') || 'Kampagne erstellt');
+              fetchCampaigns();
+            }}
+          />
+        )}
+      </>
     );
   }
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          {campaigns.length} {t('planner.campaigns')}
+        </div>
+        <Button
+          size="sm"
+          onClick={() => setShowTemplateDialog(true)}
+          disabled={!workspaceId}
+          className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+        >
+          <Plus className="h-4 w-4" />
+          {t('planner.goToTemplates')}
+        </Button>
+      </div>
       <AnimatePresence mode="popLayout">
         {campaigns.map((campaign, index) => {
           const { scheduled, total } = getStatusCounts(campaign.posts);
