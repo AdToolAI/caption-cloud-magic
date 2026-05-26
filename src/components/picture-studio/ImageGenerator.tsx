@@ -265,13 +265,15 @@ export function ImageGenerator() {
     if (error) {
       const fnError: any = error;
       if (fnError.context && typeof fnError.context.json === 'function') {
-        const body = await fnError.context.json();
+        const body = await fnError.context.json().catch(() => null);
         if (body?.code === 'INSUFFICIENT_CREDITS' || body?.code === 'NO_WALLET') {
           const err: any = new Error(body.error);
           err.needsPurchase = true;
           throw err;
         }
-        throw new Error(body?.error || fnError.message);
+        const err: any = new Error(body?.error || fnError.message);
+        err.code = body?.code;
+        throw err;
       }
       throw error;
     }
