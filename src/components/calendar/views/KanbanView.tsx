@@ -260,45 +260,49 @@ export function KanbanView({
 
   const activePost = activeId ? posts.find((p) => p.id === activeId) : null;
 
-  const scrollerRef = (el: HTMLDivElement | null) => {
-    (window as any).__kanbanScroller = el;
-  };
-  const scrollBy = (dx: number) => {
-    const el = (window as any).__kanbanScroller as HTMLDivElement | null;
-    el?.scrollBy({ left: dx, behavior: "smooth" });
-  };
+  const isBoardEmpty = posts.length === 0;
+  const totalInPipeline = filtered.length;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
+      {/* Top strip — Bond gold/cyan accent */}
+      <div className="relative h-px w-full overflow-hidden rounded-full">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#F5C76A]/40 to-transparent" />
+      </div>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder={t("common.search") as string || "Suchen…"}
-            className="pl-8 bg-background/40 backdrop-blur border-white/10"
+            placeholder="Suchen…"
+            className="pl-9 h-9 bg-white/[0.03] backdrop-blur-xl border-white/10 focus-visible:border-[#F5C76A]/40 focus-visible:ring-0 placeholder:text-muted-foreground/50"
           />
         </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 bg-background/40 backdrop-blur border-white/10">
-              <Filter className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 h-9 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-[#F5C76A]/40 hover:bg-white/[0.05] hover:text-[#F5C76A]"
+            >
+              <Filter className="h-3.5 w-3.5" />
               Kanäle
               {channelFilter.length > 0 && (
-                <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#F5C76A]/20 text-[10px] text-[#F5C76A] px-1">
                   {channelFilter.length}
-                </Badge>
+                </span>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-48 bg-popover/95 backdrop-blur border-white/10">
+          <DropdownMenuContent className="w-48 bg-popover/95 backdrop-blur-xl border-white/10">
             <DropdownMenuLabel>Kanal-Filter</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {channels.length === 0 && (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">Keine Kanäle</div>
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">Noch keine Kanäle</div>
             )}
             {channels.map((c) => (
               <DropdownMenuCheckboxItem
@@ -315,9 +319,7 @@ export function KanbanView({
             {channelFilter.length > 0 && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setChannelFilter([])}>
-                  Zurücksetzen
-                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setChannelFilter([])}>Zurücksetzen</DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>
@@ -325,12 +327,16 @@ export function KanbanView({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-2 bg-background/40 backdrop-blur border-white/10">
-              <Settings2 className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 h-9 bg-white/[0.03] backdrop-blur-xl border border-white/10 hover:border-[#F5C76A]/40 hover:bg-white/[0.05] hover:text-[#F5C76A]"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
               Board
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur border-white/10">
+          <DropdownMenuContent className="w-56 bg-popover/95 backdrop-blur-xl border-white/10">
             <DropdownMenuLabel>Sortierung</DropdownMenuLabel>
             <DropdownMenuItem onClick={() => setSettings((s) => ({ ...s, sort: "date_asc" }))}>
               {settings.sort === "date_asc" ? "✓ " : ""}Datum aufsteigend
@@ -357,25 +363,9 @@ export function KanbanView({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="ml-auto flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => scrollBy(-360)}
-            aria-label="Scroll left"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => scrollBy(360)}
-            aria-label="Scroll right"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+        <div className="ml-auto flex items-center gap-2 text-[11px] tracking-[0.18em] uppercase text-muted-foreground/70">
+          <span className="hidden sm:inline">In Pipeline</span>
+          <span className="font-mono text-[#F5C76A] tabular-nums">{String(totalInPipeline).padStart(2, "0")}</span>
         </div>
       </div>
 
@@ -390,26 +380,37 @@ export function KanbanView({
           setOverColumn(null);
         }}
       >
-        <div
-          ref={scrollerRef}
-          className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth"
-        >
-          {visibleColumns.map((col) => (
-            <Column
-              key={col.key}
-              col={col}
-              posts={grouped[col.key] || []}
-              limit={settings.limits[col.key]}
-              isOver={overColumn === col.key}
-              onPostClick={onPostClick}
-              onCreate={onCreateInColumn}
-              readOnly={readOnly}
-              selectedEventIds={selectedEventIds}
-              label={tStatus(col.key)}
-              locale={locale}
-            />
-          ))}
-        </div>
+        {isBoardEmpty ? (
+          <BoardEmptyState
+            columns={visibleColumns}
+            onCreate={() => onCreateInColumn?.("briefing")}
+            tStatus={tStatus}
+          />
+        ) : (
+          <div
+            className="grid gap-3 [&::-webkit-scrollbar]:hidden"
+            style={{
+              gridTemplateColumns: `repeat(${visibleColumns.length}, minmax(0, 1fr))`,
+              scrollbarWidth: "none",
+            }}
+          >
+            {visibleColumns.map((col) => (
+              <Column
+                key={col.key}
+                col={col}
+                posts={grouped[col.key] || []}
+                limit={settings.limits[col.key]}
+                isOver={overColumn === col.key}
+                onPostClick={onPostClick}
+                onCreate={onCreateInColumn}
+                readOnly={readOnly}
+                selectedEventIds={selectedEventIds}
+                label={tStatus(col.key)}
+                locale={locale}
+              />
+            ))}
+          </div>
+        )}
 
         <DragOverlay dropAnimation={{ duration: 180 }}>
           {activePost ? (
@@ -419,6 +420,66 @@ export function KanbanView({
           ) : null}
         </DragOverlay>
       </DndContext>
+    </div>
+  );
+}
+
+/* ----------------------- Board Empty State ----------------------- */
+
+function BoardEmptyState({
+  columns,
+  onCreate,
+  tStatus,
+}: {
+  columns: ColumnDef[];
+  onCreate: () => void;
+  tStatus: (k: string) => string;
+}) {
+  return (
+    <div className="relative rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.02] to-transparent p-8 md:p-12 overflow-hidden">
+      {/* Ghost columns preview behind */}
+      <div
+        className="absolute inset-0 grid gap-3 p-6 opacity-[0.15] pointer-events-none"
+        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(0, 1fr))` }}
+      >
+        {columns.map((c) => (
+          <div
+            key={c.key}
+            className="rounded-xl border border-white/10 bg-white/[0.02]"
+            style={{ borderLeft: `2px solid ${c.accent}` }}
+          />
+        ))}
+      </div>
+
+      {/* Foreground */}
+      <div className="relative flex flex-col items-center text-center max-w-md mx-auto py-8">
+        <div className="relative mb-5">
+          <div className="absolute inset-0 rounded-full bg-[#F5C76A]/20 blur-2xl" />
+          <div className="relative h-16 w-16 rounded-full border border-[#F5C76A]/40 bg-black/40 backdrop-blur flex items-center justify-center">
+            <LayoutGrid className="h-7 w-7 text-[#F5C76A]" />
+          </div>
+        </div>
+        <h3 className="font-serif text-2xl tracking-tight text-foreground">Dein Content-Board ist bereit</h3>
+        <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+          Erstelle deinen ersten Post, um die Pipeline vom Briefing bis zur Veröffentlichung zu starten.
+        </p>
+        <button
+          onClick={onCreate}
+          className="mt-6 group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#F5C76A] text-black font-medium text-sm shadow-[0_0_40px_-8px_rgba(245,199,106,0.6)] hover:shadow-[0_0_60px_-4px_rgba(245,199,106,0.8)] transition-shadow"
+        >
+          <Plus className="h-4 w-4" />
+          Ersten Post erstellen
+        </button>
+        <div className="mt-8 flex items-center gap-3 text-[11px] tracking-[0.2em] uppercase text-muted-foreground/60">
+          {columns.slice(0, 5).map((c, i) => (
+            <span key={c.key} className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: c.accent }} />
+              {tStatus(c.key)}
+              {i < Math.min(columns.length, 5) - 1 && <span className="text-muted-foreground/30">›</span>}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
