@@ -17,6 +17,7 @@ import { Copy, Trash2, FileText, MessageSquare, CheckSquare, UserCheck, Clock, P
 import { useTranslation } from "@/hooks/useTranslation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { PostComposerPanel } from "./PostComposerPanel";
 
 interface EventDrawerProps {
   open: boolean;
