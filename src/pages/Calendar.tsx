@@ -516,7 +516,7 @@ export default function Calendar() {
 
   const renderView = () => {
     // Transform events to Post format that views expect
-    const transformedPosts = calendarFilters.filteredEvents.map(event => ({
+    const transformedPosts = (calendarFilters.filteredEvents as typeof events).map(event => ({
       id: event.id,
       title: event.title,
       channels: event.channels,
