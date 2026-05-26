@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Upload, Instagram, Facebook, Linkedin, Youtube, Twitter, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CSVUploadDialog } from "./CSVUploadDialog";
-import { PlanLimitDialog } from "./PlanLimitDialog";
+
 import { InstagramTokenDialog } from "./InstagramTokenDialog";
 import { TokenStatusBadge } from "./TokenStatusBadge";
 import { XConnectionCard } from "./XConnectionCard";
