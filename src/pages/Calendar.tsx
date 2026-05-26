@@ -268,6 +268,19 @@ export default function Calendar() {
 
   const loading = workspacesLoading || eventsLoading;
 
+  // Advanced filter system
+  const filterScope = selectedWorkspace ?? null;
+  const calendarFilters = useCalendarFilters(events as any, filterScope);
+  const ownerNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    (workspaceMembers as any[]).forEach((m) => {
+      const id = m.user_id ?? m.id;
+      const name = m.profiles?.email || m.profiles?.full_name || id;
+      if (id) map[id] = name;
+    });
+    return map;
+  }, [workspaceMembers]);
+
   useEffect(() => {
     if (user) {
       fetchUserPlan();
