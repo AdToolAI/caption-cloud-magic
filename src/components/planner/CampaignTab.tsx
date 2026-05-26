@@ -71,11 +71,12 @@ interface Campaign {
 
 interface CampaignTabProps {
   workspaceId: string | null;
+  initialOpenTemplates?: boolean;
 }
 
 const localeMap = { en: enUS, de, es } as const;
 
-export function CampaignTab({ workspaceId }: CampaignTabProps) {
+export function CampaignTab({ workspaceId, initialOpenTemplates = false }: CampaignTabProps) {
   const navigate = useNavigate();
   const { t, language } = useTranslation();
   const dateFnsLocale = localeMap[language] || enUS;
@@ -86,8 +87,13 @@ export function CampaignTab({ workspaceId }: CampaignTabProps) {
   const [deleting, setDeleting] = useState(false);
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
   const [generatorPost, setGeneratorPost] = useState<CampaignPost | null>(null);
+  const [showTemplateDialog, setShowTemplateDialog] = useState(false);
 
-  const dayNames = [
+  useEffect(() => {
+    if (initialOpenTemplates && workspaceId) {
+      setShowTemplateDialog(true);
+    }
+  }, [initialOpenTemplates, workspaceId]);
     t('planner.monday'), t('planner.tuesday'), t('planner.wednesday'),
     t('planner.thursday'), t('planner.friday'), t('planner.saturday'), t('planner.sunday')
   ];
