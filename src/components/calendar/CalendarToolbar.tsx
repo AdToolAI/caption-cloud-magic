@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { canQuickCalendarPost } from "@/lib/entitlements";
 import { QuickPostUpsellModal } from "@/components/pricing/QuickPostUpsellModal";
 
-export type ViewType = "month" | "week" | "list" | "kanban" | "timeline";
+export type ViewType = "month" | "week" | "list" | "kanban" | "heatmap";
 
 export interface CalendarToolbarProps {
   currentView: ViewType;
