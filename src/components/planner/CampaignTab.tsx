@@ -15,8 +15,10 @@ import {
   Clock,
   Sparkles,
   Eye,
-  ExternalLink
+  ExternalLink,
+  Plus
 } from "lucide-react";
+import { CampaignTemplateDialog } from "@/components/calendar/CampaignTemplateDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
