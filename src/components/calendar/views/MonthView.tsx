@@ -218,90 +218,160 @@ export function MonthView({
     );
   }
 
+  // Density bar color by dominant status of the day
+  const dominantStatusColor = (dayPosts: Post[]) => {
+    if (dayPosts.length === 0) return null;
+    const counts: Record<string, number> = {};
+    dayPosts.forEach((p) => (counts[p.status] = (counts[p.status] || 0) + 1));
+    const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    return statusColors[dominant] ?? "bg-primary";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between px-2">
-        <h2 className="text-3xl font-bold">{format(currentMonth, "MMMM yyyy")}</h2>
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-3xl font-bold tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
+            {format(currentMonth, "MMMM")}
+          </h2>
+          <span className="text-xl text-muted-foreground/60 tabular-nums">
+            {format(currentMonth, "yyyy")}
+          </span>
+        </div>
         <div className="flex gap-2">
-          <Button onClick={prevMonth} variant="outline" size="default">
+          <Button
+            onClick={prevMonth}
+            variant="outline"
+            size="default"
+            className="bg-card/40 backdrop-blur-md border-white/10 hover:border-primary/40 hover:bg-primary/10 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all"
+          >
             <ChevronLeft className="w-5 h-5" />
           </Button>
-          <Button onClick={nextMonth} variant="outline" size="default">
+          <Button
+            onClick={nextMonth}
+            variant="outline"
+            size="default"
+            className="bg-card/40 backdrop-blur-md border-white/10 hover:border-primary/40 hover:bg-primary/10 hover:shadow-[0_0_15px_hsla(43,90%,68%,0.2)] transition-all"
+          >
             <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-3">
-        {/* Header */}
-        {weekDays.map((day) => (
-          <div key={day} className="text-center font-bold p-3 text-sm text-muted-foreground bg-muted/30 rounded-lg">
-            {day}
-          </div>
-        ))}
+      {/* Weekday header with gold hairline */}
+      <div className="relative">
+        <div className="grid grid-cols-7 gap-3 pb-2">
+          {weekDays.map((day, idx) => {
+            const isWeekend = idx >= 5;
+            return (
+              <div
+                key={day}
+                className={cn(
+                  "text-center text-[10px] font-semibold tracking-[0.18em] uppercase py-2",
+                  isWeekend ? "text-cyan-400/70" : "text-muted-foreground/80"
+                )}
+              >
+                {day}
+              </div>
+            );
+          })}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+      </div>
 
+      <div className="grid grid-cols-7 gap-3">
         {/* Days */}
         {days.map((day) => {
           const dayPosts = getPostsForDay(day);
           const isCurrentMonth = isSameMonth(day, currentMonth);
           const isToday = isSameDay(day, new Date());
-          
+          const dayOfWeek = day.getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+          const density = Math.min(dayPosts.length, 4); // 0..4
+          const densityColor = dominantStatusColor(dayPosts);
+
           return (
             <motion.div
               key={day.toISOString()}
               onClick={() => isCurrentMonth && onDateClick?.(day)}
               onDragOver={isCurrentMonth ? handleDragOver : undefined}
               onDrop={isCurrentMonth ? (e) => handleDrop(e, day) : undefined}
-              whileHover={isCurrentMonth ? { scale: 1.03 } : undefined}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              whileHover={isCurrentMonth ? { y: -2 } : undefined}
+              transition={{ type: "spring", stiffness: 400, damping: 28 }}
               className={cn(
-                "min-h-[100px] p-3 border-2 rounded-xl transition-all cursor-pointer group relative",
-                "backdrop-blur-sm bg-card/60",
-                isToday && "border-primary bg-primary/5 shadow-[0_0_20px_hsla(var(--primary)/0.15)]",
-                !isCurrentMonth && "opacity-30 bg-muted/10",
-                isCurrentMonth && !isToday && "border-white/10 hover:border-primary/40 hover:shadow-[0_0_15px_hsla(var(--primary)/0.1)] hover:bg-accent/30",
-                draggedPostId && isCurrentMonth && "border-dashed border-primary/60 bg-primary/10 shadow-[0_0_15px_hsla(var(--primary)/0.2)]",
+                "min-h-[110px] p-3 pl-4 border rounded-2xl transition-all cursor-pointer group relative overflow-hidden",
+                "backdrop-blur-md",
+                isToday
+                  ? "bg-primary/[0.07] border-primary/50 shadow-[0_0_25px_hsla(43,90%,68%,0.18),inset_0_0_20px_hsla(43,90%,68%,0.04)]"
+                  : isCurrentMonth
+                  ? cn(
+                      "bg-card/40 border-white/5 hover:border-primary/40 hover:bg-card/60 hover:shadow-[0_8px_24px_-8px_hsla(43,90%,68%,0.25)]",
+                      isWeekend && "bg-card/30"
+                    )
+                  : "opacity-30 bg-muted/5 border-white/5",
+                draggedPostId && isCurrentMonth && "border-dashed border-primary/60 bg-primary/10",
                 "flex flex-col"
               )}
             >
-              {/* Animated today ring */}
+              {/* Density bar on left edge */}
+              {density > 0 && (
+                <div
+                  className={cn(
+                    "absolute left-0 top-2 bottom-2 w-[3px] rounded-full",
+                    densityColor,
+                    "opacity-80"
+                  )}
+                  style={{ height: `${20 + density * 18}%`, top: "10%" }}
+                />
+              )}
+
+              {/* Today double-ring pulse */}
               {isToday && (
                 <motion.div
-                  className="absolute -inset-[2px] rounded-xl border-2 border-primary/40 pointer-events-none"
-                  animate={{ opacity: [0.4, 0.8, 0.4] }}
+                  className="absolute -inset-px rounded-2xl border border-primary/30 pointer-events-none"
+                  animate={{ opacity: [0.3, 0.7, 0.3] }}
                   transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                 />
               )}
 
               <div className="flex items-center justify-between mb-2">
-                <span className={cn(
-                  "text-sm font-semibold",
-                  isToday && "bg-primary text-primary-foreground rounded-full w-7 h-7 flex items-center justify-center font-bold text-base shadow-[0_0_10px_hsla(var(--primary)/0.4)]"
-                )}>
-                  {format(day, "d")}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={cn(
+                      "text-base font-bold tabular-nums leading-none",
+                      isToday ? "text-primary" : isWeekend ? "text-cyan-300/80" : "text-foreground/90"
+                    )}
+                  >
+                    {format(day, "d")}
+                  </span>
+                  {isToday && (
+                    <span className="text-[8px] font-bold tracking-[0.15em] text-primary/80 uppercase">
+                      {t("postingTimes.today") || "Today"}
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-1.5">
                   {dayPosts.length > 0 && (
-                    <Badge variant="secondary" className="text-xs font-semibold px-2">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 tabular-nums">
                       {dayPosts.length}
-                    </Badge>
+                    </span>
                   )}
                   {isCurrentMonth && (
                     <Button
                       variant="ghost"
                       size="icon"
                       className={cn(
-                        "h-8 w-8 transition-all rounded-lg",
-                        dayPosts.length === 0 
-                          ? "opacity-70 hover:opacity-100 hover:bg-primary hover:text-primary-foreground" 
-                          : "opacity-0 group-hover:opacity-100 hover:bg-primary/90 hover:text-primary-foreground"
+                        "h-6 w-6 transition-all rounded-md",
+                        dayPosts.length === 0
+                          ? "opacity-60 hover:opacity-100 hover:bg-primary/20 hover:text-primary"
+                          : "opacity-0 group-hover:opacity-100 hover:bg-primary/20 hover:text-primary"
                       )}
                       onClick={(e) => {
                         e.stopPropagation();
                         onDateClick?.(day);
                       }}
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -326,7 +396,7 @@ export function MonthView({
                         platformStyle.border,
                         platformStyle.text,
                         platformStyle.glow,
-                        "font-medium hover:scale-[1.01]",
+                        "font-medium hover:scale-[1.02]",
                         selectableStatuses.includes(post.status) && "hover:ring-1 hover:ring-gold/60",
                         isSelected && "ring-1 ring-gold ring-offset-1 ring-offset-background",
                         draggedPostId === post.id && "opacity-50 scale-95"
@@ -346,8 +416,8 @@ export function MonthView({
                   );
                 })}
                 {dayPosts.length > 3 && (
-                  <div className="text-xs text-muted-foreground text-center py-1.5 font-semibold bg-muted/30 rounded-lg">
-                    +{dayPosts.length - 3} weitere
+                  <div className="text-[10px] text-primary/80 text-center py-1 font-semibold bg-primary/10 border border-primary/20 rounded-md">
+                    +{dayPosts.length - 3} {t("calendar.mobile.events") || ""}
                   </div>
                 )}
               </div>
