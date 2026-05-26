@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useEventEmitter } from "@/hooks/useEventEmitter";
-import { useTrialAccess } from "@/hooks/useTrialAccess";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
