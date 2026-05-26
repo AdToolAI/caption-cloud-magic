@@ -20,7 +20,7 @@ export interface CalendarToolbarProps {
   onCreateEvent?: () => void;
   onAddNote: () => void;
   onExport: (format: 'csv' | 'pdf' | 'ics' | 'metrics') => void;
-  onFilter: () => void;
+  onFilter?: () => void;
   onShare: () => void;
   onOpenAutoSchedule?: () => void;
   onOpenCampaignTemplates?: () => void;
@@ -31,6 +31,8 @@ export interface CalendarToolbarProps {
   selectedEventsCount?: number;
   onSelectAllDrafts?: () => void;
   onDeselectAll?: () => void;
+  /** Slot for the rich filter popover (rendered in toolbar). */
+  filterSlot?: React.ReactNode;
 }
 
 export function CalendarToolbar({
