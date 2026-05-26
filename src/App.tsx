@@ -308,7 +308,7 @@ function AppLayout() {
            <Route path="/community" element={<Community />} />
            <Route path="/gaming" element={<GamingHub />} />
           <Route path="/explainer-studio" element={<Navigate to="/home" replace />} />
-          <Route path="/templates" element={<ComingSoon />} />
+          <Route path="/templates" element={<Navigate to="/planner?tab=campaigns&newCampaign=1" replace />} />
           <Route path="/brand-visualizer" element={<ComingSoon />} />
           <Route path="/design-assistant" element={<ComingSoon />} />
           <Route path="/ai-monitoring" element={<AIMonitoring />} />
