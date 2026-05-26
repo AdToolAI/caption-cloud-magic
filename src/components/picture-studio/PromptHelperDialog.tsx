@@ -55,9 +55,9 @@ export function PromptHelperDialog({
 
   const reset = () => { setResult(null); autoFiredRef.current = false; };
 
-  const handleGenerate = async (overrideText?: string) => {
-    const text = (overrideText ?? userText).trim();
-    if (!userText.trim()) {
+  const handleGenerate = async (overrideText?: string, intent: 'enhance' | 'freeform' = 'freeform') => {
+    const text = (typeof overrideText === 'string' ? overrideText : userText).trim();
+    if (!text) {
       toast.error("Bitte beschreib in deinen Worten was du willst.");
       return;
     }
@@ -66,10 +66,11 @@ export function PromptHelperDialog({
     try {
       const { data, error } = await supabase.functions.invoke('generate-image-prompt', {
         body: {
-          userText: userText.trim(),
+          userText: text,
           referenceImageUrl: referenceImageUrl || null,
           currentMode,
           currentTier,
+          intent,
           filters: { goal, style, mood },
         },
       });
@@ -83,6 +84,22 @@ export function PromptHelperDialog({
       setLoading(false);
     }
   };
+
+  // Auto-fire on open when in enhance mode + reference present.
+  useEffect(() => {
+    if (!open) {
+      autoFiredRef.current = false;
+      return;
+    }
+    if (autoEnhance && referenceImageUrl && !autoFiredRef.current) {
+      autoFiredRef.current = true;
+      setUserText(ENHANCE_DEFAULT_TEXT);
+      // small delay so dialog mount finishes before the spinner appears
+      setTimeout(() => { void handleGenerate(ENHANCE_DEFAULT_TEXT, 'enhance'); }, 80);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, autoEnhance, referenceImageUrl]);
+
 
   const handleApply = (chosen: string) => {
     if (!result) return;
