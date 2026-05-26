@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem, Palette, Layers } from "lucide-react";
+import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem, Palette, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
@@ -19,6 +20,13 @@ import { ImageCard } from "./ImageCard";
 import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
+import { PromptHelperDialog, type PromptHelperResult } from "./PromptHelperDialog";
+import { PreflightCheck } from "./PreflightCheck";
+import {
+  PICTURE_MODES,
+  type PictureMode,
+  type QualityTier as ModelTier,
+} from "@/config/pictureStudioModels";
 
 interface GeneratedImage {
   id?: string;
@@ -94,8 +102,14 @@ export function ImageGenerator() {
   const [style, setStyle] = useState(cached?.style ?? "realistic");
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
   const [tier, setTier] = useState<QualityTier>('standard');
-  const [editMode, setEditMode] = useState(cached?.editMode ?? false);
+  
+  // New mode model (replaces editMode boolean). Legacy editMode is migrated.
+  const initialMode: PictureMode =
+    cached?.mode ?? (cached?.editMode ? 'transform' : 'create');
+  const [mode, setMode] = useState<PictureMode>(initialMode);
   const [referenceImage, setReferenceImage] = useState<string | null>(cached?.referenceImage ?? null);
+  const [styleReference, setStyleReference] = useState<string | null>(cached?.styleReference ?? null);
+  const [strength, setStrength] = useState<number>(cached?.strength ?? 70);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>(cached?.generatedImages ?? []);
   const [replicateLoading, setReplicateLoading] = useState(false);
 
@@ -104,9 +118,12 @@ export function ImageGenerator() {
   const [lightboxImage, setLightboxImage] = useState<GeneratedImage | null>(null);
   const [justGenerated, setJustGenerated] = useState(false);
   const [variantsCount, setVariantsCount] = useState<1 | 4>(1);
-  const [styleReference, setStyleReference] = useState<string | null>(null);
   const [useBrandKit, setUseBrandKit] = useState(false);
   const [ciScores, setCiScores] = useState<Record<string, number>>({});
+  const [helperOpen, setHelperOpen] = useState(false);
+
+  // Derived: legacy editMode = "we have a reference + we want to transform"
+  const editMode = mode === 'transform';
 
   const loading = replicateLoading;
   const baseCost = TIER_COSTS[tier];
@@ -123,20 +140,36 @@ export function ImageGenerator() {
       aspectRatio,
       quality: tier === 'standard' || tier === 'fast' ? 'fast' : 'pro',
       editMode,
+      mode,
+      strength,
       referenceImage,
+      styleReference,
       generatedImages,
     });
-  }, [prompt, style, aspectRatio, tier, editMode, referenceImage, generatedImages]);
+  }, [prompt, style, aspectRatio, tier, editMode, mode, strength, referenceImage, styleReference, generatedImages]);
+
+  // When the mode changes, clean up slots that aren't relevant for it.
+  useEffect(() => {
+    if (mode === 'create') {
+      // create: no reference of any kind
+      setReferenceImage(null);
+      setStyleReference(null);
+    } else if (mode === 'transform') {
+      // transform: only the i2i slot matters
+      setStyleReference(null);
+    } else if (mode === 'restyle') {
+      // restyle: only the style reference matters
+      setReferenceImage(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   const handleReferenceUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setReferenceImage(reader.result as string);
-      setEditMode(true);
-    };
+    reader.onloadend = () => setReferenceImage(reader.result as string);
     reader.readAsDataURL(file);
   };
 
@@ -157,11 +190,51 @@ export function ImageGenerator() {
     mood: activeBrandKit.mood || undefined,
   } : null;
 
+  // Build the effective prompt: for transform-mode, append a preservation
+  // suffix based on the strength slider, so downstream models (which mostly
+  // don't expose a numeric "strength" param) honor user intent via language.
+  const effectivePrompt = useMemo(() => {
+    const base = prompt.trim();
+    if (mode !== 'transform' || !referenceImage) return base;
+    if (strength <= 35) {
+      return `${base}\n\nPreserve the exact composition, subjects, layout and lighting of the reference image. Only refine style and details — do not move, add, or remove subjects.`;
+    }
+    if (strength <= 65) {
+      return `${base}\n\nKeep the overall composition and main subjects of the reference image. Adjust style, lighting and atmosphere as described.`;
+    }
+    return `${base}\n\nUse the reference image as loose inspiration only.`;
+  }, [prompt, mode, referenceImage, strength]);
+
+  /** "Realistic Reproduction" one-click for the transform mode. */
+  const handleRealisticReproduction = () => {
+    setTier('ultra');
+    setStrength(40);
+    setStyle('realistic');
+    setVariantsCount(1);
+    setPrompt((p) => {
+      const base = p.trim();
+      const suffix = 'photorealistic, ultra-detailed, preserve composition and all subjects from reference, natural light, sharp focus, IMAX color grading';
+      if (base.toLowerCase().includes('photorealistic')) return base;
+      return base ? `${base}, ${suffix}` : `Photorealistic recreation of the reference scene, ${suffix}`;
+    });
+    toast.success('Realistic-Reproduction-Preset gesetzt');
+  };
+
+  const handleHelperApply = (result: PromptHelperResult, chosenPrompt: string) => {
+    setPrompt(chosenPrompt);
+    setTier(result.recommendedTier as ModelTier);
+    setMode(result.recommendedMode);
+    if (result.recommendedMode === 'transform') {
+      setStrength(result.recommendedStrength);
+    }
+    toast.success(`Prompt übernommen — Modell: ${result.recommendedTier}`);
+  };
+
   const generateOne = async (): Promise<any | null> => {
     if (tier === 'standard') {
       const { data, error } = await supabase.functions.invoke('generate-studio-image', {
         body: {
-          prompt: prompt.trim(),
+          prompt: effectivePrompt,
           style,
           aspectRatio,
           quality: 'fast',
@@ -178,12 +251,13 @@ export function ImageGenerator() {
     // Premium tier — Replicate via €-Wallet
     const { data, error } = await supabase.functions.invoke('generate-image-replicate', {
       body: {
-        prompt: prompt.trim(),
+        prompt: effectivePrompt,
         tier,
         aspectRatio,
         style,
         referenceImageUrl: editMode ? referenceImage : undefined,
-        styleReferenceUrl: styleReference || undefined,
+        styleReferenceUrl: mode === 'restyle' ? (styleReference || undefined) : undefined,
+        strength: mode === 'transform' ? strength : undefined,
         brandKit: brandKitPayload,
       }
     });
@@ -460,32 +534,63 @@ export function ImageGenerator() {
             </div>
           </div>
 
-          {/* Phase C — Style Reference + Brand-Kit Lock */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Style Reference Slot */}
-            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-primary" />
-                  Style Reference
-                  <span className="text-[10px] text-muted-foreground">(Fast/Ultra)</span>
-                </Label>
-                {styleReference && (
+          {/* MODE SWITCH — replaces the old dual-slot UI */}
+          <div className="space-y-2">
+            <Label className="text-xs">Modus</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(PICTURE_MODES) as PictureMode[]).map((m) => {
+                const meta = PICTURE_MODES[m];
+                const active = mode === m;
+                return (
                   <button
-                    onClick={() => setStyleReference(null)}
+                    key={m}
+                    type="button"
+                    onClick={() => setMode(m)}
+                    className={`p-3 rounded-lg border text-left transition-all ${
+                      active
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border/50 bg-background/30 hover:border-border'
+                    }`}
+                  >
+                    <div className="font-semibold text-sm mb-0.5">{meta.label}</div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">{meta.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* SINGLE REFERENCE SLOT — only shown when the mode needs one */}
+          {PICTURE_MODES[mode].needsReference && (
+            <div className="p-3 rounded-lg border border-border/50 bg-background/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs flex items-center gap-1.5">
+                  {mode === 'transform' ? (
+                    <><ImageIcon className="h-3.5 w-3.5 text-primary" /> Vorlage-Bild (wird verwandelt)</>
+                  ) : (
+                    <><Palette className="h-3.5 w-3.5 text-primary" /> Stil-Referenz (Farben/Mood)</>
+                  )}
+                </Label>
+                {(mode === 'transform' ? referenceImage : styleReference) && (
+                  <button
+                    onClick={() => mode === 'transform' ? setReferenceImage(null) : setStyleReference(null)}
                     className="text-[10px] text-muted-foreground hover:text-destructive"
                   >
                     Entfernen
                   </button>
                 )}
               </div>
-              {styleReference ? (
+              {(mode === 'transform' ? referenceImage : styleReference) ? (
                 <button
                   type="button"
-                  onClick={() => styleRefInputRef.current?.click()}
-                  className="relative block w-full h-16 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
+                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
+                  className="relative block w-full h-24 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
                 >
-                  <img src={styleReference} className="h-full w-full object-cover" alt="Style Reference" />
+                  <img
+                    src={mode === 'transform' ? referenceImage! : styleReference!}
+                    className="h-full w-full object-cover"
+                    alt="Reference"
+                  />
                   <div className="absolute inset-0 bg-background/70 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                     <Upload className="h-4 w-4" />
                   </div>
@@ -494,121 +599,131 @@ export function ImageGenerator() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full h-16 border-dashed"
-                  onClick={() => styleRefInputRef.current?.click()}
+                  className="w-full h-24 border-dashed"
+                  onClick={() => mode === 'transform' ? fileInputRef.current?.click() : styleRefInputRef.current?.click()}
                 >
                   <Upload className="h-3.5 w-3.5 mr-1.5" />
-                  Style-Bild hochladen
+                  Bild hochladen
                 </Button>
               )}
-              <input
-                ref={styleRefInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleStyleRefUpload}
-              />
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Übernimmt Farbpalette & Ästhetik des Referenzbilds
-              </p>
-            </div>
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+              <input ref={styleRefInputRef} type="file" accept="image/*" className="hidden" onChange={handleStyleRefUpload} />
 
-            {/* Brand-Kit Toggle */}
-            <div className="p-3 rounded-lg border border-border/50 bg-background/30">
-              <div className="flex items-center justify-between mb-2">
-                <Label className="text-xs flex items-center gap-1.5">
-                  <Palette className="h-3.5 w-3.5 text-primary" />
-                  Brand-Kit Lock
-                </Label>
-                <Switch
-                  checked={useBrandKit}
-                  onCheckedChange={setUseBrandKit}
-                  disabled={!activeBrandKit}
-                />
-              </div>
-              {activeBrandKit ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[activeBrandKit.primary_color, activeBrandKit.secondary_color, activeBrandKit.accent_color]
-                      .filter(Boolean)
-                      .slice(0, 3)
-                      .map((c, i) => (
-                        <div
-                          key={i}
-                          className="h-5 w-5 rounded-full border border-border/50"
-                          style={{ backgroundColor: c as string }}
-                        />
-                      ))}
+              {/* Strength slider — transform mode only */}
+              {mode === 'transform' && referenceImage && (
+                <div className="pt-2 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">Stärke der Veränderung</span>
+                    <span className="font-mono">{strength}%</span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
-                  </p>
+                  <Slider
+                    value={[strength]}
+                    onValueChange={([v]) => setStrength(v)}
+                    min={0}
+                    max={100}
+                    step={5}
+                  />
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span>nah am Original</span>
+                    <span>nur Inspiration</span>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
-                </p>
               )}
-              <p className="text-[10px] text-muted-foreground mt-1.5">
-                Injiziert Brand-Farben + Mood ins Prompt
-              </p>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch checked={editMode} onCheckedChange={(v) => { setEditMode(v); if (!v) setReferenceImage(null); }} />
-              <Label className="text-sm">{t('picStudio.imageToImage')}</Label>
+              {/* Realistic-Reproduction one-click — transform mode only */}
+              {mode === 'transform' && referenceImage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={handleRealisticReproduction}
+                >
+                  <Camera className="h-3.5 w-3.5 mr-1.5" />
+                  📸 Bild realistisch & detailliert reproduzieren
+                </Button>
+              )}
             </div>
-            {editMode && (
+          )}
+
+          {/* Brand-Kit Toggle */}
+          <div className="p-3 rounded-lg border border-border/50 bg-background/30">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Palette className="h-3.5 w-3.5 text-primary" />
+                Brand-Kit Lock
+              </Label>
+              <Switch
+                checked={useBrandKit}
+                onCheckedChange={setUseBrandKit}
+                disabled={!activeBrandKit}
+              />
+            </div>
+            {activeBrandKit ? (
               <div className="flex items-center gap-2">
-                {referenceImage ? (
-                  <div className="relative group/ref">
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className="relative block h-12 w-12 rounded-md overflow-hidden border border-border hover:border-primary transition-colors"
-                      title={t('picStudio.uploadImage')}
-                    >
-                      <img src={referenceImage} className="h-full w-full object-cover" alt="Reference" />
-                      <div className="absolute inset-0 bg-background/70 opacity-0 group-hover/ref:opacity-100 transition-opacity flex items-center justify-center">
-                        <Upload className="h-4 w-4 text-foreground" />
-                      </div>
-                    </button>
-                    <button onClick={(e) => { e.stopPropagation(); setReferenceImage(null); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center z-10">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                    <Upload className="h-3.5 w-3.5 mr-1" /> {t('picStudio.uploadImage')}
-                  </Button>
-                )}
-                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleReferenceUpload} />
+                <div className="flex gap-1">
+                  {[activeBrandKit.primary_color, activeBrandKit.secondary_color, activeBrandKit.accent_color]
+                    .filter(Boolean)
+                    .slice(0, 3)
+                    .map((c, i) => (
+                      <div key={i} className="h-5 w-5 rounded-full border border-border/50" style={{ backgroundColor: c as string }} />
+                    ))}
+                </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  {activeBrandKit.brand_name || 'Aktiver Brand-Kit'}
+                </p>
               </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Kein aktives Brand-Kit. <button onClick={() => navigate('/brand-kit')} className="text-primary underline">Anlegen</button>
+              </p>
             )}
+          </div>
 
-            {/* Variations Toggle */}
-            <div className="flex items-center gap-2 ml-auto">
-              <Label className="text-sm text-muted-foreground">Varianten:</Label>
-              <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
-                {([1, 4] as const).map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setVariantsCount(n)}
-                    className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
-                      variantsCount === n
-                        ? 'bg-primary text-primary-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
-                  </button>
-                ))}
-              </div>
+          {/* Variants */}
+          <div className="flex items-center gap-2 ml-auto">
+            <Label className="text-sm text-muted-foreground">Varianten:</Label>
+            <div className="flex items-center rounded-lg border border-border/50 bg-background/30 p-0.5">
+              {([1, 4] as const).map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setVariantsCount(n)}
+                  className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                    variantsCount === n
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {n}× {n === 4 && <span className="opacity-70">Bilder</span>}
+                </button>
+              ))}
             </div>
           </div>
+
+          {/* Prompt Helper trigger */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => setHelperOpen(true)}
+          >
+            <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
+            ✨ Prompt-Helfer öffnen
+          </Button>
+
+          {/* Pre-flight check */}
+          <PreflightCheck
+            mode={mode}
+            tier={tier}
+            prompt={prompt}
+            variantsCount={variantsCount}
+            cost={cost}
+            currencySymbol={currencySymbol}
+            onSwitchTier={(t) => setTier(t as QualityTier)}
+            onOpenHelper={() => setHelperOpen(true)}
+            onSetVariants={setVariantsCount}
+          />
+
 
           <Button
             className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground"
