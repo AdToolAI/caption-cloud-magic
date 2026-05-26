@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,9 @@ interface Props {
   currentMode: PictureMode;
   currentTier: QualityTier;
   referenceImageUrl?: string | null;
+  /** When true and a reference image is present, auto-runs the helper in
+   *  "Bild übernehmen & verbessern" mode (deep vision analysis + transform/ultra). */
+  autoEnhance?: boolean;
   onApply: (result: PromptHelperResult, chosenPrompt: string) => void;
 }
 
@@ -35,9 +38,12 @@ const GOALS = ['Werbung', 'Social', 'Portrait', 'Szene', 'Produkt', 'Kunst'];
 const STYLES = ['Fotorealistisch', 'Cinematisch', 'Illustration', '3D', 'Anime', 'Aquarell'];
 const MOODS = ['Episch', 'Ruhig', 'Dramatisch', 'Hell', 'Düster', 'Verspielt'];
 
+const ENHANCE_DEFAULT_TEXT =
+  "Übernimm dieses Bild 1:1 und verbessere Qualität, Realismus, Lichtkonsistenz und Detailtreue — behalte alle Personen, Kleidung, Komposition und Hintergrund exakt bei.";
+
 export function PromptHelperDialog({
   open, onOpenChange, initialUserText = '',
-  currentMode, currentTier, referenceImageUrl, onApply,
+  currentMode, currentTier, referenceImageUrl, autoEnhance, onApply,
 }: Props) {
   const [userText, setUserText] = useState(initialUserText);
   const [goal, setGoal] = useState<string | null>(null);
@@ -45,11 +51,13 @@ export function PromptHelperDialog({
   const [mood, setMood] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<PromptHelperResult | null>(null);
+  const autoFiredRef = useRef(false);
 
-  const reset = () => { setResult(null); };
+  const reset = () => { setResult(null); autoFiredRef.current = false; };
 
-  const handleGenerate = async () => {
-    if (!userText.trim()) {
+  const handleGenerate = async (overrideText?: string, intent: 'enhance' | 'freeform' = 'freeform') => {
+    const text = (typeof overrideText === 'string' ? overrideText : userText).trim();
+    if (!text) {
       toast.error("Bitte beschreib in deinen Worten was du willst.");
       return;
     }
@@ -58,10 +66,11 @@ export function PromptHelperDialog({
     try {
       const { data, error } = await supabase.functions.invoke('generate-image-prompt', {
         body: {
-          userText: userText.trim(),
+          userText: text,
           referenceImageUrl: referenceImageUrl || null,
           currentMode,
           currentTier,
+          intent,
           filters: { goal, style, mood },
         },
       });
@@ -75,6 +84,22 @@ export function PromptHelperDialog({
       setLoading(false);
     }
   };
+
+  // Auto-fire on open when in enhance mode + reference present.
+  useEffect(() => {
+    if (!open) {
+      autoFiredRef.current = false;
+      return;
+    }
+    if (autoEnhance && referenceImageUrl && !autoFiredRef.current) {
+      autoFiredRef.current = true;
+      setUserText(ENHANCE_DEFAULT_TEXT);
+      // small delay so dialog mount finishes before the spinner appears
+      setTimeout(() => { void handleGenerate(ENHANCE_DEFAULT_TEXT, 'enhance'); }, 80);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, autoEnhance, referenceImageUrl]);
+
 
   const handleApply = (chosen: string) => {
     if (!result) return;
@@ -116,7 +141,11 @@ export function PromptHelperDialog({
             {referenceImageUrl && (
               <div className="flex items-center gap-2 p-2 rounded-md bg-primary/5 border border-primary/20 text-xs">
                 <ImageIcon className="h-4 w-4 text-primary shrink-0" />
-                <span>Dein Referenzbild wird mitanalysiert.</span>
+                <span>
+                  {autoEnhance
+                    ? 'Bild übernehmen & verbessern — Modell, Modus und Strength werden automatisch gesetzt.'
+                    : 'Dein Referenzbild wird mitanalysiert.'}
+                </span>
                 <img src={referenceImageUrl} alt="ref" className="ml-auto h-10 w-10 object-cover rounded" />
               </div>
             )}
@@ -147,7 +176,7 @@ export function PromptHelperDialog({
               </div>
             </div>
 
-            <Button onClick={handleGenerate} disabled={loading || !userText.trim()} className="w-full">
+            <Button onClick={() => handleGenerate()} disabled={loading || !userText.trim()} className="w-full">
               {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Analysiere…</>
                        : <><Sparkles className="h-4 w-4 mr-2" /> Prompt bauen</>}
             </Button>

@@ -121,6 +121,7 @@ export function ImageGenerator() {
   const [useBrandKit, setUseBrandKit] = useState(false);
   const [ciScores, setCiScores] = useState<Record<string, number>>({});
   const [helperOpen, setHelperOpen] = useState(false);
+  const [helperAutoEnhance, setHelperAutoEnhance] = useState(false);
 
   // Derived: legacy editMode = "we have a reference + we want to transform"
   const editMode = mode === 'transform';
@@ -484,20 +485,33 @@ export function ImageGenerator() {
       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
         <CardContent className="p-6 space-y-5">
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <Label className="flex items-center gap-2">
                 <Wand2 className="h-4 w-4 text-primary" />
                 {t('picStudio.prompt')}
               </Label>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs"
-                onClick={() => setHelperOpen(true)}
-              >
-                <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                ✨ Prompt-Helfer
-              </Button>
+              <div className="flex items-center gap-1.5">
+                {(mode === 'transform' && referenceImage) && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs"
+                    onClick={() => { setHelperAutoEnhance(true); setHelperOpen(true); }}
+                  >
+                    <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+                    ✨ Bild übernehmen & verbessern
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs"
+                  onClick={() => { setHelperAutoEnhance(false); setHelperOpen(true); }}
+                >
+                  <Wand2 className="h-3.5 w-3.5 mr-1.5 text-primary" />
+                  ✨ Prompt-Helfer
+                </Button>
+              </div>
             </div>
             <Textarea
               placeholder={t('picStudio.promptPlaceholder')}
@@ -831,11 +845,12 @@ export function ImageGenerator() {
 
       <PromptHelperDialog
         open={helperOpen}
-        onOpenChange={setHelperOpen}
+        onOpenChange={(o) => { setHelperOpen(o); if (!o) setHelperAutoEnhance(false); }}
         initialUserText={prompt}
         currentMode={mode}
         currentTier={tier as QualityTier}
         referenceImageUrl={mode === 'transform' ? referenceImage : mode === 'restyle' ? styleReference : null}
+        autoEnhance={helperAutoEnhance}
         onApply={handleHelperApply}
       />
     </div>
