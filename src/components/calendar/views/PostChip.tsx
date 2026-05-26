@@ -15,7 +15,9 @@ interface PostChipProps {
   onDragEnd?: () => void;
 }
 
-const PLATFORM = {
+type Palette = { from: string; via: string; to: string; glow: string; icon: string };
+
+const PLATFORM: Record<string, Palette> = {
   instagram: { from: "#833AB4", via: "#E1306C", to: "#F77737", glow: "236,72,153", icon: "📷" },
   facebook:  { from: "#1877F2", via: "#4267B2", to: "#1877F2", glow: "24,119,242",  icon: "👍" },
   linkedin:  { from: "#0A66C2", via: "#0A8A0A", to: "#0A66C2", glow: "10,138,10",  icon: "💼" },
@@ -23,7 +25,7 @@ const PLATFORM = {
   youtube:   { from: "#FF0000", via: "#CC0000", to: "#FF0000", glow: "255,0,0",    icon: "▶️" },
   twitter:   { from: "#1DA1F2", via: "#0d8ddb", to: "#1DA1F2", glow: "29,161,242", icon: "🐦" },
   x:         { from: "#000000", via: "#1a1a1a", to: "#000000", glow: "200,200,200", icon: "𝕏" },
-} as const;
+};
 
 const FALLBACK = { from: "#F5C76A", via: "#E0A93D", to: "#F5C76A", glow: "245,199,106", icon: "📝" };
 
