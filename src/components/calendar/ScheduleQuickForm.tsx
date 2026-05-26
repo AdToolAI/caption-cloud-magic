@@ -228,56 +228,9 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
     }
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-    >
-      <Card 
-        id="quick-schedule-form" 
-        className="relative overflow-hidden backdrop-blur-xl bg-card/60 border-white/10"
-      >
-        {/* Shimmer border effect */}
-        <div className="absolute inset-0 rounded-xl p-[1px] overflow-hidden pointer-events-none">
-          <div 
-            className="absolute inset-0 rounded-xl"
-            style={{
-              background: 'linear-gradient(90deg, transparent 0%, hsl(var(--primary) / 0.3) 25%, hsl(var(--primary) / 0.6) 50%, hsl(var(--primary) / 0.3) 75%, transparent 100%)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer-border 3s ease-in-out infinite',
-              mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-              maskComposite: 'exclude',
-              WebkitMaskComposite: 'xor',
-              padding: '1px',
-            }}
-          />
-        </div>
+  const formInner = (
+    <form onSubmit={handleSubmit} className="space-y-5">
 
-        <style>{`
-          @keyframes shimmer-border {
-            0%, 100% { background-position: -200% 0; }
-            50% { background-position: 200% 0; }
-          }
-        `}</style>
-
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg bg-gradient-to-r from-primary via-amber-400 to-primary bg-clip-text text-transparent">
-                {t('calendar.quickSchedule')}
-              </CardTitle>
-              <CardDescription>{t('calendar.createAndSchedule')}</CardDescription>
-            </div>
-            {isPrefilled && (
-              <Badge variant="secondary" className="text-xs">
-                🎨 {t('calendar.importedFromGenerator')}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-5">
             {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title">{t('calendar.titleOptional')}</Label>
