@@ -24,6 +24,7 @@ interface DayCockpitDialogProps {
   date: Date | null;
   workspaceId: string;
   onSuccess?: () => void;
+  onEventClick?: (eventId: string) => void;
 }
 
 const localeMap: Record<string, string> = { en: 'en-US', de: 'de-DE', es: 'es-ES' };
@@ -53,7 +54,7 @@ function statusVisual(status: string) {
   }
 }
 
-export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSuccess }: DayCockpitDialogProps) {
+export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSuccess, onEventClick }: DayCockpitDialogProps) {
   const { t, language } = useTranslation();
   const dateLocale = localeMap[language] || 'en-US';
 
@@ -229,12 +230,20 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
                       minute: '2-digit',
                     });
                     return (
-                      <motion.div
+                      <motion.button
                         key={ev.id}
+                        type="button"
+                        onClick={() => {
+                          if (onEventClick) {
+                            onOpenChange(false);
+                            // Wait for dialog close animation, then open drawer
+                            setTimeout(() => onEventClick(ev.id), 180);
+                          }
+                        }}
                         initial={{ opacity: 0, x: 10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.04 }}
-                        className={`group relative rounded-xl border ${v.ring} bg-white/[0.02] hover:bg-white/[0.04] backdrop-blur-sm p-3 transition-all`}
+                        className={`group relative w-full text-left rounded-xl border ${v.ring} bg-white/[0.02] hover:bg-white/[0.06] hover:border-primary/40 backdrop-blur-sm p-3 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/50`}
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col items-center pt-0.5 min-w-[3rem]">
@@ -242,7 +251,7 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
                             <span className="mt-1">{v.icon}</span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-white/90 truncate">
+                            <p className="text-sm text-white/90 truncate group-hover:text-white">
                               {ev.title || ev.caption?.slice(0, 60) || t('calendar.titleOptional')}
                             </p>
                             {ev.caption && ev.title && (
@@ -261,8 +270,11 @@ export function DayCockpitDialog({ open, onOpenChange, date, workspaceId, onSucc
                               </div>
                             )}
                           </div>
+                          <span className="text-[10px] uppercase tracking-widest text-primary/60 opacity-0 group-hover:opacity-100 transition-opacity self-center">
+                            Bearbeiten →
+                          </span>
                         </div>
-                      </motion.div>
+                      </motion.button>
                     );
                   })}
                 </div>
