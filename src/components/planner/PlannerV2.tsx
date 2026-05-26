@@ -387,7 +387,7 @@ export function PlannerV2({ className }: PlannerV2Props) {
         </div>
       </Card>
 
-      <Tabs defaultValue="posts" className="mb-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
         <TabsList className="mb-4">
           <TabsTrigger value="posts" className="gap-2">
             <FileText className="h-4 w-4" />
