@@ -431,18 +431,40 @@ export function ScheduleQuickForm({ workspaceId, onSuccess, lockedDate, embedded
             {/* Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-            {/* Date/Time */}
+            {/* Date/Time — when lockedDate is set, show only a time picker */}
             <div className="space-y-2">
-              <Label htmlFor="when">{t("calendarSchedule.publishDateTime")}</Label>
-              <Input
-                id="when"
-                type="datetime-local"
-                value={when}
-                onChange={(e) => setWhen(e.target.value)}
-                disabled={busy}
-                className="bg-muted/20 border-white/10 focus:border-primary/50"
-              />
+              {lockedDate ? (
+                <>
+                  <Label htmlFor="time">
+                    {t("calendarSchedule.publishDateTime")}
+                    <span className="ml-2 text-xs text-primary/80">
+                      {lockedDate.toLocaleDateString(language === 'de' ? 'de-DE' : language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+                    </span>
+                  </Label>
+                  <Input
+                    id="time"
+                    type="time"
+                    value={time}
+                    onChange={(e) => setTime(e.target.value)}
+                    disabled={busy}
+                    className="bg-muted/20 border-white/10 focus:border-primary/50"
+                  />
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="when">{t("calendarSchedule.publishDateTime")}</Label>
+                  <Input
+                    id="when"
+                    type="datetime-local"
+                    value={when}
+                    onChange={(e) => setWhen(e.target.value)}
+                    disabled={busy}
+                    className="bg-muted/20 border-white/10 focus:border-primary/50"
+                  />
+                </>
+              )}
             </div>
+
 
             {/* Divider */}
             <div className="h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
