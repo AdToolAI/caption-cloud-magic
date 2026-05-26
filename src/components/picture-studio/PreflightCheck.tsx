@@ -26,7 +26,7 @@ interface Props {
  * Catches risky combinations BEFORE credits are spent.
  */
 export function PreflightCheck({
-  mode, tier, prompt, variantsCount, cost, currencySymbol,
+  mode, tier, prompt, variantsCount, cost, currencySymbol, hasReference = false,
   onSwitchTier, onOpenHelper, onSetVariants,
 }: Props) {
   const tips: { icon: 'warn' | 'info'; text: string; action?: { label: string; run: () => void } }[] = [];
