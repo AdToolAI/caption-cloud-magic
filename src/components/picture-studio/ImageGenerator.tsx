@@ -102,7 +102,7 @@ export function ImageGenerator() {
   const [style, setStyle] = useState(cached?.style ?? "realistic");
   const [aspectRatio, setAspectRatio] = useState(cached?.aspectRatio ?? "1:1");
   const [tier, setTier] = useState<QualityTier>('standard');
-  const [editMode, setEditMode] = useState(cached?.editMode ?? false);
+  
   // New mode model (replaces editMode boolean). Legacy editMode is migrated.
   const initialMode: PictureMode =
     cached?.mode ?? (cached?.editMode ? 'transform' : 'create');
