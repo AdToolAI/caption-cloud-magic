@@ -180,15 +180,13 @@ export function MonthView({
                       {dayPosts.length} {t("calendar.mobile.events")}
                     </div>
                   </div>
-                  {(
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onDateClick?.(day)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDateClick?.(day)}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
                 </div>
 
                 <div className="space-y-2">
