@@ -347,10 +347,6 @@ export default function Calendar() {
   };
 
   const handleDateClick = (date: Date) => {
-    if (!hasCalendarAccess()) {
-      setShowUpgrade(true);
-      return;
-    }
     setPrefillDate(date);
     setShowDayCockpit(true);
   };
