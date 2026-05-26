@@ -6,9 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem, Palette, Layers } from "lucide-react";
+import { Sparkles, Upload, Loader2, Wand2, Image as ImageIcon, X, FolderOpen, Wallet, Zap, Crown, Gem, Palette, Camera } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAIVideoWallet } from "@/hooks/useAIVideoWallet";
@@ -19,6 +20,13 @@ import { ImageCard } from "./ImageCard";
 import { StudioLightbox } from "./StudioLightbox";
 import { SaveToAlbumDialog } from "./SaveToAlbumDialog";
 import { getCachedState, setCachedState } from "./imageGeneratorCache";
+import { PromptHelperDialog, type PromptHelperResult } from "./PromptHelperDialog";
+import { PreflightCheck } from "./PreflightCheck";
+import {
+  PICTURE_MODES,
+  type PictureMode,
+  type QualityTier as ModelTier,
+} from "@/config/pictureStudioModels";
 
 interface GeneratedImage {
   id?: string;
