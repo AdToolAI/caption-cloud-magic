@@ -208,7 +208,7 @@ export function EventDrawer({ open, onClose, eventId, onDelete, onUpdate }: Even
   return (
     <>
       <Sheet open={open} onOpenChange={onClose}>
-        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-5xl overflow-y-auto">
           <SheetHeader>
             <SheetTitle className="flex items-center justify-between">
               <span>{event?.title || t("calendar.drawer.eventDetails")}</span>
