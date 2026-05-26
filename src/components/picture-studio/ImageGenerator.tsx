@@ -302,6 +302,7 @@ export function ImageGenerator() {
       const results = await Promise.allSettled(tasks);
 
       let successCount = 0;
+      let safetyFilteredMsg: string | null = null;
       for (const r of results) {
         if (r.status === 'fulfilled' && r.value) {
           await handleGenerationSuccess(r.value);
@@ -313,12 +314,22 @@ export function ImageGenerator() {
             setReplicateLoading(false);
             return;
           }
+          if ((r.reason as any)?.code === 'SAFETY_FILTERED') {
+            safetyFilteredMsg = r.reason.message;
+          }
           console.error('[ImageGenerator] variant failed:', r.reason);
         }
       }
 
       if (successCount === 0) {
-        toast.error('Bildgenerierung fehlgeschlagen');
+        if (safetyFilteredMsg) {
+          toast.warning('Sicherheitsfilter ausgelöst', {
+            description: safetyFilteredMsg,
+            duration: 12000,
+          });
+        } else {
+          toast.error('Bildgenerierung fehlgeschlagen');
+        }
       } else if (variantsCount > 1) {
         toast.success(`${successCount} von ${variantsCount} Varianten generiert`);
       }
