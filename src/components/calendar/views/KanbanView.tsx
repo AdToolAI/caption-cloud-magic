@@ -134,7 +134,7 @@ function loadSettings(): BoardSettings {
     if (raw) return JSON.parse(raw);
   } catch {}
   return {
-    hidden: [],
+    hidden: ["approved", "scheduled"],
     sort: "date_asc",
     limits: Object.fromEntries(DEFAULT_COLUMNS.map((c) => [c.key, c.wipLimit])),
   };
