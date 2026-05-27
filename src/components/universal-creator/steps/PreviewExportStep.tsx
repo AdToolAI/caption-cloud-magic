@@ -374,6 +374,15 @@ export function PreviewExportStep({
             throw error;
           }
 
+          // Edge function may return { ok:false, error, error_category } for clean failures
+          // (e.g. AWS throttling) — surface them immediately instead of polling for 10 min.
+          if (data && data.ok === false) {
+            const friendly = /aborted|timeout/i.test(String(data.error || ''))
+              ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
+              : (data.error || t('uc.failed'));
+            throw new Error(friendly);
+          }
+
           // New webhook-based architecture: receive render_id, not output_url
           if (!data?.render_id) {
             throw new Error(t('uc.renderIdMissing'));

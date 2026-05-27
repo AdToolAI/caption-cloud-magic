@@ -144,6 +144,20 @@ serve(async (req) => {
     }
 
     // ============================================
+    // EARLY WAIT — no real render ID yet and just started
+    // Avoid expensive S3 listing/HEAD requests that would 403 anyway.
+    // ============================================
+    if (!realRenderId && elapsedSeconds < 30) {
+      console.log(`⏳ No real_render_id yet (${Math.round(elapsedSeconds)}s old) — returning early rendering status`);
+      return jsonResponse({
+        render_id: effectiveRenderId,
+        progress: { done: false, overallProgress: 0.05, progressSource: 'early-wait' },
+        status: 'rendering',
+        diagnostics: { trackingMode, realRenderId: null, elapsedSeconds: Math.round(elapsedSeconds), progressSource: 'early-wait' },
+      });
+    }
+
+    // ============================================
     // CHECK S3 FOR COMPLETED VIDEO
     // ============================================
     const foundUrl = await findVideoOnS3(aws, bucketName, realRenderId, outName, effectiveRenderId, supabaseAdmin, tableName, renderIdColumn, outputColumn, renderData);

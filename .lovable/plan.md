@@ -1,76 +1,36 @@
+## Root Cause
 
-## Problem
+Aus den Edge-Logs: `render-with-remotion` loggt `✅ Render start queued` und sofort danach `shutdown` — **`EdgeRuntime.waitUntil` wird auf Supabase Edge Functions nicht zuverlässig ausgeführt**. Der Worker stirbt, bevor der AWS-Lambda-Call passiert. Folge:
 
-Der Render schlägt jetzt sauber fehl (kein Hänger mehr!) mit:
-> AWS Concurrency limit reached (Original Error: Rate Exceeded.)
+- `real_remotion_render_id` wird nie in die DB geschrieben (DB-Row bleibt mit `real_id=null`).
+- `check-remotion-progress` fällt auf S3-Listing zurück → `ListObjects failed: 403`.
+- Lambda's getRenderProgress mit einer bogus ID läuft ins interne Timeout → DOMException **"The operation was aborted"** → landet als `progress.errors[0]` im Frontend-Toast.
 
-Das ist ein bekanntes Lambda-Verhalten: Wenn AWS zu viele parallele Invocations sieht (z.B. weil andere Renders im Konto laufen, oder Lambda gerade hochskaliert), wirft `renderMediaOnLambda` synchron `Rate Exceeded`. Aktuell behandeln wir das als finalen Fehler → Job failed, Credits refunded, User muss manuell neu starten.
+## Fix
 
-Laut Memory ([Deep Sweep Throttle Resilience](mem://features/qa-agent/deep-sweep-throttle-resilience)) haben wir diese Logik im QA-Agent bereits, aber **nicht im Production-Renderpfad** für Universal Creator.
+### 1. `supabase/functions/render-with-remotion/index.ts`
+- `EdgeRuntime.waitUntil(startRemotionRenderInBackground(...))` ersetzen durch **`await startRemotionRender(...)`**.
+- Retry-Backoffs kürzen auf `[2000, 5000, 10000]` ms (max 3 Retries, worst-case ~17 s — passt locker ins Edge-Budget von ~150 s, da der reine Lambda-Start nur 1–3 s dauert).
+- Response erst nach erfolgreichem Start zurückgeben, inkl. `real_remotion_render_id` im Body.
+- Bei `failRenderAndRefundOnce` zusätzlich `{ ok: false, error, error_category }` zurückgeben statt nur DB-Update.
 
-## Lösung
+### 2. `supabase/functions/check-remotion-progress/index.ts`
+- Wenn `real_id=null` UND `started_at` < 30 s alt → `status: 'rendering', progress: 0` zurückgeben (kein S3-Listing).
+- Lambda-getRenderProgress-Fetch in try/catch wrappen: bei AbortError/Timeout transient als `rendering` mit altem Progress zurückgeben — niemals als `failed`/`errors[]` propagieren.
 
-Retry mit exponentiellem Backoff in `render-with-remotion` (Background-Worker), **bevor** wir den Job als failed markieren und Credits refunden.
+### 3. `src/components/universal-creator/steps/PreviewExportStep.tsx`
+- `invoke('render-with-remotion')`-Response prüfen: bei `data.ok === false` oder thrown error den Job direkt auf `failed` setzen (kein 10-Min-Polling-Wait).
+- Bei Fehler-Texten die `/aborted|timeout/i` matchen → freundliche Toast: „AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten."
 
-### Plan
+### 4. Verifikation
+- `supabase--deploy_edge_functions` für beide Functions.
+- `curl_edge_functions` Mini-Render-Test → Response muss `real_remotion_render_id` enthalten.
+- DB: `content_config.real_remotion_render_id` ist gesetzt, `status='rendering'`.
 
-1. **`supabase/functions/render-with-remotion/index.ts`** — `startRemotionRenderInBackground`:
-   - Wrap des `renderMediaOnLambda`-Calls in einen Retry-Loop:
-     - Max 5 Versuche
-     - Backoff: 3s → 6s → 12s → 24s → 48s (mit ±20% Jitter)
-     - Retry nur bei Throttle-Mustern: `Rate Exceeded`, `TooManyRequestsException`, `ConcurrencyLimitExceeded`, `AWS Concurrency limit reached`, HTTP 429
-     - Alle anderen Fehler → sofort failen (kein blindes Retry)
-   - Während Retry: `video_renders.status` bleibt auf `rendering`, aber wir schreiben `error_message = "Warte auf AWS-Kapazität (Versuch X/5)…"` damit der User Feedback sieht
-   - Erst wenn alle 5 Versuche scheitern → `failRenderAndRefundOnce` mit klarer Meldung "AWS-Kapazität dauerhaft erschöpft, bitte später erneut versuchen"
+## Geänderte Dateien
+- `supabase/functions/render-with-remotion/index.ts`
+- `supabase/functions/check-remotion-progress/index.ts`
+- `src/components/universal-creator/steps/PreviewExportStep.tsx`
 
-2. **`src/components/universal-creator/steps/PreviewExportStep.tsx`** — Anzeige:
-   - Wenn `error_message` mit "Warte auf AWS-Kapazität" beginnt, das **nicht** als Fehler darstellen, sondern als gelben "Retry läuft…" Hinweis (Spinner statt rotes X)
-   - Polling-Timeout pro Job von 6 min auf **10 min** erhöhen, damit die volle Retry-Kette (max ~93s Backoff + Render) reinpasst
-
-3. **`supabase/functions/check-remotion-progress/index.ts`** — Timeout-Schutz:
-   - `UNIVERSAL_CREATOR_TIMEOUT_SECONDS` von 360 → 600 (10 min), passt zu Frontend
-
-4. **Deploy & Test**
-   - `render-with-remotion` und `check-remotion-progress` deployen
-   - User testet erneut → Erwartung: entweder erfolgreicher Render nach 1-2 Retries, oder klare Meldung nach 10 min mit Refund
-
-### Was wir NICHT ändern
-
-- Lambda-Concurrency-Konfiguration in AWS (nicht im Code-Scope)
-- Andere Renderpfade (Director's Cut, Composer) — können in Folge-Loop nachgezogen werden, falls gewünscht
-
-## Technische Details
-
-**Retry-Helper** (neu in `render-with-remotion/index.ts`):
-```ts
-const THROTTLE_PATTERNS = [
-  /rate exceeded/i,
-  /toomanyrequests/i,
-  /concurrencylimitexceeded/i,
-  /aws concurrency limit/i,
-  /\b429\b/,
-];
-
-async function invokeLambdaWithRetry(payload, renderId, supabase) {
-  const delays = [3000, 6000, 12000, 24000, 48000];
-  let lastError;
-  for (let attempt = 0; attempt < delays.length; attempt++) {
-    try {
-      return await renderMediaOnLambda(payload);
-    } catch (e) {
-      const msg = String(e?.message ?? e);
-      const throttled = THROTTLE_PATTERNS.some(rx => rx.test(msg));
-      if (!throttled || attempt === delays.length - 1) throw e;
-      lastError = e;
-      await supabase.from('video_renders').update({
-        error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 2}/5)…`,
-      }).eq('id', renderId);
-      const jitter = 1 + (Math.random() * 0.4 - 0.2);
-      await new Promise(r => setTimeout(r, delays[attempt] * jitter));
-    }
-  }
-  throw lastError;
-}
-```
-
-Aufruf-Site ersetzt den direkten `renderMediaOnLambda(...)` durch `invokeLambdaWithRetry(...)`.
+## Risiken
+Der HTTP-Request zum Edge-Function blockiert jetzt bis Lambda den Start akzeptiert (typ. 2–5 s, bei Throttle bis ~20 s). Das ist deutlich besser als der bisherige stille Fehlschlag.
