@@ -353,7 +353,14 @@ async function findVideoOnS3(
 
       try {
         const listResp = await aws.fetch(listUrl, { method: 'GET' });
-        if (!listResp.ok) { console.log('⚠️ ListObjects failed:', listResp.status); break; }
+        if (!listResp.ok) {
+          // 403 is expected when the bucket policy doesn't allow ListObjects for this role —
+          // HEAD/Webhook paths handle the happy case. Stay silent to avoid log noise.
+          if (listResp.status !== 403) {
+            console.log('⚠️ ListObjects failed:', listResp.status);
+          }
+          break;
+        }
 
         const xml = await listResp.text();
         pagesScanned++;
