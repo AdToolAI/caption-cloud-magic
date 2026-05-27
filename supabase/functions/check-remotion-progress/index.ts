@@ -157,6 +157,7 @@ serve(async (req) => {
     let estimatedProgress = 0.15;
     let progressSource = 'default';
 
+    let sawProgressArtifact = false;
     try {
       // Try real render ID first, then pending render ID
       const idsToTry = [realRenderId, effectiveRenderId].filter(Boolean);
@@ -166,6 +167,7 @@ serve(async (req) => {
         const progressUrl = `https://${bucketName}.s3.${AWS_REGION}.amazonaws.com/renders/${id}/progress.json`;
         const resp = await aws.fetch(progressUrl, { method: 'GET' });
         if (resp.ok) {
+          sawProgressArtifact = true;
           progressJson = await resp.json();
           console.log(`✅ Found progress.json via id=${id}`);
           break;
@@ -195,9 +197,7 @@ serve(async (req) => {
             content_config: { ...existingCfg, error_category: errorCategory },
           }).eq(renderIdColumn, effectiveRenderId);
 
-          if (cc.credits_used && renderData?.user_id) {
-            try { await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: cc.credits_used }); } catch {}
-          }
+          await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, cc);
 
           return jsonResponse({
             render_id: effectiveRenderId,
@@ -227,6 +227,23 @@ serve(async (req) => {
       }
     } catch (e) {
       console.log('⚠️ progress.json check error:', e);
+    }
+
+    if (!isDirectorsCut && elapsedSeconds > effectiveTimeoutSeconds && !realRenderId && !sawProgressArtifact) {
+      const existingCfg = (renderData?.content_config as any) || {};
+      const message = 'Render konnte nicht gestartet werden: Es kam kein Lambda-Status und kein Webhook zurück.';
+      await supabaseAdmin.from(tableName).update({
+        status: 'failed',
+        error_message: message,
+        completed_at: new Date().toISOString(),
+        content_config: { ...existingCfg, error_category: 'start_failed' },
+      }).eq(renderIdColumn, effectiveRenderId);
+      await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, existingCfg);
+      return jsonResponse({
+        render_id: effectiveRenderId,
+        progress: { done: false, fatalErrorEncountered: true, errors: [message], overallProgress: 0, errorCategory: 'start_failed' },
+        status: 'failed',
+      });
     }
 
     // ============================================
