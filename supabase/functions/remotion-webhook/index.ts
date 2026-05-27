@@ -468,13 +468,12 @@ serve(async (req) => {
       const classifyError = (msg: string): 'rate_limit' | 'lambda_crash' | 'validation' | 'timeout' | 'audio_corruption' | 'unknown' => {
         const lower = msg.toLowerCase();
         if (/rate exceeded|concurrency limit|throttl/i.test(lower)) return 'rate_limit';
-        // r33: Audio corruption detection — ffprobe crashes on corrupt MP3/audio files
         if (/ffprobe.*failed|ffprobe.*exit code|invalid data found.*processing input|failed to find.*mpeg audio|not a valid audio/i.test(lower)) return 'audio_corruption';
-        // r32: Lottie stall detection — BEFORE generic lambda_crash to avoid false positives
         if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(lower)) return 'lambda_crash';
         if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(lower)) return 'lambda_crash';
         if (/codec|preset|framerange|invalid|schema|zod/i.test(lower)) return 'validation';
-        // r32: Only classify as timeout from webhook type, not from string matching (avoid docs links)
+        // Remote-media abort / streaming abort during Lambda runtime
+        if (/the operation was aborted|aborterror|createasynciterator|node:internal\/streams/i.test(lower)) return 'lambda_crash';
         if (type === 'timeout') return 'timeout';
         return 'unknown';
       };
@@ -567,28 +566,35 @@ serve(async (req) => {
 
         // ✅ FORENSICS: Read existing content_config to preserve + augment
         const { data: existingRow } = await supabaseAdmin.from('video_renders')
-          .select('content_config').eq('render_id', matchedId).maybeSingle();
+          .select('content_config, status').eq('render_id', matchedId).maybeSingle();
         const existingCfg = (existingRow?.content_config as any) || {};
+        const alreadyRefunded = existingCfg.credit_refund_done === true;
+        const alreadyCompleted = existingRow?.status === 'completed';
 
-        await supabaseAdmin.from('video_renders').update({
-          status: 'failed',
-          error_message: errorMessage,
-          completed_at: new Date().toISOString(),
-          content_config: {
-            ...existingCfg,
-            lambda_error_full: lambdaErrorFull,
-            error_fingerprint: errorFingerprint,
-            error_category: errorCategory, // ✅ NEW: structured category
-            webhook_error_type: type,
-            webhook_received_at: new Date().toISOString(),
-            webhook_render_id: renderId,
-            // r42: failure_stage for isolation diagnostics
-            failure_stage: 'lambda-runtime',
-          },
-        }).eq('render_id', matchedId);
+        if (!alreadyCompleted) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'failed',
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+            content_config: {
+              ...existingCfg,
+              lambda_error_full: lambdaErrorFull,
+              error_fingerprint: errorFingerprint,
+              error_category: errorCategory,
+              webhook_error_type: type,
+              webhook_received_at: new Date().toISOString(),
+              webhook_render_id: renderId,
+              failure_stage: 'lambda-runtime',
+              credit_refund_done: alreadyRefunded || (creditsUsed && userId ? true : alreadyRefunded),
+            },
+          }).eq('render_id', matchedId);
+        }
 
-        if (creditsUsed && userId) {
+        if (creditsUsed && userId && !alreadyRefunded && !alreadyCompleted) {
           await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: creditsUsed });
+          console.log(`💰 Refunded ${creditsUsed} credits for failed render ${matchedId}`);
+        } else if (alreadyRefunded) {
+          console.log(`💰 Skip refund — already refunded for ${matchedId}`);
         }
 
         // Composer project failure
