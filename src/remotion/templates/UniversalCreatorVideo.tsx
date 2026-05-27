@@ -2698,7 +2698,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ BUNDLE CANARY: Proves which bundle version is running in Lambda
   if (frame === 0) {
-    console.error('UCV_BUNDLE_CANARY=2026-03-18-r60-phase9-10-cinematic');
+    console.log('UCV_BUNDLE_CANARY=2026-03-18-r60-phase9-10-cinematic');
   }
   
   // ✅ DIAGNOSTIC TOGGLES: Read from props (passed via `diag` schema field)
@@ -2719,13 +2719,13 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
   
   // ✅ Log effective diag toggles on first frame for CloudWatch forensics
   if (frame === 0) {
-    console.error('[DIAG_TOGGLES_EFFECTIVE]', JSON.stringify(diagToggles));
-    console.error('[DIAG_PROFILE]', rawDiag?.diagnosticProfile || 'unknown');
+    console.log('[DIAG_TOGGLES_EFFECTIVE]', JSON.stringify(diagToggles));
+    console.log('[DIAG_PROFILE]', rawDiag?.diagnosticProfile || 'unknown');
   }
   
   // ✅ CRITICAL: Always log to CloudWatch for debugging
   if (frame === 0 || frame === 1) {
-    console.error('[UniversalCreatorVideo RENDER START]', JSON.stringify({
+    console.log('[UniversalCreatorVideo RENDER START]', JSON.stringify({
       fps,
       durationInFrames,
       width,
