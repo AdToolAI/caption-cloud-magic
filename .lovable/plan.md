@@ -1,44 +1,76 @@
-Do I know what the issue is? Yes.
 
-The hosted backend is healthy. The current render rows show the real problem: `render-with-remotion` creates `video_renders` rows like `pending-...`, Lambda accepts the async invocation with HTTP 202, but no `remotion-webhook` request arrives and `real_remotion_render_id` stays empty. Because the frontend now only polls the database row, it keeps seeing `status='rendering'` forever instead of forcing reconciliation or failure.
+## Problem
 
-## Plan
+Der Render schlägt jetzt sauber fehl (kein Hänger mehr!) mit:
+> AWS Concurrency limit reached (Original Error: Rate Exceeded.)
 
-1. **Clean up the stuck renders now**
-   - Mark the currently stuck Universal Creator `video_renders` rows as `failed` with a clear timeout/start-failure message.
-   - Refund credits idempotently so the same failed row cannot refund twice.
-   - Leave unrelated active render types, like the very recent dialog-stitch row, untouched unless they are stale and clearly orphaned.
+Das ist ein bekanntes Lambda-Verhalten: Wenn AWS zu viele parallele Invocations sieht (z.B. weil andere Renders im Konto laufen, oder Lambda gerade hochskaliert), wirft `renderMediaOnLambda` synchron `Rate Exceeded`. Aktuell behandeln wir das als finalen Fehler → Job failed, Credits refunded, User muss manuell neu starten.
 
-2. **Make `render-with-remotion` non-sticky**
-   - Store reliable tracking metadata on every render row: `lambda_invoked_at`, `tracking_mode`, `bucket_name`, `out_name`, `credits_used`, and an idempotent refund marker.
-   - Explicitly pass `bucketName` and deterministic `outName` into the Remotion Lambda payload instead of leaving `bucketName: null`.
-   - Keep the quick return behavior, but treat “Lambda accepted” only as “start requested”, not proof that Remotion is actually rendering.
+Laut Memory ([Deep Sweep Throttle Resilience](mem://features/qa-agent/deep-sweep-throttle-resilience)) haben wir diese Logik im QA-Agent bereits, aber **nicht im Production-Renderpfad** für Universal Creator.
 
-3. **Make progress polling authoritative again**
-   - Change the Universal Creator polling to call `check-remotion-progress` for active render IDs instead of only reading `video_renders`.
-   - Use the function response to update UI progress, completed URL, or failure message.
-   - Keep realtime as a fast path, but polling must be able to recover a completed S3 output or fail/refund a dead job.
+## Lösung
 
-4. **Harden `check-remotion-progress`**
-   - For Universal Creator rows with no real Remotion render ID, no progress file, and no webhook after a short grace period, mark them failed with “Render konnte nicht gestartet werden”.
-   - Keep a hard timeout around 6 minutes for short Universal Creator renders and persist the failure in the database.
-   - Refund credits only once using the stored refund marker.
+Retry mit exponentiellem Backoff in `render-with-remotion` (Background-Worker), **bevor** wir den Job als failed markieren und Credits refunden.
 
-5. **Improve the UI state**
-   - Add per-job `startedAt` tracking so the timeout cannot reset on rerender/reload.
-   - Replace the endless “Rendering läuft…” message with progress from the backend and a visible failure state when the backend marks the render failed.
-   - Unlock the render button after all jobs complete or fail.
+### Plan
 
-6. **Deploy and validate**
-   - Deploy `render-with-remotion` and `check-remotion-progress` after changes.
-   - Verify logs show new render rows receiving tracking metadata.
-   - Verify a stuck render becomes `failed` with refunded credits instead of spinning indefinitely.
-   - Verify a successful render becomes `completed` with a download URL via webhook or S3 reconciliation.
+1. **`supabase/functions/render-with-remotion/index.ts`** — `startRemotionRenderInBackground`:
+   - Wrap des `renderMediaOnLambda`-Calls in einen Retry-Loop:
+     - Max 5 Versuche
+     - Backoff: 3s → 6s → 12s → 24s → 48s (mit ±20% Jitter)
+     - Retry nur bei Throttle-Mustern: `Rate Exceeded`, `TooManyRequestsException`, `ConcurrencyLimitExceeded`, `AWS Concurrency limit reached`, HTTP 429
+     - Alle anderen Fehler → sofort failen (kein blindes Retry)
+   - Während Retry: `video_renders.status` bleibt auf `rendering`, aber wir schreiben `error_message = "Warte auf AWS-Kapazität (Versuch X/5)…"` damit der User Feedback sieht
+   - Erst wenn alle 5 Versuche scheitern → `failRenderAndRefundOnce` mit klarer Meldung "AWS-Kapazität dauerhaft erschöpft, bitte später erneut versuchen"
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+2. **`src/components/universal-creator/steps/PreviewExportStep.tsx`** — Anzeige:
+   - Wenn `error_message` mit "Warte auf AWS-Kapazität" beginnt, das **nicht** als Fehler darstellen, sondern als gelben "Retry läuft…" Hinweis (Spinner statt rotes X)
+   - Polling-Timeout pro Job von 6 min auf **10 min** erhöhen, damit die volle Retry-Kette (max ~93s Backoff + Render) reinpasst
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+3. **`supabase/functions/check-remotion-progress/index.ts`** — Timeout-Schutz:
+   - `UNIVERSAL_CREATOR_TIMEOUT_SECONDS` von 360 → 600 (10 min), passt zu Frontend
+
+4. **Deploy & Test**
+   - `render-with-remotion` und `check-remotion-progress` deployen
+   - User testet erneut → Erwartung: entweder erfolgreicher Render nach 1-2 Retries, oder klare Meldung nach 10 min mit Refund
+
+### Was wir NICHT ändern
+
+- Lambda-Concurrency-Konfiguration in AWS (nicht im Code-Scope)
+- Andere Renderpfade (Director's Cut, Composer) — können in Folge-Loop nachgezogen werden, falls gewünscht
+
+## Technische Details
+
+**Retry-Helper** (neu in `render-with-remotion/index.ts`):
+```ts
+const THROTTLE_PATTERNS = [
+  /rate exceeded/i,
+  /toomanyrequests/i,
+  /concurrencylimitexceeded/i,
+  /aws concurrency limit/i,
+  /\b429\b/,
+];
+
+async function invokeLambdaWithRetry(payload, renderId, supabase) {
+  const delays = [3000, 6000, 12000, 24000, 48000];
+  let lastError;
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    try {
+      return await renderMediaOnLambda(payload);
+    } catch (e) {
+      const msg = String(e?.message ?? e);
+      const throttled = THROTTLE_PATTERNS.some(rx => rx.test(msg));
+      if (!throttled || attempt === delays.length - 1) throw e;
+      lastError = e;
+      await supabase.from('video_renders').update({
+        error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 2}/5)…`,
+      }).eq('id', renderId);
+      const jitter = 1 + (Math.random() * 0.4 - 0.2);
+      await new Promise(r => setTimeout(r, delays[attempt] * jitter));
+    }
+  }
+  throw lastError;
+}
+```
+
+Aufruf-Site ersetzt den direkten `renderMediaOnLambda(...)` durch `invokeLambdaWithRetry(...)`.

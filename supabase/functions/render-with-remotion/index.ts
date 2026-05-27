@@ -74,6 +74,20 @@ async function failRenderAndRefundOnce(params: {
     .eq('render_id', pendingRenderId);
 }
 
+const THROTTLE_PATTERNS = [
+  /rate exceeded/i,
+  /toomanyrequests/i,
+  /concurrencylimitexceeded/i,
+  /aws concurrency limit/i,
+  /throttl/i,
+];
+
+function isThrottleSignal(status: number, body: string): boolean {
+  if (status === 429) return true;
+  if (status >= 500 && /rate|throttl|concurrency/i.test(body)) return true;
+  return THROTTLE_PATTERNS.some((rx) => rx.test(body));
+}
+
 async function startRemotionRenderInBackground(params: {
   aws: any;
   lambdaUrl: string;
@@ -86,82 +100,131 @@ async function startRemotionRenderInBackground(params: {
   outName: string;
 }) {
   const { aws, lambdaUrl, asciiSafeJson, pendingRenderId, userId, creditsRequired, supabaseAdmin, bucketName, outName } = params;
-  try {
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: asciiSafeJson,
-    });
-    const lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
-    const responseText = await lambdaResponse.text().catch(() => '');
-    console.log('📥 Lambda start response:', lambdaResponse.status, 'requestId:', lambdaRequestId, 'body:', responseText.substring(0, 500));
 
-    if (!lambdaResponse.ok) {
-      await failRenderAndRefundOnce({
-        supabaseAdmin,
-        pendingRenderId,
-        userId,
-        creditsRequired,
-        message: `Lambda-Start fehlgeschlagen (${lambdaResponse.status}): ${responseText || 'Keine Antwort'}`,
-        category: lambdaResponse.status === 429 ? 'rate_limit' : 'lambda_start_failed',
-        extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background' },
+  // Backoff schedule for AWS throttle responses (Rate Exceeded / 429).
+  // Total worst-case wait ≈ 3+8+20+40 = 71s, within the 10 min frontend budget.
+  const BACKOFFS_MS = [3000, 8000, 20000, 40000];
+  const MAX_ATTEMPTS = BACKOFFS_MS.length + 1; // 5 total attempts
+
+  let lastError: { status: number; body: string } | null = null;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const lambdaResponse = await aws.fetch(lambdaUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: asciiSafeJson,
       });
-      return;
-    }
+      const lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
+      const responseText = await lambdaResponse.text().catch(() => '');
+      console.log(`📥 Lambda start response (attempt ${attempt}/${MAX_ATTEMPTS}):`, lambdaResponse.status, 'requestId:', lambdaRequestId, 'body:', responseText.substring(0, 500));
 
-    let parsed: any = null;
-    try { parsed = responseText ? JSON.parse(responseText) : null; } catch { parsed = null; }
-    const realRenderId = parsed?.renderId || null;
-    if (!realRenderId) {
-      await failRenderAndRefundOnce({
-        supabaseAdmin,
-        pendingRenderId,
-        userId,
-        creditsRequired,
-        message: `Lambda-Start lieferte keine Render-ID zurück: ${responseText.substring(0, 500) || 'Leere Antwort'}`,
-        category: 'lambda_start_failed',
-        extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background_no_render_id' },
-      });
-      return;
-    }
+      if (!lambdaResponse.ok) {
+        const throttled = isThrottleSignal(lambdaResponse.status, responseText);
+        if (throttled && attempt < MAX_ATTEMPTS) {
+          const wait = BACKOFFS_MS[attempt - 1];
+          console.warn(`⏳ Lambda throttled (${lambdaResponse.status}). Retry ${attempt + 1}/${MAX_ATTEMPTS} in ${wait}ms`);
+          await supabaseAdmin
+            .from('video_renders')
+            .update({ error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 1}/${MAX_ATTEMPTS})…` })
+            .eq('render_id', pendingRenderId);
+          lastError = { status: lambdaResponse.status, body: responseText };
+          await new Promise((r) => setTimeout(r, wait));
+          continue;
+        }
+        await failRenderAndRefundOnce({
+          supabaseAdmin,
+          pendingRenderId,
+          userId,
+          creditsRequired,
+          message: `Lambda-Start fehlgeschlagen (${lambdaResponse.status}): ${responseText || 'Keine Antwort'}`,
+          category: lambdaResponse.status === 429 || throttled ? 'rate_limit' : 'lambda_start_failed',
+          extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background', retry_attempts: attempt },
+        });
+        return;
+      }
 
-    const { data: current } = await supabaseAdmin
-      .from('video_renders')
-      .select('status, content_config')
-      .eq('render_id', pendingRenderId)
-      .maybeSingle();
-    if (current?.status === 'completed') return;
-    const existingConfig = (current?.content_config as any) || {};
-    await supabaseAdmin
-      .from('video_renders')
-      .update({
-        status: 'rendering',
-        bucket_name: bucketName,
-        content_config: {
-          ...existingConfig,
-          real_remotion_render_id: realRenderId,
-          lambda_render_id: pendingRenderId,
-          lambda_request_id: lambdaRequestId,
-          lambda_function: LAMBDA_FUNCTION_NAME,
-          lambda_accepted: true,
-          tracking_mode: 'request_response_background',
+      let parsed: any = null;
+      try { parsed = responseText ? JSON.parse(responseText) : null; } catch { parsed = null; }
+      const realRenderId = parsed?.renderId || null;
+      if (!realRenderId) {
+        await failRenderAndRefundOnce({
+          supabaseAdmin,
+          pendingRenderId,
+          userId,
+          creditsRequired,
+          message: `Lambda-Start lieferte keine Render-ID zurück: ${responseText.substring(0, 500) || 'Leere Antwort'}`,
+          category: 'lambda_start_failed',
+          extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background_no_render_id' },
+        });
+        return;
+      }
+
+      const { data: current } = await supabaseAdmin
+        .from('video_renders')
+        .select('status, content_config')
+        .eq('render_id', pendingRenderId)
+        .maybeSingle();
+      if (current?.status === 'completed') return;
+      const existingConfig = (current?.content_config as any) || {};
+      await supabaseAdmin
+        .from('video_renders')
+        .update({
+          status: 'rendering',
           bucket_name: bucketName,
-          out_name: outName,
-        },
-      })
-      .eq('render_id', pendingRenderId);
-    console.log(`✅ Stored real Remotion render ID ${realRenderId} for ${pendingRenderId}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown Lambda start error';
-    console.error('❌ Background Lambda start failed:', error);
+          error_message: null,
+          content_config: {
+            ...existingConfig,
+            real_remotion_render_id: realRenderId,
+            lambda_render_id: pendingRenderId,
+            lambda_request_id: lambdaRequestId,
+            lambda_function: LAMBDA_FUNCTION_NAME,
+            lambda_accepted: true,
+            tracking_mode: 'request_response_background',
+            bucket_name: bucketName,
+            out_name: outName,
+            retry_attempts: attempt,
+          },
+        })
+        .eq('render_id', pendingRenderId);
+      console.log(`✅ Stored real Remotion render ID ${realRenderId} for ${pendingRenderId} (attempt ${attempt})`);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown Lambda start error';
+      const throttled = THROTTLE_PATTERNS.some((rx) => rx.test(message));
+      console.error(`❌ Background Lambda start failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, error);
+      if (throttled && attempt < MAX_ATTEMPTS) {
+        const wait = BACKOFFS_MS[attempt - 1];
+        await supabaseAdmin
+          .from('video_renders')
+          .update({ error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 1}/${MAX_ATTEMPTS})…` })
+          .eq('render_id', pendingRenderId);
+        await new Promise((r) => setTimeout(r, wait));
+        continue;
+      }
+      await failRenderAndRefundOnce({
+        supabaseAdmin,
+        pendingRenderId,
+        userId,
+        creditsRequired,
+        message: `Lambda-Start Ausnahme: ${message}`,
+        category: /timeout|idle/i.test(message) ? 'timeout' : (throttled ? 'rate_limit' : 'lambda_start_failed'),
+        extraConfig: { lambda_error: message.substring(0, 1000), tracking_mode: 'request_response_background_exception', retry_attempts: attempt },
+      });
+      return;
+    }
+  }
+
+  // Should not reach here, but guard anyway
+  if (lastError) {
     await failRenderAndRefundOnce({
       supabaseAdmin,
       pendingRenderId,
       userId,
       creditsRequired,
-      message: `Lambda-Start Ausnahme: ${message}`,
-      category: /timeout|idle/i.test(message) ? 'timeout' : 'lambda_start_failed',
-      extraConfig: { lambda_error: message.substring(0, 1000), tracking_mode: 'request_response_background_exception' },
+      message: `AWS-Kapazität dauerhaft erschöpft nach ${MAX_ATTEMPTS} Versuchen. Bitte später erneut versuchen.`,
+      category: 'rate_limit',
+      extraConfig: { lambda_error: lastError.body.substring(0, 1000), tracking_mode: 'request_response_background', retry_attempts: MAX_ATTEMPTS },
     });
   }
 }

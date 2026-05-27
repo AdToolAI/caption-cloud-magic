@@ -145,7 +145,7 @@ export function PreviewExportStep({
       .subscribe();
 
     // Authoritative progress poll: checks DB + S3 reconciliation + server-side timeout/refund
-    const HARD_TIMEOUT_MS = 6 * 60 * 1000; // 6 Minuten
+    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minuten — passt zur AWS-Retry-Backoff-Kette
 
     const pollDbStatus = async () => {
       try {
@@ -186,7 +186,7 @@ export function PreviewExportStep({
           const timedOut = updated.map(j => {
             const startedAt = j.startedAt || Date.now();
             if (j.status === 'rendering' && Date.now() - startedAt > HARD_TIMEOUT_MS) {
-              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>6 Min). Bitte erneut versuchen.' };
+              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>10 Min). Bitte erneut versuchen.' };
             }
             return j;
           });

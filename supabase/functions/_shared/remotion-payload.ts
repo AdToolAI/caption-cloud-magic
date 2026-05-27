@@ -306,7 +306,10 @@ export function normalizeStartPayload(partial: Record<string, unknown>): Normali
   if (partial.width != null) normalized.width = partial.width as number;
   if (partial.outName != null) normalized.outName = partial.outName as string;
   if (partial.jpegQuality != null) normalized.jpegQuality = partial.jpegQuality as number;
-  if (partial.maxRetries != null) normalized.maxRetries = partial.maxRetries as number;
+  // Default to 3 internal retries so Remotion auto-recovers from transient
+  // AWS sub-Lambda throttles ("Rate Exceeded" / ConcurrencyLimitExceeded)
+  // before surfacing a fatal error to the user.
+  normalized.maxRetries = (partial.maxRetries as number | undefined) ?? 3;
 
   return normalized;
 }
