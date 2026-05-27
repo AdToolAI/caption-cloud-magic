@@ -357,6 +357,8 @@ serve(async (req) => {
     // ============================================
     
     const pendingRenderId = `pending-${crypto.randomUUID()}`;
+    const outName = `${pendingRenderId}.mp4`;
+    const lambdaInvokedAt = new Date().toISOString();
     const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
     
     console.log('🆔 Generated pendingRenderId:', pendingRenderId);
@@ -389,6 +391,8 @@ serve(async (req) => {
       timeoutInMilliseconds: 300000,
       
       // Output
+      bucketName,
+      outName,
       privacy: 'public',
       
       // Webhook
@@ -400,6 +404,7 @@ serve(async (req) => {
           user_id: userId,
           project_id: project_id,
           credits_used: credits_required,
+          out_name: outName,
           // Allow callers (e.g. render-long-form-video) to override the source
           // so the webhook can route the result back to the right table.
           source: (customizations as any)?.source || 'universal-creator',
@@ -431,6 +436,11 @@ serve(async (req) => {
         content_config: {
           ...customizations,
           credits_used: credits_required,
+          credit_refund_done: false,
+          lambda_invoked_at: lambdaInvokedAt,
+          tracking_mode: 'async-event-with-outname',
+          bucket_name: bucketName,
+          out_name: outName,
         },
         subtitle_config: {},
         status: 'rendering',

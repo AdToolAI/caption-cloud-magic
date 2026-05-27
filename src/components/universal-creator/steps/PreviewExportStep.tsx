@@ -37,6 +37,7 @@ interface RenderJob {
   downloadUrl?: string;
   error?: string;
   renderId?: string; // For realtime tracking
+  startedAt?: number;
 }
 
 export function PreviewExportStep({
@@ -64,11 +65,13 @@ export function PreviewExportStep({
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
 
   // Extract active render IDs to prevent infinite loop
-  const activeRenderIds = useMemo(
-    () => renderJobs
-      .filter(j => j.status === 'rendering' && j.renderId)
-      .map(j => j.renderId!),
+  const activeRenderJobs = useMemo(
+    () => renderJobs.filter(j => j.status === 'rendering' && j.renderId),
     [renderJobs]
+  );
+  const activeRenderIds = useMemo(
+    () => activeRenderJobs.map(j => j.renderId!),
+    [activeRenderJobs]
   );
 
   // Realtime subscription for render updates with aggressive fallback polling
@@ -141,45 +144,52 @@ export function PreviewExportStep({
       )
       .subscribe();
 
-    // Direct DB poll as fallback (in case Realtime misses an update)
-    const renderStartedAt = Date.now();
+    // Authoritative progress poll: checks DB + S3 reconciliation + server-side timeout/refund
     const HARD_TIMEOUT_MS = 6 * 60 * 1000; // 6 Minuten
 
     const pollDbStatus = async () => {
       try {
-        const { data, error } = await supabase
-          .from('video_renders')
-          .select('render_id, status, video_url, error_message')
-          .in('render_id', activeRenderIds);
-
-        if (error) {
-          console.error('DB poll error:', error);
-          return;
-        }
-        if (!data) return;
+        const progressResults = await Promise.all(
+          activeRenderJobs.map(async (job) => {
+            const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
+              body: { render_id: job.renderId, source: 'universal-creator' },
+            });
+            if (error) throw error;
+            return { jobId: job.id, renderId: job.renderId, startedAt: job.startedAt, data };
+          })
+        );
 
         setRenderJobs(prev => {
           const updated = prev.map(j => {
-            const row = data.find((r: any) => r.render_id === j.renderId);
-            if (!row || j.status !== 'rendering') return j;
-            if (row.status === 'completed' && row.video_url) {
+            const result = progressResults.find(r => r.renderId === j.renderId);
+            if (!result || j.status !== 'rendering') return j;
+            const progress = result.data?.progress || {};
+
+            if (result.data?.status === 'completed' && progress.outputFile) {
               toast.success(t('uc.renderCompleted', { platform: j.format.platform }));
-              return { ...j, status: 'completed' as const, progress: 100, downloadUrl: row.video_url };
+              return { ...j, status: 'completed' as const, progress: 100, downloadUrl: progress.outputFile };
             }
-            if (row.status === 'failed') {
+
+            if (result.data?.status === 'failed' || progress.fatalErrorEncountered) {
+              const errorMessage = progress.errors?.[0] || result.data?.error || t('uc.failed');
               toast.error(t('uc.renderFailed', { platform: j.format.platform }));
-              return { ...j, status: 'failed' as const, error: row.error_message || t('uc.failed') };
+              return { ...j, status: 'failed' as const, progress: 0, error: errorMessage };
             }
-            return j;
+
+            const nextProgress = typeof progress.overallProgress === 'number'
+              ? Math.max(j.progress, Math.min(92, Math.round(progress.overallProgress * 100)))
+              : j.progress;
+            return { ...j, progress: nextProgress };
           });
 
           // Hard-timeout: nach 6 Minuten als failed markieren
-          const elapsed = Date.now() - renderStartedAt;
-          const timedOut = elapsed > HARD_TIMEOUT_MS
-            ? updated.map(j => j.status === 'rendering'
-                ? { ...j, status: 'failed' as const, error: 'Render-Timeout (>6 Min). Bitte erneut versuchen.' }
-                : j)
-            : updated;
+          const timedOut = updated.map(j => {
+            const startedAt = j.startedAt || Date.now();
+            if (j.status === 'rendering' && Date.now() - startedAt > HARD_TIMEOUT_MS) {
+              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>6 Min). Bitte erneut versuchen.' };
+            }
+            return j;
+          });
 
           const allDone = timedOut.every(j => j.status === 'completed' || j.status === 'failed');
           if (allDone && reservationId) {
@@ -381,6 +391,7 @@ export function PreviewExportStep({
                     status: 'rendering',
                     progress: 20,
                     renderId: data.render_id,
+                    startedAt: Date.now(),
                   }
                 : j
             )
