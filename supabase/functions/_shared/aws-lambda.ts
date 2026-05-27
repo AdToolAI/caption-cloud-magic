@@ -3,7 +3,7 @@
  * All render edge functions must use this instead of local getLambdaFunctionName().
  */
 
-const DEFAULT_LAMBDA_FUNCTION = 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
+const DEFAULT_LAMBDA_FUNCTION = 'remotion-render-4-0-462-mem3008mb-disk10240mb-600sec';
 
 /**
  * Resolves the Lambda function name from REMOTION_LAMBDA_FUNCTION_ARN secret.
