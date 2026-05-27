@@ -15,6 +15,7 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { extractFunctionsError } from '@/lib/functionsError';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
