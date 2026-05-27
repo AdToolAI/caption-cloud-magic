@@ -145,7 +145,7 @@ export function PreviewExportStep({
       .subscribe();
 
     // Authoritative progress poll: checks DB + S3 reconciliation + server-side timeout/refund
-    const HARD_TIMEOUT_MS = 6 * 60 * 1000; // 6 Minuten
+    const HARD_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minuten — passt zur AWS-Retry-Backoff-Kette
 
     const pollDbStatus = async () => {
       try {
