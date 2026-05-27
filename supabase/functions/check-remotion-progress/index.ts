@@ -10,6 +10,7 @@ const corsHeaders = {
 const AWS_REGION = 'eu-central-1';
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 const RENDER_TIMEOUT_SECONDS = 720; // 12 min
+const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 360; // 6 min for short UCC exports
 const MAX_RECONCILIATION_PAGES = 20; // max 20 pages × 200 keys = 4000 keys
 
 serve(async (req) => {
@@ -88,7 +89,11 @@ serve(async (req) => {
     const timeoutAnchor = lambdaInvokedAt || createdAt;
     const elapsedSeconds = (Date.now() - timeoutAnchor) / 1000;
 
-    if (elapsedSeconds > RENDER_TIMEOUT_SECONDS) {
+    const effectiveTimeoutSeconds = !isDirectorsCut && cc?.source !== 'composer'
+      ? UNIVERSAL_CREATOR_TIMEOUT_SECONDS
+      : RENDER_TIMEOUT_SECONDS;
+
+    if (elapsedSeconds > effectiveTimeoutSeconds) {
       console.log(`⏰ TIMEOUT after ${Math.round(elapsedSeconds)}s, last-resort S3 search...`);
       const recoveredUrl = await findVideoOnS3(aws, bucketName, realRenderId, outName, effectiveRenderId, supabaseAdmin, tableName, renderIdColumn, outputColumn, renderData);
       if (recoveredUrl) {
@@ -99,7 +104,7 @@ serve(async (req) => {
       const existingCfgTimeout = (renderData?.content_config as any) || {};
       await supabaseAdmin.from(tableName).update({
         status: 'failed',
-        error_message: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Minuten. tracking_mode=${trackingMode}, real_id=${realRenderId || 'none'}`,
+        error_message: `Render-Timeout nach ${Math.round(effectiveTimeoutSeconds / 60)} Minuten. tracking_mode=${trackingMode}, real_id=${realRenderId || 'none'}`,
         content_config: { ...existingCfgTimeout, error_category: 'timeout' },
       }).eq(renderIdColumn, effectiveRenderId);
 
@@ -115,11 +120,11 @@ serve(async (req) => {
           const existingRd = (progressRows[0].result_data as any) || {};
           await supabaseAdmin.from('universal_video_progress').update({
             current_step: 'failed', status: 'failed', progress_percent: 0,
-            status_message: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min. Mode: ${trackingMode}`,
+            status_message: `Render-Timeout nach ${Math.round(effectiveTimeoutSeconds / 60)} Min. Mode: ${trackingMode}`,
             result_data: {
               ...existingRd,
               errorCategory: 'timeout',
-              errorMessage: `Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min.`,
+              errorMessage: `Render-Timeout nach ${Math.round(effectiveTimeoutSeconds / 60)} Min.`,
               failedAt: new Date().toISOString(),
             },
             updated_at: new Date().toISOString(),
@@ -128,16 +133,11 @@ serve(async (req) => {
       }
 
       // Refund credits
-      if (cc.credits_used && renderData?.user_id) {
-        try {
-          await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: cc.credits_used });
-          console.log(`💰 Refunded ${cc.credits_used} credits`);
-        } catch (e) { console.error('Refund error:', e); }
-      }
+      await refundRenderCreditsOnce(supabaseAdmin, tableName, renderIdColumn, effectiveRenderId, renderData, cc);
 
       return jsonResponse({
         render_id: effectiveRenderId,
-        progress: { done: false, fatalErrorEncountered: true, errors: [`Render-Timeout nach ${Math.round(RENDER_TIMEOUT_SECONDS / 60)} Min.`], overallProgress: 0, errorCategory: 'timeout' },
+        progress: { done: false, fatalErrorEncountered: true, errors: [`Render-Timeout nach ${Math.round(effectiveTimeoutSeconds / 60)} Min.`], overallProgress: 0, errorCategory: 'timeout' },
         status: 'failed',
         diagnostics: { trackingMode, realRenderId, elapsedSeconds: Math.round(elapsedSeconds) },
       });
