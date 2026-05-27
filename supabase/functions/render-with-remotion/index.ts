@@ -673,7 +673,7 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Starting Remotion Lambda synchronously...');
+    console.log('🚀 Scheduling Remotion Lambda start asynchronously (EdgeRuntime.waitUntil)...');
 
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
@@ -681,39 +681,29 @@ serve(async (req) => {
     console.log('📦 ASCII-safe JSON payload (post-processed), size:', asciiSafeJson.length, 'bytes');
     console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
 
-    const startResult = await startRemotionRender({
-      aws,
-      lambdaUrl,
-      asciiSafeJson,
-      pendingRenderId,
-      userId,
-      creditsRequired: credits_required,
-      supabaseAdmin,
-      bucketName,
-      outName,
-    });
-
-    if (!startResult.ok) {
-      console.error('❌ Lambda start failed, returning error to client:', startResult.error);
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          render_id: pendingRenderId,
-          status: 'failed',
-          error: startResult.error,
-          error_category: startResult.errorCategory,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log('✅ Lambda accepted render, real_remotion_render_id:', startResult.realRenderId);
+    // Fire-and-forget: Lambda start (incl. retries on AWS aborts/throttles) runs
+    // in the background so the edge function returns within ~1s and never hits
+    // the 150s Supabase idle timeout. Webhook + polling reconcile the final state.
+    EdgeRuntime.waitUntil(
+      startRemotionRender({
+        aws,
+        lambdaUrl,
+        asciiSafeJson,
+        pendingRenderId,
+        userId: userId!,
+        creditsRequired: credits_required,
+        supabaseAdmin,
+        bucketName,
+        outName,
+      }).catch((err) => {
+        console.error('❌ Background Lambda start crashed:', err);
+      })
+    );
 
     return new Response(
       JSON.stringify({
         ok: true,
         render_id: pendingRenderId,
-        real_remotion_render_id: startResult.realRenderId,
         status: 'rendering',
         message: 'Video-Rendering wurde gestartet. Status wird automatisch aktualisiert.'
       }),
