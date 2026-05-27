@@ -82,10 +82,27 @@ const THROTTLE_PATTERNS = [
   /throttl/i,
 ];
 
+// Transient network/runtime failures from the AWS SDK call itself
+// (connection abort, idle timeout) — should be retried like throttling.
+const TRANSIENT_PATTERNS = [
+  /operation was aborted/i,
+  /\baborted\b/i,
+  /\btimeout\b/i,
+  /idle timeout/i,
+  /network error/i,
+  /fetch failed/i,
+  /connection.*(reset|closed)/i,
+];
+
 function isThrottleSignal(status: number, body: string): boolean {
   if (status === 429) return true;
   if (status >= 500 && /rate|throttl|concurrency/i.test(body)) return true;
   return THROTTLE_PATTERNS.some((rx) => rx.test(body));
+}
+
+function isTransientSignal(message: string): boolean {
+  return THROTTLE_PATTERNS.some((rx) => rx.test(message))
+    || TRANSIENT_PATTERNS.some((rx) => rx.test(message));
 }
 
 async function startRemotionRender(params: {
