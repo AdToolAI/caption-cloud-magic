@@ -37,6 +37,7 @@ interface RenderJob {
   downloadUrl?: string;
   error?: string;
   renderId?: string; // For realtime tracking
+  startedAt?: number;
 }
 
 export function PreviewExportStep({
@@ -64,11 +65,13 @@ export function PreviewExportStep({
   const totalCost = selectedFormats.length * ESTIMATED_COSTS.video_render * qualityMultiplier;
 
   // Extract active render IDs to prevent infinite loop
-  const activeRenderIds = useMemo(
-    () => renderJobs
-      .filter(j => j.status === 'rendering' && j.renderId)
-      .map(j => j.renderId!),
+  const activeRenderJobs = useMemo(
+    () => renderJobs.filter(j => j.status === 'rendering' && j.renderId),
     [renderJobs]
+  );
+  const activeRenderIds = useMemo(
+    () => activeRenderJobs.map(j => j.renderId!),
+    [activeRenderJobs]
   );
 
   // Realtime subscription for render updates with aggressive fallback polling
