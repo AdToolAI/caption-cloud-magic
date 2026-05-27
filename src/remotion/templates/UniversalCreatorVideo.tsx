@@ -3025,7 +3025,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
               <AbsoluteFill>
                 <SceneBackground
                   scene={(() => {
-                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_SCENE idx=${index} type=${scene.type} profile=${rawDiag?.diagnosticProfile || '?'}`);
+                    if (frame === scene.startFrame) console.log(`[FORENSIC] ENTER_SCENE idx=${index} type=${scene.type} profile=${rawDiag?.diagnosticProfile || '?'}`);
                     return scene;
                   })()}
                   frame={frame - scene.startFrame}
@@ -3039,7 +3039,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
                  />
                 <TextOverlay
                   scene={(() => {
-                    if (frame === scene.startFrame) console.error(`[FORENSIC] ENTER_TEXT_ANIM idx=${index} disableAnimatedText=${diagToggles.disableAnimatedText}`);
+                    if (frame === scene.startFrame) console.log(`[FORENSIC] ENTER_TEXT_ANIM idx=${index} disableAnimatedText=${diagToggles.disableAnimatedText}`);
                     return scene;
                   })()}
                   frame={frame - scene.startFrame}
@@ -3148,7 +3148,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       
       {/* Lottie Icons for current scene - context-based visibility */}
       {!diagToggles.disableLottieIcons && currentScene && ['solution', 'feature', 'proof'].includes(currentScene.type) && (() => {
-        if (frame === 0) console.error(`[FORENSIC] ENTER_LOTTIE_ICONS disabled=${diagToggles.disableLottieIcons}`);
+        if (frame === 0) console.log(`[FORENSIC] ENTER_LOTTIE_ICONS disabled=${diagToggles.disableLottieIcons}`);
         return (
         <LottieIcons
           sceneType={currentScene.type as 'solution' | 'feature' | 'proof' | 'hook' | 'problem' | 'cta'}
@@ -3161,7 +3161,7 @@ export const UniversalCreatorVideo: React.FC<UniversalCreatorVideoProps> = ({
       
       {/* Phase 1: PrecisionSubtitleOverlay with word-level karaoke */}
       {!diagToggles.disablePrecisionSubtitles && subtitles && Array.isArray(subtitles) && subtitles.length > 0 && (() => {
-        if (frame === 0) console.error(`[FORENSIC] ENTER_SUBTITLE_OVERLAY count=${subtitles?.length || 0}`);
+        if (frame === 0) console.log(`[FORENSIC] ENTER_SUBTITLE_OVERLAY count=${subtitles?.length || 0}`);
         return (
         <PrecisionSubtitleOverlay
           subtitles={subtitles.map(s => ({
