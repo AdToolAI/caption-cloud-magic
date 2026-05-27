@@ -89,7 +89,7 @@ serve(async (req) => {
     const timeoutAnchor = lambdaInvokedAt || createdAt;
     const elapsedSeconds = (Date.now() - timeoutAnchor) / 1000;
 
-    const effectiveTimeoutSeconds = !isDirectorsCut && cc?.source !== 'composer'
+    const effectiveTimeoutSeconds = !isDirectorsCut && source !== 'composer' && source !== 'dialog-stitch'
       ? UNIVERSAL_CREATOR_TIMEOUT_SECONDS
       : RENDER_TIMEOUT_SECONDS;
 
