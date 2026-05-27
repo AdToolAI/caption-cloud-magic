@@ -380,8 +380,8 @@ export function PreviewExportStep({
           // (e.g. AWS throttling) — surface them immediately instead of polling for 10 min.
           if (data && data.ok === false) {
             const raw = String(data.error || '');
-            const friendly = /aborted|timeout/i.test(raw)
-              ? 'AWS hat den Render-Start abgebrochen. Bitte in einer Minute erneut starten.'
+            const friendly = /aborted|timeout|idle/i.test(raw)
+              ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
               : (raw || t('uc.failed'));
             throw new Error(friendly);
           }
