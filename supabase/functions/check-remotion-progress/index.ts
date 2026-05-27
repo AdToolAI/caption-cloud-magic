@@ -147,7 +147,7 @@ serve(async (req) => {
     // EARLY WAIT — no real render ID yet and just started
     // Avoid expensive S3 listing/HEAD requests that would 403 anyway.
     // ============================================
-    if (!realRenderId && elapsedSeconds < 30) {
+    if (!realRenderId && elapsedSeconds < 60) {
       console.log(`⏳ No real_render_id yet (${Math.round(elapsedSeconds)}s old) — returning early rendering status`);
       return jsonResponse({
         render_id: effectiveRenderId,
