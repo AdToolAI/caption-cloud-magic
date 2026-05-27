@@ -649,7 +649,7 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Scheduling Remotion Lambda start in background...');
+    console.log('🚀 Starting Remotion Lambda synchronously...');
 
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
@@ -657,7 +657,7 @@ serve(async (req) => {
     console.log('📦 ASCII-safe JSON payload (post-processed), size:', asciiSafeJson.length, 'bytes');
     console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
 
-    EdgeRuntime.waitUntil(startRemotionRenderInBackground({
+    const startResult = await startRemotionRender({
       aws,
       lambdaUrl,
       asciiSafeJson,
@@ -667,14 +667,29 @@ serve(async (req) => {
       supabaseAdmin,
       bucketName,
       outName,
-    }));
+    });
 
-    console.log('✅ Render start queued. Background task will store the real Remotion render ID or fail/refund.');
+    if (!startResult.ok) {
+      console.error('❌ Lambda start failed, returning error to client:', startResult.error);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          render_id: pendingRenderId,
+          status: 'failed',
+          error: startResult.error,
+          error_category: startResult.errorCategory,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('✅ Lambda accepted render, real_remotion_render_id:', startResult.realRenderId);
 
     return new Response(
       JSON.stringify({
         ok: true,
         render_id: pendingRenderId,
+        real_remotion_render_id: startResult.realRenderId,
         status: 'rendering',
         message: 'Video-Rendering wurde gestartet. Status wird automatisch aktualisiert.'
       }),
