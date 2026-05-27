@@ -373,7 +373,10 @@ export function PreviewExportStep({
 
           if (error) {
             const detail = await extractFunctionsError(error);
-            throw new Error(detail || t('uc.failed'));
+            const friendly = /idle.?timeout|aborted|timeout|IDLE_TIMEOUT/i.test(detail || '')
+              ? 'AWS-Start dauert ungewöhnlich lang. Bitte in einer Minute erneut starten.'
+              : (detail || t('uc.failed'));
+            throw new Error(friendly);
           }
 
           // Edge function may return { ok:false, error, error_category } for clean failures
