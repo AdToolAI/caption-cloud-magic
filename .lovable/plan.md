@@ -1,35 +1,34 @@
-## Befund
+## Problem
 
-Der aktuelle Fehler ist wieder kein Frontend-Problem. In der Datenbank steht der letzte Render als `failed` mit `The operation was aborted`, und `content_config.real_remotion_render_id` ist weiterhin leer. Die Function-Logs zeigen: `render-with-remotion` erstellt den Render-Datensatz und baut den Lambda-Payload, aber danach wird keine echte Remotion-Render-ID gespeichert.
+Neue Fehlermeldung im UI:
+> `Request idle timeout limit (150s) reached (IDLE_TIMEOUT)`
 
-Auffällig ist außerdem: Obwohl im Code „Stability Mode“ existiert, läuft der letzte Universal-Creator-Render laut Payload-Diagnose weiterhin mit `DISTRIBUTED scheduling`: 600 Frames → `framesPerLambda=100` → 6 Lambdas. Das ist genau der Bereich, in dem die vorherigen AWS-Concurrency-/Abort-Probleme entstanden sind.
+Ursache: Mit der letzten Änderung wartet `render-with-remotion` synchron auf den AWS Lambda-Start (`await startRemotionRender`). Wenn AWS in den ersten Versuchen abbricht (`operation was aborted`) und unsere Retry-Schedule `[2s, 5s, 10s]` plus tatsächliche AWS-Latenz dazukommt, überschreitet die Edge Function den harten Supabase-Idle-Timeout von **150 s** — die Antwort kommt nie an, das Frontend zeigt `IDLE_TIMEOUT`.
+
+Wir hatten vorher schon `EdgeRuntime.waitUntil` benutzt, das funktioniert; das Problem damals war nur, dass die `real_remotion_render_id` zu spät geschrieben wurde. Das lässt sich aber rein über den Polling-Pfad sauber abfangen — der Webhook ist ohnehin die maßgebliche Quelle.
 
 ## Plan
 
-1. **Universal-Creator wirklich auf Stability Scheduling zwingen**
-   - In `render-with-remotion/index.ts` beim Aufbau des Lambda-Payloads explizit `_schedulingMode: 'stability'` setzen.
-   - Für den gezeigten 20s-Render ergibt das 600 Frames → 2 Lambdas statt 6.
-   - `maxRetries` nicht mehr aktiv auf `1` heruntersetzen, damit der Normalizer wieder die vorgesehenen 3 internen Remotion-Retries verwenden kann.
-   - `timeoutInMilliseconds` auf 600s angleichen, passend zur Lambda-Konfiguration.
+### 1. `supabase/functions/render-with-remotion/index.ts` — zurück auf asynchronen Lambda-Start
+- DB-Insert (`video_renders` mit `status: 'rendering'`) bleibt **vor** dem Lambda-Call (wie heute).
+- `startRemotionRender(...)` nicht mehr `await`en, sondern in `EdgeRuntime.waitUntil(...)` einhängen.
+- Sofort `200 OK` mit `{ ok: true, render_id: pendingRenderId, status: 'rendering' }` zurückgeben — `real_remotion_render_id` wird durch den Hintergrundlauf später in `content_config` geschrieben (Code dafür existiert bereits in `startRemotionRender`).
+- Bei nicht abgefangenen Fehlern im Hintergrund kümmert sich `failRenderAndRefundOnce` bereits um Status `failed` + idempotenten Refund.
 
-2. **Abgebrochene Lambda-Start-Requests als transient behandeln**
-   - `AbortError`, `operation was aborted`, `timeout`, `idle timeout` im Lambda-Start-Retry als retrybare Signale klassifizieren.
-   - Kurzer Backoff wie bisher, aber nach Ausschöpfen der Versuche mit einer klaren deutschen Meldung und idempotenter Credit-Erstattung.
-   - Die Datenbank bekommt strukturierte Felder wie `error_category: 'timeout' | 'rate_limit'` und `failure_stage: 'lambda_start'`, damit die UI nicht nur „non-2xx“ zeigt.
+### 2. `supabase/functions/check-remotion-progress/index.ts` — Warmlauf-Phase tolerieren
+- Bestehende Logik („wenn jünger als 30 s und keine `real_remotion_render_id` → weiter `rendering` melden") leicht erhöhen auf **60 s**, damit der asynchrone Start nicht fälschlich als `start_failed` markiert wird.
+- Wenn nach > 60 s immer noch keine `real_remotion_render_id` da ist und der DB-Status nicht `failed` ist, weiter `rendering` melden (Webhook übernimmt am Ende) — also keine neue Eskalation, nur die Schwelle anheben.
 
-3. **Response-Status konsistent halten**
-   - Wenn der Lambda-Start scheitert, bleibt die Function-Antwort bei HTTP 200 mit `{ ok:false, error, error_category }`, statt dass das Frontend nur den generischen `Edge Function returned a non-2xx status code` sieht.
-   - Der bestehende `catch`-Block wird erweitert, sodass auch unerwartete Fehler nach bereits abgezogenen Credits denselben strukturierten Fehlerpfad nutzen.
+### 3. `src/components/universal-creator/steps/PreviewExportStep.tsx` — Fehlermeldung-Mapping
+- `IDLE_TIMEOUT`/`idle timeout` aus der Backend-Antwort weiterhin abfangen und als „AWS-Start dauert ungewöhnlich lang. Bitte erneut versuchen." anzeigen — als zusätzlicher Sicherheitsnetz-Fall, falls der Edge-Function-Wrapper selbst (vor unserer Antwort) timed-outet.
+- Sonst keine UI-Änderungen.
 
-4. **Progress-Check nicht bei fehlender echter Render-ID eskalieren lassen**
-   - Wenn nach kurzer Zeit noch kein `real_remotion_render_id` vorhanden ist, soll `check-remotion-progress` keine S3-List-Recovery erzwingen, sondern bis zu einem klaren Start-Failure-Zeitfenster weiter `rendering`/„Start wird bestätigt“ melden.
-   - Erst danach als `start_failed` markieren und Credits einmalig erstatten.
+### 4. Verifikation
+- `render-with-remotion` und `check-remotion-progress` deployen.
+- In den Edge-Function-Logs prüfen: Antwort kommt unter ~2 s, `EdgeRuntime.waitUntil` schreibt `real_remotion_render_id` innerhalb von ~10–30 s.
+- Frontend: Render starten → kein `IDLE_TIMEOUT` mehr; Status geht über `rendering` → `completed`.
 
-5. **Frontend-Fehlermeldung verbessern**
-   - `PreviewExportStep.tsx` soll bei `ok:false` direkt die echte Backend-Meldung anzeigen.
-   - Für generische `FunctionsHttpError`-Fälle wird `extractFunctionsError()` genutzt, damit Response-Body-Details statt `Edge Function returned a non-2xx status code` erscheinen.
+## Was sich **nicht** ändert
 
-6. **Verifikation nach Umsetzung**
-   - Edge Functions `render-with-remotion` und `check-remotion-progress` deployen.
-   - Mit einem Smoke-Test prüfen, dass `render-with-remotion` entweder `ok:true` plus `real_remotion_render_id` zurückgibt oder `ok:false` mit klarer Meldung.
-   - Den neuesten `video_renders`-Datensatz prüfen: kein leerer `real_remotion_render_id` bei erfolgreichem Start; bei Fehlschlag strukturierte `error_category` und Refund-Flag.
+- Scheduling-Mode (`stability`), `timeoutInMilliseconds: 600000`, Backoff-Schedule, Webhook-Pfad, Credit-Refund-Logik.
+- `failRenderAndRefundOnce` bleibt 1:1 — Refund weiterhin idempotent über `credit_refund_done`.
