@@ -393,6 +393,39 @@ async function findVideoOnS3(
   return null;
 }
 
+async function refundRenderCreditsOnce(
+  supabaseAdmin: any,
+  tableName: string,
+  renderIdColumn: string,
+  renderId: string,
+  renderData: any,
+  contentConfig: any,
+) {
+  const creditsUsed = Number(contentConfig?.credits_used || 0);
+  const alreadyRefunded = contentConfig?.credit_refund_done === true;
+  if (!creditsUsed || !renderData?.user_id || alreadyRefunded) return;
+
+  try {
+    await supabaseAdmin.rpc('increment_balance', { p_user_id: renderData.user_id, p_amount: creditsUsed });
+    const { data: latest } = await supabaseAdmin
+      .from(tableName)
+      .select('content_config')
+      .eq(renderIdColumn, renderId)
+      .maybeSingle();
+    const latestConfig = (latest?.content_config as any) || contentConfig || {};
+    await supabaseAdmin.from(tableName).update({
+      content_config: {
+        ...latestConfig,
+        credit_refund_done: true,
+        credit_refunded_at: new Date().toISOString(),
+      },
+    }).eq(renderIdColumn, renderId);
+    console.log(`💰 Refunded ${creditsUsed} credits once for render ${renderId}`);
+  } catch (e) {
+    console.error('Refund error:', e);
+  }
+}
+
 // ============================================
 // HELPER: Mark render as completed and save to Media Library
 // ============================================
