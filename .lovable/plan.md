@@ -1,30 +1,33 @@
-## Diagnose
+## Befund
 
-Logs zeigen:
-- `render-with-remotion` startet um 19:35:08 und macht `shutdown` um 19:38:28 — exakt **200 Sekunden** später.
-- Der Code in `supabase/functions/render-with-remotion/index.ts` (Zeile 450–472) ruft Lambda **synchron** (`RequestResponse`) auf und wartet auf das fertige Video.
-- Die Render-Schätzung im Log: `estTime=200.0s` für 6 parallele Lambdas.
-- Supabase Edge Functions haben aber eine harte Wall-Clock-Grenze (~150 s). Bevor Lambda antwortet, killt die Runtime die Function → der Client bekommt `non-2xx status code` ("Edge Function returned a non-2xx status code").
+Der gezeigte Hänger ist kein Frontend-Spinner allein: In der Datenbank liegen aktuelle Render-Jobs seit über 10 Minuten auf `rendering`. Gleichzeitig gab es vorher wiederholt `IDLE_TIMEOUT` nach 150 Sekunden. Die Ursache sitzt sehr wahrscheinlich in der Render-Start-/Tracking-Kette:
 
-Der Webhook (`remotion-webhook`) ist im Payload bereits konfiguriert und würde den Render-Status sowieso selbst auf "completed" setzen — der synchrone Aufruf ist also unnötig und genau die Ursache des Fehlers.
+- Universal Creator startet inzwischen `render-with-remotion` asynchron.
+- Die UI pollt aber zusätzlich `check-remotion-progress` mit einem Parameter-Mismatch (`render_id` vs. `renderId`), wodurch der Status nicht zuverlässig aufgeklärt wird.
+- Ältere/alternative Renderpfade wie Dialog-Stitch bzw. `invoke-remotion-render` nutzen noch synchrones Lambda-Startverhalten oder warten zu lange und hinterlassen Jobs als `rendering`, wenn kein Webhook zurückkommt.
+- Stale Jobs werden erst nach sehr langer Zeit oder gar nicht sauber als fehlgeschlagen markiert/refunded, dadurch bleibt die UI auf „Wird gerendert…“.
 
-## Fix
+## Plan
 
-`supabase/functions/render-with-remotion/index.ts` umstellen auf **asynchrone Lambda-Invocation** (Pattern wie in den anderen funktionierenden Render-Functions / `EdgeRuntime.waitUntil`-Memo):
+1. **Universal Creator Polling reparieren**
+   - In `PreviewExportStep.tsx` den Polling-Call an `check-remotion-progress` korrekt mit `renderId`/`render_id` handhaben.
+   - Zusätzlich den einfachen DB-Status (`check-render-status` oder direkte `video_renders`-Abfrage über bestehenden Auth-Kontext) als Fallback nutzen, damit abgeschlossene/fehlgeschlagene Jobs auch ohne Realtime sofort in der UI ankommen.
+   - `isRendering` zuverlässig beenden, sobald alle Jobs `completed` oder `failed` sind.
 
-1. Beim `aws.fetch` zum Lambda-Endpoint Header `X-Amz-Invocation-Type: Event` setzen.
-2. Erfolgs-Check anpassen: Async-Invoke liefert **HTTP 202** ohne Body. Statt `lambdaResponse.json()` nur prüfen, dass Status `202` ist.
-3. `realRenderId` ist im Async-Modus nicht aus der Lambda-Antwort verfügbar — also den `pendingRenderId` als Render-ID an den Client zurückgeben (Webhook patcht das `video_renders`-Record später mit dem echten Lambda-Render-ID via `customData.pending_render_id`).
-4. Response unverändert: `{ ok: true, render_id: pendingRenderId, status: 'rendering', message: ... }`.
-5. Refund-Pfad bleibt: bei `!response.ok` (also nicht 202/200) → `failed` markieren + Credits zurückerstatten (idempotent).
+2. **Render-Progress Function robuster machen**
+   - `check-remotion-progress` so anpassen, dass sie stale Jobs früher erkennt und sauber in `failed` setzt, wenn kein echtes Lambda-/S3-Tracking möglich ist.
+   - Für Jobs ohne `real_remotion_render_id` und ohne auffindbare S3-Datei nach definiertem Timeout eine klare Fehlermeldung speichern.
+   - Credit-Refund nur idempotent ausführen, wenn `credits_used` vorhanden ist und noch kein Refund-Marker gesetzt wurde.
 
-Keine Änderungen am Frontend (`PreviewExportStep.tsx`) nötig — es pollt bereits über `check-remotion-progress` und hört auf den Realtime-Kanal.
+3. **Noch synchrone Lambda-Pfade entschärfen**
+   - `invoke-remotion-render` und relevante Dialog-Stitch-Aufrufe auf den bereits vorgesehenen Async/Event-Modus umstellen bzw. den sync wait deutlich begrenzen, damit keine 150s Edge-Function-Timeouts mehr entstehen.
+   - Den realen Render-Status danach über `out_name`, `progress.json` und Webhook/S3-Reconciliation auflösen.
 
-Keine Änderungen am Webhook nötig — der nutzt `customData.pending_render_id` schon korrekt.
+4. **Aktuell hängende Jobs bereinigen**
+   - Die jetzt offenen `rendering`-Rows prüfen.
+   - Wenn keine Output-Datei in S3 gefunden wird und sie über Timeout liegen: auf `failed` setzen, aussagekräftige Fehlermeldung speichern und Credits idempotent zurückbuchen.
+   - Dadurch verschwindet der endlose Spinner in der UI und der Nutzer bekommt einen echten Fehlerstatus statt „rendering“.
 
-## Verifikation
-
-- Nach Deploy: Render im Universal Creator starten.
-- Edge Function Logs: `render-with-remotion` sollte in <5s mit `📥 Lambda async response status: 202` und `ok:true` antworten.
-- `remotion-webhook` Logs: nach ~3 Min Eingang von Lambda → `video_renders.status = completed` + Output-URL.
-- Frontend: Statt "Fehlgeschlagen" zeigt der Render-Status erst "Rendering", dann "Fertig".
+5. **Deployment & Validierung**
+   - Betroffene Edge Functions deployen.
+   - Danach Logs/Datenbank prüfen: ein neuer Render muss schnell einen Job zurückgeben, nach Fehlern sauber `failed` werden oder bei erfolgreichem Webhook/S3-Recovery `completed` mit Download-URL erhalten.
