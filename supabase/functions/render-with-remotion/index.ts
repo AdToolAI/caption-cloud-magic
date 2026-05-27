@@ -447,100 +447,64 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Invoking Remotion Lambda (SYNCHRONOUS mode - RequestResponse)...');
-    
-    // ✅ SYNCHRONOUS INVOCATION: No X-Amz-Invocation-Type header = RequestResponse (default)
-    // Lambda processes and returns result directly (typically 45-60 seconds)
-    // This was the working approach from December 2025
-    
-    // ✅ CORRECT FIX: First stringify normally, then post-process to escape non-ASCII
-    // toAsciiSafeJson uses String.fromCharCode(92) for a SINGLE backslash
-    // This prevents double-escaping that breaks Lambda JSON parsing
+    console.log('🚀 Invoking Remotion Lambda (ASYNC mode - Event)...');
+
+    // ✅ ASYNC INVOCATION: X-Amz-Invocation-Type: Event → Lambda returns 202 immediately,
+    // runs render in background, webhook (remotion-webhook) marks video_renders as completed.
+    // This avoids Supabase Edge Function wall-clock timeout (~150s) for renders >2min.
+
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
-    
+
     console.log('📦 ASCII-safe JSON payload (post-processed), size:', asciiSafeJson.length, 'bytes');
     console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
-    
+
     const lambdaResponse = await aws.fetch(lambdaUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // No X-Amz-Invocation-Type header = synchronous RequestResponse (default)
+        'X-Amz-Invocation-Type': 'Event',
       },
       body: asciiSafeJson,
     });
 
-    console.log('📥 Lambda synchronous response status:', lambdaResponse.status);
+    console.log('📥 Lambda async response status:', lambdaResponse.status);
 
-    // Synchronous invocation returns 200 OK with the result
-    if (!lambdaResponse.ok) {
+    // Async invocation returns HTTP 202 Accepted with empty body
+    if (lambdaResponse.status !== 202 && !lambdaResponse.ok) {
       const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda synchronous invocation failed:', lambdaResponse.status, errorText);
-      
-      // Clean up render record
+      console.error('❌ Lambda async invocation failed:', lambdaResponse.status, errorText);
+
       await supabaseAdmin
         .from('video_renders')
-        .update({ 
-          status: 'failed', 
+        .update({
+          status: 'failed',
           error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
           completed_at: new Date().toISOString()
         })
         .eq('render_id', pendingRenderId);
-      
-      // Refund credits on Lambda failure
+
       await supabaseAdmin.rpc('increment_balance', {
         p_user_id: userId,
         p_amount: credits_required
       });
       console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
-      
+
       throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
     }
 
-    // ✅ Parse synchronous Lambda response - contains renderId, outputFile, bucketName
-    const lambdaResult = await lambdaResponse.json();
-    console.log('✅ Lambda synchronous response:', JSON.stringify(lambdaResult, null, 2));
-    
-    const realRenderId = lambdaResult.renderId;
-    const outputFile = lambdaResult.outputFile;
-    const outputBucket = lambdaResult.outBucket || lambdaResult.bucketName || bucketName;
-    
-    // Build the real output URL
-    const outputUrl = outputFile || 
-      `https://s3.${AWS_REGION}.amazonaws.com/${outputBucket}/renders/${realRenderId}/out.mp4`;
-    
-    console.log('🎬 Real Render ID:', realRenderId);
-    console.log('📁 Output URL:', outputUrl);
-
-    // ✅ Update render record with real renderId — webhook will mark as completed
-    const { error: updateError } = await supabaseAdmin
-      .from('video_renders')
-      .update({
-        content_config: {
-          ...customizations,
-          credits_used: credits_required,
-          real_remotion_render_id: realRenderId,
-        },
-      })
-      .eq('render_id', pendingRenderId);
-    
-    if (updateError) {
-      console.error('⚠️ Failed to update render record with real renderId:', updateError);
-    } else {
-      console.log('✅ Updated render record with real renderId, waiting for webhook...');
-    }
+    console.log('✅ Lambda accepted render (202). Webhook will mark completion.');
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         ok: true,
         render_id: pendingRenderId,
-        real_render_id: realRenderId,
         status: 'rendering',
         message: 'Video-Rendering läuft. Webhook benachrichtigt bei Fertigstellung.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
 
   } catch (error) {
     console.error('Error:', error);
