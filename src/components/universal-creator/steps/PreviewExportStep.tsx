@@ -186,7 +186,7 @@ export function PreviewExportStep({
           const timedOut = updated.map(j => {
             const startedAt = j.startedAt || Date.now();
             if (j.status === 'rendering' && Date.now() - startedAt > HARD_TIMEOUT_MS) {
-              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>6 Min). Bitte erneut versuchen.' };
+              return { ...j, status: 'failed' as const, progress: 0, error: 'Render-Timeout (>10 Min). Bitte erneut versuchen.' };
             }
             return j;
           });
