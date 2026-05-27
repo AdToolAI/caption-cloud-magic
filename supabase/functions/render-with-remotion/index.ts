@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,14 +11,7 @@ const corsHeaders = {
 };
 
 // AWS Lambda configuration
-const AWS_REGION = 'eu-central-1';
-function getLambdaFunctionName(): string {
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
-}
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
@@ -30,6 +24,146 @@ function toAsciiSafeJson(jsonString: string): string {
     // String.fromCharCode(92) = single backslash, not escaped
     return String.fromCharCode(92) + 'u' + hex;
   });
+}
+
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
+
+async function failRenderAndRefundOnce(params: {
+  supabaseAdmin: any;
+  pendingRenderId: string;
+  userId: string;
+  creditsRequired: number;
+  message: string;
+  category: string;
+  extraConfig?: Record<string, unknown>;
+}) {
+  const { supabaseAdmin, pendingRenderId, userId, creditsRequired, message, category, extraConfig = {} } = params;
+  const { data: current } = await supabaseAdmin
+    .from('video_renders')
+    .select('status, content_config')
+    .eq('render_id', pendingRenderId)
+    .maybeSingle();
+
+  if (current?.status === 'completed') return;
+
+  const existingConfig = (current?.content_config as any) || {};
+  const alreadyRefunded = existingConfig.credit_refund_done === true;
+  if (!alreadyRefunded && creditsRequired > 0) {
+    const { error: refundError } = await supabaseAdmin.rpc('increment_balance', {
+      p_user_id: userId,
+      p_amount: creditsRequired,
+    });
+    if (refundError) console.error('💰 Refund failed:', refundError);
+    else console.log(`💰 Refunded ${creditsRequired} credits for failed render ${pendingRenderId}`);
+  }
+
+  await supabaseAdmin
+    .from('video_renders')
+    .update({
+      status: 'failed',
+      error_message: message.slice(0, 1000),
+      completed_at: new Date().toISOString(),
+      content_config: {
+        ...existingConfig,
+        ...extraConfig,
+        credit_refund_done: alreadyRefunded || creditsRequired > 0,
+        error_category: category,
+        failure_stage: 'lambda_start',
+      },
+    })
+    .eq('render_id', pendingRenderId);
+}
+
+async function startRemotionRenderInBackground(params: {
+  aws: any;
+  lambdaUrl: string;
+  asciiSafeJson: string;
+  pendingRenderId: string;
+  userId: string;
+  creditsRequired: number;
+  supabaseAdmin: any;
+  bucketName: string;
+  outName: string;
+}) {
+  const { aws, lambdaUrl, asciiSafeJson, pendingRenderId, userId, creditsRequired, supabaseAdmin, bucketName, outName } = params;
+  try {
+    const lambdaResponse = await aws.fetch(lambdaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: asciiSafeJson,
+    });
+    const lambdaRequestId = lambdaResponse.headers.get('x-amzn-requestid') || null;
+    const responseText = await lambdaResponse.text().catch(() => '');
+    console.log('📥 Lambda start response:', lambdaResponse.status, 'requestId:', lambdaRequestId, 'body:', responseText.substring(0, 500));
+
+    if (!lambdaResponse.ok) {
+      await failRenderAndRefundOnce({
+        supabaseAdmin,
+        pendingRenderId,
+        userId,
+        creditsRequired,
+        message: `Lambda-Start fehlgeschlagen (${lambdaResponse.status}): ${responseText || 'Keine Antwort'}`,
+        category: lambdaResponse.status === 429 ? 'rate_limit' : 'lambda_start_failed',
+        extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background' },
+      });
+      return;
+    }
+
+    let parsed: any = null;
+    try { parsed = responseText ? JSON.parse(responseText) : null; } catch { parsed = null; }
+    const realRenderId = parsed?.renderId || null;
+    if (!realRenderId) {
+      await failRenderAndRefundOnce({
+        supabaseAdmin,
+        pendingRenderId,
+        userId,
+        creditsRequired,
+        message: `Lambda-Start lieferte keine Render-ID zurück: ${responseText.substring(0, 500) || 'Leere Antwort'}`,
+        category: 'lambda_start_failed',
+        extraConfig: { lambda_request_id: lambdaRequestId, lambda_error: responseText.substring(0, 1000), tracking_mode: 'request_response_background_no_render_id' },
+      });
+      return;
+    }
+
+    const { data: current } = await supabaseAdmin
+      .from('video_renders')
+      .select('status, content_config')
+      .eq('render_id', pendingRenderId)
+      .maybeSingle();
+    if (current?.status === 'completed') return;
+    const existingConfig = (current?.content_config as any) || {};
+    await supabaseAdmin
+      .from('video_renders')
+      .update({
+        status: 'rendering',
+        bucket_name: bucketName,
+        content_config: {
+          ...existingConfig,
+          real_remotion_render_id: realRenderId,
+          lambda_render_id: pendingRenderId,
+          lambda_request_id: lambdaRequestId,
+          lambda_function: LAMBDA_FUNCTION_NAME,
+          lambda_accepted: true,
+          tracking_mode: 'request_response_background',
+          bucket_name: bucketName,
+          out_name: outName,
+        },
+      })
+      .eq('render_id', pendingRenderId);
+    console.log(`✅ Stored real Remotion render ID ${realRenderId} for ${pendingRenderId}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown Lambda start error';
+    console.error('❌ Background Lambda start failed:', error);
+    await failRenderAndRefundOnce({
+      supabaseAdmin,
+      pendingRenderId,
+      userId,
+      creditsRequired,
+      message: `Lambda-Start Ausnahme: ${message}`,
+      category: /timeout|idle/i.test(message) ? 'timeout' : 'lambda_start_failed',
+      extraConfig: { lambda_error: message.substring(0, 1000), tracking_mode: 'request_response_background_exception' },
+    });
+  }
 }
 
 serve(async (req) => {
@@ -457,11 +591,7 @@ serve(async (req) => {
 
     const lambdaUrl = `https://lambda.${AWS_REGION}.amazonaws.com/2015-03-31/functions/${LAMBDA_FUNCTION_NAME}/invocations`;
 
-    console.log('🚀 Invoking Remotion Lambda (ASYNC mode - Event)...');
-
-    // ✅ ASYNC INVOCATION: X-Amz-Invocation-Type: Event → Lambda returns 202 immediately,
-    // runs render in background, webhook (remotion-webhook) marks video_renders as completed.
-    // This avoids Supabase Edge Function wall-clock timeout (~150s) for renders >2min.
+    console.log('🚀 Scheduling Remotion Lambda start in background...');
 
     const rawJson = JSON.stringify(lambdaPayload);
     const asciiSafeJson = toAsciiSafeJson(rawJson);
@@ -469,48 +599,26 @@ serve(async (req) => {
     console.log('📦 ASCII-safe JSON payload (post-processed), size:', asciiSafeJson.length, 'bytes');
     console.log('📝 Sample (first 500 chars):', asciiSafeJson.substring(0, 500));
 
-    const lambdaResponse = await aws.fetch(lambdaUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Amz-Invocation-Type': 'Event',
-      },
-      body: asciiSafeJson,
-    });
+    EdgeRuntime.waitUntil(startRemotionRenderInBackground({
+      aws,
+      lambdaUrl,
+      asciiSafeJson,
+      pendingRenderId,
+      userId,
+      creditsRequired: credits_required,
+      supabaseAdmin,
+      bucketName,
+      outName,
+    }));
 
-    console.log('📥 Lambda async response status:', lambdaResponse.status);
-
-    // Async invocation returns HTTP 202 Accepted with empty body
-    if (lambdaResponse.status !== 202 && !lambdaResponse.ok) {
-      const errorText = await lambdaResponse.text();
-      console.error('❌ Lambda async invocation failed:', lambdaResponse.status, errorText);
-
-      await supabaseAdmin
-        .from('video_renders')
-        .update({
-          status: 'failed',
-          error_message: `Lambda invocation failed: ${lambdaResponse.status}`,
-          completed_at: new Date().toISOString()
-        })
-        .eq('render_id', pendingRenderId);
-
-      await supabaseAdmin.rpc('increment_balance', {
-        p_user_id: userId,
-        p_amount: credits_required
-      });
-      console.log(`💰 Refunded ${credits_required} credits due to Lambda error`);
-
-      throw new Error(`Lambda invocation failed with status ${lambdaResponse.status}: ${errorText}`);
-    }
-
-    console.log('✅ Lambda accepted render (202). Webhook will mark completion.');
+    console.log('✅ Render start queued. Background task will store the real Remotion render ID or fail/refund.');
 
     return new Response(
       JSON.stringify({
         ok: true,
         render_id: pendingRenderId,
         status: 'rendering',
-        message: 'Video-Rendering läuft. Webhook benachrichtigt bei Fertigstellung.'
+        message: 'Video-Rendering wurde gestartet. Status wird automatisch aktualisiert.'
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
