@@ -141,62 +141,79 @@ export function PreviewExportStep({
       )
       .subscribe();
 
-    // Aggressive fallback polling - check status directly via Lambda every 30 seconds
-    const checkRenderStatus = async (renderId: string) => {
+    // Direct DB poll as fallback (in case Realtime misses an update)
+    const renderStartedAt = Date.now();
+    const HARD_TIMEOUT_MS = 6 * 60 * 1000; // 6 Minuten
+
+    const pollDbStatus = async () => {
       try {
-        console.log('⏰ Direct Lambda polling for render:', renderId);
-        
-        // Call edge function to check progress directly from Lambda
-        const { data, error } = await supabase.functions.invoke('check-remotion-progress', {
-          body: {
-            render_id: renderId
-          }
-        });
+        const { data, error } = await supabase
+          .from('video_renders')
+          .select('render_id, status, video_url, error_message')
+          .in('render_id', activeRenderIds);
 
         if (error) {
-          console.error('Error checking progress:', error);
+          console.error('DB poll error:', error);
           return;
         }
+        if (!data) return;
 
-        console.log('📊 Direct progress result:', data);
+        setRenderJobs(prev => {
+          const updated = prev.map(j => {
+            const row = data.find((r: any) => r.render_id === j.renderId);
+            if (!row || j.status !== 'rendering') return j;
+            if (row.status === 'completed' && row.video_url) {
+              toast.success(t('uc.renderCompleted', { platform: j.format.platform }));
+              return { ...j, status: 'completed' as const, progress: 100, downloadUrl: row.video_url };
+            }
+            if (row.status === 'failed') {
+              toast.error(t('uc.renderFailed', { platform: j.format.platform }));
+              return { ...j, status: 'failed' as const, error: row.error_message || t('uc.failed') };
+            }
+            return j;
+          });
 
-        if (data?.progress) {
-          const { done, fatalErrorEncountered, outputFile, errors } = data.progress;
-          
-          if (done && outputFile) {
-            toast.success('Video fertig gerendert!');
-            setRenderJobs(prev => prev.map(j =>
-              j.renderId === renderId
-                ? { ...j, status: 'completed' as const, progress: 100, downloadUrl: outputFile }
-                : j
-            ));
-          } else if (fatalErrorEncountered) {
-            const errorMsg = errors?.join(', ') || 'Rendering fehlgeschlagen';
-            toast.error('Render fehlgeschlagen');
-            setRenderJobs(prev => prev.map(j =>
-              j.renderId === renderId
-                ? { ...j, status: 'failed' as const, error: errorMsg }
-                : j
-            ));
+          // Hard-timeout: nach 6 Minuten als failed markieren
+          const elapsed = Date.now() - renderStartedAt;
+          const timedOut = elapsed > HARD_TIMEOUT_MS
+            ? updated.map(j => j.status === 'rendering'
+                ? { ...j, status: 'failed' as const, error: 'Render-Timeout (>6 Min). Bitte erneut versuchen.' }
+                : j)
+            : updated;
+
+          const allDone = timedOut.every(j => j.status === 'completed' || j.status === 'failed');
+          if (allDone && reservationId) {
+            const successCount = timedOut.filter(j => j.status === 'completed').length;
+            if (successCount > 0) {
+              const actualCost = successCount * ESTIMATED_COSTS.video_render;
+              commit(reservationId, actualCost).catch(console.error);
+              toast.success(t('uc.videosRendered', { count: String(successCount), credits: String(actualCost) }));
+            } else {
+              refund(reservationId, 'All renders failed or timed out').catch(console.error);
+              toast.error(t('uc.renderAllFailed'));
+            }
+            setReservationId(null);
+            setIsRendering(false);
           }
-        }
-      } catch (error) {
-        console.error('Error checking render status:', error);
+
+          return timedOut;
+        });
+      } catch (e) {
+        console.error('Poll error:', e);
       }
     };
 
-    // Poll every 30 seconds for all active renders
-    const pollIntervalId = setInterval(() => {
-      console.log('🔄 Polling for render updates...');
-      activeRenderIds.forEach(renderId => checkRenderStatus(renderId));
-    }, 30000); // Check every 30 seconds
+    // Sofort einmal pollen, danach alle 8 Sekunden
+    pollDbStatus();
+    const pollIntervalId = setInterval(pollDbStatus, 8000);
 
     return () => {
       console.log('🧹 Cleaning up realtime subscription and polling');
       supabase.removeChannel(channel);
       clearInterval(pollIntervalId);
     };
-  }, [activeRenderIds.join(','), renderJobs, reservationId]);
+  }, [activeRenderIds.join(','), reservationId]);
+
 
   // Additional format options for multi-format export
   const formatOptions: FormatConfig[] = [
