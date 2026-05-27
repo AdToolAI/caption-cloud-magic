@@ -2,10 +2,10 @@
  * Remotion Lambda Start Payload Normalizer
  * 
  * Ensures all Lambda invocations send a COMPLETE payload that satisfies
- * the Remotion v4.0.424 ServerlessStartPayload schema.
+ * the Remotion v4.0.462 ServerlessStartPayload schema.
  */
 
-const REMOTION_VERSION = '4.0.424';
+const REMOTION_VERSION = '4.0.462';
 
 /**
  * r31: Lambda 600s + 8 Lambdas — resolves the deadlock between timeout and rate-limit.
@@ -211,7 +211,7 @@ export interface NormalizedStartPayload {
 
 /**
  * Takes a partial/incomplete Lambda start payload and returns a fully
- * normalized payload that Remotion v4.0.424 will accept.
+ * normalized payload that Remotion v4.0.462 will accept.
  */
 export function normalizeStartPayload(partial: Record<string, unknown>): NormalizedStartPayload {
   // Ensure inputProps is in serialized format
