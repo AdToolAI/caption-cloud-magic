@@ -254,9 +254,7 @@ export function UniversalCreator() {
         return !!(contentConfig?.scriptText && contentConfig?.voiceoverUrl);
       case 2: return scenes.length > 0;
       case 3: return true;
-      case 4:
-        if (!contentConfig?.voiceoverUrl) return true;
-        return !!(subtitleConfig?.segments && subtitleConfig.segments.length > 0);
+      case 4: return true; // Untertitel sind optional
       case 5: return true;
       default: return false;
     }
