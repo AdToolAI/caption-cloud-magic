@@ -3,6 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,14 +11,7 @@ const corsHeaders = {
 };
 
 // AWS Lambda configuration
-const AWS_REGION = 'eu-central-1';
-function getLambdaFunctionName(): string {
-  const arn = Deno.env.get('REMOTION_LAMBDA_FUNCTION_ARN') || '';
-  if (arn.includes(':function:')) return arn.split(':function:')[1] || arn;
-  return arn || 'remotion-render-4-0-424-mem3008mb-disk2048mb-600sec';
-}
 const LAMBDA_FUNCTION_NAME = getLambdaFunctionName();
-const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 
 // Note: We ALWAYS serialize inputProps to S3 since Remotion's internal serialization fails
 
