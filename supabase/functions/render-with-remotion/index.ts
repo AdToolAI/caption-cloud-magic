@@ -82,10 +82,27 @@ const THROTTLE_PATTERNS = [
   /throttl/i,
 ];
 
+// Transient network/runtime failures from the AWS SDK call itself
+// (connection abort, idle timeout) — should be retried like throttling.
+const TRANSIENT_PATTERNS = [
+  /operation was aborted/i,
+  /\baborted\b/i,
+  /\btimeout\b/i,
+  /idle timeout/i,
+  /network error/i,
+  /fetch failed/i,
+  /connection.*(reset|closed)/i,
+];
+
 function isThrottleSignal(status: number, body: string): boolean {
   if (status === 429) return true;
   if (status >= 500 && /rate|throttl|concurrency/i.test(body)) return true;
   return THROTTLE_PATTERNS.some((rx) => rx.test(body));
+}
+
+function isTransientSignal(message: string): boolean {
+  return THROTTLE_PATTERNS.some((rx) => rx.test(message))
+    || TRANSIENT_PATTERNS.some((rx) => rx.test(message));
 }
 
 async function startRemotionRender(params: {
@@ -189,21 +206,26 @@ async function startRemotionRender(params: {
       return { ok: true, realRenderId, lambdaRequestId };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Lambda start error';
+      const transient = isTransientSignal(message);
       const throttled = THROTTLE_PATTERNS.some((rx) => rx.test(message));
       console.error(`❌ Lambda start failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, error);
-      if (throttled && attempt < MAX_ATTEMPTS) {
+      if (transient && attempt < MAX_ATTEMPTS) {
         const wait = BACKOFFS_MS[attempt - 1];
         await supabaseAdmin
           .from('video_renders')
-          .update({ error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 1}/${MAX_ATTEMPTS})…` })
+          .update({ error_message: `Verbindung zu AWS unterbrochen, neuer Versuch ${attempt + 1}/${MAX_ATTEMPTS}…` })
           .eq('render_id', pendingRenderId);
         await new Promise((r) => setTimeout(r, wait));
         continue;
       }
-      const category = /timeout|idle/i.test(message) ? 'timeout' : (throttled ? 'rate_limit' : 'lambda_start_failed');
+      const category = /timeout|aborted|idle/i.test(message)
+        ? 'timeout'
+        : (throttled ? 'rate_limit' : 'lambda_start_failed');
       const friendly = throttled
         ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
-        : `Lambda-Start Ausnahme: ${message}`;
+        : category === 'timeout'
+          ? 'AWS hat den Render-Start abgebrochen (Netzwerk-Timeout). Bitte erneut starten.'
+          : `Lambda-Start Ausnahme: ${message}`;
       await failRenderAndRefundOnce({
         supabaseAdmin, pendingRenderId, userId, creditsRequired,
         message: friendly, category,
@@ -578,9 +600,11 @@ serve(async (req) => {
       muted: false,
       audioCodec: 'aac',
       
-      // Execution
-      maxRetries: 1,
-      timeoutInMilliseconds: 300000,
+      // r70: Force stability scheduling (fewer, longer Lambdas) for Universal Creator
+      // to avoid AWS Concurrency / "Rate Exceeded" aborts that we keep hitting in
+      // distributed mode. Let Remotion handle its own internal sub-Lambda retries.
+      _schedulingMode: 'stability',
+      timeoutInMilliseconds: 600000,
       
       // Output
       bucketName,

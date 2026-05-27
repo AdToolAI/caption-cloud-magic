@@ -15,6 +15,7 @@ import { mapBackgroundAssetToUniversalVideo } from '@/lib/background-asset-mappe
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useTranslation } from '@/hooks/useTranslation';
+import { extractFunctionsError } from '@/lib/functionsError';
 
 interface PreviewExportStepProps {
   formatConfig: FormatConfig;
@@ -371,15 +372,17 @@ export function PreviewExportStep({
           });
 
           if (error) {
-            throw error;
+            const detail = await extractFunctionsError(error);
+            throw new Error(detail || t('uc.failed'));
           }
 
           // Edge function may return { ok:false, error, error_category } for clean failures
           // (e.g. AWS throttling) — surface them immediately instead of polling for 10 min.
           if (data && data.ok === false) {
-            const friendly = /aborted|timeout/i.test(String(data.error || ''))
-              ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
-              : (data.error || t('uc.failed'));
+            const raw = String(data.error || '');
+            const friendly = /aborted|timeout/i.test(raw)
+              ? 'AWS hat den Render-Start abgebrochen. Bitte in einer Minute erneut starten.'
+              : (raw || t('uc.failed'));
             throw new Error(friendly);
           }
 
