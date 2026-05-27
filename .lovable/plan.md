@@ -1,34 +1,36 @@
-## Problem
+## Befund
 
-Neue Fehlermeldung im UI:
-> `Request idle timeout limit (150s) reached (IDLE_TIMEOUT)`
+Der aktuelle Fehler ist nicht mehr der Edge-Function-`IDLE_TIMEOUT`. Der Render startet inzwischen und bekommt eine echte Remotion-Render-ID. Danach bricht die Remotion Lambda Runtime selbst ab:
 
-Ursache: Mit der letzten Änderung wartet `render-with-remotion` synchron auf den AWS Lambda-Start (`await startRemotionRender`). Wenn AWS in den ersten Versuchen abbricht (`operation was aborted`) und unsere Retry-Schedule `[2s, 5s, 10s]` plus tatsächliche AWS-Latenz dazukommt, überschreitet die Edge Function den harten Supabase-Idle-Timeout von **150 s** — die Antwort kommt nie an, das Frontend zeigt `IDLE_TIMEOUT`.
+```text
+AbortError: The operation was aborted
+failure_stage: lambda-runtime
+```
 
-Wir hatten vorher schon `EdgeRuntime.waitUntil` benutzt, das funktioniert; das Problem damals war nur, dass die `real_remotion_render_id` zu spät geschrieben wurde. Das lässt sich aber rein über den Polling-Pfad sauber abfangen — der Webhook ist ohnehin die maßgebliche Quelle.
+In den letzten fehlgeschlagenen Jobs sieht man außerdem, dass die Szenen externe Pixabay-Video-URLs direkt in Remotion laden. Das ist wahrscheinlich der neue Engpass: Lambda muss mehrere Remote-MP4s plus Audio während des Renderns streamen; wenn ein Stream abbricht, meldet Remotion nur generisch `The operation was aborted`.
 
 ## Plan
 
-### 1. `supabase/functions/render-with-remotion/index.ts` — zurück auf asynchronen Lambda-Start
-- DB-Insert (`video_renders` mit `status: 'rendering'`) bleibt **vor** dem Lambda-Call (wie heute).
-- `startRemotionRender(...)` nicht mehr `await`en, sondern in `EdgeRuntime.waitUntil(...)` einhängen.
-- Sofort `200 OK` mit `{ ok: true, render_id: pendingRenderId, status: 'rendering' }` zurückgeben — `real_remotion_render_id` wird durch den Hintergrundlauf später in `content_config` geschrieben (Code dafür existiert bereits in `startRemotionRender`).
-- Bei nicht abgefangenen Fehlern im Hintergrund kümmert sich `failRenderAndRefundOnce` bereits um Status `failed` + idempotenten Refund.
+1. **Remotion-Template entschärfen**
+   - In `src/remotion/templates/UniversalCreatorVideo.tsx` die `[FORENSIC]`-Debug-Ausgaben von `console.error` auf normale Debug-/Info-Ausgabe umstellen oder entfernen, damit sie nicht mehr als rote Fehler im Browser erscheinen.
+   - `SafeVideo` robuster machen: keine unnötige `pauseWhenBuffering`-Blockade für dekorative Hintergrundvideos, sauberer Fallback auf Gradient, wenn Remote-Video nicht lädt.
 
-### 2. `supabase/functions/check-remotion-progress/index.ts` — Warmlauf-Phase tolerieren
-- Bestehende Logik („wenn jünger als 30 s und keine `real_remotion_render_id` → weiter `rendering` melden") leicht erhöhen auf **60 s**, damit der asynchrone Start nicht fälschlich als `start_failed` markiert wird.
-- Wenn nach > 60 s immer noch keine `real_remotion_render_id` da ist und der DB-Status nicht `failed` ist, weiter `rendering` melden (Webhook übernimmt am Ende) — also keine neue Eskalation, nur die Schwelle anheben.
+2. **Universal-Creator-Render stabilisieren**
+   - In `supabase/functions/render-with-remotion/index.ts` für `UniversalCreatorVideo` zunächst einen stabilen Render-Pfad aktivieren: externe Hintergrundvideos werden vor dem Lambda-Start in sichere statische/Gradient-Fallbacks umgewandelt oder optional als Video deaktiviert.
+   - Voiceover und Musik bleiben erhalten, damit der eigentliche Export weiterhin nutzbar ist.
+   - Zusätzlich `customData` um Diagnosefelder ergänzen, damit Webhook/DB später eindeutig zeigen, ob ein stabilisierter Render-Pfad verwendet wurde.
 
-### 3. `src/components/universal-creator/steps/PreviewExportStep.tsx` — Fehlermeldung-Mapping
-- `IDLE_TIMEOUT`/`idle timeout` aus der Backend-Antwort weiterhin abfangen und als „AWS-Start dauert ungewöhnlich lang. Bitte erneut versuchen." anzeigen — als zusätzlicher Sicherheitsnetz-Fall, falls der Edge-Function-Wrapper selbst (vor unserer Antwort) timed-outet.
-- Sonst keine UI-Änderungen.
+3. **Webhook-Fehler richtig klassifizieren und Credits zuverlässig erstatten**
+   - In `supabase/functions/remotion-webhook/index.ts` `AbortError` / `The operation was aborted` als `timeout` oder `lambda_crash` klassifizieren statt `unknown`.
+   - Den Refund idempotent machen wie bei `render-with-remotion`: `credit_refund_done` prüfen und erst dann Credits zurückgeben. Aktuell steht bei den letzten Fehlern `credit_refund_done:false`, obwohl refunded wurde/werden sollte; das muss konsistent werden.
 
-### 4. Verifikation
-- `render-with-remotion` und `check-remotion-progress` deployen.
-- In den Edge-Function-Logs prüfen: Antwort kommt unter ~2 s, `EdgeRuntime.waitUntil` schreibt `real_remotion_render_id` innerhalb von ~10–30 s.
-- Frontend: Render starten → kein `IDLE_TIMEOUT` mehr; Status geht über `rendering` → `completed`.
+4. **Polling weniger irreführend machen**
+   - In `supabase/functions/check-remotion-progress/index.ts` S3-`ListObjects`-403 nicht wiederholt als Warn-Fehler behandeln, weil die HEAD-/Webhook-Wege ausreichen. Das reduziert Log-Rauschen und falsche Fehlersuche.
 
-## Was sich **nicht** ändert
+5. **Deploy und Verifikation**
+   - Betroffene Edge Functions deployen: `render-with-remotion`, `remotion-webhook`, optional `check-remotion-progress`.
+   - Danach Logs prüfen: Render sollte nicht mehr mit `AbortError` wegen Remote-Video-Streaming abbrechen; bei echtem Lambda-Abbruch wird der Fehler korrekt kategorisiert und Credits werden genau einmal erstattet.
 
-- Scheduling-Mode (`stability`), `timeoutInMilliseconds: 600000`, Backoff-Schedule, Webhook-Pfad, Credit-Refund-Logik.
-- `failRenderAndRefundOnce` bleibt 1:1 — Refund weiterhin idempotent über `credit_refund_done`.
+## Erwartetes Ergebnis
+
+Der Render läuft nicht mehr in den Edge-Function-Timeout, und der aktuelle Lambda-Abbruch durch instabile Remote-Medien wird abgefangen bzw. vermieden. Falls AWS/Remotion dennoch abbricht, sieht die App eine klare Fehlerkategorie und Credits werden zuverlässig zurückgebucht.
