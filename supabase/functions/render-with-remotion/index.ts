@@ -600,9 +600,11 @@ serve(async (req) => {
       muted: false,
       audioCodec: 'aac',
       
-      // Execution
-      maxRetries: 1,
-      timeoutInMilliseconds: 300000,
+      // r70: Force stability scheduling (fewer, longer Lambdas) for Universal Creator
+      // to avoid AWS Concurrency / "Rate Exceeded" aborts that we keep hitting in
+      // distributed mode. Let Remotion handle its own internal sub-Lambda retries.
+      _schedulingMode: 'stability',
+      timeoutInMilliseconds: 600000,
       
       // Output
       bucketName,
