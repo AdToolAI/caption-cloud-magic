@@ -391,6 +391,7 @@ export function PreviewExportStep({
                     status: 'rendering',
                     progress: 20,
                     renderId: data.render_id,
+                    startedAt: Date.now(),
                   }
                 : j
             )
