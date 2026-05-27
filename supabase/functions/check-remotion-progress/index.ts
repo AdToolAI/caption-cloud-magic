@@ -10,7 +10,7 @@ const corsHeaders = {
 const AWS_REGION = 'eu-central-1';
 const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
 const RENDER_TIMEOUT_SECONDS = 720; // 12 min
-const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 360; // 6 min for short UCC exports
+const UNIVERSAL_CREATOR_TIMEOUT_SECONDS = 600; // 10 min — accommodates AWS throttle backoff retries
 const MAX_RECONCILIATION_PAGES = 20; // max 20 pages × 200 keys = 4000 keys
 
 serve(async (req) => {
