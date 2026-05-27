@@ -206,21 +206,26 @@ async function startRemotionRender(params: {
       return { ok: true, realRenderId, lambdaRequestId };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown Lambda start error';
+      const transient = isTransientSignal(message);
       const throttled = THROTTLE_PATTERNS.some((rx) => rx.test(message));
       console.error(`❌ Lambda start failed (attempt ${attempt}/${MAX_ATTEMPTS}):`, error);
-      if (throttled && attempt < MAX_ATTEMPTS) {
+      if (transient && attempt < MAX_ATTEMPTS) {
         const wait = BACKOFFS_MS[attempt - 1];
         await supabaseAdmin
           .from('video_renders')
-          .update({ error_message: `Warte auf AWS-Kapazität (Versuch ${attempt + 1}/${MAX_ATTEMPTS})…` })
+          .update({ error_message: `Verbindung zu AWS unterbrochen, neuer Versuch ${attempt + 1}/${MAX_ATTEMPTS}…` })
           .eq('render_id', pendingRenderId);
         await new Promise((r) => setTimeout(r, wait));
         continue;
       }
-      const category = /timeout|idle/i.test(message) ? 'timeout' : (throttled ? 'rate_limit' : 'lambda_start_failed');
+      const category = /timeout|aborted|idle/i.test(message)
+        ? 'timeout'
+        : (throttled ? 'rate_limit' : 'lambda_start_failed');
       const friendly = throttled
         ? 'AWS-Kapazität gerade ausgelastet. Bitte in einer Minute erneut starten.'
-        : `Lambda-Start Ausnahme: ${message}`;
+        : category === 'timeout'
+          ? 'AWS hat den Render-Start abgebrochen (Netzwerk-Timeout). Bitte erneut starten.'
+          : `Lambda-Start Ausnahme: ${message}`;
       await failRenderAndRefundOnce({
         supabaseAdmin, pendingRenderId, userId, creditsRequired,
         message: friendly, category,
