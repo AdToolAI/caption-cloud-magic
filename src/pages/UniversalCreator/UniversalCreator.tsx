@@ -360,6 +360,33 @@ export function UniversalCreator() {
     <div className="container mx-auto py-8 px-4 space-y-6 max-w-7xl">
       {/* Progress Stepper */}
       <Card className="p-6">
+        <div className="flex items-center justify-end mb-4">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                {t('uc.newProject') || 'Neues Projekt'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {t('uc.newProjectConfirmTitle') || 'Neues Projekt starten?'}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('uc.newProjectConfirmDesc') ||
+                    'Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel') || 'Abbrechen'}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleNewProject}>
+                  {t('uc.newProject') || 'Neues Projekt'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
         <div className="flex items-center justify-between">
           {WIZARD_STEPS.map((step, index) => (
             <div key={step.id} className="flex items-center flex-1">
