@@ -1,37 +1,41 @@
 ## Befund
 
-Die Buckets waren in den letzten Fixes vertauscht. Korrekt ist:
+Der Serve-URL-Fix ist aktiv: Die aktuellen Logs zeigen, dass `serveUrl` jetzt korrekt auf den neuen Bundle-Bucket `remotionlambda-eucentral1-6ul51trd3p` zeigt.
 
-| Zweck | Bucket |
-|---|---|
-| Bundle (Serve URL) — **korrekt/neu** | `remotionlambda-eucentral1-6ul51trd3p` |
-| Output / falsch verwendet als „canonical" | `remotionlambda-eucentral1-13gm4o6s90` |
+Der neue Fehler kommt danach aus dem Remotion-Lambda-Webhook:
 
-Die zuvor eingebaute `normalizeRemotionServeUrl()` in `render-with-remotion` zieht jeden Wert auf den **falschen** Bucket `13gm4o6s90` und überschreibt damit gerade das, was vom Secret korrekt gesetzt wurde. Deshalb landet der Render bei `…-13gm4o6s90/sites/adtool-remotion-bundle/index.html`, wo S3 mit `AllAccessDisabled` antwortet (dort liegt das Bundle nicht).
+- `bucketName`: `remotionlambda-eucentral1-13gm4o6s90`
+- Fehler: `AccessDenied: Access Denied`
+- Stadium: Lambda-Runtime, nicht mehr beim Laden des Bundles
 
-Außerdem zeigt `scripts/deploy-remotion-bundle.sh` aktuell auf den falschen Bucket `13gm4o6s90`, sodass jedes erneute Deploy das Bundle weiterhin in den falschen Bucket schreiben würde.
+Das bedeutet: Der alte Bucket wird jetzt als Output-Bucket verwendet. Dort versucht Lambda zu schreiben/lesen bzw. ACLs zu setzen. Genau das scheitert mit S3/IAM-Berechtigungen.
 
 ## Plan
 
-1. **Canonical-Bucket korrigieren**
-   - In `supabase/functions/render-with-remotion/index.ts` den `DEFAULT_BUCKET_NAME` (bzw. die Normalisierungs-Konstante) auf `remotionlambda-eucentral1-6ul51trd3p` setzen.
-   - `normalizeRemotionServeUrl()` umdrehen: wenn das Secret auf `…-13gm4o6s90` zeigt, automatisch auf `…-6ul51trd3p` umschreiben. Sonst Secret unverändert übernehmen.
-   - Warn-Log bleibt erhalten, aber mit korrektem „from/to".
+1. **Output-Bucket nicht mehr hart auf den alten Bucket erzwingen**
+   - In `render-with-remotion` die feste `bucketName = DEFAULT_BUCKET_NAME`-Übergabe entfernen oder auf den funktionierenden Bundle-/Lambda-Bucket umstellen.
+   - Ziel: Remotion Lambda soll nicht mehr in `remotionlambda-eucentral1-13gm4o6s90` schreiben, wenn dieser Bucket keine gültigen Rechte hat.
 
-2. **Deploy-Skript korrigieren**
-   - In `scripts/deploy-remotion-bundle.sh` `S3_BUCKET` auf `remotionlambda-eucentral1-6ul51trd3p` setzen, Site-Pfad bleibt `sites/adtool-remotion-bundle`.
-   - Verifizierungs-URL am Ende des Skripts entsprechend anpassen.
+2. **Payload-Normalisierung absichern**
+   - In `_shared/remotion-payload.ts` verhindern, dass ein leerer oder veralteter `bucketName` wieder in den Lambda-Payload gelangt.
+   - Falls `bucketName` weggelassen wird, kann Remotion den passenden Bucket selbst bestimmen; alternativ nutzen wir den neuen `6ul51trd3p`-Bucket konsistent für Bundle und Output.
 
-3. **Edge-Function deployen**
-   - `render-with-remotion` neu deployen, damit die invertierte Normalisierung aktiv wird.
+3. **Datenbank-Tracking anpassen**
+   - `video_renders.bucket_name` und `content_config.bucket_name` dürfen nicht mehr irreführend den alten Bucket speichern, wenn der Render nicht dort landet.
+   - Bei automatischer Bucket-Wahl speichern wir `null` oder den tatsächlich verwendeten Bucket aus dem Lambda/Webhook.
 
-4. **Verifikation**
-   - Erneut „1 Format(e) rendern" klicken.
-   - In den Function-Logs prüfen, dass `serveUrl` jetzt mit `…-6ul51trd3p…` beginnt.
-   - Wenn weiterhin `AllAccessDisabled` auftritt, liegt es an AWS-Bucket-Policy/Public-Access-Block auf `…-6ul51trd3p` — dann ist es kein Code-Problem mehr.
+4. **Edge Function neu deployen**
+   - `render-with-remotion` deployen.
+   - Falls `_shared/remotion-payload.ts` geändert wird, wird es mit der Funktion mitdeployt.
+
+5. **Verifikation über Logs**
+   - Neuen Test-Render starten.
+   - Prüfen, dass der Lambda-Payload entweder keinen `bucketName` mehr enthält oder nicht mehr `13gm4o6s90` nutzt.
+   - Wenn danach weiterhin `AccessDenied` kommt, ist es eindeutig eine AWS-IAM/S3-Policy der tatsächlich verwendeten Output-Location.
 
 ## Technische Details
 
-- Keine Schema- oder Daten-Änderungen.
-- Keine Secret-Änderung nötig — Code-seitige Normalisierung deckt sowohl korrekt gesetzte als auch veraltete Secret-Werte ab.
-- `DEFAULT_BUCKET_NAME` wird projektweit nur für die Serve-URL-Normalisierung verwendet; Output-Bucket-Logik bleibt unverändert (Remotion Lambda nutzt seinen eigenen konfigurierten Output-Bucket).
+- Die Serve URL ist nicht mehr das Problem; sie zeigt bereits korrekt auf `6ul51trd3p`.
+- Der Fehler entsteht beim Output-Bucket `13gm4o6s90`.
+- Remotion-Doku empfiehlt, `forceBucketName`/festen Bucket nicht zu erzwingen, sondern Remotion den Bucket bestimmen zu lassen, außer die IAM-Rechte sind garantiert korrekt.
+- Kein Datenbankschema nötig, keine Migration nötig.
