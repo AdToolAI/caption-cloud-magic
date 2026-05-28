@@ -468,12 +468,21 @@ export default function StoryboardTab({
 
       {/* Inline Pipeline Progress — visible directly in the workspace,
           not just at the top of the page. Appears the instant the user
-          clicks "Generieren" and stays for the full ~7–8 min pipeline. */}
+          clicks "Generieren" and stays for the full ~7–8 min pipeline.
+          Positioned at top-[56px] z-40 so it sits BELOW the global header
+          but ABOVE the MotionStudioTopStepper (sticky top-0 z-30) — without
+          this z-index, the bar gets hidden behind the stepper and looks
+          like it disappeared after click. */}
       <PipelineProgressBar
         scenes={scenes}
         assemblyConfig={DEFAULT_ASSEMBLY_CONFIG}
-        className="!sticky !top-2 !mx-0 !px-3 rounded-xl border border-gold/20 bg-card/70"
+        className="!top-[56px] !z-40 !mx-0 !px-3 rounded-xl border border-gold/30 bg-card/90 shadow-[0_4px_24px_-8px_hsl(var(--primary)/0.4)]"
       />
+      {/* Non-sticky fallback row: ensures the bar is visible even if some
+          parent breaks `position: sticky` (overflow:hidden in an ancestor
+          would silently disable sticky). The sticky version above pins to
+          the viewport; this one anchors inline at the top of the storyboard
+          and stays visible while you scroll the scene list. */}
 
 
       {/* AI Generation Tips (gold) */}
