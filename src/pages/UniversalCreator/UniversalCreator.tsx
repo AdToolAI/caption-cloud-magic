@@ -377,28 +377,40 @@ export function UniversalCreator() {
           <Card className="p-6 sticky top-6 space-y-4">
             <h3 className="text-lg font-semibold">{t('uc.livePreview')}</h3>
             
-            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 2 && currentStep < 4 && (
-              <div className="relative rounded-lg overflow-hidden bg-black" style={{ aspectRatio: formatConfig.width / formatConfig.height }}>
-                {scenes.length > 0 && scenes[0]?.background?.videoUrl ? (
-                  <video src={scenes[0].background.videoUrl} className="w-full h-full object-contain" loop muted autoPlay playsInline />
-                ) : backgroundAsset?.url ? (
-                  backgroundAsset.type === 'video' ? (
-                    <video src={backgroundAsset.url} className="w-full h-full object-contain" loop muted autoPlay playsInline />
-                  ) : (
-                    <img src={backgroundAsset.url} alt="Background" className="w-full h-full object-contain" />
-                  )
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">{t('uc.previewLoading')}</p>
-                  </div>
-                )}
-                <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                  {t('uc.simplePreview')}
-                </div>
-              </div>
-            )}
+            {formatConfig && (backgroundAsset || scenes.length > 0) && currentStep === 2 && (() => {
+              // Prefer currently-selected background asset (next scene preview),
+              // fall back to last added scene, then first scene.
+              const previewSource =
+                backgroundAsset?.url
+                  ? { type: backgroundAsset.type, url: backgroundAsset.url }
+                  : (() => {
+                      const last = scenes[scenes.length - 1];
+                      if (last?.background?.videoUrl) return { type: 'video' as const, url: last.background.videoUrl };
+                      if (last?.background?.imageUrl) return { type: 'image' as const, url: last.background.imageUrl };
+                      return null;
+                    })();
 
-            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 4 && (
+              return (
+                <div className="relative rounded-lg overflow-hidden bg-black" style={{ aspectRatio: formatConfig.width / formatConfig.height }}>
+                  {previewSource ? (
+                    previewSource.type === 'video' ? (
+                      <video key={previewSource.url} src={previewSource.url} className="w-full h-full object-contain" loop muted autoPlay playsInline />
+                    ) : (
+                      <img src={previewSource.url} alt="Background" className="w-full h-full object-contain" />
+                    )
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <p className="text-sm text-muted-foreground">{t('uc.previewLoading')}</p>
+                    </div>
+                  )}
+                  <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                    {backgroundAsset ? t('uc.simplePreview') + ' — ' + (scenes.length > 0 ? '→ next scene' : '→ scene 1') : t('uc.simplePreview')}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 3 && (
               <RemotionPreviewPlayer
                 componentName="UniversalCreatorVideo"
                 customizations={{
