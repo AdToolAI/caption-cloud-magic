@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.compose-clip-webhook]
 verify_jwt = false
 
+[functions.sync-so-webhook]
+verify_jwt = false
+
 [functions.compose-video-clips]
 verify_jwt = true
 timeout_sec = 180
