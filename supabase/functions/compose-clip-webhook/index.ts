@@ -72,14 +72,36 @@ serve(async (req) => {
       // Update scene — also clear any stale clip_error from a previous failed
       // engine (e.g. HeyGen "Talking Photo deleted") so the UI doesn't show a
       // misleading error next to a freshly rendered Hailuo clip.
+      //
+      // Atomic Cinematic-Sync handoff: if this scene is cinematic-sync and the
+      // previous clip_source label is still ai-happyhorse (legacy / stale from
+      // before the Stage 2 hotfix), normalize it to ai-hailuo here. Otherwise
+      // the auto-trigger below would call compose-dialog-scene which would
+      // re-invalidate the freshly finished master and the user is stuck in
+      // an endless "Clip wird erstellt" loop.
+      const { data: preUpdateScene } = await supabase
+        .from('composer_scenes')
+        .select('engine_override, clip_source, lip_sync_status, twoshot_stage')
+        .eq('id', sceneId)
+        .maybeSingle();
+      const isCinematicSync =
+        String((preUpdateScene as any)?.engine_override ?? '') === 'cinematic-sync';
+      const staleHappyHorseLabel =
+        String((preUpdateScene as any)?.clip_source ?? '') === 'ai-happyhorse';
+      const sceneUpdate: Record<string, unknown> = {
+        clip_url: permanentUrl,
+        clip_status: 'ready',
+        clip_error: null,
+        updated_at: new Date().toISOString(),
+      };
+      if (isCinematicSync) {
+        if (staleHappyHorseLabel) sceneUpdate.clip_source = 'ai-hailuo';
+        sceneUpdate.lip_sync_status = 'pending';
+        sceneUpdate.twoshot_stage = 'master_clip';
+      }
       await supabase
         .from('composer_scenes')
-        .update({
-          clip_url: permanentUrl,
-          clip_status: 'ready',
-          clip_error: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(sceneUpdate)
         .eq('id', sceneId);
 
       // 📚 Auto-archive every generated AI clip into the Media Library (KI tab).

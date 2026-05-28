@@ -1,63 +1,37 @@
 ## Befund
 
-Die Szene ist in der Datenbank nicht mehr wirklich in der Szenengeneration:
-
-- Szene 1 hat `clip_status = ready`
-- `clip_url` ist vorhanden
-- `lip_sync_status = pending`
-- `dialog_shots = null`
-- In den Logs gibt es keinen Aufruf von `compose-dialog-scene` für diese Szene
-
-Das heißt: Der Master-Clip ist fertig, aber der automatische Übergang zum Lip-Sync wurde nicht zuverlässig gestartet. Die UI zeigt weiter „Szene wird gebaut…“, weil sie bei Cinematic-Sync `status === ready + lip_sync pending` als laufende Arbeit interpretiert.
-
-## Problem
-
-Der aktuelle Auto-Trigger hängt zu stark am Client/Tab-Polling und an `EdgeRuntime.waitUntil` im Clip-Webhook. Wenn der Webhook-Background-Task oder der Client-Trigger ausfällt, bleibt die Szene im Zwischenzustand:
-
-```text
-clip ready -> lip_sync pending -> kein dialog_shots State -> kein poll-dialog-shots -> kein Lip-Sync
-```
-
-Das ist genau der Zustand im Screenshot.
+- Ja: **HappyHorse läuft bei uns über Replicate** (`alibaba/happyhorse-1.0`).
+- Für **Cinematic-Sync mit 2 Sprechern** wird HappyHorse aber inzwischen absichtlich blockiert und auf **Hailuo** umgestellt, weil HappyHorse als Master-Plate für Multi-Personen-Lip-Sync zu stark driftet.
+- Der aktuelle Hänger ist nicht mehr HappyHorse selbst: Die betroffene Szene wurde bereits auf `ai-hailuo` migriert.
+- Der eigentliche Fehler ist ein **Race im Webhook/Retroactive-Guard**:
+  - Hailuo liefert den Clip erfolgreich zurück.
+  - `compose-clip-webhook` setzt `clip_url`/`clip_status=ready`.
+  - Danach ruft der Webhook `compose-dialog-scene` auf.
+  - `compose-dialog-scene` sieht aber noch `clip_source=ai-happyhorse`, invalidiert den gerade fertigen Clip wieder und setzt `clip_status=pending`.
+  - Ergebnis: UI bleibt bei Clip-Generierung hängen; Lip-Sync startet nicht zuverlässig.
 
 ## Plan
 
-1. **Backend-Übergang robust machen**
-   - `compose-clip-webhook` soll den Lip-Sync-Start für Cinematic-Sync nicht nur als stillen Background-Fetch versuchen.
-   - Nach erfolgreichem Master-Clip wird ein verlässlicher Startmarker gesetzt bzw. `compose-dialog-scene` so angestoßen, dass Fehler sichtbar in `clip_error` landen.
-   - Falls der direkte Start nicht klappt, bleibt die Szene nicht unsichtbar hängen.
+1. **Retroactive HappyHorse-Guard korrigieren**
+   - `compose-dialog-scene` darf einen fertigen Hailuo-Master nicht mehr wegwerfen, nur weil `clip_source` noch stale `ai-happyhorse` ist.
+   - Wenn bereits ein valider `clip_url` existiert und die aktuelle Prediction vom Hailuo-Neurender kommt, soll die Funktion direkt den Dialog-Shot-State erzeugen statt erneut zu invalidieren.
 
-2. **Client Auto-Trigger erweitern**
-   - `useTwoShotAutoTrigger` soll genau diesen Zustand erkennen:
-     - `engine_override = cinematic-sync`
-     - `clip_status = ready`
-     - `clip_url` vorhanden
-     - `lip_sync_status = pending/null`
-     - `dialog_shots = null`
-   - Dann `compose-dialog-scene` erneut anstoßen, auch wenn `twoshot_stage` leer ist.
-   - Wichtig: keinen Optimistic-Lock, der die Edge Function wieder blockiert.
+2. **Webhook atomar machen**
+   - `compose-clip-webhook` soll bei Cinematic-Sync nach erfolgreichem Clip nicht nur `clip_url` und `clip_status` setzen, sondern auch sicherstellen:
+     - `clip_source = 'ai-hailuo'`, wenn HappyHorse zuvor für Multi-Speaker migriert wurde
+     - `lip_sync_status = 'pending'`
+     - `twoshot_stage = 'master_clip'`
+   - Damit liest `compose-dialog-scene` keinen alten HappyHorse-State mehr.
 
-3. **UI ehrlich machen**
-   - In der Szenenkarte nicht mehr „Szene wird gebaut…“ anzeigen, wenn der Clip schon fertig ist.
-   - Stattdessen: „Lip-Sync startet…“ oder „Lip-Sync läuft“, damit klar ist, welche Phase hängt.
-   - Wenn nach einer Wartezeit keine `dialog_shots` entstehen, Fehler/Retry-Hinweis statt endloser Bau-Overlay.
+3. **Kickstart-Sweep gegen Endlosschleifen härten**
+   - `poll-dialog-shots` soll Szenen, bei denen `compose-dialog-scene` mit `missing_audio_plan` oder einem Guard-Fehler scheitert, sichtbar auf `failed`/`clip_error` setzen statt jede Minute denselben unsichtbaren Start zu wiederholen.
+   - Für Szenen mit fertigem Audio-Plan und fertigem Clip soll der Sweep weiterhin Lip-Sync starten.
 
-4. **Poller-Recovery ergänzen**
-   - `poll-dialog-shots` bleibt zuständig, sobald `dialog_shots` existieren.
-   - Der Client soll laufende `dialog_shots` weiter anpollern, aber nicht mehrere parallele Starts auslösen.
+4. **Betroffene Szene reparieren**
+   - Die aktuelle Szene wieder auf den fertigen Master-Zustand bringen, falls der Webhook ihn gerade gelöscht hat.
+   - Danach `compose-dialog-scene` einmal direkt anstoßen, damit `dialog_shots` erzeugt werden und `poll-dialog-shots` Sync.so startet.
 
-5. **Betroffene Szene neu anstoßen**
-   - Szene `63ca7ed3-5771-4d4e-8e84-a8df3e78bb36` auf sauberen Lip-Sync-Pending-State setzen und `compose-dialog-scene` einmal direkt starten.
-   - Danach sollte `dialog_shots` angelegt werden und der Status von `pending` auf `running/lipsyncing` wechseln.
-
-## Dateien
-
-- `src/hooks/useTwoShotAutoTrigger.ts`
-- `src/components/video-composer/SceneInlinePlayer.tsx`
-- optional `src/components/video-composer/SceneClipProgress.tsx`
-- `supabase/functions/compose-clip-webhook/index.ts`
-- ggf. direkte Datenkorrektur für die betroffene Szene
-
-## Erwartetes Ergebnis
-
-Die Pipeline bleibt nicht mehr zwischen fertigem Hailuo-Clip und Lip-Sync hängen. Sobald der Master-Clip fertig ist, wird `compose-dialog-scene` zuverlässig gestartet; im UI steht dann Lip-Sync statt Szenengeneration. Wenn der Start scheitert, gibt es einen echten Fehler mit Retry statt endlosem Spinner.
+5. **Validierung**
+   - Logs prüfen: kein erneutes „HappyHorse invalidating master“ nach Hailuo-Erfolg.
+   - Datenbank prüfen: Szene geht von `ready + pending` zu `dialog_shots.version=4` und dann `lip_sync_status=running/stitching/done`.
+   - UI sollte dann nicht mehr bei „Clips“ hängen, sondern den Lip-Sync-Schritt anzeigen.

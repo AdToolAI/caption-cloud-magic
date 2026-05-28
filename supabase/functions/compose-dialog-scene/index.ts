@@ -410,16 +410,19 @@ serve(async (req) => {
     if (!userId) return json({ error: "missing_user" }, 403);
 
     // ─── STAGE 2 HOTFIX (May 2026): retroactive HappyHorse-master guard ────
-    // The `compose-video-clips` guard only blocks HappyHorse before the first
-    // master render. If the user clicks "🔁 Lip-Sync neu rendern" on a scene
-    // whose master plate was already rendered with HappyHorse 1.0 (high
-    // identity-drift, unsuitable for 2-speaker lip-sync masters), Sync.so
-    // animates mouths on a structurally broken plate → visible mouth-offset
-    // regardless of Sync.so quality. We must invalidate the master here too.
+    // Only invalidate when the master plate is NOT yet a usable rendered clip.
+    // If clip_url already exists and clip_status='ready', the master was either
+    // (a) a successful Hailuo regen whose clip_source label is just stale, or
+    // (b) the user explicitly wants to lipsync the existing master. In both
+    // cases we must NOT throw it away — that caused the "render never finishes"
+    // loop where every webhook auto-trigger nuked the freshly finished clip.
     {
       const cs = String((scene as any).clip_source ?? "");
       const eo = String((scene as any).engine_override ?? "auto");
-      if (cs === "ai-happyhorse" && eo === "cinematic-sync") {
+      const hasReadyClip =
+        !!(scene as any).clip_url &&
+        String((scene as any).clip_url).length > 0;
+      if (cs === "ai-happyhorse" && eo === "cinematic-sync" && !hasReadyClip) {
         const dlg = String((scene as any).dialog_script ?? "");
         const speakerNames = new Set(
           dlg
@@ -430,7 +433,7 @@ serve(async (req) => {
         );
         if (speakerNames.size >= 2) {
           console.warn(
-            `[compose-dialog-scene] scene ${sceneId}: HappyHorse + cinematic-sync + ${speakerNames.size} speakers — invalidating master & re-rendering with ai-hailuo (Stage 2 hotfix).`,
+            `[compose-dialog-scene] scene ${sceneId}: HappyHorse + cinematic-sync + ${speakerNames.size} speakers, no ready master — re-rendering with ai-hailuo (Stage 2 hotfix).`,
           );
           await supabase
             .from("composer_scenes")
@@ -449,9 +452,6 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
 
-          // Fire-and-forget compose-video-clips for this single scene; its
-          // webhook (`compose-clip-webhook`) will auto-retrigger
-          // compose-dialog-scene once the new Hailuo master is ready.
           const clipsPayload = {
             projectId: scene.project_id,
             scenes: [
@@ -496,6 +496,16 @@ serve(async (req) => {
             202,
           );
         }
+      }
+      // If the master is already a ready clip but clip_source is still the
+      // legacy HappyHorse label, silently normalize it to ai-hailuo so future
+      // sweeps and the UI don't misclassify it.
+      if (cs === "ai-happyhorse" && hasReadyClip) {
+        await supabase
+          .from("composer_scenes")
+          .update({ clip_source: "ai-hailuo", updated_at: new Date().toISOString() })
+          .eq("id", sceneId);
+        (scene as any).clip_source = "ai-hailuo";
       }
     }
 

@@ -842,6 +842,30 @@ serve(async (req) => {
               console.warn(
                 `[poll-dialog-shots] kickstart compose-dialog-scene ${r.id} failed ${resp.status}: ${t.slice(0, 300)}`,
               );
+              // Stop the endless cron loop: if compose-dialog-scene rejects
+              // with a permanent precondition error, mark the scene as failed
+              // with a clear clip_error so the UI shows a retry hint instead
+              // of spinning forever.
+              const permanent =
+                resp.status === 422 ||
+                resp.status === 400 ||
+                resp.status === 404 ||
+                resp.status === 403;
+              if (permanent) {
+                let code = `compose_dialog_scene_${resp.status}`;
+                try {
+                  const j = JSON.parse(t);
+                  if (j?.error) code = String(j.error);
+                } catch { /* keep default */ }
+                await supabase
+                  .from("composer_scenes")
+                  .update({
+                    lip_sync_status: "failed",
+                    clip_error: `lipsync_kickstart_failed:${code}`,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", r.id);
+              }
             }
           }).catch((e) => {
             console.warn(
@@ -856,6 +880,7 @@ serve(async (req) => {
         }
       }
     }
+
 
     if (sceneIds.length === 0) {
       return json({ ok: true, processed: 0, kickstarted });
