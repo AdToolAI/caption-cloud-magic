@@ -660,6 +660,49 @@ async function processScene(
   // onto the original master plate, trimmed to that turn's window, and
   // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
+    // ── Multi-speaker integrity gate ──────────────────────────────────
+    // For 2+ speakers, every shot MUST have been dispatched with
+    // deterministic coords. A `ready` shot without deterministic_coords
+    // means Sync.so ran in auto_detect and almost certainly animated the
+    // wrong face. Refuse to ship that as final output.
+    const multi = isMultiSpeakerScene(shots);
+    if (multi) {
+      const invalid = shots.filter(
+        (s) => !s.target_coords || s.deterministic_coords !== true,
+      );
+      if (invalid.length > 0) {
+        const ids = invalid.map((s) => s.idx).join(",");
+        console.error(
+          `[poll-dialog-shots] scene ${sceneId} multi-speaker integrity FAIL — shots [${ids}] missing deterministic coords; refusing stitch.`,
+        );
+        invalid.forEach((s) =>
+          markShotTerminalFailed(
+            s,
+            `multi_speaker_coords_missing: shot dispatched without deterministic face coords`,
+          ),
+        );
+        const failedState: DialogShotsState = {
+          ...newState,
+          shots,
+          status: "failed",
+        };
+        const refunded = userId
+          ? await refundIfNeeded(supabase, userId, failedState)
+          : failedState;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: refunded,
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: `lipsync_wrong_face_guard: shots ${ids} mis-targeted, bitte Szene neu rendern`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        return { status: "failed", mutated: true };
+      }
+    }
+
     // Idempotency guard — if a stitch render is already in flight, just
     // persist state and wait for the webhook to write clip_url back. If the
     // previous dispatch failed or never created a render row, clear the stale
