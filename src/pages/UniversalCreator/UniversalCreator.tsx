@@ -365,23 +365,20 @@ export function UniversalCreator() {
             <AlertDialogTrigger asChild>
               <Button variant="outline" size="sm" className="gap-2">
                 <Plus className="w-4 h-4" />
-                {t('uc.newProject') || 'Neues Projekt'}
+                Neues Projekt
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {t('uc.newProjectConfirmTitle') || 'Neues Projekt starten?'}
-                </AlertDialogTitle>
+                <AlertDialogTitle>Neues Projekt starten?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {t('uc.newProjectConfirmDesc') ||
-                    'Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.'}
+                  Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel>{t('common.cancel') || 'Abbrechen'}</AlertDialogCancel>
+                <AlertDialogCancel>Abbrechen</AlertDialogCancel>
                 <AlertDialogAction onClick={handleNewProject}>
-                  {t('uc.newProject') || 'Neues Projekt'}
+                  Neues Projekt starten
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
