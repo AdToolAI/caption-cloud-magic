@@ -38,7 +38,13 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
     : "auto";
 }
 
-function prepareRetryFromWebhook(shot: any, reason: string): boolean {
+const ASSUMED_MASTER_FPS = 24;
+
+function isMultiSpeakerScene(shots: any[]): boolean {
+  return new Set(shots.map((s) => s?.speaker_idx)).size >= 2;
+}
+
+function prepareRetryFromWebhook(shot: any, reason: string, allShots: any[]): boolean {
   if ((shot?.retry_count ?? 0) >= 1) return false;
   const failedMode = dispatchModeForShot(shot);
   shot.retry_count = (shot.retry_count ?? 0) + 1;
@@ -48,11 +54,29 @@ function prepareRetryFromWebhook(shot: any, reason: string): boolean {
   shot.started_at = undefined;
   shot.completed_at = undefined;
   shot.error = `retrying_after_${reason}`.slice(0, 300);
-  if (failedMode === "coords") {
+
+  if (isMultiSpeakerScene(allShots) && shot.target_coords) {
+    shot.force_coords = true;
+    shot.deterministic_coords = true;
+    const [start, end] = Array.isArray(shot.window) ? shot.window : [0, 0];
+    shot.frame_number_override = Math.max(
+      0,
+      Math.round(((Number(start) + Number(end)) / 2) * ASSUMED_MASTER_FPS),
+    );
+    console.warn(
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} speaker=${shot.speaker_name ?? "?"} ${reason} → retry coords-locked frame=${shot.frame_number_override} retry=${shot.retry_count}`,
+    );
+  } else if (failedMode === "coords") {
     shot.force_coords = false;
     shot.deterministic_coords = false;
+    console.warn(
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry auto fallback retry=${shot.retry_count}`,
+    );
   } else if (shot.target_coords) {
     shot.force_coords = true;
+    console.warn(
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry coords fallback retry=${shot.retry_count}`,
+    );
   }
   return true;
 }
@@ -165,7 +189,7 @@ serve(async (req) => {
     shot.output_url = outputUrl;
     shot.completed_at = nowIso;
     shot.error = undefined;
-  } else if (!prepareRetryFromWebhook(shot, `sync_${status}`)) {
+  } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
     shot.status = "failed";
     shot.error = `sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 240)}`;
     shot.completed_at = nowIso;
