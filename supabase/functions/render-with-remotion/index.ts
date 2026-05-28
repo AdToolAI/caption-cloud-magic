@@ -492,11 +492,14 @@ serve(async (req) => {
     });
 
     // Get configuration
-    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+    const rawRemotionServeUrl = Deno.env.get('REMOTION_SERVE_URL');
 
-    if (!REMOTION_SERVE_URL) {
+    if (!rawRemotionServeUrl) {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
+
+    const REMOTION_SERVE_URL = normalizeRemotionServeUrl(rawRemotionServeUrl);
+    console.log('🔗 Effective REMOTION_SERVE_URL:', REMOTION_SERVE_URL.substring(0, 120));
 
     const componentName = component_name || 'UniversalVideo';
 
