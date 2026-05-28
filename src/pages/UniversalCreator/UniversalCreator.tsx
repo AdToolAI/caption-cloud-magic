@@ -166,6 +166,26 @@ export function UniversalCreator() {
     }
   };
 
+  const handleNewProject = () => {
+    localStorage.removeItem('universal-creator-backup');
+    setProjectId(undefined);
+    setFormatConfig(null);
+    setContentConfig(null);
+    setBackgroundAsset(null);
+    setAudioConfig({
+      background_music_id: null,
+      music_volume: 0.3,
+      voiceover_id: null,
+      voiceover_volume: 1.0,
+      sound_effects: [],
+    });
+    setSelectedMusicUrl(null);
+    setSubtitleConfig(undefined);
+    setScenes([]);
+    setCurrentStep(0);
+    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
+  };
+
   const saveProgress = async () => {
     if (!user || !formatConfig) return;
     try {
