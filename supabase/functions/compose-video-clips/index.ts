@@ -783,6 +783,38 @@ serve(async (req) => {
           .eq("id", scene.id);
       }
 
+      // STAGE 2 (Lip-Sync Strategy May 2026): HappyHorse 1.0 exhibits high
+      // identity-drift on multi-cast frames and is not viable as a Master-Plate
+      // for cinematic-sync two-shot dialog. Force-migrate any cinematic-sync
+      // scene with ≥2 distinct speakers to ai-hailuo (Tier-B fallback). The UI
+      // shows a warning badge separately; this guard makes the block defensive.
+      if (
+        (scene.clipSource as string) === "ai-happyhorse" &&
+        (scene.engineOverride ?? "auto") === "cinematic-sync"
+      ) {
+        const dlg = String((scene as any).dialogScript ?? "");
+        const speakerNames = new Set(
+          dlg
+            .split(/\r?\n/)
+            .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{0,40}?)\]?\s*[:：]/))
+            .filter((m): m is RegExpMatchArray => !!m)
+            .map((m) => m[1].trim().toLowerCase()),
+        );
+        if (speakerNames.size >= 2) {
+          console.warn(
+            `[compose-video-clips] Scene ${scene.id}: HappyHorse + cinematic-sync + ${speakerNames.size} speakers — migrating to ai-hailuo (HappyHorse identity-drift is too high for multi-cast lip-sync masters).`,
+          );
+          scene.clipSource = "ai-hailuo";
+          await supabaseAdmin
+            .from("composer_scenes")
+            .update({
+              clip_source: "ai-hailuo",
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", scene.id);
+        }
+      }
+
       // Defensive: rewrite unsupported AI engines to a working default.
       if (
         scene.clipSource.startsWith("ai-") &&
