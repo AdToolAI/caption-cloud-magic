@@ -183,7 +183,6 @@ async function startSyncTurnJob(
     payload.webhookUrl = webhookUrl;
     (payload as any).webhook_url = webhookUrl;
   }
-  };
   console.log(
     `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
   );
