@@ -132,7 +132,6 @@ function expandWindow(
  *  start time to a `frame_number` so Sync.so samples coords INSIDE the
  *  turn window, not at frame 0 of the master video. */
 const ASSUMED_MASTER_FPS = 24;
-
 async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
@@ -146,6 +145,10 @@ async function startSyncTurnJob(
    *  'coords' = use fixed pixel coords + frame_number aligned to the
    *  turn start (deterministic fallback when auto_detect fails). */
   mode: "auto" | "coords" = "auto",
+  /** Optional Sync.so webhook URL (B.1 Stage 5). When set, Sync.so will POST
+   *  the terminal status to this URL — cuts per-shot completion latency from
+   *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
+  webhookUrl?: string,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
@@ -173,6 +176,13 @@ async function startSyncTurnJob(
       { type: "audio", url: audioUrl },
     ],
     options,
+  };
+  if (webhookUrl) {
+    // Sync.so v2 accepts `webhookUrl` (camelCase). Include `webhook_url` too
+    // for forward-compat. Unknown fields are ignored by the API.
+    payload.webhookUrl = webhookUrl;
+    (payload as any).webhook_url = webhookUrl;
+  }
   };
   console.log(
     `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
