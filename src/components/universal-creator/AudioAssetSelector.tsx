@@ -323,6 +323,28 @@ export const AudioAssetSelector = ({
 
   const musicTracks = audioLibrary?.filter(a => a.type === 'music') || [];
 
+  // Clean visual title: strip trailing ", NN seconds" / ", NNs" / " - NN seconds"
+  const cleanTitle = (raw?: string | null): string => {
+    if (!raw) return '';
+    return raw
+      .replace(/[,\-–—]\s*\d+\s*(seconds?|secs?|s)\s*$/i, '')
+      .trim();
+  };
+
+  // Dedupe library by URL (fallback: cleaned title) to avoid the same track
+  // appearing dozens of times in the list.
+  const dedupedMusicTracks = useMemo(() => {
+    const seen = new Set<string>();
+    const out: typeof musicTracks = [];
+    for (const t of musicTracks) {
+      const key = (t.url || cleanTitle(t.title) || t.id).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+    return out;
+  }, [musicTracks]);
+
   return (
     <div className="space-y-6">
       {/* Background Music Section */}
