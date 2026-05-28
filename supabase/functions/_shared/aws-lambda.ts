@@ -23,6 +23,14 @@ export function getLambdaFunctionName(): string {
 export const AWS_REGION = 'eu-central-1';
 
 /**
- * Default S3 bucket for Remotion renders.
+ * Default S3 bucket for Remotion render OUTPUTS (Lambda writes finished mp4s here).
+ * The AWS Lambda execution role has read/write IAM permissions on this bucket.
  */
 export const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
+
+/**
+ * Canonical S3 bucket where the Remotion site BUNDLE (serve URL) is deployed.
+ * This is intentionally different from DEFAULT_BUCKET_NAME — the Lambda loads
+ * the bundle from here and writes outputs to DEFAULT_BUCKET_NAME.
+ */
+export const REMOTION_BUNDLE_BUCKET_NAME = 'remotionlambda-eucentral1-6ul51trd3p';
