@@ -487,7 +487,7 @@ export const AudioAssetSelector = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                  {musicTracks.map((track) => (
+                  {dedupedMusicTracks.map((track) => (
                     <div
                       key={track.id}
                       className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
@@ -496,20 +496,19 @@ export const AudioAssetSelector = ({
                           : 'border-border'
                       }`}
                     >
-                      {track.thumbnail_url && (
+                      {track.thumbnail_url ? (
                         <img
                           src={track.thumbnail_url}
-                          alt={track.title}
-                          className="w-12 h-12 rounded object-cover"
+                          alt={cleanTitle(track.title)}
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
                         />
+                      ) : (
+                        <div className="w-12 h-12 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
+                          <Music className="h-5 w-5 text-muted-foreground" />
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{track.title}</p>
-                        <div className="flex gap-2 text-xs text-muted-foreground">
-                          {track.genre && <Badge variant="outline">{track.genre}</Badge>}
-                          {track.mood && <Badge variant="outline">{track.mood}</Badge>}
-                          {track.duration_sec && <span>{Math.round(track.duration_sec)}s</span>}
-                        </div>
+                        <p className="font-medium truncate">{cleanTitle(track.title)}</p>
                       </div>
                       <Button
                         type="button"
