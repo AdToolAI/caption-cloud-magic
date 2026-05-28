@@ -1802,13 +1802,31 @@ export default function SceneCard({
                                     dialog_shots: null,
                                   })
                                   .eq("id", scene.id);
-                                const { error } =
+                                const { data, error } =
                                   await supabase.functions.invoke(
                                     "compose-dialog-scene",
                                     { body: { scene_id: scene.id } },
                                   );
                                 if (error) throw error;
-                                onUpdate({ lipSyncStatus: "running" });
+                                if (
+                                  data &&
+                                  (data as any).status ===
+                                    "master_regenerated_for_lipsync_stability"
+                                ) {
+                                  toast({
+                                    title: "Master-Plate wird neu erzeugt",
+                                    description:
+                                      "HappyHorse ist für 2-Sprecher-Lip-Sync nicht stabil genug. Der Master wird mit Hailuo neu gerendert — Lip-Sync startet danach automatisch.",
+                                  });
+                                  onUpdate({
+                                    clipStatus: "generating",
+                                    clipUrl: null,
+                                    lipSyncStatus: null,
+                                  });
+                                } else {
+                                  onUpdate({ lipSyncStatus: "running" });
+                                }
+
                               } catch (e) {
                                 console.warn("[SceneCard] re-sync failed", e);
                               }
