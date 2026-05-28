@@ -208,6 +208,7 @@ serve(async (req) => {
           // r32: Lottie stall detection
           else if (/waiting for lottie|delayrender.*lottie|lottie.*animation.*load/i.test(combinedMsg)) errorCategory = 'lambda_crash';
           else if (/reading '(length|0)'|reading "(length|0)"|getrealframerange/i.test(combinedMsg)) errorCategory = 'lambda_crash';
+          else if (/the operation was aborted|aborterror|createasynciterator|node:internal\/streams/i.test(combinedMsg)) errorCategory = 'lambda_crash';
           else if (/codec|preset|framerange|invalid|schema|zod/i.test(combinedMsg)) errorCategory = 'validation';
 
           const existingCfg = (renderData?.content_config as any) || {};
