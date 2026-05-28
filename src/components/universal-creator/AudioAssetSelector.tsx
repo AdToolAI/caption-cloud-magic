@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -323,6 +323,28 @@ export const AudioAssetSelector = ({
 
   const musicTracks = audioLibrary?.filter(a => a.type === 'music') || [];
 
+  // Clean visual title: strip trailing ", NN seconds" / ", NNs" / " - NN seconds"
+  const cleanTitle = (raw?: string | null): string => {
+    if (!raw) return '';
+    return raw
+      .replace(/[,\-–—]\s*\d+\s*(seconds?|secs?|s)\s*$/i, '')
+      .trim();
+  };
+
+  // Dedupe library by URL (fallback: cleaned title) to avoid the same track
+  // appearing dozens of times in the list.
+  const dedupedMusicTracks = useMemo(() => {
+    const seen = new Set<string>();
+    const out: typeof musicTracks = [];
+    for (const t of musicTracks) {
+      const key = (t.url || cleanTitle(t.title) || t.id).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(t);
+    }
+    return out;
+  }, [musicTracks]);
+
   return (
     <div className="space-y-6">
       {/* Background Music Section */}
@@ -388,23 +410,27 @@ export const AudioAssetSelector = ({
                     </Button>
                   </div>
                 </div>
-                {musicTracks.find(t => t.id === selectedMusicId) && (
-                  <div className="flex items-center gap-3 p-2 rounded bg-background">
-                    {musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url && (
-                      <img
-                        src={musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url}
-                        alt=""
-                        className="w-10 h-10 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{musicTracks.find(t => t.id === selectedMusicId)?.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {musicTracks.find(t => t.id === selectedMusicId)?.duration_sec}s
-                      </p>
+                {musicTracks.find(t => t.id === selectedMusicId) && (() => {
+                  const sel = musicTracks.find(t => t.id === selectedMusicId)!;
+                  return (
+                    <div className="flex items-center gap-3 p-2 rounded bg-background">
+                      {sel.thumbnail_url ? (
+                        <img
+                          src={sel.thumbnail_url}
+                          alt=""
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-muted/40 flex items-center justify-center">
+                          <Music className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{cleanTitle(sel.title)}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </Card>
             )}
           
@@ -461,7 +487,7 @@ export const AudioAssetSelector = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                  {musicTracks.map((track) => (
+                  {dedupedMusicTracks.map((track) => (
                     <div
                       key={track.id}
                       className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
@@ -470,20 +496,19 @@ export const AudioAssetSelector = ({
                           : 'border-border'
                       }`}
                     >
-                      {track.thumbnail_url && (
+                      {track.thumbnail_url ? (
                         <img
                           src={track.thumbnail_url}
-                          alt={track.title}
-                          className="w-12 h-12 rounded object-cover"
+                          alt={cleanTitle(track.title)}
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
                         />
+                      ) : (
+                        <div className="w-12 h-12 rounded bg-muted/40 flex items-center justify-center flex-shrink-0">
+                          <Music className="h-5 w-5 text-muted-foreground" />
+                        </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{track.title}</p>
-                        <div className="flex gap-2 text-xs text-muted-foreground">
-                          {track.genre && <Badge variant="outline">{track.genre}</Badge>}
-                          {track.mood && <Badge variant="outline">{track.mood}</Badge>}
-                          {track.duration_sec && <span>{Math.round(track.duration_sec)}s</span>}
-                        </div>
+                        <p className="font-medium truncate">{cleanTitle(track.title)}</p>
                       </div>
                       <Button
                         type="button"

@@ -270,7 +270,7 @@ export function UniversalCreator() {
     if (formatConfig) {
       saveToLocalStorage();
     }
-  }, [formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
+  }, [currentStep, formatConfig, contentConfig, backgroundAsset, audioConfig, scenes, subtitleConfig]);
 
   useEffect(() => {
     if (!formatConfig && !contentConfig) {
