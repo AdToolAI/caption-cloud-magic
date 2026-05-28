@@ -505,7 +505,7 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        if (!prepareShotRetry(shot, `sync_${p.status}`)) {
+        if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
           markShotTerminalFailed(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
         }
         mutated = true;
