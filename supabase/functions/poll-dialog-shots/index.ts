@@ -432,22 +432,30 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        // 1× retry: if this was the first attempt (auto_detect) and we
-        // have FaceMap coords available, redispatch with coords mode
-        // (deterministic fallback) instead of giving up. Empirically
-        // fixes the "An unknown error occurred." silent-fail on Sync.so
-        // for turns whose window does not start at t=0.
-        const canRetry =
-          (shot.retry_count ?? 0) < 1 && shot.target_coords && !shot.force_coords;
-        if (canRetry) {
+        // 1× retry policy: deterministic-coords is now the PRIMARY mode.
+        // If a coords-dispatch fails (e.g. Sync.so rejects frame_number),
+        // retry once with auto_detect on the isolated speaker WAV.
+        // If an auto-dispatch fails and we DO have coords, retry once with
+        // coords. Either path counts toward retry_count.
+        const firstAttempt = (shot.retry_count ?? 0) < 1;
+        if (firstAttempt) {
           shot.retry_count = (shot.retry_count ?? 0) + 1;
-          shot.force_coords = true;
           shot.status = "pending";
           shot.sync_job_id = undefined;
           shot.error = undefined;
-          console.warn(
-            `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with coords fallback (attempt ${shot.retry_count})`,
-          );
+          if (shot.target_coords && !shot.force_coords && !shot.deterministic_coords) {
+            shot.force_coords = true;
+            console.warn(
+              `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with coords fallback (attempt ${shot.retry_count})`,
+            );
+          } else {
+            // Was coords-mode → fall back to auto_detect for this retry.
+            shot.force_coords = false;
+            shot.deterministic_coords = false;
+            console.warn(
+              `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with auto_detect fallback (attempt ${shot.retry_count})`,
+            );
+          }
         } else {
           shot.status = "failed";
           shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
@@ -511,9 +519,18 @@ async function processScene(
       const win = (nextShot.render_window
         ?? expandWindow(nextShot, shots)) as [number, number];
       nextShot.render_window = win;
-      // Try auto_detect FIRST on the isolated speaker WAV; only fall back
-      // to coords+frame_number on a failed-poll retry.
-      const useCoords = !!nextShot.force_coords && !!nextShot.target_coords;
+      // Deterministic-first dispatch (Artlist parity, May 2026):
+      // For multi-speaker scenes the FaceMap already identity-matched each
+      // turn to a pixel coordinate. Letting Sync.so auto_detect the speaker
+      // inside a two-shot frame is the #1 cause of "wrong mouth moves" —
+      // the provider routinely picks the wrong face when both are visible.
+      // → If we have target_coords AND the shot was flagged deterministic
+      //   (or this is a retry), dispatch with coords + frame_number.
+      // → Only fall back to auto_detect when no coords exist at all
+      //   (single-speaker scenes are safe).
+      const useCoords =
+        !!nextShot.target_coords &&
+        (nextShot.deterministic_coords === true || !!nextShot.force_coords);
       const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
       const audioUrl = nextShot.audio_url || state.master_audio_url;
       const jobId = await startSyncTurnJob(
