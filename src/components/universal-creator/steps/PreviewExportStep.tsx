@@ -721,7 +721,7 @@ export function PreviewExportStep({
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t('uc.subtitleSegmentsCount')}:</span>
-            <span className="font-medium">{subtitleConfig.segments.length}</span>
+            <span className="font-medium">{subtitleConfig?.segments?.length ?? 0}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t('uc.selectedFormats')}:</span>
