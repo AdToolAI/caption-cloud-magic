@@ -526,6 +526,7 @@ async function processScene(
         nextShot.temperature,
         nextShot.idx,
         mode,
+        syncWebhookUrl,
       );
       nextShot.sync_job_id = jobId;
       nextShot.status = "lipsyncing";
