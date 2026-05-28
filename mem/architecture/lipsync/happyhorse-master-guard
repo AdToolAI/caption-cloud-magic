@@ -1,0 +1,20 @@
+---
+name: HappyHorse Master Guard (Cinematic-Sync)
+description: HappyHorse 1.0 is blocked as master-plate for cinematic-sync scenes with ≥2 speakers — guarded both in compose-video-clips (pre-render) AND in compose-dialog-scene (retroactive, invalidates existing master + clears lip_sync state + re-invokes compose-video-clips with ai-hailuo)
+type: feature
+---
+
+HappyHorse 1.0 has high identity-drift on multi-cast frames and is structurally unsuitable as a master plate for Sync.so two-shot lip-sync. Two-layer guard:
+
+1. **Pre-render guard** in `compose-video-clips` (line ~786): blocks `clip_source='ai-happyhorse' + engine_override='cinematic-sync' + ≥2 speakers in dialog_script` and migrates to `ai-hailuo` before Hailuo i2v runs.
+
+2. **Retroactive guard** in `compose-dialog-scene` (Stage 2 hotfix, May 2026): same check on every "🔁 Lip-Sync neu rendern" invocation. If triggered:
+   - Clears `clip_url`, `dialog_shots`, `lip_sync_status`, `lip_sync_applied_at`, `lip_sync_source_clip_url`, `reference_image_url`, `twoshot_stage`, `clip_error`.
+   - Sets `clip_source='ai-hailuo'`, `clip_status='pending'`.
+   - Fire-and-forgets `compose-video-clips` for that single scene.
+   - Returns 202 with `status: 'master_regenerated_for_lipsync_stability'`.
+   - `compose-clip-webhook` rescue-path then auto-retriggers `compose-dialog-scene` once the new Hailuo master is ready.
+
+SceneCard handler reads the 202 status and shows a German toast ("Master-Plate wird neu erzeugt — Lip-Sync startet danach automatisch") plus sets `clipStatus='generating'`.
+
+Speaker count is detected by regex `^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{0,40}?)\]?\s*[:：]` on `dialog_script`, lowercased, deduplicated.
