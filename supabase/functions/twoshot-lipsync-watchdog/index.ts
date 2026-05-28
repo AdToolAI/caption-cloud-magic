@@ -271,13 +271,13 @@ serve(async (req) => {
               .update({
                 lip_sync_status: "failed",
                 twoshot_stage: "failed",
-                clip_error: "syncso_poll_timeout: watchdog auto-failed after 12 min without completion",
+                clip_error: "sync_so_timeout_8min: watchdog auto-failed (Sync.so job no terminal status after 8 min)",
                 updated_at: nowIso,
                 audio_plan: {
                   ...(s.audio_plan as any),
                   twoshot: {
                     ...twoshot,
-                    syncJobs: { ...syncJobs, refunded: true, failedAt: nowIso, lastError: "watchdog_timeout", lastErrorAt: nowIso },
+                    syncJobs: { ...syncJobs, refunded: true, failedAt: nowIso, lastError: "sync_so_timeout_8min", lastErrorAt: nowIso },
                   },
                 },
               })
