@@ -1,41 +1,37 @@
-## Befund
+## Problem
 
-Der Serve-URL-Fix ist aktiv: Die aktuellen Logs zeigen, dass `serveUrl` jetzt korrekt auf den neuen Bundle-Bucket `remotionlambda-eucentral1-6ul51trd3p` zeigt.
+In `supabase/functions/render-with-remotion/index.ts` ersetzt `stabilizeUniversalCreatorScenes()` (Zeile 135) **bedingungslos** jede Szene mit `background.type === 'video'` durch `imageUrl`-Fallback oder — wenn keiner vorhanden ist — durch einen dunklen Gradient `#050816 → #111827`.
 
-Der neue Fehler kommt danach aus dem Remotion-Lambda-Webhook:
+Log-Beweis vom aktuellen Render (`pending-d6f794cb…`):
+```
+🛡️ Stable UniversalCreator render path: replaced 4 external video source(s) with static fallbacks
+```
 
-- `bucketName`: `remotionlambda-eucentral1-13gm4o6s90`
-- Fehler: `AccessDenied: Access Denied`
-- Stadium: Lambda-Runtime, nicht mehr beim Laden des Bundles
+Audio (Voiceover + BG-Music) läuft als separater Track unverändert → exakt das beobachtete Symptom: **Ton ja, Bild komplett schwarz**.
 
-Das bedeutet: Der alte Bucket wird jetzt als Output-Bucket verwendet. Dort versucht Lambda zu schreiben/lesen bzw. ACLs zu setzen. Genau das scheitert mit S3/IAM-Berechtigungen.
+## Fix
 
-## Plan
+1. **`stabilizeUniversalCreatorScenes` standardmäßig ausschalten.**
+   Nur noch aktiv, wenn explizit per Flag angefordert (z.B. `payload.forceStableRenderPath === true` oder Env `REMOTION_FORCE_STABLE_RENDER=1`). Default = Originalvideos werden 1:1 an Lambda durchgereicht.
 
-1. **Output-Bucket nicht mehr hart auf den alten Bucket erzwingen**
-   - In `render-with-remotion` die feste `bucketName = DEFAULT_BUCKET_NAME`-Übergabe entfernen oder auf den funktionierenden Bundle-/Lambda-Bucket umstellen.
-   - Ziel: Remotion Lambda soll nicht mehr in `remotionlambda-eucentral1-13gm4o6s90` schreiben, wenn dieser Bucket keine gültigen Rechte hat.
+2. **Aufruf-Stelle (Zeile 592–596)** entsprechend gaten:
+   ```ts
+   if (shouldStabilize) {
+     const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
+     …
+   }
+   ```
 
-2. **Payload-Normalisierung absichern**
-   - In `_shared/remotion-payload.ts` verhindern, dass ein leerer oder veralteter `bucketName` wieder in den Lambda-Payload gelangt.
-   - Falls `bucketName` weggelassen wird, kann Remotion den passenden Bucket selbst bestimmen; alternativ nutzen wir den neuen `6ul51trd3p`-Bucket konsistent für Bundle und Output.
+3. **Logging beibehalten**, aber klarer formulieren (`⚠️ Forced stable render path active …`), damit man künftig sofort sieht, ob die Fallback-Kette greift.
 
-3. **Datenbank-Tracking anpassen**
-   - `video_renders.bucket_name` und `content_config.bucket_name` dürfen nicht mehr irreführend den alten Bucket speichern, wenn der Render nicht dort landet.
-   - Bei automatischer Bucket-Wahl speichern wir `null` oder den tatsächlich verwendeten Bucket aus dem Lambda/Webhook.
+4. **`render-with-remotion` deployen**, dann erneuten Test-Render anstoßen und in den Logs verifizieren, dass die Zeile *nicht* mehr erscheint und das Lambda-Payload die echten `videoUrl`s enthält.
 
-4. **Edge Function neu deployen**
-   - `render-with-remotion` deployen.
-   - Falls `_shared/remotion-payload.ts` geändert wird, wird es mit der Funktion mitdeployt.
+## Was unverändert bleibt
 
-5. **Verifikation über Logs**
-   - Neuen Test-Render starten.
-   - Prüfen, dass der Lambda-Payload entweder keinen `bucketName` mehr enthält oder nicht mehr `13gm4o6s90` nutzt.
-   - Wenn danach weiterhin `AccessDenied` kommt, ist es eindeutig eine AWS-IAM/S3-Policy der tatsächlich verwendeten Output-Location.
+- Bucket-/Serve-URL-Logik (`6ul51trd3p`) — funktioniert nachweislich (Lambda-Start = 200 OK).
+- Audio-Pipeline.
+- Webhook, Credit-Refund, alle anderen Render-Funktionen.
 
-## Technische Details
+## Risiken
 
-- Die Serve URL ist nicht mehr das Problem; sie zeigt bereits korrekt auf `6ul51trd3p`.
-- Der Fehler entsteht beim Output-Bucket `13gm4o6s90`.
-- Remotion-Doku empfiehlt, `forceBucketName`/festen Bucket nicht zu erzwingen, sondern Remotion den Bucket bestimmen zu lassen, außer die IAM-Rechte sind garantiert korrekt.
-- Kein Datenbankschema nötig, keine Migration nötig.
+Falls die ursprüngliche Instabilität (externe Video-URLs → Lambda-Failure) zurückkommt, kann sie per Flag jederzeit wieder eingeschaltet werden, ohne Code-Rollback. Sollte ein Lambda-Fail auftreten, sehen wir das sofort im neuen Render-Log und können gezielt reagieren (statt jedes Video präventiv zu zerstören).
