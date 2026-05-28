@@ -312,19 +312,26 @@ export default function VideoComposerDashboard() {
             adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
             adVariantStrategy: (projRow as any).ad_variant_strategy ?? prev.adVariantStrategy ?? null,
             parentProjectId: (projRow as any).parent_project_id ?? prev.parentProjectId ?? null,
-            cutdownType: (projRow as any).cutdown_type ?? prev.cutdownType ?? null,
-          }));
-        }
+            withAudio: row.with_audio !== false,
+            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            // ── Volatile lifecycle fields: ALWAYS take DB value, never local ──
+            // These describe the live render/lipsync job and MUST NOT be merged
+            // with a stale optimistic patch from localStorage. (Stage 6 fix.)
+            lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
+            lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
+            lipSyncStatus: (row as any).lip_sync_status ?? null,
+            clipUrl: row.clip_url ?? undefined,
+            clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            replicatePredictionId: row.replicate_prediction_id ?? null,
+            clipError: (row as any).clip_error ?? null,
+            // ── Non-lifecycle fields below: DB-first with local fallback ──
+            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
+            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
+            uploadUrl: row.upload_url ?? local?.uploadUrl,
+            uploadType: row.upload_type ?? local?.uploadType,
+            referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
+            clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
 
-        if (dbError) throw dbError;
-        if (!data || data.length === 0) return;
-
-        // Map DB rows → local ComposerScene shape, preferring DB as source of truth
-        // for status/url/cost. Fall back to localStorage values for the rest.
-        const localById = new Map(project.scenes.map(s => [s.id, s]));
-        const dbScenes: ComposerScene[] = data.map((row: any) => {
-          const local = localById.get(row.id);
-          return {
             id: row.id,
             projectId: row.project_id,
             orderIndex: row.order_index,
