@@ -696,24 +696,75 @@ serve(async (req) => {
 
     // Identity coverage check: every multi-speaker shot MUST have a coord.
     // Single-speaker scenes can fall back to Sync.so auto_detect safely.
+    //
+    // STAGE 1 RESILIENCE (May 2026): if identity-based mapping fails but we
+    // have ≥N face coordinates from the anchor, fall back to **positional
+    // assignment** by script-appearance order — the anchor was composed with
+    // portraits in script order, so leftmost face ≈ first speaker, next ≈
+    // second, etc. This prevents the `dialog_missing_face_coords` hard-stop
+    // from blocking otherwise-valid two-shot scenes whenever Gemini Vision
+    // returns ambiguous identity matches.
     const distinctSpeakerIdxs = new Set(rawShots.map((s) => s.speaker_idx));
     if (distinctSpeakerIdxs.size >= 2) {
-      const missing = rawShots.filter((s) => !s.target_coords);
+      let missing = rawShots.filter((s) => !s.target_coords);
+      if (missing.length > 0) {
+        const faces = Array.isArray(workingFaceMap?.faces) ? workingFaceMap!.faces : [];
+        const sortedFaces = [...faces]
+          .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
+          .sort((a: any, b: any) => Number(a.center[0]) - Number(b.center[0]));
+        if (sortedFaces.length >= distinctSpeakerIdxs.size) {
+          // Build positional map: script-appearance order → leftmost-first face
+          const appearanceOrder: string[] = [];
+          for (const s of rawShots) {
+            const key = String(s.character_id ?? `__spk_${s.speaker_idx}`).toLowerCase();
+            if (!appearanceOrder.includes(key)) appearanceOrder.push(key);
+          }
+          const positional = new Map<string, [number, number]>();
+          appearanceOrder.forEach((key, idx) => {
+            const f = sortedFaces[idx];
+            if (f) positional.set(key, [Number(f.center[0]), Number(f.center[1])]);
+          });
+          let recovered = 0;
+          for (const s of rawShots) {
+            if (s.target_coords) continue;
+            const key = String(s.character_id ?? `__spk_${s.speaker_idx}`).toLowerCase();
+            const c = positional.get(key);
+            if (c) {
+              s.target_coords = c;
+              s.deterministic_coords = true;
+              recovered++;
+            }
+          }
+          if (recovered > 0) {
+            console.warn(
+              `[compose-dialog-scene] scene ${sceneId} positional-fallback recovered ` +
+                `${recovered} missing face coords (identity mapping ambiguous, ` +
+                `${sortedFaces.length} faces in anchor, ${distinctSpeakerIdxs.size} speakers).`,
+            );
+          }
+          missing = rawShots.filter((s) => !s.target_coords);
+        }
+      }
       if (missing.length > 0) {
         const missingChars = Array.from(
           new Set(missing.map((m) => m.character_id ?? m.speaker_name)),
         );
+        const facesFound = Array.isArray(workingFaceMap?.faces)
+          ? workingFaceMap!.faces.length
+          : 0;
         await supabase
           .from("composer_scenes")
           .update({
             lip_sync_status: "failed",
             twoshot_stage: "failed",
             clip_error:
-              `dialog_missing_face_coords: ${missingChars.join(", ")} — Gesichts-Identitäts-Mapping nicht möglich. Bitte „🎥 Clip + Lip-Sync neu rendern" für eine frische Anchor + Identity-Detection.`,
+              `dialog_missing_face_coords: ${missingChars.join(", ")} — ` +
+              `Anchor enthält nur ${facesFound} erkennbare Gesichter für ${distinctSpeakerIdxs.size} Sprecher. ` +
+              `Bitte „🎥 Clip + Lip-Sync neu rendern" für eine frische Anchor + Identity-Detection.`,
           })
           .eq("id", sceneId);
         return json(
-          { error: "missing_face_coords", missing: missingChars },
+          { error: "missing_face_coords", missing: missingChars, facesFound },
           422,
         );
       }
