@@ -551,8 +551,14 @@ export function PreviewExportStep({
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
                 <p>✓ Voice-over: {contentConfig.voiceoverConfig?.voiceName}</p>
-                <p>✓ Untertitel: {subtitleConfig.segments.length} Segmente</p>
-                <p>✓ Style: {subtitleConfig.style.font}, {subtitleConfig.style.fontSize}px</p>
+                {subtitleConfig?.segments?.length ? (
+                  <>
+                    <p>✓ Untertitel: {subtitleConfig.segments.length} Segmente</p>
+                    {subtitleConfig.style && (
+                      <p>✓ Style: {subtitleConfig.style.font}, {subtitleConfig.style.fontSize}px</p>
+                    )}
+                  </>
+                ) : null}
               </div>
             </div>
           </div>

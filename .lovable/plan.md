@@ -1,17 +1,21 @@
-## 1. Step 4 — Track-Liste aufräumen
+## Problem
 
-**Datei:** `src/components/universal-creator/AudioAssetSelector.tsx`
+Wenn du in Step 5 (Vorschau & Export) wechselst, crasht die Seite mit:
+`Cannot read properties of undefined (reading 'segments')`
 
-- Karten-Render der Bibliothek (Zeilen 463-503) reduzieren auf: **Thumbnail (oder Music-Icon-Fallback) + Titel + Play + Auswählen + Löschen**. Genre-/Mood-Badges und die `…s`-Sekundenanzeige entfernen.
-- Titel visuell säubern: trailing `, NN seconds` / `, NNs` per regex aus dem angezeigten String strippen (DB unverändert).
-- Duplikate zusammenfassen: neuer `dedupedMusicTracks`-Memo, Key = `url || title`.
-- Gleiche Cleanup-Anzeige auch in der „Selected Track"-Card (Zeile 391-407).
+Ursache: In `src/components/universal-creator/steps/PreviewExportStep.tsx` wird an zwei Stellen ungeschützt auf `subtitleConfig.segments.length` (und `subtitleConfig.style.font/fontSize`) zugegriffen. Wenn Step 4 übersprungen wurde oder `subtitleConfig` `undefined`/leer ist, knallt der Render.
 
-## 2. Step-Persistenz Bug
+- Zeile 554: `subtitleConfig.segments.length`
+- Zeile 555: `subtitleConfig.style.font`, `subtitleConfig.style.fontSize`
+- Zeile 718: `subtitleConfig.segments.length`
 
-**Datei:** `src/pages/UniversalCreator/UniversalCreator.tsx`
+(Andere Stellen, z.B. `SubtitleTimingStep.tsx` und `UniversalCreator.tsx`, nutzen bereits korrekt `subtitleConfig?.segments`.)
 
-- `useEffect`-Deps in Zeile 273 um `currentStep` erweitern, damit ein Step-Wechsel sofort in `localStorage` gespeichert wird und nach Tab-Wechsel der korrekte Step wiederhergestellt wird.
+## Fix
 
-## Scope
-Reine Frontend-Änderungen. Keine DB, keine Edge Functions, kein neues Datenmodell.
+In `PreviewExportStep.tsx`:
+
+1. Zeile 552–556: Untertitel-/Style-Zeilen nur rendern wenn `subtitleConfig?.segments?.length` > 0 (mit optional chaining für `style`).
+2. Zeile 716–719: `subtitleConfig?.segments?.length ?? 0` verwenden.
+
+Reines Defensive-Rendering, keine Logik-Änderung. Danach lädt Step 5 sauber, auch wenn keine Untertitel erzeugt wurden.
