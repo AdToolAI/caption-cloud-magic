@@ -172,8 +172,28 @@ export default function VideoComposerDashboard() {
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
       return { ...defaultProject, id: urlProjectId! };
     }
-    return loadDraft() || defaultProject;
+    const draft = loadDraft();
+    if (!draft) return defaultProject;
+    // Stage 6: detox stale optimistic patches. A scene marked clipStatus
+    // 'generating' WITHOUT a backend job handle (no predictionId, no
+    // lipSync/twoshot in flight) is a dead optimistic patch from a previous
+    // session — reset to 'pending' so the UI doesn't show a fake "Baut…"
+    // overlay until DB-sync arrives ~1s later.
+    const detoxedScenes = (draft.scenes ?? []).map((s: any) => {
+      const lip = s?.lipSyncStatus;
+      const two = s?.twoshotStage;
+      const hasJob =
+        !!s?.replicatePredictionId ||
+        lip === 'running' ||
+        (two && two !== 'failed' && two !== 'done' && two !== 'complete');
+      if (s?.clipStatus === 'generating' && !hasJob) {
+        return { ...s, clipStatus: 'pending' };
+      }
+      return s;
+    });
+    return { ...draft, scenes: detoxedScenes };
   });
+
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     // Stage 19: Clips-Tab ist konsolidiert ins Storyboard — alte Deep-Links umleiten.
     if (urlTab === 'clips') return 'storyboard';
@@ -314,16 +334,25 @@ export default function VideoComposerDashboard() {
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
             lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            // ── Volatile lifecycle fields: ALWAYS take DB value, never local ──
+            // These describe the live render/lipsync job and MUST NOT be merged
+            // with a stale optimistic patch from localStorage. (Stage 6 fix.)
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
             lipSyncStatus: (row as any).lip_sync_status ?? null,
+            clipUrl: row.clip_url ?? undefined,
+            clipStatus: (row.clip_status || 'pending') as ClipStatus,
+            replicatePredictionId: row.replicate_prediction_id ?? null,
+            clipError: (row as any).clip_error ?? null,
+            twoshotStage: (row as any).twoshot_stage ?? null,
+            previewClipUrl: (row as any).preview_clip_url ?? null,
+            previewStatus: (row as any).preview_status ?? null,
+            // ── Non-lifecycle fields below: DB-first with local fallback ──
             aiPrompt: row.ai_prompt ?? local?.aiPrompt,
             stockKeywords: row.stock_keywords ?? local?.stockKeywords,
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
-            clipUrl: row.clip_url ?? undefined,
-            clipStatus: (row.clip_status || 'pending') as ClipStatus,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
             textOverlay: row.text_overlay ?? local?.textOverlay ?? {
               text: '',
@@ -334,7 +363,6 @@ export default function VideoComposerDashboard() {
             },
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
-            replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
@@ -364,21 +392,19 @@ export default function VideoComposerDashboard() {
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
             continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
-            twoshotStage: ((row as any).twoshot_stage as any) ?? local?.twoshotStage ?? null,
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null
               ? Number((row as any).frame_pick_seconds)
               : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
-            previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
-            previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
             seed: ((row as any).seed as any) ?? local?.seed ?? null,
             seedVariations: Array.isArray((row as any).seed_variations)
               ? ((row as any).seed_variations as any)
               : (local?.seedVariations ?? []),
           };
         });
+
 
         const readyCount = dbScenes.filter(s =>
           s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
