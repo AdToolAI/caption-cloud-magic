@@ -312,6 +312,26 @@ export default function VideoComposerDashboard() {
             adMeta: ((projRow as any).ad_meta as AdCampaignMeta | null) ?? prev.adMeta ?? null,
             adVariantStrategy: (projRow as any).ad_variant_strategy ?? prev.adVariantStrategy ?? null,
             parentProjectId: (projRow as any).parent_project_id ?? prev.parentProjectId ?? null,
+            cutdownType: (projRow as any).cutdown_type ?? prev.cutdownType ?? null,
+          }));
+        }
+
+        if (dbError) throw dbError;
+        if (!data || data.length === 0) return;
+
+        // Map DB rows → local ComposerScene shape, preferring DB as source of truth
+        // for status/url/cost. Fall back to localStorage values for the rest.
+        const localById = new Map(project.scenes.map(s => [s.id, s]));
+        const dbScenes: ComposerScene[] = data.map((row: any) => {
+          const local = localById.get(row.id);
+          return {
+            id: row.id,
+            projectId: row.project_id,
+            orderIndex: row.order_index,
+            sceneType: row.scene_type,
+            durationSeconds: row.duration_seconds,
+            clipSource: row.clip_source as ClipSource,
+            clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
             lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
             // ── Volatile lifecycle fields: ALWAYS take DB value, never local ──
@@ -324,33 +344,15 @@ export default function VideoComposerDashboard() {
             clipStatus: (row.clip_status || 'pending') as ClipStatus,
             replicatePredictionId: row.replicate_prediction_id ?? null,
             clipError: (row as any).clip_error ?? null,
+            twoshotStage: (row as any).twoshot_stage ?? null,
+            previewClipUrl: (row as any).preview_clip_url ?? null,
+            previewStatus: (row as any).preview_status ?? null,
             // ── Non-lifecycle fields below: DB-first with local fallback ──
             aiPrompt: row.ai_prompt ?? local?.aiPrompt,
             stockKeywords: row.stock_keywords ?? local?.stockKeywords,
             uploadUrl: row.upload_url ?? local?.uploadUrl,
             uploadType: row.upload_type ?? local?.uploadType,
             referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
-            clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
-
-            id: row.id,
-            projectId: row.project_id,
-            orderIndex: row.order_index,
-            sceneType: row.scene_type,
-            durationSeconds: row.duration_seconds,
-            clipSource: row.clip_source as ClipSource,
-            clipQuality: (row.clip_quality || 'standard') as ClipQuality,
-            withAudio: row.with_audio !== false,
-            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
-            lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
-            lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
-            lipSyncStatus: (row as any).lip_sync_status ?? null,
-            aiPrompt: row.ai_prompt ?? local?.aiPrompt,
-            stockKeywords: row.stock_keywords ?? local?.stockKeywords,
-            uploadUrl: row.upload_url ?? local?.uploadUrl,
-            uploadType: row.upload_type ?? local?.uploadType,
-            referenceImageUrl: row.reference_image_url ?? local?.referenceImageUrl,
-            clipUrl: row.clip_url ?? undefined,
-            clipStatus: (row.clip_status || 'pending') as ClipStatus,
             clipLeadInTrimSeconds: Number(((row as any).clip_lead_in_trim_seconds as any) ?? local?.clipLeadInTrimSeconds ?? 0),
             textOverlay: row.text_overlay ?? local?.textOverlay ?? {
               text: '',
@@ -361,7 +363,6 @@ export default function VideoComposerDashboard() {
             },
             transitionType: row.transition_type ?? local?.transitionType ?? 'crossfade',
             transitionDuration: row.transition_duration ?? local?.transitionDuration ?? 0.5,
-            replicatePredictionId: row.replicate_prediction_id ?? local?.replicatePredictionId,
             retryCount: row.retry_count ?? 0,
             costEuros: Number(row.cost_euros ?? 0),
             directorModifiers: (row.director_modifiers as any) ?? local?.directorModifiers ?? {},
@@ -391,21 +392,19 @@ export default function VideoComposerDashboard() {
             continuityAutoRepair: ((row as any).continuity_auto_repair as any) ?? local?.continuityAutoRepair,
             continuityLocked: ((row as any).continuity_locked as any) ?? local?.continuityLocked,
             lockReferenceUrl: ((row as any).lock_reference_url as any) ?? local?.lockReferenceUrl,
-            twoshotStage: ((row as any).twoshot_stage as any) ?? local?.twoshotStage ?? null,
             continuationSourceSceneId: ((row as any).continuity_source_scene_id as any) ?? local?.continuationSourceSceneId ?? null,
             framePickSeconds: ((row as any).frame_pick_seconds as any) != null
               ? Number((row as any).frame_pick_seconds)
               : (local?.framePickSeconds ?? null),
             audioPlan: ((row as any).audio_plan as any) ?? local?.audioPlan,
             dialogLockedAt: ((row as any).dialog_locked_at as any) ?? local?.dialogLockedAt ?? null,
-            previewClipUrl: ((row as any).preview_clip_url as any) ?? local?.previewClipUrl ?? null,
-            previewStatus: ((row as any).preview_status as any) ?? local?.previewStatus ?? null,
             seed: ((row as any).seed as any) ?? local?.seed ?? null,
             seedVariations: Array.isArray((row as any).seed_variations)
               ? ((row as any).seed_variations as any)
               : (local?.seedVariations ?? []),
           };
         });
+
 
         const readyCount = dbScenes.filter(s =>
           s.clipStatus === 'ready' || (s.clipSource === 'upload' && !!s.uploadUrl)
