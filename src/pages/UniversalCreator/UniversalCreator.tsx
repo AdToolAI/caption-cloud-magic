@@ -183,7 +183,7 @@ export function UniversalCreator() {
     setSubtitleConfig(undefined);
     setScenes([]);
     setCurrentStep(0);
-    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
+    toast.success('Neues Projekt gestartet');
   };
 
   const saveProgress = async () => {
