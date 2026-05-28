@@ -183,17 +183,36 @@ export function usePipelineProgress({
     const ready = aiScenes.filter((s) => s.clipStatus === 'ready').length;
     const generating = aiScenes.filter((s) => s.clipStatus === 'generating').length;
     const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
+    // Stage 7: a scene with an active backend handle (Replicate prediction,
+    // dialog-shot pipeline, lipsync stage) also counts as "running" — even
+    // when clipStatus momentarily reverts to 'pending' between the optimistic
+    // patch and the first DB realtime update. Without this, the progress bar
+    // disappears for 5–30 s right after the user clicks "Generieren".
+    const backendActive = aiScenes.filter((s) => {
+      const sa = s as any;
+      const stage = sa.twoshotStage;
+      const lip = sa.lipSyncStatus;
+      const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
+      const dsActive = !!ds && ds.status && !['done', 'failed'].includes(ds.status);
+      return (
+        !!sa.replicatePredictionId ||
+        lip === 'running' ||
+        (stage && !['done', 'complete', 'failed'].includes(stage)) ||
+        dsActive
+      );
+    }).length;
     // Progress is measured RELATIVE to the baseline captured on `clips:start`.
     const baseReady = b?.clipsReady ?? 0;
     const baseTotal = b?.clipsTotal ?? aiScenes.length;
     const denom = Math.max(1, baseTotal - baseReady);
     const numer = Math.max(0, ready - baseReady);
     const progress = Math.min(1, numer / denom);
+    const running = generating > 0 || backendActive > 0;
     return {
       progress,
-      running: generating > 0,
-      done: progress >= 1 && generating === 0 && failed === 0,
-      failed: failed > 0 && generating === 0,
+      running,
+      done: progress >= 1 && !running && failed === 0,
+      failed: failed > 0 && !running,
     };
   }, [aiScenes]);
 
