@@ -23,14 +23,19 @@ export function getLambdaFunctionName(): string {
 export const AWS_REGION = 'eu-central-1';
 
 /**
- * Default S3 bucket for Remotion render OUTPUTS (Lambda writes finished mp4s here).
- * The AWS Lambda execution role has read/write IAM permissions on this bucket.
- */
-export const DEFAULT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
-
-/**
- * Canonical S3 bucket where the Remotion site BUNDLE (serve URL) is deployed.
- * This is intentionally different from DEFAULT_BUCKET_NAME — the Lambda loads
- * the bundle from here and writes outputs to DEFAULT_BUCKET_NAME.
+ * Canonical S3 bucket where the Remotion site BUNDLE (serve URL) is deployed
+ * AND where render outputs are written. Using a single bucket avoids
+ * cross-bucket IAM/ACL issues (previously the legacy output bucket
+ * `…-13gm4o6s90` returned AccessDenied during render).
+ *
+ * The AWS Lambda execution role has read/write IAM permissions on every
+ * bucket matching `remotionlambda-*`, so the same bucket works for both.
  */
 export const REMOTION_BUNDLE_BUCKET_NAME = 'remotionlambda-eucentral1-6ul51trd3p';
+export const DEFAULT_BUCKET_NAME = REMOTION_BUNDLE_BUCKET_NAME;
+
+/**
+ * Legacy output bucket — kept only as a constant so old DB rows referencing
+ * it remain interpretable. New renders MUST NOT target this bucket.
+ */
+export const LEGACY_OUTPUT_BUCKET_NAME = 'remotionlambda-eucentral1-13gm4o6s90';
