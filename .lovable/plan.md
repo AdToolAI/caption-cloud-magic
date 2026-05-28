@@ -1,119 +1,92 @@
 
-# Strategie: Motion Studio Lip-Sync auf Artlist-Niveau
+# Stage 2-Hotfix + Stage 5 — Lip-Sync Stabilität
 
-## Status quo (Diagnose)
+## Warum jetzt zuerst ein Hotfix
 
-Aktuelles Scheitern in deiner Szene (HappyHorse 1.0 + Cinematic Dialog · 2 Sprecher):
+DB-Check der gerade gerenderten Szene (`f863d0e8…`):
+
 ```
-clip_error: dialog_missing_face_coords: samuel-dusatko, matthew-dusatko
-            — Gesichts-Identitäts-Mapping nicht möglich.
+clip_source      = ai-happyhorse
+engine_override  = cinematic-sync
+lip_sync_status  = done
+3 dialog_shots, lip_sync_applied_at gesetzt
 ```
-Historischer DB-Verlauf der letzten Cinematic-Sync-Szenen zeigt drei wiederkehrende Failure-Klassen:
 
-1. **Identity-Mapping fällt aus** — Gemini Vision findet die Gesichter im Anchor nicht eindeutig den `characterId`s zu → harter Stopp vor Sync.so.
-2. **AWS Lambda Rate Limit** (vom eingefrorenen Konto) → `dialog_stitch_lambda_failed`.
-3. **Sync.so Poll-Timeout** nach 12 min (Watchdog) — kein Webhook, nur Polling.
+Stage 2 hat technisch nicht "versagt" — der Guard sitzt in `compose-video-clips` und greift nur beim **Master-Render**. Du hast aber „🔁 Lip-Sync neu rendern" benutzt, was direkt `compose-dialog-scene` triggert und den **bereits existierenden HappyHorse-Master** wiederverwendet. Resultat: Sync.so animiert Münder auf einer Plate, die für 2-Sprecher-Dialog nicht stabil genug ist → Lippen sitzen falsch, egal wie gut Sync.so arbeitet.
 
-Die Pipeline (compose-dialog-scene v4 → poll-dialog-shots → ffmpeg-stitch) ist architektonisch nah an Artlist, aber **drei Schichten sind zu fragil**: Anchor-Identity, Provider-Selection und Recovery. Plus: HappyHorse 1.0 als Master-Plate ist ungetestet für Lip-Sync.
-
-Was Artlist Studio tatsächlich tut (aus Blog/Reviews 04–05/2026):
-- **Cast & Locations als Pinned References** mit Identity-Lock auf jedem Shot
-- **Kling 3.0 als Default-Master** (nicht HappyHorse) → höhere Gesichtsstabilität
-- **Pro Sprecher-Turn ein eigener Lip-Sync-Pass** (nicht ein Union-Fenster)
-- **Replikation + Webhook**, kein langes Polling
-- **Frame-aware Stitching** auf dem Original-Master, nicht Re-Encode-Kaskaden
-
-Daraus folgt: wir bauen die Pipeline **nicht neu**, sondern härten sie in 5 klar abgegrenzten Stufen.
+Bevor wir Stage 5 angehen, muss dieser Pfad geschlossen werden, sonst bleibt der Effekt bestehen.
 
 ---
 
-## Stufe 1 — Anchor + Identity hart machen *(Fix für aktuelle Szene)*
+## Teil A — Stage 2 Hotfix: HappyHorse-Master retroaktiv ersetzen
 
-Ziel: `dialog_missing_face_coords` kann strukturell nicht mehr auftreten.
+1. **`compose-dialog-scene`** bekommt am Eingang denselben Guard wie `compose-video-clips`:
+   - Wenn `clip_source='ai-happyhorse'` + `engine_override='cinematic-sync'` + ≥2 Sprecher im `dialog_script`:
+     - `clip_source` wird auf `ai-hailuo` umgesetzt
+     - `clip_url`, `dialog_shots`, `lip_sync_status`, `lip_sync_applied_at` werden gecleart
+     - Aufruf an `compose-video-clips` für diese eine Szene, damit der Master mit Hailuo neu erzeugt wird
+     - Erst danach läuft die Dialog-Pipeline
+   - User-facing Info im Response: `master_regenerated_for_lipsync_stability`
+2. **„🔁 Lip-Sync neu rendern"-Button** (`SceneCard`) bekommt einen kleinen Hinweis-Toast, wenn ein Master-Wechsel ausgelöst wurde („Master-Plate wird mit Hailuo neu erzeugt — Lip-Sync startet danach automatisch").
+3. Einmaliges Cleanup-Script (read-only SELECT zuerst, dann gezielte UPDATEs): alle Szenen mit `clip_source='ai-happyhorse' AND engine_override='cinematic-sync'` werden auf `ai-hailuo` + clip_url=NULL gesetzt, damit beim nächsten Aufruf automatisch sauber neu gerendert wird. **Kein Auto-Render** — passiert erst, wenn du die Szene aktiv triggerst.
 
-- `compose-scene-anchor` für ≥2-Cast-Szenen erzwingt **N Pre-Flight Retries** mit progressiv strikterem Prompt-Suffix (jeweils eine Achse: equal screen share → front-facing → no occlusion → distinct identities).
-- Gemini Vision Identity Match bekommt **Portraits aller Cast-Member als Reference-Slots** mit Side-by-Side-Comparison-Prompt statt nur Frame-Inspektion.
-- Auto-Rebuild faceMap aus dem letzten verfügbaren guten Anchor des Projekts, wenn neuer Anchor < N Gesichter liefert (mit Warnung, aber ohne Stop).
-- "🎥 Clip + Lip-Sync neu rendern"-Button bekommt explizite **Anchor-Force-Regenerate** Flag, die den Cache der Szene **und** des Project-Anchor-Pools invalidiert.
-
-Akzeptanz: deine aktuelle Szene (S01 Hook, Samuel + Matthew) rendert ohne `dialog_missing_face_coords`.
-
----
-
-## Stufe 2 — Two-Shot-Master in Artlist-Qualität
-
-Ziel: der Master-Plate, auf den Sync.so animiert, hat die gleiche Identitäts-Stabilität wie Artlists Cast-System.
-
-- **Provider-Tiering für Cinematic-Dialog** explizit machen: Kling 3 Std/Pro = Tier-A (Default), Hailuo 2.3 = Tier-B (Fallback), HappyHorse 1.0 = **gesperrt** für 2+ Speaker (Identity-Drift zu hoch, das ist die Hauptursache deines aktuellen Falls).
-- UI-Badge in `SceneCard`: "Empfohlen für Dialog" auf Kling, Warn-Badge auf HappyHorse mit 1-Klick-Switch.
-- `compose-video-clips` hängt für Cinematic-Sync immer den `TWO_SHOT_FRAMING_SUFFIX` + "lip-ready, mouth visible, no hands near face, no microphones, no closed-mouth resting pose" an — und scrubbed Dialog-Skript aus dem visuellen Prompt (ist bereits Policy, wird aber für HappyHorse umgangen → härten).
-- Pre-Flight Face-Count-Audit nutzt `_shared/face-count.ts` **vor** dem Credit-Charge, nicht danach.
+Akzeptanz: deine aktuelle Szene rendert mit Hailuo-Master und Sync.so-Lip-Sync, der Mund-Versatz verschwindet.
 
 ---
 
-## Stufe 3 — Per-Turn Parallel Lip-Sync (Artlist's "ein Pass pro Replik")
+## Teil B — Stage 5: Stabilität & Recovery
 
-Die v4-Architektur in `compose-dialog-scene` ist bereits per-turn-parallel. Was fehlt für Artlist-Parität:
+Damit nach dem Hotfix die Pipeline auch unter Last sauber bleibt.
 
-- **Pre-Roll/Tail dynamisch pro Turn**: aktuell 120ms/80ms statisch → adaptiv 80–200 ms basierend auf Onset-Energie der TTS-Phrase (kurze Konsonant-Onsets brauchen mehr Lead-in als Vokal-Onsets). Berechnung in `compose-twoshot-audio` aus der bereits vorhandenen PCM-Sample-Map.
-- **Temperatur-Curve** statt Schwellwert (`<2s → 1.0, sonst 0.85`): kontinuierliche Kurve `temp = clamp(0.85 + 0.4 · (1 - minTurnDur/3), 0.85, 1.15)`.
-- **Pro-Turn Coordinate-Refinement**: aktuell ein Face-Center pro Sprecher für die ganze Szene. Wenn ein Turn > 4 s ist, in der Mitte ein zweites Sample auf dem Original-Master nehmen (Sprecher kann den Kopf gedreht haben) und Sync.so denselben Turn als zwei Mikro-Windows geben.
+### 1. Sync.so Webhook statt Polling
+- `compose-dialog-scene` registriert pro Sync.so-Job eine `webhook_url` (Edge-Function `sync-so-webhook`), die direkt in `dialog_shots.shots[i]` die Felder `status`, `output_url`, `error` schreibt.
+- Webhook-HMAC wird mit `SYNC_SO_WEBHOOK_SECRET` (neuer Secret) verifiziert.
+- `poll-dialog-shots` bleibt als Sicherheitsnetz: wenn nach 90s kein Webhook-Event kam, fällt es auf Polling zurück (heutiges Verhalten).
+- Erwarteter Effekt: 12-min-Watchdog-Fälle gehen praktisch auf 0.
 
----
+### 2. Lambda Concurrency-Aware Stitch
+- `render-dialog-stitch` liest vor jedem Dispatch das `aws_concurrency_budget` (existiert bereits aus der DC-Policy).
+- Wenn < 1 Slot frei: Szene bleibt auf `lip_sync_status='stitching'`, Eintrag wird in `pg_cron`-Tabelle `render_stitch_queue` (neu, leichtgewichtig) gequeued.
+- Cron-Tick alle 60s leert die Queue, sobald Slots frei sind.
+- Erkennt 3-Layer (englische + deutsche AWS-Limit-Strings + 429) wie schon der Deep Sweep.
 
-## Stufe 4 — Multi-Speaker (3+) als First-Class
+### 3. Idempotente Refund-Audit
+- Audit-Pass in `compose-dialog-scene`, `poll-dialog-shots`, `render-dialog-stitch`, `twoshot-lipsync-watchdog`: jeder Fail-Pfad löst genau einmal `refund-credits` mit deterministischer UUID `dialog-refund:{scene_id}:{stage}` aus.
+- Heute lückenhaft bei `dialog_missing_face_coords` und bei stitch-failed nach Webhook-Fehler.
 
-Aktuell sauber für 2 Sprecher; 3+ läuft theoretisch, ist aber nie ausgereizt. Artlist erlaubt bis 4 Cast pro Shot.
-
-- `compose-scene-anchor` `TWO_SHOT_FRAMING_SUFFIX` wird zu `MULTI_SHOT_FRAMING_SUFFIX(n)` mit dynamischen Composition-Hints (2 = side-by-side, 3 = wide three-shot, 4 = group medium).
-- Per-character `track_url` (bereits vorhanden, derzeit nur Debug) wird für 3+ Sprecher zu Sync.so-Input umfunktioniert, falls merged WAV pro Turn zu mehrdeutig ist.
-- UI: "Dialog-Cast" picker mit max-4-Slot, Reihenfolge = Sprech-Reihenfolge im Skript.
-
----
-
-## Stufe 5 — Stabilität & Recovery (Sync.so Webhook + Lambda-Backoff)
-
-Ziel: kein 12-min-Timeout, kein AWS-Rate-Limit-Crash mehr.
-
-- **Sync.so Webhook** statt Polling: `poll-dialog-shots` registriert pro Shot eine `webhook_url` an Sync.so. Falls Webhook nach 90 s kein Signal liefert → Fallback auf Polling (heutiges Verhalten). Reduziert die Watchdog-12-min-Fälle praktisch auf 0.
-- **Lambda Concurrency-Aware Stitch**: `render-dialog-stitch` checkt `aws_concurrency_budget` (existiert bereits aus DC-Policy) und queued statt sofort zu rendern, wenn < 1 Slot frei.
-- **Idempotenter Refund** bereits in Policy verankert → Audit-Pass schreiben, dass alle 4 Failure-Pfade (anchor, master, sync, stitch) ihn auch wirklich auslösen (heute lückenhaft bei `dialog_missing_face_coords`).
-- **Watchdog** verkürzt auf 8 min mit klarem Error-Code statt 12 min ohne Diagnose.
+### 4. Watchdog 12 min → 8 min mit klarem Error-Code
+- `twoshot-lipsync-watchdog` setzt Timeout-Schwelle auf 8 min, schreibt `clip_error='sync_so_timeout_8min'` mit Diagnosefeldern (letzter Sync.so-Status, Webhook-Empfang ja/nein, AWS-Concurrency zum Zeitpunkt).
+- pg_cron-Intervall bleibt 1 min.
 
 ---
 
-## Technisches Detail (nur für interne Referenz)
+## Reihenfolge der Implementierung
+
+1. Teil A (Hotfix) — danach kannst du deine aktuelle Szene sofort sauber neu rendern
+2. Teil B.1 (Webhook) — die größte Stabilitäts-Wirkung pro investierter Zeile
+3. Teil B.4 (Watchdog kürzen) — trivial, sofort als Pair mit B.1
+4. Teil B.3 (Refund-Audit) — defensiv, kein User-sichtbarer Effekt aber wichtig
+5. Teil B.2 (Lambda-Queue) — größter Aufwand, dann wenn AWS wieder Druck macht
+
+## Technische Details (intern)
 
 Betroffene Dateien:
 ```text
-supabase/functions/compose-scene-anchor/index.ts        (Stufe 1, 2, 4)
-supabase/functions/compose-video-clips/index.ts         (Stufe 2)
-supabase/functions/compose-dialog-scene/index.ts        (Stufe 3, 5)
-supabase/functions/poll-dialog-shots/index.ts           (Stufe 3, 5)
-supabase/functions/compose-twoshot-audio/index.ts       (Stufe 3)
-supabase/functions/render-dialog-stitch/index.ts        (Stufe 5)
-supabase/functions/twoshot-lipsync-watchdog/index.ts    (Stufe 5)
-supabase/functions/_shared/face-count.ts                (Stufe 1, 4)
-supabase/functions/_shared/sync-so.ts                   (Stufe 3, 5)
-src/components/composer/SceneCard/* (Provider-Badge)    (Stufe 2)
-mem/architecture/lipsync/sync-so-pro-model-policy       (Update nach Stufe 3+5)
+supabase/functions/compose-dialog-scene/index.ts         (Teil A, B.3)
+supabase/functions/poll-dialog-shots/index.ts            (B.1, B.3)
+supabase/functions/sync-so-webhook/index.ts              (B.1, NEU)
+supabase/functions/render-dialog-stitch/index.ts         (B.2, B.3)
+supabase/functions/twoshot-lipsync-watchdog/index.ts     (B.3, B.4)
+supabase/functions/_shared/sync-so.ts                    (B.1 — webhook_url field)
+src/components/composer/SceneCard/*                      (Teil A Toast)
+mem/architecture/lipsync/sync-so-pro-model-policy        (Update nach B.1+B.4)
+mem/features/video-composer/dialog-shot-pipeline         (Update nach B.1+B.2)
 ```
-Neue DB-Spalten: keine. Neue Tabellen: keine. Schreibt nur in bestehende `composer_scenes.audio_plan` / `clip_error` / `clip_url`.
 
-Migrationen sind nicht nötig — alles läuft in Edge-Functions + Frontend.
+Neue Tabellen: `render_stitch_queue` (B.2, 3 Spalten: scene_id, queued_at, attempts).
+Neue Secrets: `SYNC_SO_WEBHOOK_SECRET`.
+Migrationen: 1× für Queue-Tabelle + pg_cron-Job; sonst nur Edge-Functions + Frontend-Toast.
 
----
-
-## Reihenfolge & Aufwand
-
-| Stufe | Aufwand | Liefert dir konkret |
-|---|---|---|
-| 1 — Anchor/Identity härten | klein | aktuelle Szene rendert |
-| 2 — Provider-Tiering + HappyHorse Lock | klein | keine "non-2xx" mehr auf 2-Sprecher-Dialog |
-| 3 — Per-Turn Refinement | mittel | Artlist-vergleichbare Mund-Genauigkeit |
-| 4 — Multi-Speaker 3+ | mittel | echte Dialog-Szenen (nicht nur Two-Shot) |
-| 5 — Webhook + Lambda-Backoff | klein–mittel | keine 12-min-Timeouts, kein AWS-Crash |
-
-Empfehlung: **Stufe 1 + 2 sofort zusammen** (entsperrt deine aktuelle Szene), danach **Stufe 5** (Stabilität), dann **3 + 4** (Qualität auf Artlist-Niveau).
-
-Sag mir, ob ich mit Stufe 1+2 starten soll, oder ob du eine andere Reihenfolge willst.
+Sag mir bitte:
+- soll ich mit **Teil A + B.1 + B.4** in einem Rutsch loslegen (klein, hoher Impact, entsperrt deine Szene)?
+- oder zuerst nur **Teil A** rein, du verifizierst, und dann gehen wir Stage 5 in Ruhe durch?
