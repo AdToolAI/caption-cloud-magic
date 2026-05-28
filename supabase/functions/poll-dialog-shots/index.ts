@@ -880,7 +880,7 @@ serve(async (req) => {
         }
       }
     }
-    }
+
 
     if (sceneIds.length === 0) {
       return json({ ok: true, processed: 0, kickstarted });
