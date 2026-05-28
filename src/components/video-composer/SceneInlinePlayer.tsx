@@ -133,7 +133,7 @@ export default function SceneInlinePlayer({
         </div>
 
         {/* Status badge top-right */}
-        <div className="absolute top-1.5 right-1.5 z-20">
+        <div className="absolute top-1.5 right-1.5 z-20 flex flex-col items-end gap-1">
           {isReady && (
             <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 backdrop-blur text-[9px] font-semibold text-emerald-300 border border-emerald-500/40">
               ✓ {t('videoComposer.clipReadyBadge')}
@@ -155,7 +155,20 @@ export default function SceneInlinePlayer({
               ✕ Fehler
             </span>
           )}
+          {/* Stage 5 warn: legacy HappyHorse master with multi-speaker dialog →
+              lip-sync was generated against the wrong plate. Re-render swaps to Hailuo. */}
+          {scene.clipSource === 'ai-happyhorse' &&
+            scene.engineOverride === 'cinematic-sync' &&
+            dialogVoiceCount >= 2 && (
+              <span
+                title="Lip-Sync auf altem HappyHorse-Master. Bitte 🔁 Lip-Sync neu rendern — wird automatisch mit Hailuo erzeugt."
+                className="px-1.5 py-0.5 rounded-md bg-amber-500/15 backdrop-blur text-[9px] font-semibold text-amber-300 border border-amber-500/40"
+              >
+                ⚠ Re-Render empfohlen
+              </span>
+            )}
         </div>
+
 
         {/* Media layer */}
         {isReady ? (
