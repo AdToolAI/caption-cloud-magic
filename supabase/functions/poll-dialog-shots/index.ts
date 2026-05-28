@@ -517,9 +517,9 @@ async function processScene(
   // earlier speaker's mouth animation. The deterministic Lambda stitch
   // (DialogStitchVideo) recombines them by timeline window afterwards.
   //
-  // We still dispatch at most MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK new jobs
-  // per tick to respect the Sync.so Creator-plan concurrency budget — but
-  // turn ordering no longer matters for correctness.
+  // We dispatch strictly serial per scene: if any turn is still lipsyncing,
+  // no new turn starts. This matches Artlist-style provider-pool behavior and
+  // avoids Sync.so concurrency/race failures.
   const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
   const stillInFlight = sortedShots.some((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (stillInFlight) {
