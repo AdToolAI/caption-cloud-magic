@@ -34,7 +34,7 @@ const corsHeaders = {
 
 const STALE_PRESYNC_MS = 8 * 60 * 1000; // 8 min: no sync job ever recorded
 const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // 2 min: CPU/preflight abort before Sync.so submit
-const STALE_SYNC_POLL_MS = 12 * 60 * 1000; // 12 min: Sync.so job stuck
+const STALE_SYNC_POLL_MS = 8 * 60 * 1000; // 8 min: Sync.so job stuck (Stage 5 B.4)
 const STALE_RESET_REINVOKE_MS = 2 * 60 * 1000; // 2 min: auto-reset, re-fire
 
 function json(body: unknown, status = 200) {
