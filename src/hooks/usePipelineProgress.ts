@@ -487,5 +487,6 @@ export function usePipelineProgress({
     etaSeconds: Math.round(etaSeconds),
     elapsedSeconds,
     isActive,
+    hasFailure,
   };
 }

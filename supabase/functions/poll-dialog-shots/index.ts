@@ -104,6 +104,44 @@ interface DialogShotsState {
   error?: string;
 }
 
+function dispatchModeForShot(shot: DialogShot): "auto" | "coords" {
+  return shot.target_coords && (shot.deterministic_coords === true || !!shot.force_coords)
+    ? "coords"
+    : "auto";
+}
+
+function prepareShotRetry(shot: DialogShot, reason: string): boolean {
+  if ((shot.retry_count ?? 0) >= 1) return false;
+  const failedMode = dispatchModeForShot(shot);
+  shot.retry_count = (shot.retry_count ?? 0) + 1;
+  shot.status = "pending";
+  shot.sync_job_id = undefined;
+  shot.output_url = undefined;
+  shot.started_at = undefined;
+  shot.completed_at = undefined;
+  shot.error = `retrying_after_${reason}`.slice(0, 300);
+
+  if (failedMode === "coords") {
+    // Coords/frame_number failed → retry once with auto_detect on the isolated speaker WAV.
+    shot.force_coords = false;
+    shot.deterministic_coords = false;
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect fallback (attempt ${shot.retry_count})`);
+  } else if (shot.target_coords) {
+    // Auto failed → retry once with deterministic coords if available.
+    shot.force_coords = true;
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with coords fallback (attempt ${shot.retry_count})`);
+  } else {
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect (attempt ${shot.retry_count})`);
+  }
+  return true;
+}
+
+function markShotTerminalFailed(shot: DialogShot, error: string) {
+  shot.status = "failed";
+  shot.error = error.slice(0, 300);
+  shot.completed_at = new Date().toISOString();
+}
+
 // ── Sync.so dispatch ────────────────────────────────────────────────────
 
 /** Expand a turn's single window with pre-roll/tail, clamping each side
@@ -432,33 +470,8 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        // 1× retry policy: deterministic-coords is now the PRIMARY mode.
-        // If a coords-dispatch fails (e.g. Sync.so rejects frame_number),
-        // retry once with auto_detect on the isolated speaker WAV.
-        // If an auto-dispatch fails and we DO have coords, retry once with
-        // coords. Either path counts toward retry_count.
-        const firstAttempt = (shot.retry_count ?? 0) < 1;
-        if (firstAttempt) {
-          shot.retry_count = (shot.retry_count ?? 0) + 1;
-          shot.status = "pending";
-          shot.sync_job_id = undefined;
-          shot.error = undefined;
-          if (shot.target_coords && !shot.force_coords && !shot.deterministic_coords) {
-            shot.force_coords = true;
-            console.warn(
-              `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with coords fallback (attempt ${shot.retry_count})`,
-            );
-          } else {
-            // Was coords-mode → fall back to auto_detect for this retry.
-            shot.force_coords = false;
-            shot.deterministic_coords = false;
-            console.warn(
-              `[poll-dialog-shots] turn ${shot.idx} ${p.status} → retry with auto_detect fallback (attempt ${shot.retry_count})`,
-            );
-          }
-        } else {
-          shot.status = "failed";
-          shot.error = `sync_${p.status}: ${p.error ?? "unknown"}`.slice(0, 300);
+        if (!prepareShotRetry(shot, `sync_${p.status}`)) {
+          markShotTerminalFailed(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
         }
         mutated = true;
       }
@@ -477,9 +490,10 @@ async function processScene(
       if (shot.status !== "lipsyncing" || !shot.started_at) continue;
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
-      shot.status = "failed";
-      shot.error = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      shot.completed_at = new Date().toISOString();
+      const timeoutReason = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
+      if (!prepareShotRetry(shot, "sync_so_timeout_8min")) {
+        markShotTerminalFailed(shot, timeoutReason);
+      }
       mutated = true;
       console.warn(
         `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_8min job=${shot.sync_job_id} ageMs=${ageMs}`,
@@ -503,10 +517,26 @@ async function processScene(
   // earlier speaker's mouth animation. The deterministic Lambda stitch
   // (DialogStitchVideo) recombines them by timeline window afterwards.
   //
-  // We still dispatch at most MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK new jobs
-  // per tick to respect the Sync.so Creator-plan concurrency budget — but
-  // turn ordering no longer matters for correctness.
+  // We dispatch strictly serial per scene: if any turn is still lipsyncing,
+  // no new turn starts. This matches Artlist-style provider-pool behavior and
+  // avoids Sync.so concurrency/race failures.
   const sortedShots = [...shots].sort((a, b) => a.idx - b.idx);
+  const stillInFlight = sortedShots.some((s) => s.status === "lipsyncing" && s.sync_job_id);
+  if (stillInFlight) {
+    if (mutated) {
+      newState = { ...newState, shots, status: "lipsyncing" };
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: newState,
+          lip_sync_status: "running",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      return { status: "lipsyncing", mutated: true };
+    }
+    return { status: "lipsyncing", mutated: false };
+  }
   const pending = sortedShots.filter((s) => s.status === "pending");
   let dispatchedThisTick = 0;
   for (const nextShot of pending) {
@@ -528,10 +558,7 @@ async function processScene(
       //   (or this is a retry), dispatch with coords + frame_number.
       // → Only fall back to auto_detect when no coords exist at all
       //   (single-speaker scenes are safe).
-      const useCoords =
-        !!nextShot.target_coords &&
-        (nextShot.deterministic_coords === true || !!nextShot.force_coords);
-      const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
+      const mode = dispatchModeForShot(nextShot);
       const audioUrl = nextShot.audio_url || state.master_audio_url;
       const jobId = await startSyncTurnJob(
         syncKey,
@@ -564,8 +591,10 @@ async function processScene(
         // Stop dispatching more on this tick — concurrency saturated.
         break;
       } else {
-        nextShot.status = "failed";
-        nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+        const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
+        if (!prepareShotRetry(nextShot, "dispatch_failed")) {
+          markShotTerminalFailed(nextShot, reason);
+        }
         mutated = true;
       }
     }

@@ -32,6 +32,31 @@ function ok(body: unknown = { ok: true }) {
   });
 }
 
+function dispatchModeForShot(shot: any): "auto" | "coords" {
+  return shot?.target_coords && (shot?.deterministic_coords === true || !!shot?.force_coords)
+    ? "coords"
+    : "auto";
+}
+
+function prepareRetryFromWebhook(shot: any, reason: string): boolean {
+  if ((shot?.retry_count ?? 0) >= 1) return false;
+  const failedMode = dispatchModeForShot(shot);
+  shot.retry_count = (shot.retry_count ?? 0) + 1;
+  shot.status = "pending";
+  shot.sync_job_id = undefined;
+  shot.output_url = undefined;
+  shot.started_at = undefined;
+  shot.completed_at = undefined;
+  shot.error = `retrying_after_${reason}`.slice(0, 300);
+  if (failedMode === "coords") {
+    shot.force_coords = false;
+    shot.deterministic_coords = false;
+  } else if (shot.target_coords) {
+    shot.force_coords = true;
+  }
+  return true;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -140,9 +165,7 @@ serve(async (req) => {
     shot.output_url = outputUrl;
     shot.completed_at = nowIso;
     shot.error = undefined;
-  } else {
-    // FAILED / REJECTED / CANCELED — leave the retry-with-coords logic to
-    // poll-dialog-shots so we don't duplicate it here. Just mark failed.
+  } else if (!prepareRetryFromWebhook(shot, `sync_${status}`)) {
     shot.status = "failed";
     shot.error = `sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 240)}`;
     shot.completed_at = nowIso;

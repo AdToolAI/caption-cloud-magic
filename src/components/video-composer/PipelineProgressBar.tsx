@@ -37,14 +37,14 @@ export default function PipelineProgressBar({
   renderRunning,
   className,
 }: Props) {
-  const { phases, overallPercent, etaSeconds, elapsedSeconds, isActive } =
+  const { phases, overallPercent, etaSeconds, elapsedSeconds, isActive, hasFailure } =
     usePipelineProgress({ scenes, assemblyConfig, renderPercent, renderRunning });
 
   // Keep the bar mounted for 3 s after the last phase ends, so the user sees
   // the final "100 %" tick instead of an abrupt disappearance.
   const [visible, setVisible] = useState(false);
   useEffect(() => {
-    if (isActive) {
+    if (isActive || hasFailure) {
       setVisible(true);
       return;
     }
@@ -52,7 +52,7 @@ export default function PipelineProgressBar({
       const id = window.setTimeout(() => setVisible(false), 3000);
       return () => window.clearTimeout(id);
     }
-  }, [isActive, visible]);
+  }, [isActive, hasFailure, visible]);
 
   if (!visible) return null;
 
@@ -68,8 +68,8 @@ export default function PipelineProgressBar({
           'sticky top-[64px] z-20 -mx-4 px-4 py-2.5 border-b border-gold/15 bg-background/90 backdrop-blur-xl',
           className,
         )}
-        role="status"
-        aria-live="polite"
+        role={hasFailure ? 'alert' : 'status'}
+        aria-live={hasFailure ? 'assertive' : 'polite'}
       >
         <div className="max-w-7xl mx-auto flex items-center gap-4">
           {/* Phase pills */}
@@ -112,7 +112,10 @@ export default function PipelineProgressBar({
           <div className="flex-1 min-w-0">
             <div className="h-1.5 rounded-full bg-muted/40 overflow-hidden">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-primary via-primary to-accent"
+                className={cn(
+                  'h-full rounded-full',
+                  hasFailure ? 'bg-destructive' : 'bg-gradient-to-r from-primary via-primary to-accent',
+                )}
                 initial={false}
                 animate={{ width: `${overallPercent}%` }}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -123,9 +126,11 @@ export default function PipelineProgressBar({
 
           {/* Time + percent */}
           <div className="flex items-center gap-3 shrink-0 text-[11px] font-mono">
-            <span className="text-foreground tabular-nums">{overallPercent}%</span>
+            <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
+              {hasFailure ? 'Fehler' : `${overallPercent}%`}
+            </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
-              {formatTime(elapsedSeconds)} / ~{formatTime(elapsedSeconds + etaSeconds)}
+              {hasFailure ? 'Bitte „Lip-Sync neu rendern“ klicken' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
             </span>
           </div>
         </div>
