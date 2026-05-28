@@ -678,6 +678,8 @@ serve(async (req) => {
           project_id: project_id,
           credits_used: credits_required,
           out_name: outName,
+          stable_render_path: stabilizedVideoCount > 0,
+          stabilized_video_sources: stabilizedVideoCount,
           // Allow callers (e.g. render-long-form-video) to override the source
           // so the webhook can route the result back to the right table.
           source: (customizations as any)?.source || 'universal-creator',
@@ -711,9 +713,13 @@ serve(async (req) => {
           credits_used: credits_required,
           credit_refund_done: false,
           lambda_invoked_at: lambdaInvokedAt,
+          lambda_start_requested: true,
+          lambda_start_status: 'scheduled',
           tracking_mode: 'async-event-with-outname',
           bucket_name: bucketName,
           out_name: outName,
+          stable_render_path: stabilizedVideoCount > 0,
+          stabilized_video_sources: stabilizedVideoCount,
         },
         subtitle_config: {},
         status: 'rendering',
