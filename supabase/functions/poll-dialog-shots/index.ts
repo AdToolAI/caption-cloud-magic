@@ -511,9 +511,18 @@ async function processScene(
       const win = (nextShot.render_window
         ?? expandWindow(nextShot, shots)) as [number, number];
       nextShot.render_window = win;
-      // Try auto_detect FIRST on the isolated speaker WAV; only fall back
-      // to coords+frame_number on a failed-poll retry.
-      const useCoords = !!nextShot.force_coords && !!nextShot.target_coords;
+      // Deterministic-first dispatch (Artlist parity, May 2026):
+      // For multi-speaker scenes the FaceMap already identity-matched each
+      // turn to a pixel coordinate. Letting Sync.so auto_detect the speaker
+      // inside a two-shot frame is the #1 cause of "wrong mouth moves" —
+      // the provider routinely picks the wrong face when both are visible.
+      // → If we have target_coords AND the shot was flagged deterministic
+      //   (or this is a retry), dispatch with coords + frame_number.
+      // → Only fall back to auto_detect when no coords exist at all
+      //   (single-speaker scenes are safe).
+      const useCoords =
+        !!nextShot.target_coords &&
+        (nextShot.deterministic_coords === true || !!nextShot.force_coords);
       const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
       const audioUrl = nextShot.audio_url || state.master_audio_url;
       const jobId = await startSyncTurnJob(
