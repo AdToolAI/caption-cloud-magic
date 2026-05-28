@@ -410,23 +410,27 @@ export const AudioAssetSelector = ({
                     </Button>
                   </div>
                 </div>
-                {musicTracks.find(t => t.id === selectedMusicId) && (
-                  <div className="flex items-center gap-3 p-2 rounded bg-background">
-                    {musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url && (
-                      <img
-                        src={musicTracks.find(t => t.id === selectedMusicId)?.thumbnail_url}
-                        alt=""
-                        className="w-10 h-10 rounded object-cover"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{musicTracks.find(t => t.id === selectedMusicId)?.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {musicTracks.find(t => t.id === selectedMusicId)?.duration_sec}s
-                      </p>
+                {musicTracks.find(t => t.id === selectedMusicId) && (() => {
+                  const sel = musicTracks.find(t => t.id === selectedMusicId)!;
+                  return (
+                    <div className="flex items-center gap-3 p-2 rounded bg-background">
+                      {sel.thumbnail_url ? (
+                        <img
+                          src={sel.thumbnail_url}
+                          alt=""
+                          className="w-10 h-10 rounded object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded bg-muted/40 flex items-center justify-center">
+                          <Music className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{cleanTitle(sel.title)}</p>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </Card>
             )}
           
