@@ -20,7 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # S3 target — must match REMOTION_SERVE_URL secret
-S3_BUCKET="remotionlambda-eucentral1-13gm4o6s90"
+S3_BUCKET="remotionlambda-eucentral1-6ul51trd3p"
 S3_SITE_PATH="sites/adtool-remotion-bundle"
 AWS_REGION="eu-central-1"
 

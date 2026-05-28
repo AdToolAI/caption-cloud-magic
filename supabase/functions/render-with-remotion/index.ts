@@ -3,7 +3,7 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { AwsClient } from "npm:aws4fetch@1.0.18";
 import { normalizeStartPayload, payloadDiagnostics } from "../_shared/remotion-payload.ts";
-import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { getLambdaFunctionName, AWS_REGION, DEFAULT_BUCKET_NAME, REMOTION_BUNDLE_BUCKET_NAME } from "../_shared/aws-lambda.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -32,12 +32,12 @@ function normalizeRemotionServeUrl(rawServeUrl: string): string {
     const bucketMatch = url.hostname.match(/^(remotionlambda-eucentral1-[^.]+)\.s3[.-]/i);
     const secretBucketName = bucketMatch?.[1];
 
-    if (secretBucketName && secretBucketName !== DEFAULT_BUCKET_NAME) {
+    if (secretBucketName && secretBucketName !== REMOTION_BUNDLE_BUCKET_NAME) {
       const normalized = new URL(rawServeUrl);
-      normalized.hostname = `${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
-      console.warn('⚠️ Outdated REMOTION_SERVE_URL bucket detected — normalizing to canonical bucket', {
+      normalized.hostname = `${REMOTION_BUNDLE_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
+      console.warn('⚠️ Outdated REMOTION_SERVE_URL bucket detected — normalizing to canonical bundle bucket', {
         secretBucketName,
-        canonicalBucketName: DEFAULT_BUCKET_NAME,
+        canonicalBundleBucket: REMOTION_BUNDLE_BUCKET_NAME,
         originalServeUrlPrefix: rawServeUrl.substring(0, 96),
         normalizedServeUrlPrefix: normalized.toString().substring(0, 96),
       });
