@@ -26,6 +26,33 @@ function toAsciiSafeJson(jsonString: string): string {
   });
 }
 
+function normalizeRemotionServeUrl(rawServeUrl: string): string {
+  try {
+    const url = new URL(rawServeUrl);
+    const bucketMatch = url.hostname.match(/^(remotionlambda-eucentral1-[^.]+)\.s3[.-]/i);
+    const secretBucketName = bucketMatch?.[1];
+
+    if (secretBucketName && secretBucketName !== DEFAULT_BUCKET_NAME) {
+      const normalized = new URL(rawServeUrl);
+      normalized.hostname = `${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
+      console.warn('⚠️ Outdated REMOTION_SERVE_URL bucket detected — normalizing to canonical bucket', {
+        secretBucketName,
+        canonicalBucketName: DEFAULT_BUCKET_NAME,
+        originalServeUrlPrefix: rawServeUrl.substring(0, 96),
+        normalizedServeUrlPrefix: normalized.toString().substring(0, 96),
+      });
+      return normalized.toString();
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not parse REMOTION_SERVE_URL, using raw value', {
+      error: error instanceof Error ? error.message : String(error),
+      serveUrlPrefix: rawServeUrl.substring(0, 96),
+    });
+  }
+
+  return rawServeUrl;
+}
+
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 
 async function failRenderAndRefundOnce(params: {
