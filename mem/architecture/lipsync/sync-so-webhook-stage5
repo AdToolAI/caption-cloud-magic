@@ -14,4 +14,7 @@ type: feature
 - Inside `poll-dialog-shots` Step 1b: any shot with `status='lipsyncing'` whose `started_at` is >8 min old is marked `failed` with `error='sync_so_timeout_8min: job <id> stuck <Xs>'`. Refund happens via existing `state.refunded` boolean in `refundIfNeeded` (idempotent).
 - Legacy two-shot pipeline: `twoshot-lipsync-watchdog` `STALE_SYNC_POLL_MS` shortened from 12 → 8 min; clip_error string is now `sync_so_timeout_8min`.
 
+**Webhook Retry Policy:**
+- `sync-so-webhook` MUST mirror `poll-dialog-shots` retry logic. In multi-speaker scenes with `target_coords`, a terminal Sync.so failure must retry with `force_coords=true`, `deterministic_coords=true`, and `frame_number_override=round((start+end)/2*24)`. It must never downgrade that turn to `auto_detect`, because that can animate the wrong face and trigger the multi-speaker integrity guard.
+
 Idempotency: dialog_shots state is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` boolean in `audio_plan.twoshot` does the same for legacy path.
