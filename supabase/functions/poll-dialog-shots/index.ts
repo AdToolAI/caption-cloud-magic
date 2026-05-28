@@ -780,6 +780,7 @@ serve(async (req) => {
     const targetSceneId = (body?.scene_id as string) ?? querySceneId ?? null;
 
     let sceneIds: string[] = [];
+    let kickstarted: string[] = [];
     if (targetSceneId) {
       sceneIds = [targetSceneId];
     } else {
@@ -796,10 +797,68 @@ serve(async (req) => {
             ),
         )
         .map((r: any) => r.id);
+
+      // ── Kickstart sweep ────────────────────────────────────────────────
+      // Cinematic-Sync scenes whose master clip is ready but whose Lip-Sync
+      // never started (no dialog_shots, lip_sync_status pending/null) get
+      // stuck because the post-render handoff (compose-clip-webhook fire-and-
+      // forget) sometimes drops. We sweep them here on every cron tick.
+      // Guard with a 30s grace so we don't race the in-flight handoff.
+      const { data: stuckRows } = await supabase
+        .from("composer_scenes")
+        .select("id, updated_at")
+        .eq("engine_override", "cinematic-sync")
+        .eq("clip_status", "ready")
+        .is("dialog_shots", null)
+        .is("lip_sync_applied_at", null)
+        .not("clip_url", "is", null)
+        .or("lip_sync_status.is.null,lip_sync_status.eq.pending");
+      const GRACE_MS = 30_000;
+      const now = Date.now();
+      const toKick = (stuckRows ?? []).filter((r: any) => {
+        const ts = r?.updated_at ? Date.parse(r.updated_at) : 0;
+        return !ts || now - ts > GRACE_MS;
+      });
+      if (toKick.length > 0) {
+        console.log(
+          `[poll-dialog-shots] kickstart sweep: ${toKick.length} scene(s) need compose-dialog-scene`,
+        );
+        for (const r of toKick) {
+          kickstarted.push(r.id);
+          // Fire-and-forget; compose-dialog-scene returns 202 and handles its own state.
+          const kickPromise = fetch(
+            `${supabaseUrl}/functions/v1/compose-dialog-scene`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify({ scene_id: r.id }),
+            },
+          ).then(async (resp) => {
+            if (!resp.ok) {
+              const t = await resp.text().catch(() => "");
+              console.warn(
+                `[poll-dialog-shots] kickstart compose-dialog-scene ${r.id} failed ${resp.status}: ${t.slice(0, 300)}`,
+              );
+            }
+          }).catch((e) => {
+            console.warn(
+              `[poll-dialog-shots] kickstart compose-dialog-scene ${r.id} threw: ${(e as Error).message}`,
+            );
+          });
+          // @ts-ignore EdgeRuntime is global
+          if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+            // @ts-ignore
+            EdgeRuntime.waitUntil(kickPromise);
+          }
+        }
+      }
     }
 
     if (sceneIds.length === 0) {
-      return json({ ok: true, processed: 0 });
+      return json({ ok: true, processed: 0, kickstarted });
     }
 
     const results: any[] = [];
