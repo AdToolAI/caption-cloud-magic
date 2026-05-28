@@ -2,7 +2,19 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
