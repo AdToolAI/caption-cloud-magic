@@ -589,11 +589,22 @@ serve(async (req) => {
     }
 
     if (componentName === 'UniversalCreatorVideo') {
-      const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
-      sanitizedCustomizations = stabilized.customizations;
-      stabilizedVideoCount = stabilized.stabilizedVideoCount;
-      if (stabilizedVideoCount > 0) {
-        console.log(`🛡️ Stable UniversalCreator render path: replaced ${stabilizedVideoCount} external video source(s) with static fallbacks`);
+      // Stabilization (replace external scene videos with image/gradient fallbacks)
+      // is OFF by default — it was the root cause of black-image renders with
+      // working audio. Re-enable per render by setting payload flag
+      // `forceStableRenderPath: true` or env REMOTION_FORCE_STABLE_RENDER=1.
+      const forceStable =
+        (sanitizedCustomizations as any)?.forceStableRenderPath === true ||
+        Deno.env.get('REMOTION_FORCE_STABLE_RENDER') === '1';
+      if (forceStable) {
+        const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
+        sanitizedCustomizations = stabilized.customizations;
+        stabilizedVideoCount = stabilized.stabilizedVideoCount;
+        if (stabilizedVideoCount > 0) {
+          console.log(`⚠️ Forced stable render path active — replaced ${stabilizedVideoCount} external video source(s) with static fallbacks`);
+        }
+      } else {
+        console.log('✅ Passing external scene video URLs through to Lambda (stabilization disabled by default)');
       }
     }
 
