@@ -221,6 +221,9 @@ async function startSyncTurnJob(
    *  the terminal status to this URL — cuts per-shot completion latency from
    *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
   webhookUrl?: string,
+  /** Optional override for the `frame_number` coord-sampling point. Used on
+   *  retries to step away from the original failing frame (cuts/blinks). */
+  frameNumberOverride?: number,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
@@ -228,11 +231,9 @@ async function startSyncTurnJob(
     temperature,
   };
   if (mode === "coords" && coords) {
-    // Sample coords WITHIN the turn window — frame 0 of the master video
-    // is virtually never where the speaker sits during a later turn, which
-    // is exactly what produced "An unknown error occurred." from Sync.so
-    // for all non-first turns.
-    const frameNumber = Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
+    const frameNumber = Number.isFinite(frameNumberOverride as number)
+      ? Math.max(0, Math.round(frameNumberOverride as number))
+      : Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: frameNumber,
