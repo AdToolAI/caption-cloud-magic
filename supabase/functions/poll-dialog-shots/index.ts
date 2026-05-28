@@ -104,6 +104,44 @@ interface DialogShotsState {
   error?: string;
 }
 
+function dispatchModeForShot(shot: DialogShot): "auto" | "coords" {
+  return shot.target_coords && (shot.deterministic_coords === true || !!shot.force_coords)
+    ? "coords"
+    : "auto";
+}
+
+function prepareShotRetry(shot: DialogShot, reason: string): boolean {
+  if ((shot.retry_count ?? 0) >= 1) return false;
+  const failedMode = dispatchModeForShot(shot);
+  shot.retry_count = (shot.retry_count ?? 0) + 1;
+  shot.status = "pending";
+  shot.sync_job_id = undefined;
+  shot.output_url = undefined;
+  shot.started_at = undefined;
+  shot.completed_at = undefined;
+  shot.error = `retrying_after_${reason}`.slice(0, 300);
+
+  if (failedMode === "coords") {
+    // Coords/frame_number failed → retry once with auto_detect on the isolated speaker WAV.
+    shot.force_coords = false;
+    shot.deterministic_coords = false;
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect fallback (attempt ${shot.retry_count})`);
+  } else if (shot.target_coords) {
+    // Auto failed → retry once with deterministic coords if available.
+    shot.force_coords = true;
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with coords fallback (attempt ${shot.retry_count})`);
+  } else {
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect (attempt ${shot.retry_count})`);
+  }
+  return true;
+}
+
+function markShotTerminalFailed(shot: DialogShot, error: string) {
+  shot.status = "failed";
+  shot.error = error.slice(0, 300);
+  shot.completed_at = new Date().toISOString();
+}
+
 // ── Sync.so dispatch ────────────────────────────────────────────────────
 
 /** Expand a turn's single window with pre-roll/tail, clamping each side
