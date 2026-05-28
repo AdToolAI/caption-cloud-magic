@@ -1,37 +1,65 @@
-## Problem
+## Befund
 
-In `supabase/functions/render-with-remotion/index.ts` ersetzt `stabilizeUniversalCreatorScenes()` (Zeile 135) **bedingungslos** jede Szene mit `background.type === 'video'` durch `imageUrl`-Fallback oder — wenn keiner vorhanden ist — durch einen dunklen Gradient `#050816 → #111827`.
+Pixabay ist nicht grundsätzlich das Problem. Der aktuelle Render beweist:
 
-Log-Beweis vom aktuellen Render (`pending-d6f794cb…`):
+- Bucket/Access ist korrekt.
+- Lambda startet korrekt und bekommt eine echte Remotion-ID: `ps1q0d28es`.
+- Die echten Pixabay-`videoUrl`s werden jetzt wieder an Lambda durchgereicht.
+- Der Render stirbt exakt nach 600s mit `type: timeout`.
+
+Der relevante Unterschied zum früher funktionierenden Weg ist sehr wahrscheinlich diese aktuelle Stelle in `render-with-remotion`:
+
+```ts
+_schedulingMode: 'stability',
+timeoutInMilliseconds: 600000,
 ```
-🛡️ Stable UniversalCreator render path: replaced 4 external video source(s) with static fallbacks
-```
 
-Audio (Voiceover + BG-Music) läuft als separater Track unverändert → exakt das beobachtete Symptom: **Ton ja, Bild komplett schwarz**.
+Dadurch wird ein 20s-Video mit 600 Frames aktuell in zu große Lambda-Chunks gepackt. In `remotion-payload.ts` ergibt Stability Mode bei 600 Frames effektiv ca. `framesPerLambda = 300`, also nur 2 Render-Worker. Bei externen MP4s ist das zu langsam und läuft genau ins 600s-Limit.
 
-## Fix
+Früher war der Pfad schneller, weil Remotion die Frames stärker verteilt hat. Das ist der saubere Weg zurück: echte Pixabay-Videos behalten, aber wieder kleinere Chunks/mehr parallele Worker verwenden.
 
-1. **`stabilizeUniversalCreatorScenes` standardmäßig ausschalten.**
-   Nur noch aktiv, wenn explizit per Flag angefordert (z.B. `payload.forceStableRenderPath === true` oder Env `REMOTION_FORCE_STABLE_RENDER=1`). Default = Originalvideos werden 1:1 an Lambda durchgereicht.
+## Plan
 
-2. **Aufruf-Stelle (Zeile 592–596)** entsprechend gaten:
-   ```ts
-   if (shouldStabilize) {
-     const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
-     …
-   }
-   ```
+1. **Keine Poster-/Gradient-Fallback-Lösung als Standard**
+   - Pixabay-MP4s bleiben echte Hintergrundvideos.
+   - `stabilizeUniversalCreatorScenes()` bleibt standardmäßig aus.
+   - Kein pauschaler Ersatz durch Standbilder, weil das nicht dem gewünschten Ergebnis entspricht.
 
-3. **Logging beibehalten**, aber klarer formulieren (`⚠️ Forced stable render path active …`), damit man künftig sofort sieht, ob die Fallback-Kette greift.
+2. **Regression im Lambda-Scheduling beheben**
+   - Für Universal-Creator-Renders mit externen Video-Hintergründen den erzwungenen `stability`-Modus entfernen oder gezielt überschreiben.
+   - Stattdessen für kurze HD-Renders wie `20s / 600 Frames / 1080x1920` wieder kleinere Chunks verwenden.
+   - Ziel: maximal 5 Lambda-Worker, aber deutlich weniger als 300 Frames pro Worker, z.B. ca. `120 framesPerLambda` bei 600 Frames.
 
-4. **`render-with-remotion` deployen**, dann erneuten Test-Render anstoßen und in den Logs verifizieren, dass die Zeile *nicht* mehr erscheint und das Lambda-Payload die echten `videoUrl`s enthält.
+3. **Scheduling-Logik sauber kapseln**
+   - In `_shared/remotion-payload.ts` eine explizite Scheduling-Variante für externe Remotion-Videoquellen einführen, statt überall pauschal `stability` zu erzwingen.
+   - Regeln:
+     - Externe MP4-Hintergründe: scene-/duration-aware, mehr Chunks, max 5 Worker.
+     - Reine Bilder/Gradienten: bestehender stabiler Pfad kann bleiben.
+     - Retry nach Timeout: nicht noch konservativer werden, sondern Remote-Video-tauglich chunking wählen.
 
-## Was unverändert bleibt
+4. **Payload-Diagnose erweitern**
+   - Loggen:
+     - Anzahl externer Videoquellen
+     - `framesPerLambda`
+     - geschätzte Worker-Anzahl
+     - Scheduling-Modus
+   - So sehen wir beim nächsten Render sofort, ob der alte funktionierende Pfad wieder aktiv ist.
 
-- Bucket-/Serve-URL-Logik (`6ul51trd3p`) — funktioniert nachweislich (Lambda-Start = 200 OK).
-- Audio-Pipeline.
-- Webhook, Credit-Refund, alle anderen Render-Funktionen.
+5. **Fehlermeldung korrigieren**
+   - Die aktuelle Meldung „Zu viele Frames pro Lambda“ ist inhaltlich nah dran, aber zu generisch.
+   - Für diesen Fall künftig: „Render-Timeout durch zu große Lambda-Chunks bei externen Videohintergründen“.
+   - Credits bleiben wie bisher idempotent refundbar.
 
-## Risiken
+6. **Deploy & Test**
+   - Deploy: `render-with-remotion`, `_shared/remotion-payload.ts`-abhängige Funktion, optional `remotion-webhook` nur für bessere Diagnose.
+   - Danach exakt denselben Pixabay-Render erneut starten.
+   - Erwartung im Log:
+     - `stable_render_path: false`
+     - echte Pixabay-URLs vorhanden
+     - `framesPerLambda` deutlich unter 300
+     - Worker-Anzahl ca. 4–5
+     - kein 600s Timeout
 
-Falls die ursprüngliche Instabilität (externe Video-URLs → Lambda-Failure) zurückkommt, kann sie per Flag jederzeit wieder eingeschaltet werden, ohne Code-Rollback. Sollte ein Lambda-Fail auftreten, sehen wir das sofort im neuen Render-Log und können gezielt reagieren (statt jedes Video präventiv zu zerstören).
+## Ergebnis
+
+Pixabay bleibt drin. Der Fix stellt den früher funktionierenden Renderweg wieder her: echte externe MP4s, aber mit sinnvoller Lambda-Verteilung statt zu großer 300-Frame-Chunks.

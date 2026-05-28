@@ -698,13 +698,42 @@ serve(async (req) => {
       // r61: Enable audio rendering for voiceover/music
       muted: false,
       audioCodec: 'aac',
-      
-      // r70: Force stability scheduling (fewer, longer Lambdas) for Universal Creator
-      // to avoid AWS Concurrency / "Rate Exceeded" aborts that we keep hitting in
-      // distributed mode. Let Remotion handle its own internal sub-Lambda retries.
-      _schedulingMode: 'stability',
-      timeoutInMilliseconds: 600000,
-      
+
+      // r71: Scene-aware scheduling.
+      // External MP4 backgrounds (Pixabay etc.) need many small parallel chunks
+      // otherwise the 600s Lambda timeout is hit while one worker streams 4 remote
+      // videos. We detect external videos and switch to distributed mode with an
+      // explicit small framesPerLambda. Static (image/gradient/color) renders keep
+      // the conservative stability path.
+      ...(() => {
+        const scenes = Array.isArray((sanitizedCustomizations as any)?.scenes)
+          ? (sanitizedCustomizations as any).scenes
+          : [];
+        const externalVideoCount = scenes.reduce((n: number, s: any) => {
+          const bg = s?.background;
+          const isExt = bg?.type === 'video' && typeof bg?.videoUrl === 'string' && /^https?:\/\//i.test(bg.videoUrl);
+          const isAnim = s?.useAnimation === true && typeof s?.animatedVideoUrl === 'string' && /^https?:\/\//i.test(s.animatedVideoUrl);
+          return n + (isExt ? 1 : 0) + (isAnim ? 1 : 0);
+        }, 0);
+        const hasExternalVideos = externalVideoCount > 0;
+        if (hasExternalVideos) {
+          // Target ~5 workers, min 80 / max 200 fpl. For 600 frames → 120 fpl → 5λ.
+          const targetWorkers = 5;
+          const fpl = Math.max(80, Math.min(200, Math.ceil(durationInFrames / targetWorkers)));
+          console.log(`🎞️ External video scenes detected (${externalVideoCount}) — distributed scheduling, framesPerLambda=${fpl}, estWorkers=${Math.ceil(durationInFrames / fpl)}`);
+          return {
+            _schedulingMode: 'distributed' as const,
+            framesPerLambda: fpl,
+            timeoutInMilliseconds: 600000,
+          };
+        }
+        console.log('🖼️ No external video scenes — using stability scheduling');
+        return {
+          _schedulingMode: 'stability' as const,
+          timeoutInMilliseconds: 600000,
+        };
+      })(),
+
       // Output
       bucketName,
       outName,
