@@ -240,6 +240,7 @@ async function startRemotionRender(params: {
               lambda_request_id: lambdaRequestId,
               lambda_function: LAMBDA_FUNCTION_NAME,
               lambda_accepted: true,
+              lambda_start_status: 'accepted',
               tracking_mode: 'request_response_sync',
               bucket_name: bucketName,
               out_name: outName,
@@ -760,6 +761,15 @@ serve(async (req) => {
         outName,
       }).catch((err) => {
         console.error('❌ Background Lambda start crashed:', err);
+        return failRenderAndRefundOnce({
+          supabaseAdmin,
+          pendingRenderId,
+          userId: userId!,
+          creditsRequired: credits_required,
+          message: err instanceof Error ? `Lambda-Start Ausnahme: ${err.message}` : 'Lambda-Start Ausnahme: Unbekannter Fehler',
+          category: 'lambda_start_failed',
+          extraConfig: { lambda_start_status: 'failed', tracking_mode: 'async-event-start_exception' },
+        });
       })
     );
 
