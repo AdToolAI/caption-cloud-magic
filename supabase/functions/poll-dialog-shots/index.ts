@@ -627,7 +627,7 @@ async function processScene(
         break;
       } else {
         const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
-        if (!prepareShotRetry(nextShot, "dispatch_failed")) {
+        if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
           markShotTerminalFailed(nextShot, reason);
         }
         mutated = true;
