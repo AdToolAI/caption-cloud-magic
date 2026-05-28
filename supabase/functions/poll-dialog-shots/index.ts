@@ -558,10 +558,7 @@ async function processScene(
       //   (or this is a retry), dispatch with coords + frame_number.
       // → Only fall back to auto_detect when no coords exist at all
       //   (single-speaker scenes are safe).
-      const useCoords =
-        !!nextShot.target_coords &&
-        (nextShot.deterministic_coords === true || !!nextShot.force_coords);
-      const mode: "auto" | "coords" = useCoords ? "coords" : "auto";
+      const mode = dispatchModeForShot(nextShot);
       const audioUrl = nextShot.audio_url || state.master_audio_url;
       const jobId = await startSyncTurnJob(
         syncKey,
@@ -594,8 +591,10 @@ async function processScene(
         // Stop dispatching more on this tick — concurrency saturated.
         break;
       } else {
-        nextShot.status = "failed";
-        nextShot.error = `dispatch: ${(e as Error)?.message ?? "unknown"}`.slice(0, 300);
+        const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
+        if (!prepareShotRetry(nextShot, "dispatch_failed")) {
+          markShotTerminalFailed(nextShot, reason);
+        }
         mutated = true;
       }
     }
