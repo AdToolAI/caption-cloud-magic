@@ -526,7 +526,7 @@ async function processScene(
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
       const timeoutReason = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      if (!prepareShotRetry(shot, "sync_so_timeout_8min")) {
+      if (!prepareShotRetry(shot, "sync_so_timeout_8min", shots)) {
         markShotTerminalFailed(shot, timeoutReason);
       }
       mutated = true;
