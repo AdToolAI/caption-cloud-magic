@@ -393,7 +393,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url",
+        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, clip_source, engine_override, dialog_script, ai_prompt, duration_seconds, clip_quality",
       )
       .eq("id", sceneId)
       .single();
@@ -408,6 +408,97 @@ serve(async (req) => {
       .single();
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
+
+    // ─── STAGE 2 HOTFIX (May 2026): retroactive HappyHorse-master guard ────
+    // The `compose-video-clips` guard only blocks HappyHorse before the first
+    // master render. If the user clicks "🔁 Lip-Sync neu rendern" on a scene
+    // whose master plate was already rendered with HappyHorse 1.0 (high
+    // identity-drift, unsuitable for 2-speaker lip-sync masters), Sync.so
+    // animates mouths on a structurally broken plate → visible mouth-offset
+    // regardless of Sync.so quality. We must invalidate the master here too.
+    {
+      const cs = String((scene as any).clip_source ?? "");
+      const eo = String((scene as any).engine_override ?? "auto");
+      if (cs === "ai-happyhorse" && eo === "cinematic-sync") {
+        const dlg = String((scene as any).dialog_script ?? "");
+        const speakerNames = new Set(
+          dlg
+            .split(/\r?\n/)
+            .map((l) => l.match(/^\s*\[?([A-Za-zÀ-ÿ][\w\s.'-]{0,40}?)\]?\s*[:：]/))
+            .filter((m): m is RegExpMatchArray => !!m)
+            .map((m) => m[1].trim().toLowerCase()),
+        );
+        if (speakerNames.size >= 2) {
+          console.warn(
+            `[compose-dialog-scene] scene ${sceneId}: HappyHorse + cinematic-sync + ${speakerNames.size} speakers — invalidating master & re-rendering with ai-hailuo (Stage 2 hotfix).`,
+          );
+          await supabase
+            .from("composer_scenes")
+            .update({
+              clip_source: "ai-hailuo",
+              clip_url: null,
+              clip_status: "pending",
+              clip_error: null,
+              reference_image_url: null,
+              dialog_shots: null,
+              lip_sync_status: null,
+              lip_sync_applied_at: null,
+              lip_sync_source_clip_url: null,
+              twoshot_stage: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+
+          // Fire-and-forget compose-video-clips for this single scene; its
+          // webhook (`compose-clip-webhook`) will auto-retrigger
+          // compose-dialog-scene once the new Hailuo master is ready.
+          const clipsPayload = {
+            projectId: scene.project_id,
+            scenes: [
+              {
+                id: sceneId,
+                clipSource: "ai-hailuo",
+                clipQuality: (scene as any).clip_quality ?? "standard",
+                aiPrompt: (scene as any).ai_prompt ?? "",
+                durationSeconds: Number((scene as any).duration_seconds ?? 6),
+              },
+            ],
+          };
+          try {
+            fetch(`${supabaseUrl}/functions/v1/compose-video-clips`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceKey}`,
+              },
+              body: JSON.stringify(clipsPayload),
+            }).catch((e) => {
+              console.warn(
+                `[compose-dialog-scene] scene ${sceneId}: compose-video-clips re-invoke failed:`,
+                (e as Error).message,
+              );
+            });
+          } catch (e) {
+            console.warn(
+              `[compose-dialog-scene] scene ${sceneId}: compose-video-clips dispatch threw:`,
+              (e as Error).message,
+            );
+          }
+
+          return json(
+            {
+              ok: true,
+              status: "master_regenerated_for_lipsync_stability",
+              scene_id: sceneId,
+              message:
+                "HappyHorse master is not viable for 2+ speaker lip-sync. Master is being re-rendered with Hailuo; lip-sync will start automatically when the new master is ready.",
+            },
+            202,
+          );
+        }
+      }
+    }
+
 
     const plan = ((scene as any).audio_plan ?? {}) as Record<string, any>;
     let twoshot = (plan.twoshot ?? {}) as Record<string, any>;
