@@ -1,0 +1,17 @@
+---
+name: Sync.so Webhook + 8-min Per-Shot Watchdog (Stage 5 B.1 + B.4)
+description: poll-dialog-shots registers a webhook URL per Sync.so job; sync-so-webhook receives terminal status, patches dialog_shots[idx] and fire-and-forgets poll-dialog-shots; per-shot stuck-after-8min check inside poll-dialog-shots; legacy twoshot-lipsync-watchdog timeout shortened 12→8 min with clip_error 'sync_so_timeout_8min'
+type: feature
+---
+
+**B.1 Webhook:**
+- `poll-dialog-shots` builds `webhookUrl = ${SUPABASE_URL}/functions/v1/sync-so-webhook?scene_id={id}` via `appendWebhookToken(...)` (reuses existing `WEBHOOK_SHARED_SECRET`, no new secret).
+- Passed into Sync.so v2 `/generate` payload as both `webhookUrl` and `webhook_url`.
+- `sync-so-webhook` (verify_jwt=false) verifies the `?token=` shared secret, finds the scene by `scene_id` hint or by scanning in-flight scenes for the `sync_job_id`, patches `dialog_shots.shots[idx]` (status=ready+output_url OR failed with `sync_${STATUS}` error), then fire-and-forgets `poll-dialog-shots` for that scene. Always returns 200 so Sync.so never retry-storms.
+- pg_cron polling stays as safety net — webhook is purely additive.
+
+**B.4 Per-Shot 8-min Watchdog:**
+- Inside `poll-dialog-shots` Step 1b: any shot with `status='lipsyncing'` whose `started_at` is >8 min old is marked `failed` with `error='sync_so_timeout_8min: job <id> stuck <Xs>'`. Refund happens via existing `state.refunded` boolean in `refundIfNeeded` (idempotent).
+- Legacy two-shot pipeline: `twoshot-lipsync-watchdog` `STALE_SYNC_POLL_MS` shortened from 12 → 8 min; clip_error string is now `sync_so_timeout_8min`.
+
+Idempotency: dialog_shots state is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` boolean in `audio_plan.twoshot` does the same for legacy path.

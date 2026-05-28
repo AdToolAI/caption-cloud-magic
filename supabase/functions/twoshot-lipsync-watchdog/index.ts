@@ -34,7 +34,7 @@ const corsHeaders = {
 
 const STALE_PRESYNC_MS = 8 * 60 * 1000; // 8 min: no sync job ever recorded
 const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // 2 min: CPU/preflight abort before Sync.so submit
-const STALE_SYNC_POLL_MS = 12 * 60 * 1000; // 12 min: Sync.so job stuck
+const STALE_SYNC_POLL_MS = 8 * 60 * 1000; // 8 min: Sync.so job stuck (Stage 5 B.4)
 const STALE_RESET_REINVOKE_MS = 2 * 60 * 1000; // 2 min: auto-reset, re-fire
 
 function json(body: unknown, status = 200) {
@@ -271,13 +271,13 @@ serve(async (req) => {
               .update({
                 lip_sync_status: "failed",
                 twoshot_stage: "failed",
-                clip_error: "syncso_poll_timeout: watchdog auto-failed after 12 min without completion",
+                clip_error: "sync_so_timeout_8min: watchdog auto-failed (Sync.so job no terminal status after 8 min)",
                 updated_at: nowIso,
                 audio_plan: {
                   ...(s.audio_plan as any),
                   twoshot: {
                     ...twoshot,
-                    syncJobs: { ...syncJobs, refunded: true, failedAt: nowIso, lastError: "watchdog_timeout", lastErrorAt: nowIso },
+                    syncJobs: { ...syncJobs, refunded: true, failedAt: nowIso, lastError: "sync_so_timeout_8min", lastErrorAt: nowIso },
                   },
                 },
               })

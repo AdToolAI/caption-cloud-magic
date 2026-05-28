@@ -20,6 +20,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -131,7 +132,6 @@ function expandWindow(
  *  start time to a `frame_number` so Sync.so samples coords INSIDE the
  *  turn window, not at frame 0 of the master video. */
 const ASSUMED_MASTER_FPS = 24;
-
 async function startSyncTurnJob(
   apiKey: string,
   videoUrl: string,
@@ -145,6 +145,10 @@ async function startSyncTurnJob(
    *  'coords' = use fixed pixel coords + frame_number aligned to the
    *  turn start (deterministic fallback when auto_detect fails). */
   mode: "auto" | "coords" = "auto",
+  /** Optional Sync.so webhook URL (B.1 Stage 5). When set, Sync.so will POST
+   *  the terminal status to this URL — cuts per-shot completion latency from
+   *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
+  webhookUrl?: string,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
@@ -173,6 +177,12 @@ async function startSyncTurnJob(
     ],
     options,
   };
+  if (webhookUrl) {
+    // Sync.so v2 accepts `webhookUrl` (camelCase). Include `webhook_url` too
+    // for forward-compat. Unknown fields are ignored by the API.
+    payload.webhookUrl = webhookUrl;
+    (payload as any).webhook_url = webhookUrl;
+  }
   console.log(
     `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
   );
@@ -446,7 +456,37 @@ async function processScene(
       }
 
     });
+
+    // ── Step 1b (Stage 5 B.4): per-shot 8-min watchdog ────────────────
+    // A Sync.so job that hasn't returned COMPLETED/FAILED within 8 min
+    // after dispatch is functionally dead. Mark it failed with a clear
+    // error code so the user (and our diagnostics) can distinguish a
+    // provider stall from a render-stitch issue. Refund happens via
+    // pipelineStatus='failed' below (refundIfNeeded is idempotent via
+    // state.refunded).
+    const PER_SHOT_TIMEOUT_MS = 8 * 60 * 1000;
+    for (const shot of shots) {
+      if (shot.status !== "lipsyncing" || !shot.started_at) continue;
+      const ageMs = Date.now() - Date.parse(shot.started_at);
+      if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
+      shot.status = "failed";
+      shot.error = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
+      shot.completed_at = new Date().toISOString();
+      mutated = true;
+      console.warn(
+        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_8min job=${shot.sync_job_id} ageMs=${ageMs}`,
+      );
+    }
   }
+
+  // Webhook URL for B.1 — Sync.so will POST terminal status here, cutting
+  // poll latency from ~60s (cron) to ~1s. The shared secret comes from
+  // WEBHOOK_SHARED_SECRET via appendWebhookToken (same scheme as Remotion).
+  const supabaseUrl0 = Deno.env.get("SUPABASE_URL") ?? "";
+  const syncWebhookUrl = supabaseUrl0
+    ? appendWebhookToken(`${supabaseUrl0}/functions/v1/sync-so-webhook?scene_id=${sceneId}`)
+    : undefined;
+
 
   // ── Step 2: dispatch pending shots (v9 Artlist-style, NO chaining) ──
   // Every turn is lipsynced on the ORIGINAL pristine master plate with its
@@ -485,6 +525,7 @@ async function processScene(
         nextShot.temperature,
         nextShot.idx,
         mode,
+        syncWebhookUrl,
       );
       nextShot.sync_job_id = jobId;
       nextShot.status = "lipsyncing";
