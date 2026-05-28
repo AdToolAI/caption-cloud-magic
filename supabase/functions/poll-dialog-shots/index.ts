@@ -114,9 +114,18 @@ function dispatchModeForShot(shot: DialogShot): "auto" | "coords" {
     : "auto";
 }
 
-function prepareShotRetry(shot: DialogShot, reason: string): boolean {
+function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
+  return new Set(allShots.map((s) => s.speaker_idx)).size >= 2;
+}
+
+const ASSUMED_MASTER_FPS_CONST = 24;
+
+function prepareShotRetry(
+  shot: DialogShot,
+  reason: string,
+  allShots: DialogShot[],
+): boolean {
   if ((shot.retry_count ?? 0) >= 1) return false;
-  const failedMode = dispatchModeForShot(shot);
   shot.retry_count = (shot.retry_count ?? 0) + 1;
   shot.status = "pending";
   shot.sync_job_id = undefined;
@@ -125,13 +134,34 @@ function prepareShotRetry(shot: DialogShot, reason: string): boolean {
   shot.completed_at = undefined;
   shot.error = `retrying_after_${reason}`.slice(0, 300);
 
+  const multi = isMultiSpeakerScene(allShots);
+
+  // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
+  // in a two-shot frame routinely picks the wrong face (and may animate
+  // nothing on short isolated windows). Instead, keep coords and shift the
+  // sampling frame to the middle of the window so we sidestep Hailuo cuts/
+  // blinks at the window start that triggered Sync.so's "unknown error".
+  if (multi && shot.target_coords) {
+    shot.force_coords = true;
+    shot.deterministic_coords = true;
+    const [s, e] = shot.window;
+    shot.frame_number_override = Math.max(
+      0,
+      Math.round(((s + e) / 2) * ASSUMED_MASTER_FPS_CONST),
+    );
+    console.warn(
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) frame=${shot.frame_number_override} (attempt ${shot.retry_count})`,
+    );
+    return true;
+  }
+
+  const failedMode = dispatchModeForShot(shot);
   if (failedMode === "coords") {
-    // Coords/frame_number failed → retry once with auto_detect on the isolated speaker WAV.
+    // Single-speaker scenes with coords: safe to fall back to auto_detect.
     shot.force_coords = false;
     shot.deterministic_coords = false;
     console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect fallback (attempt ${shot.retry_count})`);
   } else if (shot.target_coords) {
-    // Auto failed → retry once with deterministic coords if available.
     shot.force_coords = true;
     console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with coords fallback (attempt ${shot.retry_count})`);
   } else {
