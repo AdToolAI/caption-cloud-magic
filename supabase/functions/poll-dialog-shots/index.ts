@@ -305,11 +305,13 @@ async function startSyncTurnJob(
       );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
+      (fallback.input as any[])[1] = { type: "audio", url: audioUrl };
       r = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
         headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
         body: JSON.stringify(fallback),
       });
+
       if (!r.ok) {
         const t2 = await r.text().catch(() => "");
         console.error(
