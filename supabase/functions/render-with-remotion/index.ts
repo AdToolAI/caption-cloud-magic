@@ -470,8 +470,11 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
 
+    const componentName = component_name || 'UniversalVideo';
+
     // ✅ CRITICAL: Validate and sanitize scenes before sending to Lambda
-    let sanitizedCustomizations = { ...customizations };
+    let sanitizedCustomizations = { ...(customizations || {}) };
+    let stabilizedVideoCount = 0;
     
     if (Array.isArray(sanitizedCustomizations.scenes)) {
       const originalCount = sanitizedCustomizations.scenes.length;
@@ -554,6 +557,15 @@ serve(async (req) => {
       }
     }
 
+    if (componentName === 'UniversalCreatorVideo') {
+      const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
+      sanitizedCustomizations = stabilized.customizations;
+      stabilizedVideoCount = stabilized.stabilizedVideoCount;
+      if (stabilizedVideoCount > 0) {
+        console.log(`🛡️ Stable UniversalCreator render path: replaced ${stabilizedVideoCount} external video source(s) with static fallbacks`);
+      }
+    }
+
     // ✅ CRITICAL FIX: Calculate durationInFrames EXPLICITLY to prevent Lambda array allocation errors
     const fps = 30;
     const sceneDurationSum = Array.isArray(sanitizedCustomizations.scenes) 
@@ -586,7 +598,6 @@ serve(async (req) => {
       durationInFrames: durationInFrames, // ✅ EXPLICIT - prevents Lambda from calculating
     };
 
-    const componentName = component_name || 'UniversalVideo';
     const bucketName = DEFAULT_BUCKET_NAME;
 
     // ============================================
