@@ -105,6 +105,52 @@ function isTransientSignal(message: string): boolean {
     || TRANSIENT_PATTERNS.some((rx) => rx.test(message));
 }
 
+function stabilizeUniversalCreatorScenes(customizations: Record<string, any>) {
+  if (!Array.isArray(customizations.scenes)) {
+    return { customizations, stabilizedVideoCount: 0 };
+  }
+
+  let stabilizedVideoCount = 0;
+  const stableScenes = customizations.scenes.map((scene: any) => {
+    const background = scene?.background || {};
+    const hasExternalBackgroundVideo = background?.type === 'video' && typeof background?.videoUrl === 'string' && /^https?:\/\//i.test(background.videoUrl);
+    const hasExternalAnimatedVideo = scene?.useAnimation === true && typeof scene?.animatedVideoUrl === 'string' && /^https?:\/\//i.test(scene.animatedVideoUrl);
+
+    if (!hasExternalBackgroundVideo && !hasExternalAnimatedVideo) return scene;
+
+    stabilizedVideoCount += Number(hasExternalBackgroundVideo) + Number(hasExternalAnimatedVideo);
+    const fallbackBackground = background?.imageUrl
+      ? { type: 'image', imageUrl: background.imageUrl }
+      : {
+          type: 'gradient',
+          gradientColors: Array.isArray(background?.gradientColors) && background.gradientColors.length >= 2
+            ? background.gradientColors
+            : ['#050816', '#111827'],
+        };
+
+    return {
+      ...scene,
+      useAnimation: false,
+      animatedVideoUrl: undefined,
+      background: hasExternalBackgroundVideo ? fallbackBackground : background,
+      renderStabilized: true,
+    };
+  });
+
+  return {
+    customizations: {
+      ...customizations,
+      scenes: stableScenes,
+      renderStabilization: {
+        enabled: stabilizedVideoCount > 0,
+        strategy: 'external-video-to-static-fallback',
+        stabilizedVideoCount,
+      },
+    },
+    stabilizedVideoCount,
+  };
+}
+
 async function startRemotionRender(params: {
   aws: any;
   lambdaUrl: string;
@@ -194,6 +240,7 @@ async function startRemotionRender(params: {
               lambda_request_id: lambdaRequestId,
               lambda_function: LAMBDA_FUNCTION_NAME,
               lambda_accepted: true,
+              lambda_start_status: 'accepted',
               tracking_mode: 'request_response_sync',
               bucket_name: bucketName,
               out_name: outName,
@@ -424,8 +471,11 @@ serve(async (req) => {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
 
+    const componentName = component_name || 'UniversalVideo';
+
     // ✅ CRITICAL: Validate and sanitize scenes before sending to Lambda
-    let sanitizedCustomizations = { ...customizations };
+    let sanitizedCustomizations = { ...(customizations || {}) };
+    let stabilizedVideoCount = 0;
     
     if (Array.isArray(sanitizedCustomizations.scenes)) {
       const originalCount = sanitizedCustomizations.scenes.length;
@@ -508,6 +558,15 @@ serve(async (req) => {
       }
     }
 
+    if (componentName === 'UniversalCreatorVideo') {
+      const stabilized = stabilizeUniversalCreatorScenes(sanitizedCustomizations);
+      sanitizedCustomizations = stabilized.customizations;
+      stabilizedVideoCount = stabilized.stabilizedVideoCount;
+      if (stabilizedVideoCount > 0) {
+        console.log(`🛡️ Stable UniversalCreator render path: replaced ${stabilizedVideoCount} external video source(s) with static fallbacks`);
+      }
+    }
+
     // ✅ CRITICAL FIX: Calculate durationInFrames EXPLICITLY to prevent Lambda array allocation errors
     const fps = 30;
     const sceneDurationSum = Array.isArray(sanitizedCustomizations.scenes) 
@@ -540,7 +599,6 @@ serve(async (req) => {
       durationInFrames: durationInFrames, // ✅ EXPLICIT - prevents Lambda from calculating
     };
 
-    const componentName = component_name || 'UniversalVideo';
     const bucketName = DEFAULT_BUCKET_NAME;
 
     // ============================================
@@ -621,6 +679,8 @@ serve(async (req) => {
           project_id: project_id,
           credits_used: credits_required,
           out_name: outName,
+          stable_render_path: stabilizedVideoCount > 0,
+          stabilized_video_sources: stabilizedVideoCount,
           // Allow callers (e.g. render-long-form-video) to override the source
           // so the webhook can route the result back to the right table.
           source: (customizations as any)?.source || 'universal-creator',
@@ -654,9 +714,13 @@ serve(async (req) => {
           credits_used: credits_required,
           credit_refund_done: false,
           lambda_invoked_at: lambdaInvokedAt,
+          lambda_start_requested: true,
+          lambda_start_status: 'scheduled',
           tracking_mode: 'async-event-with-outname',
           bucket_name: bucketName,
           out_name: outName,
+          stable_render_path: stabilizedVideoCount > 0,
+          stabilized_video_sources: stabilizedVideoCount,
         },
         subtitle_config: {},
         status: 'rendering',
@@ -697,6 +761,15 @@ serve(async (req) => {
         outName,
       }).catch((err) => {
         console.error('❌ Background Lambda start crashed:', err);
+        return failRenderAndRefundOnce({
+          supabaseAdmin,
+          pendingRenderId,
+          userId: userId!,
+          creditsRequired: credits_required,
+          message: err instanceof Error ? `Lambda-Start Ausnahme: ${err.message}` : 'Lambda-Start Ausnahme: Unbekannter Fehler',
+          category: 'lambda_start_failed',
+          extraConfig: { lambda_start_status: 'failed', tracking_mode: 'async-event-start_exception' },
+        });
       })
     );
 
