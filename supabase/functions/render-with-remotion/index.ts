@@ -105,6 +105,52 @@ function isTransientSignal(message: string): boolean {
     || TRANSIENT_PATTERNS.some((rx) => rx.test(message));
 }
 
+function stabilizeUniversalCreatorScenes(customizations: Record<string, any>) {
+  if (!Array.isArray(customizations.scenes)) {
+    return { customizations, stabilizedVideoCount: 0 };
+  }
+
+  let stabilizedVideoCount = 0;
+  const stableScenes = customizations.scenes.map((scene: any) => {
+    const background = scene?.background || {};
+    const hasExternalBackgroundVideo = background?.type === 'video' && typeof background?.videoUrl === 'string' && /^https?:\/\//i.test(background.videoUrl);
+    const hasExternalAnimatedVideo = scene?.useAnimation === true && typeof scene?.animatedVideoUrl === 'string' && /^https?:\/\//i.test(scene.animatedVideoUrl);
+
+    if (!hasExternalBackgroundVideo && !hasExternalAnimatedVideo) return scene;
+
+    stabilizedVideoCount += Number(hasExternalBackgroundVideo) + Number(hasExternalAnimatedVideo);
+    const fallbackBackground = background?.imageUrl
+      ? { type: 'image', imageUrl: background.imageUrl }
+      : {
+          type: 'gradient',
+          gradientColors: Array.isArray(background?.gradientColors) && background.gradientColors.length >= 2
+            ? background.gradientColors
+            : ['#050816', '#111827'],
+        };
+
+    return {
+      ...scene,
+      useAnimation: false,
+      animatedVideoUrl: undefined,
+      background: hasExternalBackgroundVideo ? fallbackBackground : background,
+      renderStabilized: true,
+    };
+  });
+
+  return {
+    customizations: {
+      ...customizations,
+      scenes: stableScenes,
+      renderStabilization: {
+        enabled: stabilizedVideoCount > 0,
+        strategy: 'external-video-to-static-fallback',
+        stabilizedVideoCount,
+      },
+    },
+    stabilizedVideoCount,
+  };
+}
+
 async function startRemotionRender(params: {
   aws: any;
   lambdaUrl: string;
