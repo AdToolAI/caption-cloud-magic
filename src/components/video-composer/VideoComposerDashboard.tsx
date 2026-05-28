@@ -172,8 +172,28 @@ export default function VideoComposerDashboard() {
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
       return { ...defaultProject, id: urlProjectId! };
     }
-    return loadDraft() || defaultProject;
+    const draft = loadDraft();
+    if (!draft) return defaultProject;
+    // Stage 6: detox stale optimistic patches. A scene marked clipStatus
+    // 'generating' WITHOUT a backend job handle (no predictionId, no
+    // lipSync/twoshot in flight) is a dead optimistic patch from a previous
+    // session — reset to 'pending' so the UI doesn't show a fake "Baut…"
+    // overlay until DB-sync arrives ~1s later.
+    const detoxedScenes = (draft.scenes ?? []).map((s: any) => {
+      const lip = s?.lipSyncStatus;
+      const two = s?.twoshotStage;
+      const hasJob =
+        !!s?.replicatePredictionId ||
+        lip === 'running' ||
+        (two && two !== 'failed' && two !== 'done' && two !== 'complete');
+      if (s?.clipStatus === 'generating' && !hasJob) {
+        return { ...s, clipStatus: 'pending' };
+      }
+      return s;
+    });
+    return { ...draft, scenes: detoxedScenes };
   });
+
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     // Stage 19: Clips-Tab ist konsolidiert ins Storyboard — alte Deep-Links umleiten.
     if (urlTab === 'clips') return 'storyboard';
