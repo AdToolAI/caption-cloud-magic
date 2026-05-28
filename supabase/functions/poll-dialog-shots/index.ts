@@ -83,6 +83,10 @@ interface DialogShot {
   /** When true, the next dispatch MUST use the coords+frame_number fallback
    *  path instead of auto_detect. */
   force_coords?: boolean;
+  /** Optional override for the Sync.so `frame_number` sample point. Used on
+   *  retries to avoid the frame that originally triggered Sync.so's
+   *  "unknown error" (cuts/blinks/motion blur at window start). */
+  frame_number_override?: number;
 }
 
 
