@@ -478,11 +478,7 @@ export default function StoryboardTab({
         assemblyConfig={DEFAULT_ASSEMBLY_CONFIG}
         className="!top-[56px] !z-40 !mx-0 !px-3 rounded-xl border border-gold/30 bg-card/90 shadow-[0_4px_24px_-8px_hsl(var(--primary)/0.4)]"
       />
-      {/* Non-sticky fallback row: ensures the bar is visible even if some
-          parent breaks `position: sticky` (overflow:hidden in an ancestor
-          would silently disable sticky). The sticky version above pins to
-          the viewport; this one anchors inline at the top of the storyboard
-          and stays visible while you scroll the scene list. */}
+
 
 
       {/* AI Generation Tips (gold) */}
