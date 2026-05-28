@@ -605,6 +605,7 @@ async function processScene(
         nextShot.idx,
         mode,
         syncWebhookUrl,
+        nextShot.frame_number_override,
       );
       nextShot.sync_job_id = jobId;
       nextShot.status = "lipsyncing";
@@ -612,7 +613,7 @@ async function processScene(
       mutated = true;
       dispatchedThisTick++;
       console.log(
-        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
       );
     } catch (e) {
       if (e instanceof SyncConcurrencyDeferredError) {
