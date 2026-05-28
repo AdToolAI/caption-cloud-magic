@@ -87,7 +87,20 @@ export default function SceneInlinePlayer({
 
   const isReady = status === 'ready' && !!clipUrl && lipsyncDone && !lipsyncFailed;
   const isFailed = status === 'failed' || lipsyncFailed;
-  const isWorking = isGenerating || status === 'generating' || lipsyncRunning;
+  // Stage 6 self-heal: a scene marked `generating` is only really working if
+  // there is an actual backend handle (Replicate prediction, sync.so job,
+  // twoshot stage in flight). Otherwise it's a stale optimistic patch from a
+  // previous session — show "Wartet" + Generieren-CTA instead of a fake
+  // "Baut…" overlay that never resolves.
+  const hasActiveBackendJob =
+    !!(scene as any).replicatePredictionId ||
+    lipSyncStatus === 'running' ||
+    (twoshotStage && twoshotStage !== 'failed' && twoshotStage !== 'done' && twoshotStage !== 'complete');
+  const isWorking =
+    isGenerating ||
+    (status === 'generating' && hasActiveBackendJob) ||
+    lipsyncRunning;
+
 
   const handleMouseEnter = () => {
     setHovering(true);
