@@ -83,6 +83,10 @@ interface DialogShot {
   /** When true, the next dispatch MUST use the coords+frame_number fallback
    *  path instead of auto_detect. */
   force_coords?: boolean;
+  /** Optional override for the Sync.so `frame_number` sample point. Used on
+   *  retries to avoid the frame that originally triggered Sync.so's
+   *  "unknown error" (cuts/blinks/motion blur at window start). */
+  frame_number_override?: number;
 }
 
 
@@ -110,9 +114,18 @@ function dispatchModeForShot(shot: DialogShot): "auto" | "coords" {
     : "auto";
 }
 
-function prepareShotRetry(shot: DialogShot, reason: string): boolean {
+function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
+  return new Set(allShots.map((s) => s.speaker_idx)).size >= 2;
+}
+
+const ASSUMED_MASTER_FPS_CONST = 24;
+
+function prepareShotRetry(
+  shot: DialogShot,
+  reason: string,
+  allShots: DialogShot[],
+): boolean {
   if ((shot.retry_count ?? 0) >= 1) return false;
-  const failedMode = dispatchModeForShot(shot);
   shot.retry_count = (shot.retry_count ?? 0) + 1;
   shot.status = "pending";
   shot.sync_job_id = undefined;
@@ -121,13 +134,34 @@ function prepareShotRetry(shot: DialogShot, reason: string): boolean {
   shot.completed_at = undefined;
   shot.error = `retrying_after_${reason}`.slice(0, 300);
 
+  const multi = isMultiSpeakerScene(allShots);
+
+  // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
+  // in a two-shot frame routinely picks the wrong face (and may animate
+  // nothing on short isolated windows). Instead, keep coords and shift the
+  // sampling frame to the middle of the window so we sidestep Hailuo cuts/
+  // blinks at the window start that triggered Sync.so's "unknown error".
+  if (multi && shot.target_coords) {
+    shot.force_coords = true;
+    shot.deterministic_coords = true;
+    const [s, e] = shot.window;
+    shot.frame_number_override = Math.max(
+      0,
+      Math.round(((s + e) / 2) * ASSUMED_MASTER_FPS_CONST),
+    );
+    console.warn(
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) frame=${shot.frame_number_override} (attempt ${shot.retry_count})`,
+    );
+    return true;
+  }
+
+  const failedMode = dispatchModeForShot(shot);
   if (failedMode === "coords") {
-    // Coords/frame_number failed → retry once with auto_detect on the isolated speaker WAV.
+    // Single-speaker scenes with coords: safe to fall back to auto_detect.
     shot.force_coords = false;
     shot.deterministic_coords = false;
     console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect fallback (attempt ${shot.retry_count})`);
   } else if (shot.target_coords) {
-    // Auto failed → retry once with deterministic coords if available.
     shot.force_coords = true;
     console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with coords fallback (attempt ${shot.retry_count})`);
   } else {
@@ -187,6 +221,9 @@ async function startSyncTurnJob(
    *  the terminal status to this URL — cuts per-shot completion latency from
    *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
   webhookUrl?: string,
+  /** Optional override for the `frame_number` coord-sampling point. Used on
+   *  retries to step away from the original failing frame (cuts/blinks). */
+  frameNumberOverride?: number,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
@@ -194,11 +231,9 @@ async function startSyncTurnJob(
     temperature,
   };
   if (mode === "coords" && coords) {
-    // Sample coords WITHIN the turn window — frame 0 of the master video
-    // is virtually never where the speaker sits during a later turn, which
-    // is exactly what produced "An unknown error occurred." from Sync.so
-    // for all non-first turns.
-    const frameNumber = Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
+    const frameNumber = Number.isFinite(frameNumberOverride as number)
+      ? Math.max(0, Math.round(frameNumberOverride as number))
+      : Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: frameNumber,
@@ -470,7 +505,7 @@ async function processScene(
         shot.completed_at = new Date().toISOString();
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
-        if (!prepareShotRetry(shot, `sync_${p.status}`)) {
+        if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
           markShotTerminalFailed(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
         }
         mutated = true;
@@ -491,7 +526,7 @@ async function processScene(
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
       const timeoutReason = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      if (!prepareShotRetry(shot, "sync_so_timeout_8min")) {
+      if (!prepareShotRetry(shot, "sync_so_timeout_8min", shots)) {
         markShotTerminalFailed(shot, timeoutReason);
       }
       mutated = true;
@@ -570,6 +605,7 @@ async function processScene(
         nextShot.idx,
         mode,
         syncWebhookUrl,
+        nextShot.frame_number_override,
       );
       nextShot.sync_job_id = jobId;
       nextShot.status = "lipsyncing";
@@ -577,7 +613,7 @@ async function processScene(
       mutated = true;
       dispatchedThisTick++;
       console.log(
-        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature}`,
+        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
       );
     } catch (e) {
       if (e instanceof SyncConcurrencyDeferredError) {
@@ -592,7 +628,7 @@ async function processScene(
         break;
       } else {
         const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
-        if (!prepareShotRetry(nextShot, "dispatch_failed")) {
+        if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
           markShotTerminalFailed(nextShot, reason);
         }
         mutated = true;
@@ -624,6 +660,49 @@ async function processScene(
   // onto the original master plate, trimmed to that turn's window, and
   // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
+    // ── Multi-speaker integrity gate ──────────────────────────────────
+    // For 2+ speakers, every shot MUST have been dispatched with
+    // deterministic coords. A `ready` shot without deterministic_coords
+    // means Sync.so ran in auto_detect and almost certainly animated the
+    // wrong face. Refuse to ship that as final output.
+    const multi = isMultiSpeakerScene(shots);
+    if (multi) {
+      const invalid = shots.filter(
+        (s) => !s.target_coords || s.deterministic_coords !== true,
+      );
+      if (invalid.length > 0) {
+        const ids = invalid.map((s) => s.idx).join(",");
+        console.error(
+          `[poll-dialog-shots] scene ${sceneId} multi-speaker integrity FAIL — shots [${ids}] missing deterministic coords; refusing stitch.`,
+        );
+        invalid.forEach((s) =>
+          markShotTerminalFailed(
+            s,
+            `multi_speaker_coords_missing: shot dispatched without deterministic face coords`,
+          ),
+        );
+        const failedState: DialogShotsState = {
+          ...newState,
+          shots,
+          status: "failed",
+        };
+        const refunded = userId
+          ? await refundIfNeeded(supabase, userId, failedState)
+          : failedState;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: refunded,
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: `lipsync_wrong_face_guard: shots ${ids} mis-targeted, bitte Szene neu rendern`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+        return { status: "failed", mutated: true };
+      }
+    }
+
     // Idempotency guard — if a stitch render is already in flight, just
     // persist state and wait for the webhook to write clip_url back. If the
     // previous dispatch failed or never created a render row, clear the stale
