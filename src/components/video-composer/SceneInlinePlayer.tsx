@@ -223,14 +223,19 @@ export default function SceneInlinePlayer({
                 className="h-9 w-9 rounded-full border-2 border-primary/40 border-t-primary"
               />
               <p className="mt-2 text-[11px] font-semibold text-primary tracking-wide">
-                Szene wird gebaut…
+                {status === 'ready' && lipsyncRunning
+                  ? (lipSyncStatus === 'running' ? 'Lip-Sync läuft…' : 'Lip-Sync startet…')
+                  : 'Szene wird gebaut…'}
               </p>
               <p className="mt-0.5 text-[9px] text-muted-foreground">
-                VO & Lip-Sync inklusive
+                {status === 'ready' && lipsyncRunning
+                  ? 'Sync.so · ~60 s pro Sprecher-Turn'
+                  : 'VO & Lip-Sync inklusive'}
               </p>
             </motion.div>
           )}
         </AnimatePresence>
+
 
         {/* Center generate / re-roll CTA — hidden while playing */}
         {!isWorking && (!isReady || hovering) && (
