@@ -410,7 +410,7 @@ export function UniversalCreator() {
               );
             })()}
 
-            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 4 && (
+            {formatConfig && (contentConfig?.voiceoverUrl || scenes.length > 0) && currentStep >= 3 && (
               <RemotionPreviewPlayer
                 componentName="UniversalCreatorVideo"
                 customizations={{
