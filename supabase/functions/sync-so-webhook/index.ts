@@ -1,0 +1,178 @@
+/**
+ * sync-so-webhook — Stage 5 B.1
+ *
+ * Receives terminal-status webhooks from Sync.so for per-turn lipsync jobs
+ * dispatched by `poll-dialog-shots` (v9 Artlist pipeline). When a webhook
+ * arrives we immediately patch the matching shot's status/output_url in
+ * `composer_scenes.dialog_shots` and fire-and-forget `poll-dialog-shots`
+ * for that scene so the next pending turn (or the Lambda stitch) starts
+ * within ~1s instead of waiting up to 60s for the next pg_cron tick.
+ *
+ * Auth: shared-secret `?token=...` (WEBHOOK_SHARED_SECRET) — same scheme
+ * used for the Remotion webhook. The full webhook URL is constructed by
+ * `poll-dialog-shots` via `appendWebhookToken`.
+ *
+ * Failure mode: if anything goes wrong we still return 200 so Sync.so does
+ * NOT retry storm us. The 60s pg_cron poller is the safety net.
+ */
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2.75.0";
+import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-webhook-token",
+};
+
+function ok(body: unknown = { ok: true }) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+  if (req.method !== "POST") return ok({ ok: true, skipped: "non_post" });
+
+  const unauth = verifyWebhookRequest(req);
+  if (unauth) return unauth;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  let payload: any = null;
+  try {
+    payload = await req.json();
+  } catch {
+    return ok({ ok: true, skipped: "no_json" });
+  }
+
+  // Sync.so payload shape varies; extract what we need defensively.
+  const jobId: string | undefined =
+    payload?.id ?? payload?.job_id ?? payload?.data?.id;
+  const status: string = String(payload?.status ?? payload?.data?.status ?? "")
+    .toUpperCase();
+  const outputUrl: string | undefined =
+    payload?.outputUrl ??
+    payload?.output_url ??
+    payload?.data?.outputUrl ??
+    payload?.data?.output_url;
+  const errorMsg: string | undefined =
+    payload?.error ?? payload?.errorMessage ?? payload?.error_message;
+
+  if (!jobId) {
+    console.warn("[sync-so-webhook] no job id in payload");
+    return ok({ ok: true, skipped: "no_job_id" });
+  }
+  if (!["COMPLETED", "FAILED", "REJECTED", "CANCELED"].includes(status)) {
+    // Intermediate event — nothing to persist, just ack.
+    return ok({ ok: true, skipped: `non_terminal:${status}` });
+  }
+
+  // Locate the scene that owns this sync_job_id. Prefer the scene_id query
+  // hint if poll-dialog-shots embedded it in the webhook URL.
+  const url = new URL(req.url);
+  const sceneHint = url.searchParams.get("scene_id");
+
+  let sceneId: string | null = null;
+  let scene: any = null;
+
+  if (sceneHint) {
+    const { data } = await supabase
+      .from("composer_scenes")
+      .select("id, dialog_shots, lip_sync_applied_at")
+      .eq("id", sceneHint)
+      .maybeSingle();
+    if (data) {
+      sceneId = data.id;
+      scene = data;
+    }
+  }
+
+  if (!scene) {
+    // Fallback: scan in-flight scenes for the job id. Bounded scan, low volume.
+    const { data: rows } = await supabase
+      .from("composer_scenes")
+      .select("id, dialog_shots, lip_sync_applied_at")
+      .in("lip_sync_status", ["running", "stitching"])
+      .limit(200);
+    for (const r of rows ?? []) {
+      const shots = (r as any)?.dialog_shots?.shots ?? [];
+      if (Array.isArray(shots) && shots.some((s: any) => s?.sync_job_id === jobId)) {
+        sceneId = r.id;
+        scene = r;
+        break;
+      }
+    }
+  }
+
+  if (!scene || !sceneId) {
+    console.warn(`[sync-so-webhook] no scene matched job ${jobId}`);
+    return ok({ ok: true, skipped: "no_scene_match", job_id: jobId });
+  }
+
+  if (scene.lip_sync_applied_at) {
+    return ok({ ok: true, skipped: "already_applied" });
+  }
+
+  const state = scene.dialog_shots ?? null;
+  if (!state || state.version !== 4 || !Array.isArray(state.shots)) {
+    return ok({ ok: true, skipped: "no_v4_state" });
+  }
+
+  const shots = state.shots.map((s: any) => ({ ...s }));
+  const idx = shots.findIndex((s: any) => s.sync_job_id === jobId);
+  if (idx < 0) {
+    return ok({ ok: true, skipped: "shot_not_found", job_id: jobId });
+  }
+
+  const shot = shots[idx];
+  const wasReady = shot.status === "ready";
+  const nowIso = new Date().toISOString();
+
+  if (status === "COMPLETED" && outputUrl) {
+    shot.status = "ready";
+    shot.output_url = outputUrl;
+    shot.completed_at = nowIso;
+    shot.error = undefined;
+  } else {
+    // FAILED / REJECTED / CANCELED — leave the retry-with-coords logic to
+    // poll-dialog-shots so we don't duplicate it here. Just mark failed.
+    shot.status = "failed";
+    shot.error = `sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 240)}`;
+    shot.completed_at = nowIso;
+  }
+
+  await supabase
+    .from("composer_scenes")
+    .update({
+      dialog_shots: { ...state, shots },
+      updated_at: nowIso,
+    })
+    .eq("id", sceneId);
+
+  console.log(
+    `[sync-so-webhook] scene=${sceneId} job=${jobId} turn=${shot.idx} ${wasReady ? "already_ready" : status}`,
+  );
+
+  // Fire-and-forget poll-dialog-shots so the pipeline advances immediately.
+  try {
+    fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({ scene_id: sceneId }),
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
+  return ok({ ok: true, scene_id: sceneId, job_id: jobId, status });
+});
