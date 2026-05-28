@@ -26,6 +26,33 @@ function toAsciiSafeJson(jsonString: string): string {
   });
 }
 
+function normalizeRemotionServeUrl(rawServeUrl: string): string {
+  try {
+    const url = new URL(rawServeUrl);
+    const bucketMatch = url.hostname.match(/^(remotionlambda-eucentral1-[^.]+)\.s3[.-]/i);
+    const secretBucketName = bucketMatch?.[1];
+
+    if (secretBucketName && secretBucketName !== DEFAULT_BUCKET_NAME) {
+      const normalized = new URL(rawServeUrl);
+      normalized.hostname = `${DEFAULT_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com`;
+      console.warn('⚠️ Outdated REMOTION_SERVE_URL bucket detected — normalizing to canonical bucket', {
+        secretBucketName,
+        canonicalBucketName: DEFAULT_BUCKET_NAME,
+        originalServeUrlPrefix: rawServeUrl.substring(0, 96),
+        normalizedServeUrlPrefix: normalized.toString().substring(0, 96),
+      });
+      return normalized.toString();
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not parse REMOTION_SERVE_URL, using raw value', {
+      error: error instanceof Error ? error.message : String(error),
+      serveUrlPrefix: rawServeUrl.substring(0, 96),
+    });
+  }
+
+  return rawServeUrl;
+}
+
 declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 
 async function failRenderAndRefundOnce(params: {
@@ -465,11 +492,14 @@ serve(async (req) => {
     });
 
     // Get configuration
-    const REMOTION_SERVE_URL = Deno.env.get('REMOTION_SERVE_URL');
+    const rawRemotionServeUrl = Deno.env.get('REMOTION_SERVE_URL');
 
-    if (!REMOTION_SERVE_URL) {
+    if (!rawRemotionServeUrl) {
       throw new Error('REMOTION_SERVE_URL not configured');
     }
+
+    const REMOTION_SERVE_URL = normalizeRemotionServeUrl(rawRemotionServeUrl);
+    console.log('🔗 Effective REMOTION_SERVE_URL:', REMOTION_SERVE_URL.substring(0, 120));
 
     const componentName = component_name || 'UniversalVideo';
 
