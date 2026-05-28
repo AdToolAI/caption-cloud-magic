@@ -2,7 +2,19 @@ import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { toast } from 'sonner';
 import { FormatSelectionStep } from '@/components/universal-creator/steps/FormatSelectionStep';
 import { ContentVoiceStep } from '@/components/universal-creator/steps/ContentVoiceStep';
 import { SubtitleTimingStep } from '@/components/universal-creator/steps/SubtitleTimingStep';
@@ -152,6 +164,26 @@ export function UniversalCreator() {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
     }
+  };
+
+  const handleNewProject = () => {
+    localStorage.removeItem('universal-creator-backup');
+    setProjectId(undefined);
+    setFormatConfig(null);
+    setContentConfig(null);
+    setBackgroundAsset(null);
+    setAudioConfig({
+      background_music_id: null,
+      music_volume: 0.3,
+      voiceover_id: null,
+      voiceover_volume: 1.0,
+      sound_effects: [],
+    });
+    setSelectedMusicUrl(null);
+    setSubtitleConfig(undefined);
+    setScenes([]);
+    setCurrentStep(0);
+    toast.success(t('uc.newProjectStarted') || 'Neues Projekt gestartet');
   };
 
   const saveProgress = async () => {
@@ -328,6 +360,33 @@ export function UniversalCreator() {
     <div className="container mx-auto py-8 px-4 space-y-6 max-w-7xl">
       {/* Progress Stepper */}
       <Card className="p-6">
+        <div className="flex items-center justify-end mb-4">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Plus className="w-4 h-4" />
+                {t('uc.newProject') || 'Neues Projekt'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {t('uc.newProjectConfirmTitle') || 'Neues Projekt starten?'}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t('uc.newProjectConfirmDesc') ||
+                    'Der aktuelle Fortschritt wird verworfen. Diese Aktion kann nicht rückgängig gemacht werden.'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>{t('common.cancel') || 'Abbrechen'}</AlertDialogCancel>
+                <AlertDialogAction onClick={handleNewProject}>
+                  {t('uc.newProject') || 'Neues Projekt'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
         <div className="flex items-center justify-between">
           {WIZARD_STEPS.map((step, index) => (
             <div key={step.id} className="flex items-center flex-1">
