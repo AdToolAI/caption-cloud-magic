@@ -88,6 +88,7 @@ serve(async (req) => {
     const createdAt = renderData?.created_at ? new Date(renderData.created_at).getTime() : Date.now();
     const timeoutAnchor = lambdaInvokedAt || createdAt;
     const elapsedSeconds = (Date.now() - timeoutAnchor) / 1000;
+    let sawProgressArtifact = false;
 
     const effectiveTimeoutSeconds = !isDirectorsCut && source !== 'composer' && source !== 'dialog-stitch'
       ? UNIVERSAL_CREATOR_TIMEOUT_SECONDS
@@ -176,7 +177,6 @@ serve(async (req) => {
     let estimatedProgress = 0.15;
     let progressSource = 'default';
 
-    let sawProgressArtifact = false;
     try {
       // Try real render ID first, then pending render ID
       const idsToTry = [realRenderId, effectiveRenderId].filter(Boolean);
