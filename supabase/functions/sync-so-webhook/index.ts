@@ -185,8 +185,95 @@ serve(async (req) => {
   }
 
   const state = scene.dialog_shots ?? null;
-  if (!state || state.version !== 4 || !Array.isArray(state.shots)) {
-    return ok({ ok: true, skipped: "no_v4_state" });
+  if (!state) {
+    return ok({ ok: true, skipped: "no_state" });
+  }
+
+  const nowIso = new Date().toISOString();
+
+  // ── v5: Sync.so Segments (1-call pipeline) ────────────────────────────
+  // No per-turn shots; the webhook output IS the final clip.
+  if (state.version === 5 && state.engine === "sync-segments") {
+    if (state.sync_job_id !== jobId) {
+      return ok({ ok: true, skipped: "v5_job_mismatch", job_id: jobId });
+    }
+    if (status === "COMPLETED" && outputUrl) {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...state,
+            status: "done",
+            final_url: outputUrl,
+            finished_at: nowIso,
+          },
+          clip_url: outputUrl,
+          lip_sync_status: "applied",
+          lip_sync_applied_at: nowIso,
+          twoshot_stage: "complete",
+          clip_error: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      console.log(
+        `[sync-so-webhook] v5 scene=${sceneId} COMPLETED → clip_url updated, lip_sync_applied`,
+      );
+    } else {
+      // FAILED / REJECTED / CANCELED → refund (idempotent) + mark failed
+      const reason = `syncso_segments_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
+      const cost = Number((state as any).cost_credits ?? 0);
+      const alreadyRefunded = !!(state as any).refunded;
+      if (cost > 0 && !alreadyRefunded) {
+        // Find user via project
+        const { data: row } = await supabase
+          .from("composer_scenes")
+          .select("project_id")
+          .eq("id", sceneId)
+          .single();
+        const { data: proj } = await supabase
+          .from("composer_projects")
+          .select("user_id")
+          .eq("id", (row as any)?.project_id)
+          .single();
+        const uid = (proj as any)?.user_id;
+        if (uid) {
+          const { data: w } = await supabase
+            .from("wallets").select("balance").eq("user_id", uid).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number((w as any)?.balance ?? 0) + cost,
+              updated_at: nowIso,
+            })
+            .eq("user_id", uid);
+        }
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...state,
+            status: "failed",
+            finished_at: nowIso,
+            refunded: cost > 0,
+            error: reason,
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: reason,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      console.warn(
+        `[sync-so-webhook] v5 scene=${sceneId} ${status} refunded=${cost} reason=${reason}`,
+      );
+    }
+    return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
+  }
+
+  // ── v4: legacy per-turn chain ─────────────────────────────────────────
+  if (state.version !== 4 || !Array.isArray(state.shots)) {
+    return ok({ ok: true, skipped: "unknown_state_version" });
   }
 
   const shots = state.shots.map((s: any) => ({ ...s }));
@@ -197,7 +284,6 @@ serve(async (req) => {
 
   const shot = shots[idx];
   const wasReady = shot.status === "ready";
-  const nowIso = new Date().toISOString();
 
   if (status === "COMPLETED" && outputUrl) {
     shot.status = "ready";
