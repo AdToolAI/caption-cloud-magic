@@ -249,29 +249,42 @@ export function usePipelineProgress({
       | { status?: string; shots?: Array<{ status: string }> }
       | null;
 
+    /**
+     * lip_sync_status is the authoritative terminal signal — webhook /
+     * watchdog / refund paths all write to it. A stale `dialog_shots.status`
+     * value (e.g. v4 row with status='queued' but lipSyncStatus='failed')
+     * must NOT keep the bar pinned in "running" forever.
+     */
+    const isTerminalScene = (s: any) =>
+      s.lipSyncStatus === 'applied' ||
+      s.lipSyncStatus === 'failed' ||
+      s.twoshotStage === 'complete' ||
+      s.twoshotStage === 'done' ||
+      s.twoshotStage === 'failed' ||
+      getDialogShots(s)?.status === 'done' ||
+      getDialogShots(s)?.status === 'failed';
+
     const done = targets.filter((s) => {
       const ds = getDialogShots(s);
       if (ds?.status === 'done') return true;
       return (
         ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+        (s as any).lipSyncStatus === 'applied' ||
         (s as any).twoshotStage === 'done' ||
         (s as any).twoshotStage === 'complete'
       );
     }).length;
 
     // A scene is only "really" running if there's evidence of an active
-    // provider job. Otherwise twoshot_stage='lipsync_*' + pending status
-    // is a zombie state (the watchdog/client will repair it within a
-    // tick) and must NOT keep the progress bar pinned at 95 %.
+    // provider job AND it's not already in a terminal lipSyncStatus.
     const hasRealJob = (s: any) => {
+      if (isTerminalScene(s)) return false;
       const predId = s.replicatePredictionId;
       if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
       const plan = s.audioPlan as any;
       const jobs = plan?.twoshot?.syncJobs?.jobs;
       if (Array.isArray(jobs) && jobs.length > 0) return true;
       if (plan?.twoshot?.heartbeat?.syncJobId) return true;
-      // New Dialog-Shot pipeline: any non-terminal dialog_shots state counts
-      // as a real job (compose-dialog-scene has reserved the work).
       const ds = getDialogShots(s);
       if (ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
       if (Array.isArray(ds?.shots) && ds!.shots.some((sh) =>
@@ -281,20 +294,21 @@ export function usePipelineProgress({
     };
     const running = targets.some(
       (s) =>
+        !isTerminalScene(s) &&
         (s as any).lipSyncStatus === 'running' &&
         hasRealJob(s),
     ) || targets.some(
       (s) => {
+        if (isTerminalScene(s)) return false;
         const stage = (s as any).twoshotStage;
         if (!stage || ['complete', 'done', 'failed'].includes(stage)) return false;
-        // Audio/anchor/master_clip stages legitimately precede the sync job.
         if (['audio', 'anchor', 'master_clip', 'preflight'].includes(stage)) {
           return (s as any).lipSyncStatus === 'running';
         }
         return hasRealJob(s);
       },
     ) || targets.some((s) => {
-      // Dialog-Shot pipeline doesn't always populate twoshot_stage.
+      if (isTerminalScene(s)) return false;
       const ds = getDialogShots(s);
       return !!ds && ds.status !== 'done' && ds.status !== 'failed';
     });
@@ -307,7 +321,7 @@ export function usePipelineProgress({
 
     const b = baselineRef.current;
 
-    // Per-shot progress (Dialog-Shot pipeline) — feinkörniger als Szenen.
+    // Per-shot progress (Dialog-Shot v4 pipeline) — finer-grained than scenes.
     const dsTotals = targets.reduce(
       (acc, s) => {
         const ds = getDialogShots(s);
@@ -319,17 +333,18 @@ export function usePipelineProgress({
       { done: 0, total: 0 },
     );
 
+    // Count "settled" scenes (terminal in any form) so a single failed scene
+    // doesn't keep the bar pinned at 95% — failed counts toward "we're done
+    // processing", just with a failure flag surfaced separately.
+    const settled = targets.filter(isTerminalScene).length;
+
     let progress: number;
     if (dsTotals.total > 0) {
       const baseDone = b?.dialogShotsDone ?? 0;
-      const baseTotal = b?.dialogShotsTotal ?? dsTotals.total;
       const denom = Math.max(1, dsTotals.total - baseDone);
       const numer = Math.max(0, dsTotals.done - baseDone);
       progress = Math.min(1, numer / denom);
-      // Fall back to scene-level done if dialog metadata says done
       if (progress < 1 && done >= targets.length) progress = 1;
-      // Use the larger of scene-level and shot-level so we never go
-      // backwards if dialog_shots are momentarily missing on a row.
       const baseSceneDone = b?.lipsyncDone ?? 0;
       const baseSceneTotal = b?.lipsyncTotal ?? targets.length;
       const sceneDenom = Math.max(1, baseSceneTotal - baseSceneDone);
@@ -342,7 +357,20 @@ export function usePipelineProgress({
       const numer = Math.max(0, done - baseDone);
       progress = Math.min(1, numer / denom);
     }
-    return { progress, running, done: progress >= 1 && !running && !failed, applicable: true, failed };
+
+    // If every target scene is in a terminal state, the lipsync phase is over
+    // — force progress to 1 so the soft-floor cap can't keep us at 95%.
+    if (settled >= targets.length) {
+      progress = 1;
+    }
+
+    return {
+      progress,
+      running: running && settled < targets.length,
+      done: progress >= 1 && (!running || settled >= targets.length) && !failed,
+      applicable: true,
+      failed,
+    };
   }, [scenes, hasLipsyncScenes]);
 
   const musicReal = useMemo(() => {
