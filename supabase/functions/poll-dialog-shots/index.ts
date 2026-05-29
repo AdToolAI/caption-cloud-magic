@@ -150,16 +150,23 @@ function prepareShotRetry(
   if (multi && shot.target_coords) {
     shot.force_coords = true;
     shot.deterministic_coords = true;
-    const [s, e] = shot.window;
-    shot.frame_number_override = Math.max(
-      0,
-      Math.round(((s + e) / 2) * ASSUMED_MASTER_FPS_CONST),
+    // CRITICAL: When `segments_secs` is set, Sync.so interprets `frame_number`
+    // as RELATIVE TO THE SEGMENT START (frame 0 = first frame of the trimmed
+    // segment), NOT absolute in the master timeline. Passing an absolute
+    // frame (e.g. 72 for a 31-frame segment) → out-of-range → "unknown error".
+    // Always compute segment-relative middle, clamped to segment length.
+    const [s, e] = (shot.render_window ?? shot.window) as [number, number];
+    const segFrames = Math.max(1, Math.floor((e - s) * ASSUMED_MASTER_FPS_CONST));
+    shot.frame_number_override = Math.min(
+      segFrames - 1,
+      Math.max(0, Math.floor(segFrames / 2)),
     );
     console.warn(
-      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) frame=${shot.frame_number_override} (attempt ${shot.retry_count})`,
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) segRelFrame=${shot.frame_number_override}/${segFrames} (attempt ${shot.retry_count})`,
     );
     return true;
   }
+
 
   const failedMode = dispatchModeForShot(shot);
   if (failedMode === "coords") {
@@ -343,7 +350,8 @@ async function startSyncTurnJob(
    *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
   webhookUrl?: string,
   /** Optional override for the `frame_number` coord-sampling point. Used on
-   *  retries to step away from the original failing frame (cuts/blinks). */
+   *  retries to step away from the original failing frame (cuts/blinks).
+   *  Must be SEGMENT-RELATIVE (0 = first frame of the trimmed segment). */
   frameNumberOverride?: number,
 ): Promise<string> {
   const options: Record<string, unknown> = {
@@ -352,9 +360,15 @@ async function startSyncTurnJob(
     temperature,
   };
   if (mode === "coords" && coords) {
-    const frameNumber = Number.isFinite(frameNumberOverride as number)
+    // Sync.so v2 + `segments_secs`: `frame_number` is interpreted RELATIVE to
+    // the segment start (frame 0 = first frame of the trimmed segment), NOT
+    // absolute in the master video. Override must already be segment-relative.
+    // Default (no override) = middle of segment, clamped to segment length.
+    const segFrames = Math.max(1, Math.floor((window[1] - window[0]) * ASSUMED_MASTER_FPS));
+    const rawFrame = Number.isFinite(frameNumberOverride as number)
       ? Math.max(0, Math.round(frameNumberOverride as number))
-      : Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
+      : Math.max(0, Math.floor(segFrames / 2));
+    const frameNumber = Math.min(segFrames - 1, rawFrame);
     options.active_speaker_detection = {
       auto_detect: false,
       frame_number: frameNumber,
@@ -363,6 +377,7 @@ async function startSyncTurnJob(
   } else {
     options.active_speaker_detection = { auto_detect: true };
   }
+
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
