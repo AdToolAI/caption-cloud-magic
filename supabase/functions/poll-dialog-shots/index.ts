@@ -1202,10 +1202,44 @@ async function processScene(
           lastValidation = v;
           // If validator itself failed (network/Gemini), do NOT block.
           if (!v.ok) break;
-          // Permissive: faceVisible AND (no coords check OR coordsMatch)
-          if (v.faceVisible && (v.coordsMatch === null || v.coordsMatch === true)) {
+          // Stage G F.4: prefer a high-quality frame (faceScore ≥ 0.6).
+          // Accept marginal frames (≥0.4) only after exhausting all offsets.
+          const scoreOk = v.faceScore == null || v.faceScore >= 0.6;
+          if (
+            v.faceVisible &&
+            (v.coordsMatch === null || v.coordsMatch === true) &&
+            scoreOk
+          ) {
             validFrame = tryFrame;
             break;
+          }
+        }
+        // Second pass: relax score threshold to 0.4 if nothing perfect found.
+        if (validFrame === null && lastValidation?.ok) {
+          for (const off of offsets) {
+            const tryFrame = Math.max(0, baseFrame + off);
+            const v = await validateFrameFace({
+              supabaseUrl: supabaseUrl0,
+              serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+              videoUrl: sourceUrl,
+              frameNumber: tryFrame,
+              fps: fpsHint,
+              targetCoords: nextShot.target_coords,
+            });
+            lastValidation = v;
+            if (!v.ok) break;
+            const scoreOk = v.faceScore == null || v.faceScore >= 0.4;
+            if (
+              v.faceVisible &&
+              (v.coordsMatch === null || v.coordsMatch === true) &&
+              scoreOk
+            ) {
+              validFrame = tryFrame;
+              console.log(
+                `[poll-dialog-shots] turn ${nextShot.idx} FACE-GATE relaxed pass picked frame ${tryFrame} score=${v.faceScore?.toFixed?.(2)}`,
+              );
+              break;
+            }
           }
         }
         if (validFrame === null && lastValidation?.ok) {
