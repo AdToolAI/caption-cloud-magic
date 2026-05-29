@@ -1,31 +1,70 @@
-Der Fehler ist jetzt konkret identifiziert: Die aktuelle v5-Funktion sendet `options.activeSpeakerDetection`, Sync.so akzeptiert aber nur `options.active_speaker_detection`. Deshalb kommt der 422-Fehler `Invalid generation options: property activeSpeakerDetection does not exist` und die App zeigt nur generisch „Edge Function returned a non-2xx status code“.
+Du hast recht: Wir dürfen jetzt nicht weiter „herumpatchen“. Der Stand aus der Forensik ist klar genug, um die nächste Runde als Diagnose-Plan aufzusetzen.
 
-Do I know what the issue is? Ja: Es ist kein Secret-, Timing- oder v4/v5-Routing-Problem. Es ist ein API-Schema-Fehler im neuen Face-Targeting-Patch.
+Was ich bereits nachweisen konnte:
+
+- Es läuft wirklich v5: `dialog_shots.version = 5`, `engine = sync-segments`.
+- Der direkte Dispatch zu Sync.so klappt: Sync.so antwortet auf `/generate` mit `201` und Job-IDs.
+- Der Fehler kommt erst asynchron vom Provider-Job: Webhook meldet sehr schnell `FAILED` mit nur `An unknown error occurred.`
+- Es gibt einen separaten Bug in unserer Retry-Forensik: `retry_count` wird beim Retry-Dispatch wieder verworfen. Dadurch wurden in ca. 15 Minuten 71 Jobs für eine Szene und 36 Jobs für eine zweite Szene erzeugt, statt sauber nach 2 Versuchen zu stoppen.
+- Der Webhook-Payload zeigt den kritischen Payload-Teil: `segments[]` plus `options.active_speaker_detection.bounding_boxes[]`.
+
+Wichtig: „Alle Sync.so-Fehler abdecken“ heißt aktuell nur, dass bekannte Fehlerklassen wie 422, Rate Limit, Timeout, 5xx, Rejected, Failed, Refund etc. abgefangen werden. Wenn Sync.so selbst nur `An unknown error occurred` zurückgibt, haben wir die Provider-Fehlerklasse abgefangen, aber nicht automatisch die Ursache. Dafür brauchen wir jetzt eine kontrollierte Isolation.
 
 Plan:
 
-1. `compose-dialog-segments` korrigieren
-   - Das ungültige camelCase-Feld `activeSpeakerDetection` entfernen.
-   - Auf das offizielle Sync.so-Feld `active_speaker_detection` wechseln.
-   - Nicht mehr unsupported `options` pro Segment senden.
+1. Live-Retry-Sturm stoppen
+   - Die aktuell betroffenen Szenen aus dem endlosen `running`/Retry-Zyklus nehmen.
+   - Keine weiteren Sync.so-Jobs erzeugen, bis die Ursache isoliert ist.
+   - Credits idempotent schützen: kein Doppel-Refund, kein weiterer Verbrauch.
 
-2. Multi-Speaker trotzdem in einem v5-Call erhalten
-   - Aus der vorhandenen `audio_plan.twoshot.faceMap` die Face-Bounding-Boxes pro Charakter nutzen.
-   - Für Sync.so eine top-level `active_speaker_detection.bounding_boxes`-Sequenz erzeugen: Frames innerhalb eines Sprecher-Segments bekommen die Box des aktiven Sprechers.
-   - Dadurch bleibt es bei einem einzigen Sync.so Segments-Call, aber jeder Sprecher steuert das richtige Gesicht.
+2. Vollständigen Debug-Datensatz sichern
+   - Den exakten v5-Payload pro fehlgeschlagenem Job persistent erfassen, nicht nur abgeschnittene Edge-Logs.
+   - Pro Job speichern:
+     - Sync.so Job-ID
+     - Modell
+     - `segments[]`
+     - Input-Audio-URLs und HEAD-Metadaten
+     - Input-Video-URL und HEAD-Metadaten
+     - `active_speaker_detection`-Form
+     - Webhook-Status und Roh-Payload
+   - Ziel: Nicht mehr nur `unknown`, sondern ein reproduzierbares Testpaket.
 
-3. Fehlerausgabe verbessern
-   - Die UI/Toast-Meldung soll den echten Backend-Fehler anzeigen, nicht nur „Edge Function returned a non-2xx status code“.
-   - Für diesen Fall würde dann z. B. sichtbar: `syncso_dispatch_failed 422: Invalid generation options...`.
+3. Minimal-Repro-Matrix gegen Sync.so fahren
+   - Mit derselben Szene kontrolliert Varianten testen, jeweils nur eine Variable ändern:
+     1. Video + ein Audio ohne `segments` und ohne Speaker-Selection.
+     2. Video + ein Audio mit `segments`.
+     3. Video + zwei Audio-Inputs mit `segments`, aber ohne `active_speaker_detection`.
+     4. Video + zwei Audio-Inputs mit `segments` + nur `coordinates`.
+     5. Video + zwei Audio-Inputs mit `segments` + `bounding_boxes`.
+   - Ergebnis zeigt, ob Sync.so an den Medien, an `segments`, an mehreren Audio-Inputs oder an `bounding_boxes` scheitert.
 
-4. Betroffene Szene zurücksetzbar machen
-   - Die aktuell fehlgeschlagene Szene `7755034f-...` wurde bereits refundet und steht auf `lip_sync_status=failed`.
-   - Nach dem Code-Fix kann sie über „Lip-Sync neu rendern“ sauber erneut mit v5 gestartet werden; falls nötig setze ich nur diesen Fehlerzustand zurück, ohne andere Szenen anzufassen.
+4. Audio- und Segment-Timing verifizieren
+   - Die per-speaker WAVs sind komplette, szenenlange Tracks mit Stille außerhalb des Sprecherfensters.
+   - Gleichzeitig setzen wir im Segment `audioInput.startTime/endTime` auf die Szenenzeit.
+   - Das muss gegen Sync.so-Dokumentation/Verhalten geprüft werden, weil bei szenenlangen Tracks die Audio-Crop-Zeiten möglicherweise anders interpretiert werden als erwartet.
+   - Falls dies die Ursache ist, wäre der echte Fix nicht „Retry“, sondern segmentgerechte Audio-Crops oder andere `audioInput`-Zeiten.
 
-5. Validierung
-   - Edge Function neu deployen.
-   - Mit derselben Szene einen Test-Call ausführen.
-   - Erwartetes Ergebnis: kein 422 mehr, sondern ein Sync.so `job_id` und `dialog_shots.version=5`, `engine=sync-segments`, `status=rendering`.
+5. Bounding-Box-Format isolieren
+   - Sync.so akzeptiert laut Docs `bounding_boxes` als per-frame Array, aber unsere Boxen stammen aus dem Anchor-Bild und werden pauschal über jedes Frame wiederholt.
+   - Zu prüfen:
+     - Erwartet Sync.so Boxen in tatsächlicher Videoauflösung statt Anchor-Auflösung?
+     - Ist die Array-Länge exakt zur Video-FPS/Dauer passend?
+     - Scheitert `lipsync-2-pro` speziell mit `segments + bounding_boxes`, obwohl das Schema gültig ist?
+
+6. Erst nach Ursache Fix implementieren
+   - Kein Fallback und kein Payload-Umbau, bevor die Matrix zeigt, welche Variable Sync.so killt.
+   - Danach gezielt fixen:
+     - Audio-Crop-Logik, falls `audioInput` falsch ist.
+     - Bounding-Box-Scaling/Format, falls Speaker-Selection falsch ist.
+     - Sync.so-Segments-Routing, falls Provider `segments + ASD` nicht stabil unterstützt.
+   - Retry-Budget trotzdem korrigieren, damit so ein Diagnosefehler nie wieder 100+ Jobs erzeugt.
+
+7. Validierung
+   - Mit derselben Szene erneut testen.
+   - Erwartung: Ein einzelner Sync.so-Job läuft entweder erfolgreich durch oder endet deterministisch mit einem echten, gespeicherten Diagnosegrund.
+   - Danach erst den normalen Auto-Trigger wieder freigeben.
+
+Keine Codeänderung ohne Diagnose-Ergebnis. Der nächste Schritt wäre also nicht „Patch“, sondern: Retry-Sturm stoppen, Payload vollständig loggen, Minimal-Repro-Matrix fahren und daraus die echte Ursache ableiten.
 
 <presentation-actions>
   <presentation-open-history>View History</presentation-open-history>
