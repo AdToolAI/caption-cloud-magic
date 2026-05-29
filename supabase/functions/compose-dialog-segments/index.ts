@@ -139,15 +139,17 @@ interface SegmentsState {
   version: 5;
   engine: "sync-segments";
   status: "queued" | "rendering" | "done" | "failed" | "retrying";
-  multi_pass: boolean;
-  passes: PassState[];
-  current_pass: number;
-  total_passes: number;
+  // Multi-pass per-speaker chain (added May 2026 to fix character swap).
+  // Optional for back-compat with in-flight single-pass rows.
+  multi_pass?: boolean;
+  passes?: PassState[];
+  current_pass?: number;
+  total_passes?: number;
   sync_job_id?: string;
   source_clip_url: string;
   total_sec: number;
-  segments: SegmentItem[];           // kept flat for diagnostics
-  cost_credits: number;              // SUM across all passes
+  segments: SegmentItem[];
+  cost_credits: number;
   refunded: boolean;
   started_at: string;
   first_started_at?: string;
