@@ -712,25 +712,21 @@ async function processScene(
 
     });
 
-    // ── Step 1b (Stage 5 B.4): per-shot 8-min watchdog ────────────────
-    // A Sync.so job that hasn't returned COMPLETED/FAILED within 8 min
-    // after dispatch is functionally dead. Mark it failed with a clear
-    // error code so the user (and our diagnostics) can distinguish a
-    // provider stall from a render-stitch issue. Refund happens via
-    // pipelineStatus='failed' below (refundIfNeeded is idempotent via
-    // state.refunded).
-    const PER_SHOT_TIMEOUT_MS = 15 * 60 * 1000;
+    // ── Step 1b: per-shot 4-min watchdog (v12 Stability) ─────────────
+    // Sync.so jobs that don't finish in ~4 min are functionally dead —
+    // they used to block the whole stitch for 15 min. Now we degrade fast.
+    const PER_SHOT_TIMEOUT_MS = 4 * 60 * 1000;
     for (const shot of shots) {
       if (shot.status !== "lipsyncing" || !shot.started_at) continue;
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
-      const timeoutReason = `sync_so_timeout_15min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      if (!prepareShotRetry(shot, "sync_so_timeout_15min", shots)) {
-        markShotTerminalFailed(shot, timeoutReason);
+      const timeoutReason = `sync_so_timeout_4min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
+      if (!prepareShotRetry(shot, "sync_so_timeout_4min", shots)) {
+        degradeShotToMaster(shot, timeoutReason);
       }
       mutated = true;
       console.warn(
-        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_15min job=${shot.sync_job_id} ageMs=${ageMs}`,
+        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_4min job=${shot.sync_job_id} ageMs=${ageMs}`,
       );
     }
   }
