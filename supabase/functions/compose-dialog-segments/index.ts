@@ -94,7 +94,7 @@ interface TwoshotSpeaker {
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
-  status: "queued" | "rendering" | "done" | "failed";
+  status: "queued" | "rendering" | "done" | "failed" | "retrying";
   sync_job_id?: string;
   source_clip_url: string;
   total_sec: number;
@@ -108,10 +108,15 @@ interface SegmentsState {
   cost_credits: number;
   refunded: boolean;
   started_at: string;
+  first_started_at?: string;
+  retry_count?: number;
+  last_error?: string;
+  last_error_class?: string;
   finished_at?: string;
   final_url?: string | null;
   error?: string;
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
