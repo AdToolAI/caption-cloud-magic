@@ -1,149 +1,48 @@
-## Befund
-
-Der Backend-Status ist gesund. Der Fehler kommt aus der Sync.so-Verarbeitung selbst: mehrere Jobs enden mit `sync_FAILED: An unknown error occurred`.
-
-Die aktuelle Pipeline ist noch nicht Artlist-robust, weil sie weiterhin Sync.so mit `segments_secs` auf dem langen Master-Video plus statischen Face-Koordinaten füttert. Das ist fragil:
-
-- Sync.so muss intern einen Ausschnitt aus einem langen Video verarbeiten.
-- Die Audioseite wird zwar vorgetrimmt, das Video aber nur per `segments_secs` referenziert.
-- Die Face-Koordinaten stammen aus Anchor/FaceMap und sind statisch, obwohl das generierte Master-Video Bewegung/Kameradrift haben kann.
-- Nach mehreren Retry-Varianten scheitern weiterhin ganze Turns; das bestätigt, dass nicht nur das Frame-Sampling falsch war, sondern die Grundstruktur noch zu provider-fragil ist.
-
 ## Ziel
 
-Die Dialog-Lip-Sync-Pipeline wird so umgebaut, dass jeder Sprecher-Turn zuerst als eigener kurzer Video-Clip materialisiert wird. Sync.so bekommt dann keinen langen Master mit `segments_secs`, sondern einen kleinen, sauberen Turn-Clip ab Sekunde 0 plus exakt passenden Audio-Slice. Danach wird alles deterministisch wieder in den Master gestitcht.
+Das Reden in der Dialog-Pipeline natürlicher und smoother machen, **ohne** die jetzt stabile Preclip → Sync.so → Stitch Pipeline anzufassen.
 
-Das ist näher an einer Artlist-ähnlichen Pipeline: segmentieren, isoliert verarbeiten, deterministisch zusammensetzen.
+## Was sich ändert (klein & isoliert)
 
-## Umsetzung
+Nur zwei Stellschrauben in `poll-dialog-shots/index.ts` rund um den Sync.so-Dispatch:
 
-### 1. Per-Turn Video-Preclip einführen
+### 1. Sync.so Qualitäts-Parameter
 
-Neue Remotion-Komposition:
+Beim Sync.so-Call pro Turn die offiziellen Smoothing-Optionen mitschicken:
 
-```text
-DialogTurnClipVideo
-masterVideoUrl + startSec + endSec -> kurzer MP4-Clip ab t=0
-```
+- `model: sync-2-pro` (bleibt)
+- `options.sync_mode: "cut_off"` (bleibt, wegen VO-länger-als-Plate)
+- **neu** `options.temperature: 0.4` → konservativer, weniger zappelig
+- **neu** `options.active_speaker: true` bei Multi-Sprecher-Plates → verhindert Mund-Artefakte bei Nicht-Sprechern
+- **neu** `options.occlusion_detection_enabled: true` → ruhigere Übergänge wenn Hand/Objekt vor dem Mund ist
 
-Eigenschaften:
+Das sind reine Provider-Hints, kein Eingriff in Preclip-Materialisierung oder Stitch.
 
-- rendert exakt das `render_window` eines Turns
-- gleiche Breite/Höhe/FPS wie Master
-- muted, ohne Audio
-- Ergebnis ist ein eigenständiger kurzer Turn-Clip
+### 2. Render-Window Lead-In/Tail leicht erhöhen
 
-### 2. Neue Backend-Funktion für Turn-Preclips
+Aktuell `lead-in 0.18s / tail 0.12s`. Wir erhöhen auf `lead-in 0.25s / tail 0.20s` (weiterhin geclamped auf die halbe Gap zum Nachbarn).
 
-Neue Funktion `render-dialog-turn`:
+Effekt: Sync.so hat etwas mehr Anlauf- und Auslaufframes pro Turn → Mundöffnung startet/endet weicher, kein hartes In/Out. Da das Fenster sowohl Preclip- als auch Stitch-Overlay-Range definiert, bleibt die Geometrie konsistent.
 
-- liest `composer_scenes.dialog_shots`
-- sucht den Turn per `sceneId + shotIdx`
-- erstellt einen `video_renders` Eintrag mit Quelle `dialog-turn-preclip`
-- startet Remotion Lambda für `DialogTurnClipVideo`
-- speichert Render-ID im jeweiligen Shot-JSON
+### 3. Stitch-Crossfade an Turn-Grenzen (rein visuell)
 
-Keine neue Tabelle nötig; wir nutzen weiterhin `dialog_shots` JSON und `video_renders`.
+In `DialogStitchVideo.tsx` an jedem Overlay-Sequence-Übergang ein 3-Frame Opacity-Crossfade auf den Overlay-Layer legen (Master darunter läuft weiter). Kein Recut, kein neuer Render-Pfad — nur ein `interpolate` auf `opacity` in den ersten/letzten 3 Frames jedes Shots.
 
-### 3. Webhook für Turn-Preclips erweitern
+Effekt: Mikro-Sprung beim Wechsel zwischen Master-Plate und lipsynced Overlay wird unsichtbar.
 
-`remotion-webhook` bekommt einen neuen Pfad für `source='dialog-turn-preclip'`:
+## Was bewusst NICHT angefasst wird
 
-- bei Erfolg: `shot.preclip_url = outputFile`, `shot.status = 'pending'`
-- bei Fehler: Shot retrybar markieren, nicht sofort ganze Szene zerstören
-- danach `poll-dialog-shots` fire-and-forget anstoßen
+- Preclip-Renderer (`DialogTurnClipVideo`, `render-dialog-turn`)
+- Webhook-Routing (`remotion-webhook`, `sync-so-webhook`)
+- Compose / Audio-Trimming / Refund-Logik
+- Lambda-Bundle muss nur neu deployed werden wegen Punkt 3 (Stitch-Composition geändert)
 
-### 4. Poller-Lifecycle erweitern
+## Deployment
 
-`poll-dialog-shots` wird von:
+1. Edge Function `poll-dialog-shots` redeployen
+2. Remotion-Bundle neu deployen (`scripts/deploy-remotion-bundle.sh`) wegen Stitch-Crossfade
+3. Kein DB-Reset nötig — wirkt ab nächstem Dialog-Render
 
-```text
-pending -> lipsyncing -> ready
-```
+## Risiko
 
-auf:
-
-```text
-pending -> preclipping -> pending_with_preclip -> lipsyncing -> ready
-```
-
-umgestellt.
-
-Wichtig: Für Sync.so wird dann primär verwendet:
-
-```text
-video = shot.preclip_url
-video segments_secs = KEINE
-frame_number = segment-relative im kurzen Clip
-audio = shot.trimmed_audio_url
-```
-
-Damit entfällt die fragile Kombination aus langem Master-Video + `segments_secs` + absolut/relativem Frame-Verhalten.
-
-### 5. Sync.so Dispatch anpassen
-
-`startSyncTurnJob` erhält einen Modus:
-
-- `segmented_master` nur noch als Legacy-/Fallback-Strategie
-- `preclip` als neuer Standard
-
-Im `preclip` Modus:
-
-- kein `segments_secs` auf dem Video
-- `frame_number` wird gegen die kurze Clipdauer geclempt
-- Audio bleibt der exakt getrimmte WAV-Slice
-- aktive Sprechererkennung bleibt bei Multi-Speaker koordinatenbasiert, aber ohne Segment-API-Risiko
-
-### 6. Finales Stitching korrigieren
-
-`DialogStitchVideo` muss unterscheiden:
-
-- alte Sync.so Outputs aus `segments_secs`: `startFrom = startFrame`
-- neue Preclip Sync.so Outputs: `startFrom = 0`
-
-Dafür bekommt jeder Shot im Stitch-Payload ein Feld wie:
-
-```text
-sourceTiming: 'relative' | 'absolute'
-```
-
-Bei Preclip-Outputs wird der kurze lipsynced Clip ab Frame 0 in das ursprüngliche `render_window` gelegt.
-
-### 7. Failure-Handling sauberer machen
-
-Aktuell können Shots bereits `failed` sein, während die Szene noch `running` bleibt, weil andere Shots weiterlaufen. Das wirkt wie ein 15-Minuten-Abbruch.
-
-Ich ändere das Verhalten so:
-
-- ein Turn-Failure stoppt keine Szene, solange Preclip-Fallback noch möglich ist
-- terminal failed erst, wenn Preclip + Sync-Retries ausgeschöpft sind
-- `clip_error` bekommt die genaue Strategie, z. B. `preclip_sync_failed_after_retries`
-- Refund bleibt idempotent nur bei finalem Abbruch
-
-### 8. Betroffene Szenen sauber neu starten
-
-Nach dem Deployment:
-
-- die fehlgeschlagenen Szenen (`a500df2e...`, `7842c6f6...`) in einen sauberen Dialog-Status zurücksetzen
-- `compose-dialog-scene` neu anstoßen
-- prüfen, dass jeder Turn erst `preclip_url`, dann `output_url`, dann final `clip_url` bekommt
-
-## Dateien
-
-Voraussichtlich betroffen:
-
-- `supabase/functions/poll-dialog-shots/index.ts`
-- `supabase/functions/sync-so-webhook/index.ts`
-- `supabase/functions/render-dialog-turn/index.ts` neu
-- `supabase/functions/remotion-webhook/index.ts`
-- `src/remotion/templates/DialogTurnClipVideo.tsx` neu
-- `src/remotion/templates/DialogStitchVideo.tsx`
-- Remotion Composition-Registry (`src/remotion/index.ts` oder Loader, je nach bestehender Registrierung)
-- Projekt-Memory zur neuen Artlist-Style Pipeline
-
-## Nicht im Scope
-
-- Kein Provider-Wechsel
-- Keine neue Datenbanktabelle
-- Keine UI-Änderung
-- Keine Entfernung der Refund-Sicherheit
+Sehr niedrig. Sync.so-Options sind dokumentiert und additiv. Lead-In/Tail-Erhöhung ist 70ms / 80ms — unkritisch, weil Clamp auf halbe Nachbar-Gap bleibt. Crossfade ist rein visuell auf der Stitch-Seite.
