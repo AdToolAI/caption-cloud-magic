@@ -434,7 +434,46 @@ serve(async (req) => {
       );
     }
 
-
+    // ── Stage E.3: Concurrency-Guard ─────────────────────────────────────
+    // Sync.so Creator plan allows ~3 parallel jobs. If we're at the cap, defer
+    // the dispatch instead of letting Sync.so throw 429.
+    const MAX_INFLIGHT = 3;
+    const inflightCount = await countInflightSyncJobs(supabase, 10);
+    if (inflightCount >= MAX_INFLIGHT) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} DEFER inflight=${inflightCount}/${MAX_INFLIGHT}`,
+      );
+      // Refund the just-debited credits so the user is not billed for the wait.
+      const { data: wDef } = await supabase
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(wDef?.balance ?? 0) + totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      const jitterMs = 5_000 + Math.floor(Math.random() * 10_000);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "pending",
+          twoshot_stage: "deferred",
+          clip_error: `syncso_concurrency_deferred:${inflightCount}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "DEFERRED", error_class: "rate_limited",
+        error_message: `inflight ${inflightCount} >= ${MAX_INFLIGHT}, retry in ${jitterMs}ms`,
+        meta: { inflight_count: inflightCount, retry_in_ms: jitterMs },
+      });
+      return json(
+        { ok: false, status: "deferred", inflight: inflightCount, retry_in_ms: jitterMs, refunded: totalCost },
+        202,
+      );
+    }
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
