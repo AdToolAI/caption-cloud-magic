@@ -138,6 +138,8 @@ serve(async (req) => {
     // Intermediate event — nothing to persist, just ack.
     return ok({ ok: true, skipped: `non_terminal:${status}` });
   }
+  // E.3: release inflight slot for any terminal status (best-effort)
+  await releaseInflightSyncJob(supabase, jobId);
 
   // Locate the scene that owns this sync_job_id. Prefer the scene_id query
   // hint if poll-dialog-shots embedded it in the webhook URL.
