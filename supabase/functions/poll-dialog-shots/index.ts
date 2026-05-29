@@ -115,6 +115,10 @@ interface DialogShot {
   /** Tracks which video source was used for the actual Sync.so dispatch.
    *  'preclip' = short clip ab t=0 (preferred). 'master' = legacy segments_secs. */
   sync_source_kind?: "preclip" | "master";
+  /** Stufe B telemetry — populated by ensureNormalizedTurnAudio. */
+  audio_dur_sec?: number;
+  audio_lead_in_sec?: number;
+  audio_peak_dbfs?: number | null;
 }
 
 
