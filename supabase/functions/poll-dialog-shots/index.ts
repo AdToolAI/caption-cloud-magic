@@ -980,7 +980,9 @@ async function processScene(
     const multi = isMultiSpeakerScene(shots);
     if (multi) {
       const invalid = shots.filter(
-        (s) => !s.target_coords || s.deterministic_coords !== true,
+        (s) =>
+          (s as any).degraded !== true &&
+          (!s.target_coords || s.deterministic_coords !== true),
       );
       if (invalid.length > 0) {
         const ids = invalid.map((s) => s.idx).join(",");
