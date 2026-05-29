@@ -54,6 +54,19 @@ interface FaceBox {
   confidence: number;
 }
 
+interface FaceQuality {
+  /** absolute degrees from frontal: 0 = perfect, ≥45 = profile shot */
+  yawDegrees: number | null;
+  /** absolute degrees from level: 0 = level, ≥30 = looking up/down hard */
+  pitchDegrees: number | null;
+  /** 0..1, 1 = both eyes wide open, 0 = closed/occluded */
+  eyeOpenScore: number | null;
+  /** 0..1, 1 = tack-sharp, 0 = motion-blurred */
+  sharpnessScore: number | null;
+  /** Composite 0..1 score, ≥0.6 = safe for Sync.so, <0.6 = shift frame. */
+  faceScore: number | null;
+}
+
 interface ValidationResult {
   faceVisible: boolean;
   faceCount: number;
@@ -61,6 +74,7 @@ interface ValidationResult {
   coordsMatch: boolean | null;
   suggestedFrameOffset: number | null;
   model: string;
+  quality?: FaceQuality;
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
