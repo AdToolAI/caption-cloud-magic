@@ -781,13 +781,7 @@ export default function SceneCard({
                               value="sync-segments"
                               className="text-xs"
                             >
-                              ⚡ Fast Dialog · 1-Call (Sync.so Segments)
-                            </SelectItem>
-                            <SelectItem
-                              value="cinematic-sync"
-                              className="text-xs"
-                            >
-                              🎬 Cinematic Chain (Per-Turn)
+                              ⚡ Fast Dialog · 1-Call (Sync.so Segments) — Default
                             </SelectItem>
                             <SelectItem value="heygen" className="text-xs">
                               🎙️ HeyGen Talking-Head
@@ -797,6 +791,12 @@ export default function SceneCard({
                             </SelectItem>
                             <SelectItem value="sync-polish" className="text-xs">
                               ✨ Sync.so Polish
+                            </SelectItem>
+                            <SelectItem
+                              value="cinematic-sync-legacy"
+                              className="text-xs text-muted-foreground"
+                            >
+                              🐢 Legacy Cinematic Chain (Per-Turn)
                             </SelectItem>
                           </SelectContent>
                         </Select>
