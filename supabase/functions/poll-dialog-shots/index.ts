@@ -213,6 +213,19 @@ function markShotTerminalFailed(shot: DialogShot, error: string) {
   shot.completed_at = new Date().toISOString();
 }
 
+/** v12 Graceful Degrade: statt die ganze Szene auf "failed" zu setzen, wenn
+ *  ein einzelner Turn dauerhaft kein Lip-Sync produziert, markieren wir den
+ *  Shot als `ready` ohne `output_url`. DialogStitchVideo skippt dann das
+ *  Overlay für dieses Fenster und zeigt die saubere Master-Plate. So bleibt
+ *  der Export funktionsfähig — lieber 1 Turn ohne Mundbewegung als 0 Video. */
+function degradeShotToMaster(shot: DialogShot, error: string) {
+  shot.status = "ready";
+  (shot as any).degraded = true;
+  shot.output_url = undefined;
+  shot.error = `degraded_to_master: ${error}`.slice(0, 300);
+  shot.completed_at = new Date().toISOString();
+}
+
 // ── Sync.so dispatch ────────────────────────────────────────────────────
 
 /** Expand a turn's single window with pre-roll/tail, clamping each side
