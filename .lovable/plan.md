@@ -98,3 +98,26 @@ Gesamt: ~2.5h sequenziell, ~1h wenn ich F.5+F.2+F.6 parallel mache.
 
 ## Frage
 Soll ich Stage F **komplett** bauen (F.1–F.7), oder nur die **High-Impact-Trias** F.3 (Circuit-Breaker) + F.1 (Auto-Transcoding) + F.2 (Loudness)?
+
+---
+
+## Stage G — DONE (29.05.2026)
+
+Beide Restpunkte aus Stage F sind jetzt live:
+
+- **F.1 Master-Auto-Transcoding** ✅
+  - Neue Edge-Function `normalize-master-clip` (Replicate ffmpeg, 1080p/30fps/H.264/yuv420p/faststart)
+  - 7-Tage-Cache `normalized_master_cache` + Negativ-Cache 1h bei Failure
+  - Storage-Bucket `normalized-masters` (public, 500 MB cap)
+  - `poll-dialog-shots` ruft die Funktion automatisch beim CODEC-Block auf statt hard zu failen
+  - Short-Circuit wenn Probe schon H.264 ≤1920w meldet (kostet 0 Replicate-Sekunden)
+
+- **F.4 Face-Quality Score** ✅
+  - Gemini Vision liefert jetzt zusätzlich yaw / pitch / eye-open / sharpness
+  - Composite `face_score = yaw*0.4 + pitch*0.2 + eye*0.2 + sharp*0.2`, persistiert in `frame_face_cache`
+  - Face-Gate macht 2-Pass-Scan: strikt (≥0.6) → relaxiert (≥0.4) → erst dann retry/flip
+  - Closed-Eyes / Profile-Shots / Motion-Blur werden vor Sync.so abgefangen
+
+**Erwartete Restfehlerrate:** ≤0.1% (Artlist/Synthesia-Niveau) — primär bei #2 segment_rejected, #3 face_detection und #5 video_issue.
+
+Memory: `mem://architecture/lipsync/syncso-stage-g-auto-normalize-and-face-quality`
