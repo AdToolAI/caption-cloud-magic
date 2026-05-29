@@ -1,33 +1,52 @@
 /**
- * compose-dialog-segments — Sync.so Segments API (1-call dialog pipeline).
+ * compose-dialog-segments — Sync.so Segments API, multi-pass per-speaker.
  *
- * Replaces the v4 per-turn chain (`compose-dialog-scene` + `poll-dialog-shots`)
- * with a SINGLE Sync.so generate call using the official `segments[]` API
- * (https://sync.so/docs/developer-guides/segments). Each turn maps to one
- * segment with `audioInput.refId` pointing to that speaker's isolated track.
+ * MAY 2026 PIVOT (character-swap fix):
+ * --------------------------------------------------------------------
+ * The old "1-call" segments dispatch (single audio multiplexed across
+ * speakers via `segments[]` + `active_speaker_detection.bounding_boxes`)
+ * has two unsolvable problems against `lipsync-2-pro`:
  *
- * Why this matters:
- *  - 1 Sync.so render instead of N (no per-turn dispatch, no ffmpeg stitch).
- *  - 1 Webhook completion instead of N webhooks + stitch trigger.
- *  - End-to-end render goes from ~10–15 min to ~3–5 min for a 3-turn scene.
- *  - Cost: ~$0.083/s × scene_duration once, vs. N × per-turn cost.
+ *   1. Sync.so segments + per-frame `bounding_boxes` returns
+ *      `An unknown error occurred` (DB-confirmed across May 2026 runs;
+ *      v4 source comment in compose-twoshot-lipsync also documents this
+ *      regression). Removing ASD makes the call complete BUT Sync.so
+ *      then picks the audio→face mapping itself and routinely swaps
+ *      speakers — exactly the bug the user reported.
+ *   2. There is no per-segment ASD field in the documented schema:
+ *      https://sync.so/docs/developer-guides/speaker-selection (top-level
+ *      `options.active_speaker_detection` only).
  *
- * State model (dialog_shots version=5):
+ * The only stable multi-speaker pattern is the one v4 used: one Sync.so
+ * call per speaker, each with single-coord ASD pointing at THAT speaker's
+ * face. We chain them: pass N's video input = pass N-1's output. The final
+ * pass's output has every speaker correctly lip-synced.
+ *
+ * State model (dialog_shots, multi-pass):
  *  {
  *    version: 5,
  *    engine: "sync-segments",
  *    status: "queued" | "rendering" | "done" | "failed",
- *    sync_job_id: string,
- *    source_clip_url: string,         // master plate (no chain)
- *    segments: [...],                 // for diagnostics
- *    cost_credits: number,
+ *    multi_pass: true,
+ *    passes: [{
+ *      idx, speaker_idx, character_id, audio_url, coords,
+ *      segments[], input_url, job_id?, output_url?, status, started_at?,
+ *      finished_at?
+ *    }, ...],
+ *    current_pass: number,           // index into passes[]
+ *    total_passes: number,
+ *    sync_job_id: string,            // CURRENT pass's job id (for webhook)
+ *    source_clip_url: string,        // pass 0 video input (master plate)
+ *    total_sec: number,
+ *    cost_credits: number,           // SUM across all passes
  *    refunded: boolean,
  *    final_url?: string,
  *    error?: string,
  *  }
  *
- * Idempotent. Auto-refund on failure (matches v4 contract). Webhook does
- * the completion patch; this function only does the dispatch.
+ * The webhook calls back into this function with `{ advance: true }` to
+ * dispatch the next pass once a pass completes. Idempotent. Single-speaker
+ * scenes still run as a single pass (no behaviour change for monologues).
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -91,20 +110,45 @@ interface TwoshotSpeaker {
   voicedRange?: { turns?: Turn[]; startSec?: number; endSec?: number };
 }
 
+interface SegmentItem {
+  startTime: number;
+  endTime: number;
+  speakerIdx: number;
+  speakerName: string;
+  refId: string;
+}
+
+interface PassState {
+  idx: number;
+  speaker_idx: number;
+  character_id: string | null;
+  speaker_name: string;
+  audio_url: string;
+  coords: [number, number] | null;
+  segments: SegmentItem[];
+  input_url: string;
+  job_id?: string;
+  output_url?: string;
+  status: "pending" | "rendering" | "done" | "failed";
+  started_at?: string;
+  finished_at?: string;
+  error?: string;
+}
+
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
   status: "queued" | "rendering" | "done" | "failed" | "retrying";
+  // Multi-pass per-speaker chain (added May 2026 to fix character swap).
+  // Optional for back-compat with in-flight single-pass rows.
+  multi_pass?: boolean;
+  passes?: PassState[];
+  current_pass?: number;
+  total_passes?: number;
   sync_job_id?: string;
   source_clip_url: string;
   total_sec: number;
-  segments: Array<{
-    startTime: number;
-    endTime: number;
-    speakerIdx: number;
-    speakerName: string;
-    refId: string;
-  }>;
+  segments: SegmentItem[];
   cost_credits: number;
   refunded: boolean;
   started_at: string;
@@ -140,6 +184,10 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const sceneId = body?.scene_id;
     const isRetry = body?.retry === true;
+    // `advance: true` is sent by the webhook to chain to the next pass after
+    // a successful pass completion. Skips wallet debit + face-gate (already
+    // validated on pass 0) and dispatches passes[current_pass].
+    const isAdvance = body?.advance === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
@@ -190,12 +238,14 @@ serve(async (req) => {
     }
 
     // Idempotency: an active render already exists → nudge and return.
-    // On `retry=true` (E.5 webhook retry path) we intentionally bypass this
-    // guard because the previous job already terminated FAILED and we now
-    // want to re-dispatch on the same scene without re-charging the wallet.
+    // On `retry=true` (E.5 webhook retry path) we bypass this guard because
+    // the previous job already terminated FAILED.
+    // On `advance=true` (multi-pass chain) we bypass too — the previous pass
+    // completed and we're now dispatching the NEXT pass on the same scene.
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     if (
       !isRetry &&
+      !isAdvance &&
       existing &&
       existing.version === 5 &&
       existing.engine === "sync-segments" &&
@@ -203,6 +253,7 @@ serve(async (req) => {
     ) {
       return json({ ok: true, status: "already_running", scene_id: sceneId }, 202);
     }
+
 
     // ── Build segments from per-speaker turns ────────────────────────────
     interface RawSegment {

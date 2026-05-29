@@ -1,74 +1,74 @@
-Du hast recht: Wir dürfen jetzt nicht weiter „herumpatchen“. Der Stand aus der Forensik ist klar genug, um die nächste Runde als Diagnose-Plan aufzusetzen.
+## Was wirklich passiert
 
-Was ich bereits nachweisen konnte:
+**1. Character-Swap (Sprecher 1 spricht Text von Sprecher 2 und umgekehrt)**
 
-- Es läuft wirklich v5: `dialog_shots.version = 5`, `engine = sync-segments`.
-- Der direkte Dispatch zu Sync.so klappt: Sync.so antwortet auf `/generate` mit `201` und Job-IDs.
-- Der Fehler kommt erst asynchron vom Provider-Job: Webhook meldet sehr schnell `FAILED` mit nur `An unknown error occurred.`
-- Es gibt einen separaten Bug in unserer Retry-Forensik: `retry_count` wird beim Retry-Dispatch wieder verworfen. Dadurch wurden in ca. 15 Minuten 71 Jobs für eine Szene und 36 Jobs für eine zweite Szene erzeugt, statt sauber nach 2 Versuchen zu stoppen.
-- Der Webhook-Payload zeigt den kritischen Payload-Teil: `segments[]` plus `options.active_speaker_detection.bounding_boxes[]`.
+Ursache eindeutig identifiziert in `supabase/functions/compose-dialog-segments/index.ts` (Zeilen 491–514):
+Beim letzten Fix gegen `provider_unknown_error` haben wir `options.active_speaker_detection` komplett aus dem Sync.so-Payload entfernt. Im Segments-Modus von `lipsync-2-pro` heißt das: **Sync.so kennt keine Face-Zuordnung mehr und ratet, welche Audio-Spur auf welches Gesicht geht.** Die FaceMap wird zwar weiterhin korrekt berechnet (DB-Beleg: Scene `4f229ba4` → `characterId: "matthew-dusatko"` links, `samuel-dusatko` rechts mit `matchConfidence 0.8`), aber der Payload trägt sie nicht mehr — also wird sie ignoriert.
 
-Wichtig: „Alle Sync.so-Fehler abdecken“ heißt aktuell nur, dass bekannte Fehlerklassen wie 422, Rate Limit, Timeout, 5xx, Rejected, Failed, Refund etc. abgefangen werden. Wenn Sync.so selbst nur `An unknown error occurred` zurückgibt, haben wir die Provider-Fehlerklasse abgefangen, aber nicht automatisch die Ursache. Dafür brauchen wir jetzt eine kontrollierte Isolation.
+Das ist KEIN Sync.so-Bug, sondern unser Trade-off von gestern, der die Lipsync-Qualität zerstört. Wir müssen ASD zurückbringen — aber so, dass `lipsync-2-pro` nicht crasht.
 
-Plan:
+**2. Progress-Bar läuft nach „fertig"-Signal weiter**
 
-1. Live-Retry-Sturm stoppen
-   - Die aktuell betroffenen Szenen aus dem endlosen `running`/Retry-Zyklus nehmen.
-   - Keine weiteren Sync.so-Jobs erzeugen, bis die Ursache isoliert ist.
-   - Credits idempotent schützen: kein Doppel-Refund, kein weiterer Verbrauch.
+Im UI ist Lipsync = 20 % Gewicht. Wenn Lipsync nach ~5 min `applied` ist, springt der Hook korrekt auf `progress=1` für die Phase (Zeile 363) — aber der Gesamt-Bar interpoliert weiter Richtung „nominal 480 s". Heißt: der Balken läuft sichtbar weiter, obwohl Lipsync fertig ist, weil keine spätere Phase (Export) ihn ablöst. Wenn anschließend kein Composer-Master-Render automatisch getriggert wird, hängt der Bar gefühlt für immer.
 
-2. Vollständigen Debug-Datensatz sichern
-   - Den exakten v5-Payload pro fehlgeschlagenem Job persistent erfassen, nicht nur abgeschnittene Edge-Logs.
-   - Pro Job speichern:
-     - Sync.so Job-ID
-     - Modell
-     - `segments[]`
-     - Input-Audio-URLs und HEAD-Metadaten
-     - Input-Video-URL und HEAD-Metadaten
-     - `active_speaker_detection`-Form
-     - Webhook-Status und Roh-Payload
-   - Ziel: Nicht mehr nur `unknown`, sondern ein reproduzierbares Testpaket.
+## Fix-Plan
 
-3. Minimal-Repro-Matrix gegen Sync.so fahren
-   - Mit derselben Szene kontrolliert Varianten testen, jeweils nur eine Variable ändern:
-     1. Video + ein Audio ohne `segments` und ohne Speaker-Selection.
-     2. Video + ein Audio mit `segments`.
-     3. Video + zwei Audio-Inputs mit `segments`, aber ohne `active_speaker_detection`.
-     4. Video + zwei Audio-Inputs mit `segments` + nur `coordinates`.
-     5. Video + zwei Audio-Inputs mit `segments` + `bounding_boxes`.
-   - Ergebnis zeigt, ob Sync.so an den Medien, an `segments`, an mehreren Audio-Inputs oder an `bounding_boxes` scheitert.
+### Schritt 1 — Sync.so Segments + Face-Targeting korrekt verbinden
 
-4. Audio- und Segment-Timing verifizieren
-   - Die per-speaker WAVs sind komplette, szenenlange Tracks mit Stille außerhalb des Sprecherfensters.
-   - Gleichzeitig setzen wir im Segment `audioInput.startTime/endTime` auf die Szenenzeit.
-   - Das muss gegen Sync.so-Dokumentation/Verhalten geprüft werden, weil bei szenenlangen Tracks die Audio-Crop-Zeiten möglicherweise anders interpretiert werden als erwartet.
-   - Falls dies die Ursache ist, wäre der echte Fix nicht „Retry“, sondern segmentgerechte Audio-Crops oder andere `audioInput`-Zeiten.
+Statt blind ASD wegzulassen, eine **dokumentations-konforme Repro-Matrix** gegen `lipsync-2-pro` fahren — diesmal mit den richtigen Variablen:
 
-5. Bounding-Box-Format isolieren
-   - Sync.so akzeptiert laut Docs `bounding_boxes` als per-frame Array, aber unsere Boxen stammen aus dem Anchor-Bild und werden pauschal über jedes Frame wiederholt.
-   - Zu prüfen:
-     - Erwartet Sync.so Boxen in tatsächlicher Videoauflösung statt Anchor-Auflösung?
-     - Ist die Array-Länge exakt zur Video-FPS/Dauer passend?
-     - Scheitert `lipsync-2-pro` speziell mit `segments + bounding_boxes`, obwohl das Schema gültig ist?
+| Variant | segments | options.active_speaker_detection | Erwartung |
+|---------|----------|---------------------------------|-----------|
+| A | ja | `{ auto_detect: false, coordinates, frame_number }` (1 Sprecher-Form, aber 2 Audios) | klärt ob `coordinates` mit segments lebt |
+| B | ja | `{ auto_detect: false, bounding_boxes: [...]}` mit Länge = `videoFrames` bei **echter** FPS (probe via ffprobe-HEAD) | unsere alte Annahme war 24 fps fix — möglicherweise war ASS-Boxen-Length falsch |
+| C | ja | jeweils `segments[i].options.bounding_box` (Sync.so segments-API erlaubt per-segment options laut Doku-Section „Segments Reference") | sauberste Variante |
+| D | ja | `auto_detect: true, speaker_labels` mit Speaker-Mapping pro `audioInput.refId` | falls Sync.so segments einen eigenen Speaker-Label-Path hat |
 
-6. Erst nach Ursache Fix implementieren
-   - Kein Fallback und kein Payload-Umbau, bevor die Matrix zeigt, welche Variable Sync.so killt.
-   - Danach gezielt fixen:
-     - Audio-Crop-Logik, falls `audioInput` falsch ist.
-     - Bounding-Box-Scaling/Format, falls Speaker-Selection falsch ist.
-     - Sync.so-Segments-Routing, falls Provider `segments + ASD` nicht stabil unterstützt.
-   - Retry-Budget trotzdem korrigieren, damit so ein Diagnosefehler nie wieder 100+ Jobs erzeugt.
+Diese Matrix wird als einmaliges Diagnose-Skript ausgeführt (kein Code-Patch), Ergebnisse landen in einer neuen `syncso_dispatch_log.meta.repro_matrix` Spalte.
 
-7. Validierung
-   - Mit derselben Szene erneut testen.
-   - Erwartung: Ein einzelner Sync.so-Job läuft entweder erfolgreich durch oder endet deterministisch mit einem echten, gespeicherten Diagnosegrund.
-   - Danach erst den normalen Auto-Trigger wieder freigeben.
+**Sobald die Matrix zeigt welche Form akzeptiert wird:**
+- Den `compose-dialog-segments`-Dispatcher anpassen, die ermittelte FaceMap + Bboxes wieder in der richtigen Form mitsenden.
+- `_diagnosticAsd` umbenennen zu echtem `asdOptions` und in den Payload reinhängen.
+- Den Kommentar (Zeile 491–498) auf die tatsächliche Erkenntnis aktualisieren.
 
-Keine Codeänderung ohne Diagnose-Ergebnis. Der nächste Schritt wäre also nicht „Patch“, sondern: Retry-Sturm stoppen, Payload vollständig loggen, Minimal-Repro-Matrix fahren und daraus die echte Ursache ableiten.
+### Schritt 2 — Audio-Cross-Routing absichern
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Selbst mit korrekter ASD: Wenn `audio_1` versehentlich Samuels Stimme enthält, der Index aber Matthew zugeordnet ist, swappen wir trotzdem. Deshalb:
+- In `compose-dialog-segments` vor Dispatch ein assertion-log: `audioRefMap[audio_N] ↔ speakers[N].character_id ↔ faceMap.faces[*].characterId` als Triple ausgeben, damit Cross-Wires sofort sichtbar sind.
+- Sanity-Check: wenn FaceMap-Identity-Match `confidence < 0.6` → Fallback-Heuristik (left=spk0, right=spk1) verwenden statt unzuverlässige Identität.
+
+### Schritt 3 — Progress-Bar nach Lipsync-Done korrigieren
+
+In `usePipelineProgress.ts`:
+- Wenn `lipsyncReal.done === true` UND kein Composer-Master-Render läuft (`renderRunning=false` & `renderPercent=0`), den Gesamt-Bar **auf den Summenanteil aller fertigen Phasen klemmen** statt weiter Richtung `RUN_NOMINAL_SECONDS` zu interpolieren.
+- Konkret: floor + ceiling-Logik so dass der Bar nach Lipsync-Done max bei `sum(weights of done phases)` steht und auf einen User-Trigger („Render Final") wartet, bevor er weiterläuft.
+- Optional aber empfohlen: nach Lipsync-Done eine UI-Card „Alle Szenen fertig — jetzt zusammenfügen?" anzeigen, damit klar ist warum der Bar pausiert.
+
+### Schritt 4 — Hängende laufende Szenen aufräumen
+
+Aktuell in der DB:
+- `7755034f-…` und `5b0ff130-…` stehen `failed` mit `provider_unknown_error` (alter Run, schon refunded — kein Action nötig)
+- Sollte beim Re-Test ein neuer Run hängen bleiben: Migration mit gleichem Pattern wie 2026-05-29.
+
+## Technische Details
+
+**Betroffene Dateien:**
+- `supabase/functions/compose-dialog-segments/index.ts` (Payload Z. 500–514, ASD-Logik Z. 447–499)
+- `supabase/functions/sync-so-webhook/index.ts` (Telemetrie der Matrix-Ergebnisse)
+- `supabase/functions/_shared/twoshot-face-map.ts` (Sanity-Threshold)
+- `src/hooks/usePipelineProgress.ts` (Gesamt-Bar Cap nach Lipsync-Done)
+- Neue Migration für `syncso_dispatch_log.meta.repro_matrix` Sichtbarkeit (rein optional — Spalte ist bereits jsonb)
+
+**Was NICHT in den Scope gehört:**
+- Kein Wechsel weg von Sync.so
+- Kein neues Modell (lipsync-2-pro bleibt)
+- Kein Refactor der gesamten v5-Pipeline
+- Keine DB-Schemaänderungen außer evtl. einem `last_asd_form` Telemetriefeld
+
+## Rückfragen vor Build
+
+Eine wichtige Entscheidung steht offen: Soll die Repro-Matrix
+**(a)** vor jedem Code-Patch einmalig manuell als Diagnose-Skript laufen (ich führe sie aus, melde Resultate, dann patch ich gezielt) — sicherer aber 1 Loop mehr, oder
+**(b)** direkt der wahrscheinlichste Pfad (Variant C — per-segment `bounding_box`) implementieren und live testen — schneller aber risikoreicher wenn C ebenfalls scheitert?
+
+Mein Vorschlag: **(a)**. Wir haben gestern schon einmal „dachten wir abgedeckt" erlebt — diesmal lieber erst messen.
