@@ -547,7 +547,51 @@ serve(async (req) => {
 
       console.log(`🔍 Error fingerprint: ${errorFingerprint}`);
 
-      if (isDialogStitch) {
+      if (isDialogTurnPreclip) {
+        // ── Per-Turn Preclip failure: shot retrybar markieren, NICHT die ──
+        // ── ganze Szene refunden — poll-dialog-shots redispatcht den       ──
+        // ── Preclip oder fällt zurück auf den Master+segments_secs-Pfad.   ──
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'failed',
+            error_message: errorMessage,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        const shotIdx = Number(customData?.shot_idx);
+        if (composerSceneId && Number.isFinite(shotIdx)) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
+          if (shots[shotIdx]) {
+            shots[shotIdx] = {
+              ...shots[shotIdx],
+              preclip_status: 'failed',
+              preclip_render_id: undefined,
+              preclip_error: errorMessage.slice(0, 240),
+              preclip_retry_count: (Number(shots[shotIdx].preclip_retry_count) || 0) + 1,
+            };
+            await supabaseAdmin.from('composer_scenes').update({
+              dialog_shots: { ...prevState, shots },
+              updated_at: new Date().toISOString(),
+            }).eq('id', composerSceneId);
+          }
+          try {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+            fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ scene_id: composerSceneId }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
+          console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} failed: ${errorMessage.slice(0, 120)}`);
+        }
+      } else if (isDialogStitch) {
         // ── Dialog-stitch failure path: mark scene failed + refund credits
         //    idempotently via dialog_shots.refunded. Sync.so per-turn costs
         //    were charged up-front by compose-dialog-scene.
