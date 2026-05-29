@@ -142,10 +142,10 @@ function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
 
 const ASSUMED_MASTER_FPS_CONST = 24;
 
-/** Max provider retries per shot before terminal failure.
- *  Sync.so occasionally returns "unknown error" on a specific frame/window
- *  combo; we step through several deterministic strategies before giving up. */
-const MAX_SHOT_RETRIES = 3;
+/** Max provider retries per shot before we fall back to "degraded ready"
+ *  (use master plate for this turn instead of failing the whole scene).
+ *  v12 Stability: 3 → 1 — endlose Retry-Schleifen blockierten den Stitch. */
+const MAX_SHOT_RETRIES = 1;
 
 /** Stable temperatures to cycle through on retries. Lower values are safer
  *  on short windows; higher values force more articulation on long windows. */
