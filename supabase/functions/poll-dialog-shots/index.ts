@@ -314,10 +314,12 @@ function expandWindow(
 // (deterministic 16-bit PCM cut), upload to `voiceover-audio/trimmed/…`,
 // and pass that URL to Sync.so. Cached on `shot.trimmed_audio_url`.
 
-// v13 Sync.so Hardening — padding constants for trimmed audio
-const AUDIO_LEAD_IN_SEC = 0.25;   // silence before sentence (helps VAD)
-const AUDIO_TAIL_SEC = 0.20;      // silence after sentence
-const AUDIO_MIN_DUR_SEC = 3.0;    // sync.so unhappy with <2s; force ≥3s
+// v13 Sync.so Hardening — minimum WAV duration safety net (audio must be at
+// least as long as expanded video window so cut_off doesn't trim speech).
+// The expanded render_window from expandWindow() now enforces ≥3.0s, so
+// audio sliced from that range will already satisfy this minimum in most
+// cases. This is just a defensive guard for edge cases.
+const AUDIO_MIN_DUR_SEC = 3.0;
 
 function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Array {
   const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
