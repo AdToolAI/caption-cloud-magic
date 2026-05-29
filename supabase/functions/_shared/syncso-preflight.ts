@@ -390,5 +390,105 @@ export function classifySyncError(message?: string | null): string {
   if (/auth|unauthorized|forbidden/.test(m)) return "auth";
   if (/http.*4\d\d/.test(m)) return "http_4xx";
   if (/http.*5\d\d/.test(m)) return "http_5xx";
+  if (/face_validation|no_face/.test(m)) return "face_validation_failed";
+  if (/precheck/.test(m)) return "precheck_face_mismatch";
   return "other";
 }
+
+// ── Face validation helper (Stage D) ────────────────────────────────────
+
+export interface FaceValidationResult {
+  ok: boolean;
+  cached?: boolean;
+  faceVisible: boolean;
+  faceCount: number;
+  faceBoxes: Array<{ x: number; y: number; w: number; h: number; confidence: number }>;
+  /** null when no target_coords provided. */
+  coordsMatch: boolean | null;
+  error?: string;
+}
+
+/**
+ * Validate that a face is visible at the given frame in the given video.
+ * Calls our internal `validate-frame-face` edge function (which is Gemini
+ * Vision + 24h cache backed). Returns a permissive `faceVisible: true`
+ * result on validator failure so callers don't double-block on a flaky
+ * vision model.
+ */
+export async function validateFrameFace(opts: {
+  supabaseUrl: string;
+  serviceKey: string;
+  videoUrl: string;
+  frameNumber: number;
+  fps?: number;
+  targetCoords?: [number, number] | [number, number, number, number] | null;
+}): Promise<FaceValidationResult> {
+  const target = opts.targetCoords;
+  // Normalize Sync.so [x, y] pixel coords into a 0..1 box ~ 12% wide
+  // around the mouth so the overlap check has something meaningful.
+  // Caller can also pass [x, y, w, h] directly (already normalized).
+  let coords: [number, number, number, number] | null = null;
+  if (Array.isArray(target)) {
+    if (target.length === 4) coords = target as [number, number, number, number];
+    else if (target.length === 2) {
+      // We don't know the master clip dimensions here. We treat the
+      // [x, y] as already-normalized 0..1 center and build a ±6% box.
+      const [cx, cy] = target as [number, number];
+      const isNorm = cx <= 1.0 && cy <= 1.0;
+      if (isNorm) {
+        coords = [
+          Math.max(0, cx - 0.06),
+          Math.max(0, cy - 0.06),
+          0.12,
+          0.12,
+        ];
+      }
+      // Pixel coords: skip the overlap check (caller decides on faceVisible only).
+    }
+  }
+
+  try {
+    const resp = await fetch(`${opts.supabaseUrl}/functions/v1/validate-frame-face`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${opts.serviceKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        video_url: opts.videoUrl,
+        frame_number: opts.frameNumber,
+        fps: opts.fps ?? 24,
+        target_coords: coords,
+      }),
+    });
+    const json = (await resp.json().catch(() => ({}))) as any;
+    if (!resp.ok || json?.ok === false) {
+      return {
+        ok: false,
+        faceVisible: true, // permissive
+        faceCount: Number(json?.faceCount) || 0,
+        faceBoxes: Array.isArray(json?.faceBoxes) ? json.faceBoxes : [],
+        coordsMatch: null,
+        error: json?.error ?? `http_${resp.status}`,
+      };
+    }
+    return {
+      ok: true,
+      cached: !!json.cached,
+      faceVisible: !!json.faceVisible,
+      faceCount: Number(json.faceCount) || 0,
+      faceBoxes: Array.isArray(json.faceBoxes) ? json.faceBoxes : [],
+      coordsMatch: json.coordsMatch == null ? null : !!json.coordsMatch,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      faceVisible: true,
+      faceCount: 0,
+      faceBoxes: [],
+      coordsMatch: null,
+      error: (e as Error)?.message ?? "fetch_failed",
+    };
+  }
+}
+
