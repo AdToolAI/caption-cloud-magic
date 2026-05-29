@@ -351,18 +351,25 @@ async function startSyncTurnJob(
   webhookUrl?: string,
   /** Optional override for the `frame_number` coord-sampling point. Used on
    *  retries to step away from the original failing frame (cuts/blinks). */
-  frameNumberOverride?: number,
-): Promise<string> {
-  const options: Record<string, unknown> = {
-    output_format: "mp4",
-    sync_mode: "cut_off",
-    temperature,
-  };
   if (mode === "coords" && coords) {
-    const frameNumber = Number.isFinite(frameNumberOverride as number)
+    // Sync.so v2 + `segments_secs`: `frame_number` is interpreted RELATIVE to
+    // the segment start (frame 0 = first frame of the trimmed segment), NOT
+    // absolute in the master video. Override must already be segment-relative.
+    // Default (no override) = middle of segment, clamped to segment length.
+    const segFrames = Math.max(1, Math.floor((window[1] - window[0]) * ASSUMED_MASTER_FPS));
+    const rawFrame = Number.isFinite(frameNumberOverride as number)
       ? Math.max(0, Math.round(frameNumberOverride as number))
-      : Math.max(0, Math.round(window[0] * ASSUMED_MASTER_FPS));
+      : Math.max(0, Math.floor(segFrames / 2));
+    const frameNumber = Math.min(segFrames - 1, rawFrame);
     options.active_speaker_detection = {
+      auto_detect: false,
+      frame_number: frameNumber,
+      coordinates: coords,
+    };
+  } else {
+    options.active_speaker_detection = { auto_detect: true };
+  }
+
       auto_detect: false,
       frame_number: frameNumber,
       coordinates: coords,
