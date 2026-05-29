@@ -262,29 +262,36 @@ serve(async (req) => {
     }
     const segments = segValidation.fixed as typeof rawSegments;
     const totalCost = computeCost(totalSec);
-    const { data: wallet } = await supabase
-      .from("wallets")
-      .select("balance")
-      .eq("user_id", userId)
-      .single();
-    if (!wallet || Number(wallet.balance) < totalCost) {
-      return json(
-        {
-          error: "INSUFFICIENT_CREDITS",
-          required: totalCost,
-          have: wallet?.balance ?? 0,
-          message: `Sync-Segments benötigt ${totalCost} Credits.`,
-        },
-        402,
-      );
+
+    // E.5: on retry path, wallet was already debited at the original dispatch
+    // and the cost is preserved in state.cost_credits. Skip re-charging.
+    if (!isRetry) {
+      const { data: wallet } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", userId)
+        .single();
+      if (!wallet || Number(wallet.balance) < totalCost) {
+        return json(
+          {
+            error: "INSUFFICIENT_CREDITS",
+            required: totalCost,
+            have: wallet?.balance ?? 0,
+            message: `Sync-Segments benötigt ${totalCost} Credits.`,
+          },
+          402,
+        );
+      }
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(wallet.balance) - totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+    } else {
+      console.log(`[compose-dialog-segments] scene=${sceneId} RETRY path (no re-charge)`);
     }
-    await supabase
-      .from("wallets")
-      .update({
-        balance: Number(wallet.balance) - totalCost,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("user_id", userId);
 
     // ── Build Sync.so payload ────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
