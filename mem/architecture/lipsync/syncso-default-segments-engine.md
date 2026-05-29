@@ -4,6 +4,9 @@ description: useTwoShotAutoTrigger routes ALL dialog scenes (cinematic-sync, syn
 type: architecture
 ---
 
+**Sync.so secret name (CRITICAL):** The Vault secret is `SYNC_API_KEY` (legacy). Every new Sync.so caller MUST read all three names in this order or it will boot into a silent 500: `SYNC_API_KEY → SYNC_SO_API_KEY → SYNCSO_API_KEY`. Use `getSyncApiKey()` from `_shared/syncso-preflight.ts` — never hand-roll the lookup. A 500 with `error: "missing_sync_api_key"` was the root cause of "Edge Function Fehler" on every dialog scene after the v5 default switch until 2026-05-29.
+
+
 **Why:** v4 (`compose-dialog-scene`) splits each dialog scene into N sequential per-turn Sync.so calls — ~10–15 min wallclock per scene and burns the Sync.so Creator concurrency budget on a single scene. v5 (`compose-dialog-segments`) sends ONE call with `segments[]` and Sync.so parallelizes internally (Artlist pattern). With v5 as default the 3-slot Sync.so concurrency budget covers 3 *different* scenes in parallel instead of 3 turns of one scene.
 
 **Routing change** (`src/hooks/useTwoShotAutoTrigger.ts`):
