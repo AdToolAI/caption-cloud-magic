@@ -280,10 +280,12 @@ function expandWindow(
     : SYNC_TAIL_SEC;
   let w0 = Math.max(0, start - maxLeadIn);
   let w1 = end + maxTail;
-  // Sync.so needs ~30+ frames of VAD context for stable lip-sync. For very
-  // short turns (<1.2s), gently widen toward neighbour boundaries (but never
-  // bleed past mid-gap) so the provider has enough frames to work with.
-  const MIN_WIN_SEC = 1.2;
+  // v13 Sync.so Hardening: Sync.so's `lipsync-2-pro` is unstable on very
+  // short clips (<3s) — short windows correlate strongly with
+  // "An unknown error occurred". Force a minimum 3.0s window by widening
+  // toward neighbour boundaries (capped at mid-gap so we never bleed into
+  // an adjacent turn's region).
+  const MIN_WIN_SEC = 3.0;
   if (w1 - w0 < MIN_WIN_SEC) {
     const need = MIN_WIN_SEC - (w1 - w0);
     const leftRoom = Math.max(0, (w0 - prevEnd) / 2);
