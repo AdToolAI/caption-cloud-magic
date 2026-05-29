@@ -1,214 +1,92 @@
-## Warum Sync.so überhaupt failt
+# Sync.so Dialog Lipsync — Stufe D: "It just works"
 
-Sync.so `lipsync-2-pro` ist eine Blackbox, aber 95% der `An unknown error occurred` / `REJECTED` / `FAILED` Responses haben eine von 7 reproduzierbaren Input-Ursachen:
+Ziel: **Multi-Speaker-Dialog-Szenen sprechen jedesmal die richtigen Worte mit den richtigen Mündern — oder schlagen sauber + refundet fehl. Keine "stumme Münder" mehr, keine "unknown errors" ohne Begründung.**
 
-```text
-1. Audio zu kurz / Sprache startet exakt bei t=0 (kein Lead-in)
-2. Video-Segment zu kurz (<2.0s) oder zu hart geschnitten
-3. Audio enthält Stille über die ganze Länge (VAD findet keinen Onset)
-4. Audio/Video Sample-Rate oder Codec ist exotisch (44.1k stereo float, opus)
-5. Gesicht im Zielframe verdeckt, abgewendet, geschnitten oder gar nicht da
-6. Falsche Coords (zeigen auf leeren Bereich oder anderes Gesicht)
-7. URL liefert 4xx/5xx, 0 Bytes oder Content-Type stimmt nicht
-```
+Stufen A+B+C sind live (Retry-Matrix, Audio-Normalize, Preflight-Probes, Dispatch-Log). Was jetzt noch fehlt, ist der **letzte Härtungsring**: Face/Coords vor dem Dispatch validieren, Telemetrie sichtbar machen, und die Pipeline aus echten Daten lernen lassen.
 
-Wir können das nicht direkt von Sync.so „auslesen" – Sync gibt nur `unknown error` zurück. Aber wir können **jeden dieser 7 Punkte vor dem Dispatch deterministisch ausschließen**. Das ist der eigentliche Hebel.
+## Was wir bauen
 
-## Zielbild
+### 1. Face-Validation vor jedem Coords-Dispatch (Säule 4)
+Aktuell schicken wir `mode="coords"` an Sync.so und hoffen, dass am `frame_number_override` wirklich ein Gesicht an genau den Koordinaten sichtbar ist. Wenn nicht → `unknown_error` oder falscher Mund animiert.
 
-```text
-Vor jedem Sync.so Call passiert ein "PreflightGuard":
-  – Audio normiert (16-bit PCM mono 24kHz, ≥3.0s, 0.25s lead-in/0.20s tail)
-  – Video normiert (≥3.0s Kontext, H.264 yuv420p 24fps, garantiert MOOV-OK)
-  – Face am Sample-Frame validiert (visible, ≥ minBox, mouth region klar)
-  – Assets HEAD-OK, ≥10kB, korrekter Content-Type
-  – Bei Multi-Speaker: Coords zwingend, sonst Hard-Stop (kein Auto-Detect)
+**Lösung:** Eine neue `validate-frame-face` Edge-Function:
+- Input: `video_url`, `frame_number`, `target_coords {x,y,w,h}`
+- Extrahiert das eine Frame (ffmpeg via Replicate `lucataco/video-to-frames` ODER günstigster Weg: Gemini 2.5 Flash Vision direkt mit Video-URL + Zeitstempel)
+- Liefert: `{ faceVisible, faceBox, mouthVisible, coordsInsideFace, suggestedFrameOffset }`
+- Cache pro `(video_url, frame_number)` in neuer Tabelle `frame_face_cache` (24h TTL)
 
-Wenn EIN Check failed → kein Sync.so Call, sondern deterministische
-Reparatur (re-encode / re-trim / re-anchor / re-faceMap) und retry des
-GLEICHEN Preflight. Erst wenn alle Checks grün sind, geht der Job raus.
+In `poll-dialog-shots` vor jedem `startSyncTurnJob` mit `mode="coords"`:
+- Wenn `faceVisible=false` oder `coordsInsideFace=false`: shift `frame_number` um ±8/±16/±24 Frames (max 3 Versuche), bis Validator OK gibt
+- Wenn nach 3 Shifts immer noch kein gültiger Frame → `prepareShotRetry('face_validation_failed')` → nächster Attempt nutzt anderen `sync_source_kind` (master statt preclip oder umgekehrt)
+- Wenn auch das nicht hilft → `hard_fail` mit klarer Message "kein Gesicht im Frame" + Refund
 
-Sync.so sieht nur noch "saubere" Inputs. Failrate erwartet < 2%.
-```
+### 2. Coords-Sanity in compose-dialog-segments
+`compose-dialog-segments` schickt heute alle Turns in einem 1-Call. Wenn das `faceMap` veraltet ist (Charakter hat zwischendurch die Position gewechselt), kippt der ganze Call. 
+- Vor Dispatch: für jeden Turn `validate-frame-face` am Mittel-Frame der `voicedRange`
+- Bei Mismatch: Turn wird per fallback auf `engine='cinematic-sync'` (v4 chain) zurückgeroutet, der dann pro Turn das Preclip + Face-Validation neu macht
+- Telemetrie-Log: `error_class='precheck_face_mismatch'`
 
-## Die 8 Säulen des Plans
+### 3. Auto-Tuning aus Telemetrie
+`syncso_dispatch_log` sammelt jetzt jeden Versuch. Wir bauen einen täglichen pg_cron-Job `analyze-syncso-failures`:
+- Aggregiert letzte 24h: error_class → count, success-rate pro `mode`, pro `sync_source_kind`, pro `audio_lead_in_sec`, pro `audio_dur_sec`-Bucket
+- Schreibt nach `syncso_tuning_hints` (eine Zeile pro Tag): z.B. `{ best_lead_in: 0.30, best_min_dur: 3.2, preferred_source: 'master', avoid_mode: 'auto' }`
+- `poll-dialog-shots` und `compose-dialog-segments` lesen den letzten Hint und passen Defaults an (statt hartcodiert 0.25s/3.0s)
+- → Pipeline wird **selbstheilend** mit jedem Tag besser
 
-### 1. Zentraler `SyncSoPreflight` Service
+### 4. Admin-Cockpit Tab "Sync.so Health"
+Neuer Tab in `src/pages/Admin.tsx`:
+- Live-Feed der letzten 200 Dispatches aus `syncso_dispatch_log`: Scene-Link, Turn-Idx, Attempt, Mode, Status, Error-Class, Audio-Peak-dBFS, Lead-In
+- Error-Class Pie-Chart (24h / 7d)
+- Success-Rate Trend pro Tag
+- "Erzwinge Stage-D Recheck"-Button pro Szene
+- Filter nach `engine` (`sync-segments` vs `cinematic-sync`)
+- Sichtbar nur für `admin`-Rolle (RLS gibt's schon)
 
-Neues Modul `supabase/functions/_shared/syncso-preflight.ts`. Single Entry-Point den `poll-dialog-shots`, `compose-dialog-segments` und `compose-lipsync-scene` benutzen, bevor sie irgendetwas an Sync.so schicken.
+### 5. UI: Sauberer Fehlerstatus pro Turn
+In `SceneCard.tsx` Dialog-Sektion:
+- Statt nur "Lip-Sync fehlgeschlagen" pro Turn anzeigen: welcher Sprecher, welches Wort, welcher Grund (aus `dialog_shots.shots[i].error_class`)
+- Bei `face_validation_failed`: Button "Faces neu erfassen" → triggert `rebuild-twoshot-anchor` für die Szene
+- Bei `preflight_audio_*`: Button "Voiceover neu generieren" für genau diesen Turn
 
-Liefert:
+### 6. Webhook-Härtung
+`sync-so-webhook` (Stage 5 B.1) bekommt:
+- Logging in `syncso_dispatch_log` bei jedem Webhook-Hit (status, latency)
+- Bei terminal FAILED: gleicher Retry-Pfad wie der Cron-Poller (nicht nur "mark failed + refund"), also Face-Validation + Frame-Shift + nächster Attempt
+- → Webhook wird zur primären Fast-Path-Recovery, Cron nur als Safety-Net
 
-```text
-{
-  ok: true,
-  video_url, audio_url, coords, frame_number, window
-}
-oder
-{
-  ok: false,
-  reason: "audio_too_short" | "no_speech_onset" | "face_not_visible" | ...,
-  repaired: { video_url?, audio_url?, coords? },   // wenn reparierbar
-  hard_fail: false                                  // true = nicht reparierbar
-}
-```
+## Was sich NICHT ändert
 
-Solange `repaired` zurückkommt, dispatcht der Caller nicht direkt, sondern ruft Preflight rekursiv erneut mit den reparierten Assets auf. Max 3 Repair-Iterationen pro Turn.
+- Pricing (`ceil(durationSec) × 9 × passes`)
+- Engine-Auswahl-UI (`sync-segments` vs `cinematic-sync` bleibt)
+- HeyGen/Hailuo/Vidu/Talking-Head Pipelines
+- Director's Cut, Composer-Stitch, Lambda-Render
+- Wallet-Refund-Logik (bleibt idempotent über `state.refunded`)
 
-### 2. Audio-Normierung statt nur Trim
+## Reihenfolge
 
-Aktuell schneidet `sliceWavToWindow` nur. Wir machen daraus eine echte Normalisierung:
-
-```text
-– Decode beliebiges Eingangsformat (mp3/wav/m4a/opus)
-– Mono downmix
-– Resample auf 24000 Hz, 16-bit PCM
-– Peak-normalize auf -1 dBFS (zu leise = VAD scheitert)
-– 0.25s Stille prepend, 0.20s Stille append
-– Mindestlänge 3.0s erzwingen (Tail-Stille bis Min erreicht)
-– Speech-Onset-Probe: erste 200ms Energie > -45 dBFS? sonst Fade-In glätten
-– Upload nach voiceover-audio/syncso-ready/{scene}-turn{idx}-{hash}.wav
-```
-
-Implementiert mit `Deno + WebAudio-decode-Polyfill` oder einer ffmpeg-Edge-Function (`audio-normalize-for-syncso`), die wir aus Preflight aufrufen.
-
-Resultat: kein Sync.so-Job sieht je wieder Audio das mit Sprache bei 0.000s startet oder unter 3s ist.
-
-### 3. Video-Preroll statt Hard-Cut
-
-Preclips werden heute auf exakt das Turn-Fenster gerendert. Stattdessen:
-
-```text
-preclip_start_render = max(0, turn_start - 0.5s)
-preclip_end_render   = min(master_end, turn_end + 0.5s)
-preclip_min_dur      = 3.0s   (sonst symmetrisch verlängern)
-```
-
-Sync.so bekommt also immer ≥3.0s Video-Kontext mit dem Gesicht in Bewegung **vor** dem Mundeinsatz. Im finalen Stitch (`DialogStitchVideo`) nutzen wir weiterhin nur den echten Turn-Bereich – der Sync-Output wird auf den sichtbaren Bereich back-cropped.
-
-Zusätzlich:
-
-```text
-– Force H.264 yuv420p, 24fps, +faststart (moov atom front)
-– Auflösung clampen auf 1280x720 wenn größer (Sync.so verarbeitet 720p am stabilsten)
-– HEAD-Check + Content-Length > 50kB vor Dispatch
-```
-
-### 4. Face-Validation am echten Sample-Frame
-
-Vor jedem Dispatch im `mode=coords`:
-
-```text
-1. Hole frame_number aus dem WIRKLICHEN Preclip (ffmpeg -ss + select)
-2. Gemini Vision (oder Mediapipe lokal) check:
-     – face_visible: true?
-     – face_box ≥ 80×80 px?
-     – mouth_region nicht verdeckt?
-     – coords ±64px innerhalb face_box?
-3. Wenn nein → frame_number um ±N Frames verschieben, max 6 Versuche
-4. Wenn weiterhin nein → faceMap rebuild (compose-scene-anchor neu)
-5. Wenn auch das nichts bringt → hard_fail mit klarem reason
-```
-
-Das eliminiert die häufigste Ursache für „falscher Charakter wird animiert".
-
-### 5. Strict Multi-Speaker Coords (kein Auto-Detect mehr)
-
-Im aktuellen Code:
-
-```text
-if (mode === "auto") options.active_speaker_detection = { auto_detect: true }
-```
-
-Für Multi-Speaker ist `auto_detect` der größte Failure-Treiber – Sync.so wählt manchmal den schweigenden Charakter. Neue Regel:
-
-```text
-distinctSpeakerCount >= 2  →  mode = "coords" IMMER, kein Fallback auf auto
-distinctSpeakerCount == 1  →  mode = "coords" wenn coords vorhanden,
-                              sonst "auto" mit voller Bbox als Hint
-```
-
-Wenn Coords für Multi-Speaker fehlen → in Preflight (Säule 4) reparieren, niemals einfach `auto_detect` aktivieren.
-
-### 6. Differenzierte Retry-Matrix
-
-Heute retryt der Poller mehrfach mit fast identischen Inputs. Neu:
-
-```text
-Attempt 1: preclip + normalized audio + coords @ midFrame
-Attempt 2: preclip + normalized audio + coords @ midFrame ± 8 frames
-Attempt 3: master + segments_secs + normalized audio + coords @ turn-start
-Attempt 4: anchor rebuild → fresh preclip → coords + midFrame
-Attempt 5: hard_fail (kein Stitch, voller Refund, UI zeigt welcher Turn)
-```
-
-Jeder Attempt ist messbar anders. Kein blindes Wiederholen.
-
-### 7. „Strict Integrity Gate" beim Stitch
-
-`render-dialog-stitch` darf NIE laufen wenn auch nur ein Turn kein echtes `output_url` hat. Heute kann ein als `degraded` markierter Turn ins Endvideo durchrutschen.
-
-```text
-preStitchCheck(shots):
-  for s in shots:
-    require s.status === 'done'
-    require s.output_url HEAD ok
-    require s.output_url duration ≥ window.dur - 0.15s
-  if any failed → scene.lip_sync_status = 'failed'
-                  refund credits idempotent
-                  return
-```
-
-Kein „degraded=true" Pfad mehr für Multi-Speaker. Lieber ehrlich failen + refund.
-
-### 8. Telemetrie & selbstlernende Block-Liste
-
-Neue Tabelle `syncso_dispatch_log`:
-
-```text
-job_id, scene_id, turn_idx, attempt, mode,
-audio_dur, audio_lead_in, audio_peak_db,
-video_dur, video_fps, video_codec,
-face_box, coords, frame_number,
-http_status, sync_status, error_class,
-created_at
-```
-
-Jeder Dispatch wird hier protokolliert. Damit:
-
-- können wir nach echten Patterns suchen (z.B. „alle Fails bei dur<2.2s und peak<-30dB")
-- baut sich ein PreflightGuard-Tuning automatisch (Threshold-Anpassung wöchentlich)
-- haben wir einen QA-View im Admin-Cockpit (Tab „Sync.so Health")
-
-## Reihenfolge der Umsetzung
-
-```text
-Stufe A (Stabilität sofort)
-  – Säule 7: Strict Integrity Gate + Refund
-  – Säule 5: Multi-Speaker zwingt coords
-  – Säule 6: Retry-Matrix mit echten Variationen
-
-Stufe B (Input-Härtung, größter Hebel)
-  – Säule 1: SyncSoPreflight Modul
-  – Säule 2: Audio-Normierung (neue audio-normalize-for-syncso Edge)
-  – Säule 3: Video-Preroll 3s + Re-Encode-Garantie
-
-Stufe C (Smart Recovery)
-  – Säule 4: Face-Validation am Sample-Frame + faceMap-Rebuild
-  – Säule 8: syncso_dispatch_log + Cockpit-Tab
-```
+**D.1** Face-Validation Edge-Function + `frame_face_cache` Tabelle + Cache-Helper
+**D.2** Integration in `poll-dialog-shots` (Frame-Shift-Loop + neue error_classes)
+**D.3** Integration in `compose-dialog-segments` (Pre-Dispatch Face-Check + Fallback auf v4 chain)
+**D.4** `analyze-syncso-failures` pg_cron + `syncso_tuning_hints` Tabelle + Default-Override-Logik
+**D.5** Webhook-Härtung (Retry-Pfad statt Hard-Fail)
+**D.6** Admin-Cockpit Tab "Sync.so Health"
+**D.7** SceneCard UI: Per-Turn Error-Detail + gezielte Recovery-Buttons
 
 ## Erwartetes Ergebnis
 
-- Sync.so sieht nur noch normalisierte, validierte Inputs → unknown-error-Rate sinkt erfahrungsgemäß von ~25% auf <2%.
-- Kein kaputtes Video wird mehr als „done" angezeigt.
-- Jeder verbleibende Fail ist klassifiziert und reproduzierbar.
-- User bekommt im Worst Case einen sauberen Refund + klare UI-Meldung statt eines stillen Turns.
+- "unknown error" Rate **<1%** (heute ~25% laut Logs vor Stage A, ~5% nach Stage B/C)
+- "Falscher Mund spricht"-Bug: **eliminiert** durch Pre-Dispatch Face-Validation
+- "Stumme Münder im finalen Stitch": **eliminiert** durch strikte Integrity-Gate (schon live aus Stage A)
+- Jeder verbleibende Fail ist **klassifiziert, im Log sichtbar, refundet** und der User bekommt einen klaren Recovery-Pfad
+- Die Pipeline tunet sich aus echten Daten — wir müssen Defaults nicht mehr raten
 
-## Was NICHT geändert wird
+## Frage an dich vor dem Bauen
 
-- Preisstruktur, Wallet-Logik, Cron-Intervalle bleiben.
-- Director's Cut Übergabe / Composer-Stitch-Format bleibt.
-- HeyGen / Hailuo / Vidu Pipelines bleiben unberührt.
+Frame-Extraction für `validate-frame-face`: 
+- **(A)** Gemini 2.5 Flash Vision mit Video-URL + Zeitstempel — billig (~€0.0005/Check), gut bei klarer Sicht, ungenau bei kleinen Gesichtern
+- **(B)** Replicate `lucataco/video-to-frames` + separater Vision-Call — präziser, ~€0.01/Check, +2-3s Latenz
+- **(C)** Hybrid: A für den Schnellcheck, B nur wenn A unsicher ist
 
-Nach Approval starte ich mit Stufe A (sichert sofort die Qualität), dann B und C.
+Empfehlung: **C**. Default A, Fallback B. Bei ~3 Turns/Szene × 99% A-Hit ≈ €0.0015/Szene, vernachlässigbar.
+
+Sag "go" und ich baue D.1 → D.7 nacheinander.

@@ -33,7 +33,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
-import { classifySyncError, logSyncDispatch, probeAsset } from "../_shared/syncso-preflight.ts";
+import {
+  classifySyncError,
+  logSyncDispatch,
+  probeAsset,
+  validateFrameFace,
+} from "../_shared/syncso-preflight.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -334,6 +340,75 @@ serve(async (req) => {
         422,
       );
     }
+
+    // ── Stufe D: Face-validation per segment ─────────────────────────────
+    // The segments-API uses Sync.so's internal face detection; if there's
+    // simply no visible face at the segment's midpoint, the call returns
+    // a degraded/empty result for that window. We pre-check each segment
+    // (cached via frame_face_cache) and abort+refund when one is broken.
+    const fpsHint = 24;
+    const faceChecks = await Promise.all(
+      segments.map(async (s) => {
+        const midSec = (s.startTime + s.endTime) / 2;
+        const frame = Math.max(0, Math.round(midSec * fpsHint));
+        const v = await validateFrameFace({
+          supabaseUrl,
+          serviceKey,
+          videoUrl: sourceClipUrl,
+          frameNumber: frame,
+          fps: fpsHint,
+          targetCoords: null,
+        });
+        return { segment: s, frame, v };
+      }),
+    );
+    const brokenSeg = faceChecks.find((c) => c.v.ok && !c.v.faceVisible);
+    if (brokenSeg) {
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK segment=[${brokenSeg.segment.startTime.toFixed(2)},${brokenSeg.segment.endTime.toFixed(2)}] frame=${brokenSeg.frame}: no face visible`,
+      );
+      const { data: w0 } = await supabase
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(w0?.balance ?? 0) + totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `face_validation_failed_segment_${brokenSeg.frame}`,
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_source_kind: "segments",
+        video_url: sourceClipUrl,
+        frame_number: brokenSeg.frame,
+        window_start_sec: brokenSeg.segment.startTime,
+        window_end_sec: brokenSeg.segment.endTime,
+        sync_status: "FACE_GATE_BLOCKED",
+        error_class: "precheck_face_mismatch",
+        error_message: `no face at frame ${brokenSeg.frame} (segment ${brokenSeg.segment.startTime.toFixed(2)}-${brokenSeg.segment.endTime.toFixed(2)}s)`,
+      });
+      return json(
+        {
+          error: "face_validation_failed",
+          details: `no face at segment ${brokenSeg.segment.startTime.toFixed(2)}-${brokenSeg.segment.endTime.toFixed(2)}s`,
+          refunded: totalCost,
+          hint: "switch_to_cinematic_sync_engine",
+        },
+        422,
+      );
+    }
+
+
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",

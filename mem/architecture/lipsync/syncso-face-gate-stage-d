@@ -1,0 +1,38 @@
+---
+name: Sync.so Face-Validation Gate (Stufe D)
+description: validate-frame-face edge function + frame_face_cache table; poll-dialog-shots and compose-dialog-segments call validateFrameFace before every coords/segment dispatch to prevent "wrong mouth" and "no face" failures
+type: architecture
+---
+
+**New edge function:** `validate-frame-face`
+- Input `{ video_url, frame_number, fps?, target_coords? }`.
+- Calls Gemini 2.5 Flash Vision via Lovable AI Gateway (image_url accepts video URLs).
+- Returns `{ faceVisible, faceCount, faceBoxes[], coordsMatch, model }`.
+- 24h cache in `public.frame_face_cache (video_url, frame_number) UNIQUE`.
+- Graceful degrade: validator failures return `ok:false` + `faceVisible:true` so dispatch is never double-blocked.
+
+**Shared helper:** `validateFrameFace()` in `_shared/syncso-preflight.ts`.
+- Normalizes Sync.so coord shapes (`[x,y]` pixel center OR `[x,y,w,h]` normalized) into a 0..1 box for the overlap check.
+- Returns permissive `faceVisible:true` on network/Gemini failure.
+
+**poll-dialog-shots integration** (cinematic-sync, per-turn):
+- Right before `startSyncTurnJob` for `mode === "coords"`: try `baseFrame` + offsets `[0,-8,+8,-16,+16,-24,+24]`. First frame with `faceVisible && (coordsMatch === true|null)` wins.
+- If none match → log `syncso_dispatch_log` row with `sync_status='FACE_GATE_BLOCKED'` and `error_class='face_validation_failed'`, then `prepareShotRetry()` which flips `sync_source_kind` for the next attempt.
+- If a shifted frame wins → mutates `nextShot.frame_number_override`.
+
+**compose-dialog-segments integration** (sync-segments, 1-call):
+- Pre-checks every segment's midpoint frame. If any returns `faceVisible:false`, refunds wallet, marks scene `lip_sync_status='failed'` with `clip_error='face_validation_failed_segment_<frame>'`, returns 422 with hint `switch_to_cinematic_sync_engine`.
+
+**Tables added:**
+- `frame_face_cache` — 24h Gemini result cache (admin SELECT via has_role).
+- `syncso_tuning_hints` — placeholder for D.4 auto-tuner (not yet wired).
+
+**Cost:** ~€0.0005/check, ~3 checks/dialog scene typical, cached → effectively €0 on retries.
+
+**Not yet implemented (follow-up):**
+- D.4 `analyze-syncso-failures` pg_cron + tuning_hints reader.
+- D.5 sync-so-webhook retry path (currently webhook still hard-fails on FAILED; poll-dialog-shots cron retry-matrix covers this within ≤1 min).
+- D.6 Admin "Sync.so Health" cockpit tab.
+- D.7 SceneCard per-turn error_class display + targeted recovery buttons.
+
+`classifySyncError` now also recognises `face_validation_failed` and `precheck_face_mismatch` buckets.
