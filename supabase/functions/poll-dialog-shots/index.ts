@@ -360,17 +360,13 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   const sliceByteLen = (endFrame - startFrame) * bytesPerFrame;
   const sliceBytes = wav.subarray(sliceByteOff, sliceByteOff + sliceByteLen);
 
-  // v13: pad with leading + trailing silence, and tail-pad to AUDIO_MIN_DUR_SEC.
-  // Sync.so's VAD needs a quiet onset to lock; sentences starting at sample 0
-  // are a major cause of `An unknown error occurred`. Min-length protects
-  // very short sentences (e.g. "Yes.") from being rejected as too-short clips.
-  const leadFrames = Math.max(0, Math.floor(AUDIO_LEAD_IN_SEC * sampleRate));
-  const tailFrames = Math.max(0, Math.floor(AUDIO_TAIL_SEC * sampleRate));
+  // v13: tail-pad with silence to AUDIO_MIN_DUR_SEC if the slice is shorter.
+  // No leading silence — the source `windowSec` already includes the
+  // render_window pre-roll, so speech is naturally offset from t=0.
   const speechFrames = endFrame - startFrame;
   const minTotalFrames = Math.ceil(AUDIO_MIN_DUR_SEC * sampleRate);
-  const naiveTotal = leadFrames + speechFrames + tailFrames;
-  const extraTailFrames = Math.max(0, minTotalFrames - naiveTotal);
-  const totalOutFrames = naiveTotal + extraTailFrames;
+  const extraTailFrames = Math.max(0, minTotalFrames - speechFrames);
+  const totalOutFrames = speechFrames + extraTailFrames;
   const outDataLen = totalOutFrames * bytesPerFrame;
 
   // Re-pack as a fresh RIFF/WAVE with the original fmt parameters.
@@ -389,9 +385,8 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   ov.setUint16(34, bitsPerSample, true);
   ov.setUint32(36, 0x64617461, false); // "data"
   ov.setUint32(40, outDataLen, true);
-  // Silence is zero bytes for PCM16 — leadFrames + tail/extraTail already
-  // zero-initialised by ArrayBuffer. We only copy the speech in the middle.
-  new Uint8Array(outBuf, 44 + leadFrames * bytesPerFrame, sliceByteLen).set(sliceBytes);
+  // Speech at the start, extraTailFrames of silence (zero-init) at the end.
+  new Uint8Array(outBuf, 44, sliceByteLen).set(sliceBytes);
   return new Uint8Array(outBuf);
 }
 
