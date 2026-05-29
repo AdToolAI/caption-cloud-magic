@@ -884,6 +884,8 @@ export interface FaceValidationResult {
   faceBoxes: Array<{ x: number; y: number; w: number; h: number; confidence: number }>;
   /** null when no target_coords provided. */
   coordsMatch: boolean | null;
+  /** Stage G F.4: composite face quality 0..1 (≥0.6 = safe for Sync.so). null when scorer didn't run. */
+  faceScore?: number | null;
   error?: string;
 }
 
