@@ -188,7 +188,7 @@ serve(async (req) => {
   if (status === "COMPLETED") {
     await recordCircuitSuccess(supabase, "sync.so");
   } else {
-    const cls = classifySyncError((payload?.error ?? payload?.errorMessage ?? payload?.error_message ?? "").toString());
+    const cls = classifySyncError((errorMsg ?? "").toString());
     await recordCircuitFailure(supabase, "sync.so", cls);
   }
 
