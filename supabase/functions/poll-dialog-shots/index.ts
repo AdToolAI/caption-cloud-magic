@@ -978,13 +978,15 @@ async function processScene(
 
       const mode = dispatchModeForShot(nextShot);
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
-      // Audio bleibt immer sample-genau vorgetrimmt (Sync.so v2 supports
-      // segments_secs nur am Video, nicht am Audio).
+      // Stufe B: audio is always normalized (mono, peak -1 dBFS, 0.25s lead-in,
+      // min 3.0s tail-padded) — eliminates the most frequent Sync.so reject
+      // causes (silence at t=0, audio too short, audio too quiet).
       let audioUrl = fullAudioUrl;
+      let preparedAudio: PreparedAudio | null = null;
       let audioTrimmed = false;
       if (nextShot.audio_url && userId) {
         try {
-          audioUrl = await ensureTrimmedTurnAudioUrl(
+          preparedAudio = await ensureNormalizedTurnAudio(
             supabase,
             userId,
             sceneId,
@@ -992,58 +994,167 @@ async function processScene(
             fullAudioUrl,
             win,
           );
-          nextShot.trimmed_audio_url = audioUrl;
+          audioUrl = preparedAudio.url;
           audioTrimmed = true;
         } catch (trimErr) {
           console.warn(
-            `[poll-dialog-shots] turn ${nextShot.idx} trim FAILED, falling back to full track: ${(trimErr as Error)?.message}`,
+            `[poll-dialog-shots] turn ${nextShot.idx} normalize FAILED, falling back to full track: ${(trimErr as Error)?.message}`,
           );
           audioUrl = fullAudioUrl;
         }
       }
-      const jobId = await startSyncTurnJob(
-        syncKey,
-        sourceUrl,
-        audioUrl,
-        dispatchWindow,
-        nextShot.target_coords,
-        nextShot.temperature,
-        nextShot.idx,
-        mode,
-        syncWebhookUrl,
-        nextShot.frame_number_override,
-        /* noSegments */ usePreclip,
-      );
-      nextShot.sync_job_id = jobId;
-      nextShot.status = "lipsyncing";
-      nextShot.started_at = new Date().toISOString();
-      mutated = true;
-      dispatchedThisTick++;
-      console.log(
-        `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
-      );
 
-
-    } catch (e) {
-      if (e instanceof SyncConcurrencyDeferredError) {
-        nextShot.status = "pending";
-        nextShot.sync_job_id = undefined;
-        nextShot.last_deferred_at = new Date().toISOString();
-        mutated = true;
+      // Stufe B: HEAD-probe both assets before paying Sync.so. A 4xx/5xx
+      // or absurdly small URL is a guaranteed "unknown error" otherwise.
+      const [videoProbe, audioProbe] = await Promise.all([
+        probeAsset(sourceUrl, "video", 50_000),
+        probeAsset(audioUrl, "audio", 5_000),
+      ]);
+      if (!videoProbe.ok || !audioProbe.ok) {
+        const reason = !videoProbe.ok
+          ? `preflight_video_${videoProbe.error}`
+          : `preflight_audio_${audioProbe.error}`;
         console.warn(
-          `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          `[poll-dialog-shots] turn ${nextShot.idx} PREFLIGHT BLOCK ${reason} video=${JSON.stringify(videoProbe)} audio=${JSON.stringify(audioProbe)}`,
         );
-        // Stop dispatching more on this tick — concurrency saturated.
-        break;
-      } else {
-        const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
-        if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          video_bytes: videoProbe.bytes,
+          audio_bytes: audioProbe.bytes,
+          video_content_type: videoProbe.contentType,
+          audio_content_type: audioProbe.contentType,
+          audio_dur_sec: preparedAudio?.durSec ?? null,
+          audio_lead_in_sec: preparedAudio?.leadInSec ?? null,
+          audio_peak_dbfs: preparedAudio?.peakDbFs ?? null,
+          audio_channels: preparedAudio?.channels ?? null,
+          audio_sample_rate: preparedAudio?.sampleRate ?? null,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          coords: nextShot.target_coords ?? null,
+          frame_number: nextShot.frame_number_override ?? null,
+          http_status: videoProbe.status || audioProbe.status,
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: reason,
+          error_message: `video=${videoProbe.error ?? "ok"} audio=${audioProbe.error ?? "ok"}`,
+        });
+        if (!prepareShotRetry(nextShot, reason, shots)) {
           degradeShotToMaster(nextShot, reason, shots);
         }
         mutated = true;
+        continue;
       }
+
+      let jobId: string | null = null;
+      let dispatchError: Error | null = null;
+      try {
+        jobId = await startSyncTurnJob(
+          syncKey,
+          sourceUrl,
+          audioUrl,
+          dispatchWindow,
+          nextShot.target_coords,
+          nextShot.temperature,
+          nextShot.idx,
+          mode,
+          syncWebhookUrl,
+          nextShot.frame_number_override,
+          /* noSegments */ usePreclip,
+        );
+        nextShot.sync_job_id = jobId;
+        nextShot.status = "lipsyncing";
+        nextShot.started_at = new Date().toISOString();
+        mutated = true;
+        dispatchedThisTick++;
+        console.log(
+          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+        );
+      } catch (e) {
+        if (e instanceof SyncConcurrencyDeferredError) {
+          nextShot.status = "pending";
+          nextShot.sync_job_id = undefined;
+          nextShot.last_deferred_at = new Date().toISOString();
+          mutated = true;
+          console.warn(
+            `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          );
+          // Log deferral and stop dispatching this tick.
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId ?? null,
+            engine: "cinematic-sync",
+            turn_idx: nextShot.idx,
+            attempt: nextShot.retry_count ?? 0,
+            mode,
+            sync_source_kind: nextShot.sync_source_kind ?? null,
+            video_url: sourceUrl,
+            audio_url: audioUrl,
+            window_start_sec: dispatchWindow[0],
+            window_end_sec: dispatchWindow[1],
+            sync_status: "DEFERRED",
+            error_class: "rate_limited",
+            error_message: e.message,
+          });
+          break;
+        } else {
+          dispatchError = e as Error;
+          const reason = `dispatch: ${dispatchError?.message ?? "unknown"}`;
+          if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
+            degradeShotToMaster(nextShot, reason, shots);
+          }
+          mutated = true;
+        }
+      }
+
+      // Always log dispatch attempt (success OR hard failure that wasn't deferral).
+      if (jobId || dispatchError) {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          job_id: jobId,
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          video_bytes: videoProbe.bytes,
+          audio_bytes: audioProbe.bytes,
+          video_content_type: videoProbe.contentType,
+          audio_content_type: audioProbe.contentType,
+          audio_dur_sec: preparedAudio?.durSec ?? null,
+          audio_lead_in_sec: preparedAudio?.leadInSec ?? null,
+          audio_peak_dbfs: preparedAudio?.peakDbFs ?? null,
+          audio_channels: preparedAudio?.channels ?? null,
+          audio_sample_rate: preparedAudio?.sampleRate ?? null,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          coords: nextShot.target_coords ?? null,
+          frame_number: nextShot.frame_number_override ?? null,
+          sync_status: jobId ? "DISPATCHED" : "DISPATCH_FAILED",
+          error_class: dispatchError ? classifySyncError(dispatchError.message) : null,
+          error_message: dispatchError ? dispatchError.message.slice(0, 500) : null,
+        });
+      }
+    } catch (e) {
+      // Outer safety — should not be reached because inner try/catch handles dispatch.
+      console.error(`[poll-dialog-shots] turn ${nextShot.idx} unexpected dispatch crash`, e);
+      const reason = `dispatch_crash: ${(e as Error)?.message ?? "unknown"}`;
+      if (!prepareShotRetry(nextShot, "dispatch_crashed", shots)) {
+        degradeShotToMaster(nextShot, reason, shots);
+      }
+      mutated = true;
     }
   }
+
 
   // ── Step 3: determine pipeline status ──────────────────────────────
   const allReady = shots.every((s) => s.status === "ready");
