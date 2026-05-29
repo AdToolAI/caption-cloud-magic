@@ -98,10 +98,41 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             .finally(() => setTimeout(() => inflight.current.delete(`poll-dialog:${d.id}`), 30_000));
         }
 
+        // ── v5 (Sync.so Segments) stale-watchdog ──────────────────────
+        // v5 has no per-turn shots and relies entirely on the webhook.
+        // If updated_at is older than STALE_SYNC_MS without a final_url,
+        // mark failed so the auto-retry below can re-dispatch (refund is
+        // handled inside compose-dialog-segments + sync-so-webhook).
+        const staleV5 = (data as any[]).filter(
+          (d) =>
+            d.engine_override === 'sync-segments' &&
+            d.dialog_shots?.version === 5 &&
+            d.lip_sync_status === 'running' &&
+            !d.lip_sync_applied_at &&
+            !d.dialog_shots?.final_url &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > STALE_SYNC_MS,
+        );
+        if (staleV5.length > 0) {
+          await Promise.all(
+            staleV5.map((d) =>
+              supabase
+                .from('composer_scenes')
+                .update({
+                  lip_sync_status: 'failed',
+                  twoshot_stage: 'failed',
+                  clip_error: 'syncso_segments_poll_timeout',
+                })
+                .eq('id', d.id),
+            ),
+          );
+        }
+
         const staleSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version !== 4 &&
+            d.dialog_shots?.version !== 5 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             hasSyncSoJob(d) &&
