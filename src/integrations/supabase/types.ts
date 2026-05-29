@@ -7434,6 +7434,39 @@ export type Database = {
         }
         Relationships: []
       }
+      frame_face_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          fps: number
+          frame_number: number
+          id: string
+          result: Json
+          validator: string
+          video_url: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          fps?: number
+          frame_number: number
+          id?: string
+          result: Json
+          validator?: string
+          video_url: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          fps?: number
+          frame_number?: number
+          id?: string
+          result?: Json
+          validator?: string
+          video_url?: string
+        }
+        Relationships: []
+      }
       gaming_discord_settings: {
         Row: {
           auto_notify_live: boolean | null
@@ -13645,6 +13678,48 @@ export type Database = {
           video_url?: string | null
           window_end_sec?: number | null
           window_start_sec?: number | null
+        }
+        Relationships: []
+      }
+      syncso_tuning_hints: {
+        Row: {
+          avoid_mode: string | null
+          best_lead_in_sec: number
+          best_min_dur_sec: number
+          created_at: string
+          id: string
+          preferred_source_kind: string
+          raw_stats: Json | null
+          sample_count: number
+          success_rate: number | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          avoid_mode?: string | null
+          best_lead_in_sec?: number
+          best_min_dur_sec?: number
+          created_at?: string
+          id?: string
+          preferred_source_kind?: string
+          raw_stats?: Json | null
+          sample_count?: number
+          success_rate?: number | null
+          window_end?: string
+          window_start: string
+        }
+        Update: {
+          avoid_mode?: string | null
+          best_lead_in_sec?: number
+          best_min_dur_sec?: number
+          created_at?: string
+          id?: string
+          preferred_source_kind?: string
+          raw_stats?: Json | null
+          sample_count?: number
+          success_rate?: number | null
+          window_end?: string
+          window_start?: string
         }
         Relationships: []
       }
