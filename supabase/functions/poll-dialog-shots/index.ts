@@ -393,18 +393,22 @@ async function startSyncTurnJob(
    *  retries to step away from the original failing frame (cuts/blinks).
    *  Must be SEGMENT-RELATIVE (0 = first frame of the trimmed segment). */
   frameNumberOverride?: number,
+  /** v10 Artlist Pipeline: when true, the video is ALREADY a short pre-clip
+   *  starting at t=0 (rendered via DialogTurnClipVideo). We MUST NOT send
+   *  `segments_secs` on it — Sync.so would otherwise try to clip an already
+   *  trimmed video and fail with "An unknown error occurred". */
+  noSegments: boolean = false,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature,
   };
+  // Determine the segment length in frames for frame_number clamping. For
+  // preclips the segment is the whole clip starting at t=0.
+  const segDurSec = noSegments ? Math.max(0.1, window[1] - window[0]) : (window[1] - window[0]);
+  const segFrames = Math.max(1, Math.floor(segDurSec * ASSUMED_MASTER_FPS));
   if (mode === "coords" && coords) {
-    // Sync.so v2 + `segments_secs`: `frame_number` is interpreted RELATIVE to
-    // the segment start (frame 0 = first frame of the trimmed segment), NOT
-    // absolute in the master video. Override must already be segment-relative.
-    // Default (no override) = middle of segment, clamped to segment length.
-    const segFrames = Math.max(1, Math.floor((window[1] - window[0]) * ASSUMED_MASTER_FPS));
     const rawFrame = Number.isFinite(frameNumberOverride as number)
       ? Math.max(0, Math.round(frameNumberOverride as number))
       : Math.max(0, Math.floor(segFrames / 2));
@@ -418,18 +422,24 @@ async function startSyncTurnJob(
     options.active_speaker_detection = { auto_detect: true };
   }
 
+  // Video input: für Preclips OHNE segments_secs (kompletter Clip ist der
+  // Turn), für Master MIT segments_secs (Legacy/Fallback-Pfad).
+  const videoInput: Record<string, unknown> = { type: "video", url: videoUrl };
+  if (!noSegments) videoInput.segments_secs = [window];
+
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl, segments_secs: [window] },
-      // Sync.so v2 only accepts `segments_secs` on video inputs. Audio MUST be
-      // pre-trimmed to the same window upstream (see `ensureTurnAudioUrl`),
-      // otherwise Sync.so reads audio from t=0 (= first sentence) while the
-      // video plays a later turn → wrong speaker / "unknown error".
+      videoInput,
+      // Audio bleibt sample-genau auf das Turn-Fenster vorgetrimmt; bei
+      // Preclips ist das ohnehin Pflicht, weil Sync.so kein `segments_secs`
+      // auf Audio-Inputs unterstützt.
       { type: "audio", url: audioUrl },
     ],
     options,
   };
+
+
 
 
   if (webhookUrl) {
