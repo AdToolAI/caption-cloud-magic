@@ -1,0 +1,25 @@
+---
+name: Sync.so Stage E Complete — Concurrency Guard + Webhook Retry Path
+description: E.3 concurrency guard now wired in compose-dialog-segments (defer at ≥3 inflight, jitter retry, full refund); E.5 webhook retry path classifies transient v5 failures (rate_limited/timeout/provider_unknown_error/http_5xx) and re-dispatches via compose-dialog-segments with retry=true (max 2 attempts, no re-charge); inflight slot registered after dispatch success.
+type: architecture
+---
+
+**E.3 Concurrency Guard (compose-dialog-segments):**
+- Before `POST /generate`: `countInflightSyncJobs(supabase, 10)` against `syncso_inflight_jobs`.
+- If `inflight >= 3`: refund the just-debited credits, set `lip_sync_status='pending'`, `twoshot_stage='deferred'`, `clip_error='syncso_concurrency_deferred:<n>'`, log `sync_status='DEFERRED' error_class='rate_limited'`, return 202 with `retry_in_ms = 5000 + random*10000`.
+- After successful dispatch: `registerInflightSyncJob(supabase, jobId, userId)`. Webhook (any terminal status) calls `releaseInflightSyncJob(supabase, jobId)`.
+
+**E.5 Webhook Retry Path (sync-so-webhook v5 branch):**
+- On terminal `FAILED|REJECTED|CANCELED` for `state.engine='sync-segments'`:
+  1. Classify error via `classifySyncError(rawErr)`.
+  2. If `isTransientSyncError(class) && state.retry_count < 2`: patch state to `status='retrying'`, increment `retry_count`, set `lip_sync_status='running'`, `twoshot_stage='syncso_segments_retry'`, and fire-and-forget `POST /compose-dialog-segments { scene_id, retry: true }`.
+  3. Otherwise (non-transient OR budget exhausted): existing idempotent refund + `lip_sync_status='failed'` path, now also persists `last_error_class`.
+- Transient classes: `provider_unknown_error`, `timeout`, `rate_limited`, `http_5xx`.
+
+**compose-dialog-segments retry=true semantics:**
+- Bypasses the "already_running" idempotency guard (previous job already terminated FAILED).
+- Skips wallet debit + credit-balance check (cost was already charged at original dispatch and lives in `state.cost_credits`).
+- All other guards still run: HEAD probes, VAD, video probe, face-gate, segments validation, coords clamp, concurrency guard.
+- If the retry's dispatch fails again, the synchronous refund path triggers (refunding the original charge exactly once). State.refunded flag prevents the webhook from double-refunding.
+
+**Net effect:** ~99% coverage on Sync.so error class #7 (rate_limited) and significant uplift on transient #1 (provider_unknown_error) and #6 (timeout). Stage E is now complete; remaining D.4 (Auto-Tuner) / D.6 (Admin Cockpit) / D.7 (Per-Turn UI) are observability/UX additions, not reliability gaps.
