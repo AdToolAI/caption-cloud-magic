@@ -400,16 +400,14 @@ async function startSyncTurnJob(
    *  trimmed video and fail with "An unknown error occurred". */
   noSegments: boolean = false,
 ): Promise<string> {
-  // v11 Smoothness: temperature wird konservativ geclamped (≤0.5). Niedrigere
-  // Werte erzeugen ruhigere, weniger zappelige Mundbewegungen — wichtig für
-  // natürlichen Dialog. Retries dürfen weiterhin höher cyclen via Override.
+  // v12 Stability: temperature konservativ geclamped (≤0.5); occlusion-detection
+  // wieder entfernt — es korrelierte mit erhöhter Sync.so-Failrate (sync_FAILED).
+  // Smoothness wird über DialogStitchVideo-Crossfade abgedeckt.
   const smoothTemp = Math.min(Math.max(temperature, 0.2), 0.5);
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature: smoothTemp,
-    // Ruhigere Übergänge, wenn Hand/Mikro/Objekt kurz vor dem Mund ist.
-    occlusion_detection_enabled: true,
   };
   // Determine the segment length in frames for frame_number clamping. For
   // preclips the segment is the whole clip starting at t=0.
