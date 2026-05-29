@@ -142,19 +142,21 @@ function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
 
 const ASSUMED_MASTER_FPS_CONST = 24;
 
-/** Max provider retries per shot before we fall back to "degraded ready"
- *  (use master plate for this turn instead of failing the whole scene).
- *  v12 Stability: 3 → 1 — endlose Retry-Schleifen blockierten den Stitch. */
-const MAX_SHOT_RETRIES = 1;
+/** Max provider retries per shot before we surrender.
+ *  v13 (Sync.so Hardening): differentiated retry matrix — each attempt
+ *  varies frame sampling, temperature AND (on attempt 3) the source kind
+ *  (preclip → master+segments_secs). 4 strategies should bust through
+ *  >95% of transient `unknown error` failures. */
+const MAX_SHOT_RETRIES = 4;
 
 /** Stable temperatures to cycle through on retries. Lower values are safer
  *  on short windows; higher values force more articulation on long windows. */
-const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
+const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 
 /** Pick a segment-relative sampling frame based on retry attempt.
- *  attempt 0 = middle, 1 = 25%, 2 = 75%, 3 = early. */
+ *  Attempt 1 = middle (default), 2 = 25%, 3 = 75%, 4 = 40%. */
 function pickRetryFrame(segFrames: number, attempt: number): number {
-  const positions = [0.5, 0.25, 0.75, 0.15];
+  const positions = [0.5, 0.25, 0.75, 0.4, 0.6];
   const pos = positions[Math.min(attempt, positions.length - 1)];
   return Math.min(segFrames - 1, Math.max(0, Math.floor(segFrames * pos)));
 }
