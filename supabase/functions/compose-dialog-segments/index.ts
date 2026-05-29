@@ -270,6 +270,43 @@ serve(async (req) => {
     const segments = segValidation.fixed as typeof rawSegments;
     const totalCost = computeCost(totalSec);
 
+    // ── Stage F.3 — Circuit Breaker (BEFORE wallet debit) ────────────────
+    // If Sync.so is in OPEN state, don't charge the user — defer with retry.
+    const circuit = await evaluateCircuit(supabase, "sync.so");
+    if (!circuit.allow) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} CIRCUIT_OPEN state=${circuit.state} reason=${circuit.reason} recent=${circuit.recentFailures}`,
+      );
+      const retryInMs = circuit.retryInMs ?? 30 * 60_000;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "pending",
+          twoshot_stage: "circuit_open",
+          clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "CIRCUIT_BLOCKED", error_class: "rate_limited",
+        error_message: `circuit ${circuit.state}: ${circuit.reason}`,
+        meta: { circuit_state: circuit.state, recent_failures: circuit.recentFailures, retry_in_ms: retryInMs },
+      });
+      return json(
+        {
+          ok: false,
+          status: "circuit_open",
+          state: circuit.state,
+          retry_in_ms: retryInMs,
+          recent_failures: circuit.recentFailures,
+          refunded: 0,
+          message: "Sync.so ist aktuell instabil — Dispatch pausiert für 30 min.",
+        },
+        202,
+      );
+    }
+
     // E.5: on retry path, wallet was already debited at the original dispatch
     // and the cost is preserved in state.cost_credits. Skip re-charging.
     if (!isRetry) {
@@ -298,6 +335,12 @@ serve(async (req) => {
         .eq("user_id", userId);
     } else {
       console.log(`[compose-dialog-segments] scene=${sceneId} RETRY path (no re-charge)`);
+    }
+
+    // Stage F.7 — read auto-tuner preferred source kind (best-effort signal only)
+    const tunerKind = await readPreferredSyncSourceKind(supabase);
+    if (tunerKind) {
+      console.log(`[compose-dialog-segments] scene=${sceneId} auto-tuner prefers source_kind=${tunerKind}`);
     }
 
     // ── Build Sync.so payload ────────────────────────────────────────────
