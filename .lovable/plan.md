@@ -1,6 +1,14 @@
-# Dialog-Pipeline: Pivot zu Sync.so Segments
+# Dialog-Pipeline: Pivot zu Sync.so Segments — STATUS: SHIPPED
 
-## Was die Recherche geändert hat
+**Umgesetzt:**
+- `compose-dialog-segments` edge function (1-Call Sync.so Segments, deployed)
+- `sync-so-webhook` v5 branch (COMPLETED → clip_url; FAILED → idempotenter Refund, deployed)
+- `useTwoShotAutoTrigger`: `DIALOG_ENGINES = {cinematic-sync, sync-segments}`, v5 stale-watchdog (12min), `syncso_segments_*` in RETRYABLE_REGEX
+- `sceneEngineRouter.ts` + Type: `'sync-segments'` als erste Klasse, Label + Reason
+- `SceneCard.tsx` Select: neuer Eintrag **⚡ Fast Dialog · 1-Call (Sync.so Segments)**
+- Memory: `mem://features/video-composer/sync-segments-dialog-pipeline`
+
+
 
 Mein vorheriger Plan ("HappyHorse als nativer Dialog-Renderer") ist **technisch nicht umsetzbar** — HappyHorse 1.0 hat keine Multi-Speaker-API. Auch der "Artlist macht das so"-Vergleich war Spekulation: Artlist betreibt nur ein Aggregator-Frontend über bestehende Modelle (Veo 3, Kling, Hailuo, HappyHorse), keine eigene Dialog-Engine.
 
