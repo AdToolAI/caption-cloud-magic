@@ -51,6 +51,11 @@ import {
   validateSegments,
   validateSyncResponseShape,
 } from "../_shared/syncso-preflight.ts";
+import {
+  pickSpeakerCoordinates,
+  resolveCharacterPortraits,
+  resolveSceneFaceMap,
+} from "../_shared/twoshot-face-map.ts";
 
 
 const corsHeaders = {
@@ -137,7 +142,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at",
+        "id, project_id, audio_plan, dialog_shots, clip_url, lip_sync_source_clip_url, lip_sync_applied_at, reference_image_url, lock_reference_url",
       )
       .eq("id", sceneId)
       .single();
@@ -366,24 +371,75 @@ serve(async (req) => {
       })),
     ];
 
+    // ── Face-targeting per segment ───────────────────────────────────────
+    // Without per-segment coordinates, Sync.so picks ONE detected face and
+    // drives ALL segments onto it (root cause of "first character speaks the
+    // whole script" bug). Resolve a face map from the scene anchor + identity-
+    // match against character portraits, then attach per-segment coordinates.
+    const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+    const anchorUrl =
+      (scene as any).lock_reference_url ||
+      (scene as any).reference_image_url ||
+      null;
+    const characterIds = speakers.map((sp) => sp.character_id ?? null);
+    const characters = await resolveCharacterPortraits(supabase, userId, characterIds);
+    const cachedFaceMap = (twoshot as any).faceMap ?? null;
+    let faceMap: Awaited<ReturnType<typeof resolveSceneFaceMap>> | null = null;
+    try {
+      faceMap = await resolveSceneFaceMap({
+        supabase,
+        sceneId,
+        anchorUrl,
+        cachedFaceMap,
+        lovableKey,
+        characters,
+      });
+    } catch (err) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} faceMap resolve failed: ${(err as Error).message}`,
+      );
+    }
+    const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
+      const picked = pickSpeakerCoordinates({
+        speakerIdx: idx,
+        characterId: sp.character_id ?? null,
+        faceMap,
+      });
+      return picked?.coords ?? null;
+    });
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} speakerCoords=${JSON.stringify(speakerCoords)}`,
+    );
+
     const payload: Record<string, unknown> = {
       model: LIPSYNC_MODEL,
       input,
-      segments: segments.map((s) => ({
-        startTime: s.startTime,
-        endTime: s.endTime,
-        audioInput: {
-          refId: s.refId,
+      // Top-level fallback: first speaker's coords drive auto-detection if the
+      // segments[] options shape isn't honored by an older Sync.so version.
+      ...(speakerCoords[0]
+        ? { options: { activeSpeakerDetection: { coordinates: speakerCoords[0] } } }
+        : {}),
+      segments: segments.map((s) => {
+        const coords = speakerCoords[s.speakerIdx] ?? null;
+        return {
           startTime: s.startTime,
           endTime: s.endTime,
-        },
-      })),
+          audioInput: {
+            refId: s.refId,
+            startTime: s.startTime,
+            endTime: s.endTime,
+          },
+          ...(coords
+            ? { options: { activeSpeakerDetection: { coordinates: coords } } }
+            : {}),
+        };
+      }),
       webhookUrl,
       webhook_url: webhookUrl,
     };
 
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1200)}`,
+      `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1500)}`,
     );
 
     // Stufe B: HEAD-probe every input asset before paying Sync.so.
