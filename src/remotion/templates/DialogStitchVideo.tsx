@@ -19,6 +19,8 @@ import {
   Audio,
   Sequence,
   Video,
+  interpolate,
+  useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
 import { z } from 'zod';
@@ -46,6 +48,36 @@ export const DialogStitchVideoSchema = z.object({
 });
 
 export type DialogStitchVideoProps = z.infer<typeof DialogStitchVideoSchema>;
+
+/** v11 Smoothness: 3-frame opacity crossfade on overlay edges so the cut
+ *  between master plate and lipsynced overlay is invisible. */
+const CROSSFADE_FRAMES = 3;
+const ShotOverlay: React.FC<{
+  src: string;
+  segDuration: number;
+  startFrom?: number;
+}> = ({ src, segDuration, startFrom }) => {
+  const frame = useCurrentFrame();
+  const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
+  const fadeOut = fadeIn;
+  const opacity = interpolate(
+    frame,
+    [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+  );
+  return (
+    <AbsoluteFill style={{ opacity }}>
+      <Video
+        src={src}
+        muted
+        playbackRate={1}
+        {...(startFrom !== undefined ? { startFrom } : {})}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </AbsoluteFill>
+  );
+};
 
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
@@ -94,19 +126,11 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             durationInFrames={segDuration}
             layout="none"
           >
-            <AbsoluteFill>
-              <Video
-                src={shot.outputUrl}
-                muted
-                playbackRate={1}
-                // 'relative' = short preclip starting at frame 0 (v10),
-                // 'absolute' = full-length master overlay (legacy segments_secs).
-                {...(shot.sourceTiming === 'relative'
-                  ? {}
-                  : { startFrom: startFrame })}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </AbsoluteFill>
+            <ShotOverlay
+              src={shot.outputUrl}
+              segDuration={segDuration}
+              startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+            />
           </Sequence>
         );
       })}
