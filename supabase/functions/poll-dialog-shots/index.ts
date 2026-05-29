@@ -766,7 +766,7 @@ async function processScene(
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
       const timeoutReason = `sync_so_timeout_4min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
       if (!prepareShotRetry(shot, "sync_so_timeout_4min", shots)) {
-        degradeShotToMaster(shot, timeoutReason);
+        degradeShotToMaster(shot, timeoutReason, shots);
       }
       mutated = true;
       console.warn(
