@@ -19,6 +19,8 @@ import {
   Audio,
   Sequence,
   Video,
+  interpolate,
+  useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
 import { z } from 'zod';
