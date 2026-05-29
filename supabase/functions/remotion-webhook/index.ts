@@ -38,6 +38,7 @@ serve(async (req) => {
     const isComposer = source === 'composer';
     const isLongForm = source === 'sora-long-form';
     const isDialogStitch = source === 'dialog-stitch';
+    const isDialogTurnPreclip = source === 'dialog-turn-preclip';
     const composerProjectId = customData?.composer_project_id;
     const renderJobId = customData?.render_job_id;
     const longFormProjectId = customData?.sora_long_form_project_id;
@@ -175,7 +176,54 @@ serve(async (req) => {
         }
       }
 
-      if (isDialogStitch) {
+      if (isDialogTurnPreclip) {
+        // ── Per-Turn Preclip success (Artlist-Style Pipeline) ──
+        // Schreibt preclip_url auf den jeweiligen Shot, setzt preclip_status='ready'
+        // und stupst poll-dialog-shots an, damit Sync.so direkt mit dem
+        // kurzen Clip ab t=0 weiterlaufen kann (ohne segments_secs).
+        if (pendingRenderId) {
+          await supabaseAdmin.from('video_renders').update({
+            status: 'completed',
+            video_url: finalOutputUrl,
+            error_message: null,
+            completed_at: new Date().toISOString(),
+          }).eq('render_id', pendingRenderId);
+        }
+        const shotIdx = Number(customData?.shot_idx);
+        if (composerSceneId && Number.isFinite(shotIdx)) {
+          const { data: sceneRow } = await supabaseAdmin
+            .from('composer_scenes')
+            .select('dialog_shots')
+            .eq('id', composerSceneId)
+            .maybeSingle();
+          const prevState = (sceneRow?.dialog_shots as any) || {};
+          const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
+          if (shots[shotIdx]) {
+            shots[shotIdx] = {
+              ...shots[shotIdx],
+              preclip_url: finalOutputUrl,
+              preclip_status: 'ready',
+              preclip_error: undefined,
+              preclip_completed_at: new Date().toISOString(),
+            };
+            await supabaseAdmin.from('composer_scenes').update({
+              dialog_shots: { ...prevState, shots },
+              updated_at: new Date().toISOString(),
+            }).eq('id', composerSceneId);
+          }
+          // Nudge poll-dialog-shots so Sync.so dispatches immediately.
+          try {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+            fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ scene_id: composerSceneId }),
+            }).catch(() => {});
+          } catch { /* ignore */ }
+          console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} ready → ${finalOutputUrl}`);
+        }
+      } else if (isDialogStitch) {
         // ── Dialog-stitch render (cinematic-sync N-speaker pipeline) ──
         // Lambda-side replacement for the forbidden Edge-Runtime ffmpeg.
         // Writes the stitched clip back onto composer_scenes and marks
