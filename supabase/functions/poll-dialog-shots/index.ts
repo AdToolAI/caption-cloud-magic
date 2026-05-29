@@ -1245,6 +1245,34 @@ async function processScene(
 
 
 
+      // ── Stage E.3: Concurrency guard (Creator plan = 3 parallel jobs) ──
+      const inflight = await countInflightSyncJobs(supabase);
+      if (inflight >= SYNCSO_DEFAULT_MAX_PARALLEL) {
+        nextShot.last_deferred_at = new Date().toISOString();
+        console.log(
+          `[poll-dialog-shots] turn ${nextShot.idx} CONCURRENCY DEFER inflight=${inflight}/${SYNCSO_DEFAULT_MAX_PARALLEL}`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "CONCURRENCY_DEFERRED",
+          error_class: "rate_limited",
+          error_message: `inflight=${inflight}`,
+          meta: { inflight, cap: SYNCSO_DEFAULT_MAX_PARALLEL },
+        });
+        mutated = true;
+        break; // stop dispatching this tick, next cron picks it up
+      }
+
       let jobId: string | null = null;
       let dispatchError: Error | null = null;
       try {
@@ -1266,8 +1294,15 @@ async function processScene(
         nextShot.started_at = new Date().toISOString();
         mutated = true;
         dispatchedThisTick++;
+        // E.3: register inflight so other scenes see this slot is taken
+        await registerInflightSyncJob(supabase, {
+          job_id: jobId,
+          user_id: userId ?? null,
+          scene_id: sceneId,
+          engine: "cinematic-sync",
+        });
         console.log(
-          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"} inflight=${inflight + 1}/${SYNCSO_DEFAULT_MAX_PARALLEL}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {
