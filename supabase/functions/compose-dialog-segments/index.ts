@@ -111,7 +111,9 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    const { scene_id: sceneId } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({}));
+    const sceneId = body?.scene_id;
+    const isRetry = body?.retry === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
