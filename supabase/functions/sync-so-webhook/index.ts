@@ -39,7 +39,7 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
 }
 
 const ASSUMED_MASTER_FPS = 24;
-const MAX_SHOT_RETRIES = 3;
+const MAX_SHOT_RETRIES = 1;
 const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
 
 function isMultiSpeakerScene(shots: any[]): boolean {
