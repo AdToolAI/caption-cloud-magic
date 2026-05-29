@@ -18,7 +18,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
-import { releaseInflightSyncJob, classifySyncError, isTransientSyncError } from "../_shared/syncso-preflight.ts";
+import {
+  releaseInflightSyncJob,
+  classifySyncError,
+  isTransientSyncError,
+  recordCircuitFailure,
+  recordCircuitSuccess,
+} from "../_shared/syncso-preflight.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
