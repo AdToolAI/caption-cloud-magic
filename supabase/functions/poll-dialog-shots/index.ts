@@ -844,7 +844,10 @@ async function processScene(
         shot.status = "ready";
         shot.completed_at = new Date().toISOString();
         mutated = true;
+        // E.3: release inflight slot
+        if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
+        if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
         if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
           degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`, shots);
         }
@@ -852,6 +855,7 @@ async function processScene(
       }
 
     });
+
 
     // ── Step 1b: per-shot 4-min watchdog (v12 Stability) ─────────────
     // Sync.so jobs that don't finish in ~4 min are functionally dead —
