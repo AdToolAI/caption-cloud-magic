@@ -253,16 +253,72 @@ serve(async (req) => {
       return ok({ ok: true, skipped: "v5_job_mismatch", job_id: jobId });
     }
     if (status === "COMPLETED" && outputUrl) {
+      // ── Re-host Sync.so result in our own bucket ────────────────────
+      // Sync.so returns a token-signed URL that expires (~24h). Composer
+      // replays + Director's Cut imports must keep working long-term, so
+      // we fetch the MP4 once and upload to ai-videos. Best-effort: on
+      // any failure we keep the original Sync.so URL.
+      let finalUrl = outputUrl;
+      try {
+        const { data: row } = await supabase
+          .from("composer_scenes")
+          .select("project_id")
+          .eq("id", sceneId)
+          .single();
+        const { data: proj } = await supabase
+          .from("composer_projects")
+          .select("user_id")
+          .eq("id", (row as any)?.project_id)
+          .single();
+        const uid = (proj as any)?.user_id;
+        if (uid) {
+          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
+          if (dl.ok) {
+            const bytes = new Uint8Array(await dl.arrayBuffer());
+            const objectPath = `composer/${uid}/${sceneId}-lipsync.mp4`;
+            const up = await supabase.storage.from("ai-videos").upload(
+              objectPath,
+              bytes,
+              { contentType: "video/mp4", upsert: true },
+            );
+            if (!up.error) {
+              const { data: pub } = supabase.storage
+                .from("ai-videos")
+                .getPublicUrl(objectPath);
+              if (pub?.publicUrl) {
+                finalUrl = pub.publicUrl;
+                console.log(
+                  `[sync-so-webhook] v5 scene=${sceneId} re-hosted ${bytes.length} bytes → ${finalUrl}`,
+                );
+              }
+            } else {
+              console.warn(
+                `[sync-so-webhook] v5 scene=${sceneId} re-host upload failed: ${up.error.message}`,
+              );
+            }
+          } else {
+            console.warn(
+              `[sync-so-webhook] v5 scene=${sceneId} re-host download HTTP ${dl.status}`,
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} re-host exception: ${(err as Error).message}`,
+        );
+      }
+
       await supabase
         .from("composer_scenes")
         .update({
           dialog_shots: {
             ...state,
             status: "done",
-            final_url: outputUrl,
+            final_url: finalUrl,
+            sync_so_url: outputUrl,
             finished_at: nowIso,
           },
-          clip_url: outputUrl,
+          clip_url: finalUrl,
           lip_sync_status: "applied",
           lip_sync_applied_at: nowIso,
           twoshot_stage: "complete",
