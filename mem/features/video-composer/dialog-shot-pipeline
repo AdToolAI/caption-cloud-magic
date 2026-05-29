@@ -18,6 +18,7 @@ Both auto-triggers route to `compose-dialog-scene`:
 5. **`render_window` PERSISTED PER SHOT.** The slightly expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbours) is computed once in `poll-dialog-shots`, persisted as `dialog_shots.shots[].render_window`, and used as BOTH the Sync.so `segments_secs` AND the Lambda overlay range. Guarantees Sync.so output range and stitch slice match byte-for-byte.
 6. **STITCHING IS RETRYABLE.** `lip_sync_status='stitching'` must be included in poll/watchdog selectors until `lip_sync_applied_at` exists. A transient `render-dialog-stitch` / Lambda dispatch failure is NOT a Sync.so timeout and must not refund or mark final failure unless Lambda returns a terminal webhook error.
 7. **MASTER DIMENSIONS WIN.** `render-dialog-stitch` passes `video_width/video_height` from `dialog_shots` into `DialogStitchVideo` (even-number normalized). Do not hard-code 1280×720 when the master plate is another even size such as 1376×768.
+8. **WINDOW APPLIES TO BOTH INPUTS.** `startSyncTurnJob` MUST attach `segments_secs: [window]` to BOTH the video AND the audio input. Without it Sync.so reads audio from `t=0` (always the first sentence in the per-speaker track) while playing a later video window — result: "unknown error" or wrong-speaker / wrong-sentence animation. This is the one Artlist-parity rule that breaks multi-turn scenes if forgotten. The 400-fallback path (segment-rejected) must symmetrically strip `segments_secs` from BOTH inputs.
 
 **Per-shot lifecycle:**
 ```

@@ -246,10 +246,16 @@ async function startSyncTurnJob(
     model: LIPSYNC_MODEL,
     input: [
       { type: "video", url: videoUrl, segments_secs: [window] },
+      // Sync.so v2 only accepts `segments_secs` on video inputs. Audio MUST be
+      // pre-trimmed to the same window upstream (see `ensureTurnAudioUrl`),
+      // otherwise Sync.so reads audio from t=0 (= first sentence) while the
+      // video plays a later turn → wrong speaker / "unknown error".
       { type: "audio", url: audioUrl },
     ],
     options,
   };
+
+
   if (webhookUrl) {
     // Sync.so v2 accepts `webhookUrl` (camelCase). Include `webhook_url` too
     // for forward-compat. Unknown fields are ignored by the API.
@@ -301,6 +307,7 @@ async function startSyncTurnJob(
       );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
+      (fallback.input as any[])[1] = { type: "audio", url: audioUrl };
       r = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
         headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
@@ -317,6 +324,7 @@ async function startSyncTurnJob(
       throw new Error(`sync.so create ${r.status}: ${txt.slice(0, 300)}`);
     }
   }
+
   const data = await r.json();
   console.log(
     `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} OK job_id=${data.id} status=${data.status ?? "?"}`,
