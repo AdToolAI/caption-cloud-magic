@@ -1083,6 +1083,96 @@ async function processScene(
         continue;
       }
 
+      // ── Stage E.1: VAD guard — block dispatch when audio has no voice ──
+      if (preparedAudio && (
+        preparedAudio.voicedRatio < MIN_VOICED_RATIO ||
+        preparedAudio.longestVoicedRun < MIN_LONGEST_VOICED_RUN_SEC
+      )) {
+        const reason = "preflight_audio_no_voice";
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} VAD BLOCK voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}% longestRun=${preparedAudio.longestVoicedRun.toFixed(2)}s`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          audio_dur_sec: preparedAudio.durSec,
+          audio_lead_in_sec: preparedAudio.leadInSec,
+          audio_peak_dbfs: preparedAudio.peakDbFs,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "VAD_BLOCKED",
+          error_class: "audio_no_voice",
+          error_message: `voiced_ratio=${preparedAudio.voicedRatio.toFixed(3)} longest_run=${preparedAudio.longestVoicedRun.toFixed(2)}s`,
+          meta: { voiced_ratio: preparedAudio.voicedRatio, longest_voiced_run: preparedAudio.longestVoicedRun },
+        });
+        // VAD failures are deterministic — invalidate trimmed cache & retry
+        // once (which re-fetches/normalizes). If it persists → hard fail.
+        nextShot.trimmed_audio_url = undefined;
+        if (!prepareShotRetry(nextShot, reason, shots)) {
+          markShotTerminalFailed(nextShot, `${reason}: voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}%`);
+        }
+        mutated = true;
+        continue;
+      }
+
+      // ── Stage E.2: Master video stream probe (codec sanity) ──────────
+      // Cached per URL for 24h. Only blocks on POSITIVE detection of an
+      // unsupported codec — when we can't tell, we let Sync.so try.
+      const streamProbe = await probeVideoStreamCached(supabase, sourceUrl);
+      if (streamProbe.ok && streamProbe.isUnsupportedCodec) {
+        const reason = `preflight_video_codec_${streamProbe.codec}`;
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} VIDEO-CODEC BLOCK codec=${streamProbe.codec} ${streamProbe.width}x${streamProbe.height}`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "CODEC_BLOCKED",
+          error_class: "video_codec_unsupported",
+          error_message: `codec=${streamProbe.codec} dims=${streamProbe.width}x${streamProbe.height}`,
+          meta: { stream: streamProbe },
+        });
+        // Switching source kind (preclip ↔ master) may re-encode → retry.
+        if (!prepareShotRetry(nextShot, reason, shots)) {
+          markShotTerminalFailed(nextShot, reason);
+        }
+        mutated = true;
+        continue;
+      }
+
+      // ── Stage E.6: Coords-bounds sanity (clamp if we know dims) ──────
+      if (nextShot.target_coords && streamProbe.ok && streamProbe.width && streamProbe.height) {
+        const clamped = clampCoordsToBounds(
+          nextShot.target_coords,
+          streamProbe.width,
+          streamProbe.height,
+        );
+        if (clamped && (clamped[0] !== nextShot.target_coords[0] || clamped[1] !== nextShot.target_coords[1])) {
+          console.log(
+            `[poll-dialog-shots] turn ${nextShot.idx} COORDS clamped ${JSON.stringify(nextShot.target_coords)} → ${JSON.stringify(clamped)} (dims ${streamProbe.width}x${streamProbe.height})`,
+          );
+          nextShot.target_coords = clamped;
+          mutated = true;
+        }
+      }
+
+
+
       // ── Stufe D: Face validation gate (coords mode only) ──────────
       // Before paying Sync.so for a `mode=coords` dispatch, verify a
       // face is actually visible at the requested frame. If not, shift
