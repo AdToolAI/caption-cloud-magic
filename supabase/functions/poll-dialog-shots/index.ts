@@ -723,7 +723,34 @@ async function processScene(
       // → Only fall back to auto_detect when no coords exist at all
       //   (single-speaker scenes are safe).
       const mode = dispatchModeForShot(nextShot);
-      const audioUrl = nextShot.audio_url || state.master_audio_url;
+      const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
+      // v9.1 Artlist parity: pre-trim the per-speaker WAV to the exact
+      // turn window so Sync.so doesn't read audio from t=0 (first
+      // sentence in the per-speaker track) while the video plays a later
+      // window. Only trim when we have an isolated per-speaker track AND
+      // userId is available. For merged-master fallback we skip — the
+      // legacy auto_detect path stays.
+      let audioUrl = fullAudioUrl;
+      let audioTrimmed = false;
+      if (nextShot.audio_url && userId) {
+        try {
+          audioUrl = await ensureTrimmedTurnAudioUrl(
+            supabase,
+            userId,
+            sceneId,
+            nextShot,
+            fullAudioUrl,
+            win,
+          );
+          nextShot.trimmed_audio_url = audioUrl;
+          audioTrimmed = true;
+        } catch (trimErr) {
+          console.warn(
+            `[poll-dialog-shots] turn ${nextShot.idx} trim FAILED, falling back to full track: ${(trimErr as Error)?.message}`,
+          );
+          audioUrl = fullAudioUrl;
+        }
+      }
       const jobId = await startSyncTurnJob(
         syncKey,
         sourceUrl,
@@ -742,8 +769,9 @@ async function processScene(
       mutated = true;
       dispatchedThisTick++;
       console.log(
-        `[poll-dialog-shots] v9 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${audioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+        `[poll-dialog-shots] v9.1 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${fullAudioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} trimmed=${audioTrimmed} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
       );
+
     } catch (e) {
       if (e instanceof SyncConcurrencyDeferredError) {
         nextShot.status = "pending";
