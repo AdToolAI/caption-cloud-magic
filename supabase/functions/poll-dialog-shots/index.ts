@@ -93,7 +93,22 @@ interface DialogShot {
    *  Sync.so reads audio from t=0 (first sentence) while the video plays
    *  a later window → wrong-speaker / "unknown error". */
   trimmed_audio_url?: string;
+  /** v10 Artlist-Style Preclip Pipeline: kurzer, server-side gerenderter
+   *  MP4-Ausschnitt aus dem Master für genau diesen Turn (ab t=0).
+   *  Sync.so bekommt diesen Clip OHNE `segments_secs` — das eliminiert
+   *  die "An unknown error occurred"-Failures aus dem Segments-Pfad. */
+  preclip_url?: string;
+  preclip_status?: "pending" | "rendering" | "ready" | "failed";
+  preclip_render_id?: string;
+  preclip_started_at?: string;
+  preclip_completed_at?: string;
+  preclip_error?: string;
+  preclip_retry_count?: number;
+  /** Tracks which video source was used for the actual Sync.so dispatch.
+   *  'preclip' = short clip ab t=0 (preferred). 'master' = legacy segments_secs. */
+  sync_source_kind?: "preclip" | "master";
 }
+
 
 
 interface DialogShotsState {
