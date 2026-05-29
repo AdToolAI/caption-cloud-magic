@@ -1,47 +1,149 @@
 ## Befund
 
-- Der Backend-Status ist gesund; der Abbruch kommt nicht von Lovable Cloud selbst.
-- In den aktuellen Szenen scheitert weiterhin genau ein Turn mit `sync_FAILED: An unknown error occurred`, obwohl die anderen Turns fertig werden.
-- Auffällig: Der Webhook-Retry berechnet `frame_number_override` noch absolut aus der Master-Timeline, während `poll-dialog-shots` bereits segment-relative Frames nutzt. Das kann bei Sync.so mit `segments_secs` wieder out-of-range werden.
-- Zusätzlich ist die Pipeline aktuell zu hart: Ein einzelner Sync.so-Unknown-Error nach nur einem Retry setzt die ganze Szene auf failed/refunded, statt provider-typisch länger/alternativ weiterzulaufen.
-- Der vom User beobachtete 15-Minuten-Abbruch passt zu: mehrere serielle Provider-Jobs + Retry + Timeout/Failure-Guard, nicht zu einem normalen Lambda-Stitch-Problem.
+Der Backend-Status ist gesund. Der Fehler kommt aus der Sync.so-Verarbeitung selbst: mehrere Jobs enden mit `sync_FAILED: An unknown error occurred`.
 
-## Plan
+Die aktuelle Pipeline ist noch nicht Artlist-robust, weil sie weiterhin Sync.so mit `segments_secs` auf dem langen Master-Video plus statischen Face-Koordinaten füttert. Das ist fragil:
 
-1. **Webhook-Retry korrigieren**
-   - `sync-so-webhook/index.ts`: `prepareRetryFromWebhook()` so ändern, dass `frame_number_override` segment-relativ berechnet wird.
-   - Dafür `render_window ?? window` verwenden und auf die Segmentlänge clampen, analog zu `poll-dialog-shots`.
-   - Damit erzeugt der schnelle Webhook-Pfad nicht wieder dieselbe falsche absolute Frame-Logik.
+- Sync.so muss intern einen Ausschnitt aus einem langen Video verarbeiten.
+- Die Audioseite wird zwar vorgetrimmt, das Video aber nur per `segments_secs` referenziert.
+- Die Face-Koordinaten stammen aus Anchor/FaceMap und sind statisch, obwohl das generierte Master-Video Bewegung/Kameradrift haben kann.
+- Nach mehreren Retry-Varianten scheitern weiterhin ganze Turns; das bestätigt, dass nicht nur das Frame-Sampling falsch war, sondern die Grundstruktur noch zu provider-fragil ist.
 
-2. **Robustere Sync.so-Retry-Strategie**
-   - `poll-dialog-shots/index.ts`: für `sync_FAILED: An unknown error occurred` nicht nach einem Versuch terminal abbrechen.
-   - Mehrere Provider-sichere Retry-Varianten pro Turn einführen, z. B.:
-     - coords, Segment-Mitte
-     - coords, Segment bei 25% / 75%
-     - leicht andere `temperature`
-     - nur als letzter Ausweg Auto-Detect bei Single-Speaker; bei Multi-Speaker weiterhin nicht blind auf falsches Gesicht fallen.
-   - Retry-Status im Shot speichern, ohne Schema-Migration, z. B. über bestehende JSON-Felder.
+## Ziel
 
-3. **Timeout nicht zu früh finalisieren**
-   - Per-Shot-Watchdog von starrer „8 Minuten = failed“ auf „Retry/Deferred zuerst, terminal erst nach mehreren Strategien oder längerer Provider-Stall-Zeit“ ändern.
-   - UI/DB bleibt währenddessen `running`, nicht sofort `failed`.
-   - Refund weiterhin nur bei finalem, nicht-recoverbarem Abbruch.
+Die Dialog-Lip-Sync-Pipeline wird so umgebaut, dass jeder Sprecher-Turn zuerst als eigener kurzer Video-Clip materialisiert wird. Sync.so bekommt dann keinen langen Master mit `segments_secs`, sondern einen kleinen, sauberen Turn-Clip ab Sekunde 0 plus exakt passenden Audio-Slice. Danach wird alles deterministisch wieder in den Master gestitcht.
 
-4. **Kurze Turns provider-tauglicher machen**
-   - Für sehr kurze Sätze (< ca. 1.2s) render window minimal stabilisieren, damit Sync.so genug Frames/VAD-Kontext bekommt.
-   - Audio bleibt weiterhin vorgetrimmt; nur das Videofenster wird vorsichtig erweitert und an Nachbar-Turns geclamped.
+Das ist näher an einer Artlist-ähnlichen Pipeline: segmentieren, isoliert verarbeiten, deterministisch zusammensetzen.
 
-5. **Bessere Diagnose persistieren**
-   - Fehlerdetails und Retry-Strategie im `dialog_shots.shots[]` JSON speichern: Strategie, frame number, window, job id, provider body soweit verfügbar.
-   - Dadurch sehen wir beim nächsten Fehler nicht nur „unknown“, sondern welcher Pfad tatsächlich gebrochen ist.
+## Umsetzung
 
-6. **Deploy und Reproduktion**
-   - `poll-dialog-shots` und `sync-so-webhook` deployen.
-   - Die zuletzt fehlgeschlagene Szene erneut in einen sauberen pending/running-Zustand setzen und `compose-dialog-scene` neu anstoßen.
-   - Validieren: alle Shots `ready`, danach `dialog_stitching`, finaler `clip_url` mit externem Master-Audio.
+### 1. Per-Turn Video-Preclip einführen
+
+Neue Remotion-Komposition:
+
+```text
+DialogTurnClipVideo
+masterVideoUrl + startSec + endSec -> kurzer MP4-Clip ab t=0
+```
+
+Eigenschaften:
+
+- rendert exakt das `render_window` eines Turns
+- gleiche Breite/Höhe/FPS wie Master
+- muted, ohne Audio
+- Ergebnis ist ein eigenständiger kurzer Turn-Clip
+
+### 2. Neue Backend-Funktion für Turn-Preclips
+
+Neue Funktion `render-dialog-turn`:
+
+- liest `composer_scenes.dialog_shots`
+- sucht den Turn per `sceneId + shotIdx`
+- erstellt einen `video_renders` Eintrag mit Quelle `dialog-turn-preclip`
+- startet Remotion Lambda für `DialogTurnClipVideo`
+- speichert Render-ID im jeweiligen Shot-JSON
+
+Keine neue Tabelle nötig; wir nutzen weiterhin `dialog_shots` JSON und `video_renders`.
+
+### 3. Webhook für Turn-Preclips erweitern
+
+`remotion-webhook` bekommt einen neuen Pfad für `source='dialog-turn-preclip'`:
+
+- bei Erfolg: `shot.preclip_url = outputFile`, `shot.status = 'pending'`
+- bei Fehler: Shot retrybar markieren, nicht sofort ganze Szene zerstören
+- danach `poll-dialog-shots` fire-and-forget anstoßen
+
+### 4. Poller-Lifecycle erweitern
+
+`poll-dialog-shots` wird von:
+
+```text
+pending -> lipsyncing -> ready
+```
+
+auf:
+
+```text
+pending -> preclipping -> pending_with_preclip -> lipsyncing -> ready
+```
+
+umgestellt.
+
+Wichtig: Für Sync.so wird dann primär verwendet:
+
+```text
+video = shot.preclip_url
+video segments_secs = KEINE
+frame_number = segment-relative im kurzen Clip
+audio = shot.trimmed_audio_url
+```
+
+Damit entfällt die fragile Kombination aus langem Master-Video + `segments_secs` + absolut/relativem Frame-Verhalten.
+
+### 5. Sync.so Dispatch anpassen
+
+`startSyncTurnJob` erhält einen Modus:
+
+- `segmented_master` nur noch als Legacy-/Fallback-Strategie
+- `preclip` als neuer Standard
+
+Im `preclip` Modus:
+
+- kein `segments_secs` auf dem Video
+- `frame_number` wird gegen die kurze Clipdauer geclempt
+- Audio bleibt der exakt getrimmte WAV-Slice
+- aktive Sprechererkennung bleibt bei Multi-Speaker koordinatenbasiert, aber ohne Segment-API-Risiko
+
+### 6. Finales Stitching korrigieren
+
+`DialogStitchVideo` muss unterscheiden:
+
+- alte Sync.so Outputs aus `segments_secs`: `startFrom = startFrame`
+- neue Preclip Sync.so Outputs: `startFrom = 0`
+
+Dafür bekommt jeder Shot im Stitch-Payload ein Feld wie:
+
+```text
+sourceTiming: 'relative' | 'absolute'
+```
+
+Bei Preclip-Outputs wird der kurze lipsynced Clip ab Frame 0 in das ursprüngliche `render_window` gelegt.
+
+### 7. Failure-Handling sauberer machen
+
+Aktuell können Shots bereits `failed` sein, während die Szene noch `running` bleibt, weil andere Shots weiterlaufen. Das wirkt wie ein 15-Minuten-Abbruch.
+
+Ich ändere das Verhalten so:
+
+- ein Turn-Failure stoppt keine Szene, solange Preclip-Fallback noch möglich ist
+- terminal failed erst, wenn Preclip + Sync-Retries ausgeschöpft sind
+- `clip_error` bekommt die genaue Strategie, z. B. `preclip_sync_failed_after_retries`
+- Refund bleibt idempotent nur bei finalem Abbruch
+
+### 8. Betroffene Szenen sauber neu starten
+
+Nach dem Deployment:
+
+- die fehlgeschlagenen Szenen (`a500df2e...`, `7842c6f6...`) in einen sauberen Dialog-Status zurücksetzen
+- `compose-dialog-scene` neu anstoßen
+- prüfen, dass jeder Turn erst `preclip_url`, dann `output_url`, dann final `clip_url` bekommt
+
+## Dateien
+
+Voraussichtlich betroffen:
+
+- `supabase/functions/poll-dialog-shots/index.ts`
+- `supabase/functions/sync-so-webhook/index.ts`
+- `supabase/functions/render-dialog-turn/index.ts` neu
+- `supabase/functions/remotion-webhook/index.ts`
+- `src/remotion/templates/DialogTurnClipVideo.tsx` neu
+- `src/remotion/templates/DialogStitchVideo.tsx`
+- Remotion Composition-Registry (`src/remotion/index.ts` oder Loader, je nach bestehender Registrierung)
+- Projekt-Memory zur neuen Artlist-Style Pipeline
 
 ## Nicht im Scope
 
-- Kein Wechsel des Providers.
-- Keine UI-Änderungen.
-- Keine neue Datenbanktabelle; wir nutzen die vorhandenen JSON-Felder in `dialog_shots`.
+- Kein Provider-Wechsel
+- Keine neue Datenbanktabelle
+- Keine UI-Änderung
+- Keine Entfernung der Refund-Sicherheit
