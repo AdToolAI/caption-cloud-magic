@@ -366,6 +366,9 @@ Deno.serve(async (req) => {
         coordsMatch,
         suggestedFrameOffset: result.suggestedFrameOffset,
         model: result.model,
+        quality: result.quality ?? null,
+        // Convenience top-level shortcut for callers that only care about pass/fail
+        faceScore: result.quality?.faceScore ?? null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
