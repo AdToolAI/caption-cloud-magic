@@ -23,6 +23,10 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
+/** Engines that share the dialog/lip-sync auto-trigger pipeline. */
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
+const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
+
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
   for (const line of String(dialogScript ?? '').split('\n')) {
