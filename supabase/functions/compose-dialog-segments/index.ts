@@ -114,13 +114,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    // Legacy secret name is SYNC_API_KEY (used by poll-dialog-shots, compose-twoshot-lipsync,
-    // poll-twoshot-lipsync). MUST be checked first or v5 dispatch returns 500 on every call.
-    const syncApiKey =
-      Deno.env.get("SYNC_API_KEY") ??
-      Deno.env.get("SYNC_SO_API_KEY") ??
-      Deno.env.get("SYNCSO_API_KEY") ??
-      "";
+    const syncApiKey = getSyncApiKey();
     if (!syncApiKey) {
       return json(
         {
