@@ -672,18 +672,18 @@ async function processScene(
     // provider stall from a render-stitch issue. Refund happens via
     // pipelineStatus='failed' below (refundIfNeeded is idempotent via
     // state.refunded).
-    const PER_SHOT_TIMEOUT_MS = 8 * 60 * 1000;
+    const PER_SHOT_TIMEOUT_MS = 15 * 60 * 1000;
     for (const shot of shots) {
       if (shot.status !== "lipsyncing" || !shot.started_at) continue;
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
-      const timeoutReason = `sync_so_timeout_8min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      if (!prepareShotRetry(shot, "sync_so_timeout_8min", shots)) {
+      const timeoutReason = `sync_so_timeout_15min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
+      if (!prepareShotRetry(shot, "sync_so_timeout_15min", shots)) {
         markShotTerminalFailed(shot, timeoutReason);
       }
       mutated = true;
       console.warn(
-        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_8min job=${shot.sync_job_id} ageMs=${ageMs}`,
+        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_15min job=${shot.sync_job_id} ageMs=${ageMs}`,
       );
     }
   }
