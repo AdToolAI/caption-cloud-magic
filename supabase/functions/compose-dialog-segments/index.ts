@@ -236,12 +236,14 @@ serve(async (req) => {
     }
 
     // Idempotency: an active render already exists → nudge and return.
-    // On `retry=true` (E.5 webhook retry path) we intentionally bypass this
-    // guard because the previous job already terminated FAILED and we now
-    // want to re-dispatch on the same scene without re-charging the wallet.
+    // On `retry=true` (E.5 webhook retry path) we bypass this guard because
+    // the previous job already terminated FAILED.
+    // On `advance=true` (multi-pass chain) we bypass too — the previous pass
+    // completed and we're now dispatching the NEXT pass on the same scene.
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     if (
       !isRetry &&
+      !isAdvance &&
       existing &&
       existing.version === 5 &&
       existing.engine === "sync-segments" &&
@@ -249,6 +251,7 @@ serve(async (req) => {
     ) {
       return json({ ok: true, status: "already_running", scene_id: sceneId }, 202);
     }
+
 
     // ── Build segments from per-speaker turns ────────────────────────────
     interface RawSegment {
