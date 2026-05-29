@@ -24,7 +24,9 @@ import {
   isTransientSyncError,
   recordCircuitFailure,
   recordCircuitSuccess,
+  logSyncDispatch,
 } from "../_shared/syncso-preflight.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -336,12 +338,38 @@ serve(async (req) => {
       const retryCount = Number((state as any).retry_count ?? 0);
       const MAX_V5_RETRIES = 2;
 
+      // Stage E.6 — persist the full webhook payload so we can post-mortem
+      // "unknown error" without grepping logs. Keep it bounded.
+      try {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          job_id: jobId,
+          engine: "sync-segments",
+          sync_status: status,
+          http_status: 200,
+          error_class: errClass,
+          error_message: rawErr.slice(0, 500),
+          meta: {
+            webhook_payload: payload,
+            retry_count_seen: retryCount,
+            transient: isTransientSyncError(errClass),
+          },
+        });
+      } catch (_e) { /* ignore log errors */ }
+
       // ── E.5 Webhook-Retry-Pfad ─────────────────────────────────────────
       // For transient failures (rate_limited, timeout, provider_unknown_error,
       // http_5xx) we re-dispatch instead of refunding. compose-dialog-segments
       // is called with retry=true so it skips re-charging the wallet.
-      const canRetry =
-        isTransientSyncError(errClass) && retryCount < MAX_V5_RETRIES;
+      // IMPORTANT: provider_unknown_error has historically masked a payload
+      // bug rather than a real transient outage. After the May-2026 retry
+      // storm (71 jobs in 15min) we treat it as NON-retryable until proper
+      // root-cause diagnostics come back — let the user see the failure
+      // instead of looping silently.
+      const treatAsTransient =
+        isTransientSyncError(errClass) && errClass !== "provider_unknown_error";
+      const canRetry = treatAsTransient && retryCount < MAX_V5_RETRIES;
+
 
       if (canRetry) {
         await supabase
