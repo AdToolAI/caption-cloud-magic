@@ -488,12 +488,18 @@ serve(async (req) => {
       };
     }
 
+    // Diagnose Mai 2026: Sync.so `lipsync-2-pro` schlägt mit
+    // "An unknown error occurred" fehl, sobald `segments[]` UND
+    // `options.active_speaker_detection` (egal ob `coordinates` oder
+    // `bounding_boxes`) gemeinsam gesendet werden. Repro-Matrix V1/V2/V3
+    // ohne ASD = COMPLETED. V4/V5 mit ASD = FAILED. Sync.so wählt im
+    // Segments-Modus den aktiven Sprecher implizit aus dem Audio-Stream
+    // des jeweiligen Segments — ASD ist nur für den Nicht-Segments-Pfad.
+    // Wir lassen ASD hier komplett weg und behalten es nur als Telemetrie.
+    const _diagnosticAsd = asdOptions; // kept for log_meta
     const payload: Record<string, unknown> = {
       model: LIPSYNC_MODEL,
       input,
-      ...(asdOptions
-        ? { options: { active_speaker_detection: asdOptions } }
-        : {}),
       segments: segments.map((s) => ({
         startTime: s.startTime,
         endTime: s.endTime,
@@ -506,6 +512,7 @@ serve(async (req) => {
       webhookUrl,
       webhook_url: webhookUrl,
     };
+
 
     console.log(
       `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1500)}`,
