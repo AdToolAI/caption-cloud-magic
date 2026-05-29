@@ -18,7 +18,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
-import { releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
+import { releaseInflightSyncJob, classifySyncError, isTransientSyncError } from "../_shared/syncso-preflight.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -222,12 +222,61 @@ serve(async (req) => {
         `[sync-so-webhook] v5 scene=${sceneId} COMPLETED → clip_url updated, lip_sync_applied`,
       );
     } else {
-      // FAILED / REJECTED / CANCELED → refund (idempotent) + mark failed
-      const reason = `syncso_segments_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
+      // FAILED / REJECTED / CANCELED
+      const rawErr = (errorMsg ?? "unknown").toString();
+      const errClass = classifySyncError(rawErr);
+      const retryCount = Number((state as any).retry_count ?? 0);
+      const MAX_V5_RETRIES = 2;
+
+      // ── E.5 Webhook-Retry-Pfad ─────────────────────────────────────────
+      // For transient failures (rate_limited, timeout, provider_unknown_error,
+      // http_5xx) we re-dispatch instead of refunding. compose-dialog-segments
+      // is called with retry=true so it skips re-charging the wallet.
+      const canRetry =
+        isTransientSyncError(errClass) && retryCount < MAX_V5_RETRIES;
+
+      if (canRetry) {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...state,
+              status: "retrying",
+              retry_count: retryCount + 1,
+              last_error: rawErr.slice(0, 200),
+              last_error_class: errClass,
+            },
+            lip_sync_status: "running",
+            twoshot_stage: "syncso_segments_retry",
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} → retry ${retryCount + 1}/${MAX_V5_RETRIES}`,
+        );
+        // Fire-and-forget re-dispatch. compose-dialog-segments reads the
+        // existing state (cost_credits already debited and stored) and uses
+        // retry=true to skip re-charging.
+        try {
+          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ scene_id: sceneId, retry: true }),
+          }).catch(() => {});
+        } catch {
+          /* ignore */
+        }
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true });
+      }
+
+      // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
+      const reason = `syncso_segments_${status}: ${rawErr.slice(0, 200)}`;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
-        // Find user via project
         const { data: row } = await supabase
           .from("composer_scenes")
           .select("project_id")
@@ -260,6 +309,7 @@ serve(async (req) => {
             finished_at: nowIso,
             refunded: cost > 0,
             error: reason,
+            last_error_class: errClass,
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
@@ -268,7 +318,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.warn(
-        `[sync-so-webhook] v5 scene=${sceneId} ${status} refunded=${cost} reason=${reason}`,
+        `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} retries=${retryCount} refunded=${cost} reason=${reason}`,
       );
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
