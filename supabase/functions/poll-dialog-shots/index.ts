@@ -93,7 +93,22 @@ interface DialogShot {
    *  Sync.so reads audio from t=0 (first sentence) while the video plays
    *  a later window → wrong-speaker / "unknown error". */
   trimmed_audio_url?: string;
+  /** v10 Artlist-Style Preclip Pipeline: kurzer, server-side gerenderter
+   *  MP4-Ausschnitt aus dem Master für genau diesen Turn (ab t=0).
+   *  Sync.so bekommt diesen Clip OHNE `segments_secs` — das eliminiert
+   *  die "An unknown error occurred"-Failures aus dem Segments-Pfad. */
+  preclip_url?: string;
+  preclip_status?: "pending" | "rendering" | "ready" | "failed";
+  preclip_render_id?: string;
+  preclip_started_at?: string;
+  preclip_completed_at?: string;
+  preclip_error?: string;
+  preclip_retry_count?: number;
+  /** Tracks which video source was used for the actual Sync.so dispatch.
+   *  'preclip' = short clip ab t=0 (preferred). 'master' = legacy segments_secs. */
+  sync_source_kind?: "preclip" | "master";
 }
+
 
 
 interface DialogShotsState {
@@ -378,18 +393,22 @@ async function startSyncTurnJob(
    *  retries to step away from the original failing frame (cuts/blinks).
    *  Must be SEGMENT-RELATIVE (0 = first frame of the trimmed segment). */
   frameNumberOverride?: number,
+  /** v10 Artlist Pipeline: when true, the video is ALREADY a short pre-clip
+   *  starting at t=0 (rendered via DialogTurnClipVideo). We MUST NOT send
+   *  `segments_secs` on it — Sync.so would otherwise try to clip an already
+   *  trimmed video and fail with "An unknown error occurred". */
+  noSegments: boolean = false,
 ): Promise<string> {
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature,
   };
+  // Determine the segment length in frames for frame_number clamping. For
+  // preclips the segment is the whole clip starting at t=0.
+  const segDurSec = noSegments ? Math.max(0.1, window[1] - window[0]) : (window[1] - window[0]);
+  const segFrames = Math.max(1, Math.floor(segDurSec * ASSUMED_MASTER_FPS));
   if (mode === "coords" && coords) {
-    // Sync.so v2 + `segments_secs`: `frame_number` is interpreted RELATIVE to
-    // the segment start (frame 0 = first frame of the trimmed segment), NOT
-    // absolute in the master video. Override must already be segment-relative.
-    // Default (no override) = middle of segment, clamped to segment length.
-    const segFrames = Math.max(1, Math.floor((window[1] - window[0]) * ASSUMED_MASTER_FPS));
     const rawFrame = Number.isFinite(frameNumberOverride as number)
       ? Math.max(0, Math.round(frameNumberOverride as number))
       : Math.max(0, Math.floor(segFrames / 2));
@@ -403,18 +422,24 @@ async function startSyncTurnJob(
     options.active_speaker_detection = { auto_detect: true };
   }
 
+  // Video input: für Preclips OHNE segments_secs (kompletter Clip ist der
+  // Turn), für Master MIT segments_secs (Legacy/Fallback-Pfad).
+  const videoInput: Record<string, unknown> = { type: "video", url: videoUrl };
+  if (!noSegments) videoInput.segments_secs = [window];
+
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
-      { type: "video", url: videoUrl, segments_secs: [window] },
-      // Sync.so v2 only accepts `segments_secs` on video inputs. Audio MUST be
-      // pre-trimmed to the same window upstream (see `ensureTurnAudioUrl`),
-      // otherwise Sync.so reads audio from t=0 (= first sentence) while the
-      // video plays a later turn → wrong speaker / "unknown error".
+      videoInput,
+      // Audio bleibt sample-genau auf das Turn-Fenster vorgetrimmt; bei
+      // Preclips ist das ohnehin Pflicht, weil Sync.so kein `segments_secs`
+      // auf Audio-Inputs unterstützt.
       { type: "audio", url: audioUrl },
     ],
     options,
   };
+
+
 
 
   if (webhookUrl) {
@@ -741,35 +766,109 @@ async function processScene(
     }
     return { status: "lipsyncing", mutated: false };
   }
-  const pending = sortedShots.filter((s) => s.status === "pending");
+  // ── Step 2a: trigger per-turn Preclips (v10 Artlist Pipeline) ──────
+  // Bevor wir Sync.so anrufen, materialisieren wir jeden Turn als kurzen
+  // MP4-Clip ab t=0 via Remotion Lambda (`DialogTurnClipVideo`). Damit
+  // muss Sync.so kein langes Master mit `segments_secs` intern auseinander-
+  // schneiden — der häufigste Auslöser für "An unknown error occurred".
+  const MAX_PRECLIP_RETRIES = 2;
+  const PRECLIP_RENDER_TIMEOUT_MS = 10 * 60 * 1000;
+  const pendingForPreclip = sortedShots.filter(
+    (s) => s.status === "pending" && !s.preclip_url,
+  );
+  for (const shot of pendingForPreclip) {
+    if (!shot.render_window) {
+      shot.render_window = expandWindow(shot, shots);
+      mutated = true;
+    }
+    // Watchdog for stuck preclip renders.
+    if (shot.preclip_status === "rendering" && shot.preclip_started_at) {
+      const ageMs = Date.now() - Date.parse(shot.preclip_started_at);
+      if (Number.isFinite(ageMs) && ageMs > PRECLIP_RENDER_TIMEOUT_MS) {
+        shot.preclip_status = "failed";
+        shot.preclip_render_id = undefined;
+        shot.preclip_error = `preclip_timeout_${Math.round(ageMs / 1000)}s`;
+        mutated = true;
+      }
+    }
+    if (shot.preclip_status === "rendering") continue;
+    if (shot.preclip_status === "failed") {
+      const tries = Number(shot.preclip_retry_count) || 0;
+      if (tries >= MAX_PRECLIP_RETRIES) {
+        // Fall back to legacy master+segments_secs path for this shot.
+        console.warn(
+          `[poll-dialog-shots] turn ${shot.idx} preclip exhausted (${tries} tries) — falling back to master+segments_secs`,
+        );
+        shot.sync_source_kind = "master";
+        mutated = true;
+        continue;
+      }
+    }
+    // Dispatch a new preclip render.
+    try {
+      const resp = await fetch(`${supabaseUrl0}/functions/v1/render-dialog-turn`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+        },
+        body: JSON.stringify({ sceneId, shotIdx: shot.idx }),
+      });
+      if (resp.ok) {
+        shot.preclip_status = "rendering";
+        shot.preclip_started_at = shot.preclip_started_at || new Date().toISOString();
+        mutated = true;
+        console.log(
+          `[poll-dialog-shots] turn ${shot.idx} preclip dispatched window=[${shot.render_window![0].toFixed(2)},${shot.render_window![1].toFixed(2)}]`,
+        );
+      } else {
+        const t = await resp.text().catch(() => "");
+        shot.preclip_status = "failed";
+        shot.preclip_error = `dispatch ${resp.status}: ${t.slice(0, 180)}`;
+        shot.preclip_retry_count = (Number(shot.preclip_retry_count) || 0) + 1;
+        mutated = true;
+        console.warn(
+          `[poll-dialog-shots] turn ${shot.idx} preclip dispatch failed ${resp.status}: ${t.slice(0, 240)}`,
+        );
+      }
+    } catch (e) {
+      shot.preclip_status = "failed";
+      shot.preclip_error = `dispatch crash: ${(e as Error)?.message ?? "unknown"}`;
+      shot.preclip_retry_count = (Number(shot.preclip_retry_count) || 0) + 1;
+      mutated = true;
+    }
+  }
+
+  // ── Step 2b: dispatch pending shots (v10 Artlist-style) ────────────
+  // Standard: preclip_url + noSegments=true (kurzer Clip ab t=0).
+  // Fallback: master + segments_secs (Legacy-Pfad nach preclip-Erschöpfung
+  // oder bei `sync_source_kind='master'`).
+  const pending = sortedShots.filter((s) => {
+    if (s.status !== "pending") return false;
+    // Block until preclip ready OR fallback explicitly chosen.
+    if (s.sync_source_kind === "master") return true;
+    return !!s.preclip_url;
+  });
   let dispatchedThisTick = 0;
   for (const nextShot of pending) {
     if (dispatchedThisTick >= MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK) break;
     try {
-      // Always render on the ORIGINAL master plate — never on another shot's
-      // Sync.so output. Chaining caused later turns to re-animate earlier
-      // speakers' mouths with the wrong audio ("ghost speech").
-      const sourceUrl = state.source_clip_url;
+      const usePreclip = !!nextShot.preclip_url && nextShot.sync_source_kind !== "master";
+      const sourceUrl = usePreclip ? (nextShot.preclip_url as string) : state.source_clip_url;
       const win = (nextShot.render_window
         ?? expandWindow(nextShot, shots)) as [number, number];
       nextShot.render_window = win;
-      // Deterministic-first dispatch (Artlist parity, May 2026):
-      // For multi-speaker scenes the FaceMap already identity-matched each
-      // turn to a pixel coordinate. Letting Sync.so auto_detect the speaker
-      // inside a two-shot frame is the #1 cause of "wrong mouth moves" —
-      // the provider routinely picks the wrong face when both are visible.
-      // → If we have target_coords AND the shot was flagged deterministic
-      //   (or this is a retry), dispatch with coords + frame_number.
-      // → Only fall back to auto_detect when no coords exist at all
-      //   (single-speaker scenes are safe).
+      // For preclips the Sync.so video starts at t=0, so we pass a
+      // synthetic [0, dur] window for frame_number/audio length sizing.
+      const dispatchWindow: [number, number] = usePreclip
+        ? [0, Math.max(0.1, win[1] - win[0])]
+        : win;
+      nextShot.sync_source_kind = usePreclip ? "preclip" : "master";
+
       const mode = dispatchModeForShot(nextShot);
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
-      // v9.1 Artlist parity: pre-trim the per-speaker WAV to the exact
-      // turn window so Sync.so doesn't read audio from t=0 (first
-      // sentence in the per-speaker track) while the video plays a later
-      // window. Only trim when we have an isolated per-speaker track AND
-      // userId is available. For merged-master fallback we skip — the
-      // legacy auto_detect path stays.
+      // Audio bleibt immer sample-genau vorgetrimmt (Sync.so v2 supports
+      // segments_secs nur am Video, nicht am Audio).
       let audioUrl = fullAudioUrl;
       let audioTrimmed = false;
       if (nextShot.audio_url && userId) {
@@ -795,13 +894,14 @@ async function processScene(
         syncKey,
         sourceUrl,
         audioUrl,
-        win,
+        dispatchWindow,
         nextShot.target_coords,
         nextShot.temperature,
         nextShot.idx,
         mode,
         syncWebhookUrl,
         nextShot.frame_number_override,
+        /* noSegments */ usePreclip,
       );
       nextShot.sync_job_id = jobId;
       nextShot.status = "lipsyncing";
@@ -809,8 +909,9 @@ async function processScene(
       mutated = true;
       dispatchedThisTick++;
       console.log(
-        `[poll-dialog-shots] v9.1 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} mode=${mode} src=MASTER audio=${fullAudioUrl === state.master_audio_url ? "MERGED(fallback)" : "ISOLATED"} trimmed=${audioTrimmed} window=[${win[0].toFixed(2)},${win[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+        `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
       );
+
 
     } catch (e) {
       if (e instanceof SyncConcurrencyDeferredError) {

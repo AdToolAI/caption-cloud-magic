@@ -28,7 +28,13 @@ const ShotSchema = z.object({
   endSec: z.number().min(0),
   /** Sync.so per-turn output (already lipsynced to this window). */
   outputUrl: z.string().url(),
+  /** 'absolute' = output deckt komplette Master-Timeline ab (legacy
+   *  segments_secs-Pfad) → mit startFrom=startFrame ausrichten.
+   *  'relative' = output ist kurzer Preclip ab t=0 (v10 Artlist-Pipeline)
+   *  → ohne startFrom direkt in das Fenster legen. */
+  sourceTiming: z.enum(['absolute', 'relative']).optional(),
 });
+
 
 export const DialogStitchVideoSchema = z.object({
   masterVideoUrl: z.string().url(),
@@ -93,10 +99,11 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 src={shot.outputUrl}
                 muted
                 playbackRate={1}
-                // Start the overlay clip from the same absolute time as
-                // the master so the lipsynced face is geometrically
-                // aligned with the underlying plate.
-                startFrom={startFrame}
+                // 'relative' = short preclip starting at frame 0 (v10),
+                // 'absolute' = full-length master overlay (legacy segments_secs).
+                {...(shot.sourceTiming === 'relative'
+                  ? {}
+                  : { startFrom: startFrame })}
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             </AbsoluteFill>
@@ -106,6 +113,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
 
       {/* Single canonical audio track (merged master WAV). */}
       {masterAudioUrl && <Audio src={masterAudioUrl} />}
+
 
       {/* Suppress unused var warning for totalSec — used in calculateMetadata. */}
       {totalSec ? null : null}
