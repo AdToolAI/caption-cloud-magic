@@ -57,6 +57,33 @@ export default function PipelineProgressBar({
     }
   }, [isActive, hasFailure, visible]);
 
+  // Sync.so concurrency slot indicator — surfaces *why* a scene is "waiting"
+  // when 3 lipsync jobs are already in flight (Sync.so Creator plan limit).
+  const lipsyncPhase = phases.find((p) => p.id === 'lipsync');
+  const lipsyncRunning = lipsyncPhase?.status === 'running';
+  const [syncsoSlots, setSyncsoSlots] = useState<number | null>(null);
+  useEffect(() => {
+    if (!lipsyncRunning) {
+      setSyncsoSlots(null);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      const cutoff = new Date(Date.now() - 10 * 60_000).toISOString();
+      const { count } = await supabase
+        .from('syncso_inflight_jobs')
+        .select('job_id', { count: 'exact', head: true })
+        .gte('started_at', cutoff);
+      if (!cancelled) setSyncsoSlots(typeof count === 'number' ? count : 0);
+    };
+    refresh();
+    const id = window.setInterval(refresh, 5_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [lipsyncRunning]);
+
   if (!visible) return null;
 
   return (
