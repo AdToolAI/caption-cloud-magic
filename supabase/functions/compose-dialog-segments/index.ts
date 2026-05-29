@@ -371,11 +371,21 @@ serve(async (req) => {
       })),
     ];
 
-    // ── Face-targeting per segment ───────────────────────────────────────
-    // Without per-segment coordinates, Sync.so picks ONE detected face and
-    // drives ALL segments onto it (root cause of "first character speaks the
-    // whole script" bug). Resolve a face map from the scene anchor + identity-
-    // match against character portraits, then attach per-segment coordinates.
+    // ── Face-targeting (multi-speaker) ───────────────────────────────────
+    // Sync.so's segments API does NOT accept per-segment `options`. To drive
+    // the correct face per turn we build a TOP-LEVEL per-frame
+    // `active_speaker_detection.bounding_boxes` array — each entry is the
+    // active speaker's bbox for that frame ([x1, y1, x2, y2] in video pixel
+    // coords), or null when no face should be targeted. Sync.so docs:
+    // https://sync.so/docs/developer-guides/speaker-selection
+    //
+    // For single-speaker scenes we fall back to the simpler
+    // `frame_number` + `coordinates` shortcut (matches poll-dialog-shots).
+    //
+    // IMPORTANT: the previous version sent `options.activeSpeakerDetection`
+    // (camelCase), which Sync.so rejects with HTTP 422
+    // "property activeSpeakerDetection does not exist". The correct key is
+    // snake_case `active_speaker_detection`.
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const anchorUrl =
       (scene as any).lock_reference_url ||
@@ -399,6 +409,24 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} faceMap resolve failed: ${(err as Error).message}`,
       );
     }
+
+    // Per-speaker bbox lookup (anchor pixel space — matches the i2v plate's
+    // native resolution closely enough that Sync.so lands on the right face).
+    type Bbox = [number, number, number, number];
+    const speakerBboxes: Array<Bbox | null> = speakers.map((sp, idx) => {
+      if (!faceMap?.faces?.length) return null;
+      const wanted = String(sp.character_id ?? "").toLowerCase();
+      const byId = wanted
+        ? faceMap.faces.find((f) => String(f.characterId ?? "").toLowerCase() === wanted)
+        : null;
+      const bySide = !byId
+        ? faceMap.faces.find((f) => f.side === (idx === 0 ? "left" : "right"))
+        : null;
+      const hit = byId ?? bySide ?? faceMap.faces[idx] ?? null;
+      if (!hit?.bbox || hit.bbox.length !== 4) return null;
+      return hit.bbox as Bbox;
+    });
+    // Per-speaker single-point coords for the single-speaker fast path.
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
         speakerIdx: idx,
@@ -408,32 +436,68 @@ serve(async (req) => {
       return picked?.coords ?? null;
     });
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} speakerCoords=${JSON.stringify(speakerCoords)}`,
+      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} bboxes=${JSON.stringify(speakerBboxes)}`,
     );
+
+    // Build top-level `options.active_speaker_detection`.
+    //
+    // Multi-speaker (≥2 speakers AND ≥2 known bboxes): per-frame bounding_boxes.
+    // Single-speaker (1 speaker OR only one bbox resolved): frame_number+coordinates.
+    // Otherwise: omit — Sync.so auto-detects.
+    const ASSUMED_FPS = 24; // Hailuo / Kling i2v default; close enough for ASD windowing
+    const totalFrames = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
+    const usableBboxes = speakerBboxes.filter((b): b is Bbox => !!b);
+    const multiSpeaker = speakers.length >= 2 && usableBboxes.length >= 2;
+
+    let asdOptions: Record<string, unknown> | null = null;
+    if (multiSpeaker) {
+      // Fallback bbox = the first known speaker's bbox (used for frames that
+      // fall in gaps between segments so we never send all-nulls).
+      const fallbackBbox = usableBboxes[0];
+      const boundingBoxes: Array<Bbox | null> = new Array(totalFrames).fill(null);
+      // Pre-sort segments by start for stable lookup.
+      const sortedSegs = [...segments].sort((a, b) => a.startTime - b.startTime);
+      let segCursor = 0;
+      for (let f = 0; f < totalFrames; f++) {
+        const t = f / ASSUMED_FPS;
+        while (
+          segCursor < sortedSegs.length - 1 &&
+          t >= sortedSegs[segCursor].endTime
+        ) {
+          segCursor++;
+        }
+        const seg = sortedSegs[segCursor];
+        const inSeg = seg && t >= seg.startTime && t < seg.endTime;
+        const bbox = inSeg ? speakerBboxes[seg.speakerIdx] : null;
+        boundingBoxes[f] = bbox ?? fallbackBbox;
+      }
+      asdOptions = {
+        auto_detect: false,
+        bounding_boxes: boundingBoxes,
+      };
+    } else if (speakerCoords[0]) {
+      asdOptions = {
+        auto_detect: false,
+        frame_number: Math.max(0, Math.floor(totalFrames / 2)),
+        coordinates: speakerCoords[0],
+      };
+    }
 
     const payload: Record<string, unknown> = {
       model: LIPSYNC_MODEL,
       input,
-      // Top-level fallback: first speaker's coords drive auto-detection if the
-      // segments[] options shape isn't honored by an older Sync.so version.
-      ...(speakerCoords[0]
-        ? { options: { activeSpeakerDetection: { coordinates: speakerCoords[0] } } }
+      ...(asdOptions
+        ? { options: { active_speaker_detection: asdOptions } }
         : {}),
-      segments: segments.map((s) => {
-        const coords = speakerCoords[s.speakerIdx] ?? null;
-        return {
+      segments: segments.map((s) => ({
+        startTime: s.startTime,
+        endTime: s.endTime,
+        audioInput: {
+          refId: s.refId,
           startTime: s.startTime,
           endTime: s.endTime,
-          audioInput: {
-            refId: s.refId,
-            startTime: s.startTime,
-            endTime: s.endTime,
-          },
-          ...(coords
-            ? { options: { activeSpeakerDetection: { coordinates: coords } } }
-            : {}),
-        };
-      }),
+        },
+      })),
       webhookUrl,
       webhook_url: webhookUrl,
     };

@@ -1,63 +1,35 @@
-# Was die DB wirklich sagt
+Der Fehler ist jetzt konkret identifiziert: Die aktuelle v5-Funktion sendet `options.activeSpeakerDetection`, Sync.so akzeptiert aber nur `options.active_speaker_detection`. Deshalb kommt der 422-Fehler `Invalid generation options: property activeSpeakerDetection does not exist` und die App zeigt nur generisch „Edge Function returned a non-2xx status code“.
 
-Ich habe die letzten Szenen direkt aus `composer_scenes` gelesen:
+Do I know what the issue is? Ja: Es ist kein Secret-, Timing- oder v4/v5-Routing-Problem. Es ist ein API-Schema-Fehler im neuen Face-Targeting-Patch.
 
-| Szene | dialog_shots.version | engine | status | Bemerkung |
-|---|---|---|---|---|
-| `386381bd…` (zuletzt erfolgreich gerendert) | **5** | `sync-segments` | `applied` | ✅ v5 hat 1 Sync.so-Call mit 3 segments[] gemacht und ein clip_url zurückgegeben |
-| `6005fa3c…` (davor steckengeblieben) | **4** | – | `failed` | alte v4-Zeile von vor dem Env-Var-Fix |
-| `e9ce0e05…` | **4** | – | `failed` | dito |
+Plan:
 
-**Ja, v5 läuft.** Der Beweis ist `engine=sync-segments` + `sync_job_id` (Sync.so Generation-UUID) auf der einen erfolgreichen Szene. Die zwei "failed"-Zeilen sind alte v4-Reste, die der Watchdog refundet hat.
+1. `compose-dialog-segments` korrigieren
+   - Das ungültige camelCase-Feld `activeSpeakerDetection` entfernen.
+   - Auf das offizielle Sync.so-Feld `active_speaker_detection` wechseln.
+   - Nicht mehr unsupported `options` pro Segment senden.
 
-# Das echte Problem: Face-Targeting fehlt in v5
+2. Multi-Speaker trotzdem in einem v5-Call erhalten
+   - Aus der vorhandenen `audio_plan.twoshot.faceMap` die Face-Bounding-Boxes pro Charakter nutzen.
+   - Für Sync.so eine top-level `active_speaker_detection.bounding_boxes`-Sequenz erzeugen: Frames innerhalb eines Sprecher-Segments bekommen die Box des aktiven Sprechers.
+   - Dadurch bleibt es bei einem einzigen Sync.so Segments-Call, aber jeder Sprecher steuert das richtige Gesicht.
 
-In `compose-dialog-segments` wird folgendes an Sync.so geschickt:
+3. Fehlerausgabe verbessern
+   - Die UI/Toast-Meldung soll den echten Backend-Fehler anzeigen, nicht nur „Edge Function returned a non-2xx status code“.
+   - Für diesen Fall würde dann z. B. sichtbar: `syncso_dispatch_failed 422: Invalid generation options...`.
 
-```ts
-segments: segments.map((s) => ({
-  startTime, endTime,
-  audioInput: { refId, startTime, endTime },
-}))
-```
+4. Betroffene Szene zurücksetzbar machen
+   - Die aktuell fehlgeschlagene Szene `7755034f-...` wurde bereits refundet und steht auf `lip_sync_status=failed`.
+   - Nach dem Code-Fix kann sie über „Lip-Sync neu rendern“ sauber erneut mit v5 gestartet werden; falls nötig setze ich nur diesen Fehlerzustand zurück, ohne andere Szenen anzufassen.
 
-Kein `targetCoords`, kein `faceBbox`, kein `personId` pro Segment. Sync.so hat genau zwei Modi:
+5. Validierung
+   - Edge Function neu deployen.
+   - Mit derselben Szene einen Test-Call ausführen.
+   - Erwartetes Ergebnis: kein 422 mehr, sondern ein Sync.so `job_id` und `dialog_shots.version=5`, `engine=sync-segments`, `status=rendering`.
 
-1. Wir sagen pro Segment **welches Gesicht** angesteuert werden soll.
-2. Wir sagen es nicht → Sync.so wählt **ein** Gesicht (in der Regel das größte / links erkannte) und legt ALLE Audio-Segmente darauf.
-
-Genau das siehst du: "der erste Charakter spricht das gesamte Skript".
-
-Die alte v4-Pipeline (`compose-twoshot-lipsync`) löst das, weil sie pro Sprecher einen separaten Sync.so-Call mit `targetCoords: firstTarget.coords` (Gemini-Vision detektiert die zwei Gesichter im Two-Shot-Anker und mappt sie auf die Charaktere, gecached in `audio_plan.twoshot.faceMap`). v5 nutzt diese vorhandene `faceMap` schlicht nicht — der Speed-Gewinn wurde mit dem Verlust der Face-Disambiguierung erkauft.
-
-# Zweites Problem: Progress-Bar bleibt bei 95 % stehen
-
-Der "fertig"-Badge an der Szene stimmt (lip_sync_status=applied). Der globale `PipelineProgressBar` zählt aber alle 5 Szenen-Phasen und scheint einen Stage nicht als terminal zu erkennen — wahrscheinlich weil eine andere Szene (`ccd1e3a4…`, ohne clip_url, lip_sync_status=NULL) noch als "in Arbeit" zählt obwohl sie nie gestartet wurde. Muss ich kurz im Komponentencode verifizieren.
-
-# Plan
-
-### 1. Face-Targeting in v5 nachrüsten (Hauptfix)
-- `compose-dialog-segments` liest dieselbe `audio_plan.twoshot.faceMap` wie v4 (Gemini-Vision-Cache existiert bereits).
-- Falls keine `faceMap` da ist: gleicher Gemini-Vision-Call wie in v4 nachholen (oder Helper aus `compose-twoshot-lipsync` in `_shared/` ziehen — Stage H der Lipsync-Stages).
-- Pro `segment` wird `options.targetCoords: [nx, ny]` mitgegeben, basierend auf dem `character_id` des `speakerIdx`. Sync.so segments-API akzeptiert `options` pro Segment (gleicher Shape wie auf der Top-Level-API, die v4 verwendet).
-- Bei Single-Speaker-Szenen passiert nichts Neues — kein Regression-Risiko.
-
-### 2. Sync.so-Output in eigenes Storage downloaden
-- `sync-so-webhook` schreibt aktuell `clip_url = https://api.sync.so/v2/generations/{id}/result?token=…`. Der Token läuft nach ~24 h ab → Composer-Replays brechen später.
-- Nach COMPLETED: fetch + Upload nach `ai-videos/composer/{userId}/{sceneId}-lipsync.mp4`, dann `clip_url` auf die Storage-URL setzen. Idempotent über bestehenden `state.refunded`-Pfad erweitert.
-
-### 3. PipelineProgressBar Stuck-at-95 %-Fix
-- Komponente kurz auditieren: Szenen ohne `lip_sync_status` aber mit `clip_url` als terminal zählen, "skipped" Szenen (kein Dialog) komplett aus Lipsync-Phase ausschließen. Reine Frontend-Änderung.
-
-### 4. Alte v4-Failed-Szenen aufräumen
-- Die zwei `failed`-Reihen sind harmlos (Watchdog hat refundet), aber blockieren ggf. UI-Polling. Per "Erneut versuchen"-Klick laufen sie jetzt sauber durch v5 — kein DB-Eingriff nötig.
-
-# Bewusst NICHT Teil dieses Plans
-- Wechsel auf Sync.so `personActiveSegments` / multi-person preview API. `targetCoords` pro Segment ist die kleinste Änderung mit größtem Effekt; ein Pipeline-Rewrite auf das neuere Person-Detection-Schema lohnt sich erst, wenn 3+ Sprecher Standard werden.
-- Keine Änderungen an der Routing-Logik, Concurrency-Limits oder Webhook-Pfaden — die laufen alle korrekt.
-
-# Aufwand
-~30 min. 1 Edge-Function (`compose-dialog-segments`), 1 Webhook (`sync-so-webhook`), 1 Komponente (`PipelineProgressBar.tsx`), optional 1 Helper in `_shared/twoshot-face-map.ts`. Kein DB-Migration, kein Secret-Touch.
-
-# Frage
-Soll ich alle drei Punkte (1+2+3) zusammen umsetzen oder erst nur den Face-Targeting-Fix (1) ausrollen und 2+3 separat?
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
