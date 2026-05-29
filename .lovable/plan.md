@@ -1,56 +1,45 @@
+# Was wirklich passiert ist
 
-## Was ich gefunden habe
+Die "Edge Function Fehler"-Meldung im UI kommt von `compose-dialog-segments` → **500 `missing_sync_api_key`**. Direktes curl gegen die laufende Funktion bestätigt das.
 
-**Die aktuelle, "hängende" Szene** (`e9ce0e05…`) läuft auf `engine_override = 'cinematic-sync'` und steht in `twoshot_stage='lipsync_1'`. Das ist der **alte v4-Pfad** (`compose-dialog-scene`), der die 3 Sprecher-Turns **streng sequenziell** durch Sync.so schickt:
+Ursache ist ein simpler **Env-Var-Naming-Mismatch**, kein Sync.so-Outage und kein Bug in der Lipsync-Logik:
 
-```text
-turn 0 (2.3s)  →  Sync.so  ~3-5 min
-                                     ↓
-turn 1 (0.9s)  →  Sync.so  ~3-5 min   ← Wahrscheinlichkeitsspitze für "sync_FAILED: unknown error"
-                                                 ↓
-turn 2 (…)     →  Sync.so  ~3-5 min
-                                                              ↓
-                                                              Stitch
-```
+| Funktion | gelesene Env-Var-Namen |
+|---|---|
+| `poll-dialog-shots` (v4-Pfad) | `SYNC_API_KEY` → `SYNC_SO_API_KEY` → `SYNCSO_API_KEY` ✅ |
+| `compose-twoshot-lipsync` (legacy) | `SYNC_API_KEY` ✅ |
+| `poll-twoshot-lipsync` (legacy) | `SYNC_API_KEY` ✅ |
+| **`compose-dialog-segments` (v5)** | `SYNC_SO_API_KEY` → `SYNCSO_API_KEY` ❌ — `SYNC_API_KEY` fehlt |
 
-Also: pro Szene ~10–15 min Wallclock, und **kein einziger paralleler Call**. Das ist nicht das, was Artlist macht.
+Das im Supabase-Vault hinterlegte Secret heißt `SYNC_API_KEY` (alle anderen Funktionen lesen es seit Monaten erfolgreich). Beim Bau der neuen v5-Pipeline wurde der erste Fallback-Name vergessen → die Funktion bootet, kommt sofort in den Key-Check, returnt 500 — kein Log, keine Telemetrie.
 
-**Bestätigung aus der DB:**
-- `syncso_dispatch_log` ist komplett leer → v4 schreibt keine Telemetrie, wir sind blind.
-- `syncso_inflight_jobs` leer → der ganze E.3-Concurrency-Guard + v5-Code wird in deinem heutigen Flow **nie betreten**, weil v5 nie ausgewählt wird.
-- Historie: häufiger Fehler ist `sync_FAILED: An unknown error occurred.` — typischerweise wenn Sync.so eines der per-turn-Audios als zu kurz / leise / leer ablehnt. Bei dir gibt es einen Turn mit nur 0.929s — genau ein klassischer Trigger.
-- Außerdem ein 429 in der Historie: Sync.so hat ein Concurrency-Limit (Creator-Plan: 3 parallele Jobs). Mehr als 3 Szenen gleichzeitig lipsyncen geht nicht ohne Plan-Upgrade.
+Konsequenz: Seit der Default-Switch auf v5 (vorherige Iteration) **jede** Dialog-Szene mit `engine_override='cinematic-sync'` oder `'sync-segments'` läuft sofort in diesen 500 — der Hook setzt dann `engine_override='cinematic-sync'` zurück, der v4-Watchdog übernimmt, und am Ende kommt der bekannte `watchdog_stuck_lipsync_refunded`. Genau das Muster der letzten zwei Szenen in der DB.
 
-**Was Artlist tatsächlich macht** ist nicht "viele kleine Calls parallel" — sondern: **EIN Call pro Master-Video mit allen Segmenten als `segments[]`-Array**, und Sync.so verarbeitet die intern parallel. Das ist exakt **v5 `sync-segments`** (`compose-dialog-segments`), den ich in den letzten Stages gebaut habe — aber er ist heute nur ein optionaler Dropdown-Eintrag, kein Default.
+# Plan
 
-## Plan
+### 1. Env-Var-Lookup in `compose-dialog-segments` fixen
+Eine Zeile: `Deno.env.get("SYNC_API_KEY")` als ersten Lookup ergänzen, identisch zu `poll-dialog-shots`. Plus dieselbe `checked:`-Liste im 500-Body wie dort, damit zukünftige Naming-Fehler sofort sichtbar sind statt stumm im Log.
 
-### 1. v5 `sync-segments` zum Default machen
-- `useTwoShotAutoTrigger.ts` Zeilen 327–332: Routing umkehren — Default ist `compose-dialog-segments`, der v4-Pfad (`compose-dialog-scene`) wird nur noch genutzt, wenn `engine_override === 'cinematic-sync'` **explizit** gesetzt ist.
-- `SceneCard` Engine-Dropdown: "⚡ Fast Dialog · 1-Call" als ausgewählter Default markieren, v4 als "Legacy (per-turn)" mit Warnungs-Icon.
-- Bei Szenen, die heute schon mit `engine_override=''` oder `'cinematic-sync'` in der DB stehen: einmaliger UI-Migrations-Hinweis "Auf Fast Dialog umschalten?" mit One-Click-Switch — kein Auto-Rewrite, damit laufende Renders nicht abreißen.
+### 2. Shared Helper (`_shared/syncso-preflight.ts`)
+`getSyncApiKey()` Helper hinzufügen, der die drei Namen in fester Reihenfolge prüft. `compose-dialog-segments` und `poll-dialog-shots` ziehen den Helper. Künftige Sync.so-Funktionen müssen nicht mehr raten welcher Name "richtig" ist.
 
-### 2. Cross-Scene-Parallelität ehrlich sichtbar machen
-Sync.so Creator erlaubt 3 parallele Jobs. Das nutzen wir jetzt schon nicht, weil v4 jeden Job intern in 3 sequentielle Sub-Jobs splittet → effektiv läuft pro Szene nur ein Sync.so-Slot. Mit v5 = 1 Job pro Szene können wir tatsächlich 3 Szenen parallel lipsyncen.
-- Auto-Trigger schon jetzt batched (Loop über alle Kandidaten in einem Tick) — mit v5 nutzt das den E.3-Guard sauber aus.
-- Zusätzlich ein UI-Indikator "X von 3 Sync.so-Slots aktiv" oben in der Lipsync-Statusleiste, gespeist aus `syncso_inflight_jobs`. Macht für den User sichtbar, warum z.B. Szene 4 noch "wartet" statt "läuft".
+### 3. Stuck Scene aufräumen
+Die aktuell hängende Szene `6005fa3c-…` steht seit ~12 min in `lip_sync_status='running'` mit v4-Shots. Der `twoshot-lipsync-watchdog` pickt sie beim nächsten cron-tick auf und refundet. Sobald der Fix deployed ist, kann der User per UI "Lip-Sync erneut" klicken — diesmal greift v5 mit korrektem API-Key.
 
-### 3. Die "sync_FAILED unknown error" konkret abfangen
-- In `compose-dialog-segments`: vor dem Dispatch eine **harte Untergrenze pro Segment** (0.5s) durchsetzen. Wenn ein Segment kürzer ist: an das nächste annähen oder mit Stille pad (gleiche Logik wie F.2 Loudness, aber zeitbasiert). Heute gibt's nur eine globale 3s-Mindestdauer für das Gesamt-Audio.
-- Sync.so v2 Response-Body bei FAILED loggen — gerade die "unknown error"-Meldung ist die generische Default-Message, der eigentliche Grund steht in `error.details` und wird heute verworfen. Direkt nach Stage F.6 (Schema-Drift-Detector) das gleiche Pattern auch für FAILED-Bodies.
+Kein DB-Eingriff nötig, kein User-Refund-Hack — der bestehende Refund-Pfad ist idempotent.
 
-### 4. v4 Telemetrie nachrüsten oder v4 abschalten
-Zwei Optionen, ich empfehle die zweite:
-- **A:** v4 mit `logSyncDispatch()`-Calls instrumentieren (~20 min). Wir wissen dann, warum die alten Szenen failen, aber bauen Tech-Debt aus.
-- **B (empfohlen):** v4 nur noch als manueller "Fallback Compatibility Mode" hinter einem Settings-Toggle; die "Auto-Retry"-Logik im Hook routet failed v4-Szenen automatisch auf v5 um. Spart uns die Doppel-Wartung.
+### 4. Memory-Update
+Kurze Notiz in `mem/architecture/lipsync/syncso-default-segments-engine.md` ergänzen: "Sync.so secret heißt `SYNC_API_KEY` (legacy) — neue Funktionen MÜSSEN alle drei Namen in der Reihenfolge `SYNC_API_KEY → SYNC_SO_API_KEY → SYNCSO_API_KEY` lesen, sonst booten sie in 500."
 
-### 5. Sync.so Plan-Hinweis im UI
-Wenn die letzten 24h einen 429 hatten ODER `syncso_inflight_jobs.count >= 3` zum Zeitpunkt eines neuen Trigger-Tick: Inline-Hinweis in der Lipsync-Bar "Sync.so Concurrency-Slot voll — Szene wartet ~X min. Plan upgraden?". Kein automatischer Block, nur Transparenz.
+# Bewusst NICHT Teil dieses Plans
 
-## Was bewusst NICHT Teil dieses Plans ist
-- Multi-Provider-Fallback (Sync.so → Hedra/HeyGen Switch bei Rate-Limit). Eigenes Epic, deutlich größer.
-- "Echte" Cross-Szenen-Parallelisierung über 3 hinaus — das ist eine Sync.so-Account-Limitierung, nicht unser Code.
-- Refactoring der v4-Stitch-Lambda. Wenn Schritt 4B durchgeht, brauchen wir die irgendwann gar nicht mehr.
+- Umbenennung des Vault-Secrets auf den "schöneren" Namen. Das würde alle Legacy-Funktionen brechen und ist eine separate Operation.
+- Weitere Änderungen an der Lipsync-Logik. Die Pipeline ist nach diesem Fix funktional korrekt; der Rest (Concurrency, Segment-Längen-Guard, …) ist bereits in den vorigen Stages umgesetzt.
 
-## Frage an dich
-Soll ich den Plan **komplett** so umsetzen (Schritte 1–5, ~90 min), oder nur Schritt **1 + 3 + 5** sofort (Default-Switch + Segment-Length-Guard + UI-Hinweis, ~30 min) und Schritt 2/4 separat?
+# Aufwand
+
+~5 min. 2 Dateien (`compose-dialog-segments/index.ts`, `_shared/syncso-preflight.ts`), 1 Memory-Update, 1 Edge-Function-Redeploy.
+
+# Frage
+
+Soll ich direkt umsetzen?
