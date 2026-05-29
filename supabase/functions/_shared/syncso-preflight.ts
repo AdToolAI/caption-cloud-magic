@@ -289,6 +289,65 @@ export function normalizeWav(
   };
 }
 
+// ── VAD detection (Stage E.1) ───────────────────────────────────────────
+
+export interface VadResult {
+  voicedSec: number;
+  totalSec: number;
+  voicedRatio: number;
+  /** Longest contiguous voiced run in seconds. */
+  longestVoicedRun: number;
+}
+
+/**
+ * Cheap energy-gate VAD on a 16-bit PCM WAV. Splits into 20ms frames and
+ * counts frames with peak amplitude >= -35 dBFS as "voiced". Returns the
+ * voiced ratio and the longest contiguous voiced run.
+ *
+ * Used as a pre-dispatch guard: if a "voiceover" WAV has no detectable
+ * speech (TTS dropped, encoding bug, silent input) Sync.so will return
+ * `unknown error` or animate a closed mouth. We catch it here instead.
+ */
+export function detectVoicedFrames(wav: Uint8Array): VadResult {
+  const info = inspectWav(wav);
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  const frameLenSec = 0.02;
+  const framesPerWindow = Math.max(1, Math.floor(info.sampleRate * frameLenSec));
+  const voicedThresh = 10 ** (-35 / 20);
+  let voicedWindows = 0;
+  let totalWindows = 0;
+  let longestRun = 0;
+  let currentRun = 0;
+  for (let f = 0; f < info.totalFrames; f += framesPerWindow) {
+    const end = Math.min(info.totalFrames, f + framesPerWindow);
+    let peak = 0;
+    for (let g = f; g < end; g += 2) { // stride-2 for CPU
+      let maxC = 0;
+      for (let c = 0; c < info.channels; c++) {
+        const s = dv.getInt16(info.dataOff + (g * info.channels + c) * 2, true);
+        const a = Math.abs(s) / 32768;
+        if (a > maxC) maxC = a;
+      }
+      if (maxC > peak) peak = maxC;
+    }
+    totalWindows++;
+    if (peak >= voicedThresh) {
+      voicedWindows++;
+      currentRun += frameLenSec;
+      if (currentRun > longestRun) longestRun = currentRun;
+    } else {
+      currentRun = 0;
+    }
+  }
+  const voicedSec = voicedWindows * frameLenSec;
+  return {
+    voicedSec,
+    totalSec: info.durSec,
+    voicedRatio: totalWindows > 0 ? voicedWindows / totalWindows : 0,
+    longestVoicedRun: longestRun,
+  };
+}
+
 // ── Coords sanity ───────────────────────────────────────────────────────
 
 export interface CoordsCheck {
@@ -316,6 +375,321 @@ export function checkCoordsBounds(
     return { ok: false, reason: "out_of_bounds", clamped: [cx, cy] };
   }
   return { ok: true };
+}
+
+/** Clamp coords into [margin, dim-margin]. Returns null if dims unknown. */
+export function clampCoordsToBounds(
+  coords: [number, number] | null | undefined,
+  width: number,
+  height: number,
+): [number, number] | null {
+  if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return null;
+  if (!width || !height) return [coords[0], coords[1]];
+  const margin = 8;
+  return [
+    Math.max(margin, Math.min(width - margin, coords[0])),
+    Math.max(margin, Math.min(height - margin, coords[1])),
+  ];
+}
+
+// ── Segment validation (Stage E.4) ──────────────────────────────────────
+
+export interface SegmentLike {
+  startTime: number;
+  endTime: number;
+  speakerIdx?: number;
+  speakerName?: string;
+  refId?: string;
+}
+
+export interface SegmentValidation {
+  ok: boolean;
+  reason?: string;
+  /** Auto-fixed segments (clamped + sorted + de-overlapped). */
+  fixed: SegmentLike[];
+  /** Repairs applied for telemetry. */
+  repairs: string[];
+}
+
+const SEG_MIN_DUR = 0.3;
+const SEG_MAX_DUR = 30;
+const SEG_OVERLAP_TOLERANCE = 0.01; // 10ms
+
+/**
+ * Validate + auto-repair a Sync.so segments array.
+ *  - Sort by startTime
+ *  - Clamp each segment into [0, totalSec]
+ *  - Drop segments <SEG_MIN_DUR or >SEG_MAX_DUR (cannot heal those)
+ *  - Trim overlaps: if seg[i+1].start < seg[i].end, push seg[i+1].start forward
+ *  - Final hard check: any remaining gap/overlap/coverage failure → ok=false
+ */
+export function validateSegments(
+  segments: SegmentLike[],
+  totalSec: number,
+): SegmentValidation {
+  const repairs: string[] = [];
+  if (!Array.isArray(segments) || segments.length === 0) {
+    return { ok: false, reason: "no_segments", fixed: [], repairs };
+  }
+  // Clone + clamp + sort
+  let work: SegmentLike[] = segments
+    .map((s) => ({
+      ...s,
+      startTime: Math.max(0, Math.min(totalSec, Number(s.startTime) || 0)),
+      endTime: Math.max(0, Math.min(totalSec, Number(s.endTime) || 0)),
+    }))
+    .filter((s) => {
+      const d = s.endTime - s.startTime;
+      if (d < SEG_MIN_DUR) {
+        repairs.push(`dropped_short_seg_${d.toFixed(3)}s`);
+        return false;
+      }
+      if (d > SEG_MAX_DUR) {
+        repairs.push(`dropped_long_seg_${d.toFixed(1)}s`);
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a.startTime - b.startTime);
+
+  if (work.length === 0) {
+    return { ok: false, reason: "all_segments_invalid_after_clamp", fixed: [], repairs };
+  }
+
+  // De-overlap (preserve next segment, trim previous)
+  for (let i = 0; i < work.length - 1; i++) {
+    const cur = work[i];
+    const next = work[i + 1];
+    if (next.startTime < cur.endTime - SEG_OVERLAP_TOLERANCE) {
+      const newEnd = next.startTime;
+      if (newEnd - cur.startTime < SEG_MIN_DUR) {
+        return {
+          ok: false,
+          reason: `overlap_unfixable_at_${i}`,
+          fixed: work,
+          repairs,
+        };
+      }
+      repairs.push(`trimmed_overlap_at_${i}_${(cur.endTime - newEnd).toFixed(3)}s`);
+      cur.endTime = newEnd;
+    }
+  }
+
+  const maxEnd = work[work.length - 1].endTime;
+  if (maxEnd > totalSec + 0.1) {
+    return { ok: false, reason: `exceeds_total_${maxEnd.toFixed(2)}>${totalSec.toFixed(2)}`, fixed: work, repairs };
+  }
+
+  return { ok: true, fixed: work, repairs };
+}
+
+// ── Concurrency guard + backoff (Stage E.3) ─────────────────────────────
+
+/** Default max parallel Sync.so jobs (Creator plan). */
+export const SYNCSO_DEFAULT_MAX_PARALLEL = 3;
+
+export async function countInflightSyncJobs(
+  supabase: { from: (t: string) => any },
+): Promise<number> {
+  try {
+    const { count, error } = await supabase
+      .from("syncso_inflight_jobs")
+      .select("job_id", { count: "exact", head: true })
+      .gt("expires_at", new Date().toISOString());
+    if (error) {
+      console.warn(`[syncso-preflight] inflight count failed: ${error.message}`);
+      return 0;
+    }
+    return Number(count) || 0;
+  } catch (e) {
+    console.warn(`[syncso-preflight] inflight count crash: ${(e as Error).message}`);
+    return 0;
+  }
+}
+
+export async function registerInflightSyncJob(
+  supabase: { from: (t: string) => any },
+  row: { job_id: string; user_id?: string | null; scene_id?: string | null; engine: string },
+): Promise<void> {
+  try {
+    await supabase.from("syncso_inflight_jobs").upsert(
+      {
+        job_id: row.job_id,
+        user_id: row.user_id ?? null,
+        scene_id: row.scene_id ?? null,
+        engine: row.engine,
+        started_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      },
+      { onConflict: "job_id" },
+    );
+  } catch (e) {
+    console.warn(`[syncso-preflight] register inflight crash: ${(e as Error).message}`);
+  }
+}
+
+export async function releaseInflightSyncJob(
+  supabase: { from: (t: string) => any },
+  jobId: string,
+): Promise<void> {
+  try {
+    await supabase.from("syncso_inflight_jobs").delete().eq("job_id", jobId);
+  } catch (e) {
+    console.warn(`[syncso-preflight] release inflight crash: ${(e as Error).message}`);
+  }
+}
+
+/** Exponential backoff with jitter, capped at 60s. attempt is 1-based. */
+export function computeBackoffMs(attempt: number): number {
+  const base = Math.min(60_000, (2 ** Math.max(0, attempt - 1)) * 2_000);
+  const jitter = Math.floor(Math.random() * 3_000);
+  return base + jitter;
+}
+
+// ── MP4 stream probe (Stage E.2) ────────────────────────────────────────
+
+export interface VideoStreamInfo {
+  ok: boolean;
+  codec?: string;        // e.g. "avc1" | "hev1" | "vp09"
+  width?: number;
+  height?: number;
+  hasAudioTrack?: boolean;
+  /** True only if we positively detected non-H.264. */
+  isUnsupportedCodec?: boolean;
+  reason?: string;
+}
+
+/**
+ * Very lightweight MP4 probe: RANGE-fetch first 256kB, walk the box tree
+ * looking for the first `trak`/`stsd` codec FourCC and any `soun` handler.
+ * Conservative: returns ok=true with empty codec when moov is too far in
+ * the file (faststart not enabled). Only flags hard failures.
+ */
+export async function probeMp4Stream(url: string): Promise<VideoStreamInfo> {
+  if (!url) return { ok: false, reason: "empty_url" };
+  try {
+    const r = await fetch(url, { headers: { Range: "bytes=0-262143" } });
+    if (!r.ok && r.status !== 206) {
+      return { ok: false, reason: `http_${r.status}` };
+    }
+    const buf = new Uint8Array(await r.arrayBuffer());
+    return parseMp4Boxes(buf);
+  } catch (e) {
+    return { ok: false, reason: (e as Error)?.message ?? "fetch_failed" };
+  }
+}
+
+function parseMp4Boxes(buf: Uint8Array): VideoStreamInfo {
+  const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+  const codecs: string[] = [];
+  let width: number | undefined;
+  let height: number | undefined;
+  let hasAudioTrack = false;
+  let currentHandler: string | null = null;
+
+  function walk(start: number, end: number) {
+    let p = start;
+    while (p + 8 <= end) {
+      const size = dv.getUint32(p, false);
+      const type = String.fromCharCode(buf[p + 4], buf[p + 5], buf[p + 6], buf[p + 7]);
+      if (size < 8 || p + size > end) return;
+      const contentStart = p + 8;
+      const contentEnd = p + size;
+      // Container boxes
+      if (["moov", "trak", "mdia", "minf", "stbl", "edts"].includes(type)) {
+        walk(contentStart, Math.min(end, contentEnd));
+      } else if (type === "hdlr") {
+        // handler box: 4 reserved + 4 handler_type (chars)
+        if (contentEnd - contentStart >= 12) {
+          const h = String.fromCharCode(
+            buf[contentStart + 8],
+            buf[contentStart + 9],
+            buf[contentStart + 10],
+            buf[contentStart + 11],
+          );
+          currentHandler = h;
+          if (h === "soun") hasAudioTrack = true;
+        }
+      } else if (type === "stsd") {
+        // first child sample-entry, FourCC at offset +8 (version+flags+count = 8 bytes)
+        if (contentEnd - contentStart >= 16) {
+          const codec = String.fromCharCode(
+            buf[contentStart + 12],
+            buf[contentStart + 13],
+            buf[contentStart + 14],
+            buf[contentStart + 15],
+          );
+          if (currentHandler === "vide" || currentHandler === null) {
+            codecs.push(codec);
+            // visual sample entry: width @ +32, height @ +34 inside the entry
+            const entryStart = contentStart + 8; // start of entry (size+codec)
+            if (contentEnd - entryStart >= 36) {
+              width = dv.getUint16(entryStart + 32, false);
+              height = dv.getUint16(entryStart + 34, false);
+            }
+          }
+        }
+      }
+      p += size;
+    }
+  }
+
+  walk(0, buf.byteLength);
+  const codec = codecs[0];
+  const supported = !codec || /^(avc1|avc3|hvc1|hev1)$/.test(codec);
+  return {
+    ok: true,
+    codec,
+    width,
+    height,
+    hasAudioTrack,
+    isUnsupportedCodec: !!codec && !supported,
+  };
+}
+
+export async function probeVideoStreamCached(
+  supabase: { from: (t: string) => any },
+  url: string,
+  ttlHours = 24,
+): Promise<VideoStreamInfo> {
+  try {
+    const { data: cached } = await supabase
+      .from("video_stream_probe_cache")
+      .select("codec, width, height, fps, has_audio_track, probed_at")
+      .eq("video_url", url)
+      .maybeSingle();
+    if (cached?.probed_at) {
+      const ageMs = Date.now() - Date.parse(cached.probed_at);
+      if (ageMs < ttlHours * 3600 * 1000) {
+        return {
+          ok: true,
+          codec: cached.codec ?? undefined,
+          width: cached.width ?? undefined,
+          height: cached.height ?? undefined,
+          hasAudioTrack: cached.has_audio_track ?? undefined,
+          isUnsupportedCodec: !!cached.codec && !/^(avc1|avc3|hvc1|hev1)$/.test(cached.codec),
+        };
+      }
+    }
+  } catch { /* cache miss / table absent */ }
+
+  const probe = await probeMp4Stream(url);
+  if (probe.ok) {
+    try {
+      await supabase.from("video_stream_probe_cache").upsert(
+        {
+          video_url: url,
+          codec: probe.codec ?? null,
+          width: probe.width ?? null,
+          height: probe.height ?? null,
+          has_audio_track: probe.hasAudioTrack ?? null,
+          probed_at: new Date().toISOString(),
+        },
+        { onConflict: "video_url" },
+      );
+    } catch { /* best effort */ }
+  }
+  return probe;
 }
 
 // ── Dispatch log writer ─────────────────────────────────────────────────
@@ -380,19 +754,32 @@ export async function logSyncDispatch(
 export function classifySyncError(message?: string | null): string {
   if (!message) return "unknown";
   const m = message.toLowerCase();
+  if (/no_voiced_frames|preflight_audio_no_voice|silence|voiced|vad/.test(m)) return "audio_no_voice";
+  if (/unsupported.*codec|codec.*not.*support|video_codec_unsupported/.test(m)) return "video_codec_unsupported";
+  if (/segments?.*invalid|overlap|segment.*reject/.test(m)) return "segments_invalid";
+  if (/face_validation|no_face|face.gate/.test(m)) return "face_validation_failed";
+  if (/precheck/.test(m)) return "precheck_face_mismatch";
   if (/unknown error/.test(m)) return "provider_unknown_error";
   if (/segment/.test(m)) return "segment_rejected";
   if (/face|speaker|mouth/.test(m)) return "face_detection";
-  if (/audio|silence|voiced|onset|vad/.test(m)) return "audio_issue";
-  if (/video|codec|resolution|fps/.test(m)) return "video_issue";
+  if (/audio|onset/.test(m)) return "audio_issue";
+  if (/video|resolution|fps/.test(m)) return "video_issue";
   if (/timeout|timed.out/.test(m)) return "timeout";
   if (/rate.?limit|concurrency|429/.test(m)) return "rate_limited";
   if (/auth|unauthorized|forbidden/.test(m)) return "auth";
   if (/http.*4\d\d/.test(m)) return "http_4xx";
   if (/http.*5\d\d/.test(m)) return "http_5xx";
-  if (/face_validation|no_face/.test(m)) return "face_validation_failed";
-  if (/precheck/.test(m)) return "precheck_face_mismatch";
   return "other";
+}
+
+/** True for errors worth retrying (transient infra / provider blips). */
+export function isTransientSyncError(errorClass: string): boolean {
+  return [
+    "provider_unknown_error",
+    "timeout",
+    "rate_limited",
+    "http_5xx",
+  ].includes(errorClass);
 }
 
 // ── Face validation helper (Stage D) ────────────────────────────────────

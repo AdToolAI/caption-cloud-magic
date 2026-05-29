@@ -23,10 +23,18 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
+  clampCoordsToBounds,
+  countInflightSyncJobs,
+  detectVoicedFrames,
   inspectWav,
+  isTransientSyncError,
   logSyncDispatch,
   normalizeWav,
   probeAsset,
+  probeVideoStreamCached,
+  registerInflightSyncJob,
+  releaseInflightSyncJob,
+  SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
 } from "../_shared/syncso-preflight.ts";
 
@@ -405,7 +413,12 @@ interface PreparedAudio {
   channels: number;
   sampleRate: number;
   bytes: number;
+  voicedRatio: number;
+  longestVoicedRun: number;
 }
+
+const MIN_VOICED_RATIO = 0.15;
+const MIN_LONGEST_VOICED_RUN_SEC = 0.4;
 
 async function ensureNormalizedTurnAudio(
   supabase: ReturnType<typeof createClient>,
@@ -433,6 +446,8 @@ async function ensureNormalizedTurnAudio(
           channels: 1,
           sampleRate: 24000,
           bytes: Number(head.headers.get("content-length") ?? "0") || 0,
+          voicedRatio: Number((shot as any).audio_voiced_ratio ?? 1),
+          longestVoicedRun: Number((shot as any).audio_longest_voiced_run ?? 0),
         };
       }
     } catch { /* fall through to regenerate */ }
@@ -450,6 +465,16 @@ async function ensureNormalizedTurnAudio(
     forceMono: true,
   });
 
+  // Stage E.1: VAD on the SLICED (pre-pad) signal so 0.25s lead-in & tail
+  // padding don't poison the ratio.
+  let vad = { voicedRatio: 1, longestVoicedRun: 0, voicedSec: 0, totalSec: 0 } as
+    ReturnType<typeof detectVoicedFrames>;
+  try {
+    vad = detectVoicedFrames(sliced);
+  } catch (e) {
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} VAD inspect failed: ${(e as Error).message}`);
+  }
+
   const { error } = await supabase.storage
     .from("voiceover-audio")
     .upload(path, normalized.bytes, { contentType: "audio/wav", upsert: true });
@@ -463,9 +488,11 @@ async function ensureNormalizedTurnAudio(
   shot.audio_peak_dbfs = Number.isFinite(normalized.info.peakDbFs)
     ? normalized.info.peakDbFs
     : null;
+  (shot as any).audio_voiced_ratio = vad.voicedRatio;
+  (shot as any).audio_longest_voiced_run = vad.longestVoicedRun;
 
   console.log(
-    `[poll-dialog-shots] turn ${shot.idx} audio normalized path=${path} bytes=${normalized.bytes.byteLength} dur=${normalized.info.durSec.toFixed(2)}s peak=${Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs.toFixed(1) : "silent"}dBFS leadIn=${normalized.info.leadInSec.toFixed(3)}s gain=${normalized.appliedGain.toFixed(2)}x`,
+    `[poll-dialog-shots] turn ${shot.idx} audio normalized path=${path} bytes=${normalized.bytes.byteLength} dur=${normalized.info.durSec.toFixed(2)}s peak=${Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs.toFixed(1) : "silent"}dBFS leadIn=${normalized.info.leadInSec.toFixed(3)}s gain=${normalized.appliedGain.toFixed(2)}x voiced=${(vad.voicedRatio * 100).toFixed(0)}% longestRun=${vad.longestVoicedRun.toFixed(2)}s`,
   );
   return {
     url: pub.publicUrl,
@@ -475,6 +502,8 @@ async function ensureNormalizedTurnAudio(
     channels: 1,
     sampleRate: normalized.info.sampleRate,
     bytes: normalized.bytes.byteLength,
+    voicedRatio: vad.voicedRatio,
+    longestVoicedRun: vad.longestVoicedRun,
   };
 }
 
@@ -815,7 +844,10 @@ async function processScene(
         shot.status = "ready";
         shot.completed_at = new Date().toISOString();
         mutated = true;
+        // E.3: release inflight slot
+        if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
+        if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
         if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
           degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`, shots);
         }
@@ -823,6 +855,7 @@ async function processScene(
       }
 
     });
+
 
     // ── Step 1b: per-shot 4-min watchdog (v12 Stability) ─────────────
     // Sync.so jobs that don't finish in ~4 min are functionally dead —
@@ -1054,6 +1087,96 @@ async function processScene(
         continue;
       }
 
+      // ── Stage E.1: VAD guard — block dispatch when audio has no voice ──
+      if (preparedAudio && (
+        preparedAudio.voicedRatio < MIN_VOICED_RATIO ||
+        preparedAudio.longestVoicedRun < MIN_LONGEST_VOICED_RUN_SEC
+      )) {
+        const reason = "preflight_audio_no_voice";
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} VAD BLOCK voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}% longestRun=${preparedAudio.longestVoicedRun.toFixed(2)}s`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          audio_dur_sec: preparedAudio.durSec,
+          audio_lead_in_sec: preparedAudio.leadInSec,
+          audio_peak_dbfs: preparedAudio.peakDbFs,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "VAD_BLOCKED",
+          error_class: "audio_no_voice",
+          error_message: `voiced_ratio=${preparedAudio.voicedRatio.toFixed(3)} longest_run=${preparedAudio.longestVoicedRun.toFixed(2)}s`,
+          meta: { voiced_ratio: preparedAudio.voicedRatio, longest_voiced_run: preparedAudio.longestVoicedRun },
+        });
+        // VAD failures are deterministic — invalidate trimmed cache & retry
+        // once (which re-fetches/normalizes). If it persists → hard fail.
+        nextShot.trimmed_audio_url = undefined;
+        if (!prepareShotRetry(nextShot, reason, shots)) {
+          markShotTerminalFailed(nextShot, `${reason}: voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}%`);
+        }
+        mutated = true;
+        continue;
+      }
+
+      // ── Stage E.2: Master video stream probe (codec sanity) ──────────
+      // Cached per URL for 24h. Only blocks on POSITIVE detection of an
+      // unsupported codec — when we can't tell, we let Sync.so try.
+      const streamProbe = await probeVideoStreamCached(supabase, sourceUrl);
+      if (streamProbe.ok && streamProbe.isUnsupportedCodec) {
+        const reason = `preflight_video_codec_${streamProbe.codec}`;
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} VIDEO-CODEC BLOCK codec=${streamProbe.codec} ${streamProbe.width}x${streamProbe.height}`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "CODEC_BLOCKED",
+          error_class: "video_codec_unsupported",
+          error_message: `codec=${streamProbe.codec} dims=${streamProbe.width}x${streamProbe.height}`,
+          meta: { stream: streamProbe },
+        });
+        // Switching source kind (preclip ↔ master) may re-encode → retry.
+        if (!prepareShotRetry(nextShot, reason, shots)) {
+          markShotTerminalFailed(nextShot, reason);
+        }
+        mutated = true;
+        continue;
+      }
+
+      // ── Stage E.6: Coords-bounds sanity (clamp if we know dims) ──────
+      if (nextShot.target_coords && streamProbe.ok && streamProbe.width && streamProbe.height) {
+        const clamped = clampCoordsToBounds(
+          nextShot.target_coords,
+          streamProbe.width,
+          streamProbe.height,
+        );
+        if (clamped && (clamped[0] !== nextShot.target_coords[0] || clamped[1] !== nextShot.target_coords[1])) {
+          console.log(
+            `[poll-dialog-shots] turn ${nextShot.idx} COORDS clamped ${JSON.stringify(nextShot.target_coords)} → ${JSON.stringify(clamped)} (dims ${streamProbe.width}x${streamProbe.height})`,
+          );
+          nextShot.target_coords = clamped;
+          mutated = true;
+        }
+      }
+
+
+
       // ── Stufe D: Face validation gate (coords mode only) ──────────
       // Before paying Sync.so for a `mode=coords` dispatch, verify a
       // face is actually visible at the requested frame. If not, shift
@@ -1126,6 +1249,34 @@ async function processScene(
 
 
 
+      // ── Stage E.3: Concurrency guard (Creator plan = 3 parallel jobs) ──
+      const inflight = await countInflightSyncJobs(supabase);
+      if (inflight >= SYNCSO_DEFAULT_MAX_PARALLEL) {
+        nextShot.last_deferred_at = new Date().toISOString();
+        console.log(
+          `[poll-dialog-shots] turn ${nextShot.idx} CONCURRENCY DEFER inflight=${inflight}/${SYNCSO_DEFAULT_MAX_PARALLEL}`,
+        );
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          sync_status: "CONCURRENCY_DEFERRED",
+          error_class: "rate_limited",
+          error_message: `inflight=${inflight}`,
+          meta: { inflight, cap: SYNCSO_DEFAULT_MAX_PARALLEL },
+        });
+        mutated = true;
+        break; // stop dispatching this tick, next cron picks it up
+      }
+
       let jobId: string | null = null;
       let dispatchError: Error | null = null;
       try {
@@ -1147,8 +1298,15 @@ async function processScene(
         nextShot.started_at = new Date().toISOString();
         mutated = true;
         dispatchedThisTick++;
+        // E.3: register inflight so other scenes see this slot is taken
+        await registerInflightSyncJob(supabase, {
+          job_id: jobId,
+          user_id: userId ?? null,
+          scene_id: sceneId,
+          engine: "cinematic-sync",
+        });
         console.log(
-          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"} inflight=${inflight + 1}/${SYNCSO_DEFAULT_MAX_PARALLEL}`,
         );
       } catch (e) {
         if (e instanceof SyncConcurrencyDeferredError) {

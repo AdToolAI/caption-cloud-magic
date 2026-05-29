@@ -35,9 +35,13 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
+  countInflightSyncJobs,
   logSyncDispatch,
   probeAsset,
+  registerInflightSyncJob,
+  SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
+  validateSegments,
 } from "../_shared/syncso-preflight.ts";
 
 
@@ -220,7 +224,7 @@ serve(async (req) => {
       }
     });
 
-    const segments = raw.map((r) => ({
+    const rawSegments = raw.map((r) => ({
       startTime: Number(r.startTime.toFixed(3)),
       endTime: Number(r.endTime.toFixed(3)),
       speakerIdx: r.speakerIdx,
@@ -228,7 +232,29 @@ serve(async (req) => {
       refId: audioRefMap.get(r.audioUrl)!,
     }));
 
-    // ── Wallet reserve ───────────────────────────────────────────────────
+    // Stage E.4: validate + auto-repair segments before paying Sync.so.
+    const segValidation = validateSegments(rawSegments, totalSec);
+    if (!segValidation.ok) {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `segments_invalid_${segValidation.reason}`,
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "SEGMENTS_INVALID", error_class: "segments_invalid",
+        error_message: segValidation.reason ?? "unknown",
+        meta: { repairs: segValidation.repairs, original_count: rawSegments.length },
+      });
+      return json({ error: "segments_invalid", reason: segValidation.reason, repairs: segValidation.repairs }, 422);
+    }
+    if (segValidation.repairs.length > 0) {
+      console.warn(`[compose-dialog-segments] scene=${sceneId} segments auto-repaired: ${segValidation.repairs.join(", ")}`);
+    }
+    const segments = segValidation.fixed as typeof rawSegments;
     const totalCost = computeCost(totalSec);
     const { data: wallet } = await supabase
       .from("wallets")
