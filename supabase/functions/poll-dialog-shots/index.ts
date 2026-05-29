@@ -1054,6 +1054,78 @@ async function processScene(
         continue;
       }
 
+      // ── Stufe D: Face validation gate (coords mode only) ──────────
+      // Before paying Sync.so for a `mode=coords` dispatch, verify a
+      // face is actually visible at the requested frame. If not, shift
+      // the frame by ±8/±16/±24 until we find one. After 3 shifts,
+      // retry via prepareShotRetry which flips sync_source_kind.
+      if (mode === "coords" && nextShot.target_coords) {
+        const fpsHint = 24;
+        const baseFrame = nextShot.frame_number_override
+          ?? Math.round(((dispatchWindow[0] + dispatchWindow[1]) / 2) * fpsHint);
+        const offsets = [0, -8, +8, -16, +16, -24, +24];
+        let validFrame: number | null = null;
+        let lastValidation: Awaited<ReturnType<typeof validateFrameFace>> | null = null;
+        for (const off of offsets) {
+          const tryFrame = Math.max(0, baseFrame + off);
+          const v = await validateFrameFace({
+            supabaseUrl: supabaseUrl0,
+            serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+            videoUrl: sourceUrl,
+            frameNumber: tryFrame,
+            fps: fpsHint,
+            targetCoords: nextShot.target_coords,
+          });
+          lastValidation = v;
+          // If validator itself failed (network/Gemini), do NOT block.
+          if (!v.ok) break;
+          // Permissive: faceVisible AND (no coords check OR coordsMatch)
+          if (v.faceVisible && (v.coordsMatch === null || v.coordsMatch === true)) {
+            validFrame = tryFrame;
+            break;
+          }
+        }
+        if (validFrame === null && lastValidation?.ok) {
+          // No face anywhere near the configured frame → retry/flip source kind
+          const reason = "face_validation_failed";
+          console.warn(
+            `[poll-dialog-shots] turn ${nextShot.idx} FACE-GATE blocked at baseFrame=${baseFrame} faces=${lastValidation.faceCount} coordsMatch=${lastValidation.coordsMatch}`,
+          );
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId ?? null,
+            engine: "cinematic-sync",
+            turn_idx: nextShot.idx,
+            attempt: nextShot.retry_count ?? 0,
+            mode,
+            sync_source_kind: nextShot.sync_source_kind ?? null,
+            video_url: sourceUrl,
+            audio_url: audioUrl,
+            window_start_sec: dispatchWindow[0],
+            window_end_sec: dispatchWindow[1],
+            coords: nextShot.target_coords ?? null,
+            frame_number: baseFrame,
+            sync_status: "FACE_GATE_BLOCKED",
+            error_class: reason,
+            error_message: `faces=${lastValidation.faceCount} coordsMatch=${lastValidation.coordsMatch}`,
+            meta: { faceBoxes: lastValidation.faceBoxes },
+          });
+          if (!prepareShotRetry(nextShot, reason, shots)) {
+            degradeShotToMaster(nextShot, reason, shots);
+          }
+          mutated = true;
+          continue;
+        }
+        if (validFrame !== null && validFrame !== baseFrame) {
+          console.log(
+            `[poll-dialog-shots] turn ${nextShot.idx} FACE-GATE shifted frame ${baseFrame} → ${validFrame}`,
+          );
+          nextShot.frame_number_override = validFrame;
+        }
+      }
+
+
+
       let jobId: string | null = null;
       let dispatchError: Error | null = null;
       try {
