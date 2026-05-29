@@ -312,6 +312,11 @@ function expandWindow(
 // (deterministic 16-bit PCM cut), upload to `voiceover-audio/trimmed/…`,
 // and pass that URL to Sync.so. Cached on `shot.trimmed_audio_url`.
 
+// v13 Sync.so Hardening — padding constants for trimmed audio
+const AUDIO_LEAD_IN_SEC = 0.25;   // silence before sentence (helps VAD)
+const AUDIO_TAIL_SEC = 0.20;      // silence after sentence
+const AUDIO_MIN_DUR_SEC = 3.0;    // sync.so unhappy with <2s; force ≥3s
+
 function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Array {
   const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
   if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) {
@@ -351,11 +356,24 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   const sliceByteLen = (endFrame - startFrame) * bytesPerFrame;
   const sliceBytes = wav.subarray(sliceByteOff, sliceByteOff + sliceByteLen);
 
+  // v13: pad with leading + trailing silence, and tail-pad to AUDIO_MIN_DUR_SEC.
+  // Sync.so's VAD needs a quiet onset to lock; sentences starting at sample 0
+  // are a major cause of `An unknown error occurred`. Min-length protects
+  // very short sentences (e.g. "Yes.") from being rejected as too-short clips.
+  const leadFrames = Math.max(0, Math.floor(AUDIO_LEAD_IN_SEC * sampleRate));
+  const tailFrames = Math.max(0, Math.floor(AUDIO_TAIL_SEC * sampleRate));
+  const speechFrames = endFrame - startFrame;
+  const minTotalFrames = Math.ceil(AUDIO_MIN_DUR_SEC * sampleRate);
+  const naiveTotal = leadFrames + speechFrames + tailFrames;
+  const extraTailFrames = Math.max(0, minTotalFrames - naiveTotal);
+  const totalOutFrames = naiveTotal + extraTailFrames;
+  const outDataLen = totalOutFrames * bytesPerFrame;
+
   // Re-pack as a fresh RIFF/WAVE with the original fmt parameters.
-  const outBuf = new ArrayBuffer(44 + sliceByteLen);
+  const outBuf = new ArrayBuffer(44 + outDataLen);
   const ov = new DataView(outBuf);
   ov.setUint32(0, 0x52494646, false); // "RIFF"
-  ov.setUint32(4, 36 + sliceByteLen, true);
+  ov.setUint32(4, 36 + outDataLen, true);
   ov.setUint32(8, 0x57415645, false); // "WAVE"
   ov.setUint32(12, 0x666d7420, false); // "fmt "
   ov.setUint32(16, 16, true);
@@ -366,8 +384,10 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   ov.setUint16(32, bytesPerFrame, true);
   ov.setUint16(34, bitsPerSample, true);
   ov.setUint32(36, 0x64617461, false); // "data"
-  ov.setUint32(40, sliceByteLen, true);
-  new Uint8Array(outBuf, 44).set(sliceBytes);
+  ov.setUint32(40, outDataLen, true);
+  // Silence is zero bytes for PCM16 — leadFrames + tail/extraTail already
+  // zero-initialised by ArrayBuffer. We only copy the speech in the middle.
+  new Uint8Array(outBuf, 44 + leadFrames * bytesPerFrame, sliceByteLen).set(sliceBytes);
   return new Uint8Array(outBuf);
 }
 
