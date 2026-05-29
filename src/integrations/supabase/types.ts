@@ -7438,32 +7438,47 @@ export type Database = {
         Row: {
           created_at: string
           expires_at: string
+          eye_open_score: number | null
+          face_score: number | null
           fps: number
           frame_number: number
           id: string
+          pitch_degrees: number | null
           result: Json
+          sharpness_score: number | null
           validator: string
           video_url: string
+          yaw_degrees: number | null
         }
         Insert: {
           created_at?: string
           expires_at?: string
+          eye_open_score?: number | null
+          face_score?: number | null
           fps?: number
           frame_number: number
           id?: string
+          pitch_degrees?: number | null
           result: Json
+          sharpness_score?: number | null
           validator?: string
           video_url: string
+          yaw_degrees?: number | null
         }
         Update: {
           created_at?: string
           expires_at?: string
+          eye_open_score?: number | null
+          face_score?: number | null
           fps?: number
           frame_number?: number
           id?: string
+          pitch_degrees?: number | null
           result?: Json
+          sharpness_score?: number | null
           validator?: string
           video_url?: string
+          yaw_degrees?: number | null
         }
         Relationships: []
       }
@@ -8986,6 +9001,72 @@ export type Database = {
           id?: string
           language?: string
           news_json?: Json
+        }
+        Relationships: []
+      }
+      normalized_master_cache: {
+        Row: {
+          bytes: number | null
+          created_at: string
+          duration_sec: number | null
+          error_message: string | null
+          expires_at: string
+          id: string
+          normalized_codec: string
+          normalized_fps: number
+          normalized_height: number
+          normalized_url: string
+          normalized_width: number
+          provider: string
+          provider_job_id: string | null
+          source_codec: string | null
+          source_fps: number | null
+          source_height: number | null
+          source_url: string
+          source_width: number | null
+          status: string
+        }
+        Insert: {
+          bytes?: number | null
+          created_at?: string
+          duration_sec?: number | null
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          normalized_codec?: string
+          normalized_fps?: number
+          normalized_height?: number
+          normalized_url: string
+          normalized_width?: number
+          provider?: string
+          provider_job_id?: string | null
+          source_codec?: string | null
+          source_fps?: number | null
+          source_height?: number | null
+          source_url: string
+          source_width?: number | null
+          status?: string
+        }
+        Update: {
+          bytes?: number | null
+          created_at?: string
+          duration_sec?: number | null
+          error_message?: string | null
+          expires_at?: string
+          id?: string
+          normalized_codec?: string
+          normalized_fps?: number
+          normalized_height?: number
+          normalized_url?: string
+          normalized_width?: number
+          provider?: string
+          provider_job_id?: string | null
+          source_codec?: string | null
+          source_fps?: number | null
+          source_height?: number | null
+          source_url?: string
+          source_width?: number | null
+          status?: string
         }
         Relationships: []
       }
