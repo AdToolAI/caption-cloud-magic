@@ -36,12 +36,19 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
   countInflightSyncJobs,
+  emitSystemAlert,
+  evaluateCircuit,
   logSyncDispatch,
+  openCircuit,
   probeAsset,
+  readPreferredSyncSourceKind,
+  recordCircuitFailure,
+  recordCircuitSuccess,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
   validateSegments,
+  validateSyncResponseShape,
 } from "../_shared/syncso-preflight.ts";
 
 
