@@ -147,6 +147,15 @@ serve(async (req) => {
   // E.3: release inflight slot for any terminal status (best-effort)
   await releaseInflightSyncJob(supabase, jobId);
 
+  // Stage F.3 — feed the provider circuit breaker on terminal status.
+  if (status === "COMPLETED") {
+    await recordCircuitSuccess(supabase, "sync.so");
+  } else {
+    const cls = classifySyncError((payload?.error ?? payload?.errorMessage ?? payload?.error_message ?? "").toString());
+    await recordCircuitFailure(supabase, "sync.so", cls);
+  }
+
+
   // Locate the scene that owns this sync_job_id. Prefer the scene_id query
   // hint if poll-dialog-shots embedded it in the webhook URL.
   const url = new URL(req.url);
