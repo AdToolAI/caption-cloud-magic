@@ -87,6 +87,12 @@ interface DialogShot {
    *  retries to avoid the frame that originally triggered Sync.so's
    *  "unknown error" (cuts/blinks/motion blur at window start). */
   frame_number_override?: number;
+  /** v9.1 Artlist parity: deterministic per-turn WAV slice (uploaded to
+   *  `voiceover-audio/trimmed/`). Sync.so v2 only accepts `segments_secs`
+   *  on video inputs, so we MUST pre-trim the audio upstream — otherwise
+   *  Sync.so reads audio from t=0 (first sentence) while the video plays
+   *  a later window → wrong-speaker / "unknown error". */
+  trimmed_audio_url?: string;
 }
 
 
