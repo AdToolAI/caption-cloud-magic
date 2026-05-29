@@ -27,7 +27,9 @@ import {
   logSyncDispatch,
   normalizeWav,
   probeAsset,
+  validateFrameFace,
 } from "../_shared/syncso-preflight.ts";
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
