@@ -110,21 +110,44 @@ interface TwoshotSpeaker {
   voicedRange?: { turns?: Turn[]; startSec?: number; endSec?: number };
 }
 
+interface SegmentItem {
+  startTime: number;
+  endTime: number;
+  speakerIdx: number;
+  speakerName: string;
+  refId: string;
+}
+
+interface PassState {
+  idx: number;
+  speaker_idx: number;
+  character_id: string | null;
+  speaker_name: string;
+  audio_url: string;
+  coords: [number, number] | null;
+  segments: SegmentItem[];
+  input_url: string;
+  job_id?: string;
+  output_url?: string;
+  status: "pending" | "rendering" | "done" | "failed";
+  started_at?: string;
+  finished_at?: string;
+  error?: string;
+}
+
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
   status: "queued" | "rendering" | "done" | "failed" | "retrying";
+  multi_pass: boolean;
+  passes: PassState[];
+  current_pass: number;
+  total_passes: number;
   sync_job_id?: string;
   source_clip_url: string;
   total_sec: number;
-  segments: Array<{
-    startTime: number;
-    endTime: number;
-    speakerIdx: number;
-    speakerName: string;
-    refId: string;
-  }>;
-  cost_credits: number;
+  segments: SegmentItem[];           // kept flat for diagnostics
+  cost_credits: number;              // SUM across all passes
   refunded: boolean;
   started_at: string;
   first_started_at?: string;
