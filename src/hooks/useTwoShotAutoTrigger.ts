@@ -20,6 +20,7 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { emitPipelineEvent } from '@/lib/pipelineEvents';
+import { extractFunctionsError } from '@/lib/functionsError';
 
 const POLL_INTERVAL_MS = 8_000;
 
