@@ -49,8 +49,11 @@ class SyncConcurrencyDeferredError extends Error {
 /** Pre-roll/tail for `segments_secs` (Sync.so VAD onset + frame-grid rounding).
  *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
  *  never bleed into another turn's region. */
-const SYNC_LEAD_IN_SEC = 0.18;
-const SYNC_TAIL_SEC = 0.12;
+// v11 Smoothness: leicht erhöhte Anlauf-/Auslaufframes geben Sync.so mehr
+// Bewegungsraum vor/nach der eigentlichen Sprechphase. Bleibt geclamped auf
+// die halbe Gap zum Nachbar-Turn, daher keine Overlap-Gefahr.
+const SYNC_LEAD_IN_SEC = 0.25;
+const SYNC_TAIL_SEC = 0.20;
 
 interface DialogShot {
   idx: number;
