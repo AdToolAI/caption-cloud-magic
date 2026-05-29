@@ -48,12 +48,10 @@ class SyncConcurrencyDeferredError extends Error {
 
 /** Pre-roll/tail for `segments_secs` (Sync.so VAD onset + frame-grid rounding).
  *  Hard-clamped to ½ of the gap to the nearest neighbour window so it can
- *  never bleed into another turn's region. */
-// v11 Smoothness: leicht erhöhte Anlauf-/Auslaufframes geben Sync.so mehr
-// Bewegungsraum vor/nach der eigentlichen Sprechphase. Bleibt geclamped auf
-// die halbe Gap zum Nachbar-Turn, daher keine Overlap-Gefahr.
-const SYNC_LEAD_IN_SEC = 0.25;
-const SYNC_TAIL_SEC = 0.20;
+ *  never bleed into another turn's region. v12 Stability: zurück auf
+ *  konservative Werte — aggressive Lead-In/Tail erhöhte die Sync.so-Failrate. */
+const SYNC_LEAD_IN_SEC = 0.18;
+const SYNC_TAIL_SEC = 0.12;
 
 interface DialogShot {
   idx: number;
@@ -144,10 +142,10 @@ function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
 
 const ASSUMED_MASTER_FPS_CONST = 24;
 
-/** Max provider retries per shot before terminal failure.
- *  Sync.so occasionally returns "unknown error" on a specific frame/window
- *  combo; we step through several deterministic strategies before giving up. */
-const MAX_SHOT_RETRIES = 3;
+/** Max provider retries per shot before we fall back to "degraded ready"
+ *  (use master plate for this turn instead of failing the whole scene).
+ *  v12 Stability: 3 → 1 — endlose Retry-Schleifen blockierten den Stitch. */
+const MAX_SHOT_RETRIES = 1;
 
 /** Stable temperatures to cycle through on retries. Lower values are safer
  *  on short windows; higher values force more articulation on long windows. */
@@ -212,6 +210,19 @@ function prepareShotRetry(
 function markShotTerminalFailed(shot: DialogShot, error: string) {
   shot.status = "failed";
   shot.error = error.slice(0, 300);
+  shot.completed_at = new Date().toISOString();
+}
+
+/** v12 Graceful Degrade: statt die ganze Szene auf "failed" zu setzen, wenn
+ *  ein einzelner Turn dauerhaft kein Lip-Sync produziert, markieren wir den
+ *  Shot als `ready` ohne `output_url`. DialogStitchVideo skippt dann das
+ *  Overlay für dieses Fenster und zeigt die saubere Master-Plate. So bleibt
+ *  der Export funktionsfähig — lieber 1 Turn ohne Mundbewegung als 0 Video. */
+function degradeShotToMaster(shot: DialogShot, error: string) {
+  shot.status = "ready";
+  (shot as any).degraded = true;
+  shot.output_url = undefined;
+  shot.error = `degraded_to_master: ${error}`.slice(0, 300);
   shot.completed_at = new Date().toISOString();
 }
 
@@ -402,16 +413,14 @@ async function startSyncTurnJob(
    *  trimmed video and fail with "An unknown error occurred". */
   noSegments: boolean = false,
 ): Promise<string> {
-  // v11 Smoothness: temperature wird konservativ geclamped (≤0.5). Niedrigere
-  // Werte erzeugen ruhigere, weniger zappelige Mundbewegungen — wichtig für
-  // natürlichen Dialog. Retries dürfen weiterhin höher cyclen via Override.
+  // v12 Stability: temperature konservativ geclamped (≤0.5); occlusion-detection
+  // wieder entfernt — es korrelierte mit erhöhter Sync.so-Failrate (sync_FAILED).
+  // Smoothness wird über DialogStitchVideo-Crossfade abgedeckt.
   const smoothTemp = Math.min(Math.max(temperature, 0.2), 0.5);
   const options: Record<string, unknown> = {
     output_format: "mp4",
     sync_mode: "cut_off",
     temperature: smoothTemp,
-    // Ruhigere Übergänge, wenn Hand/Mikro/Objekt kurz vor dem Mund ist.
-    occlusion_detection_enabled: true,
   };
   // Determine the segment length in frames for frame_number clamping. For
   // preclips the segment is the whole clip starting at t=0.
@@ -709,32 +718,28 @@ async function processScene(
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
         if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
-          markShotTerminalFailed(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
+          degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
         }
         mutated = true;
       }
 
     });
 
-    // ── Step 1b (Stage 5 B.4): per-shot 8-min watchdog ────────────────
-    // A Sync.so job that hasn't returned COMPLETED/FAILED within 8 min
-    // after dispatch is functionally dead. Mark it failed with a clear
-    // error code so the user (and our diagnostics) can distinguish a
-    // provider stall from a render-stitch issue. Refund happens via
-    // pipelineStatus='failed' below (refundIfNeeded is idempotent via
-    // state.refunded).
-    const PER_SHOT_TIMEOUT_MS = 15 * 60 * 1000;
+    // ── Step 1b: per-shot 4-min watchdog (v12 Stability) ─────────────
+    // Sync.so jobs that don't finish in ~4 min are functionally dead —
+    // they used to block the whole stitch for 15 min. Now we degrade fast.
+    const PER_SHOT_TIMEOUT_MS = 4 * 60 * 1000;
     for (const shot of shots) {
       if (shot.status !== "lipsyncing" || !shot.started_at) continue;
       const ageMs = Date.now() - Date.parse(shot.started_at);
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
-      const timeoutReason = `sync_so_timeout_15min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
-      if (!prepareShotRetry(shot, "sync_so_timeout_15min", shots)) {
-        markShotTerminalFailed(shot, timeoutReason);
+      const timeoutReason = `sync_so_timeout_4min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
+      if (!prepareShotRetry(shot, "sync_so_timeout_4min", shots)) {
+        degradeShotToMaster(shot, timeoutReason);
       }
       mutated = true;
       console.warn(
-        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_15min job=${shot.sync_job_id} ageMs=${ageMs}`,
+        `[poll-dialog-shots] turn ${shot.idx} sync_so_timeout_4min job=${shot.sync_job_id} ageMs=${ageMs}`,
       );
     }
   }
@@ -780,8 +785,8 @@ async function processScene(
   // MP4-Clip ab t=0 via Remotion Lambda (`DialogTurnClipVideo`). Damit
   // muss Sync.so kein langes Master mit `segments_secs` intern auseinander-
   // schneiden — der häufigste Auslöser für "An unknown error occurred".
-  const MAX_PRECLIP_RETRIES = 2;
-  const PRECLIP_RENDER_TIMEOUT_MS = 10 * 60 * 1000;
+  const MAX_PRECLIP_RETRIES = 1;
+  const PRECLIP_RENDER_TIMEOUT_MS = 4 * 60 * 1000;
   const pendingForPreclip = sortedShots.filter(
     (s) => s.status === "pending" && !s.preclip_url,
   );
@@ -936,7 +941,7 @@ async function processScene(
       } else {
         const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
         if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
-          markShotTerminalFailed(nextShot, reason);
+          degradeShotToMaster(nextShot, reason);
         }
         mutated = true;
       }
@@ -975,7 +980,9 @@ async function processScene(
     const multi = isMultiSpeakerScene(shots);
     if (multi) {
       const invalid = shots.filter(
-        (s) => !s.target_coords || s.deterministic_coords !== true,
+        (s) =>
+          (s as any).degraded !== true &&
+          (!s.target_coords || s.deterministic_coords !== true),
       );
       if (invalid.length > 0) {
         const ids = invalid.map((s) => s.idx).join(",");

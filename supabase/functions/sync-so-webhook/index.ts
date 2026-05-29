@@ -39,7 +39,7 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
 }
 
 const ASSUMED_MASTER_FPS = 24;
-const MAX_SHOT_RETRIES = 3;
+const MAX_SHOT_RETRIES = 1;
 const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
 
 function isMultiSpeakerScene(shots: any[]): boolean {
@@ -205,8 +205,13 @@ serve(async (req) => {
     shot.completed_at = nowIso;
     shot.error = undefined;
   } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
-    shot.status = "failed";
-    shot.error = `sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 240)}`;
+    // v12 Graceful Degrade: statt die ganze Szene zu killen, markieren wir
+    // den Turn als "ready ohne Lipsync-Overlay" — DialogStitchVideo zeigt
+    // dann die saubere Master-Plate für dieses Fenster.
+    shot.status = "ready";
+    shot.degraded = true;
+    shot.output_url = undefined;
+    shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
     shot.completed_at = nowIso;
   }
 

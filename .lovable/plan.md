@@ -1,48 +1,90 @@
+## Einschätzung
+
+Artlist veröffentlicht keine exakten SLA-Zeiten für Lip-Sync. Der entscheidende Unterschied ist aber: Bei Artlist/HappyHorse läuft Dialog/Lip-Sync möglichst provider-nativ in einer Generation bzw. stark gekapselt, nicht als lange Kette aus Szene → Preclip → externer Lip-Sync pro Turn → Stitch. Für kurze 5–10s Dialog-Clips sollte ein robuster Zielwert bei uns eher bei ca. 2–5 Minuten liegen, nicht 15 Minuten.
+
+Was ich gerade sehe:
+- Der Backend-Status ist gesund.
+- Die aktuelle Szene hängt nicht an der Datenbank, sondern an Sync.so-Failures/Retry-Schleifen.
+- Es gab mehrere `sync_FAILED → retry 1/3 ... retry 3/3` für einzelne Turns.
+- Der Watchdog steht aktuell effektiv bei 15 Minuten pro Shot. Das ist zu lang für UX und fühlt sich wie „nie fertig“ an.
+- Zusätzlich sehe ich doppelte Dispatch-Logs für denselben Turn. Das kann durch parallele Poller/Webhook-Kicks passieren und erhöht Kosten, Wartezeit und Fehlerwahrscheinlichkeit.
+
 ## Ziel
 
-Das Reden in der Dialog-Pipeline natürlicher und smoother machen, **ohne** die jetzt stabile Preclip → Sync.so → Stitch Pipeline anzufassen.
+Die Pipeline soll nicht versuchen, jeden einzelnen Turn endlos perfekt zu retten, sondern wie ein Produktivsystem arbeiten:
 
-## Was sich ändert (klein & isoliert)
+```text
+schnell versuchen → gezielt 1x retten → sauber degradieren → Video fertigstellen
+```
 
-Nur zwei Stellschrauben in `poll-dialog-shots/index.ts` rund um den Sync.so-Dispatch:
+Das senkt die sichtbare Fehlerquote, weil der Gesamtprozess nicht mehr an einem einzelnen problematischen Mund-Fenster hängen bleibt.
 
-### 1. Sync.so Qualitäts-Parameter
+## Plan
 
-Beim Sync.so-Call pro Turn die offiziellen Smoothing-Optionen mitschicken:
+### 1. Sync.so-Risiko wieder reduzieren
 
-- `model: sync-2-pro` (bleibt)
-- `options.sync_mode: "cut_off"` (bleibt, wegen VO-länger-als-Plate)
-- **neu** `options.temperature: 0.4` → konservativer, weniger zappelig
-- **neu** `options.active_speaker: true` bei Multi-Sprecher-Plates → verhindert Mund-Artefakte bei Nicht-Sprechern
-- **neu** `options.occlusion_detection_enabled: true` → ruhigere Übergänge wenn Hand/Objekt vor dem Mund ist
+Ich würde die letzte „Smoothness“-Änderung teilweise entschärfen:
+- `occlusion_detection_enabled` vorerst wieder entfernen oder nur optional senden.
+- Temperatur konservativ lassen, aber nicht auf Retry-Werte hochziehen, die wieder Zappeln/Failures provozieren.
+- Lead-In/Tail moderat halten, aber keine aggressiven Extra-Fenster bei sehr kurzen Turns.
 
-Das sind reine Provider-Hints, kein Eingriff in Preclip-Materialisierung oder Stitch.
+Warum: Smoothness darf nicht die Completion-Rate verschlechtern. Erst Stabilität, dann Feinschliff.
 
-### 2. Render-Window Lead-In/Tail leicht erhöhen
+### 2. Watchdog von 15 Minuten auf produktive Grenze senken
 
-Aktuell `lead-in 0.18s / tail 0.12s`. Wir erhöhen auf `lead-in 0.25s / tail 0.20s` (weiterhin geclamped auf die halbe Gap zum Nachbarn).
+Ändern in `poll-dialog-shots`:
+- Sync.so-Shot-Timeout: ca. 4 Minuten statt 15 Minuten.
+- Preclip-Timeout: ca. 3–4 Minuten statt 10 Minuten.
+- Max. Sync-Retries: von 3 auf 1–2 reduzieren.
 
-Effekt: Sync.so hat etwas mehr Anlauf- und Auslaufframes pro Turn → Mundöffnung startet/endet weicher, kein hartes In/Out. Da das Fenster sowohl Preclip- als auch Stitch-Overlay-Range definiert, bleibt die Geometrie konsistent.
+Effekt: Ein kaputter Turn blockiert nicht den ganzen Clip.
 
-### 3. Stitch-Crossfade an Turn-Grenzen (rein visuell)
+### 3. Graceful Fallback statt kompletter Pipeline-Fehler
 
-In `DialogStitchVideo.tsx` an jedem Overlay-Sequence-Übergang ein 3-Frame Opacity-Crossfade auf den Overlay-Layer legen (Master darunter läuft weiter). Kein Recut, kein neuer Render-Pfad — nur ein `interpolate` auf `opacity` in den ersten/letzten 3 Frames jedes Shots.
+Wenn ein Turn nach kurzer Retry-Phase weiter fehlschlägt:
+- Nicht die ganze Szene als failed markieren.
+- Den Turn als „degraded ready“ behandeln.
+- Beim Stitch wird für diesen Turn die originale Master-Plate verwendet, also keine perfekte Mundbewegung, aber das Video wird fertig.
 
-Effekt: Mikro-Sprung beim Wechsel zwischen Master-Plate und lipsynced Overlay wird unsichtbar.
+Das ist näher an professioneller Produktlogik: Lieber 95% Output fertig liefern als 0% wegen eines 0.9s-Turns.
 
-## Was bewusst NICHT angefasst wird
+### 4. Duplicate-Dispatch-Schutz einbauen
 
-- Preclip-Renderer (`DialogTurnClipVideo`, `render-dialog-turn`)
-- Webhook-Routing (`remotion-webhook`, `sync-so-webhook`)
-- Compose / Audio-Trimming / Refund-Logik
-- Lambda-Bundle muss nur neu deployed werden wegen Punkt 3 (Stitch-Composition geändert)
+Ich würde eine kleine Szenen-Lock-Logik ergänzen, damit parallele Poller/Webhooks nicht denselben Turn mehrfach an Sync.so schicken.
 
-## Deployment
+Technisch:
+- Pro Szene ein kurzer `dialog_shots.processing_lock_until` Marker oder eine kleine DB-Lock-Funktion.
+- Wenn ein Poller schon arbeitet, skippt der nächste sauber.
+- Dadurch weniger doppelte Jobs, weniger Provider-Stress, weniger Kosten.
 
-1. Edge Function `poll-dialog-shots` redeployen
-2. Remotion-Bundle neu deployen (`scripts/deploy-remotion-bundle.sh`) wegen Stitch-Crossfade
-3. Kein DB-Reset nötig — wirkt ab nächstem Dialog-Render
+### 5. Progress-Anzeige ehrlicher machen
 
-## Risiko
+Aktuell wirkt `95% / 14:28 min` wie fast fertig, obwohl intern noch ein Turn hängt. Ich würde den Status granular machen:
+- „Preclips fertig“
+- „Lip-Sync Turn 2/3“
+- „Retry 1/1“
+- „Fallback aktiv“
+- „Stitching“
 
-Sehr niedrig. Sync.so-Options sind dokumentiert und additiv. Lead-In/Tail-Erhöhung ist 70ms / 80ms — unkritisch, weil Clamp auf halbe Nachbar-Gap bleibt. Crossfade ist rein visuell auf der Stitch-Seite.
+Und die Fortschrittslogik nicht bei 95% festkleben lassen.
+
+### 6. Aktuelle hängende Szene retten
+
+Nach dem Code-Fix:
+- Den aktuellen hängenden Lip-Sync-Status kontrolliert weiterführen oder nur den Lip-Sync-Teil resetten.
+- Keine Szenengenerierung neu starten, wenn die Clips schon da sind.
+- Danach einmal durchlaufen lassen und Logs prüfen.
+
+## Erwartetes Ergebnis
+
+- Normale kurze Dialogszene: ca. 2–5 Minuten Zielzeit.
+- Problematische Szene: sauberer Abschluss mit Degradation statt 15-Minuten-Hänger.
+- Weniger Sync.so-Jobs durch Dispatch-Lock.
+- Geringere sichtbare Fehlerrate, weil ein einzelner Provider-Fail nicht mehr den ganzen Export blockiert.
+
+## Nicht anfassen
+
+- Keine Änderung an der funktionierenden Szene-Generierung.
+- Kein kompletter Pipeline-Rewrite.
+- Keine riskante Parallelisierung aller Sync.so-Turns.
+- Keine Änderung an Credits/Refund-Logik außer bestehende Fail-Safes beizubehalten.
