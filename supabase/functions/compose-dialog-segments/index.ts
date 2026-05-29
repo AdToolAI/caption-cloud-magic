@@ -38,6 +38,7 @@ import {
   countInflightSyncJobs,
   emitSystemAlert,
   evaluateCircuit,
+  getSyncApiKey,
   logSyncDispatch,
   openCircuit,
   probeAsset,
