@@ -39,13 +39,21 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
 }
 
 const ASSUMED_MASTER_FPS = 24;
+const MAX_SHOT_RETRIES = 3;
+const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
 
 function isMultiSpeakerScene(shots: any[]): boolean {
   return new Set(shots.map((s) => s?.speaker_idx)).size >= 2;
 }
 
+function pickRetryFrame(segFrames: number, attempt: number): number {
+  const positions = [0.5, 0.25, 0.75, 0.15];
+  const pos = positions[Math.min(attempt, positions.length - 1)];
+  return Math.min(segFrames - 1, Math.max(0, Math.floor(segFrames * pos)));
+}
+
 function prepareRetryFromWebhook(shot: any, reason: string, allShots: any[]): boolean {
-  if ((shot?.retry_count ?? 0) >= 1) return false;
+  if ((shot?.retry_count ?? 0) >= MAX_SHOT_RETRIES) return false;
   const failedMode = dispatchModeForShot(shot);
   shot.retry_count = (shot.retry_count ?? 0) + 1;
   shot.status = "pending";
@@ -55,27 +63,34 @@ function prepareRetryFromWebhook(shot: any, reason: string, allShots: any[]): bo
   shot.completed_at = undefined;
   shot.error = `retrying_after_${reason}`.slice(0, 300);
 
+  const attempt = shot.retry_count;
+
   if (isMultiSpeakerScene(allShots) && shot.target_coords) {
     shot.force_coords = true;
     shot.deterministic_coords = true;
-    const [start, end] = Array.isArray(shot.window) ? shot.window : [0, 0];
-    shot.frame_number_override = Math.max(
-      0,
-      Math.round(((Number(start) + Number(end)) / 2) * ASSUMED_MASTER_FPS),
-    );
+    // Sync.so v2 + `segments_secs`: `frame_number` is SEGMENT-RELATIVE
+    // (0 = first frame of the trimmed segment). Compute relative to the
+    // render_window (matches poll-dialog-shots).
+    const win = (Array.isArray(shot.render_window) && shot.render_window.length === 2)
+      ? shot.render_window
+      : (Array.isArray(shot.window) ? shot.window : [0, 0]);
+    const [s, e] = [Number(win[0]) || 0, Number(win[1]) || 0];
+    const segFrames = Math.max(1, Math.floor((e - s) * ASSUMED_MASTER_FPS));
+    shot.frame_number_override = pickRetryFrame(segFrames, attempt);
+    shot.temperature = RETRY_TEMPERATURES[attempt % RETRY_TEMPERATURES.length];
     console.warn(
-      `[sync-so-webhook] turn=${shot.idx ?? "?"} speaker=${shot.speaker_name ?? "?"} ${reason} → retry coords-locked frame=${shot.frame_number_override} retry=${shot.retry_count}`,
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} coords-locked segRelFrame=${shot.frame_number_override}/${segFrames} temp=${shot.temperature}`,
     );
   } else if (failedMode === "coords") {
     shot.force_coords = false;
     shot.deterministic_coords = false;
     console.warn(
-      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry auto fallback retry=${shot.retry_count}`,
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry ${attempt} auto fallback`,
     );
   } else if (shot.target_coords) {
     shot.force_coords = true;
     console.warn(
-      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry coords fallback retry=${shot.retry_count}`,
+      `[sync-so-webhook] turn=${shot.idx ?? "?"} ${reason} → retry ${attempt} coords fallback`,
     );
   }
   return true;
