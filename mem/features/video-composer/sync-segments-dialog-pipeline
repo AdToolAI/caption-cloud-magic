@@ -1,0 +1,24 @@
+---
+name: Fast Dialog Pipeline (Sync.so Segments, v5)
+description: 1-Call Sync.so Segments dispatcher (compose-dialog-segments) replaces the v4 per-turn chain. dialog_shots.version=5, engine_override='sync-segments', webhook-driven completion, v5 stale-watchdog at 12min.
+type: feature
+---
+
+Engine: `engine_override = 'sync-segments'` (parallel to legacy `'cinematic-sync'`).
+
+**Flow:**
+1. `compose-dialog-segments` reads `audio_plan.twoshot.speakers[].voicedRange.turns[]`, builds `segments[]` array with `audioInput.refId` per turn, dispatches a SINGLE Sync.so `lipsync-2-pro` call on the master plate (`clip_url` or `lip_sync_source_clip_url`).
+2. State persisted as `dialog_shots = { version: 5, engine: 'sync-segments', status: 'rendering', sync_job_id, cost_credits, segments[], ... }`.
+3. `sync-so-webhook` v5 branch: COMPLETED → write `clip_url = outputUrl`, `lip_sync_applied_at = now`. FAILED/REJECTED/CANCELED → idempotent refund (guarded by `state.refunded`), mark `lip_sync_status='failed'`.
+4. Wallet refund is idempotent both on dispatch failure (502 path in `compose-dialog-segments`) and webhook failure (`refunded` flag in state).
+
+**Cost:** `ceil(totalSec) * 9` credits (min 9), single pass. ~3–5 min end-to-end vs. ~10–15 min for v4 chain.
+
+**Routing (`useTwoShotAutoTrigger`):**
+- `DIALOG_ENGINES = {'cinematic-sync', 'sync-segments'}` triggers both auto-pipelines.
+- v5 candidates route to `compose-dialog-segments`, v4 to `compose-dialog-scene`.
+- v5 stale-watchdog: `lip_sync_status='running'` + no `final_url` + `updated_at` > 12min → mark `syncso_segments_poll_timeout`, auto-retry via RETRYABLE_REGEX.
+
+**UI:** SceneCard engine-override Select has `⚡ Fast Dialog · 1-Call (Sync.so Segments)` option. Router (`sceneEngineRouter.ts`) returns a recommendation when override='sync-segments'.
+
+**v4 legacy** (`compose-dialog-scene` + per-turn `dialog_shots.shots[]` + Lambda stitch) remains the safe fallback and is unchanged.

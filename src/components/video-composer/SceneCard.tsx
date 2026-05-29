@@ -778,10 +778,16 @@ export default function SceneCard({
                               ⚙️ Auto (empfohlen)
                             </SelectItem>
                             <SelectItem
+                              value="sync-segments"
+                              className="text-xs"
+                            >
+                              ⚡ Fast Dialog · 1-Call (Sync.so Segments)
+                            </SelectItem>
+                            <SelectItem
                               value="cinematic-sync"
                               className="text-xs"
                             >
-                              🎬 Cinematic + Lip-Sync (Artlist-Style)
+                              🎬 Cinematic Chain (Per-Turn)
                             </SelectItem>
                             <SelectItem value="heygen" className="text-xs">
                               🎙️ HeyGen Talking-Head

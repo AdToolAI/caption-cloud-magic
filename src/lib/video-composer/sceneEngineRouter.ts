@@ -19,7 +19,7 @@
  */
 import type { ComposerScene } from '@/types/video-composer';
 
-export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'cinematic-sync' | 'broll';
+export type SceneEngine = 'heygen-talking-head' | 'sync-polish' | 'cinematic-sync' | 'sync-segments' | 'broll';
 
 export interface EngineRecommendation {
   engine: SceneEngine;
@@ -105,6 +105,15 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
           ? 'Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate + Sync.so Lip-Sync, dann zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher.'
           : 'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
       extraCostEur: speakers >= 2 ? 0.55 * speakers : 0.20,
+    };
+  }
+  if (override === 'sync-segments') {
+    return {
+      engine: 'sync-segments',
+      label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
+      reason:
+        'Sync.so Segments API: ein einziger Lipsync-Call über die fertige Master-Plate mit segments[] pro Sprecher-Turn. ~3–5 min statt ~10–15 min, ein Webhook, ein Refund.',
+      extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
 
