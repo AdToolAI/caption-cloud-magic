@@ -21,6 +21,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import {
+  classifySyncError,
+  inspectWav,
+  logSyncDispatch,
+  normalizeWav,
+  probeAsset,
+} from "../_shared/syncso-preflight.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -108,6 +115,10 @@ interface DialogShot {
   /** Tracks which video source was used for the actual Sync.so dispatch.
    *  'preclip' = short clip ab t=0 (preferred). 'master' = legacy segments_secs. */
   sync_source_kind?: "preclip" | "master";
+  /** Stufe B telemetry — populated by ensureNormalizedTurnAudio. */
+  audio_dur_sec?: number;
+  audio_lead_in_sec?: number;
+  audio_peak_dbfs?: number | null;
 }
 
 
@@ -301,25 +312,28 @@ function expandWindow(
 }
 
 // ───────────────────────────────────────────────────────────────────────
-// WAV pre-trim (v9.1 Artlist parity fix)
+// WAV pre-trim + Stufe B normalize (v14 Sync.so input hardening)
 // ───────────────────────────────────────────────────────────────────────
 //
 // Sync.so v2 only accepts `segments_secs` on VIDEO inputs. The audio is
 // always read from t=0 of whatever URL we pass. So when a per-speaker WAV
-// contains multiple turns (e.g. Samuel at 0–2.3s AND 3.8–6.4s), shot K>0
-// would be mapped to Samuel's FIRST sentence — wrong mouth shapes,
-// "unknown error" failures, or wrong-speaker animation.
+// contains multiple turns we MUST slice the WAV to the exact turn window
+// before dispatch — otherwise Sync.so would map shot K>0 to the speaker's
+// FIRST sentence (wrong mouth shapes / "unknown error").
 //
-// Fix: slice the per-speaker WAV to the exact turn window server-side
-// (deterministic 16-bit PCM cut), upload to `voiceover-audio/trimmed/…`,
-// and pass that URL to Sync.so. Cached on `shot.trimmed_audio_url`.
+// v14 (Stufe B): in addition to slicing, every dispatched WAV now goes
+// through `normalizeWav()` which:
+//   – mono-downmixes,
+//   – peak-normalizes to -1 dBFS (fixes "audio too quiet → VAD silent"),
+//   – prepends 0.25s lead-in silence (fixes "speech starts exactly at
+//     t=0" which Sync.so VAD fails on),
+//   – pads tail to a minimum 3.0s total length.
+// Cache namespace bumped to `trimmed-v14` so any older un-normalized
+// WAVs cannot be re-served from storage.
 
-// v13 Sync.so Hardening — minimum WAV duration safety net (audio must be at
-// least as long as expanded video window so cut_off doesn't trim speech).
-// The expanded render_window from expandWindow() now enforces ≥3.0s, so
-// audio sliced from that range will already satisfy this minimum in most
-// cases. This is just a defensive guard for edge cases.
-const AUDIO_MIN_DUR_SEC = 3.0;
+const AUDIO_LEAD_IN_SEC = 0.25;
+const AUDIO_MIN_TOTAL_SEC = 3.0;
+const AUDIO_PEAK_TARGET_DBFS = -1;
 
 function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Array {
   const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
@@ -360,22 +374,14 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   const sliceByteLen = (endFrame - startFrame) * bytesPerFrame;
   const sliceBytes = wav.subarray(sliceByteOff, sliceByteOff + sliceByteLen);
 
-  // v13: tail-pad with silence to AUDIO_MIN_DUR_SEC if the slice is shorter.
-  // No leading silence — the source `windowSec` already includes the
-  // render_window pre-roll, so speech is naturally offset from t=0.
-  const speechFrames = endFrame - startFrame;
-  const minTotalFrames = Math.ceil(AUDIO_MIN_DUR_SEC * sampleRate);
-  const extraTailFrames = Math.max(0, minTotalFrames - speechFrames);
-  const totalOutFrames = speechFrames + extraTailFrames;
-  const outDataLen = totalOutFrames * bytesPerFrame;
-
-  // Re-pack as a fresh RIFF/WAVE with the original fmt parameters.
-  const outBuf = new ArrayBuffer(44 + outDataLen);
+  // Re-pack the raw slice as a fresh RIFF/WAVE. Normalization (lead-in,
+  // peak, min-dur, mono) happens in a separate pass via normalizeWav().
+  const outBuf = new ArrayBuffer(44 + sliceByteLen);
   const ov = new DataView(outBuf);
-  ov.setUint32(0, 0x52494646, false); // "RIFF"
-  ov.setUint32(4, 36 + outDataLen, true);
-  ov.setUint32(8, 0x57415645, false); // "WAVE"
-  ov.setUint32(12, 0x666d7420, false); // "fmt "
+  ov.setUint32(0, 0x52494646, false);
+  ov.setUint32(4, 36 + sliceByteLen, true);
+  ov.setUint32(8, 0x57415645, false);
+  ov.setUint32(12, 0x666d7420, false);
   ov.setUint32(16, 16, true);
   ov.setUint16(20, 1, true);
   ov.setUint16(22, channels, true);
@@ -383,53 +389,93 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   ov.setUint32(28, sampleRate * bytesPerFrame, true);
   ov.setUint16(32, bytesPerFrame, true);
   ov.setUint16(34, bitsPerSample, true);
-  ov.setUint32(36, 0x64617461, false); // "data"
-  ov.setUint32(40, outDataLen, true);
-  // Speech at the start, extraTailFrames of silence (zero-init) at the end.
+  ov.setUint32(36, 0x64617461, false);
+  ov.setUint32(40, sliceByteLen, true);
   new Uint8Array(outBuf, 44, sliceByteLen).set(sliceBytes);
   return new Uint8Array(outBuf);
 }
 
-async function ensureTrimmedTurnAudioUrl(
+interface PreparedAudio {
+  url: string;
+  durSec: number;
+  leadInSec: number;
+  peakDbFs: number;
+  channels: number;
+  sampleRate: number;
+  bytes: number;
+}
+
+async function ensureNormalizedTurnAudio(
   supabase: ReturnType<typeof createClient>,
   userId: string,
   sceneId: string,
   shot: DialogShot,
   sourceAudioUrl: string,
   windowSec: [number, number],
-): Promise<string> {
-  // Idempotent cache: same scene+turn+window → reuse existing object.
-  if (shot.trimmed_audio_url) return shot.trimmed_audio_url;
-
+): Promise<PreparedAudio> {
   const winTag = `${windowSec[0].toFixed(3)}-${windowSec[1].toFixed(3)}`;
-  // v13: bump cache namespace so any old un-padded WAVs don't get re-served.
-  const path = `${userId}/twoshot-vo/trimmed-v13/${sceneId}-turn${shot.idx}-${winTag}.wav`;
+  // v14: bump cache namespace so any pre-Stufe-B trimmed WAVs don't get served.
+  const path = `${userId}/twoshot-vo/trimmed-v14/${sceneId}-turn${shot.idx}-${winTag}.wav`;
 
-  // Fast path: if already in storage from a prior tick, reuse it.
+  // Fast path: reuse if already in storage AND we still have stats on the shot.
   const { data: existing } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
-  try {
-    const head = await fetch(existing.publicUrl, { method: "HEAD" });
-    if (head.ok) {
-      console.log(`[poll-dialog-shots] turn ${shot.idx} trim cache HIT ${path}`);
-      return existing.publicUrl;
-    }
-  } catch { /* fall through to slice */ }
+  if (shot.trimmed_audio_url === existing.publicUrl && shot.audio_dur_sec) {
+    try {
+      const head = await fetch(existing.publicUrl, { method: "HEAD" });
+      if (head.ok) {
+        return {
+          url: existing.publicUrl,
+          durSec: Number(shot.audio_dur_sec) || 0,
+          leadInSec: Number(shot.audio_lead_in_sec) || 0,
+          peakDbFs: Number(shot.audio_peak_dbfs) || 0,
+          channels: 1,
+          sampleRate: 24000,
+          bytes: Number(head.headers.get("content-length") ?? "0") || 0,
+        };
+      }
+    } catch { /* fall through to regenerate */ }
+  }
 
   const res = await fetch(sourceAudioUrl);
   if (!res.ok) throw new Error(`fetch audio ${res.status}`);
   const wav = new Uint8Array(await res.arrayBuffer());
   const sliced = sliceWavToWindow(wav, windowSec);
+  // Stufe B: normalize → mono, peak -1 dBFS, 0.25s lead-in, min 3.0s.
+  const normalized = normalizeWav(sliced, {
+    leadInSec: AUDIO_LEAD_IN_SEC,
+    minTotalSec: AUDIO_MIN_TOTAL_SEC,
+    peakDbFs: AUDIO_PEAK_TARGET_DBFS,
+    forceMono: true,
+  });
 
   const { error } = await supabase.storage
     .from("voiceover-audio")
-    .upload(path, sliced, { contentType: "audio/wav", upsert: true });
+    .upload(path, normalized.bytes, { contentType: "audio/wav", upsert: true });
   if (error) throw new Error(`upload ${error.message}`);
   const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
+
+  // Cache stats on the shot so subsequent ticks skip the re-inspect.
+  shot.trimmed_audio_url = pub.publicUrl;
+  shot.audio_dur_sec = normalized.info.durSec;
+  shot.audio_lead_in_sec = normalized.info.leadInSec;
+  shot.audio_peak_dbfs = Number.isFinite(normalized.info.peakDbFs)
+    ? normalized.info.peakDbFs
+    : null;
+
   console.log(
-    `[poll-dialog-shots] turn ${shot.idx} trimmed audio uploaded path=${path} bytes=${sliced.byteLength} win=[${windowSec[0].toFixed(3)},${windowSec[1].toFixed(3)}]`,
+    `[poll-dialog-shots] turn ${shot.idx} audio normalized path=${path} bytes=${normalized.bytes.byteLength} dur=${normalized.info.durSec.toFixed(2)}s peak=${Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs.toFixed(1) : "silent"}dBFS leadIn=${normalized.info.leadInSec.toFixed(3)}s gain=${normalized.appliedGain.toFixed(2)}x`,
   );
-  return pub.publicUrl;
+  return {
+    url: pub.publicUrl,
+    durSec: normalized.info.durSec,
+    leadInSec: normalized.info.leadInSec,
+    peakDbFs: Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs : -Infinity,
+    channels: 1,
+    sampleRate: normalized.info.sampleRate,
+    bytes: normalized.bytes.byteLength,
+  };
 }
+
 
 
 
@@ -932,13 +978,15 @@ async function processScene(
 
       const mode = dispatchModeForShot(nextShot);
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
-      // Audio bleibt immer sample-genau vorgetrimmt (Sync.so v2 supports
-      // segments_secs nur am Video, nicht am Audio).
+      // Stufe B: audio is always normalized (mono, peak -1 dBFS, 0.25s lead-in,
+      // min 3.0s tail-padded) — eliminates the most frequent Sync.so reject
+      // causes (silence at t=0, audio too short, audio too quiet).
       let audioUrl = fullAudioUrl;
+      let preparedAudio: PreparedAudio | null = null;
       let audioTrimmed = false;
       if (nextShot.audio_url && userId) {
         try {
-          audioUrl = await ensureTrimmedTurnAudioUrl(
+          preparedAudio = await ensureNormalizedTurnAudio(
             supabase,
             userId,
             sceneId,
@@ -946,58 +994,167 @@ async function processScene(
             fullAudioUrl,
             win,
           );
-          nextShot.trimmed_audio_url = audioUrl;
+          audioUrl = preparedAudio.url;
           audioTrimmed = true;
         } catch (trimErr) {
           console.warn(
-            `[poll-dialog-shots] turn ${nextShot.idx} trim FAILED, falling back to full track: ${(trimErr as Error)?.message}`,
+            `[poll-dialog-shots] turn ${nextShot.idx} normalize FAILED, falling back to full track: ${(trimErr as Error)?.message}`,
           );
           audioUrl = fullAudioUrl;
         }
       }
-      const jobId = await startSyncTurnJob(
-        syncKey,
-        sourceUrl,
-        audioUrl,
-        dispatchWindow,
-        nextShot.target_coords,
-        nextShot.temperature,
-        nextShot.idx,
-        mode,
-        syncWebhookUrl,
-        nextShot.frame_number_override,
-        /* noSegments */ usePreclip,
-      );
-      nextShot.sync_job_id = jobId;
-      nextShot.status = "lipsyncing";
-      nextShot.started_at = new Date().toISOString();
-      mutated = true;
-      dispatchedThisTick++;
-      console.log(
-        `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
-      );
 
-
-    } catch (e) {
-      if (e instanceof SyncConcurrencyDeferredError) {
-        nextShot.status = "pending";
-        nextShot.sync_job_id = undefined;
-        nextShot.last_deferred_at = new Date().toISOString();
-        mutated = true;
+      // Stufe B: HEAD-probe both assets before paying Sync.so. A 4xx/5xx
+      // or absurdly small URL is a guaranteed "unknown error" otherwise.
+      const [videoProbe, audioProbe] = await Promise.all([
+        probeAsset(sourceUrl, "video", 50_000),
+        probeAsset(audioUrl, "audio", 5_000),
+      ]);
+      if (!videoProbe.ok || !audioProbe.ok) {
+        const reason = !videoProbe.ok
+          ? `preflight_video_${videoProbe.error}`
+          : `preflight_audio_${audioProbe.error}`;
         console.warn(
-          `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          `[poll-dialog-shots] turn ${nextShot.idx} PREFLIGHT BLOCK ${reason} video=${JSON.stringify(videoProbe)} audio=${JSON.stringify(audioProbe)}`,
         );
-        // Stop dispatching more on this tick — concurrency saturated.
-        break;
-      } else {
-        const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
-        if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          video_bytes: videoProbe.bytes,
+          audio_bytes: audioProbe.bytes,
+          video_content_type: videoProbe.contentType,
+          audio_content_type: audioProbe.contentType,
+          audio_dur_sec: preparedAudio?.durSec ?? null,
+          audio_lead_in_sec: preparedAudio?.leadInSec ?? null,
+          audio_peak_dbfs: preparedAudio?.peakDbFs ?? null,
+          audio_channels: preparedAudio?.channels ?? null,
+          audio_sample_rate: preparedAudio?.sampleRate ?? null,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          coords: nextShot.target_coords ?? null,
+          frame_number: nextShot.frame_number_override ?? null,
+          http_status: videoProbe.status || audioProbe.status,
+          sync_status: "PREFLIGHT_BLOCKED",
+          error_class: reason,
+          error_message: `video=${videoProbe.error ?? "ok"} audio=${audioProbe.error ?? "ok"}`,
+        });
+        if (!prepareShotRetry(nextShot, reason, shots)) {
           degradeShotToMaster(nextShot, reason, shots);
         }
         mutated = true;
+        continue;
       }
+
+      let jobId: string | null = null;
+      let dispatchError: Error | null = null;
+      try {
+        jobId = await startSyncTurnJob(
+          syncKey,
+          sourceUrl,
+          audioUrl,
+          dispatchWindow,
+          nextShot.target_coords,
+          nextShot.temperature,
+          nextShot.idx,
+          mode,
+          syncWebhookUrl,
+          nextShot.frame_number_override,
+          /* noSegments */ usePreclip,
+        );
+        nextShot.sync_job_id = jobId;
+        nextShot.status = "lipsyncing";
+        nextShot.started_at = new Date().toISOString();
+        mutated = true;
+        dispatchedThisTick++;
+        console.log(
+          `[poll-dialog-shots] v10 dispatched turn ${nextShot.idx} speaker=${nextShot.speaker_name} src=${usePreclip ? "PRECLIP" : "MASTER+segments"} mode=${mode} trimmed=${audioTrimmed} masterWin=[${win[0].toFixed(2)},${win[1].toFixed(2)}] dispatchWin=[${dispatchWindow[0].toFixed(2)},${dispatchWindow[1].toFixed(2)}] coords=${JSON.stringify(nextShot.target_coords)} temp=${nextShot.temperature} retry=${nextShot.retry_count ?? 0} frameOverride=${nextShot.frame_number_override ?? "default"}`,
+        );
+      } catch (e) {
+        if (e instanceof SyncConcurrencyDeferredError) {
+          nextShot.status = "pending";
+          nextShot.sync_job_id = undefined;
+          nextShot.last_deferred_at = new Date().toISOString();
+          mutated = true;
+          console.warn(
+            `[poll-dialog-shots] turn ${nextShot.idx} deferred_due_to_concurrency retryAfter=${e.retryAfter ?? "?"}`,
+          );
+          // Log deferral and stop dispatching this tick.
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId ?? null,
+            engine: "cinematic-sync",
+            turn_idx: nextShot.idx,
+            attempt: nextShot.retry_count ?? 0,
+            mode,
+            sync_source_kind: nextShot.sync_source_kind ?? null,
+            video_url: sourceUrl,
+            audio_url: audioUrl,
+            window_start_sec: dispatchWindow[0],
+            window_end_sec: dispatchWindow[1],
+            sync_status: "DEFERRED",
+            error_class: "rate_limited",
+            error_message: e.message,
+          });
+          break;
+        } else {
+          dispatchError = e as Error;
+          const reason = `dispatch: ${dispatchError?.message ?? "unknown"}`;
+          if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
+            degradeShotToMaster(nextShot, reason, shots);
+          }
+          mutated = true;
+        }
+      }
+
+      // Always log dispatch attempt (success OR hard failure that wasn't deferral).
+      if (jobId || dispatchError) {
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId,
+          user_id: userId ?? null,
+          engine: "cinematic-sync",
+          job_id: jobId,
+          turn_idx: nextShot.idx,
+          attempt: nextShot.retry_count ?? 0,
+          mode,
+          sync_source_kind: nextShot.sync_source_kind ?? null,
+          video_url: sourceUrl,
+          audio_url: audioUrl,
+          video_bytes: videoProbe.bytes,
+          audio_bytes: audioProbe.bytes,
+          video_content_type: videoProbe.contentType,
+          audio_content_type: audioProbe.contentType,
+          audio_dur_sec: preparedAudio?.durSec ?? null,
+          audio_lead_in_sec: preparedAudio?.leadInSec ?? null,
+          audio_peak_dbfs: preparedAudio?.peakDbFs ?? null,
+          audio_channels: preparedAudio?.channels ?? null,
+          audio_sample_rate: preparedAudio?.sampleRate ?? null,
+          window_start_sec: dispatchWindow[0],
+          window_end_sec: dispatchWindow[1],
+          coords: nextShot.target_coords ?? null,
+          frame_number: nextShot.frame_number_override ?? null,
+          sync_status: jobId ? "DISPATCHED" : "DISPATCH_FAILED",
+          error_class: dispatchError ? classifySyncError(dispatchError.message) : null,
+          error_message: dispatchError ? dispatchError.message.slice(0, 500) : null,
+        });
+      }
+    } catch (e) {
+      // Outer safety — should not be reached because inner try/catch handles dispatch.
+      console.error(`[poll-dialog-shots] turn ${nextShot.idx} unexpected dispatch crash`, e);
+      const reason = `dispatch_crash: ${(e as Error)?.message ?? "unknown"}`;
+      if (!prepareShotRetry(nextShot, "dispatch_crashed", shots)) {
+        degradeShotToMaster(nextShot, reason, shots);
+      }
+      mutated = true;
     }
   }
+
 
   // ── Step 3: determine pipeline status ──────────────────────────────
   const allReady = shots.every((s) => s.status === "ready");

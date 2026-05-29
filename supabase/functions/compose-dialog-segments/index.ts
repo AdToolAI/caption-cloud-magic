@@ -33,6 +33,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
+import { classifySyncError, logSyncDispatch, probeAsset } from "../_shared/syncso-preflight.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -281,6 +282,59 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1200)}`,
     );
 
+    // Stufe B: HEAD-probe every input asset before paying Sync.so.
+    const audioUrls = Array.from(audioRefMap.keys());
+    const probes = await Promise.all([
+      probeAsset(sourceClipUrl, "video", 50_000),
+      ...audioUrls.map((u) => probeAsset(u, "audio", 5_000)),
+    ]);
+    const videoProbe = probes[0];
+    const audioProbes = probes.slice(1);
+    const badProbe =
+      (!videoProbe.ok ? `video:${videoProbe.error}` : null) ??
+      audioProbes
+        .map((p, i) => (p.ok ? null : `audio[${i}]:${p.error}`))
+        .find(Boolean);
+    if (badProbe) {
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} PREFLIGHT BLOCK ${badProbe} video=${JSON.stringify(videoProbe)} audio=${JSON.stringify(audioProbes)}`,
+      );
+      // Refund the reservation we just took.
+      const { data: w0 } = await supabase
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(w0?.balance ?? 0) + totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `syncso_segments_preflight_${badProbe}`,
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_source_kind: "segments",
+        video_url: sourceClipUrl,
+        video_bytes: videoProbe.bytes,
+        video_content_type: videoProbe.contentType,
+        sync_status: "PREFLIGHT_BLOCKED",
+        error_class: badProbe.startsWith("video") ? "video_head_fail" : "audio_head_fail",
+        error_message: badProbe,
+      });
+      return json(
+        { error: "preflight_failed", details: badProbe, refunded: totalCost },
+        422,
+      );
+    }
+
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
       headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
@@ -310,6 +364,22 @@ serve(async (req) => {
           clip_error: `syncso_segments_dispatch_${resp.status}`,
         })
         .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_source_kind: "segments",
+        video_url: sourceClipUrl,
+        video_bytes: videoProbe.bytes,
+        video_content_type: videoProbe.contentType,
+        window_start_sec: 0,
+        window_end_sec: totalSec,
+        http_status: resp.status,
+        sync_status: "DISPATCH_FAILED",
+        error_class: classifySyncError(errTxt),
+        error_message: errTxt.slice(0, 500),
+        meta: { segments_count: segments.length },
+      });
       return json(
         {
           error: "syncso_dispatch_failed",
@@ -327,6 +397,22 @@ serve(async (req) => {
       console.error(`[compose-dialog-segments] scene=${sceneId} no job id in response`);
       return json({ error: "no_job_id" }, 502);
     }
+
+    await logSyncDispatch(supabase, {
+      scene_id: sceneId,
+      user_id: userId,
+      engine: "sync-segments",
+      job_id: jobId,
+      sync_source_kind: "segments",
+      video_url: sourceClipUrl,
+      video_bytes: videoProbe.bytes,
+      video_content_type: videoProbe.contentType,
+      window_start_sec: 0,
+      window_end_sec: totalSec,
+      http_status: resp.status,
+      sync_status: "DISPATCHED",
+      meta: { segments_count: segments.length },
+    });
 
     const nowIso = new Date().toISOString();
     const state: SegmentsState = {

@@ -13546,6 +13546,108 @@ export type Database = {
         }
         Relationships: []
       }
+      syncso_dispatch_log: {
+        Row: {
+          attempt: number
+          audio_bytes: number | null
+          audio_channels: number | null
+          audio_content_type: string | null
+          audio_dur_sec: number | null
+          audio_lead_in_sec: number | null
+          audio_peak_dbfs: number | null
+          audio_sample_rate: number | null
+          audio_url: string | null
+          coords: Json | null
+          created_at: string
+          engine: string
+          error_class: string | null
+          error_message: string | null
+          frame_number: number | null
+          http_status: number | null
+          id: string
+          job_id: string | null
+          meta: Json | null
+          mode: string | null
+          preflight_repairs: Json | null
+          scene_id: string | null
+          sync_source_kind: string | null
+          sync_status: string | null
+          turn_idx: number | null
+          user_id: string | null
+          video_bytes: number | null
+          video_content_type: string | null
+          video_url: string | null
+          window_end_sec: number | null
+          window_start_sec: number | null
+        }
+        Insert: {
+          attempt?: number
+          audio_bytes?: number | null
+          audio_channels?: number | null
+          audio_content_type?: string | null
+          audio_dur_sec?: number | null
+          audio_lead_in_sec?: number | null
+          audio_peak_dbfs?: number | null
+          audio_sample_rate?: number | null
+          audio_url?: string | null
+          coords?: Json | null
+          created_at?: string
+          engine: string
+          error_class?: string | null
+          error_message?: string | null
+          frame_number?: number | null
+          http_status?: number | null
+          id?: string
+          job_id?: string | null
+          meta?: Json | null
+          mode?: string | null
+          preflight_repairs?: Json | null
+          scene_id?: string | null
+          sync_source_kind?: string | null
+          sync_status?: string | null
+          turn_idx?: number | null
+          user_id?: string | null
+          video_bytes?: number | null
+          video_content_type?: string | null
+          video_url?: string | null
+          window_end_sec?: number | null
+          window_start_sec?: number | null
+        }
+        Update: {
+          attempt?: number
+          audio_bytes?: number | null
+          audio_channels?: number | null
+          audio_content_type?: string | null
+          audio_dur_sec?: number | null
+          audio_lead_in_sec?: number | null
+          audio_peak_dbfs?: number | null
+          audio_sample_rate?: number | null
+          audio_url?: string | null
+          coords?: Json | null
+          created_at?: string
+          engine?: string
+          error_class?: string | null
+          error_message?: string | null
+          frame_number?: number | null
+          http_status?: number | null
+          id?: string
+          job_id?: string | null
+          meta?: Json | null
+          mode?: string | null
+          preflight_repairs?: Json | null
+          scene_id?: string | null
+          sync_source_kind?: string | null
+          sync_status?: string | null
+          turn_idx?: number | null
+          user_id?: string | null
+          video_bytes?: number | null
+          video_content_type?: string | null
+          video_url?: string | null
+          window_end_sec?: number | null
+          window_start_sec?: number | null
+        }
+        Relationships: []
+      }
       synthetic_probe_runs: {
         Row: {
           error_message: string | null
