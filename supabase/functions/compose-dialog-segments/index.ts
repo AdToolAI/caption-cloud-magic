@@ -164,8 +164,12 @@ serve(async (req) => {
     }
 
     // Idempotency: an active render already exists → nudge and return.
+    // On `retry=true` (E.5 webhook retry path) we intentionally bypass this
+    // guard because the previous job already terminated FAILED and we now
+    // want to re-dispatch on the same scene without re-charging the wallet.
     const existing = (scene as any).dialog_shots as SegmentsState | null;
     if (
+      !isRetry &&
       existing &&
       existing.version === 5 &&
       existing.engine === "sync-segments" &&
