@@ -150,16 +150,23 @@ function prepareShotRetry(
   if (multi && shot.target_coords) {
     shot.force_coords = true;
     shot.deterministic_coords = true;
-    const [s, e] = shot.window;
-    shot.frame_number_override = Math.max(
-      0,
-      Math.round(((s + e) / 2) * ASSUMED_MASTER_FPS_CONST),
+    // CRITICAL: When `segments_secs` is set, Sync.so interprets `frame_number`
+    // as RELATIVE TO THE SEGMENT START (frame 0 = first frame of the trimmed
+    // segment), NOT absolute in the master timeline. Passing an absolute
+    // frame (e.g. 72 for a 31-frame segment) → out-of-range → "unknown error".
+    // Always compute segment-relative middle, clamped to segment length.
+    const [s, e] = (shot.render_window ?? shot.window) as [number, number];
+    const segFrames = Math.max(1, Math.floor((e - s) * ASSUMED_MASTER_FPS_CONST));
+    shot.frame_number_override = Math.min(
+      segFrames - 1,
+      Math.max(0, Math.floor(segFrames / 2)),
     );
     console.warn(
-      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) frame=${shot.frame_number_override} (attempt ${shot.retry_count})`,
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) segRelFrame=${shot.frame_number_override}/${segFrames} (attempt ${shot.retry_count})`,
     );
     return true;
   }
+
 
   const failedMode = dispatchModeForShot(shot);
   if (failedMode === "coords") {
