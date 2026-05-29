@@ -364,6 +364,22 @@ serve(async (req) => {
           clip_error: `syncso_segments_dispatch_${resp.status}`,
         })
         .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId,
+        user_id: userId,
+        engine: "sync-segments",
+        sync_source_kind: "segments",
+        video_url: sourceClipUrl,
+        video_bytes: videoProbe.bytes,
+        video_content_type: videoProbe.contentType,
+        window_start_sec: 0,
+        window_end_sec: totalSec,
+        http_status: resp.status,
+        sync_status: "DISPATCH_FAILED",
+        error_class: classifySyncError(errTxt),
+        error_message: errTxt.slice(0, 500),
+        meta: { segments_count: segments.length },
+      });
       return json(
         {
           error: "syncso_dispatch_failed",
@@ -381,6 +397,22 @@ serve(async (req) => {
       console.error(`[compose-dialog-segments] scene=${sceneId} no job id in response`);
       return json({ error: "no_job_id" }, 502);
     }
+
+    await logSyncDispatch(supabase, {
+      scene_id: sceneId,
+      user_id: userId,
+      engine: "sync-segments",
+      job_id: jobId,
+      sync_source_kind: "segments",
+      video_url: sourceClipUrl,
+      video_bytes: videoProbe.bytes,
+      video_content_type: videoProbe.contentType,
+      window_start_sec: 0,
+      window_end_sec: totalSec,
+      http_status: resp.status,
+      sync_status: "DISPATCHED",
+      meta: { segments_count: segments.length },
+    });
 
     const nowIso = new Date().toISOString();
     const state: SegmentsState = {
