@@ -365,7 +365,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
           supabase.functions
             .invoke(fnName, { body: { scene_id: d.id } })
-            .then(({ data: lsData, error: lsErr }) => {
+            .then(async ({ data: lsData, error: lsErr }) => {
               const errBody = (lsErr as any)?.context;
               const reason = lsData?.error ?? errBody?.error;
               const message = lsData?.message ?? errBody?.message;
@@ -379,14 +379,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                 });
               } else if (lsErr) {
                 emitPipelineEvent({ type: 'lipsync:end' });
+                const realMsg = await extractFunctionsError(lsErr);
                 toast({
                   title: 'Lip-Sync fehlgeschlagen',
-                  description:
-                    message || (lsErr as Error).message || 'Unbekannter Fehler beim Lip-Sync.',
+                  description: realMsg || message || 'Unbekannter Fehler beim Lip-Sync.',
                   variant: 'destructive',
                 });
                 console.warn(
-                  `[useTwoShotAutoTrigger] invoke failed for ${d.id}`,
+                  `[useTwoShotAutoTrigger] invoke failed for ${d.id}: ${realMsg}`,
                   lsErr,
                 );
               }
