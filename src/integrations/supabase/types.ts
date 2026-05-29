@@ -13681,6 +13681,33 @@ export type Database = {
         }
         Relationships: []
       }
+      syncso_inflight_jobs: {
+        Row: {
+          engine: string
+          expires_at: string
+          job_id: string
+          scene_id: string | null
+          started_at: string
+          user_id: string | null
+        }
+        Insert: {
+          engine: string
+          expires_at?: string
+          job_id: string
+          scene_id?: string | null
+          started_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          engine?: string
+          expires_at?: string
+          job_id?: string
+          scene_id?: string | null
+          started_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       syncso_tuning_hints: {
         Row: {
           avoid_mode: string | null
@@ -16070,6 +16097,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      video_stream_probe_cache: {
+        Row: {
+          codec: string | null
+          duration_sec: number | null
+          fps: number | null
+          has_audio_track: boolean | null
+          height: number | null
+          id: string
+          probed_at: string
+          raw_meta: Json | null
+          video_url: string
+          width: number | null
+        }
+        Insert: {
+          codec?: string | null
+          duration_sec?: number | null
+          fps?: number | null
+          has_audio_track?: boolean | null
+          height?: number | null
+          id?: string
+          probed_at?: string
+          raw_meta?: Json | null
+          video_url: string
+          width?: number | null
+        }
+        Update: {
+          codec?: string | null
+          duration_sec?: number | null
+          fps?: number | null
+          has_audio_track?: boolean | null
+          height?: number | null
+          id?: string
+          probed_at?: string
+          raw_meta?: Json | null
+          video_url?: string
+          width?: number | null
+        }
+        Relationships: []
       }
       video_template_versions: {
         Row: {
