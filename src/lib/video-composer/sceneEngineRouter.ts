@@ -107,6 +107,15 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       extraCostEur: speakers >= 2 ? 0.55 * speakers : 0.20,
     };
   }
+  if (override === 'sync-segments') {
+    return {
+      engine: 'sync-segments',
+      label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
+      reason:
+        'Sync.so Segments API: ein einziger Lipsync-Call über die fertige Master-Plate mit segments[] pro Sprecher-Turn. ~3–5 min statt ~10–15 min, ein Webhook, ein Refund.',
+      extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
+    };
+  }
 
   // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
