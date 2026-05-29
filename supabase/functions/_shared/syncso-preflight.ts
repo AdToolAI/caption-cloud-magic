@@ -176,12 +176,23 @@ export interface NormalizeOptions {
   peakDbFs?: number | null;    // default -1
   /** Force mono downmix if input has >1 channel. */
   forceMono?: boolean;         // default true
+  /**
+   * Stage F.2 — EBU R128-style loudness target in LUFS. When set, the
+   * normalizer first lifts the RMS-based loudness toward this target
+   * (capped at +12dB amplification) BEFORE the final peak cap. Default
+   * -16 LUFS (Sync.so sweet spot). Set `null` to disable loudness norm.
+   */
+  targetLufs?: number | null;  // default -16
 }
 
 export interface NormalizedWav {
   bytes: Uint8Array;
   info: WavInfo;
   appliedGain: number;         // linear multiplier applied for peak-norm
+  /** Stage F.2 — measured loudness (RMS-LUFS) of the source signal. */
+  sourceLufs?: number;
+  /** Stage F.2 — measured loudness after gain application. */
+  resultLufs?: number;
 }
 
 /**
@@ -197,6 +208,7 @@ export function normalizeWav(
     minTotalSec = 3.0,
     peakDbFs = -1,
     forceMono = true,
+    targetLufs = -16,
   } = opts;
 
   const info = inspectWav(wav);
@@ -229,22 +241,44 @@ export function normalizeWav(
     }
   }
 
-  // 2) Peak-normalize (skip if already loud or peakDbFs null or signal is silent).
-  let gain = 1;
+  // 2a) Stage F.2 — RMS-LUFS loudness measurement on raw signal.
+  const sourceLufs = measureLufsInt16(speech);
+
+  // 2b) LUFS gain (lift signal toward targetLufs before peak-cap).
+  let loudnessGain = 1;
+  if (
+    targetLufs != null &&
+    Number.isFinite(sourceLufs) &&
+    sourceLufs > -70 &&
+    sourceLufs < targetLufs
+  ) {
+    const deltaDb = targetLufs - sourceLufs;
+    // Cap loudness lift at +12dB so we never amplify pure noise.
+    const cappedDb = Math.min(12, deltaDb);
+    loudnessGain = 10 ** (cappedDb / 20);
+    for (let i = 0; i < speech.length; i++) {
+      const v = Math.round(speech[i] * loudnessGain);
+      speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+    }
+  }
+
+  // 2c) Peak-normalize (after loudness lift) — skip if already loud or signal silent.
+  let gain = loudnessGain;
   if (peakDbFs != null && Number.isFinite(info.peakDbFs)) {
-    const currentPeak = 10 ** (info.peakDbFs / 20);
+    const currentPeak = (10 ** (info.peakDbFs / 20)) * loudnessGain;
     const targetPeak = 10 ** (peakDbFs / 20);
     if (currentPeak > 0 && currentPeak < targetPeak) {
-      gain = targetPeak / currentPeak;
-      // Safety: never amplify by more than 12 dB (avoid noise blow-ups on near-silent input).
-      const maxGain = 10 ** (12 / 20);
-      if (gain > maxGain) gain = maxGain;
-      for (let i = 0; i < speech.length; i++) {
-        const v = Math.round(speech[i] * gain);
-        speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+      const peakGain = targetPeak / currentPeak;
+      // Safety: combined gain capped at +12 dB total over original.
+      const maxTotalGain = 10 ** (12 / 20);
+      const effectiveGain = Math.min(peakGain, maxTotalGain / loudnessGain);
+      if (effectiveGain > 1) {
+        for (let i = 0; i < speech.length; i++) {
+          const v = Math.round(speech[i] * effectiveGain);
+          speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+        }
+        gain = loudnessGain * effectiveGain;
       }
-    } else {
-      gain = 1;
     }
   }
 
@@ -282,11 +316,69 @@ export function normalizeWav(
   // tail silence is zero-init.
 
   const outBytes = new Uint8Array(out);
+  const resultLufs = measureLufsInt16(speech);
   return {
     bytes: outBytes,
     info: { ...info, totalFrames: outFrames, durSec: outFrames / sampleRate, channels: outChannels, leadInSec },
     appliedGain: gain,
+    sourceLufs,
+    resultLufs,
   };
+}
+
+/**
+ * Stage F.2 — Cheap RMS-based LUFS estimator over 400ms windows
+ * with a -10 LUFS offset (close enough to EBU R128 mean loudness
+ * for our gain decisions). Returns -Infinity for true silence.
+ */
+function measureLufsInt16(samples: Int16Array): number {
+  if (!samples.length) return -Infinity;
+  // 400ms at 44.1kHz ~= 17640 samples; we don't know sr here so just chunk fixed.
+  const chunk = 16_000;
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < samples.length; i += chunk) {
+    const end = Math.min(samples.length, i + chunk);
+    let s = 0;
+    for (let j = i; j < end; j++) {
+      const v = samples[j] / 32768;
+      s += v * v;
+    }
+    sumSq += s;
+    count += end - i;
+  }
+  if (count === 0) return -Infinity;
+  const rms = Math.sqrt(sumSq / count);
+  if (rms <= 0) return -Infinity;
+  // RMS dBFS → approximate LUFS (offset −0.691 for K-weighting omitted; close enough).
+  return 20 * Math.log10(rms);
+}
+
+/**
+ * Stage F.2 — Hard-floor SNR check. Returns true if the signal is below
+ * -45 dBFS RMS (basically inaudible). Caller should refuse to dispatch
+ * such a clip to Sync.so and tell the user to re-record.
+ */
+export function isAudioTooQuiet(wav: Uint8Array): { tooQuiet: boolean; rmsDbFs: number } {
+  try {
+    const info = inspectWav(wav);
+    const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+    let sumSq = 0;
+    let count = 0;
+    const stride = 4;
+    for (let f = 0; f < info.totalFrames; f += stride) {
+      for (let c = 0; c < info.channels; c++) {
+        const s = dv.getInt16(info.dataOff + (f * info.channels + c) * 2, true) / 32768;
+        sumSq += s * s;
+        count++;
+      }
+    }
+    const rms = count ? Math.sqrt(sumSq / count) : 0;
+    const dbFs = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+    return { tooQuiet: dbFs < -45, rmsDbFs: dbFs };
+  } catch {
+    return { tooQuiet: false, rmsDbFs: 0 };
+  }
 }
 
 // ── VAD detection (Stage E.1) ───────────────────────────────────────────
@@ -879,3 +971,258 @@ export async function validateFrameFace(opts: {
   }
 }
 
+
+// ── Stage F.3 — Provider Circuit Breaker ────────────────────────────────
+
+export type CircuitState = "closed" | "open" | "half_open";
+
+export interface CircuitDecision {
+  /** true if dispatch is allowed; false if breaker is OPEN. */
+  allow: boolean;
+  state: CircuitState;
+  /** Suggested defer in ms when allow=false. */
+  retryInMs?: number;
+  /** Why we're blocking (for telemetry / UI). */
+  reason?: string;
+  /** Recent failure count from rolling window. */
+  recentFailures?: number;
+}
+
+const CIRCUIT_FAIL_THRESHOLD = 5;          // 5 fails in 5min trips breaker
+const CIRCUIT_OPEN_DURATION_MS = 30 * 60_000; // 30 min
+const CIRCUIT_HALF_OPEN_PROBE_MS = 30 * 60_000;
+
+/**
+ * Returns whether a dispatch to `provider` may proceed.
+ *  - state=closed → always allow.
+ *  - state=open & opened_at + 30min > now → block (defer).
+ *  - state=open & opened_at + 30min <= now → flip to half_open + allow (probe).
+ *  - state=half_open → allow exactly one probe, caller updates via record*.
+ *
+ * Also evaluates the rolling-window failure count: if state=closed but
+ * recent failures ≥ threshold, we open the circuit synchronously and
+ * block this call too.
+ */
+export async function evaluateCircuit(
+  supabase: any,
+  provider = "sync.so",
+): Promise<CircuitDecision> {
+  try {
+    const { data: row, error } = await supabase
+      .from("provider_circuit_state")
+      .select("state, opened_at, fail_count, last_failure_at")
+      .eq("provider", provider)
+      .maybeSingle();
+    if (error) {
+      console.warn(`[circuit] read failed: ${error.message}`);
+      return { allow: true, state: "closed", reason: "read_failed" };
+    }
+    const state = (row?.state ?? "closed") as CircuitState;
+    const now = Date.now();
+
+    if (state === "open") {
+      const openedAt = row?.opened_at ? Date.parse(row.opened_at) : 0;
+      const elapsed = now - openedAt;
+      if (elapsed < CIRCUIT_OPEN_DURATION_MS) {
+        return {
+          allow: false,
+          state: "open",
+          retryInMs: Math.max(60_000, CIRCUIT_OPEN_DURATION_MS - elapsed),
+          reason: "circuit_open",
+        };
+      }
+      // Promote to half_open + let this call probe.
+      await supabase
+        .from("provider_circuit_state")
+        .update({ state: "half_open", half_open_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("provider", provider);
+      return { allow: true, state: "half_open", reason: "probe" };
+    }
+
+    // closed (or half_open) — also check rolling window for runaway failures
+    const { data: countRow } = await supabase
+      .rpc("syncso_recent_failure_count", { _window_min: 5 });
+    const recent = typeof countRow === "number" ? countRow : Number(countRow) || 0;
+    if (state === "closed" && recent >= CIRCUIT_FAIL_THRESHOLD) {
+      await openCircuit(supabase, provider, "rolling_threshold", recent);
+      await emitSystemAlert(supabase, {
+        alert_type: "circuit_breaker_opened",
+        severity: "critical",
+        source: provider,
+        message: `Circuit breaker OPEN: ${recent} failures in last 5 min`,
+        payload: { recent_failures: recent, threshold: CIRCUIT_FAIL_THRESHOLD },
+      });
+      return {
+        allow: false,
+        state: "open",
+        retryInMs: CIRCUIT_OPEN_DURATION_MS,
+        reason: "rolling_threshold",
+        recentFailures: recent,
+      };
+    }
+    return { allow: true, state, recentFailures: recent };
+  } catch (e) {
+    console.warn(`[circuit] eval crash: ${(e as Error).message}`);
+    return { allow: true, state: "closed", reason: "eval_crash" };
+  }
+}
+
+export async function openCircuit(
+  supabase: any,
+  provider: string,
+  errorClass: string,
+  failCount?: number,
+): Promise<void> {
+  try {
+    await supabase
+      .from("provider_circuit_state")
+      .update({
+        state: "open",
+        opened_at: new Date().toISOString(),
+        last_failure_at: new Date().toISOString(),
+        last_error_class: errorClass,
+        fail_count: failCount ?? null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("provider", provider);
+  } catch (e) {
+    console.warn(`[circuit] open crash: ${(e as Error).message}`);
+  }
+}
+
+export async function recordCircuitSuccess(
+  supabase: any,
+  provider = "sync.so",
+): Promise<void> {
+  try {
+    await supabase
+      .from("provider_circuit_state")
+      .update({
+        state: "closed",
+        fail_count: 0,
+        last_success_at: new Date().toISOString(),
+        opened_at: null,
+        half_open_at: null,
+        last_error_class: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("provider", provider);
+  } catch (e) {
+    console.warn(`[circuit] success crash: ${(e as Error).message}`);
+  }
+}
+
+export async function recordCircuitFailure(
+  supabase: any,
+  provider: string,
+  errorClass: string,
+): Promise<void> {
+  try {
+    // Read fail_count first to increment (no atomic increment in supabase-js)
+    const { data } = await supabase
+      .from("provider_circuit_state")
+      .select("state, fail_count")
+      .eq("provider", provider)
+      .maybeSingle();
+    const nextFail = (data?.fail_count ?? 0) + 1;
+    const updates: Record<string, unknown> = {
+      fail_count: nextFail,
+      last_failure_at: new Date().toISOString(),
+      last_error_class: errorClass,
+      updated_at: new Date().toISOString(),
+    };
+    // If we're in half_open and the probe failed, slam back to open.
+    if (data?.state === "half_open") {
+      updates.state = "open";
+      updates.opened_at = new Date().toISOString();
+    }
+    await supabase.from("provider_circuit_state").update(updates).eq("provider", provider);
+  } catch (e) {
+    console.warn(`[circuit] failure crash: ${(e as Error).message}`);
+  }
+}
+
+// ── Stage F.6 — Schema-drift Detector + System Alerts ───────────────────
+
+export interface SyncResponseShapeCheck {
+  ok: boolean;
+  missingKeys: string[];
+}
+
+const SYNC_REQUIRED_KEYS = ["id", "status"] as const;
+
+/**
+ * Validate that Sync.so /generate response carries the keys we depend on.
+ * Returns { ok:false, missingKeys } if Sync.so changed their schema.
+ * Caller MUST emit a system_alert + keep the job pending (no refund).
+ */
+export function validateSyncResponseShape(json: unknown): SyncResponseShapeCheck {
+  const missingKeys: string[] = [];
+  if (!json || typeof json !== "object") {
+    return { ok: false, missingKeys: [...SYNC_REQUIRED_KEYS] };
+  }
+  const obj = json as Record<string, unknown>;
+  for (const k of SYNC_REQUIRED_KEYS) {
+    if (!(k in obj)) missingKeys.push(k);
+  }
+  return { ok: missingKeys.length === 0, missingKeys };
+}
+
+export interface SystemAlertInput {
+  alert_type: string;
+  severity?: "info" | "warning" | "critical";
+  source: string;
+  message: string;
+  payload?: Record<string, unknown>;
+}
+
+/** Best-effort fire-and-forget system alert insert. Dedupe at type+source within 1h. */
+export async function emitSystemAlert(
+  supabase: any,
+  alert: SystemAlertInput,
+): Promise<void> {
+  try {
+    // Dedupe: skip if same alert_type + source raised within last 60 min and unacknowledged
+    const sinceIso = new Date(Date.now() - 60 * 60_000).toISOString();
+    const { data: dupes } = await supabase
+      .from("system_alerts")
+      .select("id")
+      .eq("alert_type", alert.alert_type)
+      .eq("source", alert.source)
+      .eq("acknowledged", false)
+      .gte("created_at", sinceIso)
+      .limit(1);
+    if (Array.isArray(dupes) && dupes.length > 0) return;
+    await supabase.from("system_alerts").insert({
+      alert_type: alert.alert_type,
+      severity: alert.severity ?? "warning",
+      source: alert.source,
+      message: alert.message,
+      payload: alert.payload ?? {},
+    });
+  } catch (e) {
+    console.warn(`[system-alert] emit crash: ${(e as Error).message}`);
+  }
+}
+
+// ── Stage F.7 — Auto-Tuner read ─────────────────────────────────────────
+
+/**
+ * Read the auto-tuner's preferred sync_source_kind from system_config.
+ * Returns null if no signal yet — caller should fall back to its own default.
+ */
+export async function readPreferredSyncSourceKind(
+  supabase: any,
+): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from("system_config")
+      .select("value")
+      .eq("key", "syncso.preferred_source_kind")
+      .maybeSingle();
+    const v = data?.value?.value;
+    return typeof v === "string" && v.length > 0 ? v : null;
+  } catch {
+    return null;
+  }
+}

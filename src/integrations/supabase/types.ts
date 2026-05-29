@@ -10364,6 +10364,45 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_circuit_state: {
+        Row: {
+          fail_count: number
+          half_open_at: string | null
+          last_error_class: string | null
+          last_failure_at: string | null
+          last_success_at: string | null
+          meta: Json
+          opened_at: string | null
+          provider: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          fail_count?: number
+          half_open_at?: string | null
+          last_error_class?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          meta?: Json
+          opened_at?: string | null
+          provider: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          fail_count?: number
+          half_open_at?: string | null
+          last_error_class?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          meta?: Json
+          opened_at?: string | null
+          provider?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       provider_quota_log: {
         Row: {
           created_at: string
@@ -13780,6 +13819,45 @@ export type Database = {
           run_at?: string
           status?: string
           threshold_ms?: number | null
+        }
+        Relationships: []
+      }
+      system_alerts: {
+        Row: {
+          acknowledged: boolean
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          created_at: string
+          id: string
+          message: string
+          payload: Json
+          severity: string
+          source: string
+        }
+        Insert: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          created_at?: string
+          id?: string
+          message: string
+          payload?: Json
+          severity?: string
+          source: string
+        }
+        Update: {
+          acknowledged?: boolean
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          created_at?: string
+          id?: string
+          message?: string
+          payload?: Json
+          severity?: string
+          source?: string
         }
         Relationships: []
       }
@@ -17458,6 +17536,10 @@ export type Database = {
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
+      syncso_recent_failure_count: {
+        Args: { _window_min?: number }
+        Returns: number
+      }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
       verify_license_certificate: {
         Args: { _token: string }

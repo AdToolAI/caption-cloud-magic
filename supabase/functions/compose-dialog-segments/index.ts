@@ -36,12 +36,19 @@ import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
   countInflightSyncJobs,
+  emitSystemAlert,
+  evaluateCircuit,
   logSyncDispatch,
+  openCircuit,
   probeAsset,
+  readPreferredSyncSourceKind,
+  recordCircuitFailure,
+  recordCircuitSuccess,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
   validateSegments,
+  validateSyncResponseShape,
 } from "../_shared/syncso-preflight.ts";
 
 
@@ -263,6 +270,43 @@ serve(async (req) => {
     const segments = segValidation.fixed as typeof rawSegments;
     const totalCost = computeCost(totalSec);
 
+    // ── Stage F.3 — Circuit Breaker (BEFORE wallet debit) ────────────────
+    // If Sync.so is in OPEN state, don't charge the user — defer with retry.
+    const circuit = await evaluateCircuit(supabase, "sync.so");
+    if (!circuit.allow) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} CIRCUIT_OPEN state=${circuit.state} reason=${circuit.reason} recent=${circuit.recentFailures}`,
+      );
+      const retryInMs = circuit.retryInMs ?? 30 * 60_000;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "pending",
+          twoshot_stage: "circuit_open",
+          clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "CIRCUIT_BLOCKED", error_class: "rate_limited",
+        error_message: `circuit ${circuit.state}: ${circuit.reason}`,
+        meta: { circuit_state: circuit.state, recent_failures: circuit.recentFailures, retry_in_ms: retryInMs },
+      });
+      return json(
+        {
+          ok: false,
+          status: "circuit_open",
+          state: circuit.state,
+          retry_in_ms: retryInMs,
+          recent_failures: circuit.recentFailures,
+          refunded: 0,
+          message: "Sync.so ist aktuell instabil — Dispatch pausiert für 30 min.",
+        },
+        202,
+      );
+    }
+
     // E.5: on retry path, wallet was already debited at the original dispatch
     // and the cost is preserved in state.cost_credits. Skip re-charging.
     if (!isRetry) {
@@ -291,6 +335,12 @@ serve(async (req) => {
         .eq("user_id", userId);
     } else {
       console.log(`[compose-dialog-segments] scene=${sceneId} RETRY path (no re-charge)`);
+    }
+
+    // Stage F.7 — read auto-tuner preferred source kind (best-effort signal only)
+    const tunerKind = await readPreferredSyncSourceKind(supabase);
+    if (tunerKind) {
+      console.log(`[compose-dialog-segments] scene=${sceneId} auto-tuner prefers source_kind=${tunerKind}`);
     }
 
     // ── Build Sync.so payload ────────────────────────────────────────────
@@ -533,6 +583,8 @@ serve(async (req) => {
         error_message: errTxt.slice(0, 500),
         meta: { segments_count: segments.length },
       });
+      // Stage F.3 — record failure so circuit can trip on rolling failures.
+      await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
         {
           error: "syncso_dispatch_failed",
@@ -545,6 +597,34 @@ serve(async (req) => {
     }
 
     const data = await resp.json();
+
+    // Stage F.6 — Schema-drift detector. If Sync.so renamed/dropped a
+    // required key, raise a critical alert and keep the job in pending
+    // (no refund, no charge bump) so we get a clean repro and a stuck
+    // job we can investigate manually.
+    const shape = validateSyncResponseShape(data);
+    if (!shape.ok) {
+      console.error(
+        `[compose-dialog-segments] scene=${sceneId} SCHEMA_DRIFT missing=${shape.missingKeys.join(",")}`,
+      );
+      await emitSystemAlert(supabase, {
+        alert_type: "syncso_schema_drift",
+        severity: "critical",
+        source: "sync.so",
+        message: `Sync.so /generate response missing keys: ${shape.missingKeys.join(", ")}`,
+        payload: { missing_keys: shape.missingKeys, sample: data },
+      });
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        http_status: resp.status,
+        sync_status: "SCHEMA_DRIFT", error_class: "schema_drift",
+        error_message: `missing keys: ${shape.missingKeys.join(",")}`,
+        meta: { response_sample: data },
+      });
+      // Don't refund — we want the operator to investigate before the user retries.
+      return json({ error: "schema_drift", missing: shape.missingKeys }, 502);
+    }
+
     const jobId = String(data.id ?? "");
     if (!jobId) {
       console.error(`[compose-dialog-segments] scene=${sceneId} no job id in response`);
@@ -552,7 +632,16 @@ serve(async (req) => {
     }
 
     // E.3: register inflight slot so concurrent dispatchers back off.
-    await registerInflightSyncJob(supabase, jobId, userId);
+    // Use the correct shared-module signature (was a latent bug — second arg is a row object).
+    await registerInflightSyncJob(supabase, {
+      job_id: jobId,
+      user_id: userId,
+      scene_id: sceneId,
+      engine: "sync-segments",
+    });
+
+    // Stage F.3 — successful dispatch resets fail counter and closes half-open breakers.
+    await recordCircuitSuccess(supabase, "sync.so");
 
     await logSyncDispatch(supabase, {
       scene_id: sceneId,
