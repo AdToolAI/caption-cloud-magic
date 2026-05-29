@@ -1000,7 +1000,7 @@ async function processScene(
     if (dispatchedThisTick >= MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK) break;
     try {
       const usePreclip = !!nextShot.preclip_url && nextShot.sync_source_kind !== "master";
-      const sourceUrl = usePreclip ? (nextShot.preclip_url as string) : state.source_clip_url;
+      let sourceUrl = usePreclip ? (nextShot.preclip_url as string) : state.source_clip_url;
       const win = (nextShot.render_window
         ?? expandWindow(nextShot, shots)) as [number, number];
       nextShot.render_window = win;
