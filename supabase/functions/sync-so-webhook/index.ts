@@ -255,11 +255,58 @@ serve(async (req) => {
       return ok({ ok: true, skipped: "v5_job_mismatch", job_id: jobId });
     }
     if (status === "COMPLETED" && outputUrl) {
-      // ── Re-host Sync.so result in our own bucket ────────────────────
-      // Sync.so returns a token-signed URL that expires (~24h). Composer
-      // replays + Director's Cut imports must keep working long-term, so
-      // we fetch the MP4 once and upload to ai-videos. Best-effort: on
-      // any failure we keep the original Sync.so URL.
+      // ── Multi-pass chain: advance to next pass if more remain ───────────
+      const passes = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
+      const currentPass = Number((state as any).current_pass ?? 0);
+      const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
+      const isLastPass = currentPass >= totalPasses - 1 || passes.length === 0;
+
+      if (passes[currentPass]) {
+        passes[currentPass] = {
+          ...passes[currentPass],
+          status: "done",
+          output_url: outputUrl,
+          finished_at: nowIso,
+        };
+      }
+
+      if (!isLastPass) {
+        // Persist this pass's output, advance cursor, fire-and-forget next dispatch.
+        const nextPassIdx = currentPass + 1;
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...state,
+              passes,
+              current_pass: nextPassIdx,
+              status: "rendering",
+              updated_at: nowIso,
+            },
+            lip_sync_status: "running",
+            twoshot_stage: `syncso_pass_${nextPassIdx + 1}_of_${totalPasses}`,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.log(
+          `[sync-so-webhook] v5 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done → advancing`,
+        );
+        try {
+          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ scene_id: sceneId, advance: true }),
+          }).catch(() => {});
+        } catch {
+          /* ignore */
+        }
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", advanced_to_pass: nextPassIdx + 1 });
+      }
+
+      // ── Last pass complete → re-host + apply ───────────────────────────
       let finalUrl = outputUrl;
       try {
         const { data: row } = await supabase
@@ -315,6 +362,7 @@ serve(async (req) => {
         .update({
           dialog_shots: {
             ...state,
+            passes,
             status: "done",
             final_url: finalUrl,
             sync_so_url: outputUrl,
@@ -329,7 +377,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.log(
-        `[sync-so-webhook] v5 scene=${sceneId} COMPLETED → clip_url updated, lip_sync_applied`,
+        `[sync-so-webhook] v5 scene=${sceneId} FINAL pass ${currentPass + 1}/${totalPasses} → clip_url updated, lip_sync_applied`,
       );
     } else {
       // FAILED / REJECTED / CANCELED
