@@ -113,7 +113,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // handled inside compose-dialog-segments + sync-so-webhook).
         const staleV5 = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'sync-segments' &&
+            d.engine_override !== 'cinematic-sync-legacy' &&
+            isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version === 5 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
