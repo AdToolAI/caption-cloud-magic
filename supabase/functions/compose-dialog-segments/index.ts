@@ -35,9 +35,13 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
+  countInflightSyncJobs,
   logSyncDispatch,
   probeAsset,
+  registerInflightSyncJob,
+  SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
+  validateSegments,
 } from "../_shared/syncso-preflight.ts";
 
 
