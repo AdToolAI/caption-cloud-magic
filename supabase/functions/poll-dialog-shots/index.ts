@@ -299,14 +299,14 @@ async function startSyncTurnJob(
     );
     // Fallback: retry without segments_secs if Sync.so rejects the window.
     if (
-      r.status === 400 &&
-      /segments? configuration is invalid|only supported for video inputs|invalid.+segment/i.test(txt)
-    ) {
-      console.warn(
-        `[poll-dialog-shots] segment rejected, retry without window: ${txt.slice(0, 200)}`,
-      );
       const fallback = { ...payload };
       (fallback.input as any[])[0] = { type: "video", url: videoUrl };
+      r = await fetch(`${SYNC_API_BASE}/generate`, {
+        method: "POST",
+        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        body: JSON.stringify(fallback),
+      });
+
       (fallback.input as any[])[1] = { type: "audio", url: audioUrl };
       r = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
