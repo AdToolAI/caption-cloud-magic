@@ -403,7 +403,8 @@ async function ensureTrimmedTurnAudioUrl(
   if (shot.trimmed_audio_url) return shot.trimmed_audio_url;
 
   const winTag = `${windowSec[0].toFixed(3)}-${windowSec[1].toFixed(3)}`;
-  const path = `${userId}/twoshot-vo/trimmed/${sceneId}-turn${shot.idx}-${winTag}.wav`;
+  // v13: bump cache namespace so any old un-padded WAVs don't get re-served.
+  const path = `${userId}/twoshot-vo/trimmed-v13/${sceneId}-turn${shot.idx}-${winTag}.wav`;
 
   // Fast path: if already in storage from a prior tick, reuse it.
   const { data: existing } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
