@@ -332,12 +332,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // Route by engine: 'sync-segments' = 1-call Sync.so Segments API,
-          // 'cinematic-sync' = legacy per-turn dialog chain (v4).
+          // Route by engine. Default = v5 1-call Sync.so Segments (Artlist
+          // pattern): one POST with segments[], Sync.so parallelizes internally,
+          // single webhook, single refund — ~3–5 min vs. ~10–15 min for v4.
+          // Only `cinematic-sync-legacy` keeps the old per-turn chain.
           const fnName =
-            d.engine_override === 'sync-segments'
-              ? 'compose-dialog-segments'
-              : 'compose-dialog-scene';
+            d.engine_override === 'cinematic-sync-legacy'
+              ? 'compose-dialog-scene'
+              : 'compose-dialog-segments';
 
           // For retry-candidates (previously 'failed'), clear the failure
           // markers first so the edge function's running-takeover guard sees a
