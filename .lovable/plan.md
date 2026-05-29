@@ -1,45 +1,63 @@
-# Was wirklich passiert ist
+# Was die DB wirklich sagt
 
-Die "Edge Function Fehler"-Meldung im UI kommt von `compose-dialog-segments` → **500 `missing_sync_api_key`**. Direktes curl gegen die laufende Funktion bestätigt das.
+Ich habe die letzten Szenen direkt aus `composer_scenes` gelesen:
 
-Ursache ist ein simpler **Env-Var-Naming-Mismatch**, kein Sync.so-Outage und kein Bug in der Lipsync-Logik:
+| Szene | dialog_shots.version | engine | status | Bemerkung |
+|---|---|---|---|---|
+| `386381bd…` (zuletzt erfolgreich gerendert) | **5** | `sync-segments` | `applied` | ✅ v5 hat 1 Sync.so-Call mit 3 segments[] gemacht und ein clip_url zurückgegeben |
+| `6005fa3c…` (davor steckengeblieben) | **4** | – | `failed` | alte v4-Zeile von vor dem Env-Var-Fix |
+| `e9ce0e05…` | **4** | – | `failed` | dito |
 
-| Funktion | gelesene Env-Var-Namen |
-|---|---|
-| `poll-dialog-shots` (v4-Pfad) | `SYNC_API_KEY` → `SYNC_SO_API_KEY` → `SYNCSO_API_KEY` ✅ |
-| `compose-twoshot-lipsync` (legacy) | `SYNC_API_KEY` ✅ |
-| `poll-twoshot-lipsync` (legacy) | `SYNC_API_KEY` ✅ |
-| **`compose-dialog-segments` (v5)** | `SYNC_SO_API_KEY` → `SYNCSO_API_KEY` ❌ — `SYNC_API_KEY` fehlt |
+**Ja, v5 läuft.** Der Beweis ist `engine=sync-segments` + `sync_job_id` (Sync.so Generation-UUID) auf der einen erfolgreichen Szene. Die zwei "failed"-Zeilen sind alte v4-Reste, die der Watchdog refundet hat.
 
-Das im Supabase-Vault hinterlegte Secret heißt `SYNC_API_KEY` (alle anderen Funktionen lesen es seit Monaten erfolgreich). Beim Bau der neuen v5-Pipeline wurde der erste Fallback-Name vergessen → die Funktion bootet, kommt sofort in den Key-Check, returnt 500 — kein Log, keine Telemetrie.
+# Das echte Problem: Face-Targeting fehlt in v5
 
-Konsequenz: Seit der Default-Switch auf v5 (vorherige Iteration) **jede** Dialog-Szene mit `engine_override='cinematic-sync'` oder `'sync-segments'` läuft sofort in diesen 500 — der Hook setzt dann `engine_override='cinematic-sync'` zurück, der v4-Watchdog übernimmt, und am Ende kommt der bekannte `watchdog_stuck_lipsync_refunded`. Genau das Muster der letzten zwei Szenen in der DB.
+In `compose-dialog-segments` wird folgendes an Sync.so geschickt:
+
+```ts
+segments: segments.map((s) => ({
+  startTime, endTime,
+  audioInput: { refId, startTime, endTime },
+}))
+```
+
+Kein `targetCoords`, kein `faceBbox`, kein `personId` pro Segment. Sync.so hat genau zwei Modi:
+
+1. Wir sagen pro Segment **welches Gesicht** angesteuert werden soll.
+2. Wir sagen es nicht → Sync.so wählt **ein** Gesicht (in der Regel das größte / links erkannte) und legt ALLE Audio-Segmente darauf.
+
+Genau das siehst du: "der erste Charakter spricht das gesamte Skript".
+
+Die alte v4-Pipeline (`compose-twoshot-lipsync`) löst das, weil sie pro Sprecher einen separaten Sync.so-Call mit `targetCoords: firstTarget.coords` (Gemini-Vision detektiert die zwei Gesichter im Two-Shot-Anker und mappt sie auf die Charaktere, gecached in `audio_plan.twoshot.faceMap`). v5 nutzt diese vorhandene `faceMap` schlicht nicht — der Speed-Gewinn wurde mit dem Verlust der Face-Disambiguierung erkauft.
+
+# Zweites Problem: Progress-Bar bleibt bei 95 % stehen
+
+Der "fertig"-Badge an der Szene stimmt (lip_sync_status=applied). Der globale `PipelineProgressBar` zählt aber alle 5 Szenen-Phasen und scheint einen Stage nicht als terminal zu erkennen — wahrscheinlich weil eine andere Szene (`ccd1e3a4…`, ohne clip_url, lip_sync_status=NULL) noch als "in Arbeit" zählt obwohl sie nie gestartet wurde. Muss ich kurz im Komponentencode verifizieren.
 
 # Plan
 
-### 1. Env-Var-Lookup in `compose-dialog-segments` fixen
-Eine Zeile: `Deno.env.get("SYNC_API_KEY")` als ersten Lookup ergänzen, identisch zu `poll-dialog-shots`. Plus dieselbe `checked:`-Liste im 500-Body wie dort, damit zukünftige Naming-Fehler sofort sichtbar sind statt stumm im Log.
+### 1. Face-Targeting in v5 nachrüsten (Hauptfix)
+- `compose-dialog-segments` liest dieselbe `audio_plan.twoshot.faceMap` wie v4 (Gemini-Vision-Cache existiert bereits).
+- Falls keine `faceMap` da ist: gleicher Gemini-Vision-Call wie in v4 nachholen (oder Helper aus `compose-twoshot-lipsync` in `_shared/` ziehen — Stage H der Lipsync-Stages).
+- Pro `segment` wird `options.targetCoords: [nx, ny]` mitgegeben, basierend auf dem `character_id` des `speakerIdx`. Sync.so segments-API akzeptiert `options` pro Segment (gleicher Shape wie auf der Top-Level-API, die v4 verwendet).
+- Bei Single-Speaker-Szenen passiert nichts Neues — kein Regression-Risiko.
 
-### 2. Shared Helper (`_shared/syncso-preflight.ts`)
-`getSyncApiKey()` Helper hinzufügen, der die drei Namen in fester Reihenfolge prüft. `compose-dialog-segments` und `poll-dialog-shots` ziehen den Helper. Künftige Sync.so-Funktionen müssen nicht mehr raten welcher Name "richtig" ist.
+### 2. Sync.so-Output in eigenes Storage downloaden
+- `sync-so-webhook` schreibt aktuell `clip_url = https://api.sync.so/v2/generations/{id}/result?token=…`. Der Token läuft nach ~24 h ab → Composer-Replays brechen später.
+- Nach COMPLETED: fetch + Upload nach `ai-videos/composer/{userId}/{sceneId}-lipsync.mp4`, dann `clip_url` auf die Storage-URL setzen. Idempotent über bestehenden `state.refunded`-Pfad erweitert.
 
-### 3. Stuck Scene aufräumen
-Die aktuell hängende Szene `6005fa3c-…` steht seit ~12 min in `lip_sync_status='running'` mit v4-Shots. Der `twoshot-lipsync-watchdog` pickt sie beim nächsten cron-tick auf und refundet. Sobald der Fix deployed ist, kann der User per UI "Lip-Sync erneut" klicken — diesmal greift v5 mit korrektem API-Key.
+### 3. PipelineProgressBar Stuck-at-95 %-Fix
+- Komponente kurz auditieren: Szenen ohne `lip_sync_status` aber mit `clip_url` als terminal zählen, "skipped" Szenen (kein Dialog) komplett aus Lipsync-Phase ausschließen. Reine Frontend-Änderung.
 
-Kein DB-Eingriff nötig, kein User-Refund-Hack — der bestehende Refund-Pfad ist idempotent.
-
-### 4. Memory-Update
-Kurze Notiz in `mem/architecture/lipsync/syncso-default-segments-engine.md` ergänzen: "Sync.so secret heißt `SYNC_API_KEY` (legacy) — neue Funktionen MÜSSEN alle drei Namen in der Reihenfolge `SYNC_API_KEY → SYNC_SO_API_KEY → SYNCSO_API_KEY` lesen, sonst booten sie in 500."
+### 4. Alte v4-Failed-Szenen aufräumen
+- Die zwei `failed`-Reihen sind harmlos (Watchdog hat refundet), aber blockieren ggf. UI-Polling. Per "Erneut versuchen"-Klick laufen sie jetzt sauber durch v5 — kein DB-Eingriff nötig.
 
 # Bewusst NICHT Teil dieses Plans
-
-- Umbenennung des Vault-Secrets auf den "schöneren" Namen. Das würde alle Legacy-Funktionen brechen und ist eine separate Operation.
-- Weitere Änderungen an der Lipsync-Logik. Die Pipeline ist nach diesem Fix funktional korrekt; der Rest (Concurrency, Segment-Längen-Guard, …) ist bereits in den vorigen Stages umgesetzt.
+- Wechsel auf Sync.so `personActiveSegments` / multi-person preview API. `targetCoords` pro Segment ist die kleinste Änderung mit größtem Effekt; ein Pipeline-Rewrite auf das neuere Person-Detection-Schema lohnt sich erst, wenn 3+ Sprecher Standard werden.
+- Keine Änderungen an der Routing-Logik, Concurrency-Limits oder Webhook-Pfaden — die laufen alle korrekt.
 
 # Aufwand
-
-~5 min. 2 Dateien (`compose-dialog-segments/index.ts`, `_shared/syncso-preflight.ts`), 1 Memory-Update, 1 Edge-Function-Redeploy.
+~30 min. 1 Edge-Function (`compose-dialog-segments`), 1 Webhook (`sync-so-webhook`), 1 Komponente (`PipelineProgressBar.tsx`), optional 1 Helper in `_shared/twoshot-face-map.ts`. Kein DB-Migration, kein Secret-Touch.
 
 # Frage
-
-Soll ich direkt umsetzen?
+Soll ich alle drei Punkte (1+2+3) zusammen umsetzen oder erst nur den Face-Targeting-Fix (1) ausrollen und 2+3 separat?
