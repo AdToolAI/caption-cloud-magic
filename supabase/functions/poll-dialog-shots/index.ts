@@ -1719,9 +1719,24 @@ serve(async (req) => {
       return json({ ok: true, processed: 0, kickstarted });
     }
 
+    // ── F.5 Burst-Control ──────────────────────────────────────────────
+    // Cap scenes-per-tick to avoid Sync.so 429 spikes when many users
+    // have pending dialog jobs at the same second. Single-scene calls
+    // (targetSceneId set) bypass the cap.
+    const MAX_SCENES_PER_TICK = 2;
+    const scenesToProcess = targetSceneId
+      ? sceneIds
+      : sceneIds.slice(0, MAX_SCENES_PER_TICK);
+    const deferred = sceneIds.length - scenesToProcess.length;
+
     const results: any[] = [];
-    for (const id of sceneIds) {
+    for (const id of scenesToProcess) {
       try {
+        // F.5 Jitter (0–800ms) so parallel pollers don't fire identically.
+        if (!targetSceneId) {
+          const jitterMs = Math.floor(Math.random() * 800);
+          if (jitterMs > 0) await new Promise((r) => setTimeout(r, jitterMs));
+        }
         const r = await processScene(supabase, syncKey, id);
         results.push({ scene_id: id, ...r });
       } catch (e) {
@@ -1730,7 +1745,13 @@ serve(async (req) => {
       }
     }
 
-    return json({ ok: true, processed: sceneIds.length, results });
+    return json({
+      ok: true,
+      processed: scenesToProcess.length,
+      deferred,
+      kickstarted,
+      results,
+    });
   } catch (e) {
     console.error("[poll-dialog-shots] fatal", e);
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
