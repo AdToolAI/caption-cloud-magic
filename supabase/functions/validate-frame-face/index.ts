@@ -54,6 +54,19 @@ interface FaceBox {
   confidence: number;
 }
 
+interface FaceQuality {
+  /** absolute degrees from frontal: 0 = perfect, ≥45 = profile shot */
+  yawDegrees: number | null;
+  /** absolute degrees from level: 0 = level, ≥30 = looking up/down hard */
+  pitchDegrees: number | null;
+  /** 0..1, 1 = both eyes wide open, 0 = closed/occluded */
+  eyeOpenScore: number | null;
+  /** 0..1, 1 = tack-sharp, 0 = motion-blurred */
+  sharpnessScore: number | null;
+  /** Composite 0..1 score, ≥0.6 = safe for Sync.so, <0.6 = shift frame. */
+  faceScore: number | null;
+}
+
 interface ValidationResult {
   faceVisible: boolean;
   faceCount: number;
@@ -61,6 +74,7 @@ interface ValidationResult {
   coordsMatch: boolean | null;
   suggestedFrameOffset: number | null;
   model: string;
+  quality?: FaceQuality;
 }
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -108,6 +122,11 @@ async function writeCache(
           fps,
           result,
           validator: result.model,
+          face_score: result.quality?.faceScore ?? null,
+          yaw_degrees: result.quality?.yawDegrees ?? null,
+          pitch_degrees: result.quality?.pitchDegrees ?? null,
+          eye_open_score: result.quality?.eyeOpenScore ?? null,
+          sharpness_score: result.quality?.sharpnessScore ?? null,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
         },
         { onConflict: "video_url,frame_number" },
@@ -157,16 +176,27 @@ The frame is at timestamp ${timestampSec.toFixed(3)}s (frame ${frameNumber} @ ${
 Look at THAT EXACT MOMENT and tell me:
 1. How many human faces are clearly visible?
 2. For each face, its bounding box in normalized 0..1 coordinates [x, y, width, height] where (0,0) is top-left.
+3. For the LARGEST face, estimate quality signals critical for lip-sync:
+   - yawDegrees: absolute head rotation from frontal in degrees (0 = looking at camera, 45 = 3/4 profile, 90 = full profile)
+   - pitchDegrees: absolute head tilt from level in degrees (0 = level, 30 = clearly looking up or down)
+   - eyeOpenScore: 0..1 (1 = both eyes wide open, 0.5 = squinting, 0 = closed/occluded)
+   - sharpnessScore: 0..1 (1 = tack-sharp face, 0.5 = mild motion blur, 0 = heavy blur)
 
 Reply ONLY with strict JSON, no markdown:
 {
   "faceCount": <number>,
   "faces": [
     { "x": <0..1>, "y": <0..1>, "w": <0..1>, "h": <0..1>, "confidence": <0..1> }
-  ]
+  ],
+  "quality": {
+    "yawDegrees": <number or null>,
+    "pitchDegrees": <number or null>,
+    "eyeOpenScore": <0..1 or null>,
+    "sharpnessScore": <0..1 or null>
+  }
 }
 
-If no face is clearly visible (back of head, blurred, hidden), return faceCount=0 and empty faces array.`;
+If no face is clearly visible (back of head, blurred, hidden), return faceCount=0, empty faces array, and all quality fields null.`;
 
   const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -197,7 +227,7 @@ If no face is clearly visible (back of head, blurred, hidden), return faceCount=
   const raw = json?.choices?.[0]?.message?.content?.trim() ?? "";
   // strip code fences if any
   const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-  let parsed: { faceCount: number; faces: FaceBox[] };
+  let parsed: { faceCount: number; faces: FaceBox[]; quality?: any };
   try {
     parsed = JSON.parse(cleaned);
   } catch {
@@ -217,13 +247,54 @@ If no face is clearly visible (back of head, blurred, hidden), return faceCount=
     }))
     .filter((b) => b.w > 0.02 && b.h > 0.02); // sanity: ignore noise <2% of frame
 
+  // ── F.4 Face quality scoring ──────────────────────────────────────
+  const q = parsed.quality ?? {};
+  const yaw = Number.isFinite(q.yawDegrees) ? Math.abs(Number(q.yawDegrees)) : null;
+  const pitch = Number.isFinite(q.pitchDegrees) ? Math.abs(Number(q.pitchDegrees)) : null;
+  const eye = Number.isFinite(q.eyeOpenScore)
+    ? Math.max(0, Math.min(1, Number(q.eyeOpenScore)))
+    : null;
+  const sharp = Number.isFinite(q.sharpnessScore)
+    ? Math.max(0, Math.min(1, Number(q.sharpnessScore)))
+    : null;
+
+  // Composite: each axis maps to a 0..1 contribution, then weighted.
+  // Yaw: 0°=1.0, 30°=0.5, ≥60°=0.0
+  // Pitch: 0°=1.0, 20°=0.5, ≥45°=0.0
+  // Eye-open and sharpness pass through 0..1.
+  // Weights: yaw 0.4, pitch 0.2, eye 0.2, sharp 0.2
+  function clamp01(n: number) { return Math.max(0, Math.min(1, n)); }
+  const yawScore = yaw === null ? 0.8 : clamp01(1 - yaw / 60);
+  const pitchScore = pitch === null ? 0.8 : clamp01(1 - pitch / 45);
+  const eyeScore = eye === null ? 0.8 : eye;
+  const sharpScore = sharp === null ? 0.8 : sharp;
+  const faceScore = faces.length === 0
+    ? 0
+    : clamp01(
+        yawScore * 0.4 + pitchScore * 0.2 + eyeScore * 0.2 + sharpScore * 0.2,
+      );
+
+  // Suggest a frame offset when the face is sideways/closed: try ±24 frames
+  // (≈1s @ 24fps). Direction is heuristic — caller will try both signs.
+  let suggestedFrameOffset: number | null = null;
+  if (faces.length > 0 && faceScore < 0.6) {
+    suggestedFrameOffset = 24;
+  }
+
   return {
     faceVisible: faces.length > 0,
     faceCount: faces.length,
     faceBoxes: faces,
     coordsMatch: null, // filled by caller after overlap check
-    suggestedFrameOffset: null,
+    suggestedFrameOffset,
     model: "google/gemini-2.5-flash",
+    quality: {
+      yawDegrees: yaw,
+      pitchDegrees: pitch,
+      eyeOpenScore: eye,
+      sharpnessScore: sharp,
+      faceScore,
+    },
   };
 }
 
@@ -295,6 +366,9 @@ Deno.serve(async (req) => {
         coordsMatch,
         suggestedFrameOffset: result.suggestedFrameOffset,
         model: result.model,
+        quality: result.quality ?? null,
+        // Convenience top-level shortcut for callers that only care about pass/fail
+        faceScore: result.quality?.faceScore ?? null,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

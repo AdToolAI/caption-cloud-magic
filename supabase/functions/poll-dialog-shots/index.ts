@@ -1000,7 +1000,7 @@ async function processScene(
     if (dispatchedThisTick >= MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK) break;
     try {
       const usePreclip = !!nextShot.preclip_url && nextShot.sync_source_kind !== "master";
-      const sourceUrl = usePreclip ? (nextShot.preclip_url as string) : state.source_clip_url;
+      let sourceUrl = usePreclip ? (nextShot.preclip_url as string) : state.source_clip_url;
       const win = (nextShot.render_window
         ?? expandWindow(nextShot, shots)) as [number, number];
       nextShot.render_window = win;
@@ -1129,34 +1129,67 @@ async function processScene(
       // ── Stage E.2: Master video stream probe (codec sanity) ──────────
       // Cached per URL for 24h. Only blocks on POSITIVE detection of an
       // unsupported codec — when we can't tell, we let Sync.so try.
-      const streamProbe = await probeVideoStreamCached(supabase, sourceUrl);
+      let streamProbe = await probeVideoStreamCached(supabase, sourceUrl);
       if (streamProbe.ok && streamProbe.isUnsupportedCodec) {
-        const reason = `preflight_video_codec_${streamProbe.codec}`;
-        console.warn(
-          `[poll-dialog-shots] turn ${nextShot.idx} VIDEO-CODEC BLOCK codec=${streamProbe.codec} ${streamProbe.width}x${streamProbe.height}`,
+        // ── Stage G F.1: Auto-Transcode instead of hard-block ──────────
+        // Call normalize-master-clip; on success swap sourceUrl to the
+        // H.264 normalized version (cached 7d). On failure, fall through
+        // to the existing block path so we don't burn credits on broken
+        // codec dispatches.
+        console.log(
+          `[poll-dialog-shots] turn ${nextShot.idx} CODEC ${streamProbe.codec} → attempting auto-normalize`,
         );
-        await logSyncDispatch(supabase, {
-          scene_id: sceneId,
-          user_id: userId ?? null,
-          engine: "cinematic-sync",
-          turn_idx: nextShot.idx,
-          attempt: nextShot.retry_count ?? 0,
-          mode,
-          sync_source_kind: nextShot.sync_source_kind ?? null,
-          video_url: sourceUrl,
-          window_start_sec: dispatchWindow[0],
-          window_end_sec: dispatchWindow[1],
-          sync_status: "CODEC_BLOCKED",
-          error_class: "video_codec_unsupported",
-          error_message: `codec=${streamProbe.codec} dims=${streamProbe.width}x${streamProbe.height}`,
-          meta: { stream: streamProbe },
-        });
-        // Switching source kind (preclip ↔ master) may re-encode → retry.
-        if (!prepareShotRetry(nextShot, reason, shots)) {
-          markShotTerminalFailed(nextShot, reason);
+        try {
+          const normRes = await fetch(
+            `${supabaseUrl0}/functions/v1/normalize-master-clip`,
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ source_url: sourceUrl }),
+            },
+          );
+          const normJson = await normRes.json().catch(() => ({})) as any;
+          if (normRes.ok && normJson?.ok && normJson.normalized_url && normJson.normalized_url !== sourceUrl) {
+            console.log(
+              `[poll-dialog-shots] turn ${nextShot.idx} AUTO-NORMALIZED → ${normJson.normalized_url} (cached=${normJson.cached})`,
+            );
+            sourceUrl = normJson.normalized_url;
+            // Re-probe the normalized URL so downstream coords-bounds use the new dims.
+            streamProbe = await probeVideoStreamCached(supabase, sourceUrl);
+            // Don't fall through to the block — proceed with new URL.
+          } else {
+            throw new Error(normJson?.reason ?? `http_${normRes.status}`);
+          }
+        } catch (normErr) {
+          const reason = `preflight_video_codec_${streamProbe.codec}`;
+          console.warn(
+            `[poll-dialog-shots] turn ${nextShot.idx} AUTO-NORMALIZE FAILED ${(normErr as Error)?.message} → CODEC BLOCK`,
+          );
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId,
+            user_id: userId ?? null,
+            engine: "cinematic-sync",
+            turn_idx: nextShot.idx,
+            attempt: nextShot.retry_count ?? 0,
+            mode,
+            sync_source_kind: nextShot.sync_source_kind ?? null,
+            video_url: sourceUrl,
+            window_start_sec: dispatchWindow[0],
+            window_end_sec: dispatchWindow[1],
+            sync_status: "CODEC_BLOCKED",
+            error_class: "video_codec_unsupported",
+            error_message: `codec=${streamProbe.codec} normalize_failed=${(normErr as Error)?.message}`,
+            meta: { stream: streamProbe, normalize_error: (normErr as Error)?.message },
+          });
+          if (!prepareShotRetry(nextShot, reason, shots)) {
+            markShotTerminalFailed(nextShot, reason);
+          }
+          mutated = true;
+          continue;
         }
-        mutated = true;
-        continue;
       }
 
       // ── Stage E.6: Coords-bounds sanity (clamp if we know dims) ──────
@@ -1202,10 +1235,44 @@ async function processScene(
           lastValidation = v;
           // If validator itself failed (network/Gemini), do NOT block.
           if (!v.ok) break;
-          // Permissive: faceVisible AND (no coords check OR coordsMatch)
-          if (v.faceVisible && (v.coordsMatch === null || v.coordsMatch === true)) {
+          // Stage G F.4: prefer a high-quality frame (faceScore ≥ 0.6).
+          // Accept marginal frames (≥0.4) only after exhausting all offsets.
+          const scoreOk = v.faceScore == null || v.faceScore >= 0.6;
+          if (
+            v.faceVisible &&
+            (v.coordsMatch === null || v.coordsMatch === true) &&
+            scoreOk
+          ) {
             validFrame = tryFrame;
             break;
+          }
+        }
+        // Second pass: relax score threshold to 0.4 if nothing perfect found.
+        if (validFrame === null && lastValidation?.ok) {
+          for (const off of offsets) {
+            const tryFrame = Math.max(0, baseFrame + off);
+            const v = await validateFrameFace({
+              supabaseUrl: supabaseUrl0,
+              serviceKey: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+              videoUrl: sourceUrl,
+              frameNumber: tryFrame,
+              fps: fpsHint,
+              targetCoords: nextShot.target_coords,
+            });
+            lastValidation = v;
+            if (!v.ok) break;
+            const scoreOk = v.faceScore == null || v.faceScore >= 0.4;
+            if (
+              v.faceVisible &&
+              (v.coordsMatch === null || v.coordsMatch === true) &&
+              scoreOk
+            ) {
+              validFrame = tryFrame;
+              console.log(
+                `[poll-dialog-shots] turn ${nextShot.idx} FACE-GATE relaxed pass picked frame ${tryFrame} score=${v.faceScore?.toFixed?.(2)}`,
+              );
+              break;
+            }
           }
         }
         if (validFrame === null && lastValidation?.ok) {
