@@ -413,7 +413,12 @@ interface PreparedAudio {
   channels: number;
   sampleRate: number;
   bytes: number;
+  voicedRatio: number;
+  longestVoicedRun: number;
 }
+
+const MIN_VOICED_RATIO = 0.15;
+const MIN_LONGEST_VOICED_RUN_SEC = 0.4;
 
 async function ensureNormalizedTurnAudio(
   supabase: ReturnType<typeof createClient>,
@@ -441,6 +446,8 @@ async function ensureNormalizedTurnAudio(
           channels: 1,
           sampleRate: 24000,
           bytes: Number(head.headers.get("content-length") ?? "0") || 0,
+          voicedRatio: Number((shot as any).audio_voiced_ratio ?? 1),
+          longestVoicedRun: Number((shot as any).audio_longest_voiced_run ?? 0),
         };
       }
     } catch { /* fall through to regenerate */ }
@@ -458,6 +465,16 @@ async function ensureNormalizedTurnAudio(
     forceMono: true,
   });
 
+  // Stage E.1: VAD on the SLICED (pre-pad) signal so 0.25s lead-in & tail
+  // padding don't poison the ratio.
+  let vad = { voicedRatio: 1, longestVoicedRun: 0, voicedSec: 0, totalSec: 0 } as
+    ReturnType<typeof detectVoicedFrames>;
+  try {
+    vad = detectVoicedFrames(sliced);
+  } catch (e) {
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} VAD inspect failed: ${(e as Error).message}`);
+  }
+
   const { error } = await supabase.storage
     .from("voiceover-audio")
     .upload(path, normalized.bytes, { contentType: "audio/wav", upsert: true });
@@ -471,9 +488,11 @@ async function ensureNormalizedTurnAudio(
   shot.audio_peak_dbfs = Number.isFinite(normalized.info.peakDbFs)
     ? normalized.info.peakDbFs
     : null;
+  (shot as any).audio_voiced_ratio = vad.voicedRatio;
+  (shot as any).audio_longest_voiced_run = vad.longestVoicedRun;
 
   console.log(
-    `[poll-dialog-shots] turn ${shot.idx} audio normalized path=${path} bytes=${normalized.bytes.byteLength} dur=${normalized.info.durSec.toFixed(2)}s peak=${Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs.toFixed(1) : "silent"}dBFS leadIn=${normalized.info.leadInSec.toFixed(3)}s gain=${normalized.appliedGain.toFixed(2)}x`,
+    `[poll-dialog-shots] turn ${shot.idx} audio normalized path=${path} bytes=${normalized.bytes.byteLength} dur=${normalized.info.durSec.toFixed(2)}s peak=${Number.isFinite(normalized.info.peakDbFs) ? normalized.info.peakDbFs.toFixed(1) : "silent"}dBFS leadIn=${normalized.info.leadInSec.toFixed(3)}s gain=${normalized.appliedGain.toFixed(2)}x voiced=${(vad.voicedRatio * 100).toFixed(0)}% longestRun=${vad.longestVoicedRun.toFixed(2)}s`,
   );
   return {
     url: pub.publicUrl,
@@ -483,6 +502,8 @@ async function ensureNormalizedTurnAudio(
     channels: 1,
     sampleRate: normalized.info.sampleRate,
     bytes: normalized.bytes.byteLength,
+    voicedRatio: vad.voicedRatio,
+    longestVoicedRun: vad.longestVoicedRun,
   };
 }
 
