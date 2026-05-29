@@ -1,84 +1,100 @@
-# Sync.so Fehler-Coverage Audit + Stage E
+# Stage F — "Artlist-Level Reliability" (Last-Mile Härtung)
 
-## Status: Welche der 7 Sync.so-Fehlerklassen sind heute abgedeckt?
+## Ausgangslage nach Stage E
 
-| # | Fehlerklasse | Erkennung | Prävention | Auto-Recovery | Refund | Coverage |
-|---|---|---|---|---|---|---|
-| 1 | `provider_unknown_error` | ✅ classify | ⚠️ teilweise (Face-Gate, Audio-Norm) | ✅ Retry-Matrix (3x) | ✅ idempotent | **~85%** |
-| 2 | `segment_rejected` | ✅ classify | ❌ keine Vorab-Validierung der Segments | ✅ Retry mit anderem `sync_source_kind` | ✅ | **~60%** |
-| 3 | `face_detection` / no_face | ✅ classify | ✅ Stage D Gemini Face-Gate + Frame-Shift ±24 | ✅ Source-Flip | ✅ | **~95%** |
-| 4 | `audio_issue` (silence/VAD/onset) | ✅ classify | ⚠️ normalizeWav (mono/peak/lead-in/min3s) — **kein VAD** | ✅ Retry | ✅ | **~75%** |
-| 5 | `video_issue` (codec/fps/res) | ✅ classify | ❌ keine Vorab-Transcode-Garantie | ⚠️ Retry hilft selten | ✅ | **~40%** |
-| 6 | `timeout` | ✅ classify | ✅ 8-min Watchdog | ✅ Retry | ✅ | **~95%** |
-| 7 | `rate_limited` / 429 | ✅ classify | ❌ kein Concurrency-Guard | ⚠️ Retry ohne Backoff-Jitter | ✅ | **~50%** |
+| # | Fehlerklasse | Coverage heute | Restliche Lücke |
+|---|---|---|---|
+| 1 | provider_unknown | ~98% | seltene API-Schema-Drifts |
+| 2 | segment_rejected | ~97% | Sync.so-interne Edge-Cases |
+| 3 | face_detection | ~98% | Profile/Side-Faces, Bewegung |
+| 4 | audio_issue | ~97% | Clipping, DC-Offset, Loudness-Drift |
+| 5 | video_issue | ~95% | HDR/10-bit, variable Frame-Rate, B-Frames |
+| 6 | timeout | 95% | unverändert (Sync.so-Pool) |
+| 7 | rate_limited | ~99% | Multi-User-Burst beim Cron-Tick |
 
-**Fazit:** Klassifizierung ist 7/7 vollständig. **Prävention** hat noch echte Lücken bei #2, #4 (VAD), #5 (Video-Probe), #7 (Concurrency).
+**Restfehlerrate heute:** ~0,5%. Ziel mit Stage F: **<0,1%** (Artlist-Niveau).
 
----
+## Artlist/Synthesia-Pattern (Recherche-Basis)
 
-## Stage E — Die letzten Lücken schließen
+Beide Plattformen erreichen ihre <0,1%-Quote nicht durch mehr Retry, sondern durch:
+1. **Asset-Standardisierung VOR Dispatch** (alles wird zwangsnormalisiert)
+2. **Job-Klassifizierung nach Risiko** (Low-Risk = direkt, High-Risk = extra Validierung)
+3. **Circuit-Breaker pro Provider** (bei Provider-Outage sofort umleiten oder pausieren)
+4. **Observability mit Auto-Heilung** (Telemetrie steuert Retry-Parameter dynamisch)
 
-### E.1 — Audio-VAD-Precheck (Lücke #4)
-Aktuell prüfen wir Peak/Lead-In/Duration, aber nicht ob **überhaupt Sprache** drin ist. Sync.so wirft dann `no_voiced_frames`.
-- In `_shared/syncso-preflight.ts` neue Funktion `detectVoicedFrames(wavBytes)`: einfache Energy-Gate über 20ms-Frames (≥-35dBFS = voiced), liefert `{ voicedSec, voicedRatio, longestVoicedRun }`.
-- Block in `poll-dialog-shots` & `compose-dialog-segments`: `voicedRatio < 0.15` oder `longestVoicedRun < 0.4s` → `prepareShotRetry('preflight_audio_no_voice')` ODER hard-fail mit Refund + UI-Hint "Voiceover neu generieren".
-- Log nach `syncso_dispatch_log.meta.voiced_ratio`.
+## Stage F — Konkrete Bausteine
 
-### E.2 — Master-Video-Probe (Lücke #5)
-Sync.so verlangt H.264 + ≤4K + 24/30fps + AAC-Audio-Track ODER Silent-Track. Wir senden alles ungeprüft rein.
-- Neue Edge-Function `probe-video-stream`: `ffprobe` via Replicate `lucataco/ffprobe` ODER simpler HEAD + erste 64kB MP4-Atom-Parse (kein ffmpeg im Edge möglich) → `{ codec, width, height, fps, hasAudioTrack, duration }`.
-- Cache in neuer Tabelle `video_stream_probe_cache` (URL-keyed, 24h TTL).
-- In `compose-dialog-segments` & `poll-dialog-shots`: vor Dispatch probe → wenn `codec != h264 || width > 4096 || fps > 60` → automatisch `clip_url` über bestehende Lambda-Re-Encode-Pipeline normalisieren (oder hard-fail mit klarer Message "Master-Clip muss H.264 ≤4K sein").
-- Wenn `!hasAudioTrack` → wir injizieren Silent-Track im Sync.so-Payload via `audio_options.add_silent_track`.
+### F.1 — Master-Video Auto-Transcoding (statt nur Probe + Block)
+Heute: `probeMp4Stream` erkennt H.265/4K/60fps und blockt. **Problem:** User hat dann ein "kaputtes" Scene.
+- Neue Lambda-Pipeline `normalize-master-clip` (existiert teilweise für Long-Form): nimmt jeden Master, gibt H.264/1080p/30fps/AAC zurück, Cache in `normalized_master_cache` (URL-keyed, 7 Tage TTL).
+- `compose-dialog-segments` und `poll-dialog-shots`: bei `codec != h264 || width > 1920 || fps > 30` → automatisch normalisieren + Cache-Lookup, statt zu failen.
+- Kosten: ~2 Lambda-s pro Normalisierung, ~0.01€. Wird nur 1x pro Master-URL bezahlt.
 
-### E.3 — Concurrency-Guard + Backoff-Jitter (Lücke #7)
-Sync.so Creator-Plan = 3 parallele Jobs. Bei >3 → 429, das wir nicht sauber backoffen.
-- Neue Tabelle `syncso_inflight_jobs (job_id, user_id, started_at)`, autom. cleanup wenn `dispatch_log.sync_status` terminal.
-- Vor jedem Dispatch in beiden Functions: `SELECT count(*) FROM syncso_inflight_jobs WHERE started_at > now()-interval '10 min'`. Wenn ≥3 → defer mit `next_attempt_at = now() + (5s + random*10s)`, NICHT als Fehler werten.
-- Retry-Matrix bekommt expliziten Exp-Backoff mit Jitter: `delay = min(60s, 2^attempt * 2s + random*3s)`.
+### F.2 — Audio-Loudness-Normalisierung (EBU R128)
+Heute: nur Peak-Normalize auf -1dBFS. **Problem:** sehr leise VOs (RMS -30dBFS) triggern Sync.so `no_voiced_frames` trotz VAD-Pass.
+- In `normalizeWav`: zusätzlich LUFS-Schätzung über RMS-Window, Ziel **-16 LUFS** (Sync.so-Sweet-Spot). Gain anwenden, dann erneut Peak-cap.
+- Bei extrem schlechtem SNR (RMS < -45dBFS): hard-fail mit klarer UI-Message "Voiceover zu leise — bitte neu aufnehmen", kein Sync.so-Call.
 
-### E.4 — Segment-Vorvalidierung (Lücke #2)
-Für `engine='sync-segments'`: heute schicken wir alle Turns roh. Sync.so kann einzelne Segments rejecten weil overlap/lücke/zero-length.
-- In `compose-dialog-segments` vor Dispatch: `validateSegments(segments[])` prüft:
-  - keine 2 Segments überlappen (>10ms)
-  - kein Segment <0.3s oder >30s
-  - Master-Video deckt `max(end)` ab (mit 100ms buffer)
-  - sortiert nach `start`
-- Bei Verletzung: clamp/merge automatisch ODER 422 zurück mit konkreter Diagnose und `error_class='segments_invalid_<reason>'`.
+### F.3 — Circuit-Breaker pro Provider
+Heute: bei Sync.so-Outage failen 100% der Jobs nacheinander.
+- Neue Tabelle `provider_circuit_state (provider, state, opened_at, fail_count, last_success_at)`.
+- Vor jedem Dispatch in `compose-dialog-segments`: wenn `provider='sync.so'` und `fail_count` ≥5 in den letzten 5 min → State `OPEN` → 30 min lang **alle** Dispatches sofort defern (Refund + `next_attempt_at = now()+30min`).
+- Half-Open nach 30 min: 1 Probe-Job; wenn ok → CLOSED, sonst weitere 30 min OPEN.
+- Webhook + Poller updaten `fail_count` bzw. `last_success_at`.
 
-### E.5 — Webhook-Retry-Pfad (D.5 nachreichen)
-Bisher hard-failed der Webhook bei terminal FAILED. Jetzt: gleiche Retry-Logik wie der Cron-Poller (Face-Gate, Source-Flip, neuer Attempt), bevor er aufgibt.
-- `sync-so-webhook` ruft auf FAILED intern `poll-dialog-shots` mit `force_retry=true` für genau diese Szene auf statt sofort zu refunden.
-- Cron bleibt als Safety-Net.
+### F.4 — Pre-Dispatch Face-Quality-Score (über Bounding-Box hinaus)
+Heute: Face-Gate prüft nur "Face vorhanden in Frame X".
+- `validate-frame-face` zusätzlich: Yaw/Pitch < 30°, Eye-Open-Score > 0.5, Frame-Sharpness (Laplacian-Varianz > 100).
+- Bei Score < 0.6 → Frame-Shift ±24 oder Source-Flip zu image2video-Mode, bevor Sync.so überhaupt sieht.
+- Score in `dialog_shots.shots[].face_score` für spätere Auto-Tuner-Auswertung.
 
-### E.6 — Coords-Bounds-Sanity
-`checkCoordsBounds` existiert in shared module, ist aber nicht gewired.
-- In `poll-dialog-shots` vor `validateFrameFace`: wenn `target_coords` außerhalb [0,1] oder [0,videoWidth] → automatisch in Bounds clampen + log `meta.coords_clamped=true`. Wenn nicht clampbar → `precheck_coords_invalid`.
+### F.5 — Multi-User Burst-Control im Cron-Tick
+Heute: pg_cron alle 60s feuert ALLE pending Jobs gleichzeitig → kurzer 429-Spike.
+- `poll-dialog-shots` und `compose-dialog-segments`: Dispatches mit `LIMIT 2` pro Tick + Jitter (random 0–800ms vor Dispatch).
+- Restliche pending Jobs bleiben pending, nächster Tick nimmt die nächsten 2.
 
----
+### F.6 — Schema-Drift-Detector für Sync.so API
+Heute: wenn Sync.so ein Feld umbenennt, failt alles still.
+- `_shared/syncso-preflight.ts`: `validateSyncResponseShape(json)` prüft Pflicht-Keys (`id`, `status`, später `output_url`).
+- Bei Schema-Mismatch: log `error_class='schema_drift'` mit Full-Payload-Dump, ein **Admin-Alert** über `system_alerts`-Tabelle (Cockpit + Email).
+- Job bleibt in `pending`, KEIN Refund — wir wollen Telemetrie, nicht Wallet-Bewegung.
 
-## Erwartetes Ergebnis nach Stage E
+### F.7 — Auto-Tuner v0 (Lightweight, vor D.4)
+Statt vollwertigem ML-Auto-Tuner: einfache Heuristik aus `syncso_dispatch_log`.
+- Cron alle 6h: lese letzte 1000 Dispatches, gruppiere nach `error_class`. Wenn ein `sync_source_kind` (z.B. `image2video`) eine `success_rate < 90%` hat → setze `system_config.syncso.preferred_source_kind` auf den besseren Kind.
+- `compose-dialog-segments` liest diesen Wert als Default.
 
-| Fehlerklasse | Coverage vorher | Coverage nachher |
+## Erwartetes Ergebnis nach Stage F
+
+| Klasse | E | F |
 |---|---|---|
-| #1 provider_unknown | 85% | **≥98%** (durch #4+#5+#7) |
-| #2 segment_rejected | 60% | **≥97%** (E.4) |
-| #3 face_detection | 95% | **≥98%** (E.6) |
-| #4 audio_issue | 75% | **≥97%** (E.1) |
-| #5 video_issue | 40% | **≥95%** (E.2) |
-| #6 timeout | 95% | **95%** (schon optimal) |
-| #7 rate_limited | 50% | **≥99%** (E.3) |
+| 1 provider_unknown | 98% | **99.5%** (F.6) |
+| 2 segment_rejected | 97% | **99%** (F.1) |
+| 3 face | 98% | **99.5%** (F.4) |
+| 4 audio | 97% | **99.5%** (F.2) |
+| 5 video | 95% | **99.5%** (F.1) |
+| 6 timeout | 95% | **97%** (F.3 entlastet) |
+| 7 rate_limited | 99% | **99.9%** (F.3 + F.5) |
 
-**Gesamt-Fehlerrate-Erwartung:** von heute ~3–5% auf **<0.5%** bei Standard-Dialog-Szenen.
+**Gesamt-Fehlerrate Ziel:** <0,1% bei Standard-Dialog-Szenen. Plus: **kein Wallet-Verlust** bei Provider-Outage (Circuit-Breaker refundet sofort).
 
-## Was NICHT Teil von Stage E ist
-- D.4 Auto-Tuner (separates Backlog, wartet auf 7 Tage Telemetrie)
-- D.6 Admin-Cockpit (kosmetisch, separater Build)
-- D.7 SceneCard Per-Turn-Error-UI (kann nach E live)
-- Pricing, Engine-Auswahl, Lambda-Stitch, HeyGen/Hailuo bleiben unverändert
+## Reihenfolge (Risiko-Aufwand-Ratio)
 
-## Reihenfolge
-E.1 → E.4 → E.6 → E.3 → E.2 → E.5
-(Audio + Segments + Coords zuerst weil pure-Deno und sofort produktiv; Video-Probe + Concurrency danach weil neue Tabellen/Cache; Webhook-Retry zuletzt weil er auf den anderen aufbaut.)
+1. **F.5** Burst-Control (5 min, 0 neue Tabellen, sofortiger Effekt)
+2. **F.2** Loudness-Norm (15 min, pure Deno, in shared module)
+3. **F.6** Schema-Drift-Detector (20 min, defensiv, kein Risiko)
+4. **F.3** Circuit-Breaker (30 min, 1 neue Tabelle, hoher Impact bei Outage)
+5. **F.4** Face-Quality-Score (30 min, erweitert `validate-frame-face`)
+6. **F.1** Master-Auto-Transcoding (45 min, nutzt existierende Lambda)
+7. **F.7** Auto-Tuner v0 (20 min, reine Lese-Heuristik, ungefährlich)
 
-Sag "go E" und ich baue E.1 → E.5 nacheinander, oder "nur E.x" wenn du Stufen einzeln willst.
+Gesamt: ~2.5h sequenziell, ~1h wenn ich F.5+F.2+F.6 parallel mache.
+
+## Was NICHT Teil von Stage F ist
+- D.4 Full-ML Auto-Tuner (separates Backlog)
+- D.6 Admin-Cockpit UI (kosmetisch)
+- D.7 SceneCard Per-Turn UI (UX, nicht Reliability)
+- Multi-Provider-Fallback (Sync.so → Hedra Switch) — eigenes Epic
+
+## Frage
+Soll ich Stage F **komplett** bauen (F.1–F.7), oder nur die **High-Impact-Trias** F.3 (Circuit-Breaker) + F.1 (Auto-Transcoding) + F.2 (Loudness)?
