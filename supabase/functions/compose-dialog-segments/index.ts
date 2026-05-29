@@ -94,7 +94,7 @@ interface TwoshotSpeaker {
 interface SegmentsState {
   version: 5;
   engine: "sync-segments";
-  status: "queued" | "rendering" | "done" | "failed";
+  status: "queued" | "rendering" | "done" | "failed" | "retrying";
   sync_job_id?: string;
   source_clip_url: string;
   total_sec: number;
@@ -108,10 +108,15 @@ interface SegmentsState {
   cost_credits: number;
   refunded: boolean;
   started_at: string;
+  first_started_at?: string;
+  retry_count?: number;
+  last_error?: string;
+  last_error_class?: string;
   finished_at?: string;
   final_url?: string | null;
   error?: string;
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -483,12 +488,18 @@ serve(async (req) => {
       };
     }
 
+    // Diagnose Mai 2026: Sync.so `lipsync-2-pro` schlägt mit
+    // "An unknown error occurred" fehl, sobald `segments[]` UND
+    // `options.active_speaker_detection` (egal ob `coordinates` oder
+    // `bounding_boxes`) gemeinsam gesendet werden. Repro-Matrix V1/V2/V3
+    // ohne ASD = COMPLETED. V4/V5 mit ASD = FAILED. Sync.so wählt im
+    // Segments-Modus den aktiven Sprecher implizit aus dem Audio-Stream
+    // des jeweiligen Segments — ASD ist nur für den Nicht-Segments-Pfad.
+    // Wir lassen ASD hier komplett weg und behalten es nur als Telemetrie.
+    const _diagnosticAsd = asdOptions; // kept for log_meta
     const payload: Record<string, unknown> = {
       model: LIPSYNC_MODEL,
       input,
-      ...(asdOptions
-        ? { options: { active_speaker_detection: asdOptions } }
-        : {}),
       segments: segments.map((s) => ({
         startTime: s.startTime,
         endTime: s.endTime,
@@ -501,6 +512,7 @@ serve(async (req) => {
       webhookUrl,
       webhook_url: webhookUrl,
     };
+
 
     console.log(
       `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1500)}`,
@@ -785,10 +797,46 @@ serve(async (req) => {
       window_end_sec: totalSec,
       http_status: resp.status,
       sync_status: "DISPATCHED",
-      meta: { segments_count: segments.length },
+      meta: {
+        segments_count: segments.length,
+        is_retry: isRetry,
+        // Stage E.6 — Persist the full outgoing payload so we can post-mortem
+        // Sync.so "unknown error" jobs without re-instrumenting. Truncated to
+        // keep meta column under control, but bounding_boxes summarized rather
+        // than dropped (we need shape + length, not every frame).
+        payload_summary: {
+          model: payload.model,
+          input: input.map((i: any) => ({ type: i.type, url: i.url, refId: i.refId })),
+          segments: segments,
+          asd_kind: asdOptions
+            ? (asdOptions.bounding_boxes ? "bounding_boxes" : "coordinates")
+            : "auto",
+          asd_box_count: Array.isArray((asdOptions as any)?.bounding_boxes)
+            ? (asdOptions as any).bounding_boxes.length
+            : null,
+          asd_unique_boxes: Array.isArray((asdOptions as any)?.bounding_boxes)
+            ? Array.from(new Set(
+                ((asdOptions as any).bounding_boxes as any[]).map((b) =>
+                  Array.isArray(b) ? b.join(",") : String(b),
+                ),
+              )).slice(0, 8)
+            : null,
+          asd_coords: (asdOptions as any)?.coordinates ?? null,
+          face_map_source: faceMap?.source ?? null,
+          face_count: faceMap?.faces?.length ?? 0,
+          assumed_fps: ASSUMED_FPS,
+          total_sec: totalSec,
+        },
+      },
     });
 
     const nowIso = new Date().toISOString();
+    // E.5 retry-preserve: when re-dispatching after a webhook FAILED, keep the
+    // retry budget the webhook already incremented. Otherwise compose-dialog-
+    // segments would silently reset retry_count to undefined and the webhook
+    // would think retry_count=0 → endless re-dispatch loop (Mai 2026 incident
+    // produced 71 jobs in 15 min for a single scene).
+    const prev = (existing && existing.version === 5) ? existing : null;
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",
@@ -797,10 +845,18 @@ serve(async (req) => {
       source_clip_url: sourceClipUrl,
       total_sec: totalSec,
       segments,
-      cost_credits: totalCost,
+      cost_credits: isRetry ? Number((prev as any)?.cost_credits ?? totalCost) : totalCost,
       refunded: false,
       started_at: nowIso,
       final_url: null,
+      ...(isRetry && prev
+        ? {
+            retry_count: Number((prev as any).retry_count ?? 0),
+            first_started_at: (prev as any).first_started_at ?? (prev as any).started_at ?? nowIso,
+            last_error: (prev as any).last_error,
+            last_error_class: (prev as any).last_error_class,
+          } as Partial<SegmentsState>
+        : { first_started_at: nowIso } as Partial<SegmentsState>),
     };
 
     await supabase
@@ -815,6 +871,7 @@ serve(async (req) => {
         updated_at: nowIso,
       })
       .eq("id", sceneId);
+
 
     return json(
       {
