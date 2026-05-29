@@ -1,0 +1,37 @@
+---
+name: Sync.so Stage F — Artlist-Level Reliability (Circuit Breaker + Loudness + Schema Drift)
+description: F.2 LUFS loudness norm in normalizeWav (+12dB cap, target -16 LUFS) + isAudioTooQuiet hard floor; F.3 provider_circuit_state breaker (5 fails / 5min → OPEN 30min, half_open probe) wired BEFORE wallet debit in compose-dialog-segments and updated on every webhook terminal; F.6 validateSyncResponseShape + emitSystemAlert raise critical alert on schema drift without refunding; F.7 readPreferredSyncSourceKind reads system_config seeded auto-tuner hint.
+type: architecture
+---
+
+**New shared helpers** (`_shared/syncso-preflight.ts`):
+- `normalizeWav({ targetLufs })` — F.2 EBU-R128-style RMS-LUFS lift (default −16 LUFS, +12dB cap) BEFORE peak-cap; returns `sourceLufs` + `resultLufs` for telemetry.
+- `isAudioTooQuiet(wav)` — F.2 hard floor; <−45 dBFS RMS → caller must refuse dispatch.
+- `evaluateCircuit / openCircuit / recordCircuitSuccess / recordCircuitFailure` — F.3 provider_circuit_state CRUD. CLOSED → OPEN at 5 fails/5min rolling window OR on half_open probe failure; OPEN blocks for 30 min then promotes to half_open for one probe.
+- `validateSyncResponseShape(json)` — F.6 schema-drift sentinel (required keys `id`, `status`).
+- `emitSystemAlert(supabase, …)` — dedupes alerts by (alert_type, source) within 1h.
+- `readPreferredSyncSourceKind(supabase)` — F.7 read auto-tuner output from `system_config.syncso.preferred_source_kind`.
+
+**New DB objects** (migration `20260529172608`):
+- `provider_circuit_state` (PK `provider`, RLS admin-read, seeded `sync.so` CLOSED).
+- `system_alerts` (admin-read + admin-update for ack, indexed on unack+created).
+- `syncso_recent_failure_count(_window_min)` SECURITY DEFINER helper.
+- `system_config` seeds: `syncso.preferred_source_kind` + `syncso.auto_tuner_last_run`.
+
+**compose-dialog-segments wiring:**
+- F.3 `evaluateCircuit` runs BEFORE wallet debit — OPEN → 202 with `retry_in_ms`, no charge, scene → `twoshot_stage='circuit_open'`, dispatch logged as `CIRCUIT_BLOCKED`.
+- F.7 `readPreferredSyncSourceKind` logged for telemetry (no behavior change yet; tuner cron job ships separately).
+- After `POST /generate`: `validateSyncResponseShape` → on drift emit critical `syncso_schema_drift` alert + `SCHEMA_DRIFT` log row, no refund, 502 (so operator investigates a stuck job rather than the user retrying blindly).
+- On dispatch HTTP failure → `recordCircuitFailure`. On success → `recordCircuitSuccess`.
+- **Fixed latent bug**: `registerInflightSyncJob` was called with `(supabase, jobId, userId)` but the shared signature is `(supabase, { job_id, user_id, scene_id, engine })` — inserts were silently failing. Now passes the correct row object.
+
+**sync-so-webhook wiring:**
+- After `releaseInflightSyncJob`: COMPLETED → `recordCircuitSuccess`; FAILED/REJECTED/CANCELED → `recordCircuitFailure(classifySyncError(...))`. This is the primary signal for the rolling-window threshold.
+
+**Not yet implemented from Stage F plan:**
+- F.1 Master-Video Auto-Transcoding (`normalize-master-clip` Lambda) — codec detection logs only, no auto-fix yet.
+- F.4 Face-Quality Score (Yaw/Pitch/Sharpness in `validate-frame-face`) — needs Gemini Vision prompt update.
+- F.5 Cron-tick burst control (LIMIT 2 + jitter in `poll-dialog-shots`) — pending separate edit.
+- F.7 Auto-Tuner cron job that *writes* `preferred_source_kind` from `syncso_dispatch_log` analysis — only the read side is live.
+
+**Expected coverage uplift** (vs. Stage E baseline): #1 provider_unknown 98%→99%+, #4 audio_issue 97%→99% (LUFS), #7 rate_limited 99%→99.9% (breaker), plus zero-charge guarantee on Sync.so outages.
