@@ -182,6 +182,10 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const sceneId = body?.scene_id;
     const isRetry = body?.retry === true;
+    // `advance: true` is sent by the webhook to chain to the next pass after
+    // a successful pass completion. Skips wallet debit + face-gate (already
+    // validated on pass 0) and dispatches passes[current_pass].
+    const isAdvance = body?.advance === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
