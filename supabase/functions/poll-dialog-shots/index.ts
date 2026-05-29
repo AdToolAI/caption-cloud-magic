@@ -350,7 +350,15 @@ async function startSyncTurnJob(
    *  ~60s (cron tick) down to ~1s. pg_cron polling stays as safety net. */
   webhookUrl?: string,
   /** Optional override for the `frame_number` coord-sampling point. Used on
-   *  retries to step away from the original failing frame (cuts/blinks). */
+   *  retries to step away from the original failing frame (cuts/blinks).
+   *  Must be SEGMENT-RELATIVE (0 = first frame of the trimmed segment). */
+  frameNumberOverride?: number,
+): Promise<string> {
+  const options: Record<string, unknown> = {
+    output_format: "mp4",
+    sync_mode: "cut_off",
+    temperature,
+  };
   if (mode === "coords" && coords) {
     // Sync.so v2 + `segments_secs`: `frame_number` is interpreted RELATIVE to
     // the segment start (frame 0 = first frame of the trimmed segment), NOT
@@ -370,13 +378,6 @@ async function startSyncTurnJob(
     options.active_speaker_detection = { auto_detect: true };
   }
 
-      auto_detect: false,
-      frame_number: frameNumber,
-      coordinates: coords,
-    };
-  } else {
-    options.active_speaker_detection = { auto_detect: true };
-  }
   const payload: Record<string, unknown> = {
     model: LIPSYNC_MODEL,
     input: [
