@@ -785,10 +785,46 @@ serve(async (req) => {
       window_end_sec: totalSec,
       http_status: resp.status,
       sync_status: "DISPATCHED",
-      meta: { segments_count: segments.length },
+      meta: {
+        segments_count: segments.length,
+        is_retry: isRetry,
+        // Stage E.6 — Persist the full outgoing payload so we can post-mortem
+        // Sync.so "unknown error" jobs without re-instrumenting. Truncated to
+        // keep meta column under control, but bounding_boxes summarized rather
+        // than dropped (we need shape + length, not every frame).
+        payload_summary: {
+          model: payload.model,
+          input: input.map((i: any) => ({ type: i.type, url: i.url, refId: i.refId })),
+          segments: segments,
+          asd_kind: asdOptions
+            ? (asdOptions.bounding_boxes ? "bounding_boxes" : "coordinates")
+            : "auto",
+          asd_box_count: Array.isArray((asdOptions as any)?.bounding_boxes)
+            ? (asdOptions as any).bounding_boxes.length
+            : null,
+          asd_unique_boxes: Array.isArray((asdOptions as any)?.bounding_boxes)
+            ? Array.from(new Set(
+                ((asdOptions as any).bounding_boxes as any[]).map((b) =>
+                  Array.isArray(b) ? b.join(",") : String(b),
+                ),
+              )).slice(0, 8)
+            : null,
+          asd_coords: (asdOptions as any)?.coordinates ?? null,
+          face_map_source: faceMap?.source ?? null,
+          face_count: faceMap?.faces?.length ?? 0,
+          assumed_fps: ASSUMED_FPS,
+          total_sec: totalSec,
+        },
+      },
     });
 
     const nowIso = new Date().toISOString();
+    // E.5 retry-preserve: when re-dispatching after a webhook FAILED, keep the
+    // retry budget the webhook already incremented. Otherwise compose-dialog-
+    // segments would silently reset retry_count to undefined and the webhook
+    // would think retry_count=0 → endless re-dispatch loop (Mai 2026 incident
+    // produced 71 jobs in 15 min for a single scene).
+    const prev = (existing && existing.version === 5) ? existing : null;
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",
@@ -797,10 +833,18 @@ serve(async (req) => {
       source_clip_url: sourceClipUrl,
       total_sec: totalSec,
       segments,
-      cost_credits: totalCost,
+      cost_credits: isRetry ? Number((prev as any)?.cost_credits ?? totalCost) : totalCost,
       refunded: false,
       started_at: nowIso,
       final_url: null,
+      ...(isRetry && prev
+        ? {
+            retry_count: Number((prev as any).retry_count ?? 0),
+            first_started_at: (prev as any).first_started_at ?? (prev as any).started_at ?? nowIso,
+            last_error: (prev as any).last_error,
+            last_error_class: (prev as any).last_error_class,
+          } as Partial<SegmentsState>
+        : { first_started_at: nowIso } as Partial<SegmentsState>),
     };
 
     await supabase
@@ -815,6 +859,7 @@ serve(async (req) => {
         updated_at: nowIso,
       })
       .eq("id", sceneId);
+
 
     return json(
       {
