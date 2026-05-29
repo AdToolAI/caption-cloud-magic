@@ -1,90 +1,79 @@
-## Einschätzung
+# Dialog-Pipeline: Pivot zu Sync.so Segments
 
-Artlist veröffentlicht keine exakten SLA-Zeiten für Lip-Sync. Der entscheidende Unterschied ist aber: Bei Artlist/HappyHorse läuft Dialog/Lip-Sync möglichst provider-nativ in einer Generation bzw. stark gekapselt, nicht als lange Kette aus Szene → Preclip → externer Lip-Sync pro Turn → Stitch. Für kurze 5–10s Dialog-Clips sollte ein robuster Zielwert bei uns eher bei ca. 2–5 Minuten liegen, nicht 15 Minuten.
+## Was die Recherche geändert hat
 
-Was ich gerade sehe:
-- Der Backend-Status ist gesund.
-- Die aktuelle Szene hängt nicht an der Datenbank, sondern an Sync.so-Failures/Retry-Schleifen.
-- Es gab mehrere `sync_FAILED → retry 1/3 ... retry 3/3` für einzelne Turns.
-- Der Watchdog steht aktuell effektiv bei 15 Minuten pro Shot. Das ist zu lang für UX und fühlt sich wie „nie fertig“ an.
-- Zusätzlich sehe ich doppelte Dispatch-Logs für denselben Turn. Das kann durch parallele Poller/Webhook-Kicks passieren und erhöht Kosten, Wartezeit und Fehlerwahrscheinlichkeit.
+Mein vorheriger Plan ("HappyHorse als nativer Dialog-Renderer") ist **technisch nicht umsetzbar** — HappyHorse 1.0 hat keine Multi-Speaker-API. Auch der "Artlist macht das so"-Vergleich war Spekulation: Artlist betreibt nur ein Aggregator-Frontend über bestehende Modelle (Veo 3, Kling, Hailuo, HappyHorse), keine eigene Dialog-Engine.
 
-## Ziel
+**Die echte Lösung für das Problem (15 min Chain, hohe Fehlerrate) ist** die **Sync.so Segments API** — die ist bereits in unserem Stack, kann nativ Multi-Speaker in **1 Call** lipsyncen, und wir nutzen ihre Single-Speaker-Variante schon (`sync/lipsync-2-pro`).
 
-Die Pipeline soll nicht versuchen, jeden einzelnen Turn endlos perfekt zu retten, sondern wie ein Produktivsystem arbeiten:
+## Architektur-Vergleich
 
 ```text
-schnell versuchen → gezielt 1x retten → sauber degradieren → Video fertigstellen
-```
+HEUTE (Chain, ~10–15 min, mehrere Failure-Points):
+  Hailuo i2v plate  →  Sync.so call #1 (turn 1)
+                    →  Sync.so call #2 (turn 2)
+                    →  Sync.so call #3 (turn 3)
+                    →  ffmpeg concat  →  done
 
-Das senkt die sichtbare Fehlerquote, weil der Gesamtprozess nicht mehr an einem einzelnen problematischen Mund-Fenster hängen bleibt.
+NEU (Sync.so Segments, 1 Call, ~3–5 min):
+  Hailuo i2v plate (1 plate mit beiden Sprechern im Frame)
+    →  Sync.so 1× Call mit segments[]
+       [{ audio: vo_a, start: 0,   end: 2.5, face: "left"  },
+        { audio: vo_b, start: 2.5, end: 5,   face: "right" },
+        { audio: vo_a, start: 5,   end: 8,   face: "left"  }]
+    →  done
+```
 
 ## Plan
 
-### 1. Sync.so-Risiko wieder reduzieren
+### 1. Neue Edge Function `compose-dialog-segments`
+- Input: `sceneId`, `master_plate_url` (Hailuo i2v mit allen Sprechern im Frame), `dialog_script[]` mit speaker + audio_url + start/end pro Turn, `face_assignments` (welche Bildregion = welcher Speaker).
+- Baut 1× Sync.so-Call mit `segments[]` (siehe https://sync.so/docs/developer-guides/segments).
+- Webhook-driven (wie heute), schreibt `clip_url` direkt in `composer_scenes`.
+- Idempotenter Refund bei Fehler (deterministische UUID aus scene_id + segment_count).
 
-Ich würde die letzte „Smoothness“-Änderung teilweise entschärfen:
-- `occlusion_detection_enabled` vorerst wieder entfernen oder nur optional senden.
-- Temperatur konservativ lassen, aber nicht auf Retry-Werte hochziehen, die wieder Zappeln/Failures provozieren.
-- Lead-In/Tail moderat halten, aber keine aggressiven Extra-Fenster bei sehr kurzen Turns.
+### 2. Engine-Override
+- Neuer Wert `engine_override = 'sync-segments'` parallel zu `cinematic-sync`.
+- Default für neue Multi-Sprecher-Szenen: `sync-segments`.
+- UI-Toggle pro Szene: "Fast Dialog (1 Call)" vs "Legacy Chain".
 
-Warum: Smoothness darf nicht die Completion-Rate verschlechtern. Erst Stabilität, dann Feinschliff.
+### 3. Face-Region-Detection (1× pro Scene)
+- Nach Master-Plate-Generation: `gemini-2.5-flash` Vision-Call → bbox pro Cast-Member im Frame.
+- Cache in `composer_scenes.face_regions` (jsonb).
+- Sync.so Segments akzeptiert face-bbox oder face-index — wir wählen das was die API verlangt.
 
-### 2. Watchdog von 15 Minuten auf produktive Grenze senken
+### 4. Legacy bleibt als Fallback
+- `compose-dialog-scene` + `poll-dialog-shots` bleiben unverändert.
+- Auto-Fallback nach `sync-segments` Failure (max 1 Retry, dann Chain).
+- Single-Speaker-Szenen unverändert.
 
-Ändern in `poll-dialog-shots`:
-- Sync.so-Shot-Timeout: ca. 4 Minuten statt 15 Minuten.
-- Preclip-Timeout: ca. 3–4 Minuten statt 10 Minuten.
-- Max. Sync-Retries: von 3 auf 1–2 reduzieren.
+### 5. Feature-Flag-Rollout
+- `system_config.dialog_engine_default = 'sync-segments' | 'cinematic-sync'`.
+- Start: `cinematic-sync` (Default), neuer Toggle im UI.
+- Nach ≥90% Erfolg über 30 Runs → Auto-Switch auf `sync-segments` als Default.
 
-Effekt: Ein kaputter Turn blockiert nicht den ganzen Clip.
+### 6. UI-Anpassung
+- `DialogScenePhaseDisplay` bekommt 2-Phasen-Modus für `sync-segments` (Polling → Done).
+- Cinematic-Sync behält 5-Phasen-Anzeige.
 
-### 3. Graceful Fallback statt kompletter Pipeline-Fehler
+## Was unverändert bleibt
+- Audio-Pipeline (VO-Generation, audio_plan.tracks[])
+- `compose-dialog-scene`, `poll-dialog-shots`, `render-dialog-stitch`, `sync-so-webhook`
+- Single-Speaker-Szenen
+- Composer-UI, Credits, Refund-Logik
 
-Wenn ein Turn nach kurzer Retry-Phase weiter fehlschlägt:
-- Nicht die ganze Szene als failed markieren.
-- Den Turn als „degraded ready“ behandeln.
-- Beim Stitch wird für diesen Turn die originale Master-Plate verwendet, also keine perfekte Mundbewegung, aber das Video wird fertig.
+## Risiken / offene Punkte
+- **Sync.so Segments + Face-Detection-Reliability**: Wenn beide Sprecher zu nah / überlappen, kann face-assignment scheitern → Fallback auf Chain.
+- **Master-Plate-Qualität**: Hailuo muss beide Sprecher stabil im Frame halten — dafür nutzen wir bereits unser Multi-Character-Composition (`portraitUrls[]` an `compose-scene-anchor`). Funktioniert.
+- **Pricing**: Sync.so lipsync-2-pro $0.083/s × 8s = ~$0.67 statt heute ~$2.00 (3 Calls). **Günstiger** als Chain.
+- **Max Speakers**: Sync.so detected mehrere Faces automatisch — kein harter 2-Sprecher-Cap wie bei MultiTalk.
 
-Das ist näher an professioneller Produktlogik: Lieber 95% Output fertig liefern als 0% wegen eines 0.9s-Turns.
+## Was wir NICHT bauen
+- ❌ HappyHorse als Dialog-Renderer (API kann es nicht)
+- ❌ MeiGen MultiTalk (max 2 Sprecher, ~7min, kein Brand-Identity-Lock)
+- ❌ Veo 3 Dialog (keine Reference-Faces = killt Avatar-System)
 
-### 4. Duplicate-Dispatch-Schutz einbauen
-
-Ich würde eine kleine Szenen-Lock-Logik ergänzen, damit parallele Poller/Webhooks nicht denselben Turn mehrfach an Sync.so schicken.
-
-Technisch:
-- Pro Szene ein kurzer `dialog_shots.processing_lock_until` Marker oder eine kleine DB-Lock-Funktion.
-- Wenn ein Poller schon arbeitet, skippt der nächste sauber.
-- Dadurch weniger doppelte Jobs, weniger Provider-Stress, weniger Kosten.
-
-### 5. Progress-Anzeige ehrlicher machen
-
-Aktuell wirkt `95% / 14:28 min` wie fast fertig, obwohl intern noch ein Turn hängt. Ich würde den Status granular machen:
-- „Preclips fertig“
-- „Lip-Sync Turn 2/3“
-- „Retry 1/1“
-- „Fallback aktiv“
-- „Stitching“
-
-Und die Fortschrittslogik nicht bei 95% festkleben lassen.
-
-### 6. Aktuelle hängende Szene retten
-
-Nach dem Code-Fix:
-- Den aktuellen hängenden Lip-Sync-Status kontrolliert weiterführen oder nur den Lip-Sync-Teil resetten.
-- Keine Szenengenerierung neu starten, wenn die Clips schon da sind.
-- Danach einmal durchlaufen lassen und Logs prüfen.
-
-## Erwartetes Ergebnis
-
-- Normale kurze Dialogszene: ca. 2–5 Minuten Zielzeit.
-- Problematische Szene: sauberer Abschluss mit Degradation statt 15-Minuten-Hänger.
-- Weniger Sync.so-Jobs durch Dispatch-Lock.
-- Geringere sichtbare Fehlerrate, weil ein einzelner Provider-Fail nicht mehr den ganzen Export blockiert.
-
-## Nicht anfassen
-
-- Keine Änderung an der funktionierenden Szene-Generierung.
-- Kein kompletter Pipeline-Rewrite.
-- Keine riskante Parallelisierung aller Sync.so-Turns.
-- Keine Änderung an Credits/Refund-Logik außer bestehende Fail-Safes beizubehalten.
+## Tech-Details
+- Sync.so Segments Doc: https://sync.so/docs/developer-guides/segments
+- Replicate Model: `sync/lipsync-2-pro` (bereits in unserem Stack)
+- Memory-Update nach Erfolg: neue Notiz `mem://features/video-composer/sync-segments-dialog-pipeline`

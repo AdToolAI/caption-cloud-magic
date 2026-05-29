@@ -23,6 +23,10 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
+/** Engines that share the dialog/lip-sync auto-trigger pipeline. */
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
+const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
+
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
   for (const line of String(dialogScript ?? '').split('\n')) {
@@ -80,7 +84,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const dialogShotRows = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'cinematic-sync' &&
+            isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version === 4 &&
             !d.lip_sync_applied_at &&
             (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching') &&
@@ -96,7 +100,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const staleSyncJobs = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'cinematic-sync' &&
+            isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
@@ -117,7 +121,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'cinematic-sync' &&
+            isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
@@ -136,7 +140,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // recorded. Clear the stage too so the candidate filter can re-invoke.
         const preflightAborts = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'cinematic-sync' &&
+            isDialogEngine(d.engine_override) &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             !hasRecordedProviderJob(d) &&
@@ -167,7 +171,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Stale-recovery: 'running' >6min ohne lip_sync_applied_at → reset
         const stale = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'cinematic-sync' &&
+            isDialogEngine(d.engine_override) &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
             !hasRecordedProviderJob(d) &&
@@ -195,7 +199,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Reset stage AND status atomically so the candidate-filter below
         // picks it up in the same tick.
         const zombies = (data as any[]).filter((d) => {
-          if (d.engine_override !== 'cinematic-sync') return false;
+          if (!isDialogEngine(d.engine_override)) return false;
           if (d.lip_sync_applied_at) return false;
           if (d.lip_sync_status !== 'pending') return false;
           if (typeof d.twoshot_stage !== 'string' || !/^lipsync_/i.test(d.twoshot_stage)) return false;
@@ -242,7 +246,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns)/i;
 
         const candidates = (data as any[]).filter((d) => {
-          if (d.engine_override !== 'cinematic-sync') return false;
+          if (!isDialogEngine(d.engine_override)) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           // Master clip must be READY — never try lip-sync on a failed/generating master.
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -264,7 +268,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         if (candidates.length === 0) {
           const anyVisibleLipsyncWork = (data as any[]).some(
             (d) =>
-              d.engine_override === 'cinematic-sync' &&
+              isDialogEngine(d.engine_override) &&
               !d.lip_sync_applied_at &&
               (d.lip_sync_status === 'running' ||
                 (d.twoshot_stage && !['done', 'complete', 'failed'].includes(String(d.twoshot_stage)))),
@@ -289,9 +293,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // NEW dialog-based shot pipeline (1, 2, 3+ speakers) — replaces the
-          // legacy compose-twoshot-lipsync / compose-lipsync-scene split.
-          const fnName = 'compose-dialog-scene';
+          // Route by engine: 'sync-segments' = 1-call Sync.so Segments API,
+          // 'cinematic-sync' = legacy per-turn dialog chain (v4).
+          const fnName =
+            d.engine_override === 'sync-segments'
+              ? 'compose-dialog-segments'
+              : 'compose-dialog-scene';
 
           // For retry-candidates (previously 'failed'), clear the failure
           // markers first so the edge function's running-takeover guard sees a
