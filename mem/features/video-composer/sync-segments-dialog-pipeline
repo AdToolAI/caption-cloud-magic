@@ -1,24 +1,58 @@
 ---
-name: Fast Dialog Pipeline (Sync.so Segments, v5)
-description: 1-Call Sync.so Segments dispatcher (compose-dialog-segments) replaces the v4 per-turn chain. dialog_shots.version=5, engine_override='sync-segments', webhook-driven completion, v5 stale-watchdog at 12min.
+name: Fast Dialog Pipeline (Sync.so Multi-Pass Chain, v5)
+description: compose-dialog-segments now dispatches N sequential Sync.so calls (one per speaker, each chained on the previous pass's output) instead of one segments[]+ASD call (which crashes lipsync-2-pro). Webhook chains via {advance: true}; per-pass payload uses single audio + single-coord ASD, NO segments[]. State stores passes[] + current_pass + total_passes. Single-speaker scenes still run as one pass.
 type: feature
 ---
 
 Engine: `engine_override = 'sync-segments'` (parallel to legacy `'cinematic-sync'`).
 
-**Flow:**
-1. `compose-dialog-segments` reads `audio_plan.twoshot.speakers[].voicedRange.turns[]`, builds `segments[]` array with `audioInput.refId` per turn, dispatches a SINGLE Sync.so `lipsync-2-pro` call on the master plate (`clip_url` or `lip_sync_source_clip_url`).
-2. State persisted as `dialog_shots = { version: 5, engine: 'sync-segments', status: 'rendering', sync_job_id, cost_credits, segments[], ... }`.
-3. `sync-so-webhook` v5 branch: COMPLETED → write `clip_url = outputUrl`, `lip_sync_applied_at = now`. FAILED/REJECTED/CANCELED → idempotent refund (guarded by `state.refunded`), mark `lip_sync_status='failed'`.
-4. Wallet refund is idempotent both on dispatch failure (502 path in `compose-dialog-segments`) and webhook failure (`refunded` flag in state).
+**Why multi-pass:** Sync.so `lipsync-2-pro` crashes (`An unknown error occurred`) when `segments[]` + `options.active_speaker_detection` are sent together. Dropping ASD makes the call complete but Sync.so picks audio→face auto-mapping and routinely swaps speakers. The only stable multi-speaker pattern is v4's: one call per speaker with single-coord ASD, chained.
 
-**Cost:** `ceil(totalSec) * 9` credits (min 9), single pass. ~3–5 min end-to-end vs. ~10–15 min for v4 chain.
+**Per-pass payload (no segments[]):**
+```json
+{
+  "model": "lipsync-2-pro",
+  "input": [
+    { "type": "video", "url": "<prev pass output OR master plate>" },
+    { "type": "audio", "url": "<speaker.track_url with silence between turns>" }
+  ],
+  "options": {
+    "active_speaker_detection": {
+      "auto_detect": false,
+      "frame_number": <mid of first turn>,
+      "coordinates": [x, y]
+    }
+  },
+  "webhookUrl": "..."
+}
+```
 
-**Routing (`useTwoShotAutoTrigger`):**
-- `DIALOG_ENGINES = {'cinematic-sync', 'sync-segments'}` triggers both auto-pipelines.
-- v5 candidates route to `compose-dialog-segments`, v4 to `compose-dialog-scene`.
-- v5 stale-watchdog: `lip_sync_status='running'` + no `final_url` + `updated_at` > 12min → mark `syncso_segments_poll_timeout`, auto-retry via RETRYABLE_REGEX.
+**State model (`dialog_shots`):**
+```ts
+{
+  version: 5, engine: "sync-segments", status: "rendering"|"done"|"failed",
+  multi_pass: boolean, passes: PassState[],
+  current_pass: number, total_passes: number,
+  sync_job_id: string,         // CURRENT pass's job id (for webhook match)
+  source_clip_url, total_sec, cost_credits, refunded,
+  first_started_at, started_at, retry_count,
+  final_url?: string,          // set only on last pass COMPLETED
+}
+```
 
-**UI:** SceneCard engine-override Select has `⚡ Fast Dialog · 1-Call (Sync.so Segments)` option. Router (`sceneEngineRouter.ts`) returns a recommendation when override='sync-segments'.
+**Webhook flow (sync-so-webhook v5 branch):**
+- COMPLETED + more passes remain → mark pass done, increment `current_pass`, fire-and-forget `compose-dialog-segments {scene_id, advance: true}`.
+- COMPLETED + last pass → re-host MP4 to ai-videos, set `clip_url`, `lip_sync_applied_at`, `twoshot_stage='complete'`.
+- FAILED/transient + retry budget → re-dispatch same pass via `{scene_id, retry: true}`.
+- FAILED/non-retryable → idempotent refund + `lip_sync_status='failed'`.
 
-**v4 legacy** (`compose-dialog-scene` + per-turn `dialog_shots.shots[]` + Lambda stitch) remains the safe fallback and is unchanged.
+**Requirements:** every speaker MUST have `track_url` (compose-twoshot-audio output). Missing → 422 + refund + clear error.
+
+**Cost:** still `ceil(totalSec) * 9` credits charged ONCE upfront. All passes share the same budget (Sync.so bills per-pass internally, our user-facing price stays flat). `cost_credits` preserved across `retry=true` and `advance=true` dispatches.
+
+**Progress bar (`usePipelineProgress.ts`):** when lipsync is terminal (done/failed) AND no master-render is running, `runSoftPercent` stops ramping toward `RUN_NOMINAL_SECONDS` and locks to `phaseOverall` (sum of weighted done phases). Eliminates the "still loading after 5 min" stuck-bar bug.
+
+**Affected files:**
+- `supabase/functions/compose-dialog-segments/index.ts` (multi-pass dispatch + advance branch)
+- `supabase/functions/sync-so-webhook/index.ts` (advance vs finalize logic)
+- `src/hooks/usePipelineProgress.ts` (waitingForExport cap)

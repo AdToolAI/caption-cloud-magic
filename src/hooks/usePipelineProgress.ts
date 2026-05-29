@@ -497,16 +497,38 @@ export function usePipelineProgress({
     ? Math.round((Date.now() - pipelineStartRef.current) / 1000)
     : 0;
 
-  const runSoftPercent = isActive && pipelineStartRef.current
+  // Once lipsync is terminal (done or failed) AND no export is running, stop
+  // letting the run-soft-percent ramp toward RUN_NOMINAL_SECONDS — otherwise
+  // the bar visibly keeps "loading" for minutes after Sync.so reported done.
+  // Cap at the actual weighted-phase total instead.
+  const lipsyncPhase = phases.find((p) => p.id === 'lipsync');
+  const exportPhase = phases.find((p) => p.id === 'export');
+  const lipsyncTerminal = !!lipsyncPhase && (lipsyncPhase.status === 'done' || lipsyncPhase.status === 'failed');
+  const exportIdleOrDone = !exportPhase || exportPhase.status === 'idle' || exportPhase.status === 'done';
+  const waitingForExport = lipsyncTerminal && exportIdleOrDone && !renderRunning;
+
+  const runSoftPercent = isActive && pipelineStartRef.current && !waitingForExport
     ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
     : 0;
   const hasFailure = phases.some((p) => p.status === 'failed');
   const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
   const completedCleanly = !isActive && !hasFailure && phases.some((p) => p.status === 'done');
-  const currentOverall = allDone || completedCleanly ? 100 : isActive ? runSoftPercent : hasFailure ? runFloorRef.current : phaseOverall;
-  runFloorRef.current = isActive ? Math.max(runFloorRef.current, currentOverall) : currentOverall;
+  // When lipsync is terminal and we're waiting for the user to trigger the
+  // final render, lock the bar at the sum of completed phase weights.
+  const currentOverall = allDone || completedCleanly
+    ? 100
+    : waitingForExport
+      ? phaseOverall
+      : isActive
+        ? runSoftPercent
+        : hasFailure
+          ? runFloorRef.current
+          : phaseOverall;
+  runFloorRef.current = isActive && !waitingForExport
+    ? Math.max(runFloorRef.current, currentOverall)
+    : currentOverall;
   const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
-  const etaSeconds = isActive ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
+  const etaSeconds = isActive && !waitingForExport ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
 
   return {
     phases,
