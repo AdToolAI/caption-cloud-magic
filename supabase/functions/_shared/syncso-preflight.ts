@@ -176,12 +176,23 @@ export interface NormalizeOptions {
   peakDbFs?: number | null;    // default -1
   /** Force mono downmix if input has >1 channel. */
   forceMono?: boolean;         // default true
+  /**
+   * Stage F.2 — EBU R128-style loudness target in LUFS. When set, the
+   * normalizer first lifts the RMS-based loudness toward this target
+   * (capped at +12dB amplification) BEFORE the final peak cap. Default
+   * -16 LUFS (Sync.so sweet spot). Set `null` to disable loudness norm.
+   */
+  targetLufs?: number | null;  // default -16
 }
 
 export interface NormalizedWav {
   bytes: Uint8Array;
   info: WavInfo;
   appliedGain: number;         // linear multiplier applied for peak-norm
+  /** Stage F.2 — measured loudness (RMS-LUFS) of the source signal. */
+  sourceLufs?: number;
+  /** Stage F.2 — measured loudness after gain application. */
+  resultLufs?: number;
 }
 
 /**
@@ -197,6 +208,7 @@ export function normalizeWav(
     minTotalSec = 3.0,
     peakDbFs = -1,
     forceMono = true,
+    targetLufs = -16,
   } = opts;
 
   const info = inspectWav(wav);
