@@ -246,13 +246,15 @@ async function startSyncTurnJob(
     model: LIPSYNC_MODEL,
     input: [
       { type: "video", url: videoUrl, segments_secs: [window] },
-      // Artlist-parity: audio MUST carry the same segments_secs as the video,
-      // otherwise Sync.so reads audio from t=0 (always the first sentence)
-      // while the video plays a later turn → wrong speaker / "unknown error".
-      { type: "audio", url: audioUrl, segments_secs: [window] },
+      // Sync.so v2 only accepts `segments_secs` on video inputs. Audio MUST be
+      // pre-trimmed to the same window upstream (see `ensureTurnAudioUrl`),
+      // otherwise Sync.so reads audio from t=0 (= first sentence) while the
+      // video plays a later turn → wrong speaker / "unknown error".
+      { type: "audio", url: audioUrl },
     ],
     options,
   };
+
 
   if (webhookUrl) {
     // Sync.so v2 accepts `webhookUrl` (camelCase). Include `webhook_url` too
