@@ -51,6 +51,11 @@ import {
   validateSegments,
   validateSyncResponseShape,
 } from "../_shared/syncso-preflight.ts";
+import {
+  pickSpeakerCoordinates,
+  resolveCharacterPortraits,
+  resolveSceneFaceMap,
+} from "../_shared/twoshot-face-map.ts";
 
 
 const corsHeaders = {
