@@ -785,8 +785,8 @@ async function processScene(
   // MP4-Clip ab t=0 via Remotion Lambda (`DialogTurnClipVideo`). Damit
   // muss Sync.so kein langes Master mit `segments_secs` intern auseinander-
   // schneiden — der häufigste Auslöser für "An unknown error occurred".
-  const MAX_PRECLIP_RETRIES = 2;
-  const PRECLIP_RENDER_TIMEOUT_MS = 10 * 60 * 1000;
+  const MAX_PRECLIP_RETRIES = 1;
+  const PRECLIP_RENDER_TIMEOUT_MS = 4 * 60 * 1000;
   const pendingForPreclip = sortedShots.filter(
     (s) => s.status === "pending" && !s.preclip_url,
   );
