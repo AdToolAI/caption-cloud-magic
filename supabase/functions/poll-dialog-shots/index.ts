@@ -972,7 +972,7 @@ async function processScene(
       } else {
         const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
         if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
-          degradeShotToMaster(nextShot, reason);
+          degradeShotToMaster(nextShot, reason, shots);
         }
         mutated = true;
       }
