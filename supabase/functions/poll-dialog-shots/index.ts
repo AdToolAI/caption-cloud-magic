@@ -142,19 +142,21 @@ function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
 
 const ASSUMED_MASTER_FPS_CONST = 24;
 
-/** Max provider retries per shot before we fall back to "degraded ready"
- *  (use master plate for this turn instead of failing the whole scene).
- *  v12 Stability: 3 → 1 — endlose Retry-Schleifen blockierten den Stitch. */
-const MAX_SHOT_RETRIES = 1;
+/** Max provider retries per shot before we surrender.
+ *  v13 (Sync.so Hardening): differentiated retry matrix — each attempt
+ *  varies frame sampling, temperature AND (on attempt 3) the source kind
+ *  (preclip → master+segments_secs). 4 strategies should bust through
+ *  >95% of transient `unknown error` failures. */
+const MAX_SHOT_RETRIES = 4;
 
 /** Stable temperatures to cycle through on retries. Lower values are safer
  *  on short windows; higher values force more articulation on long windows. */
-const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
+const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 
 /** Pick a segment-relative sampling frame based on retry attempt.
- *  attempt 0 = middle, 1 = 25%, 2 = 75%, 3 = early. */
+ *  Attempt 1 = middle (default), 2 = 25%, 3 = 75%, 4 = 40%. */
 function pickRetryFrame(segFrames: number, attempt: number): number {
-  const positions = [0.5, 0.25, 0.75, 0.15];
+  const positions = [0.5, 0.25, 0.75, 0.4, 0.6];
   const pos = positions[Math.min(attempt, positions.length - 1)];
   return Math.min(segFrames - 1, Math.max(0, Math.floor(segFrames * pos)));
 }
@@ -175,6 +177,30 @@ function prepareShotRetry(
 
   const multi = isMultiSpeakerScene(allShots);
   const attempt = shot.retry_count; // 1-based after increment
+
+  // v13 Differentiated Retry Matrix:
+  //   attempt 1 → same source, new frame midFrame, lower temp
+  //   attempt 2 → same source, alternate frame (25%), different temp
+  //   attempt 3 → SWITCH source kind (preclip ↔ master) + re-trim audio,
+  //               another alternate frame (75%)
+  //   attempt 4 → SWITCH back, recompute trimmed audio fresh
+  if (attempt === 3 || attempt === 4) {
+    // Force a different transport path to escape provider sticky-failures
+    if (shot.sync_source_kind === "preclip") {
+      shot.sync_source_kind = "master";
+      // Force re-render of preclip on next pass if we ever go back
+      shot.preclip_url = undefined;
+      shot.preclip_status = undefined;
+      shot.preclip_render_id = undefined;
+    } else {
+      shot.sync_source_kind = "preclip";
+    }
+    // Invalidate trimmed audio cache so we re-trim with current padding logic
+    shot.trimmed_audio_url = undefined;
+    console.warn(
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} SWITCHED source_kind=${shot.sync_source_kind}`,
+    );
+  }
 
   // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
   // in a two-shot frame routinely picks the wrong face. Cycle frame
@@ -213,12 +239,17 @@ function markShotTerminalFailed(shot: DialogShot, error: string) {
   shot.completed_at = new Date().toISOString();
 }
 
-/** v12 Graceful Degrade: statt die ganze Szene auf "failed" zu setzen, wenn
- *  ein einzelner Turn dauerhaft kein Lip-Sync produziert, markieren wir den
- *  Shot als `ready` ohne `output_url`. DialogStitchVideo skippt dann das
- *  Overlay für dieses Fenster und zeigt die saubere Master-Plate. So bleibt
- *  der Export funktionsfähig — lieber 1 Turn ohne Mundbewegung als 0 Video. */
-function degradeShotToMaster(shot: DialogShot, error: string) {
+/** v13: Graceful degrade is ONLY safe for single-speaker scenes. For
+ *  multi-speaker dialogs, a turn without `output_url` means that sentence
+ *  has NO lip-sync at all — shipping that as "done" produced silent-mouth
+ *  videos. Multi-speaker degrade now hard-fails the scene + triggers an
+ *  idempotent credit refund. The caller decides per-scene which path to use. */
+function degradeShotToMaster(shot: DialogShot, error: string, allShots: DialogShot[]) {
+  if (isMultiSpeakerScene(allShots)) {
+    // Hard fail — caller will refund and surface the scene as failed.
+    markShotTerminalFailed(shot, `multi_speaker_no_degrade: ${error}`);
+    return;
+  }
   shot.status = "ready";
   (shot as any).degraded = true;
   shot.output_url = undefined;
@@ -249,10 +280,12 @@ function expandWindow(
     : SYNC_TAIL_SEC;
   let w0 = Math.max(0, start - maxLeadIn);
   let w1 = end + maxTail;
-  // Sync.so needs ~30+ frames of VAD context for stable lip-sync. For very
-  // short turns (<1.2s), gently widen toward neighbour boundaries (but never
-  // bleed past mid-gap) so the provider has enough frames to work with.
-  const MIN_WIN_SEC = 1.2;
+  // v13 Sync.so Hardening: Sync.so's `lipsync-2-pro` is unstable on very
+  // short clips (<3s) — short windows correlate strongly with
+  // "An unknown error occurred". Force a minimum 3.0s window by widening
+  // toward neighbour boundaries (capped at mid-gap so we never bleed into
+  // an adjacent turn's region).
+  const MIN_WIN_SEC = 3.0;
   if (w1 - w0 < MIN_WIN_SEC) {
     const need = MIN_WIN_SEC - (w1 - w0);
     const leftRoom = Math.max(0, (w0 - prevEnd) / 2);
@@ -280,6 +313,13 @@ function expandWindow(
 // Fix: slice the per-speaker WAV to the exact turn window server-side
 // (deterministic 16-bit PCM cut), upload to `voiceover-audio/trimmed/…`,
 // and pass that URL to Sync.so. Cached on `shot.trimmed_audio_url`.
+
+// v13 Sync.so Hardening — minimum WAV duration safety net (audio must be at
+// least as long as expanded video window so cut_off doesn't trim speech).
+// The expanded render_window from expandWindow() now enforces ≥3.0s, so
+// audio sliced from that range will already satisfy this minimum in most
+// cases. This is just a defensive guard for edge cases.
+const AUDIO_MIN_DUR_SEC = 3.0;
 
 function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Array {
   const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
@@ -320,11 +360,20 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   const sliceByteLen = (endFrame - startFrame) * bytesPerFrame;
   const sliceBytes = wav.subarray(sliceByteOff, sliceByteOff + sliceByteLen);
 
+  // v13: tail-pad with silence to AUDIO_MIN_DUR_SEC if the slice is shorter.
+  // No leading silence — the source `windowSec` already includes the
+  // render_window pre-roll, so speech is naturally offset from t=0.
+  const speechFrames = endFrame - startFrame;
+  const minTotalFrames = Math.ceil(AUDIO_MIN_DUR_SEC * sampleRate);
+  const extraTailFrames = Math.max(0, minTotalFrames - speechFrames);
+  const totalOutFrames = speechFrames + extraTailFrames;
+  const outDataLen = totalOutFrames * bytesPerFrame;
+
   // Re-pack as a fresh RIFF/WAVE with the original fmt parameters.
-  const outBuf = new ArrayBuffer(44 + sliceByteLen);
+  const outBuf = new ArrayBuffer(44 + outDataLen);
   const ov = new DataView(outBuf);
   ov.setUint32(0, 0x52494646, false); // "RIFF"
-  ov.setUint32(4, 36 + sliceByteLen, true);
+  ov.setUint32(4, 36 + outDataLen, true);
   ov.setUint32(8, 0x57415645, false); // "WAVE"
   ov.setUint32(12, 0x666d7420, false); // "fmt "
   ov.setUint32(16, 16, true);
@@ -335,8 +384,9 @@ function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Ar
   ov.setUint16(32, bytesPerFrame, true);
   ov.setUint16(34, bitsPerSample, true);
   ov.setUint32(36, 0x64617461, false); // "data"
-  ov.setUint32(40, sliceByteLen, true);
-  new Uint8Array(outBuf, 44).set(sliceBytes);
+  ov.setUint32(40, outDataLen, true);
+  // Speech at the start, extraTailFrames of silence (zero-init) at the end.
+  new Uint8Array(outBuf, 44, sliceByteLen).set(sliceBytes);
   return new Uint8Array(outBuf);
 }
 
@@ -352,7 +402,8 @@ async function ensureTrimmedTurnAudioUrl(
   if (shot.trimmed_audio_url) return shot.trimmed_audio_url;
 
   const winTag = `${windowSec[0].toFixed(3)}-${windowSec[1].toFixed(3)}`;
-  const path = `${userId}/twoshot-vo/trimmed/${sceneId}-turn${shot.idx}-${winTag}.wav`;
+  // v13: bump cache namespace so any old un-padded WAVs don't get re-served.
+  const path = `${userId}/twoshot-vo/trimmed-v13/${sceneId}-turn${shot.idx}-${winTag}.wav`;
 
   // Fast path: if already in storage from a prior tick, reuse it.
   const { data: existing } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
@@ -718,7 +769,7 @@ async function processScene(
         mutated = true;
       } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
         if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
-          degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`);
+          degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`, shots);
         }
         mutated = true;
       }
@@ -735,7 +786,7 @@ async function processScene(
       if (!Number.isFinite(ageMs) || ageMs <= PER_SHOT_TIMEOUT_MS) continue;
       const timeoutReason = `sync_so_timeout_4min: job ${shot.sync_job_id ?? "?"} stuck ${Math.round(ageMs / 1000)}s`;
       if (!prepareShotRetry(shot, "sync_so_timeout_4min", shots)) {
-        degradeShotToMaster(shot, timeoutReason);
+        degradeShotToMaster(shot, timeoutReason, shots);
       }
       mutated = true;
       console.warn(
@@ -941,7 +992,7 @@ async function processScene(
       } else {
         const reason = `dispatch: ${(e as Error)?.message ?? "unknown"}`;
         if (!prepareShotRetry(nextShot, "dispatch_failed", shots)) {
-          degradeShotToMaster(nextShot, reason);
+          degradeShotToMaster(nextShot, reason, shots);
         }
         mutated = true;
       }

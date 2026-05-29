@@ -126,15 +126,32 @@ serve(async (req) => {
       return json({ error: "no dialog_shots state" }, 400);
     }
 
-    // v12 Graceful Degrade: ein Shot mit status='ready' UND ohne output_url
-    // ist absichtlich degraded — wir nehmen für sein Fenster die Master-Plate.
-    const allReady = state.shots.every(
-      (s) =>
-        s.status === "ready" &&
-        (!!s.output_url || (s as any).degraded === true),
-    );
+    // v13 Strict Integrity Gate
+    //   Single-speaker: graceful-degrade allowed (degraded turn → master plate).
+    //   Multi-speaker: EVERY turn must have a real `output_url`. No degrade
+    //                  pass-through; the caller (poll-dialog-shots) has
+    //                  already converted any multi-speaker degrade into a
+    //                  hard failure, so reaching this branch without output
+    //                  means a stale/invalid state — refuse the stitch.
+    const isMulti = new Set(state.shots.map((s: any) => s.speaker_idx)).size >= 2;
+    const allReady = state.shots.every((s) => {
+      if (s.status !== "ready") return false;
+      if (isMulti) return !!s.output_url;
+      return !!s.output_url || (s as any).degraded === true;
+    });
     if (!allReady) {
-      return json({ error: "not all shots ready" }, 409);
+      const missing = state.shots
+        .filter((s) => !(s as any).output_url && (s as any).degraded !== true)
+        .map((s: any) => `turn ${s.idx}(${s.speaker_name})`)
+        .join(", ");
+      console.error(
+        `[render-dialog-stitch] integrity FAIL scene=${sceneId} multi=${isMulti} missing=[${missing}]`,
+      );
+      return json({
+        error: "integrity_gate_failed",
+        multi: isMulti,
+        missing,
+      }, 409);
     }
 
     // ── Idempotency: existing render still in flight ────────────────────
