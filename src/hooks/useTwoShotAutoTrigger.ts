@@ -293,9 +293,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // NEW dialog-based shot pipeline (1, 2, 3+ speakers) — replaces the
-          // legacy compose-twoshot-lipsync / compose-lipsync-scene split.
-          const fnName = 'compose-dialog-scene';
+          // Route by engine: 'sync-segments' = 1-call Sync.so Segments API,
+          // 'cinematic-sync' = legacy per-turn dialog chain (v4).
+          const fnName =
+            d.engine_override === 'sync-segments'
+              ? 'compose-dialog-segments'
+              : 'compose-dialog-scene';
 
           // For retry-candidates (previously 'failed'), clear the failure
           // markers first so the edge function's running-takeover guard sees a
