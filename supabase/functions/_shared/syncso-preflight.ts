@@ -960,6 +960,7 @@ export async function validateFrameFace(opts: {
       faceCount: Number(json.faceCount) || 0,
       faceBoxes: Array.isArray(json.faceBoxes) ? json.faceBoxes : [],
       coordsMatch: json.coordsMatch == null ? null : !!json.coordsMatch,
+      faceScore: Number.isFinite(json.faceScore) ? Number(json.faceScore) : null,
     };
   } catch (e) {
     return {
