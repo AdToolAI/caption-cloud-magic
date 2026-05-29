@@ -23,8 +23,16 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
-/** Engines that share the dialog/lip-sync auto-trigger pipeline. */
-const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
+/**
+ * Engines that share the dialog/lip-sync auto-trigger pipeline.
+ *
+ * `cinematic-sync-legacy` = explicit opt-in to the old v4 per-turn chain
+ * (kept for backwards-compat / debugging). Everything else (`cinematic-sync`,
+ * `sync-segments`) now routes to the v5 1-call Sync.so Segments dispatcher
+ * — Artlist pattern: ONE API call with all segments[] processed in parallel
+ * inside Sync.so, instead of 3 sequential per-turn calls.
+ */
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'cinematic-sync-legacy']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
 
 function detectSpeakerCount(dialogScript: string): number {
