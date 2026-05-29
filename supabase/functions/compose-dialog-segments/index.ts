@@ -538,6 +538,9 @@ serve(async (req) => {
       return json({ error: "no_job_id" }, 502);
     }
 
+    // E.3: register inflight slot so concurrent dispatchers back off.
+    await registerInflightSyncJob(supabase, jobId, userId);
+
     await logSyncDispatch(supabase, {
       scene_id: sceneId,
       user_id: userId,
