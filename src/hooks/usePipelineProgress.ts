@@ -180,8 +180,21 @@ export function usePipelineProgress({
   const clipsReal = useMemo(() => {
     const b = baselineRef.current;
     if (aiScenes.length === 0) return { progress: 0, running: false, done: false, failed: false };
-    const ready = aiScenes.filter((s) => s.clipStatus === 'ready').length;
-    const generating = aiScenes.filter((s) => s.clipStatus === 'generating').length;
+    // A scene also counts as ready when the lipsync chain produced a final
+    // clip_url, even if some webhook variant forgot to flip clip_status.
+    // Without this the bar gets stuck at ~40% in the Clips phase forever
+    // after Sync.so finishes.
+    const isReadyOrLipsynced = (s: any) =>
+      s.clipStatus === 'ready' ||
+      (!!s.clipUrl && (
+        s.lipSyncStatus === 'applied' ||
+        s.twoshotStage === 'complete' ||
+        s.twoshotStage === 'done'
+      ));
+    const ready = aiScenes.filter(isReadyOrLipsynced).length;
+    const generating = aiScenes.filter(
+      (s) => s.clipStatus === 'generating' && !isReadyOrLipsynced(s),
+    ).length;
     const failed = aiScenes.filter((s) => s.clipStatus === 'failed').length;
     // Stage 7: a scene with an active backend handle (Replicate prediction,
     // dialog-shot pipeline, lipsync stage) also counts as "running" — even
@@ -190,6 +203,7 @@ export function usePipelineProgress({
     // disappears for 5–30 s right after the user clicks "Generieren".
     const backendActive = aiScenes.filter((s) => {
       const sa = s as any;
+      if (isReadyOrLipsynced(sa)) return false;
       const stage = sa.twoshotStage;
       const lip = sa.lipSyncStatus;
       const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
