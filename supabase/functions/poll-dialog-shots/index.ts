@@ -126,12 +126,29 @@ function isMultiSpeakerScene(allShots: DialogShot[]): boolean {
 
 const ASSUMED_MASTER_FPS_CONST = 24;
 
+/** Max provider retries per shot before terminal failure.
+ *  Sync.so occasionally returns "unknown error" on a specific frame/window
+ *  combo; we step through several deterministic strategies before giving up. */
+const MAX_SHOT_RETRIES = 3;
+
+/** Stable temperatures to cycle through on retries. Lower values are safer
+ *  on short windows; higher values force more articulation on long windows. */
+const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
+
+/** Pick a segment-relative sampling frame based on retry attempt.
+ *  attempt 0 = middle, 1 = 25%, 2 = 75%, 3 = early. */
+function pickRetryFrame(segFrames: number, attempt: number): number {
+  const positions = [0.5, 0.25, 0.75, 0.15];
+  const pos = positions[Math.min(attempt, positions.length - 1)];
+  return Math.min(segFrames - 1, Math.max(0, Math.floor(segFrames * pos)));
+}
+
 function prepareShotRetry(
   shot: DialogShot,
   reason: string,
   allShots: DialogShot[],
 ): boolean {
-  if ((shot.retry_count ?? 0) >= 1) return false;
+  if ((shot.retry_count ?? 0) >= MAX_SHOT_RETRIES) return false;
   shot.retry_count = (shot.retry_count ?? 0) + 1;
   shot.status = "pending";
   shot.sync_job_id = undefined;
@@ -141,44 +158,35 @@ function prepareShotRetry(
   shot.error = `retrying_after_${reason}`.slice(0, 300);
 
   const multi = isMultiSpeakerScene(allShots);
+  const attempt = shot.retry_count; // 1-based after increment
 
   // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
-  // in a two-shot frame routinely picks the wrong face (and may animate
-  // nothing on short isolated windows). Instead, keep coords and shift the
-  // sampling frame to the middle of the window so we sidestep Hailuo cuts/
-  // blinks at the window start that triggered Sync.so's "unknown error".
+  // in a two-shot frame routinely picks the wrong face. Cycle frame
+  // sampling positions + temperature to escape provider "unknown error".
   if (multi && shot.target_coords) {
     shot.force_coords = true;
     shot.deterministic_coords = true;
-    // CRITICAL: When `segments_secs` is set, Sync.so interprets `frame_number`
-    // as RELATIVE TO THE SEGMENT START (frame 0 = first frame of the trimmed
-    // segment), NOT absolute in the master timeline. Passing an absolute
-    // frame (e.g. 72 for a 31-frame segment) → out-of-range → "unknown error".
-    // Always compute segment-relative middle, clamped to segment length.
     const [s, e] = (shot.render_window ?? shot.window) as [number, number];
     const segFrames = Math.max(1, Math.floor((e - s) * ASSUMED_MASTER_FPS_CONST));
-    shot.frame_number_override = Math.min(
-      segFrames - 1,
-      Math.max(0, Math.floor(segFrames / 2)),
-    );
+    shot.frame_number_override = pickRetryFrame(segFrames, attempt);
+    shot.temperature = RETRY_TEMPERATURES[(attempt) % RETRY_TEMPERATURES.length];
     console.warn(
-      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry coords-locked (multi-speaker) segRelFrame=${shot.frame_number_override}/${segFrames} (attempt ${shot.retry_count})`,
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} coords-locked segRelFrame=${shot.frame_number_override}/${segFrames} temp=${shot.temperature}`,
     );
     return true;
   }
-
 
   const failedMode = dispatchModeForShot(shot);
   if (failedMode === "coords") {
     // Single-speaker scenes with coords: safe to fall back to auto_detect.
     shot.force_coords = false;
     shot.deterministic_coords = false;
-    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect fallback (attempt ${shot.retry_count})`);
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt} with auto_detect fallback`);
   } else if (shot.target_coords) {
     shot.force_coords = true;
-    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with coords fallback (attempt ${shot.retry_count})`);
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt} with coords fallback`);
   } else {
-    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry with auto_detect (attempt ${shot.retry_count})`);
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt} with auto_detect`);
   }
   return true;
 }
