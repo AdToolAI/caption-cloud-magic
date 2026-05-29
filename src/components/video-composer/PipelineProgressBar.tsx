@@ -10,10 +10,13 @@
  */
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePipelineProgress } from '@/hooks/usePipelineProgress';
+import { supabase } from '@/integrations/supabase/client';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
+
+const SYNCSO_MAX_SLOTS = 3;
 
 interface Props {
   scenes: ComposerScene[];
