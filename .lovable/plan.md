@@ -1,62 +1,47 @@
 ## Befund
 
-Letzter Fehler-Run: Szene `ffefe177…` — Shot 0 ✓, Shot 1 ✓, Shot 2 (Samuel, Satz 3) → `sync_FAILED: An unknown error occurred.` trotz korrektem coords-locked Retry (`force_coords=true`, `frame_number_override=123`).
-
-Beim Vergleich mit Artlist's Pipeline fällt eine echte Lücke auf:
-
-In `poll-dialog-shots/index.ts` (Zeilen 245–250) bauen wir den Sync.so v2 Payload so:
-
-```ts
-input: [
-  { type: "video", url: videoUrl, segments_secs: [window] },  // ✓ getrimmt
-  { type: "audio", url: audioUrl },                            // ✗ FULL 8s-Track
-]
-```
-
-- Video wird per `segments_secs: [[3.672, 6.564]]` auf das Turn-Fenster reduziert.
-- Audio ist der **gesamte** Per-Speaker-Track (z. B. Samuels komplette 8s mit Sprache bei t=0–2.2s und t=3.8–6.4s, dazwischen Stille).
-
-Sync.so beginnt Audio immer bei seinem `t=0`. Das hat zwei Folgen:
-
-1. **Shot 0** (Samuels erster Satz, Video-Fenster [0, 2.35]): Audio-`t=0` enthält genau Samuels ersten Satz → funktioniert.
-2. **Shot 2** (Samuels dritter Satz, Video-Fenster [3.67, 6.56]): Sync.so nimmt erneut Audio-`t=0` (Samuels ersten Satz) und versucht den 2.23s-Take auf ein 2.89s-Videofenster mit komplett anderem Mund-Movement zu mappen → „unknown error" bzw. visuell der falsche Satz / falscher Sprecher.
-
-Das erklärt rückblickend auch die früheren Bugs („zweiter Satz von niemandem", „dritter Satz vom falschen Sprecher"): Sync.so sah ja immer nur den ersten Satz im Audio.
-
-Artlist macht es so, wie Sync.so es eigentlich vorsieht: **Video- UND Audio-Input bekommen dasselbe `segments_secs`**, damit beide Seiten exakt auf dasselbe Zeitfenster getrimmt werden.
+- Der Backend-Status ist gesund; der Abbruch kommt nicht von Lovable Cloud selbst.
+- In den aktuellen Szenen scheitert weiterhin genau ein Turn mit `sync_FAILED: An unknown error occurred`, obwohl die anderen Turns fertig werden.
+- Auffällig: Der Webhook-Retry berechnet `frame_number_override` noch absolut aus der Master-Timeline, während `poll-dialog-shots` bereits segment-relative Frames nutzt. Das kann bei Sync.so mit `segments_secs` wieder out-of-range werden.
+- Zusätzlich ist die Pipeline aktuell zu hart: Ein einzelner Sync.so-Unknown-Error nach nur einem Retry setzt die ganze Szene auf failed/refunded, statt provider-typisch länger/alternativ weiterzulaufen.
+- Der vom User beobachtete 15-Minuten-Abbruch passt zu: mehrere serielle Provider-Jobs + Retry + Timeout/Failure-Guard, nicht zu einem normalen Lambda-Stitch-Problem.
 
 ## Plan
 
-1. **Audio `segments_secs` mitschicken (Kernfix)**
-   - In `startSyncTurnJob()` (`poll-dialog-shots/index.ts`, Z. 245–250) das `window` zusätzlich auf den Audio-Input legen:
-     ```ts
-     { type: "audio", url: audioUrl, segments_secs: [window] }
-     ```
-   - Damit greifen Video und Audio dasselbe Zeitfenster, und Sync.so synchronisiert Samuels dritten Satz mit dem Video-Take an der richtigen Stelle.
+1. **Webhook-Retry korrigieren**
+   - `sync-so-webhook/index.ts`: `prepareRetryFromWebhook()` so ändern, dass `frame_number_override` segment-relativ berechnet wird.
+   - Dafür `render_window ?? window` verwenden und auf die Segmentlänge clampen, analog zu `poll-dialog-shots`.
+   - Damit erzeugt der schnelle Webhook-Pfad nicht wieder dieselbe falsche absolute Frame-Logik.
 
-2. **Fallback-Pfad anpassen**
-   - Im 400-„segments invalid"-Fallback (Z. 294–315) bisher nur das Video-`segments_secs` entfernt. Symmetrisch auch das Audio-`segments_secs` strippen, damit das Fallback weiterhin als legacy-kompatibler Last-Resort funktioniert.
+2. **Robustere Sync.so-Retry-Strategie**
+   - `poll-dialog-shots/index.ts`: für `sync_FAILED: An unknown error occurred` nicht nach einem Versuch terminal abbrechen.
+   - Mehrere Provider-sichere Retry-Varianten pro Turn einführen, z. B.:
+     - coords, Segment-Mitte
+     - coords, Segment bei 25% / 75%
+     - leicht andere `temperature`
+     - nur als letzter Ausweg Auto-Detect bei Single-Speaker; bei Multi-Speaker weiterhin nicht blind auf falsches Gesicht fallen.
+   - Retry-Status im Shot speichern, ohne Schema-Migration, z. B. über bestehende JSON-Felder.
 
-3. **Webhook-Pfad doppelt absichern**
-   - `sync-so-webhook` startet beim Retry intern `startSyncTurnJob` (gleiche Funktion) — der Fix gilt damit automatisch auch für webhook-triggered Retries. Kein separater Patch nötig, aber kurz im Log verifizieren („audio=ISOLATED segments=[…]").
+3. **Timeout nicht zu früh finalisieren**
+   - Per-Shot-Watchdog von starrer „8 Minuten = failed“ auf „Retry/Deferred zuerst, terminal erst nach mehreren Strategien oder längerer Provider-Stall-Zeit“ ändern.
+   - UI/DB bleibt währenddessen `running`, nicht sofort `failed`.
+   - Refund weiterhin nur bei finalem, nicht-recoverbarem Abbruch.
 
-4. **Diagnose-Log erweitern**
-   - DISPATCH-Log soll explizit zeigen, dass Audio jetzt fensterbeschränkt ist:
-     `audio=ISOLATED window=[3.67,6.56]` statt `audio=ISOLATED window=[…]` allein für Video.
+4. **Kurze Turns provider-tauglicher machen**
+   - Für sehr kurze Sätze (< ca. 1.2s) render window minimal stabilisieren, damit Sync.so genug Frames/VAD-Kontext bekommt.
+   - Audio bleibt weiterhin vorgetrimmt; nur das Videofenster wird vorsichtig erweitert und an Nachbar-Turns geclamped.
 
-5. **Saubere Reproduktion**
-   - Szene `ffefe177-9715-44a5-a961-e7851e8ffa36` zurücksetzen:
-     - `dialog_shots=null`, `lip_sync_status='pending'`, `twoshot_stage='master_clip'`, `lip_sync_applied_at=null`, `clip_error=null`
-     - `clip_url` und `source_clip_url` bleiben erhalten.
-   - `compose-dialog-scene` erneut anstoßen.
+5. **Bessere Diagnose persistieren**
+   - Fehlerdetails und Retry-Strategie im `dialog_shots.shots[]` JSON speichern: Strategie, frame number, window, job id, provider body soweit verfügbar.
+   - Dadurch sehen wir beim nächsten Fehler nicht nur „unknown“, sondern welcher Pfad tatsächlich gebrochen ist.
 
-6. **Validierung in Logs**
-   - DISPATCH-Logs zeigen für jeden Turn `segments_secs` auf **beiden** Inputs.
-   - Alle 3 Shots → `status=ready` mit Sync.so-Output-URL, kein „unknown error" mehr.
-   - Lambda-Stitch (`DialogStitchVideo`) läuft → finale `clip_url`, alle drei Sätze auf den richtigen Sprechern.
+6. **Deploy und Reproduktion**
+   - `poll-dialog-shots` und `sync-so-webhook` deployen.
+   - Die zuletzt fehlgeschlagene Szene erneut in einen sauberen pending/running-Zustand setzen und `compose-dialog-scene` neu anstoßen.
+   - Validieren: alle Shots `ready`, danach `dialog_stitching`, finaler `clip_url` mit externem Master-Audio.
 
-## Memory-Update (nach Verifizierung)
+## Nicht im Scope
 
-`mem://features/video-composer/dialog-shot-pipeline` um Punkt 8 ergänzen:
-
-> **8. WINDOW APPLIES TO BOTH INPUTS.** `startSyncTurnJob` muss `segments_secs: [window]` SOWOHL auf den Video- als auch auf den Audio-Input legen. Ohne das beginnt Sync.so beim Audio immer bei t=0 und mappt den ersten Satz auf ein späteres Video-Fenster — Folge: „unknown error" oder falsche Sprecher-Zuordnung. Das ist der eine Artlist-Parity-Unterschied, der Multi-Turn-Szenen brechen lässt.
+- Kein Wechsel des Providers.
+- Keine UI-Änderungen.
+- Keine neue Datenbanktabelle; wir nutzen die vorhandenen JSON-Felder in `dialog_shots`.
