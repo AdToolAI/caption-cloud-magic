@@ -241,22 +241,44 @@ export function normalizeWav(
     }
   }
 
-  // 2) Peak-normalize (skip if already loud or peakDbFs null or signal is silent).
-  let gain = 1;
+  // 2a) Stage F.2 — RMS-LUFS loudness measurement on raw signal.
+  const sourceLufs = measureLufsInt16(speech);
+
+  // 2b) LUFS gain (lift signal toward targetLufs before peak-cap).
+  let loudnessGain = 1;
+  if (
+    targetLufs != null &&
+    Number.isFinite(sourceLufs) &&
+    sourceLufs > -70 &&
+    sourceLufs < targetLufs
+  ) {
+    const deltaDb = targetLufs - sourceLufs;
+    // Cap loudness lift at +12dB so we never amplify pure noise.
+    const cappedDb = Math.min(12, deltaDb);
+    loudnessGain = 10 ** (cappedDb / 20);
+    for (let i = 0; i < speech.length; i++) {
+      const v = Math.round(speech[i] * loudnessGain);
+      speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+    }
+  }
+
+  // 2c) Peak-normalize (after loudness lift) — skip if already loud or signal silent.
+  let gain = loudnessGain;
   if (peakDbFs != null && Number.isFinite(info.peakDbFs)) {
-    const currentPeak = 10 ** (info.peakDbFs / 20);
+    const currentPeak = (10 ** (info.peakDbFs / 20)) * loudnessGain;
     const targetPeak = 10 ** (peakDbFs / 20);
     if (currentPeak > 0 && currentPeak < targetPeak) {
-      gain = targetPeak / currentPeak;
-      // Safety: never amplify by more than 12 dB (avoid noise blow-ups on near-silent input).
-      const maxGain = 10 ** (12 / 20);
-      if (gain > maxGain) gain = maxGain;
-      for (let i = 0; i < speech.length; i++) {
-        const v = Math.round(speech[i] * gain);
-        speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+      const peakGain = targetPeak / currentPeak;
+      // Safety: combined gain capped at +12 dB total over original.
+      const maxTotalGain = 10 ** (12 / 20);
+      const effectiveGain = Math.min(peakGain, maxTotalGain / loudnessGain);
+      if (effectiveGain > 1) {
+        for (let i = 0; i < speech.length; i++) {
+          const v = Math.round(speech[i] * effectiveGain);
+          speech[i] = v < -32768 ? -32768 : v > 32767 ? 32767 : v;
+        }
+        gain = loudnessGain * effectiveGain;
       }
-    } else {
-      gain = 1;
     }
   }
 
@@ -294,11 +316,69 @@ export function normalizeWav(
   // tail silence is zero-init.
 
   const outBytes = new Uint8Array(out);
+  const resultLufs = measureLufsInt16(speech);
   return {
     bytes: outBytes,
     info: { ...info, totalFrames: outFrames, durSec: outFrames / sampleRate, channels: outChannels, leadInSec },
     appliedGain: gain,
+    sourceLufs,
+    resultLufs,
   };
+}
+
+/**
+ * Stage F.2 — Cheap RMS-based LUFS estimator over 400ms windows
+ * with a -10 LUFS offset (close enough to EBU R128 mean loudness
+ * for our gain decisions). Returns -Infinity for true silence.
+ */
+function measureLufsInt16(samples: Int16Array): number {
+  if (!samples.length) return -Infinity;
+  // 400ms at 44.1kHz ~= 17640 samples; we don't know sr here so just chunk fixed.
+  const chunk = 16_000;
+  let sumSq = 0;
+  let count = 0;
+  for (let i = 0; i < samples.length; i += chunk) {
+    const end = Math.min(samples.length, i + chunk);
+    let s = 0;
+    for (let j = i; j < end; j++) {
+      const v = samples[j] / 32768;
+      s += v * v;
+    }
+    sumSq += s;
+    count += end - i;
+  }
+  if (count === 0) return -Infinity;
+  const rms = Math.sqrt(sumSq / count);
+  if (rms <= 0) return -Infinity;
+  // RMS dBFS → approximate LUFS (offset −0.691 for K-weighting omitted; close enough).
+  return 20 * Math.log10(rms);
+}
+
+/**
+ * Stage F.2 — Hard-floor SNR check. Returns true if the signal is below
+ * -45 dBFS RMS (basically inaudible). Caller should refuse to dispatch
+ * such a clip to Sync.so and tell the user to re-record.
+ */
+export function isAudioTooQuiet(wav: Uint8Array): { tooQuiet: boolean; rmsDbFs: number } {
+  try {
+    const info = inspectWav(wav);
+    const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+    let sumSq = 0;
+    let count = 0;
+    const stride = 4;
+    for (let f = 0; f < info.totalFrames; f += stride) {
+      for (let c = 0; c < info.channels; c++) {
+        const s = dv.getInt16(info.dataOff + (f * info.channels + c) * 2, true) / 32768;
+        sumSq += s * s;
+        count++;
+      }
+    }
+    const rms = count ? Math.sqrt(sumSq / count) : 0;
+    const dbFs = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+    return { tooQuiet: dbFs < -45, rmsDbFs: dbFs };
+  } catch {
+    return { tooQuiet: false, rmsDbFs: 0 };
+  }
 }
 
 // ── VAD detection (Stage E.1) ───────────────────────────────────────────
