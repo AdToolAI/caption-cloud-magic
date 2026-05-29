@@ -754,19 +754,32 @@ export async function logSyncDispatch(
 export function classifySyncError(message?: string | null): string {
   if (!message) return "unknown";
   const m = message.toLowerCase();
+  if (/no_voiced_frames|preflight_audio_no_voice|silence|voiced|vad/.test(m)) return "audio_no_voice";
+  if (/unsupported.*codec|codec.*not.*support|video_codec_unsupported/.test(m)) return "video_codec_unsupported";
+  if (/segments?.*invalid|overlap|segment.*reject/.test(m)) return "segments_invalid";
+  if (/face_validation|no_face|face.gate/.test(m)) return "face_validation_failed";
+  if (/precheck/.test(m)) return "precheck_face_mismatch";
   if (/unknown error/.test(m)) return "provider_unknown_error";
   if (/segment/.test(m)) return "segment_rejected";
   if (/face|speaker|mouth/.test(m)) return "face_detection";
-  if (/audio|silence|voiced|onset|vad/.test(m)) return "audio_issue";
-  if (/video|codec|resolution|fps/.test(m)) return "video_issue";
+  if (/audio|onset/.test(m)) return "audio_issue";
+  if (/video|resolution|fps/.test(m)) return "video_issue";
   if (/timeout|timed.out/.test(m)) return "timeout";
   if (/rate.?limit|concurrency|429/.test(m)) return "rate_limited";
   if (/auth|unauthorized|forbidden/.test(m)) return "auth";
   if (/http.*4\d\d/.test(m)) return "http_4xx";
   if (/http.*5\d\d/.test(m)) return "http_5xx";
-  if (/face_validation|no_face/.test(m)) return "face_validation_failed";
-  if (/precheck/.test(m)) return "precheck_face_mismatch";
   return "other";
+}
+
+/** True for errors worth retrying (transient infra / provider blips). */
+export function isTransientSyncError(errorClass: string): boolean {
+  return [
+    "provider_unknown_error",
+    "timeout",
+    "rate_limited",
+    "http_5xx",
+  ].includes(errorClass);
 }
 
 // ── Face validation helper (Stage D) ────────────────────────────────────
