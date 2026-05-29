@@ -96,47 +96,36 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       extraCostEur: 0.05,
     };
   }
-  if (override === 'cinematic-sync') {
+  if (override === 'cinematic-sync-legacy') {
     return {
       engine: 'cinematic-sync',
-      label: speakers >= 2 ? `🎭 Cinematic Dialog · ${speakers} Sprecher` : '🎬 Cinematic + Lip-Sync',
+      label: speakers >= 2 ? `🐢 Legacy Dialog · ${speakers} Sprecher` : '🐢 Legacy Cinematic + Lip-Sync',
       reason:
-        speakers >= 2
-          ? 'Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate + Sync.so Lip-Sync, dann zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher.'
-          : 'Artlist-Style: Charakter wird in die echte Szene komponiert (Hailuo i2v) und danach mit Sync.so frame-genau lip-synct. Werbe-Niveau.',
+        'Alte v4-Pipeline (per-turn): pro Sprecher ein eigener Sync.so-Call sequenziell. ~10–15 min pro Szene, kein Cross-Scene-Parallelismus. Nur als Fallback gedacht.',
       extraCostEur: speakers >= 2 ? 0.55 * speakers : 0.20,
     };
   }
-  if (override === 'sync-segments') {
+  if (override === 'cinematic-sync' || override === 'sync-segments') {
     return {
       engine: 'sync-segments',
       label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (1-Call)` : '⚡ Fast Dialog · 1-Call',
       reason:
-        'Sync.so Segments API: ein einziger Lipsync-Call über die fertige Master-Plate mit segments[] pro Sprecher-Turn. ~3–5 min statt ~10–15 min, ein Webhook, ein Refund.',
+        'Sync.so Segments API: ein einziger Lipsync-Call über die Master-Plate mit segments[] pro Sprecher-Turn. Artlist-Pattern — ~3–5 min statt ~10–15 min, ein Webhook, ein Refund, und bis zu 3 Szenen können parallel laufen.',
       extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
 
   // ── Auto routing ───────────────────────────────────────────────────
   if (hasDialog && hasCast) {
-    // Cinematic-Sync handles 1..N speakers via the Dialog-Shot Pipeline:
-    // one Hailuo plate + one Sync.so lipsync per speaker turn, then
-    // concatenated. No more HeyGen Two-Shot fallback.
-    if (speakers < 2) {
-      return {
-        engine: 'cinematic-sync',
-        label: '🎬 Cinematic + Lip-Sync (Auto)',
-        reason:
-          'Sprecher wird in die echte Szene komponiert (Hailuo i2v) und danach frame-genau lip-synct (Sync.so). Werbe-Niveau statt Avatar-Bust.',
-        extraCostEur: 0.95,
-      };
-    }
+    // Default = Fast Dialog (Sync.so Segments, 1-call).
+    // Scales to N speakers in a single API request and lets the platform
+    // run 3 scenes in parallel against Sync.so's concurrency limit.
     return {
-      engine: 'cinematic-sync',
-      label: `🎭 Cinematic Dialog · ${speakers} Sprecher (Auto)`,
+      engine: 'sync-segments',
+      label: speakers >= 2 ? `⚡ Fast Dialog · ${speakers} Sprecher (Auto)` : '⚡ Fast Dialog · 1-Call (Auto)',
       reason:
-        'Dialog-Shot Pipeline: pro Sprecher-Turn ein eigener Hailuo-Plate + Sync.so Lip-Sync, dann zu einem Clip gestitcht. Skaliert auf beliebig viele Sprecher.',
-      extraCostEur: 0.55 * speakers,
+        'Sync.so Segments API: ein einziger Lipsync-Call über die Master-Plate mit segments[] pro Sprecher-Turn. ~3–5 min statt ~10–15 min, parallel-fähig.',
+      extraCostEur: Math.max(0.20, 0.083 * Math.max(4, speakers * 2)),
     };
   }
 
