@@ -726,8 +726,33 @@ serve(async (req) => {
       webhook_url: webhookUrl,
     };
 
+    // ── Length sanity log ────────────────────────────────────────────────
+    // compose-twoshot-audio writes mono 16-bit WAV @ 44.1kHz → ~88200 bytes/sec
+    // (+ 44 byte header). Use the audio probe's Content-Length to estimate the
+    // per-speaker track duration and warn loudly if it's shorter than the
+    // scene plate — that's the classic "video stops mid-way" cause because
+    // Sync.so cut_off trims to the shorter input.
+    const WAV_BYTES_PER_SEC = 44100 * 1 * 2;
+    const audioProbeIdx = passSpeakers.findIndex(({ originalIdx }) => originalIdx === pass.speaker_idx);
+    const audioProbeBytes = audioProbeIdx >= 0 ? (audioProbes[audioProbeIdx]?.bytes ?? 0) : 0;
+    const audioApproxSec = audioProbeBytes > 44
+      ? Math.round(((audioProbeBytes - 44) / WAV_BYTES_PER_SEC) * 100) / 100
+      : null;
+    const videoBytes = videoProbe?.bytes ?? 0;
+    const lengthMismatch =
+      audioApproxSec !== null && audioApproxSec + 0.5 < totalSec;
+    if (lengthMismatch) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} LENGTH_MISMATCH pass=${currentPassIdx + 1} ` +
+        `audio≈${audioApproxSec}s < expected ${totalSec}s — Sync.so will truncate output. ` +
+        `Re-run compose-twoshot-audio to re-pad per-speaker tracks.`,
+      );
+    }
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} DISPATCH pass=${currentPassIdx + 1}/${passes.length} speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `[compose-dialog-segments] scene=${sceneId} DISPATCH pass=${currentPassIdx + 1}/${passes.length} ` +
+      `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
+      `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
+      `sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
