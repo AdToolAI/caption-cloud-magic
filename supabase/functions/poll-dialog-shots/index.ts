@@ -206,6 +206,121 @@ function expandWindow(
   return [Math.max(0, start - maxLeadIn), end + maxTail];
 }
 
+// ───────────────────────────────────────────────────────────────────────
+// WAV pre-trim (v9.1 Artlist parity fix)
+// ───────────────────────────────────────────────────────────────────────
+//
+// Sync.so v2 only accepts `segments_secs` on VIDEO inputs. The audio is
+// always read from t=0 of whatever URL we pass. So when a per-speaker WAV
+// contains multiple turns (e.g. Samuel at 0–2.3s AND 3.8–6.4s), shot K>0
+// would be mapped to Samuel's FIRST sentence — wrong mouth shapes,
+// "unknown error" failures, or wrong-speaker animation.
+//
+// Fix: slice the per-speaker WAV to the exact turn window server-side
+// (deterministic 16-bit PCM cut), upload to `voiceover-audio/trimmed/…`,
+// and pass that URL to Sync.so. Cached on `shot.trimmed_audio_url`.
+
+function sliceWavToWindow(wav: Uint8Array, windowSec: [number, number]): Uint8Array {
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  if (dv.getUint32(0, false) !== 0x52494646 || dv.getUint32(8, false) !== 0x57415645) {
+    throw new Error("Not a RIFF/WAVE file");
+  }
+  let off = 12;
+  let audioFormat = 1, channels = 1, sampleRate = 44100, bitsPerSample = 16;
+  let dataOff = -1, dataLen = 0;
+  while (off + 8 <= wav.byteLength) {
+    const id = dv.getUint32(off, false);
+    const size = dv.getUint32(off + 4, true);
+    if (id === 0x666d7420) {
+      audioFormat = dv.getUint16(off + 8, true);
+      channels = dv.getUint16(off + 10, true);
+      sampleRate = dv.getUint32(off + 12, true);
+      bitsPerSample = dv.getUint16(off + 22, true);
+    } else if (id === 0x64617461) {
+      dataOff = off + 8;
+      dataLen = size;
+      break;
+    }
+    off += 8 + size + (size & 1);
+  }
+  if (dataOff < 0) throw new Error("WAV missing data chunk");
+  if (audioFormat !== 1 || bitsPerSample !== 16) {
+    throw new Error(`Unsupported WAV: format=${audioFormat} bits=${bitsPerSample}`);
+  }
+  const bytesPerFrame = channels * (bitsPerSample / 8);
+  const totalFrames = Math.floor(dataLen / bytesPerFrame);
+
+  const [s0, s1] = windowSec;
+  const startFrame = Math.max(0, Math.floor(s0 * sampleRate));
+  const endFrame = Math.min(totalFrames, Math.ceil(s1 * sampleRate));
+  if (endFrame <= startFrame) throw new Error(`empty slice ${s0}-${s1}`);
+
+  const sliceByteOff = dataOff + startFrame * bytesPerFrame;
+  const sliceByteLen = (endFrame - startFrame) * bytesPerFrame;
+  const sliceBytes = wav.subarray(sliceByteOff, sliceByteOff + sliceByteLen);
+
+  // Re-pack as a fresh RIFF/WAVE with the original fmt parameters.
+  const outBuf = new ArrayBuffer(44 + sliceByteLen);
+  const ov = new DataView(outBuf);
+  ov.setUint32(0, 0x52494646, false); // "RIFF"
+  ov.setUint32(4, 36 + sliceByteLen, true);
+  ov.setUint32(8, 0x57415645, false); // "WAVE"
+  ov.setUint32(12, 0x666d7420, false); // "fmt "
+  ov.setUint32(16, 16, true);
+  ov.setUint16(20, 1, true);
+  ov.setUint16(22, channels, true);
+  ov.setUint32(24, sampleRate, true);
+  ov.setUint32(28, sampleRate * bytesPerFrame, true);
+  ov.setUint16(32, bytesPerFrame, true);
+  ov.setUint16(34, bitsPerSample, true);
+  ov.setUint32(36, 0x64617461, false); // "data"
+  ov.setUint32(40, sliceByteLen, true);
+  new Uint8Array(outBuf, 44).set(sliceBytes);
+  return new Uint8Array(outBuf);
+}
+
+async function ensureTrimmedTurnAudioUrl(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  sceneId: string,
+  shot: DialogShot,
+  sourceAudioUrl: string,
+  windowSec: [number, number],
+): Promise<string> {
+  // Idempotent cache: same scene+turn+window → reuse existing object.
+  if (shot.trimmed_audio_url) return shot.trimmed_audio_url;
+
+  const winTag = `${windowSec[0].toFixed(3)}-${windowSec[1].toFixed(3)}`;
+  const path = `${userId}/twoshot-vo/trimmed/${sceneId}-turn${shot.idx}-${winTag}.wav`;
+
+  // Fast path: if already in storage from a prior tick, reuse it.
+  const { data: existing } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
+  try {
+    const head = await fetch(existing.publicUrl, { method: "HEAD" });
+    if (head.ok) {
+      console.log(`[poll-dialog-shots] turn ${shot.idx} trim cache HIT ${path}`);
+      return existing.publicUrl;
+    }
+  } catch { /* fall through to slice */ }
+
+  const res = await fetch(sourceAudioUrl);
+  if (!res.ok) throw new Error(`fetch audio ${res.status}`);
+  const wav = new Uint8Array(await res.arrayBuffer());
+  const sliced = sliceWavToWindow(wav, windowSec);
+
+  const { error } = await supabase.storage
+    .from("voiceover-audio")
+    .upload(path, sliced, { contentType: "audio/wav", upsert: true });
+  if (error) throw new Error(`upload ${error.message}`);
+  const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(path);
+  console.log(
+    `[poll-dialog-shots] turn ${shot.idx} trimmed audio uploaded path=${path} bytes=${sliced.byteLength} win=[${windowSec[0].toFixed(3)},${windowSec[1].toFixed(3)}]`,
+  );
+  return pub.publicUrl;
+}
+
+
+
 /** Default fps assumption for Hailuo i2v master clips. Used to map a turn's
  *  start time to a `frame_number` so Sync.so samples coords INSIDE the
  *  turn window, not at frame 0 of the master video. */
