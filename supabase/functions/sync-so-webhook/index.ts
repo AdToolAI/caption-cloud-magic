@@ -369,6 +369,7 @@ serve(async (req) => {
             finished_at: nowIso,
           },
           clip_url: finalUrl,
+          clip_status: "ready",
           lip_sync_status: "applied",
           lip_sync_applied_at: nowIso,
           twoshot_stage: "complete",
