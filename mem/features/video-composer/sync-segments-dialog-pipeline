@@ -56,3 +56,5 @@ Engine: `engine_override = 'sync-segments'` (parallel to legacy `'cinematic-sync
 - `supabase/functions/compose-dialog-segments/index.ts` (multi-pass dispatch + advance branch)
 - `supabase/functions/sync-so-webhook/index.ts` (advance vs finalize logic)
 - `src/hooks/usePipelineProgress.ts` (waitingForExport cap)
+
+**May 30 2026 — sync_mode fix:** Per-pass payload now explicitly sets `options.sync_mode: "cut_off"`. Without it Sync.so's `lipsync-2-pro` default trimmed output to the shorter input, so multi-pass chains ended after the first speaker's last turn (3rd sentence cut off). Per-speaker tracks from compose-twoshot-audio are silence-padded to scene duration, so cut_off + matching lengths now yields a full-length output. Dispatch also logs `audio_approx_sec` vs `expected_total_sec` and persists `length_mismatch` in `syncso_dispatch_log.meta` for debugging.

@@ -1,74 +1,77 @@
-## Was wirklich passiert
+## Was passiert
 
-**1. Character-Swap (Sprecher 1 spricht Text von Sprecher 2 und umgekehrt)**
+- Lipsync-Qualität und Charakter-Zuordnung stimmen jetzt ✅
+- Aber: das **final Video endet zu früh** — User sieht nur den Anfang der Lipsync, der 3. Satz fehlt komplett. „Kamera shiftet" = das Bild bleibt einfach mittendrin stehen / cuttet weg.
 
-Ursache eindeutig identifiziert in `supabase/functions/compose-dialog-segments/index.ts` (Zeilen 491–514):
-Beim letzten Fix gegen `provider_unknown_error` haben wir `options.active_speaker_detection` komplett aus dem Sync.so-Payload entfernt. Im Segments-Modus von `lipsync-2-pro` heißt das: **Sync.so kennt keine Face-Zuordnung mehr und ratet, welche Audio-Spur auf welches Gesicht geht.** Die FaceMap wird zwar weiterhin korrekt berechnet (DB-Beleg: Scene `4f229ba4` → `characterId: "matthew-dusatko"` links, `samuel-dusatko` rechts mit `matchConfidence 0.8`), aber der Payload trägt sie nicht mehr — also wird sie ignoriert.
+## Wahrscheinliche Ursache (zu validieren)
 
-Das ist KEIN Sync.so-Bug, sondern unser Trade-off von gestern, der die Lipsync-Qualität zerstört. Wir müssen ASD zurückbringen — aber so, dass `lipsync-2-pro` nicht crasht.
+Unser neuer `compose-dialog-segments` Payload setzt **kein `sync_mode`**:
 
-**2. Progress-Bar läuft nach „fertig"-Signal weiter**
+```ts
+// compose-dialog-segments/index.ts Z. 705-720
+options: {
+  active_speaker_detection: { auto_detect: false, frame_number, coordinates }
+}
+```
 
-Im UI ist Lipsync = 20 % Gewicht. Wenn Lipsync nach ~5 min `applied` ist, springt der Hook korrekt auf `progress=1` für die Phase (Zeile 363) — aber der Gesamt-Bar interpoliert weiter Richtung „nominal 480 s". Heißt: der Balken läuft sichtbar weiter, obwohl Lipsync fertig ist, weil keine spätere Phase (Export) ihn ablöst. Wenn anschließend kein Composer-Master-Render automatisch getriggert wird, hängt der Bar gefühlt für immer.
+Alle anderen Lipsync-Pfade in der Codebase (`poll-dialog-shots`, `poll-twoshot-lipsync`, `compose-lipsync-scene`, `compose-twoshot-lipsync`) setzen explizit `sync_mode: "cut_off"`. Ohne explizites Setting nimmt Sync.so den Default — und der schneidet bei `lipsync-2-pro` das Output auf die kürzere der beiden Spuren.
+
+In unserem 2-Pass-Chain heißt das:
+- **Pass 1 (Speaker A)**: Input video = volles Hailuo-Plate (z.B. 12s), Audio = Speaker A's Track (mit Silence gepadded auf `sceneDur` aus `audio_plan` = z.B. 10s) → Output = 10s. **2s abgeschnitten.**
+- **Pass 2 (Speaker B)**: Input video = Pass-1-Output (10s), Audio = Speaker B's Track (10s) → Output = 10s, aber falls B's letzte Turn bei 9.5s endet und Sync.so trailing silence ignoriert, kann es noch kürzer werden.
+
+Ergebnis: User sieht die ersten paar Sekunden, dann ist das Video aus.
+
+Eine zweite mögliche Ursache: `compose-twoshot-audio` paddet auf `sceneDur` (aus `audio_plan.duration` oder `scene.duration_seconds`), aber das tatsächliche Hailuo-Plate kann länger sein. Wir müssen die echte Plate-Dauer mitberücksichtigen.
 
 ## Fix-Plan
 
-### Schritt 1 — Sync.so Segments + Face-Targeting korrekt verbinden
+### Schritt 1 — `sync_mode` explizit setzen
 
-Statt blind ASD wegzulassen, eine **dokumentations-konforme Repro-Matrix** gegen `lipsync-2-pro` fahren — diesmal mit den richtigen Variablen:
+In `supabase/functions/compose-dialog-segments/index.ts` Z. 705–720 den Payload erweitern:
 
-| Variant | segments | options.active_speaker_detection | Erwartung |
-|---------|----------|---------------------------------|-----------|
-| A | ja | `{ auto_detect: false, coordinates, frame_number }` (1 Sprecher-Form, aber 2 Audios) | klärt ob `coordinates` mit segments lebt |
-| B | ja | `{ auto_detect: false, bounding_boxes: [...]}` mit Länge = `videoFrames` bei **echter** FPS (probe via ffprobe-HEAD) | unsere alte Annahme war 24 fps fix — möglicherweise war ASS-Boxen-Length falsch |
-| C | ja | jeweils `segments[i].options.bounding_box` (Sync.so segments-API erlaubt per-segment options laut Doku-Section „Segments Reference") | sauberste Variante |
-| D | ja | `auto_detect: true, speaker_labels` mit Speaker-Mapping pro `audioInput.refId` | falls Sync.so segments einen eigenen Speaker-Label-Path hat |
+```ts
+options: {
+  sync_mode: "cut_off",          // explizit, kein Default-Drift
+  active_speaker_detection: { ... }
+}
+```
 
-Diese Matrix wird als einmaliges Diagnose-Skript ausgeführt (kein Code-Patch), Ergebnisse landen in einer neuen `syncso_dispatch_log.meta.repro_matrix` Spalte.
+`cut_off` ist konsistent mit allen anderen Lipsync-Pfaden. Damit weiß Sync.so dass es auf die kürzere Eingabe zuschneidet — wenn beide gleich lang sind, ist das Output voll.
 
-**Sobald die Matrix zeigt welche Form akzeptiert wird:**
-- Den `compose-dialog-segments`-Dispatcher anpassen, die ermittelte FaceMap + Bboxes wieder in der richtigen Form mitsenden.
-- `_diagnosticAsd` umbenennen zu echtem `asdOptions` und in den Payload reinhängen.
-- Den Kommentar (Zeile 491–498) auf die tatsächliche Erkenntnis aktualisieren.
+### Schritt 2 — Length-Diagnose vor Dispatch
 
-### Schritt 2 — Audio-Cross-Routing absichern
+Im bestehenden `probeAsset()`-Block (Z. 537–540) `videoProbe` und `audioProbes` um echte Dauer-Erkennung erweitern (HEAD → `Content-Length` reicht nicht, daher kurzer Range-GET auf MP4 metadata). Wenn `audioSec < videoSec − 0.5s` ein Warn-Log + `dialog_shots.meta.length_mismatch` schreiben, damit wir die Cause sehen statt zu raten.
 
-Selbst mit korrekter ASD: Wenn `audio_1` versehentlich Samuels Stimme enthält, der Index aber Matthew zugeordnet ist, swappen wir trotzdem. Deshalb:
-- In `compose-dialog-segments` vor Dispatch ein assertion-log: `audioRefMap[audio_N] ↔ speakers[N].character_id ↔ faceMap.faces[*].characterId` als Triple ausgeben, damit Cross-Wires sofort sichtbar sind.
-- Sanity-Check: wenn FaceMap-Identity-Match `confidence < 0.6` → Fallback-Heuristik (left=spk0, right=spk1) verwenden statt unzuverlässige Identität.
+### Schritt 3 — Audio auf Plate-Dauer ausrichten (defensiv)
 
-### Schritt 3 — Progress-Bar nach Lipsync-Done korrigieren
+Vor Dispatch:
+1. `videoSec` aus Probe lesen
+2. Wenn jeder `pass.audio_url` Track kürzer ist als `videoSec`, einmalig in `compose-twoshot-audio` eine Re-Pad-Pfad triggern (oder direkt im Dispatcher mit ffmpeg-padding über eine kurze Helper-Edge-Function)
+3. Alternativ einfacher: `sync_mode: "loop"` für die Audio-Track-Schleife — aber das verfälscht Lippen, daher Padding bevorzugen
 
-In `usePipelineProgress.ts`:
-- Wenn `lipsyncReal.done === true` UND kein Composer-Master-Render läuft (`renderRunning=false` & `renderPercent=0`), den Gesamt-Bar **auf den Summenanteil aller fertigen Phasen klemmen** statt weiter Richtung `RUN_NOMINAL_SECONDS` zu interpolieren.
-- Konkret: floor + ceiling-Logik so dass der Bar nach Lipsync-Done max bei `sum(weights of done phases)` steht und auf einen User-Trigger („Render Final") wartet, bevor er weiterläuft.
-- Optional aber empfohlen: nach Lipsync-Done eine UI-Card „Alle Szenen fertig — jetzt zusammenfügen?" anzeigen, damit klar ist warum der Bar pausiert.
+Mini-Variante (sicherster Schritt zuerst): Schritt 1 + Schritt 2 alleine ausrollen. Das löst sehr wahrscheinlich schon das Symptom. Schritt 3 nur falls die Logs zeigen dass Audio < Video bleibt.
 
-### Schritt 4 — Hängende laufende Szenen aufräumen
+### Schritt 4 — Webhook-Side Sanity
 
-Aktuell in der DB:
-- `7755034f-…` und `5b0ff130-…` stehen `failed` mit `provider_unknown_error` (alter Run, schon refunded — kein Action nötig)
-- Sollte beim Re-Test ein neuer Run hängen bleiben: Migration mit gleichem Pattern wie 2026-05-29.
+In `sync-so-webhook/index.ts` beim Re-Hosting die Dauer des heruntergeladenen MP4 loggen (ffprobe-Range-Header oder reine Content-Length). Wenn `outputSec < totalSec − 1s` → `dialog_shots.meta.output_truncated = true` setzen, sichtbar im Debugging.
+
+## Was NICHT in den Scope gehört
+
+- Kein Wechsel weg vom 2-Pass-Chain
+- Kein neues Modell
+- Kein Refactor der Audio-Pipeline
+- Keine DB-Schemaänderungen
 
 ## Technische Details
 
-**Betroffene Dateien:**
-- `supabase/functions/compose-dialog-segments/index.ts` (Payload Z. 500–514, ASD-Logik Z. 447–499)
-- `supabase/functions/sync-so-webhook/index.ts` (Telemetrie der Matrix-Ergebnisse)
-- `supabase/functions/_shared/twoshot-face-map.ts` (Sanity-Threshold)
-- `src/hooks/usePipelineProgress.ts` (Gesamt-Bar Cap nach Lipsync-Done)
-- Neue Migration für `syncso_dispatch_log.meta.repro_matrix` Sichtbarkeit (rein optional — Spalte ist bereits jsonb)
+**Files:**
+- `supabase/functions/compose-dialog-segments/index.ts` (Payload + Length-Probe + Meta-Logging)
+- `supabase/functions/sync-so-webhook/index.ts` (Output-Duration-Check)
+- Memory-Doc Update: `mem/features/video-composer/sync-segments-dialog-pipeline`
 
-**Was NICHT in den Scope gehört:**
-- Kein Wechsel weg von Sync.so
-- Kein neues Modell (lipsync-2-pro bleibt)
-- Kein Refactor der gesamten v5-Pipeline
-- Keine DB-Schemaänderungen außer evtl. einem `last_asd_form` Telemetriefeld
+**Rollout:** Erst Schritt 1+2, neu rendern lassen, Logs prüfen. Falls weiterhin truncation → Schritt 3.
 
-## Rückfragen vor Build
+## Rückfrage
 
-Eine wichtige Entscheidung steht offen: Soll die Repro-Matrix
-**(a)** vor jedem Code-Patch einmalig manuell als Diagnose-Skript laufen (ich führe sie aus, melde Resultate, dann patch ich gezielt) — sicherer aber 1 Loop mehr, oder
-**(b)** direkt der wahrscheinlichste Pfad (Variant C — per-segment `bounding_box`) implementieren und live testen — schneller aber risikoreicher wenn C ebenfalls scheitert?
-
-Mein Vorschlag: **(a)**. Wir haben gestern schon einmal „dachten wir abgedeckt" erlebt — diesmal lieber erst messen.
+Soll ich direkt mit Schritt 1+2 starten (minimaler Patch, sehr wahrscheinlich ausreichend), oder vorher noch die DB-Logs einer betroffenen Szene checken um die Dauer-Diskrepanz konkret zu verifizieren?
