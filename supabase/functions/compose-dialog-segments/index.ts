@@ -887,6 +887,10 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
+        sync_mode: "cut_off",
+        audio_approx_sec: audioApproxSec,
+        expected_total_sec: totalSec,
+        length_mismatch: lengthMismatch,
         payload_summary: {
           model: payload.model,
           input_video: passInputUrl,
