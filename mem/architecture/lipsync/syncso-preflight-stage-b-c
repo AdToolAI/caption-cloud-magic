@@ -1,0 +1,29 @@
+---
+name: Sync.so Preflight + Telemetry (Stufe B + C)
+description: Shared `_shared/syncso-preflight.ts` (probeAsset, normalizeWav mono+peak-1dBFS+0.25s leadIn+min3s, classifySyncError, logSyncDispatch) used by poll-dialog-shots and compose-dialog-segments; new `syncso_dispatch_log` table records every dispatch attempt with audio/video metrics + error_class for tuning.
+type: architecture
+---
+
+**Shared module:** `supabase/functions/_shared/syncso-preflight.ts`
+- `probeAsset(url, kind, minBytes)` HEAD-check (status, content-length, content-type heuristic).
+- `inspectWav(bytes)` returns dur/peakDbFs/leadIn/channels/sampleRate.
+- `normalizeWav(bytes, { leadInSec=0.25, minTotalSec=3.0, peakDbFs=-1, forceMono=true })` mono downmix + peak-normalize (capped +12dB) + 0.25s leading silence + tail-pad to ≥3.0s. Pure Deno, no ffmpeg.
+- `classifySyncError(msg)` → bucket: `provider_unknown_error | segment_rejected | face_detection | audio_issue | video_issue | timeout | rate_limited | ...`.
+- `logSyncDispatch(supabase, row)` best-effort insert into `syncso_dispatch_log` (never throws).
+
+**poll-dialog-shots:**
+- Cache namespace bumped `trimmed-v13` → `trimmed-v14`; every per-turn WAV runs through `normalizeWav`.
+- DialogShot now carries `audio_dur_sec / audio_lead_in_sec / audio_peak_dbfs`.
+- Before every `startSyncTurnJob` call: parallel `probeAsset(video, 50kB) + probeAsset(audio, 5kB)`. On any failure → `prepareShotRetry('preflight_video_*' | 'preflight_audio_*')` + log row with `sync_status='PREFLIGHT_BLOCKED'`.
+- Every dispatch (success, deferral, hard fail) writes one `syncso_dispatch_log` row.
+
+**compose-dialog-segments:**
+- HEAD-probes master video + every de-duped audio URL before paying Sync.so. Any failure → wallet refund + scene `lip_sync_status='failed'` + log row, returns 422 `preflight_failed`.
+- Logs `DISPATCHED` / `DISPATCH_FAILED` rows for analytics.
+
+**Telemetry table** (migration `20260529...syncso_dispatch_log`):
+- Columns: scene_id, user_id, engine, job_id, turn_idx, attempt, mode, sync_source_kind, video/audio URL+bytes+content_type, audio_dur_sec/lead_in/peak_dbfs/channels/sample_rate, window_start/end, coords, frame_number, http_status, sync_status, error_class, error_message, meta jsonb.
+- Indexed on (scene_id, created_at desc), (error_class, created_at desc), (job_id).
+- Grants: `service_role` ALL, `authenticated` SELECT gated by `has_role(uid, 'admin')` RLS policy.
+
+**Not implemented in this stage:** Säule 4 face-validation via Gemini Vision (expensive per-dispatch; deferred). Coords sanity helper `checkCoordsBounds` exists in the shared module but is not yet wired into dispatch.
