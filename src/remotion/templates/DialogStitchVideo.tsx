@@ -96,19 +96,11 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
             durationInFrames={segDuration}
             layout="none"
           >
-            <AbsoluteFill>
-              <Video
-                src={shot.outputUrl}
-                muted
-                playbackRate={1}
-                // 'relative' = short preclip starting at frame 0 (v10),
-                // 'absolute' = full-length master overlay (legacy segments_secs).
-                {...(shot.sourceTiming === 'relative'
-                  ? {}
-                  : { startFrom: startFrame })}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
-            </AbsoluteFill>
+            <ShotOverlay
+              src={shot.outputUrl}
+              segDuration={segDuration}
+              startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+            />
           </Sequence>
         );
       })}
