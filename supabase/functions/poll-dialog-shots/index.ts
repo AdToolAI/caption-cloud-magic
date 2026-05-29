@@ -178,6 +178,30 @@ function prepareShotRetry(
   const multi = isMultiSpeakerScene(allShots);
   const attempt = shot.retry_count; // 1-based after increment
 
+  // v13 Differentiated Retry Matrix:
+  //   attempt 1 → same source, new frame midFrame, lower temp
+  //   attempt 2 → same source, alternate frame (25%), different temp
+  //   attempt 3 → SWITCH source kind (preclip ↔ master) + re-trim audio,
+  //               another alternate frame (75%)
+  //   attempt 4 → SWITCH back, recompute trimmed audio fresh
+  if (attempt === 3 || attempt === 4) {
+    // Force a different transport path to escape provider sticky-failures
+    if (shot.sync_source_kind === "preclip") {
+      shot.sync_source_kind = "master";
+      // Force re-render of preclip on next pass if we ever go back
+      shot.preclip_url = undefined;
+      shot.preclip_status = undefined;
+      shot.preclip_render_id = undefined;
+    } else {
+      shot.sync_source_kind = "preclip";
+    }
+    // Invalidate trimmed audio cache so we re-trim with current padding logic
+    shot.trimmed_audio_url = undefined;
+    console.warn(
+      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} SWITCHED source_kind=${shot.sync_source_kind}`,
+    );
+  }
+
   // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
   // in a two-shot frame routinely picks the wrong face. Cycle frame
   // sampling positions + temperature to escape provider "unknown error".
@@ -215,12 +239,17 @@ function markShotTerminalFailed(shot: DialogShot, error: string) {
   shot.completed_at = new Date().toISOString();
 }
 
-/** v12 Graceful Degrade: statt die ganze Szene auf "failed" zu setzen, wenn
- *  ein einzelner Turn dauerhaft kein Lip-Sync produziert, markieren wir den
- *  Shot als `ready` ohne `output_url`. DialogStitchVideo skippt dann das
- *  Overlay für dieses Fenster und zeigt die saubere Master-Plate. So bleibt
- *  der Export funktionsfähig — lieber 1 Turn ohne Mundbewegung als 0 Video. */
-function degradeShotToMaster(shot: DialogShot, error: string) {
+/** v13: Graceful degrade is ONLY safe for single-speaker scenes. For
+ *  multi-speaker dialogs, a turn without `output_url` means that sentence
+ *  has NO lip-sync at all — shipping that as "done" produced silent-mouth
+ *  videos. Multi-speaker degrade now hard-fails the scene + triggers an
+ *  idempotent credit refund. The caller decides per-scene which path to use. */
+function degradeShotToMaster(shot: DialogShot, error: string, allShots: DialogShot[]) {
+  if (isMultiSpeakerScene(allShots)) {
+    // Hard fail — caller will refund and surface the scene as failed.
+    markShotTerminalFailed(shot, `multi_speaker_no_degrade: ${error}`);
+    return;
+  }
   shot.status = "ready";
   (shot as any).degraded = true;
   shot.output_url = undefined;
