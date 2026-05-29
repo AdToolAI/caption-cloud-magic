@@ -1,0 +1,308 @@
+/**
+ * validate-frame-face (Sync.so Stufe D — Face Validation)
+ *
+ * Inspects one specific frame of a video URL and reports whether a face
+ * is visible at the expected coordinates BEFORE we pay Sync.so for a
+ * lipsync job that would otherwise return "unknown error" or animate the
+ * wrong mouth.
+ *
+ * Strategy (cost-optimised hybrid):
+ *   (A) Default: Gemini 2.5 Flash Vision with the video URL + timestamp
+ *       hint. ~€0.0005/check. Returns face count + bounding boxes (0..1
+ *       normalized).
+ *   (B) Cached per (video_url, frame_number) for 24h in
+ *       public.frame_face_cache to keep cost trivial across retries.
+ *
+ * Request body (POST JSON):
+ *   {
+ *     video_url: string,                  // required
+ *     frame_number: number,               // required (0-indexed)
+ *     fps?: number,                       // default 24
+ *     target_coords?: [x, y, w, h] | null // normalized 0..1, optional
+ *   }
+ *
+ * Response 200 JSON:
+ *   {
+ *     ok: true,
+ *     cached: boolean,
+ *     faceVisible: boolean,
+ *     faceCount: number,
+ *     faceBoxes: [{ x, y, w, h, confidence }],
+ *     coordsMatch: boolean | null,         // null when target_coords omitted
+ *     suggestedFrameOffset: number | null, // frames to try if !faceVisible
+ *     model: string,
+ *   }
+ *
+ * Never throws on validator failure — returns `ok: false` with an `error`
+ * field so callers can degrade gracefully (skip face-gate, log warning,
+ * dispatch anyway).
+ */
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+interface FaceBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  confidence: number;
+}
+
+interface ValidationResult {
+  faceVisible: boolean;
+  faceCount: number;
+  faceBoxes: FaceBox[];
+  coordsMatch: boolean | null;
+  suggestedFrameOffset: number | null;
+  model: string;
+}
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+
+const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+// ── Cache ────────────────────────────────────────────────────────────────
+
+async function readCache(
+  videoUrl: string,
+  frameNumber: number,
+): Promise<ValidationResult | null> {
+  try {
+    const { data, error } = await supabase
+      .from("frame_face_cache")
+      .select("result, expires_at")
+      .eq("video_url", videoUrl)
+      .eq("frame_number", frameNumber)
+      .maybeSingle();
+    if (error || !data) return null;
+    if (new Date(data.expires_at).getTime() < Date.now()) return null;
+    return data.result as ValidationResult;
+  } catch {
+    return null;
+  }
+}
+
+async function writeCache(
+  videoUrl: string,
+  frameNumber: number,
+  fps: number,
+  result: ValidationResult,
+): Promise<void> {
+  try {
+    await supabase
+      .from("frame_face_cache")
+      .upsert(
+        {
+          video_url: videoUrl,
+          frame_number: frameNumber,
+          fps,
+          result,
+          validator: result.model,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        },
+        { onConflict: "video_url,frame_number" },
+      );
+  } catch (e) {
+    console.warn(`[validate-frame-face] cache write failed: ${(e as Error)?.message}`);
+  }
+}
+
+// ── Coords overlap check ────────────────────────────────────────────────
+
+/** Returns true if any detected face box overlaps the target by ≥40% of target area. */
+function coordsOverlap(
+  target: [number, number, number, number],
+  boxes: FaceBox[],
+): boolean {
+  if (!target || boxes.length === 0) return false;
+  const [tx, ty, tw, th] = target;
+  const targetArea = Math.max(0.0001, tw * th);
+  for (const b of boxes) {
+    const ix = Math.max(tx, b.x);
+    const iy = Math.max(ty, b.y);
+    const iw = Math.max(0, Math.min(tx + tw, b.x + b.w) - ix);
+    const ih = Math.max(0, Math.min(ty + th, b.y + b.h) - iy);
+    const inter = iw * ih;
+    if (inter / targetArea >= 0.4) return true;
+  }
+  return false;
+}
+
+// ── Gemini Vision call ──────────────────────────────────────────────────
+
+async function callGeminiVision(
+  videoUrl: string,
+  frameNumber: number,
+  fps: number,
+): Promise<ValidationResult> {
+  if (!LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY missing");
+  }
+  const timestampSec = frameNumber / Math.max(1, fps);
+
+  const prompt = `You are analyzing one specific frame of a video.
+
+The frame is at timestamp ${timestampSec.toFixed(3)}s (frame ${frameNumber} @ ${fps}fps).
+
+Look at THAT EXACT MOMENT and tell me:
+1. How many human faces are clearly visible?
+2. For each face, its bounding box in normalized 0..1 coordinates [x, y, width, height] where (0,0) is top-left.
+
+Reply ONLY with strict JSON, no markdown:
+{
+  "faceCount": <number>,
+  "faces": [
+    { "x": <0..1>, "y": <0..1>, "w": <0..1>, "h": <0..1>, "confidence": <0..1> }
+  ]
+}
+
+If no face is clearly visible (back of head, blurred, hidden), return faceCount=0 and empty faces array.`;
+
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompt },
+            { type: "image_url", image_url: { url: videoUrl } },
+          ],
+        },
+      ],
+      temperature: 0,
+    }),
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`gemini_http_${resp.status}: ${t.slice(0, 240)}`);
+  }
+  const json = await resp.json();
+  const raw = json?.choices?.[0]?.message?.content?.trim() ?? "";
+  // strip code fences if any
+  const cleaned = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+  let parsed: { faceCount: number; faces: FaceBox[] };
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // Sometimes the model returns prose before the JSON — grab the first {...} block
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error(`gemini_unparseable: ${cleaned.slice(0, 160)}`);
+    parsed = JSON.parse(m[0]);
+  }
+
+  const faces: FaceBox[] = (Array.isArray(parsed.faces) ? parsed.faces : [])
+    .map((b: any) => ({
+      x: Number(b?.x) || 0,
+      y: Number(b?.y) || 0,
+      w: Number(b?.w) || 0,
+      h: Number(b?.h) || 0,
+      confidence: Number(b?.confidence ?? 0.8),
+    }))
+    .filter((b) => b.w > 0.02 && b.h > 0.02); // sanity: ignore noise <2% of frame
+
+  return {
+    faceVisible: faces.length > 0,
+    faceCount: faces.length,
+    faceBoxes: faces,
+    coordsMatch: null, // filled by caller after overlap check
+    suggestedFrameOffset: null,
+    model: "google/gemini-2.5-flash",
+  };
+}
+
+// ── Handler ──────────────────────────────────────────────────────────────
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+  try {
+    const body = await req.json().catch(() => ({}));
+    const videoUrl: string | undefined = body.video_url;
+    const frameNumber: number | undefined = Number.isFinite(body.frame_number)
+      ? Math.max(0, Math.round(body.frame_number))
+      : undefined;
+    const fps: number = Number.isFinite(body.fps) ? Math.max(1, Math.round(body.fps)) : 24;
+    const targetCoords: [number, number, number, number] | null =
+      Array.isArray(body.target_coords) && body.target_coords.length === 4
+        ? (body.target_coords.map(Number) as [number, number, number, number])
+        : null;
+
+    if (!videoUrl || frameNumber === undefined) {
+      return new Response(
+        JSON.stringify({ ok: false, error: "video_url and frame_number required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // ── Cache lookup ─────────────────────────────────────────────────
+    const cached = await readCache(videoUrl, frameNumber);
+    let result: ValidationResult;
+    let cacheHit = false;
+    if (cached) {
+      result = cached;
+      cacheHit = true;
+    } else {
+      try {
+        result = await callGeminiVision(videoUrl, frameNumber, fps);
+      } catch (e) {
+        console.warn(`[validate-frame-face] gemini failed: ${(e as Error)?.message}`);
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            cached: false,
+            error: `validator_failed: ${(e as Error)?.message}`,
+            // Graceful degrade hint: caller should NOT block dispatch on this
+            faceVisible: true,
+            faceCount: 0,
+            faceBoxes: [],
+            coordsMatch: null,
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+      // Write to cache (fire and forget within response window)
+      await writeCache(videoUrl, frameNumber, fps, result);
+    }
+
+    // ── Coords overlap check (always, even on cache hit) ─────────────
+    const coordsMatch = targetCoords ? coordsOverlap(targetCoords, result.faceBoxes) : null;
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        cached: cacheHit,
+        faceVisible: result.faceVisible,
+        faceCount: result.faceCount,
+        faceBoxes: result.faceBoxes,
+        coordsMatch,
+        suggestedFrameOffset: result.suggestedFrameOffset,
+        model: result.model,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (e) {
+    console.error(`[validate-frame-face] crash: ${(e as Error)?.message}`);
+    return new Response(
+      JSON.stringify({ ok: false, error: (e as Error)?.message ?? "unknown" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+});
