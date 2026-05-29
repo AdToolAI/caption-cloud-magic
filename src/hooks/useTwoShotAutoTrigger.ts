@@ -23,8 +23,16 @@ import { emitPipelineEvent } from '@/lib/pipelineEvents';
 
 const POLL_INTERVAL_MS = 8_000;
 
-/** Engines that share the dialog/lip-sync auto-trigger pipeline. */
-const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
+/**
+ * Engines that share the dialog/lip-sync auto-trigger pipeline.
+ *
+ * `cinematic-sync-legacy` = explicit opt-in to the old v4 per-turn chain
+ * (kept for backwards-compat / debugging). Everything else (`cinematic-sync`,
+ * `sync-segments`) now routes to the v5 1-call Sync.so Segments dispatcher
+ * — Artlist pattern: ONE API call with all segments[] processed in parallel
+ * inside Sync.so, instead of 3 sequential per-turn calls.
+ */
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'cinematic-sync-legacy']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
 
 function detectSpeakerCount(dialogScript: string): number {
@@ -105,7 +113,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // handled inside compose-dialog-segments + sync-so-webhook).
         const staleV5 = (data as any[]).filter(
           (d) =>
-            d.engine_override === 'sync-segments' &&
+            d.engine_override !== 'cinematic-sync-legacy' &&
+            isDialogEngine(d.engine_override) &&
             d.dialog_shots?.version === 5 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
@@ -324,12 +333,14 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // Route by engine: 'sync-segments' = 1-call Sync.so Segments API,
-          // 'cinematic-sync' = legacy per-turn dialog chain (v4).
+          // Route by engine. Default = v5 1-call Sync.so Segments (Artlist
+          // pattern): one POST with segments[], Sync.so parallelizes internally,
+          // single webhook, single refund — ~3–5 min vs. ~10–15 min for v4.
+          // Only `cinematic-sync-legacy` keeps the old per-turn chain.
           const fnName =
-            d.engine_override === 'sync-segments'
-              ? 'compose-dialog-segments'
-              : 'compose-dialog-scene';
+            d.engine_override === 'cinematic-sync-legacy'
+              ? 'compose-dialog-scene'
+              : 'compose-dialog-segments';
 
           // For retry-candidates (previously 'failed'), clear the failure
           // markers first so the edge function's running-takeover guard sees a

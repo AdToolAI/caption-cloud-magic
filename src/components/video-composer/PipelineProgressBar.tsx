@@ -10,10 +10,13 @@
  */
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, Check, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, Loader2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePipelineProgress } from '@/hooks/usePipelineProgress';
+import { supabase } from '@/integrations/supabase/client';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
+
+const SYNCSO_MAX_SLOTS = 3;
 
 interface Props {
   scenes: ComposerScene[];
@@ -53,6 +56,33 @@ export default function PipelineProgressBar({
       return () => window.clearTimeout(id);
     }
   }, [isActive, hasFailure, visible]);
+
+  // Sync.so concurrency slot indicator — surfaces *why* a scene is "waiting"
+  // when 3 lipsync jobs are already in flight (Sync.so Creator plan limit).
+  const lipsyncPhase = phases.find((p) => p.id === 'lipsync');
+  const lipsyncRunning = lipsyncPhase?.status === 'running';
+  const [syncsoSlots, setSyncsoSlots] = useState<number | null>(null);
+  useEffect(() => {
+    if (!lipsyncRunning) {
+      setSyncsoSlots(null);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      const cutoff = new Date(Date.now() - 10 * 60_000).toISOString();
+      const { count } = await supabase
+        .from('syncso_inflight_jobs')
+        .select('job_id', { count: 'exact', head: true })
+        .gte('started_at', cutoff);
+      if (!cancelled) setSyncsoSlots(typeof count === 'number' ? count : 0);
+    };
+    refresh();
+    const id = window.setInterval(refresh, 5_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [lipsyncRunning]);
 
   if (!visible) return null;
 
@@ -126,6 +156,24 @@ export default function PipelineProgressBar({
 
           {/* Time + percent */}
           <div className="flex items-center gap-3 shrink-0 text-[11px] font-mono">
+            {syncsoSlots !== null && (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border tabular-nums',
+                  syncsoSlots >= SYNCSO_MAX_SLOTS
+                    ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+                    : 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10',
+                )}
+                title={
+                  syncsoSlots >= SYNCSO_MAX_SLOTS
+                    ? 'Alle 3 Sync.so-Slots belegt — weitere Szenen werden eingereiht und automatisch nachgezogen.'
+                    : `${syncsoSlots} von ${SYNCSO_MAX_SLOTS} Sync.so-Slots aktiv (parallele Lipsync-Jobs).`
+                }
+              >
+                <Zap className="h-3 w-3" />
+                {syncsoSlots}/{SYNCSO_MAX_SLOTS}
+              </span>
+            )}
             <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
               {hasFailure ? 'Fehler' : `${overallPercent}%`}
             </span>

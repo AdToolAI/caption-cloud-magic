@@ -133,8 +133,45 @@ serve(async (req) => {
     payload?.output_url ??
     payload?.data?.outputUrl ??
     payload?.data?.output_url;
-  const errorMsg: string | undefined =
-    payload?.error ?? payload?.errorMessage ?? payload?.error_message;
+  // Sync.so wraps the real cause in nested fields. Walk every known shape so
+  // we stop persisting the useless "An unknown error occurred." placeholder.
+  const extractError = (p: any): string | undefined => {
+    if (!p) return undefined;
+    const candidates = [
+      p.error,
+      p.errorMessage,
+      p.error_message,
+      p.message,
+      p.failureReason,
+      p.failure_reason,
+      p.errorCode,
+      p.error_code,
+      p?.error?.message,
+      p?.error?.details,
+      p?.error?.detail,
+      p?.error?.reason,
+      p?.data?.error,
+      p?.data?.errorMessage,
+      p?.data?.error_message,
+      p?.data?.failureReason,
+      p?.data?.error?.message,
+      p?.data?.error?.details,
+      p?.data?.error?.detail,
+      p?.data?.error?.reason,
+    ].filter((x) => typeof x === "string" && x.trim().length > 0);
+    const meaningful = candidates.find(
+      (s) => !/^an unknown error occurred\.?$/i.test(String(s).trim()),
+    );
+    return meaningful ?? candidates[0];
+  };
+  const errorMsg: string | undefined = extractError(payload);
+  if (status !== "COMPLETED") {
+    // Log the full payload once so we can post-mortem the "unknown error"
+    // class without re-instrumenting the webhook.
+    console.log(
+      `[sync-so-webhook] terminal=${status} job=${payload?.id ?? payload?.job_id} extractedErr=${JSON.stringify(errorMsg ?? null)} fullPayload=${JSON.stringify(payload).slice(0, 1500)}`,
+    );
+  }
 
   if (!jobId) {
     console.warn("[sync-so-webhook] no job id in payload");
@@ -151,7 +188,7 @@ serve(async (req) => {
   if (status === "COMPLETED") {
     await recordCircuitSuccess(supabase, "sync.so");
   } else {
-    const cls = classifySyncError((payload?.error ?? payload?.errorMessage ?? payload?.error_message ?? "").toString());
+    const cls = classifySyncError((errorMsg ?? "").toString());
     await recordCircuitFailure(supabase, "sync.so", cls);
   }
 
