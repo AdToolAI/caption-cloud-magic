@@ -14,7 +14,27 @@
  *   - compose-lipsync-scene   (legacy two-shot path, when present)
  */
 
+// ── Sync.so API key lookup ──────────────────────────────────────────────
+// The Supabase Vault secret is historically named SYNC_API_KEY (used by
+// poll-dialog-shots, compose-twoshot-lipsync, poll-twoshot-lipsync since
+// the legacy days). Newer functions must check this name FIRST or they
+// will return 500 on every dispatch even though the project is configured.
+export const SYNC_API_KEY_ENV_NAMES = [
+  "SYNC_API_KEY",
+  "SYNC_SO_API_KEY",
+  "SYNCSO_API_KEY",
+] as const;
+
+export function getSyncApiKey(): string {
+  for (const name of SYNC_API_KEY_ENV_NAMES) {
+    const v = Deno.env.get(name);
+    if (v) return v;
+  }
+  return "";
+}
+
 // ── HTTP asset probe ────────────────────────────────────────────────────
+
 
 export interface AssetProbe {
   ok: boolean;
