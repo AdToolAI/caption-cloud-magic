@@ -413,35 +413,12 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} auto-tuner prefers source_kind=${tunerKind}`);
     }
 
-    // ── Build Sync.so payload ────────────────────────────────────────────
+    // ── Webhook URL ──────────────────────────────────────────────────────
     const webhookUrl = appendWebhookToken(
       `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
     );
 
-    const input: Array<Record<string, unknown>> = [
-      { type: "video", url: sourceClipUrl },
-      ...Array.from(audioRefMap.entries()).map(([url, refId]) => ({
-        type: "audio",
-        url,
-        refId,
-      })),
-    ];
-
-    // ── Face-targeting (multi-speaker) ───────────────────────────────────
-    // Sync.so's segments API does NOT accept per-segment `options`. To drive
-    // the correct face per turn we build a TOP-LEVEL per-frame
-    // `active_speaker_detection.bounding_boxes` array — each entry is the
-    // active speaker's bbox for that frame ([x1, y1, x2, y2] in video pixel
-    // coords), or null when no face should be targeted. Sync.so docs:
-    // https://sync.so/docs/developer-guides/speaker-selection
-    //
-    // For single-speaker scenes we fall back to the simpler
-    // `frame_number` + `coordinates` shortcut (matches poll-dialog-shots).
-    //
-    // IMPORTANT: the previous version sent `options.activeSpeakerDetection`
-    // (camelCase), which Sync.so rejects with HTTP 422
-    // "property activeSpeakerDetection does not exist". The correct key is
-    // snake_case `active_speaker_detection`.
+    // ── Face-targeting (resolve per-speaker coords) ──────────────────────
     const lovableKey = Deno.env.get("LOVABLE_API_KEY");
     const anchorUrl =
       (scene as any).lock_reference_url ||
@@ -465,24 +442,6 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} faceMap resolve failed: ${(err as Error).message}`,
       );
     }
-
-    // Per-speaker bbox lookup (anchor pixel space — matches the i2v plate's
-    // native resolution closely enough that Sync.so lands on the right face).
-    type Bbox = [number, number, number, number];
-    const speakerBboxes: Array<Bbox | null> = speakers.map((sp, idx) => {
-      if (!faceMap?.faces?.length) return null;
-      const wanted = String(sp.character_id ?? "").toLowerCase();
-      const byId = wanted
-        ? faceMap.faces.find((f) => String(f.characterId ?? "").toLowerCase() === wanted)
-        : null;
-      const bySide = !byId
-        ? faceMap.faces.find((f) => f.side === (idx === 0 ? "left" : "right"))
-        : null;
-      const hit = byId ?? bySide ?? faceMap.faces[idx] ?? null;
-      if (!hit?.bbox || hit.bbox.length !== 4) return null;
-      return hit.bbox as Bbox;
-    });
-    // Per-speaker single-point coords for the single-speaker fast path.
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
         speakerIdx: idx,
@@ -491,86 +450,90 @@ serve(async (req) => {
       });
       return picked?.coords ?? null;
     });
+    // Fallback heuristic when face map is unreliable: left=spk0, right=spk1.
+    for (let i = 0; i < speakerCoords.length; i++) {
+      if (!speakerCoords[i]) {
+        speakerCoords[i] = i === 0 ? [0.3, 0.5] : i === 1 ? [0.7, 0.5] : [0.5, 0.5];
+      }
+    }
+    const ASSUMED_FPS = 24;
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} bboxes=${JSON.stringify(speakerBboxes)}`,
+      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} coords=${JSON.stringify(speakerCoords)}`,
     );
 
-    // Build top-level `options.active_speaker_detection`.
+    // ── Build PASSES (one per speaker that has turns) ────────────────────
+    // MAY 2026 pivot: instead of one Sync.so call with segments[]+ASD (which
+    // crashes lipsync-2-pro), we chain N per-speaker calls where each pass:
+    //  • takes prev pass output as video input (pass 0 = master plate)
+    //  • takes that speaker's pre-mixed audio track (with silence between
+    //    their turns — compose-twoshot-audio guarantees this)
+    //  • locks ASD to that speaker's single-coord face
+    //  • NO segments[] → no crash
     //
-    // Multi-speaker (≥2 speakers AND ≥2 known bboxes): per-frame bounding_boxes.
-    // Single-speaker (1 speaker OR only one bbox resolved): frame_number+coordinates.
-    // Otherwise: omit — Sync.so auto-detects.
-    const ASSUMED_FPS = 24; // Hailuo / Kling i2v default; close enough for ASD windowing
-    const totalFrames = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
-    const usableBboxes = speakerBboxes.filter((b): b is Bbox => !!b);
-    const multiSpeaker = speakers.length >= 2 && usableBboxes.length >= 2;
+    // Result: each pass only modifies its own speaker's mouth. After the
+    // final pass, every speaker is correctly lip-synced.
+    const passSpeakers = speakers
+      .map((sp, originalIdx) => ({ sp, originalIdx }))
+      .filter(({ sp }) => {
+        const turns = Array.isArray(sp.voicedRange?.turns) ? sp.voicedRange!.turns! : [];
+        return turns.length > 0 && !!String(sp.track_url ?? "").trim();
+      });
 
-    let asdOptions: Record<string, unknown> | null = null;
-    if (multiSpeaker) {
-      // Fallback bbox = the first known speaker's bbox (used for frames that
-      // fall in gaps between segments so we never send all-nulls).
-      const fallbackBbox = usableBboxes[0];
-      const boundingBoxes: Array<Bbox | null> = new Array(totalFrames).fill(null);
-      // Pre-sort segments by start for stable lookup.
-      const sortedSegs = [...segments].sort((a, b) => a.startTime - b.startTime);
-      let segCursor = 0;
-      for (let f = 0; f < totalFrames; f++) {
-        const t = f / ASSUMED_FPS;
-        while (
-          segCursor < sortedSegs.length - 1 &&
-          t >= sortedSegs[segCursor].endTime
-        ) {
-          segCursor++;
-        }
-        const seg = sortedSegs[segCursor];
-        const inSeg = seg && t >= seg.startTime && t < seg.endTime;
-        const bbox = inSeg ? speakerBboxes[seg.speakerIdx] : null;
-        boundingBoxes[f] = bbox ?? fallbackBbox;
-      }
-      asdOptions = {
-        auto_detect: false,
-        bounding_boxes: boundingBoxes,
-      };
-    } else if (speakerCoords[0]) {
-      asdOptions = {
-        auto_detect: false,
-        frame_number: Math.max(0, Math.floor(totalFrames / 2)),
-        coordinates: speakerCoords[0],
-      };
+    // If we can't build per-speaker passes (missing track_url), bail with a
+    // clear error rather than silently swap speakers.
+    if (passSpeakers.length === 0) {
+      // Refund the wallet debit we just took.
+      const { data: wErr } = await supabase
+        .from("wallets").select("balance").eq("user_id", userId).single();
+      await supabase
+        .from("wallets")
+        .update({
+          balance: Number(wErr?.balance ?? 0) + totalCost,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: "dialog_pipeline_no_per_speaker_tracks",
+        })
+        .eq("id", sceneId);
+      return json(
+        {
+          error: "no_per_speaker_tracks",
+          message: "Per-speaker audio tracks missing. Re-run compose-twoshot-audio.",
+          refunded: totalCost,
+        },
+        422,
+      );
     }
 
-    // Diagnose Mai 2026: Sync.so `lipsync-2-pro` schlägt mit
-    // "An unknown error occurred" fehl, sobald `segments[]` UND
-    // `options.active_speaker_detection` (egal ob `coordinates` oder
-    // `bounding_boxes`) gemeinsam gesendet werden. Repro-Matrix V1/V2/V3
-    // ohne ASD = COMPLETED. V4/V5 mit ASD = FAILED. Sync.so wählt im
-    // Segments-Modus den aktiven Sprecher implizit aus dem Audio-Stream
-    // des jeweiligen Segments — ASD ist nur für den Nicht-Segments-Pfad.
-    // Wir lassen ASD hier komplett weg und behalten es nur als Telemetrie.
-    const _diagnosticAsd = asdOptions; // kept for log_meta
-    const payload: Record<string, unknown> = {
-      model: LIPSYNC_MODEL,
-      input,
-      segments: segments.map((s) => ({
-        startTime: s.startTime,
-        endTime: s.endTime,
-        audioInput: {
-          refId: s.refId,
-          startTime: s.startTime,
-          endTime: s.endTime,
-        },
-      })),
-      webhookUrl,
-      webhook_url: webhookUrl,
-    };
+    const builtPasses: PassState[] = passSpeakers.map(({ sp, originalIdx }, passIdx) => {
+      const turns = sp.voicedRange!.turns! as Turn[];
+      const passSegments: SegmentItem[] = turns.map((t) => ({
+        startTime: Number(Math.max(0, t.startSec).toFixed(3)),
+        endTime: Number(Math.min(totalSec, Math.max(t.startSec + MIN_TURN_DUR_SEC, t.endSec)).toFixed(3)),
+        speakerIdx: originalIdx,
+        speakerName: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
+        refId: "a1",
+      }));
+      return {
+        idx: passIdx,
+        speaker_idx: originalIdx,
+        character_id: sp.character_id ?? null,
+        speaker_name: String(sp.speaker ?? `Speaker ${originalIdx + 1}`),
+        audio_url: String(sp.track_url),
+        coords: speakerCoords[originalIdx] ?? [0.5, 0.5],
+        segments: passSegments,
+        input_url: "", // filled per pass below
+        status: "pending",
+      };
+    });
 
-
-    console.log(
-      `[compose-dialog-segments] scene=${sceneId} dispatch segments=${segments.length} cost=${totalCost} payload=${JSON.stringify(payload).slice(0, 1500)}`,
-    );
-
-    // Stufe B: HEAD-probe every input asset before paying Sync.so.
-    const audioUrls = Array.from(audioRefMap.keys());
+    // ── Stufe B: HEAD-probe inputs once before paying Sync.so ────────────
+    const audioUrls = builtPasses.map((p) => p.audio_url);
     const probes = await Promise.all([
       probeAsset(sourceClipUrl, "video", 50_000),
       ...audioUrls.map((u) => probeAsset(u, "audio", 5_000)),
@@ -582,11 +545,10 @@ serve(async (req) => {
       audioProbes
         .map((p, i) => (p.ok ? null : `audio[${i}]:${p.error}`))
         .find(Boolean);
-    if (badProbe) {
+    if (badProbe && !isAdvance) {
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} PREFLIGHT BLOCK ${badProbe} video=${JSON.stringify(videoProbe)} audio=${JSON.stringify(audioProbes)}`,
+        `[compose-dialog-segments] scene=${sceneId} PREFLIGHT BLOCK ${badProbe}`,
       );
-      // Refund the reservation we just took.
       const { data: w0 } = await supabase
         .from("wallets").select("balance").eq("user_id", userId).single();
       await supabase
@@ -605,115 +567,87 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
-        scene_id: sceneId,
-        user_id: userId,
-        engine: "sync-segments",
-        sync_source_kind: "segments",
-        video_url: sourceClipUrl,
-        video_bytes: videoProbe.bytes,
-        video_content_type: videoProbe.contentType,
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_source_kind: "segments", video_url: sourceClipUrl,
         sync_status: "PREFLIGHT_BLOCKED",
         error_class: badProbe.startsWith("video") ? "video_head_fail" : "audio_head_fail",
         error_message: badProbe,
       });
-      return json(
-        { error: "preflight_failed", details: badProbe, refunded: totalCost },
-        422,
-      );
+      return json({ error: "preflight_failed", details: badProbe, refunded: totalCost }, 422);
     }
 
-    // ── Stufe D: Face-validation per segment ─────────────────────────────
-    // The segments-API uses Sync.so's internal face detection; if there's
-    // simply no visible face at the segment's midpoint, the call returns
-    // a degraded/empty result for that window. We pre-check each segment
-    // (cached via frame_face_cache) and abort+refund when one is broken.
-    const fpsHint = 24;
-    const faceChecks = await Promise.all(
-      segments.map(async (s) => {
-        const midSec = (s.startTime + s.endTime) / 2;
-        const frame = Math.max(0, Math.round(midSec * fpsHint));
+    // ── Face-gate per pass (one frame check per speaker's first turn) ────
+    if (!isAdvance) {
+      for (const pass of builtPasses) {
+        const firstTurn = pass.segments[0];
+        if (!firstTurn) continue;
+        const midSec = (firstTurn.startTime + firstTurn.endTime) / 2;
+        const frame = Math.max(0, Math.round(midSec * ASSUMED_FPS));
         const v = await validateFrameFace({
-          supabaseUrl,
-          serviceKey,
+          supabaseUrl, serviceKey,
           videoUrl: sourceClipUrl,
-          frameNumber: frame,
-          fps: fpsHint,
+          frameNumber: frame, fps: ASSUMED_FPS,
           targetCoords: null,
         });
-        return { segment: s, frame, v };
-      }),
-    );
-    const brokenSeg = faceChecks.find((c) => c.v.ok && !c.v.faceVisible);
-    if (brokenSeg) {
-      console.error(
-        `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK segment=[${brokenSeg.segment.startTime.toFixed(2)},${brokenSeg.segment.endTime.toFixed(2)}] frame=${brokenSeg.frame}: no face visible`,
-      );
-      const { data: w0 } = await supabase
-        .from("wallets").select("balance").eq("user_id", userId).single();
-      await supabase
-        .from("wallets")
-        .update({
-          balance: Number(w0?.balance ?? 0) + totalCost,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
-          clip_error: `face_validation_failed_segment_${brokenSeg.frame}`,
-        })
-        .eq("id", sceneId);
-      await logSyncDispatch(supabase, {
-        scene_id: sceneId,
-        user_id: userId,
-        engine: "sync-segments",
-        sync_source_kind: "segments",
-        video_url: sourceClipUrl,
-        frame_number: brokenSeg.frame,
-        window_start_sec: brokenSeg.segment.startTime,
-        window_end_sec: brokenSeg.segment.endTime,
-        sync_status: "FACE_GATE_BLOCKED",
-        error_class: "precheck_face_mismatch",
-        error_message: `no face at frame ${brokenSeg.frame} (segment ${brokenSeg.segment.startTime.toFixed(2)}-${brokenSeg.segment.endTime.toFixed(2)}s)`,
-      });
-      return json(
-        {
-          error: "face_validation_failed",
-          details: `no face at segment ${brokenSeg.segment.startTime.toFixed(2)}-${brokenSeg.segment.endTime.toFixed(2)}s`,
-          refunded: totalCost,
-          hint: "switch_to_cinematic_sync_engine",
-        },
-        422,
-      );
+        if (v.ok && !v.faceVisible) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame}`,
+          );
+          const { data: w0 } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(w0?.balance ?? 0) + totalCost,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: `face_validation_failed_pass_${pass.idx}_frame_${frame}`,
+            })
+            .eq("id", sceneId);
+          return json(
+            {
+              error: "face_validation_failed",
+              details: `no face for ${pass.speaker_name} at frame ${frame}`,
+              refunded: totalCost,
+              hint: "switch_to_cinematic_sync_engine",
+            },
+            422,
+          );
+        }
+      }
     }
 
-    // ── Stage E.3: Concurrency-Guard ─────────────────────────────────────
-    // Sync.so Creator plan allows ~3 parallel jobs. If we're at the cap, defer
-    // the dispatch instead of letting Sync.so throw 429.
+    // ── Concurrency guard ────────────────────────────────────────────────
     const MAX_INFLIGHT = 3;
     const inflightCount = await countInflightSyncJobs(supabase, 10);
     if (inflightCount >= MAX_INFLIGHT) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} DEFER inflight=${inflightCount}/${MAX_INFLIGHT}`,
       );
-      // Refund the just-debited credits so the user is not billed for the wait.
-      const { data: wDef } = await supabase
-        .from("wallets").select("balance").eq("user_id", userId).single();
-      await supabase
-        .from("wallets")
-        .update({
-          balance: Number(wDef?.balance ?? 0) + totalCost,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
+      // Only refund on initial dispatch (advance path keeps the existing charge).
+      if (!isAdvance && !isRetry) {
+        const { data: wDef } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(wDef?.balance ?? 0) + totalCost,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+      }
       const jitterMs = 5_000 + Math.floor(Math.random() * 10_000);
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "pending",
-          twoshot_stage: "deferred",
+          lip_sync_status: isAdvance ? "running" : "pending",
+          twoshot_stage: isAdvance ? "syncso_segments_advance_deferred" : "deferred",
           clip_error: `syncso_concurrency_deferred:${inflightCount}`,
           updated_at: new Date().toISOString(),
         })
@@ -721,14 +655,73 @@ serve(async (req) => {
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "DEFERRED", error_class: "rate_limited",
-        error_message: `inflight ${inflightCount} >= ${MAX_INFLIGHT}, retry in ${jitterMs}ms`,
-        meta: { inflight_count: inflightCount, retry_in_ms: jitterMs },
+        error_message: `inflight ${inflightCount} >= ${MAX_INFLIGHT}`,
+        meta: { inflight_count: inflightCount, retry_in_ms: jitterMs, is_advance: isAdvance },
       });
       return json(
-        { ok: false, status: "deferred", inflight: inflightCount, retry_in_ms: jitterMs, refunded: totalCost },
+        { ok: false, status: "deferred", inflight: inflightCount, retry_in_ms: jitterMs },
         202,
       );
     }
+
+    // ── Determine which pass to dispatch ─────────────────────────────────
+    const prevState = (existing && (existing as any).version === 5) ? (existing as SegmentsState) : null;
+    let passes: PassState[];
+    let currentPassIdx: number;
+    let passInputUrl: string;
+
+    if (isAdvance && prevState?.passes && typeof prevState.current_pass === "number") {
+      // Webhook is chaining us forward. Use the persisted passes, advance the cursor.
+      passes = prevState.passes.map((p) => ({ ...p }));
+      currentPassIdx = prevState.current_pass;
+      const prevPass = passes[currentPassIdx - 1];
+      passInputUrl = prevPass?.output_url || sourceClipUrl;
+      if (!passes[currentPassIdx]) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} advance but no pass at idx=${currentPassIdx}`);
+        return json({ ok: true, skipped: "no_pass_at_cursor" }, 200);
+      }
+    } else if (isRetry && prevState?.passes && typeof prevState.current_pass === "number") {
+      // Retry the same pass that just failed.
+      passes = prevState.passes.map((p) => ({ ...p }));
+      currentPassIdx = prevState.current_pass;
+      const prevPass = passes[currentPassIdx - 1];
+      passInputUrl = prevPass?.output_url || sourceClipUrl;
+    } else {
+      // Fresh dispatch: start at pass 0.
+      passes = builtPasses;
+      currentPassIdx = 0;
+      passInputUrl = sourceClipUrl;
+    }
+
+    const pass = passes[currentPassIdx];
+    pass.input_url = passInputUrl;
+    pass.status = "rendering";
+    pass.started_at = new Date().toISOString();
+
+    // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
+    const firstTurn = pass.segments[0];
+    const midSec = firstTurn ? (firstTurn.startTime + firstTurn.endTime) / 2 : totalSec / 2;
+    const frameNumber = Math.max(0, Math.floor(midSec * ASSUMED_FPS));
+    const payload: Record<string, unknown> = {
+      model: LIPSYNC_MODEL,
+      input: [
+        { type: "video", url: passInputUrl },
+        { type: "audio", url: pass.audio_url },
+      ],
+      options: {
+        active_speaker_detection: {
+          auto_detect: false,
+          frame_number: frameNumber,
+          coordinates: pass.coords,
+        },
+      },
+      webhookUrl,
+      webhook_url: webhookUrl,
+    };
+
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} DISPATCH pass=${currentPassIdx + 1}/${passes.length} speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+    );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
       method: "POST",
@@ -739,183 +732,145 @@ serve(async (req) => {
     if (!resp.ok) {
       const errTxt = await resp.text().catch(() => "");
       console.error(
-        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED status=${resp.status} body=${errTxt.slice(0, 800)}`,
+        `[compose-dialog-segments] scene=${sceneId} dispatch FAILED pass=${currentPassIdx} status=${resp.status} body=${errTxt.slice(0, 600)}`,
       );
-      // Auto-refund
-      const { data: w2 } = await supabase
-        .from("wallets").select("balance").eq("user_id", userId).single();
-      await supabase
-        .from("wallets")
-        .update({
-          balance: Number(w2?.balance ?? 0) + totalCost,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
+      // Refund only if no previous pass succeeded (i.e. this is pass 0 fresh
+      // dispatch) — if a later pass fails, we still refund the full cost since
+      // the partial output is unusable.
+      const alreadyRefunded = !!(prevState as any)?.refunded;
+      if (!alreadyRefunded) {
+        const { data: w2 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(w2?.balance ?? 0) + totalCost,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+      }
+      pass.status = "failed";
+      pass.error = `dispatch_${resp.status}:${errTxt.slice(0, 200)}`;
       await supabase
         .from("composer_scenes")
         .update({
+          dialog_shots: {
+            ...(prevState ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            passes,
+            current_pass: currentPassIdx,
+            total_passes: passes.length,
+            multi_pass: passes.length > 1,
+            source_clip_url: sourceClipUrl,
+            total_sec: totalSec,
+            segments: pass.segments,
+            cost_credits: totalCost,
+            refunded: !alreadyRefunded,
+            error: pass.error,
+            finished_at: new Date().toISOString(),
+          },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error: `syncso_segments_dispatch_${resp.status}`,
         })
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
-        scene_id: sceneId,
-        user_id: userId,
-        engine: "sync-segments",
-        sync_source_kind: "segments",
-        video_url: sourceClipUrl,
-        video_bytes: videoProbe.bytes,
-        video_content_type: videoProbe.contentType,
-        window_start_sec: 0,
-        window_end_sec: totalSec,
-        http_status: resp.status,
-        sync_status: "DISPATCH_FAILED",
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_source_kind: "segments", video_url: passInputUrl,
+        http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
-        meta: { segments_count: segments.length },
+        meta: { pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
       });
-      // Stage F.3 — record failure so circuit can trip on rolling failures.
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
-        {
-          error: "syncso_dispatch_failed",
-          status: resp.status,
-          body: errTxt.slice(0, 400),
-          refunded: totalCost,
-        },
+        { error: "syncso_dispatch_failed", status: resp.status, body: errTxt.slice(0, 400) },
         502,
       );
     }
 
     const data = await resp.json();
-
-    // Stage F.6 — Schema-drift detector. If Sync.so renamed/dropped a
-    // required key, raise a critical alert and keep the job in pending
-    // (no refund, no charge bump) so we get a clean repro and a stuck
-    // job we can investigate manually.
     const shape = validateSyncResponseShape(data);
     if (!shape.ok) {
       console.error(
         `[compose-dialog-segments] scene=${sceneId} SCHEMA_DRIFT missing=${shape.missingKeys.join(",")}`,
       );
       await emitSystemAlert(supabase, {
-        alert_type: "syncso_schema_drift",
-        severity: "critical",
-        source: "sync.so",
+        alert_type: "syncso_schema_drift", severity: "critical", source: "sync.so",
         message: `Sync.so /generate response missing keys: ${shape.missingKeys.join(", ")}`,
         payload: { missing_keys: shape.missingKeys, sample: data },
       });
-      await logSyncDispatch(supabase, {
-        scene_id: sceneId, user_id: userId, engine: "sync-segments",
-        http_status: resp.status,
-        sync_status: "SCHEMA_DRIFT", error_class: "schema_drift",
-        error_message: `missing keys: ${shape.missingKeys.join(",")}`,
-        meta: { response_sample: data },
-      });
-      // Don't refund — we want the operator to investigate before the user retries.
       return json({ error: "schema_drift", missing: shape.missingKeys }, 502);
     }
-
     const jobId = String(data.id ?? "");
     if (!jobId) {
-      console.error(`[compose-dialog-segments] scene=${sceneId} no job id in response`);
       return json({ error: "no_job_id" }, 502);
     }
 
-    // E.3: register inflight slot so concurrent dispatchers back off.
-    // Use the correct shared-module signature (was a latent bug — second arg is a row object).
     await registerInflightSyncJob(supabase, {
-      job_id: jobId,
-      user_id: userId,
-      scene_id: sceneId,
-      engine: "sync-segments",
+      job_id: jobId, user_id: userId, scene_id: sceneId, engine: "sync-segments",
     });
-
-    // Stage F.3 — successful dispatch resets fail counter and closes half-open breakers.
     await recordCircuitSuccess(supabase, "sync.so");
 
-    await logSyncDispatch(supabase, {
-      scene_id: sceneId,
-      user_id: userId,
-      engine: "sync-segments",
-      job_id: jobId,
-      sync_source_kind: "segments",
-      video_url: sourceClipUrl,
-      video_bytes: videoProbe.bytes,
-      video_content_type: videoProbe.contentType,
-      window_start_sec: 0,
-      window_end_sec: totalSec,
-      http_status: resp.status,
-      sync_status: "DISPATCHED",
-      meta: {
-        segments_count: segments.length,
-        is_retry: isRetry,
-        // Stage E.6 — Persist the full outgoing payload so we can post-mortem
-        // Sync.so "unknown error" jobs without re-instrumenting. Truncated to
-        // keep meta column under control, but bounding_boxes summarized rather
-        // than dropped (we need shape + length, not every frame).
-        payload_summary: {
-          model: payload.model,
-          input: input.map((i: any) => ({ type: i.type, url: i.url, refId: i.refId })),
-          segments: segments,
-          asd_kind: asdOptions
-            ? (asdOptions.bounding_boxes ? "bounding_boxes" : "coordinates")
-            : "auto",
-          asd_box_count: Array.isArray((asdOptions as any)?.bounding_boxes)
-            ? (asdOptions as any).bounding_boxes.length
-            : null,
-          asd_unique_boxes: Array.isArray((asdOptions as any)?.bounding_boxes)
-            ? Array.from(new Set(
-                ((asdOptions as any).bounding_boxes as any[]).map((b) =>
-                  Array.isArray(b) ? b.join(",") : String(b),
-                ),
-              )).slice(0, 8)
-            : null,
-          asd_coords: (asdOptions as any)?.coordinates ?? null,
-          face_map_source: faceMap?.source ?? null,
-          face_count: faceMap?.faces?.length ?? 0,
-          assumed_fps: ASSUMED_FPS,
-          total_sec: totalSec,
-        },
-      },
-    });
+    pass.job_id = jobId;
+    passes[currentPassIdx] = pass;
 
     const nowIso = new Date().toISOString();
-    // E.5 retry-preserve: when re-dispatching after a webhook FAILED, keep the
-    // retry budget the webhook already incremented. Otherwise compose-dialog-
-    // segments would silently reset retry_count to undefined and the webhook
-    // would think retry_count=0 → endless re-dispatch loop (Mai 2026 incident
-    // produced 71 jobs in 15 min for a single scene).
-    const prev = (existing && existing.version === 5) ? existing : null;
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",
       status: "rendering",
+      multi_pass: passes.length > 1,
+      passes,
+      current_pass: currentPassIdx,
+      total_passes: passes.length,
       sync_job_id: jobId,
       source_clip_url: sourceClipUrl,
       total_sec: totalSec,
-      segments,
-      cost_credits: isRetry ? Number((prev as any)?.cost_credits ?? totalCost) : totalCost,
+      segments: pass.segments,
+      cost_credits: isRetry || isAdvance ? Number(prevState?.cost_credits ?? totalCost) : totalCost,
       refunded: false,
-      started_at: nowIso,
+      started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
+      first_started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
+      retry_count: Number(prevState?.retry_count ?? 0),
       final_url: null,
-      ...(isRetry && prev
-        ? {
-            retry_count: Number((prev as any).retry_count ?? 0),
-            first_started_at: (prev as any).first_started_at ?? (prev as any).started_at ?? nowIso,
-            last_error: (prev as any).last_error,
-            last_error_class: (prev as any).last_error_class,
-          } as Partial<SegmentsState>
-        : { first_started_at: nowIso } as Partial<SegmentsState>),
     };
+
+    await logSyncDispatch(supabase, {
+      scene_id: sceneId, user_id: userId, engine: "sync-segments",
+      job_id: jobId, sync_source_kind: "segments",
+      video_url: passInputUrl,
+      video_bytes: videoProbe.bytes,
+      video_content_type: videoProbe.contentType,
+      window_start_sec: 0, window_end_sec: totalSec,
+      http_status: resp.status, sync_status: "DISPATCHED",
+      meta: {
+        pass_idx: currentPassIdx,
+        total_passes: passes.length,
+        speaker: pass.speaker_name,
+        character_id: pass.character_id,
+        coords: pass.coords,
+        is_retry: isRetry,
+        is_advance: isAdvance,
+        face_map_source: faceMap?.source ?? null,
+        payload_summary: {
+          model: payload.model,
+          input_video: passInputUrl,
+          audio: pass.audio_url,
+          frame_number: frameNumber,
+          coordinates: pass.coords,
+        },
+      },
+    });
 
     await supabase
       .from("composer_scenes")
       .update({
         dialog_shots: state,
         lip_sync_status: "running",
-        twoshot_stage: "syncso_segments",
+        twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
         lip_sync_source_clip_url: sourceClipUrl,
         replicate_prediction_id: `sync:${jobId}`,
         clip_error: null,
@@ -923,14 +878,15 @@ serve(async (req) => {
       })
       .eq("id", sceneId);
 
-
     return json(
       {
         ok: true,
         status: "rendering",
         scene_id: sceneId,
         sync_job_id: jobId,
-        segments: segments.length,
+        pass: currentPassIdx + 1,
+        total_passes: passes.length,
+        speaker: pass.speaker_name,
         cost_credits: totalCost,
       },
       202,
