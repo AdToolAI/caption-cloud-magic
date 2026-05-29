@@ -126,8 +126,12 @@ serve(async (req) => {
       return json({ error: "no dialog_shots state" }, 400);
     }
 
+    // v12 Graceful Degrade: ein Shot mit status='ready' UND ohne output_url
+    // ist absichtlich degraded — wir nehmen für sein Fenster die Master-Plate.
     const allReady = state.shots.every(
-      (s) => s.status === "ready" && !!s.output_url,
+      (s) =>
+        s.status === "ready" &&
+        (!!s.output_url || (s as any).degraded === true),
     );
     if (!allReady) {
       return json({ error: "not all shots ready" }, 409);
