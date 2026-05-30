@@ -386,10 +386,14 @@ export function usePipelineProgress({
         if (isTerminalScene(s)) return false;
         const stage = (s as any).twoshotStage;
         if (!stage || ['complete', 'done', 'failed'].includes(stage)) return false;
-        if (['audio', 'anchor', 'master_clip', 'preflight'].includes(stage)) {
-          return (s as any).lipSyncStatus === 'running';
+        // Frühe v5-Stages (Audio-Prep, Master-Plate fertig, Sync.so-Queue,
+        // Circuit Breaker) zählen als laufend — auch wenn lipSyncStatus
+        // noch null/pending ist. Sonst verschwindet der globale Balken,
+        // sobald die Audio-Prep läuft.
+        if (['audio', 'anchor', 'master_clip', 'preflight', 'deferred', 'circuit_open'].includes(stage)) {
+          return true;
         }
-        return hasRealJob(s);
+        return hasRealJob(s) || (s as any).lipSyncStatus === 'running';
       },
     ) || targets.some((s) => {
       if (isTerminalScene(s)) return false;
