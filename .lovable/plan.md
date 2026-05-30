@@ -1,59 +1,39 @@
-## Symptom
+## Ziel
+Sync.so darf bei HappyHorse/Lip-Sync nicht mehr als opaque `unknown error` hängen bleiben. Wir härten den Multi-Pass-Dispatch ab, loggen provider-taugliche Diagnosedaten und bauen Fallbacks, statt HappyHorse als Problem zu behandeln.
 
-Nach dem letzten Sync.so-Pass spielt das fertige Lipsync-Video bereits sauber ab, aber der globale Pipeline-Progress-Bar oben im Composer bleibt „laufend" (Phase-Pill `Clips` weiter blau-pulsierend, Gesamtprozent ~40 %, statt sauber auf 100 % zu springen und nach 3 s zu verschwinden).
+## Plan
 
-## Root Cause
+1. **Sync.so-Diagnose verbessern**
+   - Im `compose-dialog-segments` Dispatch pro Pass einen stabilen `diagnostic_id` erzeugen.
+   - In `syncso_dispatch_log.meta` speichern: Pass-Index, Job-ID, Input-Video-URL, Audio-URL, Content-Type, Bytes, geschätzte Dauer, Face-Koordinaten, Frame-Nummer, Sync.so-Options, Retry/Advance-Status.
+   - Im Webhook bei `FAILED` den kompletten Sync.so-Payload mit `diagnostic_id`, aktuellem Pass und Input-Summary persistieren, damit man später genau sieht, welcher Input Sync.so gekillt hat.
 
-In `sync-so-webhook/index.ts` schreibt der finale Pass nur:
-- `clip_url = finalUrl`
-- `lip_sync_status = "applied"`
-- `lip_sync_applied_at = nowIso`
-- `twoshot_stage = "complete"`
-- `dialog_shots.status = "done"`
+2. **Preflight gegen bekannte Sync.so-Unknown-Error-Ursachen**
+   - Per-Speaker-Audio vor Dispatch genauer validieren: WAV-Header/Dauer prüfen, VAD/Voice-Anteil prüfen, Audio-Länge gegen Szene vergleichen.
+   - Bei zu kurzem/silent/kaputtem Audio nicht zu Sync.so senden, sondern klaren Fehler setzen und Credits refundieren.
+   - Face-Koordinaten vor Dispatch clamping/validieren statt rohe Werte zu senden.
 
-Er aktualisiert **nicht** `clip_status`. Für Dialog-/Cinematic-Sync-Szenen wird das Master-Plate von der Edge Function selbst erzeugt und die Szene bleibt während des gesamten Sync.so-Chains in `clip_status = 'generating'`. Konsequenz im Frontend (`usePipelineProgress.ts → clipsReal`):
+3. **Provider-Fallback-Kaskade für `provider_unknown_error`**
+   - `unknown error` nicht sofort final failen, sondern kontrolliert retryen mit Varianten:
+     1. gleicher Payload erneut,
+     2. falls wieder fail: ohne `active_speaker_detection`/mit `auto_detect` als Analyse-Fallback,
+     3. falls Pro-Modell weiter failt: fallback auf `lipsync-2` für den betroffenen Pass.
+   - Jeder Versuch wird geloggt, damit wir sehen, welche Variante funktioniert.
+   - Refund bleibt idempotent, falls alle Varianten scheitern.
 
-- `generating > 0` ⇒ `clipsReal.running = true`
-- `ready < total` ⇒ `clipsReal.progress < 1`, `clipsReal.done = false`
-- → `isActive` bleibt `true`, die Clips-Phase pulsiert weiter, der Balken steckt zwischen ~30–40 % fest, obwohl die Lipsync-Phase bereits `done` ist.
+4. **Status/Progress klarer machen**
+   - `twoshot_stage` und `dialog_shots` bekommen `retry_variant`/`last_sync_error_class`, damit UI/Logs nicht nur „Lipsync läuft“ zeigen.
+   - Fortschrittsanzeige soll tatsächliche `total_passes` nutzen und nicht „1/3“ anzeigen, wenn Sync.so nur 2 Speaker-Pässe fährt.
 
-Die im letzten Turn ergänzte `waitingForExport`-Kappung greift hier nicht sauber, weil sie nur die Soft-Floor-Rampe stoppt, aber den Status der Clips-Phase nicht korrigiert.
+5. **Console-Warnung separat fixen**
+   - `AIArsenalShowcase` `ModelTile` auf `forwardRef` umstellen, weil Framer Motion `AnimatePresence mode="popLayout"` refs an Children gibt. Das ist nicht die Sync.so-Ursache, aber der sichtbare Console-Fehler wird damit entfernt.
 
-## Fix
+## Nicht ändern
+- HappyHorse bleibt ein gültiges Lip-Sync-Modell.
+- Kein automatisches Entfernen von HappyHorse aus dem Dialog-Dropdown.
+- Kein stilles Umschreiben auf andere Modelle als „Lösung“ für Sync.so; Fallbacks betreffen nur Sync.so-Payload/Modellvariante pro Pass.
 
-### 1. Backend (`supabase/functions/sync-so-webhook/index.ts`)
-
-Im Final-Pass-Update zusätzlich setzen:
-```
-clip_status: "ready",
-clip_error: null,
-```
-Damit ist die Master-Clip-Quelle in der DB konsistent: Szene hat `clip_url` UND `clip_status='ready'`.
-
-(Optional zur Sicherheit auch im Retry/Failed-Branch: bei harter Failure `clip_status` unverändert lassen — der bestehende `lip_sync_status='failed'` reicht für die Failure-Erkennung im Frontend.)
-
-### 2. Frontend Belt-and-Suspenders (`src/hooks/usePipelineProgress.ts`)
-
-In `clipsReal` (ca. Z. 180–217) eine Szene auch dann als „ready" zählen, wenn sie zwar nicht `clipStatus==='ready'` ist, aber bereits ein finales Lipsync-Ergebnis vorliegt:
-
-```ts
-const isReadyOrLipsynced = (s: any) =>
-  s.clipStatus === 'ready' ||
-  (!!s.clipUrl && (
-    s.lipSyncStatus === 'applied' ||
-    s.twoshotStage === 'complete' ||
-    s.twoshotStage === 'done'
-  ));
-```
-
-`ready`, `generating` und `backendActive` entsprechend ableiten, sodass eine Szene mit `lip_sync_status='applied'` + `clip_url` nicht mehr als „generating" zählt. Dadurch funktioniert der Bar auch für ältere Rows, die noch ohne den DB-Fix gespeichert wurden, sowie für eventuelle Provider, die `clip_status` nicht selbst schreiben.
-
-### 3. Memory-Update
-
-`mem/features/video-composer/sync-segments-dialog-pipeline` ergänzen: „Final pass writes `clip_status='ready'` + `clip_error=null` zusätzlich zu `clip_url`/`lip_sync_status='applied'`, damit der globale Pipeline-Progress-Bar sauber auf 100 % geht und nicht in der Clips-Phase hängenbleibt."
-
-## Out of Scope
-
-- Keine UI-Änderungen am Bar-Layout, kein Refactor von `usePipelineProgress`.
-- Kein Eingriff in Multi-Pass-Logik (Charakter-Zuordnung, `sync_mode`, Padding) — alles bereits in v5 final.
-- Kein Eingriff in den Director's-Cut-Render-Overlay.
+## Validierung
+- Logs prüfen: neuer `diagnostic_id` + passgenaue Inputdaten vorhanden.
+- Eine 2-Sprecher-Dialogszene neu rendern: bei Sync.so-Fail muss Retry/Fallback sichtbar und nachvollziehbar sein; bei Erfolg final `clip_status='ready'`, `lip_sync_status='applied'`.
+- Console prüfen: `Function components cannot be given refs` darf nicht mehr erscheinen.

@@ -54,10 +54,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
+  detectVoicedFrames,
   countInflightSyncJobs,
   emitSystemAlert,
   evaluateCircuit,
   getSyncApiKey,
+  inspectWav,
   logSyncDispatch,
   openCircuit,
   probeAsset,
@@ -92,6 +94,9 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
+const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
+const RETRY_VARIANTS = ["coords-pro", "auto-pro", "auto-standard"] as const;
+type RetryVariant = typeof RETRY_VARIANTS[number];
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
 // (regardless of speaker count), so cost = ceil(totalSec) * 9 (min 9).
@@ -101,6 +106,25 @@ const MIN_TURN_DUR_SEC = 0.4;
 
 const computeCost = (durSec: number) =>
   Math.max(LIPSYNC_MIN_CREDITS, Math.ceil(Math.max(0, durSec)) * LIPSYNC_CREDITS_PER_SEC);
+
+const isRetryVariant = (value: unknown): value is RetryVariant =>
+  typeof value === "string" && (RETRY_VARIANTS as readonly string[]).includes(value);
+
+const clampSyncCoords = (coords: [number, number] | null | undefined): [number, number] | null => {
+  if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return null;
+  const [x, y] = coords;
+  if (x <= 1 && y <= 1) return [Math.round(x * 1280), Math.round(y * 720)];
+  return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
+};
+
+async function inspectSpeakerAudio(url: string) {
+  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!resp.ok) throw new Error(`audio_get_${resp.status}`);
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+  const wav = inspectWav(bytes);
+  const vad = detectVoicedFrames(bytes);
+  return { bytes: bytes.byteLength, wav, vad };
+}
 
 interface Turn { startSec: number; endSec: number }
 interface TwoshotSpeaker {
@@ -128,6 +152,8 @@ interface PassState {
   segments: SegmentItem[];
   input_url: string;
   job_id?: string;
+  diagnostic_id?: string;
+  retry_variant?: RetryVariant;
   output_url?: string;
   status: "pending" | "rendering" | "done" | "failed";
   started_at?: string;
@@ -154,6 +180,9 @@ interface SegmentsState {
   started_at: string;
   first_started_at?: string;
   retry_count?: number;
+  retry_variant?: RetryVariant;
+  fallback_history?: Array<Record<string, unknown>>;
+  last_diagnostic_id?: string;
   last_error?: string;
   last_error_class?: string;
   finished_at?: string;
@@ -184,6 +213,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const sceneId = body?.scene_id;
     const isRetry = body?.retry === true;
+    const requestedRetryVariant = isRetryVariant(body?.retry_variant) ? body.retry_variant : null;
     // `advance: true` is sent by the webhook to chain to the next pass after
     // a successful pass completion. Skips wallet debit + face-gate (already
     // validated on pass 0) and dispatches passes[current_pass].
@@ -455,6 +485,7 @@ serve(async (req) => {
       if (!speakerCoords[i]) {
         speakerCoords[i] = i === 0 ? [0.3, 0.5] : i === 1 ? [0.7, 0.5] : [0.5, 0.5];
       }
+      speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
     }
     const ASSUMED_FPS = 24;
     console.log(
@@ -574,6 +605,67 @@ serve(async (req) => {
         error_message: badProbe,
       });
       return json({ error: "preflight_failed", details: badProbe, refunded: totalCost }, 422);
+    }
+
+    // ── Deep audio preflight: Sync.so often reports only "unknown error" for
+    // malformed, silent, or shorter-than-video WAV inputs. Validate the real
+    // bytes before dispatch so failures become actionable and refundable here.
+    const audioDiagnostics = await Promise.all(
+      builtPasses.map(async (p) => {
+        try {
+          const diag = await inspectSpeakerAudio(p.audio_url);
+          const durMismatch = diag.wav.durSec + 0.35 < totalSec;
+          const silent = diag.vad.voicedSec < 0.15 && diag.vad.longestVoicedRun < 0.12;
+          return { pass: p.idx, speaker: p.speaker_name, ok: !durMismatch && !silent, durMismatch, silent, ...diag };
+        } catch (err) {
+          return { pass: p.idx, speaker: p.speaker_name, ok: false, error: (err as Error).message };
+        }
+      }),
+    );
+    const badAudio = audioDiagnostics.find((d: any) => !d.ok) as any;
+    if (badAudio) {
+      const reason = badAudio.error
+        ? `audio_invalid_${badAudio.error}`
+        : badAudio.silent
+          ? "audio_silent_no_voice_detected"
+          : `audio_too_short_${Number(badAudio.wav?.durSec ?? 0).toFixed(2)}s_expected_${totalSec}s`;
+      console.error(`[compose-dialog-segments] scene=${sceneId} AUDIO PREFLIGHT BLOCK ${reason}`);
+      const alreadyRefunded = !!(existing as any)?.refunded;
+      if (!alreadyRefunded) {
+        const { data: w0 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(existing ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+            refunded: !alreadyRefunded,
+            error: reason,
+            audio_diagnostics: audioDiagnostics,
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `syncso_audio_preflight_${reason}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED", error_class: "audio_invalid",
+        error_message: reason,
+        meta: { audio_diagnostics: audioDiagnostics, expected_total_sec: totalSec },
+      });
+      return json({ error: "audio_preflight_failed", reason, refunded: alreadyRefunded ? 0 : totalCost }, 422);
     }
 
     // ── Face-gate per pass (one frame check per speaker's first turn) ────
@@ -697,33 +789,45 @@ serve(async (req) => {
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
+    const retryVariant: RetryVariant = isRetry
+      ? (requestedRetryVariant ?? prevState?.retry_variant ?? "coords-pro")
+      : "coords-pro";
+    const diagnosticId = `${sceneId}:${currentPassIdx + 1}:${retryVariant}:${crypto.randomUUID()}`;
+    pass.retry_variant = retryVariant;
+    pass.diagnostic_id = diagnosticId;
 
     // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
     const firstTurn = pass.segments[0];
     const midSec = firstTurn ? (firstTurn.startTime + firstTurn.endTime) / 2 : totalSec / 2;
     const frameNumber = Math.max(0, Math.floor(midSec * ASSUMED_FPS));
+    const syncOptions: Record<string, unknown> = {
+      // Explicit: keep full video length. Without this, lipsync-2-pro's
+      // default trims output to the shorter input → multi-pass chains
+      // were ending after the first speaker's last turn (3rd sentence
+      // disappeared). cut_off here = "cut to shortest" but with our
+      // silence-padded per-speaker tracks (length = sceneDur) the audio
+      // matches the video, so output stays full.
+      sync_mode: "cut_off",
+    };
+    if (retryVariant === "coords-pro") {
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        frame_number: frameNumber,
+        coordinates: pass.coords,
+      };
+    } else {
+      syncOptions.active_speaker_detection = { auto_detect: true };
+    }
+    const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
     const payload: Record<string, unknown> = {
-      model: LIPSYNC_MODEL,
+      model: retryVariant === "auto-standard" ? LIPSYNC_FALLBACK_MODEL : LIPSYNC_MODEL,
       input: [
         { type: "video", url: passInputUrl },
         { type: "audio", url: pass.audio_url },
       ],
-      options: {
-        // Explicit: keep full video length. Without this, lipsync-2-pro's
-        // default trims output to the shorter input → multi-pass chains
-        // were ending after the first speaker's last turn (3rd sentence
-        // disappeared). cut_off here = "cut to shortest" but with our
-        // silence-padded per-speaker tracks (length = sceneDur) the audio
-        // matches the video, so output stays full.
-        sync_mode: "cut_off",
-        active_speaker_detection: {
-          auto_detect: false,
-          frame_number: frameNumber,
-          coordinates: pass.coords,
-        },
-      },
-      webhookUrl,
-      webhook_url: webhookUrl,
+      options: syncOptions,
+      webhookUrl: diagnosticWebhookUrl,
+      webhook_url: diagnosticWebhookUrl,
     };
 
     // ── Length sanity log ────────────────────────────────────────────────
@@ -752,6 +856,7 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} DISPATCH pass=${currentPassIdx + 1}/${passes.length} ` +
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
+      `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
       `sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
@@ -814,7 +919,7 @@ serve(async (req) => {
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
-        meta: { pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
+        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
       });
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
@@ -867,6 +972,9 @@ serve(async (req) => {
       started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
       first_started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
       retry_count: Number(prevState?.retry_count ?? 0),
+      retry_variant: retryVariant,
+      fallback_history: prevState?.fallback_history ?? [],
+      last_diagnostic_id: diagnosticId,
       final_url: null,
     };
 
@@ -879,11 +987,14 @@ serve(async (req) => {
       window_start_sec: 0, window_end_sec: totalSec,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
+        diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
         speaker: pass.speaker_name,
         character_id: pass.character_id,
         coords: pass.coords,
+        retry_variant: retryVariant,
+        model: payload.model,
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
@@ -891,12 +1002,16 @@ serve(async (req) => {
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
+        audio_probe: audioProbes[audioProbeIdx] ?? null,
+        video_probe: videoProbe,
+        audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
         payload_summary: {
           model: payload.model,
           input_video: passInputUrl,
           audio: pass.audio_url,
           frame_number: frameNumber,
           coordinates: pass.coords,
+          options: payload.options,
         },
       },
     });
