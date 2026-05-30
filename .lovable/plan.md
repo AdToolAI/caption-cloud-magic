@@ -1,118 +1,76 @@
 ## Befund
 
-Das eigentliche Problem ist weiterhin dieselbe Kette:
+Der Fehler ist jetzt klar sichtbar: `raw_talking_head_source_blocked` ist kein neuer Provider-Ausfall, sondern ein Schutzmechanismus, der korrekt verhindert, dass Lip-Sync auf einem rohen Talking-Head-Avatar startet.
 
-- Die Szene läuft nicht sauber über `Scene-aware Anchor → Master-Clip → v5 Lip-Sync`.
-- In den aktuellen Daten wurde v5 Lip-Sync wieder mit einem `talking-head-renders/...mp4` als Videoquelle gestartet.
-- Deshalb entsteht ein roher Avatar/Talking-Head statt der im Prompt beschriebenen Szene.
-- Der Ladebalken verschwindet, weil die Szene nach einem fehlgeschlagenen/terminalen Zustand nicht mehr als aktive Clips-/Lip-Sync-Arbeit erkannt wird.
-- Der dritte Button/Schritt `Voiceover` erscheint, weil die Progress-Logik globales Voiceover als eigene Phase einblendet. Für diesen Cinematic-Sync-Flow ist das falsch: die Audio-Vorbereitung ist nur ein interner Lip-Sync-Schritt, kein eigener Nutzer-Schritt.
+Der konkrete kaputte Datensatz ist eine Cinematic-Sync-Szene mit:
 
-Do I know what the issue is? Ja: Es gibt zwei konkrete Ursachen, nicht nur ein UI-Problem.
+- `clip_source = ai-happyhorse`
+- `engine_override = cinematic-sync`
+- `clip_status = ready`
+- `clip_url = .../talking-head-renders/...mp4`
+- `reference_image_url = null`
+- `lip_sync_status = failed`
+- `twoshot_stage = failed`
 
-## Root Cause
+Damit ist die Ursache: Der Clip-Schritt wurde fälschlich als „ready“ akzeptiert, obwohl der fertige Clip kein echter Szenen-Master ist, sondern ein Talking-Head-Render. Danach blockt v5 Lip-Sync absichtlich.
 
-1. **Cinematic-Sync Single-Speaker bekommt keinen verlässlichen Anchor**
-   - `compose-video-clips` versucht zwar inzwischen auch bei 1 Sprecher einen Anchor zu erstellen.
-   - Aber die Szene nutzt `characterId: samuel-dusatko` als Slug, während der Server-Lookup aktuell primär die übergebenen `characters` nach ID nutzt.
-   - Dadurch kann `portraitUrls.length` leer bleiben, der Anchor wird übersprungen, und der Master-Clip entsteht ohne komponierte Szenenreferenz.
+Do I know what the issue is? Ja.
 
-2. **v5 akzeptiert noch Talking-Head als gültige Quelle, wenn auch `clip_url` selbst schon Talking-Head ist**
-   - `compose-dialog-segments` ignoriert zwar eine stale `lip_sync_source_clip_url`, wenn sie auf `talking-head-renders` zeigt.
-   - Wenn aber `clip_url` selbst ebenfalls ein Talking-Head ist, wird genau dieser rohe Avatar als Master-Plate verwendet.
-   - Das sieht für die Pipeline technisch „fertig“ aus, ist aber semantisch falsch.
+## Was ich ändern werde
 
-3. **HappyHorse-Cinematic-Sync setzt nicht dieselben Schutzfelder wie Hailuo**
-   - Der Hailuo-Zweig setzt bei Cinematic-Sync sauber `lip_sync_source_clip_url = null`, `lip_sync_status = pending`, `twoshot_stage = master_clip`.
-   - Der HappyHorse-Zweig setzt aktuell nur `clip_status = generating` und lässt alte Lip-Sync-/Talking-Head-Quellen leichter überleben.
+### 1. Auto-Trigger darf Talking-Head nicht als Master-Plate behandeln
 
-4. **Progress-Leiste modelliert den falschen Nutzer-Workflow**
-   - Für diesen Flow soll der Nutzer nur `Clips` und `Lip sync` sehen.
-   - `Voiceover` ist hier nur `compose-twoshot-audio` innerhalb der Lip-Sync-Pipeline.
+In `src/hooks/useTwoShotAutoTrigger.ts`:
 
-## Umsetzungsplan
-
-### 1. Anchor-Erzeugung für Single-Speaker Cinematic-Sync hart absichern
-
-In `supabase/functions/compose-video-clips/index.ts`:
-
-- Slug-IDs wie `samuel-dusatko` zusätzlich über `brand_characters` anhand Name/Slug/User auflösen.
-- Falls `characterShots` Portraits nicht über `characters` findet, serverseitig aus der Brand-Character-Library nachladen.
-- Für `engineOverride === 'cinematic-sync'` und vorhandenen Dialog/Charakter:
-  - Wenn kein Anchor erzeugt werden kann, Szene sichtbar mit `clip_status='failed'` und verständlichem Fehler abbrechen.
-  - Nicht still ohne Anchor zu HappyHorse/Hailuo weiterlaufen.
-
-### 2. HappyHorse-Cinematic-Sync auf denselben sicheren Zustand wie Hailuo bringen
-
-In `supabase/functions/compose-video-clips/index.ts` im `ai-happyhorse`-Zweig:
-
-- Bei `engineOverride === 'cinematic-sync'` vor Dispatch:
+- Vor Audio-Prep und Lip-Sync-Kandidatenprüfung wird `talking-head-renders` als ungültige Master-Quelle erkannt.
+- Solche Szenen werden nicht erneut an `compose-dialog-segments` geschickt.
+- Stattdessen wird der Zustand auf „Clip muss neu gerendert werden“ zurückgesetzt:
+  - `clip_url = null`
+  - `clip_status = pending`
+  - `lip_sync_status = pending/null`
+  - `twoshot_stage = null`
   - `lip_sync_source_clip_url = null`
-  - `lip_sync_status = 'pending'`
-  - `twoshot_stage = 'master_clip'`
-  - alte `dialog_shots` und stale Sync-IDs bereinigen
-- HappyHorse nur mit komponierter `reference_image_url` als I2V starten.
-- Wenn keine komponierte Anchor-URL vorhanden ist, nicht als T2V starten.
+  - `replicate_prediction_id = null`
+- Dadurch triggert „Alle generieren“ wieder zuerst den echten Clip-/Scene-Plate-Schritt, statt direkt wieder Lip-Sync auf dem Avatar zu versuchen.
 
-### 3. v5-Lip-Sync darf niemals auf Talking-Head-Quellen starten
+### 2. `compose-dialog-segments` blockt nicht nur, sondern heilt den Zustand
 
 In `supabase/functions/compose-dialog-segments/index.ts`:
 
-- `talking-head-renders` in **beiden** Quellen prüfen:
-  - `lip_sync_source_clip_url`
-  - `clip_url`
-- Wenn beide fehlen oder beide Talking-Head sind:
-  - Kein Sync.so-Dispatch.
-  - Status bleibt/kehrt in einen klaren Fehlerzustand zurück: `raw_talking_head_source_blocked`.
-  - Nutzer sieht „Clip neu rendern“ statt verschwindenden Ladebalken.
-- Die Diagnose soll explizit loggen: `source_kind=scene_plate | blocked_raw_talking_head`.
+- Wenn `clip_url` oder `lip_sync_source_clip_url` ein `talking-head-renders`-Video ist, wird nicht nur `lip_sync_status='failed'` gesetzt.
+- Der Clip wird zusätzlich als ungültiger Master markiert und zum Neu-Rendern freigegeben.
+- Rückgabe bleibt klar: `raw_talking_head_source_blocked`, aber die UI kann danach sauber über Clip-Render neu starten.
 
-### 4. Server-Fallback darf Lip-Sync erst nach echter Master-Scene starten
+### 3. `compose-video-clips` darf Cinematic-Sync nie ohne Anchor weiterlaufen lassen
 
-In `supabase/functions/compose-clip-webhook/index.ts`:
+In `supabase/functions/compose-video-clips/index.ts`:
 
-- Auto-Fallback zu `compose-dialog-segments` nur starten, wenn `clip_url` **nicht** aus `talking-head-renders` kommt.
-- Bei Cinematic-Sync zusätzlich sicherstellen, dass `reference_image_url` ein `/scene-anchors/` oder `/composer-anchors/` Bild ist, bevor Lip-Sync automatisch losläuft.
+- Für Cinematic-Sync mit Dialog/Charakter gilt künftig hart:
+  - kein `reference_image_url` aus `/scene-anchors/` oder `/composer-anchors/` → kein HappyHorse/Hailuo-Dispatch.
+  - kein stilles Text-to-Video-Fallback.
+- Wenn die Charakterauflösung scheitert, wird der Clip sichtbar mit `anchor_missing`/`cinematic_sync_anchor_missing` abgebrochen.
+- Für HappyHorse-Cinematic-Sync bleibt der Master-Render nur erlaubt, wenn ein komponierter Anchor existiert.
 
-### 5. Progress-Leiste auf den richtigen Flow reduzieren
+### 4. Bestehende kaputte Szene bereinigen
 
-In `src/hooks/usePipelineProgress.ts` und ggf. `PipelineProgressBar.tsx`:
+Ich werde die aktuell kaputte Szene `c95a44c4-6e85-403b-9d47-ebd25391e936` zurücksetzen:
 
-- Für Szenen mit `engineOverride='cinematic-sync'`/`sync-segments` den Nutzer-Workflow als `Clips → Lip sync` darstellen.
-- `Voiceover` nicht als eigene Phase anzeigen, wenn es nur die interne `compose-twoshot-audio`-Vorbereitung ist.
-- Audio-Prep weiterhin innerhalb der Lip-Sync-Phase sichtbar halten, z. B. als Label „Audio wird vorbereitet…“.
-- Fehlerzustände (`raw_talking_head_source_blocked`, `anchor_missing`, `face_validation_failed`) sollen die Leiste nicht einfach ausblenden, sondern als Fehler sichtbar lassen.
+- rohen `talking-head-renders`-Clip entfernen
+- Lip-Sync-Fehlerstatus entfernen
+- stale Sync-/Dialog-Felder leeren
+- Scene-Anchor-Cache für diese Szene löschen
 
-### 6. Bestehende kaputte Szenen bereinigen
+Danach kann „Alle generieren“ den korrekten Ablauf starten:
 
-Per Datenkorrektur nach Code-Fix:
+```text
+Scene-aware Anchor → echter Master-Clip → Lip-Sync
+```
 
-- Für betroffene Cinematic-Sync-Szenen, deren `clip_url` oder `lip_sync_source_clip_url` auf `talking-head-renders` zeigt:
-  - `clip_url = null`
-  - `clip_status = 'pending'`
-  - `lip_sync_source_clip_url = null`
-  - `lip_sync_status = null/pending`
-  - `lip_sync_applied_at = null`
-  - `dialog_shots = null`
-  - `twoshot_stage = null`
-  - `replicate_prediction_id = null`
-  - `reference_image_url` nur löschen, wenn sie kein echter Scene-Anchor ist
-- Danach kann die Szene neu über den korrekten Weg gerendert werden.
-
-## Validierung
+### 5. Validierung
 
 Nach Umsetzung prüfe ich:
 
-- Eine Single-Speaker-Cinematic-Sync-Szene erzeugt zuerst einen Scene-Anchor mit sichtbarer Prompt-Umgebung.
-- HappyHorse/Hailuo bekommt diese Anchor-URL als Referenzbild.
-- `compose-dialog-segments` blockt jede Talking-Head-Quelle zuverlässig.
-- Die Progress-Leiste zeigt nur `Clips` und `Lip sync` für diesen Flow.
-- Fehler bleiben sichtbar statt dass der Ladebalken verschwindet.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- Die Datenbank enthält keinen `talking-head-renders`-Master mehr für diese Cinematic-Sync-Szene.
+- Der Auto-Trigger startet nicht mehr direkt Lip-Sync auf rohen Avatar-Clips.
+- Der Fortschrittsbalken zeigt den Fehler nicht mehr als verschwindenden Zustand, sondern bleibt als Clip/Lip-Sync-Workflow nachvollziehbar.
+- Die betroffenen Edge Functions werden neu deployed.
