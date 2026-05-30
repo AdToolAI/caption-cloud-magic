@@ -2448,11 +2448,50 @@ serve(async (req) => {
           // (Going through generate-happyhorse-video would only update the
           // toolkit's ai_video_generations table, leaving the scene stuck.)
           const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncHH =
+            (scene.engineOverride ?? "auto") === "cinematic-sync";
+
+          // STAGE 4 (May 30 2026): Cinematic-Sync + HappyHorse must NEVER
+          // start without a freshly composed scene-anchor as I2V reference —
+          // otherwise HappyHorse invents the scene from text and v5 lip-sync
+          // ends up on a raw avatar bust. Mirror the Hailuo safety reset.
+          if (isCinematicSyncHH && !isI2V) {
+            const msg =
+              "happyhorse_cinematic_sync_missing_anchor: Es konnte keine Scene-Anchor-Referenz erzeugt werden. Bitte Charakter-Portraits prüfen und Szene neu rendern.";
+            console.error(
+              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} aborted — no composed reference_image_url`,
+            );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                clip_status: "failed",
+                clip_error: msg,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: msg,
+            });
+            continue;
+          }
+
           await supabaseAdmin
             .from("composer_scenes")
             .update({
               clip_status: "generating",
               clip_quality: quality,
+              ...(isCinematicSyncHH
+                ? {
+                    lip_sync_source_clip_url: null,
+                    lip_sync_status: "pending",
+                    twoshot_stage: "master_clip",
+                    dialog_shots: null,
+                    replicate_prediction_id: null,
+                    lip_sync_applied_at: null,
+                  }
+                : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-happyhorse",
                 isI2V,
@@ -2466,8 +2505,11 @@ serve(async (req) => {
             Math.max(3, Math.round(scene.durationSeconds)),
           );
           const hhResolution = quality === "pro" ? "1080p" : "720p";
+          const hhPrompt = isCinematicSyncHH
+            ? buildCinematicSyncMasterPrompt(scene)
+            : scene.aiPrompt;
           const hhInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            prompt: enrichPrompt(hhPrompt, undefined, isI2V),
             duration: hhDuration,
             resolution: hhResolution,
             seed: Math.floor(Math.random() * 2_147_483_647),
@@ -2475,7 +2517,7 @@ serve(async (req) => {
           if (isI2V) {
             hhInput.image = scene.referenceImageUrl;
             console.log(
-              `[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim("ai-happyhorse", true)}s)`,
+              `[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim("ai-happyhorse", true)}s, cinematic-sync=${isCinematicSyncHH})`,
             );
           } else {
             hhInput.aspect_ratio = "16:9";
