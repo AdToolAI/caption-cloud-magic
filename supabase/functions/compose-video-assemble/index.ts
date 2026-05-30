@@ -715,6 +715,7 @@ serve(async (req) => {
         projectId,
         totalDuration,
         scenesCount: remotionScenes.length,
+        skippedScenes,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
