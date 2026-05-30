@@ -483,6 +483,7 @@ serve(async (req) => {
       if (!speakerCoords[i]) {
         speakerCoords[i] = i === 0 ? [0.3, 0.5] : i === 1 ? [0.7, 0.5] : [0.5, 0.5];
       }
+      speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
     }
     const ASSUMED_FPS = 24;
     console.log(
