@@ -1,21 +1,24 @@
-## Ziel
-Der Lip-Sync-Schalter in Szene 2 soll nach dem Umschalten nicht durch Realtime-/DB-Sync wieder auf AUS springen.
-
-## Befund
-Der Toggle ändert aktuell zuerst nur den lokalen Scene-State. Danach feuert ein Realtime-Refetch und nimmt `lip_sync_with_voiceover` wieder aus der Datenbank als Source of Truth. Wenn der debounced Persist noch nicht durch ist, überschreibt der alte DB-Wert den lokalen Toggle sofort wieder.
-
 ## Plan
-1. **Toggle atomar speichern**
-   - Den Lip-Sync-Toggle in `SceneCard.tsx` nicht nur lokal umschalten, sondern bei persistierten Szenen sofort `composer_scenes.lip_sync_with_voiceover` aktualisieren.
-   - Lokalen UI-State optimistisch setzen, damit die UI direkt reagiert.
 
-2. **Realtime-Merge gegen Rücksprung härten**
-   - In `VideoComposerDashboard.tsx` beim DB-Refetch ein kurzlebiges lokales Pending-Feld für `lipSyncWithVoiceover` respektieren, damit ein alter Realtime-Snapshot den gerade geklickten Wert nicht sofort überschreibt.
-   - Nach erfolgreichem DB-Update darf die Datenbank wieder Source of Truth sein.
+1. **Alle Toggle-Einstiege vereinheitlichen**
+   - Nicht nur den Button in `SceneCard.tsx`, sondern auch den `Switch` in `SceneAvatarMode.tsx` über denselben Persistenzpfad laufen lassen.
+   - Dadurch wird der DB-Wert sofort geschrieben, egal von welcher UI-Stelle der Toggle bedient wird.
 
-3. **Persist-Pfad vollständig machen**
-   - Sicherstellen, dass auch `useComposerPersistence.ts` beim vollständigen Projektspeichern `lip_sync_with_voiceover` mitschreibt. Aktuell wird das Feld im regulären Project-Persist nicht gesetzt, wodurch der Toggle später erneut verloren gehen kann.
+2. **Realtime-Rücksprung blockieren**
+   - In `VideoComposerDashboard.tsx` eine kurze Pending-Map für `lipSyncWithVoiceover` einbauen.
+   - Wenn direkt nach dem Klick ein alter Realtime-Snapshot kommt, behält die UI den gerade geklickten Wert, bis die DB den neuen Wert bestätigt oder der Write fehlschlägt.
 
-4. **Validierung**
-   - Codepfade prüfen: Klick auf Toggle → lokaler State AN → DB-Update AN → Realtime-Refetch bleibt AN.
-   - Keine Änderungen an Render-/Audio-Mux-Pipeline; nur UI-State/Persistenz des Schalters.
+3. **Lokalen Debounce nicht mehr mit altem Snapshot überschreiben lassen**
+   - Den bestehenden debounced Scene-Persist so anpassen, dass er keine veralteten `lip_sync_with_voiceover` Werte zurück in die DB schreibt, während ein Toggle-Write pending ist.
+
+4. **Fehlerverhalten sauber halten**
+   - Bei DB-Fehler: Toggle sichtbar zurückrollen und Warnung loggen.
+   - Bei Erfolg: Pending-State löschen, Realtime darf danach wieder normal DB als Source of Truth nutzen.
+
+## Technische Details
+
+- Betroffene Dateien:
+  - `src/components/video-composer/VideoComposerDashboard.tsx`
+  - `src/components/video-composer/SceneAvatarMode.tsx`
+  - optional minimal: `src/components/video-composer/SceneCard.tsx` zur Nutzung desselben Handlers
+- Keine Änderungen an Render-, Sync.so-, Audio-Mux- oder Backend-Pipeline.
