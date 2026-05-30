@@ -605,6 +605,67 @@ serve(async (req) => {
       return json({ error: "preflight_failed", details: badProbe, refunded: totalCost }, 422);
     }
 
+    // ── Deep audio preflight: Sync.so often reports only "unknown error" for
+    // malformed, silent, or shorter-than-video WAV inputs. Validate the real
+    // bytes before dispatch so failures become actionable and refundable here.
+    const audioDiagnostics = await Promise.all(
+      builtPasses.map(async (p) => {
+        try {
+          const diag = await inspectSpeakerAudio(p.audio_url);
+          const durMismatch = diag.wav.durSec + 0.35 < totalSec;
+          const silent = diag.vad.voicedSec < 0.15 && diag.vad.longestVoicedRun < 0.12;
+          return { pass: p.idx, speaker: p.speaker_name, ok: !durMismatch && !silent, durMismatch, silent, ...diag };
+        } catch (err) {
+          return { pass: p.idx, speaker: p.speaker_name, ok: false, error: (err as Error).message };
+        }
+      }),
+    );
+    const badAudio = audioDiagnostics.find((d) => !d.ok);
+    if (badAudio) {
+      const reason = badAudio.error
+        ? `audio_invalid_${badAudio.error}`
+        : badAudio.silent
+          ? "audio_silent_no_voice_detected"
+          : `audio_too_short_${Number(badAudio.wav?.durSec ?? 0).toFixed(2)}s_expected_${totalSec}s`;
+      console.error(`[compose-dialog-segments] scene=${sceneId} AUDIO PREFLIGHT BLOCK ${reason}`);
+      const alreadyRefunded = !!(existing as any)?.refunded;
+      if (!alreadyRefunded) {
+        const { data: w0 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(existing ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+            refunded: !alreadyRefunded,
+            error: reason,
+            audio_diagnostics: audioDiagnostics,
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: `syncso_audio_preflight_${reason}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED", error_class: "audio_invalid",
+        error_message: reason,
+        meta: { audio_diagnostics: audioDiagnostics, expected_total_sec: totalSec },
+      });
+      return json({ error: "audio_preflight_failed", reason, refunded: alreadyRefunded ? 0 : totalCost }, 422);
+    }
+
     // ── Face-gate per pass (one frame check per speaker's first turn) ────
     if (!isAdvance) {
       for (const pass of builtPasses) {
