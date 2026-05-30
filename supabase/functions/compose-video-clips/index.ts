@@ -1038,6 +1038,54 @@ serve(async (req) => {
                 );
               if (remapped.length >= 1) effectiveShots = remapped;
             }
+
+            // STAGE 5 (May 30 2026): when the script declares speakers but
+            // the cast is empty (single-speaker quick-flows often skip the
+            // cast picker), resolve each speaker slug against brand_characters
+            // and synthesize a virtual shot so the anchor step can still run.
+            // Without this fallback the single-speaker cinematic-sync path
+            // silently skips composition → Hailuo invents a stranger OR a
+            // stale talking-head URL leaks into v5 lipsync.
+            if (effectiveShots.length === 0 && scriptSpeakers.length > 0) {
+              try {
+                const { data: brandRows } = await supabaseAdmin
+                  .from("brand_characters")
+                  .select("id, name, reference_image_url");
+                const synthesized: Array<{ characterId: string; shotType: CharacterShotType }> = [];
+                for (const slug of scriptSpeakers) {
+                  const lower = slug.toLowerCase();
+                  const first = lower.split("-")[0];
+                  const match = (brandRows ?? []).find((r: any) => {
+                    const n = String(r.name ?? "").toLowerCase().trim();
+                    const nSlug = n.replace(/\s+/g, "-");
+                    return nSlug === lower || n.split(/\s+/)[0] === first;
+                  });
+                  if (match && (match as any).reference_image_url) {
+                    const id = String((match as any).id);
+                    if (!charById.has(id)) {
+                      charById.set(id, {
+                        id,
+                        name: String((match as any).name ?? ""),
+                        referenceImageUrl: (match as any).reference_image_url,
+                      } as ComposerCharacter);
+                    }
+                    synthesized.push({ characterId: id, shotType: "full" });
+                  }
+                }
+                if (synthesized.length > 0) {
+                  console.log(
+                    `[compose-video-clips] cinematic-sync scene ${scene.id}: synthesized ${synthesized.length} shot(s) from script speakers`,
+                  );
+                  effectiveShots = synthesized;
+                }
+              } catch (resolveErr) {
+                console.warn(
+                  `[compose-video-clips] cinematic-sync scene ${scene.id}: brand-character speaker resolution failed`,
+                  resolveErr,
+                );
+              }
+            }
+
             // STAGE 3 (May 30 2026): also enforce scene-aware anchor for
             // SINGLE-speaker cinematic-sync. Without this, a 1-speaker scene
             // with a portrait would skip composition entirely and Hailuo /
@@ -1090,9 +1138,39 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
+              // Cinematic-Sync REQUIRES a portrait. If we got speakers from
+              // the script but couldn't resolve any portrait (no cast picker
+              // used + no matching brand_character), fail loud BEFORE Hailuo
+              // ever dispatches — otherwise the UI sees a silent 30s timeout.
+              if (portraitUrls.length === 0 && scriptSpeakers.length > 0) {
+                const msg = `cinematic_sync_anchor_missing_single_speaker: Konnte für die Sprecher [${scriptSpeakers.join(", ")}] keine Portraits aus den Brand Characters auflösen. Bitte einen Brand Character mit Portrait im Cast zuweisen.`;
+                console.warn(
+                  `[compose-video-clips] cinematic-sync scene ${scene.id}: ${msg}`,
+                );
+                await supabaseAdmin
+                  .from("composer_scenes")
+                  .update({
+                    clip_status: "failed",
+                    clip_error: msg,
+                    twoshot_stage: "failed",
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", scene.id);
+                results.push({ sceneId: scene.id, status: "failed", error: msg });
+                continue;
+              }
               if (portraitUrls.length >= 1) {
                 const expectedFaces = portraitUrls.length;
                 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+                // Mark anchor stage so the progress bar reflects what's
+                // actually happening — without this the UI shows "audio…"
+                // for the full Nano Banana 2 composition window.
+                try {
+                  await supabaseAdmin
+                    .from("composer_scenes")
+                    .update({ twoshot_stage: "anchor", updated_at: new Date().toISOString() })
+                    .eq("id", scene.id);
+                } catch (_) { /* non-fatal */ }
 
                 // Has the currently-pinned anchor passed the current audit version?
                 const prevAuditRaw =
