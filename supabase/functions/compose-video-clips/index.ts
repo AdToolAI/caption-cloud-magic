@@ -332,6 +332,75 @@ serve(async (req) => {
       if (c?.id) charById.set(c.id, c);
     });
 
+    // STAGE 4 (May 30 2026): hydrate missing characters from brand_characters
+    // table when scenes reference IDs/slugs (e.g. `samuel-dusatko`) that the
+    // client didn't include in the `characters` payload. Without this, the
+    // anchor-composition step gets `portraitUrls.length === 0` and silently
+    // skips composing — Cinematic-Sync then renders a raw avatar instead of
+    // the scripted scene.
+    try {
+      const referencedIds = new Set<string>();
+      for (const s of scenes) {
+        const shots = [
+          ...(s.characterShots ?? []),
+          ...(s.characterShot ? [s.characterShot] : []),
+        ];
+        for (const sh of shots) {
+          const id = (sh as any)?.characterId;
+          if (typeof id === "string" && id.length > 0 && !charById.has(id)) {
+            referencedIds.add(id);
+          }
+        }
+      }
+      if (referencedIds.size > 0) {
+        const idList = Array.from(referencedIds);
+        // Try direct ID match first (UUIDs); then fall back to slugified name.
+        const { data: byId } = await supabaseAdmin
+          .from("brand_characters")
+          .select("id, name, reference_image_url, default_voice_id")
+          .in("id", idList);
+        for (const row of byId ?? []) {
+          if (row?.id) {
+            charById.set(String((row as any).id), {
+              id: String((row as any).id),
+              name: String((row as any).name ?? ""),
+              referenceImageUrl: (row as any).reference_image_url ?? undefined,
+            } as ComposerCharacter);
+          }
+        }
+        const stillMissing = idList.filter((id) => !charById.has(id));
+        if (stillMissing.length > 0) {
+          const { data: bySlug } = await supabaseAdmin
+            .from("brand_characters")
+            .select("id, name, reference_image_url");
+          for (const row of bySlug ?? []) {
+            const slug = String((row as any).name ?? "")
+              .toLowerCase()
+              .trim()
+              .replace(/\s+/g, "-");
+            const match = stillMissing.find(
+              (id) => id.toLowerCase() === slug || id.toLowerCase() === slug.split("-")[0],
+            );
+            if (match && !charById.has(match)) {
+              charById.set(match, {
+                id: match,
+                name: String((row as any).name ?? ""),
+                referenceImageUrl: (row as any).reference_image_url ?? undefined,
+              } as ComposerCharacter);
+            }
+          }
+        }
+        console.log(
+          `[compose-video-clips] hydrated ${charById.size - (characters?.length ?? 0)} extra character(s) from brand_characters for slug/UUID refs`,
+        );
+      }
+    } catch (hydrationErr) {
+      console.warn(
+        "[compose-video-clips] brand_characters hydration failed:",
+        hydrationErr,
+      );
+    }
+
     /**
      * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
      * the image anchor renderer. Mirrors `compose-scene-anchor`'s server-side
@@ -2448,11 +2517,50 @@ serve(async (req) => {
           // (Going through generate-happyhorse-video would only update the
           // toolkit's ai_video_generations table, leaving the scene stuck.)
           const isI2V = !!scene.referenceImageUrl;
+          const isCinematicSyncHH =
+            (scene.engineOverride ?? "auto") === "cinematic-sync";
+
+          // STAGE 4 (May 30 2026): Cinematic-Sync + HappyHorse must NEVER
+          // start without a freshly composed scene-anchor as I2V reference —
+          // otherwise HappyHorse invents the scene from text and v5 lip-sync
+          // ends up on a raw avatar bust. Mirror the Hailuo safety reset.
+          if (isCinematicSyncHH && !isI2V) {
+            const msg =
+              "happyhorse_cinematic_sync_missing_anchor: Es konnte keine Scene-Anchor-Referenz erzeugt werden. Bitte Charakter-Portraits prüfen und Szene neu rendern.";
+            console.error(
+              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} aborted — no composed reference_image_url`,
+            );
+            await supabaseAdmin
+              .from("composer_scenes")
+              .update({
+                clip_status: "failed",
+                clip_error: msg,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", scene.id);
+            results.push({
+              sceneId: scene.id,
+              status: "failed",
+              error: msg,
+            });
+            continue;
+          }
+
           await supabaseAdmin
             .from("composer_scenes")
             .update({
               clip_status: "generating",
               clip_quality: quality,
+              ...(isCinematicSyncHH
+                ? {
+                    lip_sync_source_clip_url: null,
+                    lip_sync_status: "pending",
+                    twoshot_stage: "master_clip",
+                    dialog_shots: null,
+                    replicate_prediction_id: null,
+                    lip_sync_applied_at: null,
+                  }
+                : {}),
               clip_lead_in_trim_seconds: computeLeadInTrim(
                 "ai-happyhorse",
                 isI2V,
@@ -2466,8 +2574,11 @@ serve(async (req) => {
             Math.max(3, Math.round(scene.durationSeconds)),
           );
           const hhResolution = quality === "pro" ? "1080p" : "720p";
+          const hhPrompt = isCinematicSyncHH
+            ? buildCinematicSyncMasterPrompt(scene)
+            : scene.aiPrompt;
           const hhInput: Record<string, unknown> = {
-            prompt: enrichPrompt(scene.aiPrompt, undefined, isI2V),
+            prompt: enrichPrompt(hhPrompt, undefined, isI2V),
             duration: hhDuration,
             resolution: hhResolution,
             seed: Math.floor(Math.random() * 2_147_483_647),
@@ -2475,7 +2586,7 @@ serve(async (req) => {
           if (isI2V) {
             hhInput.image = scene.referenceImageUrl;
             console.log(
-              `[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim("ai-happyhorse", true)}s)`,
+              `[compose-video-clips] HappyHorse scene ${scene.id} uses image (lead-in trim ${computeLeadInTrim("ai-happyhorse", true)}s, cinematic-sync=${isCinematicSyncHH})`,
             );
           } else {
             hhInput.aspect_ratio = "16:9";
