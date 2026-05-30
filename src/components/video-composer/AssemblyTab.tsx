@@ -330,9 +330,10 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       const rid: string = data.renderId;
       setRenderId(rid);
       setRenderStatus('rendering');
+      const skipped = Number(data?.skippedScenes ?? 0);
       toast({
         title: tt('renderStarted'),
-        description: `${data.scenesCount} ${t('videoComposer.scenes')} · ${Math.round(data.totalDuration)}s`,
+        description: `${data.scenesCount} ${t('videoComposer.scenes')} · ${Math.round(data.totalDuration)}s${skipped > 0 ? ` · ${skipped} ${t('videoComposer.scenes')} ${t('videoComposer.skippedSuffix')}` : ''}`,
       });
 
       // Start polling almost immediately so the bar starts moving fast
