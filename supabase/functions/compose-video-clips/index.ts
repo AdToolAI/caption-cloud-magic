@@ -776,6 +776,40 @@ serve(async (req) => {
       "ai-image",
     ]);
 
+    // ── Optimistic pre-mark + background dispatch ─────────────────────────
+    // The original synchronous per-scene loop could take 60+ seconds per scene
+    // (Nano Banana 2 anchor compose + face/identity audits + provider dispatch).
+    // The supabase-js client gives up after ~30s, the UI then sees no provider
+    // job, the pipeline bar disappears, and the user thinks "the pipeline
+    // didn't start". Fix: pre-mark every AI scene as `generating` in DB so the
+    // UI keeps showing the working state, then run the actual loop in the
+    // background via EdgeRuntime.waitUntil and return immediately.
+    const optimisticResults = scenes.map((s) => ({
+      sceneId: s.id,
+      status: s.clipSource?.startsWith("ai-") ? "generating" : "pending",
+    }));
+    try {
+      const aiSceneIds = scenes
+        .filter((s) => s.clipSource?.startsWith("ai-"))
+        .map((s) => s.id);
+      if (aiSceneIds.length > 0) {
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            clip_status: "generating",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", aiSceneIds);
+      }
+    } catch (preMarkErr) {
+      console.warn(
+        "[compose-video-clips] optimistic pre-mark failed (non-fatal):",
+        preMarkErr,
+      );
+    }
+
+    const processScenes = async () => {
     // Process each scene
     for (const scene of scenes) {
       // Sora 2 sunset: silently migrate any legacy 'ai-sora' scene to Veo 3.1
@@ -2601,10 +2635,14 @@ serve(async (req) => {
           // STAGE 4 (May 30 2026): Cinematic-Sync + HappyHorse must NEVER
           // start without a freshly composed scene-anchor as I2V reference —
           // otherwise HappyHorse invents the scene from text and v5 lip-sync
-          // ends up on a raw avatar bust. Mirror the Hailuo safety reset.
+          // ends up on a raw avatar bust. The cinematic-sync prep block above
+          // already composes an anchor for any scene with >=1 resolvable
+          // speaker portrait. If we still land here without isI2V it means
+          // Nano Banana 2 returned no URL — fail the scene with a clear
+          // user-facing error instead of silently dispatching a stranger.
           if (isCinematicSyncHH && !isI2V) {
             const msg =
-              "happyhorse_cinematic_sync_missing_anchor: Es konnte keine Scene-Anchor-Referenz erzeugt werden. Bitte Charakter-Portraits prüfen und Szene neu rendern.";
+              "happyhorse_cinematic_sync_missing_anchor: Scene-Anchor konnte nicht erzeugt werden (Nano Banana 2 lieferte keine URL). Bitte Charakter-Portrait im Cast prüfen und Szene neu rendern.";
             console.error(
               `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} aborted — no composed reference_image_url`,
             );
@@ -2623,6 +2661,8 @@ serve(async (req) => {
             });
             continue;
           }
+
+
 
           await supabaseAdmin
             .from("composer_scenes")
@@ -2756,13 +2796,34 @@ serve(async (req) => {
         .update({ status: "preview", updated_at: new Date().toISOString() })
         .eq("id", projectId);
     }
+    }; // end processScenes()
+
+    // Kick off the heavy per-scene work in the background and return
+    // immediately. The supabase-js client therefore never times out, the UI
+    // keeps showing 'generating' (we pre-marked the DB above), and the user
+    // sees the pipeline bar move while compose/dispatch run server-side.
+    // @ts-ignore — EdgeRuntime is a Deno Deploy global on Supabase Edge
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(
+        processScenes().catch((err) => {
+          console.error(
+            "[compose-video-clips] background processScenes failed:",
+            err instanceof Error ? err.message : String(err),
+          );
+        }),
+      );
+    } else {
+      // Local dev fallback — run inline.
+      await processScenes();
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        results,
-        totalCost: actualCost,
-        generatingCount,
+        async: true,
+        results: optimisticResults,
+        generatingCount: optimisticResults.filter((r) => r.status === "generating").length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );

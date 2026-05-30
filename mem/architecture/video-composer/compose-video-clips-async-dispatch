@@ -1,0 +1,18 @@
+---
+name: compose-video-clips Async Dispatch
+description: compose-video-clips returns immediately with optimistic generating status and runs heavy anchor+dispatch work in background via EdgeRuntime.waitUntil
+type: feature
+---
+
+`compose-video-clips`:
+
+1. Markiert alle AI-Szenen sofort als `clip_status='generating'` in der DB (Pre-Mark vor dem Loop).
+2. Returnt sofort `{ success: true, async: true, results: [{sceneId, status:'generating'}], generatingCount }`.
+3. Verpackt den gesamten per-Szene-Loop + Credit-Deduction + Project-Status-Update in eine `processScenes()`-Funktion, die über `EdgeRuntime.waitUntil(processScenes())` im Hintergrund läuft.
+4. Local-Dev-Fallback: wenn `EdgeRuntime` nicht definiert ist, läuft `processScenes()` inline.
+
+**Warum:** Der originale synchrone Loop konnte pro Szene 30–90s laufen (Nano Banana 2 Anchor + Face/Identity Audits + Replicate-Dispatch). Der Browser-Client (`supabase-js`) bricht nach ~30s ab → UI verlor den Generating-State, der Ladebalken verschwand, der User dachte „die Pipeline startet gar nicht".
+
+**Für die UI ändert sich nichts** — der vorhandene Realtime-Subscribe auf `composer_scenes` + `useTwoShotAutoTrigger` Polling kümmern sich um den Rest.
+
+**Single- und Multi-Speaker-Cinematic-Sync** verwenden denselben Pfad. Der schwere Multi-Face-Identity-Audit (`auditAnchorIdentity`) läuft weiterhin nur bei `portraitUrls.length >= 2` — die 2-Charakter-Pipeline ist unverändert streng geschützt.
