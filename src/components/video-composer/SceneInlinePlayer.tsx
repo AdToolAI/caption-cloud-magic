@@ -82,6 +82,8 @@ export default function SceneInlinePlayer({
     !lipsyncDone &&
     !lipsyncFailed &&
     (lipSyncStatus === 'running' ||
+      lipSyncStatus === 'stitching' ||
+      lipSyncStatus === 'audio_muxing' ||
       (twoshotStage && twoshotStage !== 'failed') ||
       status === 'ready'); // clip ready, lip-sync still pending
 
