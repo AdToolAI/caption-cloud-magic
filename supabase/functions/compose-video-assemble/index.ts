@@ -595,9 +595,22 @@ serve(async (req) => {
     // have the FINAL merged dialogue in a separate WAV — the lipsync MP4
     // only carries the LAST pass's voice. We MUST keep the external track
     // for those, otherwise only one speaker is audible in the export.
+    // Cinematic-Sync v5 (engine='sync-segments' / version>=5) bakes the
+    // FULL multi-speaker audio chain into the scene MP4 — the legacy
+    // `audio_plan.twoshot.useExternalAudio` flag is stale for those rows
+    // and would (a) cause a duplicate VO track via sceneAudioClips and
+    // (b) suppress our embedded-audio override. Only treat as external
+    // when it really is legacy two-shot (no v5 sync-segments marker).
+    const isV5SyncSegments = (s: any) => {
+      const ds = s?.dialog_shots;
+      if (!ds) return false;
+      return ds.engine === 'sync-segments' || Number(ds.version || 0) >= 5;
+    };
     const twoshotExternalSceneIds = new Set(
       (scenes || [])
-        .filter((s: any) => s?.audio_plan?.twoshot?.useExternalAudio === true)
+        .filter((s: any) =>
+          s?.audio_plan?.twoshot?.useExternalAudio === true && !isV5SyncSegments(s),
+        )
         .map((s: any) => s.id),
     );
     const lipSyncedSceneIds = new Set(
