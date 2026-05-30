@@ -259,23 +259,44 @@ serve(async (req) => {
     }
 
     // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
-    // must NEVER use a stale `talking-head-renders/...` URL as the source —
-    // that is a HeyGen avatar bust from an earlier engine, and using it as
-    // the v5 lipsync input produces the "raw avatar instead of the scene"
-    // bug. Prefer `clip_url` (freshly rendered scene plate) and only fall
-    // back to `lip_sync_source_clip_url` when it does not point at the
-    // talking-head bucket.
-    const rawSourceCandidate =
-      (scene as any).lip_sync_source_clip_url || (scene as any).clip_url || null;
-    const isTalkingHeadUrl =
-      typeof rawSourceCandidate === "string" &&
-      rawSourceCandidate.includes("/talking-head-renders/");
-    const sourceClipUrl = isTalkingHeadUrl
-      ? ((scene as any).clip_url || null)
-      : rawSourceCandidate;
-    if (isTalkingHeadUrl) {
+    // must NEVER use a `talking-head-renders/...` URL as the source — that
+    // is a HeyGen avatar bust from an earlier engine, and using it as the
+    // v5 lipsync input produces the "raw avatar instead of the scene" bug.
+    // We check BOTH `clip_url` AND `lip_sync_source_clip_url` and block the
+    // dispatch outright if both are talking-head plates.
+    const isTalkingHead = (u: unknown) =>
+      typeof u === "string" && u.includes("/talking-head-renders/");
+    const lipSrcCandidate = (scene as any).lip_sync_source_clip_url ?? null;
+    const clipUrlCandidate = (scene as any).clip_url ?? null;
+    let sourceClipUrl: string | null = null;
+    if (typeof lipSrcCandidate === "string" && !isTalkingHead(lipSrcCandidate)) {
+      sourceClipUrl = lipSrcCandidate;
+    } else if (typeof clipUrlCandidate === "string" && !isTalkingHead(clipUrlCandidate)) {
+      sourceClipUrl = clipUrlCandidate;
+    }
+    const bothTalkingHead =
+      (lipSrcCandidate == null || isTalkingHead(lipSrcCandidate)) &&
+      isTalkingHead(clipUrlCandidate);
+    if (bothTalkingHead) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} ignoring stale talking-head source clip → using clip_url=${(scene as any).clip_url ?? "null"}`,
+        `[compose-dialog-segments] scene=${sceneId} BLOCKED — both clip_url and lip_sync_source_clip_url are raw talking-head plates`,
+      );
+      await supabase
+        .from("composer_scenes")
+        .update({
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error:
+            "raw_talking_head_source_blocked: Cinematic-Sync benötigt eine Scene-Plate (Hailuo/HappyHorse), nicht den rohen Talking-Head-Clip. Bitte „🎥 Clip + Lip-Sync neu rendern" drücken.",
+        })
+        .eq("id", sceneId);
+      return json(
+        {
+          error: "raw_talking_head_source_blocked",
+          message:
+            "Cinematic-Sync benötigt eine Scene-Plate, nicht den rohen Avatar-Clip. Szene neu rendern.",
+        },
+        422,
       );
     }
     if (!sourceClipUrl) {
@@ -284,6 +305,9 @@ serve(async (req) => {
         422,
       );
     }
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} source_kind=scene_plate url=${sourceClipUrl.slice(0, 80)}…`,
+    );
 
     // Idempotency: an active render already exists → nudge and return.
     // On `retry=true` (E.5 webhook retry path) we bypass this guard because
