@@ -316,7 +316,7 @@ export function usePipelineProgress({
       done: !!vo?.audioUrl,
       applicable: true,
     };
-  }, [assemblyConfig?.voiceover]);
+  }, [assemblyConfig?.voiceover, baselineVersion]);
 
   const lipsyncReal = useMemo(() => {
     if (!hasLipsyncScenes) {
