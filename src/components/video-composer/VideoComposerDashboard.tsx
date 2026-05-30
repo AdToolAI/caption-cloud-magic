@@ -48,6 +48,7 @@ import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import { castSignature } from '@/lib/video-composer/castSignature';
+import { resolveLipSyncValue, getLipSyncPending } from '@/lib/video-composer/lipSyncPending';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -333,7 +334,7 @@ export default function VideoComposerDashboard() {
             clipSource: row.clip_source as ClipSource,
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
-            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            lipSyncWithVoiceover: resolveLipSyncValue(row.id, (row as any).lip_sync_with_voiceover === true),
             // ── Volatile lifecycle fields: ALWAYS take DB value, never local ──
             // These describe the live render/lipsync job and MUST NOT be merged
             // with a stale optimistic patch from localStorage. (Stage 6 fix.)
@@ -471,7 +472,7 @@ export default function VideoComposerDashboard() {
             clipSource: row.clip_source as ClipSource,
             clipQuality: (row.clip_quality || 'standard') as ClipQuality,
             withAudio: row.with_audio !== false,
-            lipSyncWithVoiceover: (row as any).lip_sync_with_voiceover === true,
+            lipSyncWithVoiceover: resolveLipSyncValue(row.id, (row as any).lip_sync_with_voiceover === true),
             lipSyncAppliedAt: (row as any).lip_sync_applied_at ?? null,
             lipSyncSourceClipUrl: (row as any).lip_sync_source_clip_url ?? null,
             lipSyncStatus: (row as any).lip_sync_status ?? null,
