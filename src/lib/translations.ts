@@ -6767,6 +6767,8 @@ export const translations: Record<Language, any> = {
       clipsNotReady: "Clips nicht bereit",
       generateClipsFirst: "Bitte generiere zuerst alle Clips im Clips-Tab.",
       allClipsMustBeReady: "alle Clips müssen generiert sein",
+      partialRenderHint: "nicht fertige Szenen werden übersprungen",
+      skippedSuffix: "übersprungen",
       briefingForProduct: "Produkt / Service",
       briefingForCorporate: "Unternehmen / Marke",
       briefingForStorytelling: "Story",
