@@ -178,6 +178,9 @@ interface SegmentsState {
   started_at: string;
   first_started_at?: string;
   retry_count?: number;
+  retry_variant?: RetryVariant;
+  fallback_history?: Array<Record<string, unknown>>;
+  last_diagnostic_id?: string;
   last_error?: string;
   last_error_class?: string;
   finished_at?: string;
