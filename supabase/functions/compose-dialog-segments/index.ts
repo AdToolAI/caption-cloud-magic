@@ -622,7 +622,7 @@ serve(async (req) => {
         }
       }),
     );
-    const badAudio = audioDiagnostics.find((d) => !d.ok);
+    const badAudio = audioDiagnostics.find((d: any) => !d.ok) as any;
     if (badAudio) {
       const reason = badAudio.error
         ? `audio_invalid_${badAudio.error}`

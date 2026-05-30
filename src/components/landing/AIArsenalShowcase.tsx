@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { forwardRef, useState, useMemo } from "react";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import {
   Sparkles, Film, Sun, Clapperboard, Zap, Award, Wand2, Image as ImageIcon,
@@ -188,13 +188,14 @@ const CounterPill = ({ icon: Icon, value, label }: { icon: typeof Sparkles; valu
   </span>
 );
 
-const ModelTile = ({ model, index }: { model: Model; index: number }) => {
+const ModelTile = forwardRef<HTMLDivElement, { model: Model; index: number }>(({ model, index }, ref) => {
   const { t } = useTranslation();
   const colSpan = model.hero ? "col-span-2" : "col-span-1";
   const rowSpan = model.hero ? "row-span-2" : "row-span-1";
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -276,4 +277,6 @@ const ModelTile = ({ model, index }: { model: Model; index: number }) => {
       </div>
     </motion.div>
   );
-};
+});
+
+ModelTile.displayName = "ModelTile";

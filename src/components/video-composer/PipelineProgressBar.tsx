@@ -171,7 +171,7 @@ export default function PipelineProgressBar({
                 }
               >
                 <Zap className="h-3 w-3" />
-                {syncsoSlots}/{SYNCSO_MAX_SLOTS}
+                Slots {syncsoSlots}/{SYNCSO_MAX_SLOTS}
               </span>
             )}
             <span className={cn('tabular-nums', hasFailure ? 'text-destructive' : 'text-foreground')}>
