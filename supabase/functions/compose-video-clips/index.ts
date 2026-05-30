@@ -332,6 +332,75 @@ serve(async (req) => {
       if (c?.id) charById.set(c.id, c);
     });
 
+    // STAGE 4 (May 30 2026): hydrate missing characters from brand_characters
+    // table when scenes reference IDs/slugs (e.g. `samuel-dusatko`) that the
+    // client didn't include in the `characters` payload. Without this, the
+    // anchor-composition step gets `portraitUrls.length === 0` and silently
+    // skips composing — Cinematic-Sync then renders a raw avatar instead of
+    // the scripted scene.
+    try {
+      const referencedIds = new Set<string>();
+      for (const s of scenes) {
+        const shots = [
+          ...(s.characterShots ?? []),
+          ...(s.characterShot ? [s.characterShot] : []),
+        ];
+        for (const sh of shots) {
+          const id = (sh as any)?.characterId;
+          if (typeof id === "string" && id.length > 0 && !charById.has(id)) {
+            referencedIds.add(id);
+          }
+        }
+      }
+      if (referencedIds.size > 0) {
+        const idList = Array.from(referencedIds);
+        // Try direct ID match first (UUIDs); then fall back to slugified name.
+        const { data: byId } = await supabaseAdmin
+          .from("brand_characters")
+          .select("id, name, reference_image_url, default_voice_id")
+          .in("id", idList);
+        for (const row of byId ?? []) {
+          if (row?.id) {
+            charById.set(String((row as any).id), {
+              id: String((row as any).id),
+              name: String((row as any).name ?? ""),
+              referenceImageUrl: (row as any).reference_image_url ?? undefined,
+            } as ComposerCharacter);
+          }
+        }
+        const stillMissing = idList.filter((id) => !charById.has(id));
+        if (stillMissing.length > 0) {
+          const { data: bySlug } = await supabaseAdmin
+            .from("brand_characters")
+            .select("id, name, reference_image_url");
+          for (const row of bySlug ?? []) {
+            const slug = String((row as any).name ?? "")
+              .toLowerCase()
+              .trim()
+              .replace(/\s+/g, "-");
+            const match = stillMissing.find(
+              (id) => id.toLowerCase() === slug || id.toLowerCase() === slug.split("-")[0],
+            );
+            if (match && !charById.has(match)) {
+              charById.set(match, {
+                id: match,
+                name: String((row as any).name ?? ""),
+                referenceImageUrl: (row as any).reference_image_url ?? undefined,
+              } as ComposerCharacter);
+            }
+          }
+        }
+        console.log(
+          `[compose-video-clips] hydrated ${charById.size - (characters?.length ?? 0)} extra character(s) from brand_characters for slug/UUID refs`,
+        );
+      }
+    } catch (hydrationErr) {
+      console.warn(
+        "[compose-video-clips] brand_characters hydration failed:",
+        hydrationErr,
+      );
+    }
+
     /**
      * Strip spoken-dialog patterns from a scene prompt BEFORE handing it to
      * the image anchor renderer. Mirrors `compose-scene-anchor`'s server-side
