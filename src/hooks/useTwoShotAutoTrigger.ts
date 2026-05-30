@@ -465,8 +465,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           'multi_speaker_scene_routed_to_single_lipsync',
           'watchdog_stuck_lipsync_refunded',
         ]);
-        const RETRYABLE_REGEX = /^(lipsync_pass_\d+_failed|syncso_(failed|rejected|canceled)|syncso_segments_(dispatch_\d+|FAILED|REJECTED|CANCELED|poll_timeout)|twoshot_presync_timeout|syncso_poll_timeout|dialog_shots_failed|dialog_stitch_failed|dialog_all_hailuo_dispatches_failed|dialog_missing_face_coords)/i;
-        const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns)/i;
+        const RETRYABLE_REGEX = /^(lipsync_pass_\d+_failed|syncso_(failed|rejected|canceled)|syncso_segments_(dispatch_\d+|FAILED|REJECTED|CANCELED|poll_timeout)|twoshot_presync_timeout|syncso_poll_timeout|dialog_shots_failed|dialog_stitch_failed|dialog_all_hailuo_dispatches_failed|dialog_missing_face_coords|audio_mux_dispatch)/i;
+        const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_)/i;
 
         const candidates = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
