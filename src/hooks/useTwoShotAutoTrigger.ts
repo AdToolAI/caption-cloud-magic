@@ -315,6 +315,37 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
+        // ── Audio-Done → master_clip transition ─────────────────────────────
+        // Wenn compose-twoshot-audio fertig ist (audio_plan.twoshot.url
+        // existiert), Master-Clip da ist, aber twoshot_stage immer noch auf
+        // 'audio' steht (oder null), schalten wir auf 'master_clip'. Erst
+        // damit greift der v5-Kandidatenfilter unten und ruft
+        // compose-dialog-segments auf. Ohne diese Brücke bleibt die Szene
+        // permanent in 'audio' hängen, der globale Balken verschwindet,
+        // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
+        const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
+          if (!isDialogEngine(d.engine_override)) return false;
+          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          if (d.lip_sync_applied_at) return false;
+          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (!d.audio_plan?.twoshot?.url) return false;
+          if (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching' || d.lip_sync_status === 'applied' || d.lip_sync_status === 'done') return false;
+          if (d.twoshot_stage && d.twoshot_stage !== 'audio') return false;
+          return true;
+        });
+        if (audioReadyButNotAdvanced.length > 0) {
+          await Promise.all(
+            audioReadyButNotAdvanced.map((d) => {
+              d.twoshot_stage = 'master_clip';
+              return supabase
+                .from('composer_scenes')
+                .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
           if (d.engine_override === 'cinematic-sync-legacy') return false;
@@ -355,9 +386,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   })
                   .eq('id', d.id);
               } else {
+                // Direkt nach Erfolg: stage auf 'master_clip' setzen, damit der
+                // nächste Tick v5 startet (statt erst auf den DB-Refresh zu
+                // warten, der die optimistische 'audio'-Markierung überschreibt).
                 console.info(
-                  `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — v5 will start next tick`,
+                  `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — advancing to master_clip`,
                 );
+                await supabase
+                  .from('composer_scenes')
+                  .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                  .eq('id', d.id);
               }
             })
             .finally(() => {

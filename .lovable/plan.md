@@ -1,59 +1,45 @@
-## Was wirklich passiert (aus DB + Code verifiziert)
+## Befund
 
-Bei den drei letzten Szenen mit `engine_override='cinematic-sync'` (alle 1 Sprecher: „Matthew Dusatko: …") sieht die DB so aus:
+Das Problem ist nicht nur die Anzeige. In der aktuellen DB steht die betroffene Szene z. B. so:
 
-```
-clip_url            = ✓ (Master-Plate gerendert)
-audio_plan          = NULL          ← compose-twoshot-audio lief nie
-lip_sync_source_url = NULL
-lip_sync_status     = NULL
-twoshot_stage       = NULL
-```
-
-Konsequenz mit der aktuellen v5-Logik:
-
-1. `compose-dialog-segments` (v5) braucht zwingend `audio_plan.twoshot.url` + `lip_sync_source_clip_url`.
-2. Der Pre-Flight-Gate in `useTwoShotAutoTrigger` (den wir gerade gebaut haben) **überspringt die Szene still**, weil beides fehlt.
-3. Die UI in `SceneInlinePlayer.tsx` zeigt aber hartcodiert „Lip-Sync startet… · Sync.so · ~60 s pro Sprecher-Turn", weil das Label nur vom Engine + `clip_url` abhängt — nicht vom tatsächlichen Fortschritt. → User sieht ein Pseudo-Spinner ohne Balken, der nie weiterläuft, irgendwann „bricht ab" (Komponente unmountet beim Scrollen).
-
-Bei 2 Sprechern funktioniert es, weil `compose-twoshot-audio` beim ersten Generieren mitläuft (gleicher Code-Pfad in `compose-video-clips`) — aber für die drei letzten 1-Sprecher-Szenen wurde es offensichtlich nie ausgeführt (Toggle nachträglich aktiviert, Engine später gewechselt, oder Prep-Block hat schweigend abgebrochen). Es gibt aktuell **keinen Pfad**, der die fehlende Audio-Plate nachträglich baut → permanenter Stuck-State.
-
-## Was geändert wird
-
-### 1. `src/hooks/useTwoShotAutoTrigger.ts` — Audio-Plate-Self-Heal
-Neuer Pre-Stage VOR dem v5-Dispatch:
-
-- Selektiere zusätzlich Szenen mit:
-  `engine_override IN ('cinematic-sync','sync-segments')` UND `clip_status='ready'` UND `clip_url IS NOT NULL` UND `audio_plan->'twoshot'->>'url' IS NULL` UND `lip_sync_applied_at IS NULL` UND `dialog_script` enthält mind. eine `Name:`-Zeile.
-- Für jede solche Szene: setze `twoshot_stage='audio'`, dann `supabase.functions.invoke('compose-twoshot-audio', { body: { scene_id, force_regenerate: false } })`.
-- Inflight-Lock mit Key `audio-prep:${sceneId}` (60s TTL), damit derselbe Poll-Tick und parallele Tabs nicht doppelt feuern.
-- Bei Erfolg: nichts weiter tun — der nächste Tick sieht `audio_plan.twoshot.url` ✓ + master clip ✓ und feuert v5 automatisch (bestehende Logik).
-- Bei Fehler (HTTP non-2xx): `clip_error='twoshot_audio_prep_failed: <msg>'`, `twoshot_stage='failed'`. Genau diesen Code lässt der bestehende `RETRYABLE_REGEX` NICHT durch → kein Endlos-Loop.
-- Watchdog: Szene mit `twoshot_stage='audio'` länger als 3 min und immer noch ohne `audio_plan.twoshot.url` → `twoshot_stage=null`, damit beim nächsten Tick ein frischer Versuch startet (genau 1x via `autoRetried`-Set, wie wir es für Sync.so schon haben).
-
-### 2. `src/components/video-composer/SceneInlinePlayer.tsx` — ehrlicher Status
-Aktuell zeigt das Overlay nur „Lip-Sync läuft…" / „Lip-Sync startet…". Neu drei Stufen, gespeist aus `twoshot_stage` + `lip_sync_status`:
-
-```
-twoshot_stage='audio'                       → „Audio wird vorbereitet…  Sync.so wartet auf Voiceover"
-twoshot_stage='master_clip', lip_sync=null  → „Master-Plate fertig — Sync.so wird gestartet…"
-lip_sync_status='running'                   → „Lip-Sync läuft…           Sync.so · ~60 s pro Sprecher-Turn"
-twoshot_stage='failed' OR lip_sync='failed' → „Lip-Sync fehlgeschlagen — bitte erneut starten" + Retry-Button
+```text
+clip_status = ready
+clip_url = vorhanden
+audio_plan.twoshot.url = vorhanden
+twoshot_stage = audio
+lip_sync_status = null
+dialog_shots = null
+replicate_prediction_id = null
 ```
 
-Kein neuer Pipeline-Pfad, nur korrekte Labels und ein sichtbarer Ladebalken-Pulse, der schon im `audio`-Stage anläuft. Damit verschwindet das Symptom „bricht nach 30 s ab".
+Damit sieht die Kachel „Audio wird vorbereitet…“, aber der v5-Dispatch startet nicht, weil `useTwoShotAutoTrigger` Kandidaten mit `twoshot_stage='audio'` grundsätzlich blockiert. Nach erfolgreichem `compose-twoshot-audio` wird `twoshot_stage` aktuell nicht auf `master_clip`/`null` weitergeschaltet. Ergebnis: Audio ist fertig, aber die Szene bleibt in `audio` hängen; der globale Balken verschwindet, weil `usePipelineProgress` frühe Stages (`audio`, `master_clip`, `preflight`) nur dann als laufend zählt, wenn `lip_sync_status='running'` ist.
 
-### 3. Keine Edge-Function- / DB- / Sync.so-Änderungen
-`compose-twoshot-audio`, `compose-dialog-segments`, `poll-dialog-shots`, Sync.so-Plan, RLS, Tabellen — alles unverändert. Die v5-Pipeline selbst bleibt 1:1 (egal ob 1, 2, 3 oder 4 Sprecher), wir füllen nur die Vorbedingung nach, die bei manchen Single-Speaker-Flows fehlt, und machen den Status sichtbar.
+## Plan
 
-## Dateien
+1. **Audio-Prep nach Erfolg freigeben**
+   - In `src/hooks/useTwoShotAutoTrigger.ts` nach erfolgreichem `compose-twoshot-audio` die Szene aus `twoshot_stage='audio'` auf `master_clip` setzen, sofern der Master-Clip vorhanden ist.
+   - In derselben Tick-Logik zusätzlich stale Fälle heilen: `twoshot_stage='audio'` + `audio_plan.twoshot.url` vorhanden + `clip_url` vorhanden + kein Lip-Sync gestartet → sofort auf `master_clip` setzen.
+   - Dadurch greift der bestehende v5-Kandidatenfilter im nächsten Poll-Tick und ruft `compose-dialog-segments` auf.
 
-- `src/hooks/useTwoShotAutoTrigger.ts` (Self-Heal-Block + Audio-Watchdog)
-- `src/components/video-composer/SceneInlinePlayer.tsx` (dreistufiges Status-Label)
+2. **v5-Queue/Deferred-Stages nicht blockieren**
+   - Der Kandidatenfilter blockiert aktuell alle Stages außer `master_clip`/`failed`. Backend kann aber `deferred` oder `circuit_open` setzen.
+   - Diese wartenden Stages sollen nicht als Fehler verschwinden, sondern sichtbar bleiben und automatisch wieder dispatchen dürfen, sobald Slots frei sind.
 
-## Erwartung
+3. **Globalen Fortschrittsbalken stabil halten**
+   - In `src/hooks/usePipelineProgress.ts` frühe Lip-Sync-Stages (`audio`, `master_clip`, `preflight`, `deferred`, `circuit_open`) als aktive Pipeline zählen, auch wenn `lip_sync_status` noch `null`/`pending` ist.
+   - `audioPlan.twoshot.url`, `clipUrl`, `twoshotStage` und `dialogShots.version === 5` als v5-Fortschrittssignale berücksichtigen.
+   - Dadurch verschwindet der Balken nicht mehr nur deshalb, weil Sync.so noch nicht den Job-Status geschrieben hat.
 
-Bei der nächsten 1-Sprecher-Szene mit `cinematic-sync`:
-- Innerhalb von max. 8 s (ein Poll-Tick) fängt der UI-Balken bei „Audio wird vorbereitet…" an.
-- ~10–30 s später flippt das Label auf „Master-Plate fertig — Sync.so wird gestartet…" → dann „Lip-Sync läuft…".
-- Final: Szene erscheint im Storyboard, identisch zum 2-Sprecher-Flow.
+4. **Kachelstatus ehrlicher machen**
+   - In `src/components/video-composer/SceneInlinePlayer.tsx` die Labels erweitern:
+     - `audio` ohne URL: „Audio wird vorbereitet…“
+     - `audio` mit URL: „Audio fertig — Lip-Sync wird gestartet…“
+     - `master_clip`/`deferred`: „Wartet auf Sync.so-Slot…“ bzw. „Sync.so wird gestartet…“
+     - `syncso_pass_*`/`syncso_segments`: „Lip-Sync läuft…“
+     - `failed`: klare Fehlermeldung statt verschwindender Spinner
+   - Optional eine kleine Prozent-/Step-Zeile in der Kachel anzeigen, damit der Nutzer sieht, ob es bei Audio, Queue oder Sync.so steht.
+
+5. **Kein Datenbank- oder Provider-Umbau**
+   - Keine Migration nötig.
+   - Keine Änderung an Sync.so, Credits oder Tabellen.
+   - Die v5 Pipeline (`compose-dialog-segments`) bleibt der einheitliche Pfad; wir reparieren den Übergang von Audio-Prep zu v5 und die Fortschrittsableitung.
