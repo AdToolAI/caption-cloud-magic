@@ -274,9 +274,11 @@ serve(async (req) => {
           (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
 
         if (lipScene?.engine_override === 'cinematic-sync' && lipScene.clip_url && !alreadyFinal && !alreadyRunning) {
-          // NEW dialog-based shot pipeline (scales 1..N speakers). Replaces
-          // the legacy two-shot / single-shot Sync.so split.
-          const fnName = 'compose-dialog-scene';
+          // v5 dialog-segments pipeline (one Sync.so call per speaker, chained).
+          // Replaces the legacy v4 `compose-dialog-scene` fallback so the
+          // server-side rescue path never re-introduces the old per-turn flow
+          // that wrote talking-head plates into `lip_sync_source_clip_url`.
+          const fnName = 'compose-dialog-segments';
           const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },
