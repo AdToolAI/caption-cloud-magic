@@ -273,7 +273,17 @@ serve(async (req) => {
           lipScene?.lip_sync_status === 'running' ||
           (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
 
-        if (lipScene?.engine_override === 'cinematic-sync' && lipScene.clip_url && !alreadyFinal && !alreadyRunning) {
+        const isTalkingHeadClip =
+          typeof lipScene?.clip_url === "string" &&
+          lipScene.clip_url.includes("/talking-head-renders/");
+
+        if (
+          lipScene?.engine_override === 'cinematic-sync' &&
+          lipScene.clip_url &&
+          !isTalkingHeadClip &&
+          !alreadyFinal &&
+          !alreadyRunning
+        ) {
           // v5 dialog-segments pipeline (one Sync.so call per speaker, chained).
           // Replaces the legacy v4 `compose-dialog-scene` fallback so the
           // server-side rescue path never re-introduces the old per-turn flow
@@ -295,6 +305,13 @@ serve(async (req) => {
             // @ts-ignore
             EdgeRuntime.waitUntil(lipPromise);
           }
+        } else if (
+          lipScene?.engine_override === 'cinematic-sync' &&
+          isTalkingHeadClip
+        ) {
+          console.warn(
+            `[compose-clip-webhook] scene ${sceneId}: cinematic-sync clip_url is talking-head — skipping auto-lipsync fallback`,
+          );
         }
       } catch (lipErr) {
         console.error('[compose-clip-webhook] auto-lipsync fallback error:', lipErr);
