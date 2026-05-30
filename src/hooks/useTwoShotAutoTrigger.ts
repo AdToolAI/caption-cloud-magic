@@ -386,7 +386,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               const errBody = (lsErr as any)?.context;
               const reason = lsData?.error ?? errBody?.error;
               const message = lsData?.message ?? errBody?.message;
-              if (reason === 'tts_failed' || reason === 'no_voiceover') {
+              // Pre-flight races: edge function said the audio plan or the
+              // master plate isn't ready yet. The pre-flight gate above
+              // normally prevents this, but DB read-your-writes lag can
+              // still slip one through. Treat as silent retry — the next
+              // poll tick will pick it up once the row is consistent.
+              const SILENT_RACE = new Set([
+                'missing_audio_plan',
+                'missing_source_clip',
+                'dialog_pipeline_missing_audio_plan',
+                'master_clip_not_ready',
+              ]);
+              if (reason && SILENT_RACE.has(String(reason))) {
+                console.info(
+                  `[useTwoShotAutoTrigger] silent retry for ${d.id}: ${reason}`,
+                );
+              } else if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Cinematic-Sync braucht ein Voiceover',
