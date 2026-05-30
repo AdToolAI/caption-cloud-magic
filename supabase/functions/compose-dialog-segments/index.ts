@@ -808,7 +808,6 @@ serve(async (req) => {
       // silence-padded per-speaker tracks (length = sceneDur) the audio
       // matches the video, so output stays full.
       sync_mode: "cut_off",
-      diagnostic_id: diagnosticId,
     };
     if (retryVariant === "coords-pro") {
       syncOptions.active_speaker_detection = {
@@ -819,6 +818,7 @@ serve(async (req) => {
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
+    const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
     const payload: Record<string, unknown> = {
       model: retryVariant === "auto-standard" ? LIPSYNC_FALLBACK_MODEL : LIPSYNC_MODEL,
       input: [
@@ -826,8 +826,8 @@ serve(async (req) => {
         { type: "audio", url: pass.audio_url },
       ],
       options: syncOptions,
-      webhookUrl,
-      webhook_url: webhookUrl,
+      webhookUrl: diagnosticWebhookUrl,
+      webhook_url: diagnosticWebhookUrl,
     };
 
     // ── Length sanity log ────────────────────────────────────────────────
