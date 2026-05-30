@@ -1,0 +1,27 @@
+---
+name: Sync-segments multi-speaker audio mux
+description: v5 sync-segments multi-pass overwrites the audio track on every Sync.so pass with that pass's per-speaker WAV; final video has only the LAST speaker's voice. After last pass (passes.length>=2), sync-so-webhook MUST dispatch render-sync-segments-audio-mux instead of finalizing directly. The Lambda renders DialogStitchVideo with shots=[] (master video muted + master merged WAV as single audio track), and the existing dialog-stitch webhook branch writes the muxed url back to clip_url + lip_sync_applied_at.
+type: feature
+---
+
+**Symptom:** Composer cinematic-sync (v5 sync-segments) dialog scenes with 2+ speakers render with only the LAST speaker audible in the final MP4. Preview/Player are fine because they assemble per-speaker tracks client-side.
+
+**Root cause:** Sync.so v2 replaces the entire output audio track with the audio submitted for that pass. The multi-pass chain (Pass 0 input = master, Pass N input = Pass N-1 output) chains video correctly but each pass overwrites the audio with one speaker's per-speaker WAV. The merged master WAV with all speakers exists in `audio_plan.twoshot.url` but is dropped.
+
+**Fix:** A dedicated Lambda audio-mux step after the last Sync.so pass.
+
+- `supabase/functions/render-sync-segments-audio-mux/index.ts` dispatches `DialogStitchVideo` with:
+  - `masterVideoUrl = dialog_shots.final_url` (Sync.so output, lipsync baked, wrong audio)
+  - `masterAudioUrl = audio_plan.twoshot.url` (merged master WAV with all speakers)
+  - `shots = []` — no overlays needed, lipsync is already baked
+- Idempotent via `dialog_shots.audio_mux.render_id`.
+- Uses `source: 'dialog-stitch'` in webhook customData so the existing `remotion-webhook` dialog-stitch branch (lines 230–264) writes `clip_url`, `lip_sync_applied_at`, `dialog_shots.status='done'`.
+- `sync-so-webhook` last-pass branch:
+  - Multi-speaker (`passes.length >= 2`): set `dialog_shots.status='audio_muxing'`, `lip_sync_status='audio_muxing'`, do NOT touch `clip_url` yet; fire-and-forget POST to `render-sync-segments-audio-mux`.
+  - Single-speaker (`passes.length <= 1`): finalize directly as before — the only pass's audio is already the full master.
+
+**Why not in Edge Runtime:** ffmpeg is forbidden in Supabase Edge Runtime (`mux-audio-to-video` would crash). Lambda + Remotion is the supported audio mux path.
+
+**Recovery for broken existing scenes:** call `render-sync-segments-audio-mux` with `{ scene_id }`. The scene's `audio_plan.twoshot.url` must still be reachable (it lives in `voiceover-audio/twoshot-vo/`, no TTL).
+
+**Out of scope:** No change to `DialogStitchVideo.tsx` (works as-is with empty shots), `compose-video-assemble`, two-shot legacy v4 pipeline, Sync.so pricing/refund.
