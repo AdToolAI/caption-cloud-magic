@@ -776,6 +776,40 @@ serve(async (req) => {
       "ai-image",
     ]);
 
+    // ── Optimistic pre-mark + background dispatch ─────────────────────────
+    // The original synchronous per-scene loop could take 60+ seconds per scene
+    // (Nano Banana 2 anchor compose + face/identity audits + provider dispatch).
+    // The supabase-js client gives up after ~30s, the UI then sees no provider
+    // job, the pipeline bar disappears, and the user thinks "the pipeline
+    // didn't start". Fix: pre-mark every AI scene as `generating` in DB so the
+    // UI keeps showing the working state, then run the actual loop in the
+    // background via EdgeRuntime.waitUntil and return immediately.
+    const optimisticResults = scenes.map((s) => ({
+      sceneId: s.id,
+      status: s.clipSource?.startsWith("ai-") ? "generating" : "pending",
+    }));
+    try {
+      const aiSceneIds = scenes
+        .filter((s) => s.clipSource?.startsWith("ai-"))
+        .map((s) => s.id);
+      if (aiSceneIds.length > 0) {
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            clip_status: "generating",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", aiSceneIds);
+      }
+    } catch (preMarkErr) {
+      console.warn(
+        "[compose-video-clips] optimistic pre-mark failed (non-fatal):",
+        preMarkErr,
+      );
+    }
+
+    const processScenes = async () => {
     // Process each scene
     for (const scene of scenes) {
       // Sora 2 sunset: silently migrate any legacy 'ai-sora' scene to Veo 3.1
