@@ -425,10 +425,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
           // Treat ALL early stages as "not ready" — only 'master_clip' (Hailuo
-          // master rendered, audio plan written) and 'failed' (retry) qualify.
-          // Previously 'audio'/'preflight'/'anchor' could slip through if
-          // twoshot_stage was momentarily null, causing 422 missing_audio_plan.
-          if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
+          // master rendered, audio plan written), 'failed' (retry), and
+          // wartende v5-Backend-Stages ('deferred', 'circuit_open') qualify.
+          // 'audio'/'preflight'/'anchor' bedeuten die Audio-Plate ist noch
+          // nicht da → würde sonst 422 missing_audio_plan auslösen.
+          const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed', 'deferred', 'circuit_open']);
+          if (d.twoshot_stage && !ADVANCEABLE_STAGES.has(d.twoshot_stage)) return false;
           // ── Pre-flight gate ──────────────────────────────────────────
           // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
           // (merged VO from compose-twoshot-audio) AND a master plate clip.
