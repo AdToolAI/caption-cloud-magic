@@ -2053,6 +2053,8 @@ export const translations: Record<Language, any> = {
       clipsNotReady: "Clips not ready",
       generateClipsFirst: "Please generate all clips in the Clips tab first.",
       allClipsMustBeReady: "all clips must be generated",
+      partialRenderHint: "unfinished scenes will be skipped",
+      skippedSuffix: "skipped",
       briefingForProduct: "Product / Service",
       briefingForCorporate: "Company / Brand",
       briefingForStorytelling: "Story",
