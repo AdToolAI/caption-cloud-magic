@@ -1,99 +1,95 @@
-## Ziel
+## Problem kurz gesagt
 
-Der Single-Charakter-Cinematic-Sync muss wie der 2-Charakter-Flow laufen:
-
-```text
-Scene-aware Anchor → echter Master-Clip → Lip-Sync
-```
-
-Aktuell startet Lip-Sync nicht, weil vorher schon kein gültiger Master-Clip entsteht. Nach ca. 30 Sekunden bricht der Startpfad ab, bevor Provider-Generierung sichtbar beginnt.
-
-## Befund
-
-- Der Lip-Sync-Trigger ist absichtlich blockiert, solange `clip_url` fehlt. Das ist korrekt.
-- Die betroffene Single-Charakter-Szene steht nach dem Reset auf `clip_status='pending'`, `clip_url=null`, `reference_image_url=null`, `lip_sync_status='pending'`.
-- Damit kann `compose-dialog-segments` noch nicht starten, weil es zwingend eine echte Scene-Plate braucht.
-- Der kritische Single-Charakter-Unterschied: Die UI überspringt bei `engineOverride='cinematic-sync'` die Client-Anchor-Vorbereitung und verlässt sich komplett auf `compose-video-clips`, dort synchron den Anchor und dann den Master-Clip zu starten. Wenn Anchor/Audio-Prep länger dauert oder Character-Mapping fehlt, sieht der Nutzer nach ca. 30s einen Abbruch ohne sichtbaren Providerstart.
-- Die 2-Charakter-Pipeline darf dabei nicht gelockert werden: ihre Face-/Human-/Identity-Audits bleiben streng aktiv.
-
-## Umsetzung
-
-### 1. Single-Charakter als First-Class Cinematic-Sync behandeln
-
-In `compose-video-clips` trenne ich die Logik sauber nach Sprecheranzahl:
-
-- 1 Sprecher:
-  - Szene-aware Anchor ist weiterhin Pflicht.
-  - Kein Fallback auf rohen Avatar.
-  - Kein Text-only Master-Clip, wenn ein Sprecherportrait erwartet wird.
-  - Aber: Single-Speaker bekommt einen leichteren Anchor-Audit als 2-Speaker, damit er nicht unnötig durch die Multi-Face-Checks blockiert.
-- 2+ Sprecher:
-  - Bestehende Two-Shot-Audits bleiben unverändert streng.
-  - Kein Verhalten wird gelockert.
-
-### 2. Anchor-Start robuster machen
-
-Wenn die Szene im Payload keine vollständige `characterShots`/Portrait-Info hat, löst `compose-video-clips` den Sprecher serverseitig aus dem Dialog-Slug und der Brand-Character-Library auf.
-
-Beispiel:
+Du hast recht: Ein einzelner Charakter sollte einfacher sein. Im aktuellen Code ist er aber schwieriger gemacht worden, weil der Single-Charakter-Cinematic-Sync in denselben schweren Vorbereitungsblock wie Multi-Character gedrückt wurde:
 
 ```text
-Samuel Dusatko: Text
-→ slug samuel-dusatko
-→ Brand Character Samuel Dusatko
-→ reference_image_url / outfit look
-→ scene-aware anchor
+Klick → compose-video-clips wartet auf Anchor/Audit/Audio-Prep → Provider-Dispatch → Webhook → Lip-Sync
 ```
 
-Wenn das nicht möglich ist, wird die Szene mit einem klaren Fehler gestoppt:
+Wenn Anchor/Audio-Prep dabei vorher blockiert oder in den Edge-Function-Timeout läuft, kommt es genau zu deinem Verhalten: kein sichtbarer Providerstart, Ladebalken verschwindet, Lip-Sync startet nie.
+
+Aus den aktuellen Signalen:
+- Lovable Cloud ist gesund.
+- In den letzten Logs ist kein sichtbarer `compose-video-clips`/`compose-scene-anchor`/`compose-dialog-segments` Aufruf angekommen.
+- Die betroffene Single-Szene steht weiter auf `clip_status='pending'`, `clip_url=null`, `lip_sync_status='pending'`.
+- Die Szene im Screenshot ist tatsächlich ein Single-Speaker-Dialog, aber mit `clipSource='ai-happyhorse'` und `engine_override='cinematic-sync'`.
+- Der derzeitige Code bricht HappyHorse+Cinematic-Sync hart ab, wenn vorher kein `reference_image_url` erzeugt wurde. Genau dieser Anchor wird aber im gleichen synchronen Startpfad erzeugt. Das ist die Sackgasse.
+
+## Plan
+
+### 1. Single-Speaker-Cinematic-Sync als eigenen, schlanken Startpfad behandeln
+
+In `compose-video-clips` trenne ich endgültig:
 
 ```text
-cinematic_sync_anchor_missing_single_speaker
+1 Sprecher:
+  Anchor komponieren, aber kein Multi-Face/Identity-Audit-Overkill
+  Master-Clip sofort dispatchen
+  Lip-Sync danach über bestehenden v5 Trigger
+
+2+ Sprecher:
+  bestehende strenge Two-Shot-Pipeline bleibt unverändert
+  Face/Human/Identity-Audits bleiben aktiv
 ```
 
-Nicht mehr: stiller Abbruch oder verschwindender Ladebalken.
+Das schützt die 2-Charakter-Pipeline und macht den 1-Charakter-Pfad deutlich robuster.
 
-### 3. Lange Startphase nicht mehr als Abbruch wirken lassen
+### 2. Kein synchroner 30s-Abbruch mehr beim Start
 
-Der Startpfad wird so gehärtet, dass die UI den Zustand sichtbar hält:
+Der Single-Speaker-Pfad wird so umgebaut, dass die Szene sofort sichtbar in Arbeit geht:
 
-- `twoshot_stage='anchor'` während Anchor-Komposition.
-- Danach `twoshot_stage='master_clip'` beim Provider-Start.
-- Wenn Anchor nach Timeout nicht fertig wird, bleibt ein verständlicher Fehler in `clip_error`, statt dass die Pipeline einfach verschwindet.
+```text
+twoshot_stage = 'anchor'
+clip_status = 'generating'
+```
 
-### 4. Progress-Bar nur Clips + Lip-Sync für Dialog/Cinematic-Sync
+Wenn Anchor-Komposition klappt:
 
-Ich entferne die übrigen `voiceover:start/end` Events aus `SceneDialogStudio` für diese Dialog-Cinematic-Sync-Flows und mappe interne Audio-Vorbereitung auf Lip-Sync.
+```text
+reference_image_url = composed anchor
+Provider startet
+replicate_prediction_id wird gesetzt
+```
 
-Ergebnis:
+Wenn Anchor nicht klappt:
+
+```text
+clip_status = failed
+clip_error = klarer Grund
+```
+
+Nicht mehr: stiller Rückfall auf `pending` oder verschwundener Balken.
+
+### 3. HappyHorse bei Single-Cinematic-Sync nicht mehr in die Anchor-Sackgasse laufen lassen
+
+Für Single-Speaker gilt künftig:
+- Wenn HappyHorse + Cinematic-Sync ohne Anchor startet, wird es nicht hart vor dem Provider blockiert.
+- Entweder wird zuerst ein schlanker Single-Anchor erzeugt und dann HappyHorse genutzt,
+- oder bei Anchor-Timeout wird kontrolliert auf Hailuo als Master-Clip-Fallback gewechselt, weil Hailuo für Cinematic-Sync bereits stabiler verdrahtet ist.
+
+Für 2+ Sprecher bleibt die bestehende Regel bestehen: HappyHorse wird weiterhin auf Hailuo migriert, weil Multi-Cast-Identity-Drift zu riskant ist.
+
+### 4. Storyboard-Button robust machen
+
+`useSceneGenerate` und `useGenerateAllClips` sollen Single-Cinematic-Sync-Szenen vollständig und eindeutig an das Backend senden:
+
+- `audioPlan`, `dialogScript`, `dialogVoices`, `characterShot(s)` bleiben erhalten.
+- Bei Single-Speaker wird der gleiche Generate-Start ausgelöst wie bei allen anderen Clips.
+- Der lokale Optimistic State wird nicht nach kurzer Zeit zurück auf wartend gekippt, solange Backend-Stages laufen.
+
+### 5. Voiceover-Schritt für diesen Workflow verstecken
+
+In der Progress-Logik wird Dialog/Cinematic-Sync weiter als:
 
 ```text
 Clips → Lip-Sync
 ```
 
-Kein dritter sichtbarer Voiceover-Schritt für diesen Workflow.
+geführt. Interne Audio-Vorbereitung bleibt technisch nötig, erscheint aber nicht als dritter sichtbarer „Voiceover“-Button/Schritt.
 
-### 5. Audio-Mux / laufende Stages sichtbar halten
+### 6. Daten der betroffenen Szene sauber zurücksetzen
 
-Zusätzlich nehme ich die bekannten Zwischenstände in die Progress-Logik auf:
-
-- `audio_muxing` gilt als laufender Lip-Sync-Schritt.
-- `audio_mux_failed` gilt als fehlgeschlagener, retrybarer Zustand.
-
-Das schützt besonders den 2-Charakter-Flow, weil dieser häufiger in Audio-Muxing landet.
-
-### 6. Auto-Trigger schützt beide Flows
-
-In `useTwoShotAutoTrigger`:
-
-- Single- und Multi-Speaker werden beide nur gestartet, wenn `clip_url` und `audio_plan.twoshot.url` existieren.
-- `audio_muxing` wird nicht fälschlich als „nichts läuft“ behandelt.
-- `audio_mux_failed` kann sauber erneut angestoßen werden.
-- Raw Talking-Head-URLs bleiben weiterhin hart blockiert.
-
-### 7. Datenbereinigung der betroffenen Szene
-
-Nach den Codeänderungen setze ich die betroffene Szene sauber auf:
+Nach Codeänderung setze ich die betroffenen Szenen erneut auf einen wirklich frischen Zustand:
 
 ```text
 clip_url = null
@@ -101,17 +97,30 @@ clip_status = pending
 reference_image_url = null
 lip_sync_status = pending
 twoshot_stage = null
-stale dialog/sync fields = null
+replicate_prediction_id = null
+dialog_shots = null
+clip_error = null
 ```
 
-und lösche den Scene-Anchor-Cache für diese Szene, damit beim nächsten Start wirklich ein frischer Scene-aware Anchor gebaut wird.
+und lösche den Anchor-Cache für diese Szenen.
 
-## Validierung
+### 7. Deployment und Prüfung
 
-Ich prüfe nach Umsetzung:
+Ich deploye die betroffenen Backend-Funktionen und prüfe danach:
 
-- Single-Charakter-Szene startet sichtbar mit Anchor/Clip und landet nicht nach 30s im Nichts.
-- Lip-Sync startet erst nach echter Scene-Plate.
-- Kein roher Avatar-Clip wird als Master verwendet.
-- 2-Charakter-Cinematic-Sync bleibt unverändert streng: Anchor-Audit, Face-/Human-Count und Multi-Speaker-Sync bleiben aktiv.
-- Progress-Bar zeigt nur Clips und Lip-Sync für diesen Workflow.
+- Single-Charakter-Szene geht direkt sichtbar auf `anchor/generating`.
+- Provider-Job-ID wird gesetzt.
+- Nach Master-Clip wird `compose-twoshot-audio`/`compose-dialog-segments` gestartet.
+- 2-Charakter-Szenen behalten den bestehenden strengen Two-Shot-Schutz.
+
+## Dateien
+
+- `supabase/functions/compose-video-clips/index.ts`
+- `src/hooks/useSceneGenerate.ts`
+- `src/hooks/useGenerateAllClips.ts`
+- `src/hooks/usePipelineProgress.ts` falls nötig nur zur Anzeige-Korrektur
+- Datenreset für die betroffenen `composer_scenes` Rows
+
+## Wichtig
+
+Ich werde nicht wieder versuchen, Single-Speaker durch die komplette Multi-Speaker-Audit-Logik zu pressen. Genau das ist der Grund, warum sich dieser eigentlich einfache Fall so fragil verhält.
