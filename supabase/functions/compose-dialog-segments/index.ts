@@ -211,6 +211,7 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const sceneId = body?.scene_id;
     const isRetry = body?.retry === true;
+    const requestedRetryVariant = isRetryVariant(body?.retry_variant) ? body.retry_variant : null;
     // `advance: true` is sent by the webhook to chain to the next pass after
     // a successful pass completion. Skips wallet debit + face-gate (already
     // validated on pass 0) and dispatches passes[current_pass].
