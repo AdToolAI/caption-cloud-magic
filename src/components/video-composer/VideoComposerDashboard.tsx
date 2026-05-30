@@ -48,7 +48,7 @@ import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import { castSignature } from '@/lib/video-composer/castSignature';
-import { resolveLipSyncValue, getLipSyncPending, resolveDialogModeValue, getDialogModePending } from '@/lib/video-composer/lipSyncPending';
+import { resolveLipSyncValue, getLipSyncPending, resolveDialogModeValue, getDialogModePending, resolveEngineOverrideValue, getEngineOverridePending } from '@/lib/video-composer/lipSyncPending';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
