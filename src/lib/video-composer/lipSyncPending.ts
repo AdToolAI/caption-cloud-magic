@@ -63,3 +63,40 @@ export function resolveLipSyncValue(sceneId: string, dbValue: boolean): boolean 
   }
   return pending;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Same pattern for the `dialogMode` toggle ("Dialog & Lip-Sync" switch in the
+// SceneCard model picker). Without this, the toggle flips back to its old DB
+// value whenever a realtime tick or debounced scene save races the click.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const dialogModeRegistry = new Map<string, Entry>();
+
+export function markDialogModePending(sceneId: string, value: boolean): void {
+  if (!sceneId) return;
+  dialogModeRegistry.set(sceneId, { value, expiresAt: Date.now() + REGISTRY_TTL_MS });
+}
+
+export function clearDialogModePending(sceneId: string): void {
+  dialogModeRegistry.delete(sceneId);
+}
+
+export function getDialogModePending(sceneId: string): boolean | undefined {
+  const entry = dialogModeRegistry.get(sceneId);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    dialogModeRegistry.delete(sceneId);
+    return undefined;
+  }
+  return entry.value;
+}
+
+export function resolveDialogModeValue(sceneId: string, dbValue: boolean): boolean {
+  const pending = getDialogModePending(sceneId);
+  if (pending === undefined) return dbValue;
+  if (pending === dbValue) {
+    dialogModeRegistry.delete(sceneId);
+    return dbValue;
+  }
+  return pending;
+}
