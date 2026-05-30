@@ -96,13 +96,21 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const pollStartRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
-  const clipCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
-  const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
-  const renderCost = 0;
-  const totalCost = clipCost + voCost;
-
   const readyClips = scenes.filter(s => s.clipStatus === 'ready' && s.clipUrl);
   const allReady = readyClips.length === scenes.length && scenes.length > 0;
+  const canRender = readyClips.length > 0;
+
+  // Partial-render cost: only charge for clips that will actually go to Lambda.
+  const readyClipCost = readyClips.reduce(
+    (sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0
+  );
+  const clipCost = scenes.reduce(
+    (sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0
+  );
+  const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
+  const renderCost = 0;
+  const totalCost = readyClipCost + voCost;
+  const fullProjectCost = clipCost + voCost;
 
   const stopPolling = () => {
     if (pollTimerRef.current) {
