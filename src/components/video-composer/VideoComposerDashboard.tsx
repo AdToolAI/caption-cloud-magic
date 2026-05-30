@@ -836,7 +836,7 @@ export default function VideoComposerDashboard() {
           dialog_script: s.dialogScript ?? null,
           dialog_voices: (s.dialogVoices ?? {}) as any,
           dialog_takes: (s.dialogTakes ?? {}) as any,
-          engine_override: s.engineOverride ?? 'auto',
+          engine_override: getEngineOverridePending(s.id) ?? (s.engineOverride ?? 'auto'),
           director_modifiers: (s.directorModifiers ?? {}) as any,
           shot_director: (s.shotDirector ?? {}) as any,
           prompt_slots: (s.promptSlots ?? null) as any,
