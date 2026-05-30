@@ -298,7 +298,7 @@ export function usePipelineProgress({
       done: progress >= 1 && !running && failed === 0,
       failed: failed > 0 && !running,
     };
-  }, [aiScenes]);
+  }, [aiScenes, baselineVersion]);
 
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
