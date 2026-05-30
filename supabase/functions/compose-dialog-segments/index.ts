@@ -152,6 +152,8 @@ interface PassState {
   segments: SegmentItem[];
   input_url: string;
   job_id?: string;
+  diagnostic_id?: string;
+  retry_variant?: RetryVariant;
   output_url?: string;
   status: "pending" | "rendering" | "done" | "failed";
   started_at?: string;
