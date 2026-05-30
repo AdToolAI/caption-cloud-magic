@@ -394,15 +394,23 @@ export function usePipelineProgress({
       (s) => {
         if (isTerminalScene(s)) return false;
         const stage = (s as any).twoshotStage;
-        if (!stage || ['complete', 'done', 'failed'].includes(stage)) return false;
-        // Frühe v5-Stages (Audio-Prep, Master-Plate fertig, Sync.so-Queue,
-        // Circuit Breaker) zählen als laufend — auch wenn lipSyncStatus
-        // noch null/pending ist. Sonst verschwindet der globale Balken,
-        // sobald die Audio-Prep läuft.
-        if (['audio', 'anchor', 'master_clip', 'preflight', 'deferred', 'circuit_open'].includes(stage)) {
+        if (!stage || ['complete', 'done', 'failed', 'audio_mux_failed'].includes(stage)) return false;
+        // Frühe v5-Stages (Audio-Prep, Anchor-Bau, Master-Plate, Sync.so-Queue,
+        // Audio-Mux, Circuit Breaker) zählen als laufend — auch wenn
+        // lipSyncStatus noch null/pending/audio_muxing ist. Sonst verschwindet
+        // der globale Balken sobald irgendein interner Zwischenschritt läuft.
+        if ([
+          'audio',
+          'anchor',
+          'master_clip',
+          'preflight',
+          'deferred',
+          'circuit_open',
+          'audio_muxing',
+        ].includes(stage)) {
           return true;
         }
-        return hasRealJob(s) || (s as any).lipSyncStatus === 'running';
+        return hasRealJob(s) || (s as any).lipSyncStatus === 'running' || (s as any).lipSyncStatus === 'audio_muxing';
       },
     ) || targets.some((s) => {
       if (isTerminalScene(s)) return false;
@@ -413,7 +421,9 @@ export function usePipelineProgress({
     const failed = targets.some((s) => {
       const ds = getDialogShots(s);
       if (ds?.status === 'failed') return true;
-      return (s as any).lipSyncStatus === 'failed' || (s as any).twoshotStage === 'failed';
+      return (s as any).lipSyncStatus === 'failed' ||
+        (s as any).twoshotStage === 'failed' ||
+        (s as any).twoshotStage === 'audio_mux_failed';
     });
 
     const b = baselineRef.current;
