@@ -858,7 +858,7 @@ serve(async (req) => {
               .filter((l) =>
                 /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/.test(l),
               );
-            if (speakerLines.length >= 2) {
+            if (speakerLines.length >= 1) {
               // Mark stage = 'audio' so the UI can show step 1/6.
               await supabaseAdmin
                 .from("composer_scenes")

@@ -1,44 +1,65 @@
-## Problem 1 — Lip-Sync wird als isolierter Avatar gerendert statt in die Szene eingebaut
 
-Die betroffene Szene (S02 „Problem") steht in der DB auf:
-`dialog_mode=true, lip_sync_with_voiceover=false, engine_override='auto', clip_source='ai-happyhorse'`.
+## Korrektur zum vorigen Plan
 
-In `supabase/functions/compose-video-clips/index.ts` (Zeilen 1517–1547) gibt es einen Auto-Route-Branch:
-> Wenn `engine_override='auto'` UND die Szene Dialog-Text + ein Cast-Charakter-Shot + ≤1 Sprecher hat → HeyGen-Talking-Head.
+Du hast Recht — die v5 Pipeline (`compose-dialog-segments` + Sync.so Segments-API) ist intern N-speaker fähig (`speakers.forEach`, refIds, multi-pass Chain) und soll für **1 bis 4 Sprecher** der einzige Cinematic-Sync-Pfad bleiben. Wir routen also **nicht** auf `compose-lipsync-scene` um, sondern entfernen den 2-Sprecher-Mindestgate aus der Vorstufe, damit `audio_plan.twoshot` auch für 1 Sprecher erzeugt wird.
 
-HeyGen erzeugt einen Brust-Bild-Avatar (Porträt + Sprache), **nicht** den eigentlichen Szenenclip mit aufmoduliertem Lip-Sync. Der Nutzer erwartet aber Cinematic-Sync (Hailuo-Plate der Szene + Sync.so-Lip-Sync), denn er hat den „Dialog & Lip-Sync"-Toggle aktiviert.
+## Root Cause (präzisiert)
 
-Der Toggle in `SceneCard.tsx` (Zeilen 1197–1258) setzt aktuell nur `dialog_mode` (+ ggf. `clip_source`/`clip_quality`). Er erzwingt **nicht** `engine_override='cinematic-sync'` und nicht `lip_sync_with_voiceover=true`. Genau deshalb landet die Szene im HeyGen-Branch statt im Cinematic-Sync-Pfad.
+Zwei harte `>= 2` / `< 2` Gates blockieren Single-Speaker:
 
-### Fix
-- Toggle „Dialog & Lip-Sync" in `SceneCard.tsx`:
-  - **ON** → optimistisch + atomic DB-Write von `dialog_mode=true`, `engine_override='cinematic-sync'`, `lip_sync_with_voiceover=true` (zusätzlich zur bestehenden clip_source/quality-Korrektur).
-  - **OFF** → `dialog_mode=false`, `engine_override='auto'`, `lip_sync_with_voiceover=false`.
-- Pending-Registry in `src/lib/video-composer/lipSyncPending.ts` um `engineOverride` erweitern (analog zu `dialogModePending` / `lipSyncPending`), damit Realtime-Refetch und debounced Save den Toggle nicht zurückdrehen.
-- Hydration + debounced `persistScenesToDb` in `VideoComposerDashboard.tsx` müssen `resolveEngineOverrideValue` / `getEngineOverridePending` ebenfalls respektieren.
+1. **`supabase/functions/compose-video-clips/index.ts` Z. 861** — `if (speakerLines.length >= 2)` umschließt den `compose-twoshot-audio`-Fetch. Single-Speaker-Szenen springen daran vorbei → `audio_plan.twoshot` wird nie gebaut.
+2. **`supabase/functions/compose-twoshot-audio/index.ts` Z. 404** — `if (blocks.length < 2) return 400 single_speaker_or_empty`. Selbst wenn (1) gefixt ist, lehnt die Function die Single-Speaker-Szene aktiv ab.
 
-So routet `compose-video-clips` die Szene zuverlässig in den Cinematic-Sync-Branch (Hailuo-Plate → Sync.so) und der Lip-Sync wird in die eigentliche Szene eingebaut.
+Folge: `compose-dialog-segments` läuft mit leerem `audio_plan.twoshot` → `422 missing_audio_plan` → roter Toast.
 
-## Problem 2 — Progressbar startet bei ~48 % und ETA wirkt sinnlos
+`compose-dialog-segments` selbst ist N-fähig — die Schleife `speakers.forEach((sp, sIdx) => …)` (Z. 297) verarbeitet beliebig viele Sprecher; mit 1 Sprecher entstehen 1 Pass + Refunds + Webhook genau wie mit 3.
 
-`usePipelineProgress.ts` ermittelt den Gesamt-Prozentwert gewichtet über alle Phasen (clips 55 %, voiceover 10 %, lipsync 20 %, music 5 %, export 10 %). Wenn der Nutzer mitten in der Session **nur** Lip-Sync neu anstößt (oder die Auto-Trigger-Kette nach bereits gerenderten Clips startet), wird `lipsync:start` emittiert, aber `clips:start` nicht. Folge:
+## Fix (2 Mini-Edits, keine Logik-Umbauten)
 
-- `baselineRef` wird zwar im `lipsync:start`-Branch befüllt, aber die bereits fertigen Clips/Voiceover/Music tragen über `clipsReal.progress=1` (bzw. die `done`-Phasen) ihre vollen Gewichte (55 % + 10 % + 5 %) in `phaseOverall` ein → der Balken springt sofort auf ~70 % (im Screenshot 48 %, weil nicht alle Clips ready sind).
-- `pipelineStartRef` wird im neuen Run nicht zurückgesetzt, dadurch zeigt die ETA-Zeile `23s / ~23s` (Elapsed = "Remaining"), wirkt also als hätte sie keine Schätzung.
+### 1. `supabase/functions/compose-video-clips/index.ts` (Z. 861)
 
-### Fix
-- In `usePipelineProgress.ts`:
-  - Beim Empfang eines `*:start`-Events, das **nicht** `clips` ist, und solange `pipelineStartRef` null ist (= frischer Run): `pipelineStartRef`/`floorRef`/`startedAtRef` zurücksetzen wie beim `clips:start`-Branch.
-  - In `phaseOverall`: nur Phasen aufsummieren, die im aktuellen Run **aktiv** sind (laufen oder seit dem aktuellen Run abgeschlossen). Phasen, die schon vor dem Run fertig waren (`baselineRef.voiceoverHadAudio`, `baselineRef.musicHad`, `clips` komplett unter Baseline), werden mit `applicable:false` markiert und aus der Gewichtung herausgefiltert. Die verbliebenen Gewichte werden auf 100 % normalisiert (`weight / sum(activeWeights)`).
-  - `etaSeconds` wieder über `PHASE_NOMINAL_SECONDS` der noch laufenden Phasen berechnen, sodass die rechte Zeile als `elapsed / ~total` ein realistisches Total zeigt (z. B. `23s / ~2:00 min`).
+```ts
+// vorher:
+if (speakerLines.length >= 2) {
+// nachher:
+if (speakerLines.length >= 1) {
+```
 
-## Technische Details
+So wird `compose-twoshot-audio` auch für Single-Speaker-Dialog-Szenen aufgerufen und `audio_plan.twoshot.{url, speakers[1], totalSec}` aufgebaut, bevor Hailuo den Master-Clip rendert.
+
+### 2. `supabase/functions/compose-twoshot-audio/index.ts` (Z. 402–406)
+
+```ts
+// vorher:
+const blocks = parseDialogScript(dialogScript);
+if (blocks.length < 2) {
+  return json({ error: "single_speaker_or_empty", blocks: blocks.length }, 400);
+}
+// nachher:
+const blocks = parseDialogScript(dialogScript);
+if (blocks.length < 1) {
+  return json({ error: "empty_dialog_script", blocks: 0 }, 400);
+}
+```
+
+Die nachfolgende TTS-/Concat-/Upload-Logik ist bereits per-block, daraus entsteht für 1 Block: 1 Speaker-Entry in `speakers[]` mit korrekter `voicedRange.turns[]`, ein Master-WAV mit genau diesem einen Sprecher und ein per-speaker padded Track. Sample-accurate Pipeline bleibt unverändert.
+
+### 3. Routing in `src/hooks/useTwoShotAutoTrigger.ts`
+
+**Keine Änderung** — `compose-dialog-segments` bleibt für alle 1..N-Sprecher der Default. Der vorige Plan-Vorschlag, Single-Speaker auf `compose-lipsync-scene` umzuleiten, wird verworfen.
+
+## Was unverändert bleibt
+
+- `compose-dialog-segments` (N-speaker Logik bereits korrekt)
+- `sync-so-webhook`, `poll-dialog-shots`, Refund-/Watchdog-Pfade
+- Audio-Mux Lambda für Multi-Speaker bleibt aktiv für `passes.length >= 2`; bei 1 Sprecher greift weiterhin der direkte Finalize-Pfad (siehe Memory „Sync-segments multi-speaker audio mux" — Single-Speaker = direkter Finalize, weil Pass 0 Audio = Master).
+- Kein DB-Schema-Change, kein Hook-Change, kein Sync.so-Plan-Update erforderlich (Creator-Plan reicht für 1+3 Sprecher).
+
+## Dateien
 
 | Datei | Änderung |
 |---|---|
-| `src/components/video-composer/SceneCard.tsx` | Dialog-&-Lip-Sync-Toggle erweitert um `engine_override`/`lip_sync_with_voiceover` (ON/OFF), inkl. Rollback bei DB-Fehler. |
-| `src/lib/video-composer/lipSyncPending.ts` | Drittes Registry-Paar für `engineOverride` (`mark/clear/get/resolveEngineOverridePending`). |
-| `src/components/video-composer/VideoComposerDashboard.tsx` | Hydration + debounced Save nutzen neuen Resolver für `engineOverride`. |
-| `src/hooks/usePipelineProgress.ts` | Run-Baseline-Reset bei lipsync-/voiceover-/export-only Start; nur aktive Phasen gewichten; ETA aus aktiven Phasen ableiten. |
+| `supabase/functions/compose-video-clips/index.ts` | Gate `>= 2` → `>= 1` für Two-Shot-Audio-Prep |
+| `supabase/functions/compose-twoshot-audio/index.ts` | Gate `< 2` → `< 1`, Fehler umbenennen |
 
-Keine Änderungen an Edge-Functions, Sync.so-Pipeline, Render-Engine oder Audio-Mux.
+Nach dem Deploy: bestehende fehlgeschlagene Single-Speaker-Szene einmal "Lip-Sync erneut versuchen" → der Auto-Trigger reicht sie sauber durch (`audio_plan.twoshot` wird beim nächsten Master-Render aufgebaut; alternativ direkt `compose-twoshot-audio` über die Voiceover-Tab-Aktion antriggern).

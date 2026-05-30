@@ -401,8 +401,8 @@ serve(async (req) => {
 
     const dialogScript: string = (scene as any).dialog_script ?? "";
     const blocks = parseDialogScript(dialogScript);
-    if (blocks.length < 2) {
-      return json({ error: "single_speaker_or_empty", blocks: blocks.length }, 400);
+    if (blocks.length < 1) {
+      return json({ error: "empty_dialog_script", blocks: 0 }, 400);
     }
 
     // Build name → character lookup so we can resolve voices.
