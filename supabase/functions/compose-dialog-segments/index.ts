@@ -54,10 +54,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import {
   classifySyncError,
+  detectVoicedFrames,
   countInflightSyncJobs,
   emitSystemAlert,
   evaluateCircuit,
   getSyncApiKey,
+  inspectWav,
   logSyncDispatch,
   openCircuit,
   probeAsset,
@@ -92,6 +94,9 @@ function json(body: unknown, status = 200) {
 
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
+const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
+const RETRY_VARIANTS = ["coords-pro", "auto-pro", "auto-standard"] as const;
+type RetryVariant = typeof RETRY_VARIANTS[number];
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
 // (regardless of speaker count), so cost = ceil(totalSec) * 9 (min 9).
@@ -101,6 +106,25 @@ const MIN_TURN_DUR_SEC = 0.4;
 
 const computeCost = (durSec: number) =>
   Math.max(LIPSYNC_MIN_CREDITS, Math.ceil(Math.max(0, durSec)) * LIPSYNC_CREDITS_PER_SEC);
+
+const isRetryVariant = (value: unknown): value is RetryVariant =>
+  typeof value === "string" && (RETRY_VARIANTS as readonly string[]).includes(value);
+
+const clampSyncCoords = (coords: [number, number] | null | undefined): [number, number] | null => {
+  if (!coords || !Number.isFinite(coords[0]) || !Number.isFinite(coords[1])) return null;
+  const [x, y] = coords;
+  if (x <= 1 && y <= 1) return [Math.round(x * 1280), Math.round(y * 720)];
+  return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
+};
+
+async function inspectSpeakerAudio(url: string) {
+  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  if (!resp.ok) throw new Error(`audio_get_${resp.status}`);
+  const bytes = new Uint8Array(await resp.arrayBuffer());
+  const wav = inspectWav(bytes);
+  const vad = detectVoicedFrames(bytes);
+  return { bytes: bytes.byteLength, wav, vad };
+}
 
 interface Turn { startSec: number; endSec: number }
 interface TwoshotSpeaker {
