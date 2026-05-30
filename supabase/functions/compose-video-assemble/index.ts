@@ -670,7 +670,26 @@ serve(async (req) => {
         .eq('user_id', user.id);
     }
 
-    const hasAudio = !!inputProps.voiceoverUrl || !!inputProps.backgroundMusicUrl;
+    // hasAudio drives Lambda's top-level `muted` flag. If it is FALSE Lambda
+    // strips the entire audio track from the encoded MP4 — that suppresses
+    // per-scene embedded lip-sync audio even when `<Video muted={false}>`.
+    // We therefore consider ANY of these as "has audio":
+    //   - global voiceover or background music
+    //   - any scene with withAudio=true (Sora/Veo native OR baked Sync.so)
+    //   - any per-scene audio clip queued for the (post-render) SFX mux
+    const anySceneWithAudio = remotionScenes.some((s: any) => s.withAudio === true);
+    const hasAudio =
+      !!inputProps.voiceoverUrl ||
+      !!inputProps.backgroundMusicUrl ||
+      anySceneWithAudio ||
+      sceneAudioClipsForMux.length > 0;
+    console.log('[compose-video-assemble] hasAudio decision:', {
+      hasAudio,
+      voiceoverUrl: !!inputProps.voiceoverUrl,
+      backgroundMusicUrl: !!inputProps.backgroundMusicUrl,
+      anySceneWithAudio,
+      sceneAudioClipCount: sceneAudioClipsForMux.length,
+    });
 
     // 10. Build complete Lambda payload
     const lambdaPayload: Record<string, unknown> = {
