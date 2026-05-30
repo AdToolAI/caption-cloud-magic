@@ -1770,11 +1770,31 @@ export default function SceneCard({
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          onUpdate({
-                            lipSyncWithVoiceover: !scene.lipSyncWithVoiceover,
-                          })
-                        }
+                        onClick={async () => {
+                          const next = !scene.lipSyncWithVoiceover;
+                          // Optimistic local update so the toggle flips immediately.
+                          onUpdate({ lipSyncWithVoiceover: next });
+                          // Persist atomically: the dashboard's realtime refetch
+                          // takes `lip_sync_with_voiceover` from the DB as source
+                          // of truth, so without an immediate write the next
+                          // realtime tick would revert the toggle to the old DB
+                          // value.
+                          if (isUuid(scene.id)) {
+                            try {
+                              const { error } = await supabase
+                                .from("composer_scenes")
+                                .update({ lip_sync_with_voiceover: next })
+                                .eq("id", scene.id);
+                              if (error) throw error;
+                            } catch (e) {
+                              console.warn(
+                                "[SceneCard] lip-sync toggle persist failed",
+                                e,
+                              );
+                              onUpdate({ lipSyncWithVoiceover: !next });
+                            }
+                          }
+                        }}
                         disabled={scene.lipSyncStatus === "running"}
                         className={`px-2 py-1 rounded text-[10px] font-medium transition-all disabled:opacity-50 ${
                           scene.lipSyncWithVoiceover
