@@ -303,10 +303,18 @@ export function usePipelineProgress({
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
     const b = baselineRef.current;
+    // For Cinematic-Sync / sync-segments flows the user does NOT see an
+    // independent "Voiceover" step — `compose-twoshot-audio` is an internal
+    // sub-step of Lip-Sync. Suppress the phase entirely when the only audio
+    // activity is for lipsync scenes.
+    const dialogOnlyAudio =
+      hasLipsyncScenes && (!vo?.enabled && !vo?.audioUrl);
+    if (dialogOnlyAudio) {
+      return { progress: 0, running: false, done: false, applicable: false };
+    }
     if (!vo?.enabled && !vo?.audioUrl) {
       return { progress: 0, running: false, done: false, applicable: false };
     }
-    // If audio already existed at baseline, this phase isn't part of the run.
     if (b?.voiceoverHadAudio) {
       return { progress: 1, running: false, done: true, applicable: false };
     }
@@ -316,7 +324,7 @@ export function usePipelineProgress({
       done: !!vo?.audioUrl,
       applicable: true,
     };
-  }, [assemblyConfig?.voiceover, baselineVersion]);
+  }, [assemblyConfig?.voiceover, hasLipsyncScenes, baselineVersion]);
 
   const lipsyncReal = useMemo(() => {
     if (!hasLipsyncScenes) {
