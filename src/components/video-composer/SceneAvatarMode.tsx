@@ -37,6 +37,10 @@ import type { ComposerScene, ComposerCharacter } from '@/types/video-composer';
 import AvatarStage3D from './AvatarStage3D';
 import { AvatarWardrobeSheet } from '@/components/brand-characters/AvatarWardrobeSheet';
 import { AvatarPoseSheet } from '@/components/brand-characters/AvatarPoseSheet';
+import { supabase } from '@/integrations/supabase/client';
+import { markLipSyncPending, clearLipSyncPending } from '@/lib/video-composer/lipSyncPending';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface Props {
   scene: ComposerScene;
@@ -304,7 +308,25 @@ export default function SceneAvatarMode({ scene, characters, onUpdate }: Props) 
         </div>
         <Switch
           checked={lipSyncOn}
-          onCheckedChange={(v) => onUpdate({ lipSyncWithVoiceover: v })}
+          onCheckedChange={async (v) => {
+            // Optimistic local flip + same atomic DB write as SceneCard's
+            // toggle button, so this entry point is race-safe too.
+            onUpdate({ lipSyncWithVoiceover: v });
+            markLipSyncPending(scene.id, v);
+            if (UUID_RE.test(scene.id)) {
+              try {
+                const { error } = await supabase
+                  .from('composer_scenes')
+                  .update({ lip_sync_with_voiceover: v })
+                  .eq('id', scene.id);
+                if (error) throw error;
+              } catch (e) {
+                console.warn('[SceneAvatarMode] lip-sync toggle persist failed', e);
+                clearLipSyncPending(scene.id);
+                onUpdate({ lipSyncWithVoiceover: !v });
+              }
+            }
+          }}
         />
       </div>
     </div>
