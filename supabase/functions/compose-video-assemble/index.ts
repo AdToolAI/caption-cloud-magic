@@ -300,12 +300,18 @@ serve(async (req) => {
       // exported scene is silent (the external voiceover clip is also
       // filtered out further below because it's "already inside the video").
       const isLipSynced = !!s.lip_sync_applied_at;
+      const dsForAudio = s?.dialog_shots;
+      const isV5SyncSegmentsScene =
+        !!dsForAudio &&
+        (dsForAudio.engine === 'sync-segments' || Number(dsForAudio.version || 0) >= 5);
+      // v5 sync-segments bakes the full multi-speaker audio chain into the
+      // scene MP4 — the legacy `useExternalAudio` flag is stale there.
       const usesExternalDialogAudio =
-        s?.audio_plan?.twoshot?.useExternalAudio === true;
+        s?.audio_plan?.twoshot?.useExternalAudio === true && !isV5SyncSegmentsScene;
       const keepEmbeddedLipsyncAudio = isLipSynced && !usesExternalDialogAudio;
       if (keepEmbeddedLipsyncAudio) {
         console.log(
-          `[compose-video-assemble] scene ${s.id}: lipsync embedded audio kept (withAudio override)`,
+          `[compose-video-assemble] scene ${s.id}: lipsync embedded audio kept (withAudio override, v5=${isV5SyncSegmentsScene})`,
         );
       }
       return {
