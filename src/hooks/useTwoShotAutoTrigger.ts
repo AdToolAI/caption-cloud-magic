@@ -315,6 +315,37 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
+        // ── Audio-Done → master_clip transition ─────────────────────────────
+        // Wenn compose-twoshot-audio fertig ist (audio_plan.twoshot.url
+        // existiert), Master-Clip da ist, aber twoshot_stage immer noch auf
+        // 'audio' steht (oder null), schalten wir auf 'master_clip'. Erst
+        // damit greift der v5-Kandidatenfilter unten und ruft
+        // compose-dialog-segments auf. Ohne diese Brücke bleibt die Szene
+        // permanent in 'audio' hängen, der globale Balken verschwindet,
+        // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
+        const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
+          if (!isDialogEngine(d.engine_override)) return false;
+          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          if (d.lip_sync_applied_at) return false;
+          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (!d.audio_plan?.twoshot?.url) return false;
+          if (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching' || d.lip_sync_status === 'applied' || d.lip_sync_status === 'done') return false;
+          if (d.twoshot_stage && d.twoshot_stage !== 'audio') return false;
+          return true;
+        });
+        if (audioReadyButNotAdvanced.length > 0) {
+          await Promise.all(
+            audioReadyButNotAdvanced.map((d) => {
+              d.twoshot_stage = 'master_clip';
+              return supabase
+                .from('composer_scenes')
+                .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
           if (d.engine_override === 'cinematic-sync-legacy') return false;
@@ -355,9 +386,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
                   })
                   .eq('id', d.id);
               } else {
+                // Direkt nach Erfolg: stage auf 'master_clip' setzen, damit der
+                // nächste Tick v5 startet (statt erst auf den DB-Refresh zu
+                // warten, der die optimistische 'audio'-Markierung überschreibt).
                 console.info(
-                  `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — v5 will start next tick`,
+                  `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — advancing to master_clip`,
                 );
+                await supabase
+                  .from('composer_scenes')
+                  .update({ twoshot_stage: 'master_clip', updated_at: new Date().toISOString() })
+                  .eq('id', d.id);
               }
             })
             .finally(() => {
@@ -387,10 +425,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
           // Treat ALL early stages as "not ready" — only 'master_clip' (Hailuo
-          // master rendered, audio plan written) and 'failed' (retry) qualify.
-          // Previously 'audio'/'preflight'/'anchor' could slip through if
-          // twoshot_stage was momentarily null, causing 422 missing_audio_plan.
-          if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
+          // master rendered, audio plan written), 'failed' (retry), and
+          // wartende v5-Backend-Stages ('deferred', 'circuit_open') qualify.
+          // 'audio'/'preflight'/'anchor' bedeuten die Audio-Plate ist noch
+          // nicht da → würde sonst 422 missing_audio_plan auslösen.
+          const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed', 'deferred', 'circuit_open']);
+          if (d.twoshot_stage && !ADVANCEABLE_STAGES.has(d.twoshot_stage)) return false;
           // ── Pre-flight gate ──────────────────────────────────────────
           // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
           // (merged VO from compose-twoshot-audio) AND a master plate clip.

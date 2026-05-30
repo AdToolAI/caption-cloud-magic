@@ -82,6 +82,8 @@ export default function SceneInlinePlayer({
     !lipsyncDone &&
     !lipsyncFailed &&
     (lipSyncStatus === 'running' ||
+      lipSyncStatus === 'stitching' ||
+      lipSyncStatus === 'audio_muxing' ||
       (twoshotStage && twoshotStage !== 'failed') ||
       status === 'ready'); // clip ready, lip-sync still pending
 
@@ -223,21 +225,42 @@ export default function SceneInlinePlayer({
                 className="h-9 w-9 rounded-full border-2 border-primary/40 border-t-primary"
               />
               {(() => {
-                // Dreistufiges Label für Cinematic-Sync — spiegelt den
-                // tatsächlichen Fortschritt (Audio-Prep → Master fertig →
-                // Sync.so läuft) statt eines einzigen statischen Spinners.
+                // Stufiges Label für Cinematic-Sync — spiegelt jeden Schritt
+                // der v5-Pipeline wider, damit der Nutzer immer sieht, wo
+                // es gerade steht (statt eines stummen Spinners).
+                const audioUrl = (scene as any).audioPlan?.twoshot?.url;
                 let title = 'Szene wird gebaut…';
                 let sub = 'VO & Lip-Sync inklusive';
                 if (status === 'ready' && lipsyncRunning) {
-                  if (twoshotStage === 'audio') {
-                    title = 'Audio wird vorbereitet…';
-                    sub = 'Sync.so wartet auf Voiceover';
+                  if (lipSyncStatus === 'stitching' || twoshotStage === 'dialog_stitching') {
+                    title = 'Lip-Sync wird zusammengesetzt…';
+                    sub = 'Finaler Render läuft';
+                  } else if (lipSyncStatus === 'audio_muxing' || twoshotStage === 'audio_muxing') {
+                    title = 'Audio wird gemischt…';
+                    sub = 'Letzter Schritt';
                   } else if (lipSyncStatus === 'running') {
                     title = 'Lip-Sync läuft…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
-                  } else if (twoshotStage === 'master_clip' || !twoshotStage) {
-                    title = 'Master-Plate fertig — Sync.so wird gestartet…';
-                    sub = 'Gleich geht\'s los';
+                  } else if (twoshotStage === 'audio') {
+                    if (audioUrl) {
+                      title = 'Audio fertig — Lip-Sync wird gestartet…';
+                      sub = 'Gleich geht\'s los';
+                    } else {
+                      title = 'Audio wird vorbereitet…';
+                      sub = 'Voiceover wird generiert';
+                    }
+                  } else if (twoshotStage === 'deferred' || twoshotStage === 'circuit_open') {
+                    title = 'Wartet auf Sync.so-Slot…';
+                    sub = 'Sobald frei, geht es weiter';
+                  } else if (
+                    twoshotStage === 'master_clip' ||
+                    (typeof twoshotStage === 'string' && twoshotStage.startsWith('syncso_'))
+                  ) {
+                    title = 'Lip-Sync läuft…';
+                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                  } else if (!twoshotStage && audioUrl) {
+                    title = 'Lip-Sync wird gestartet…';
+                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
                   } else {
                     title = 'Lip-Sync startet…';
                     sub = 'Sync.so · ~60 s pro Sprecher-Turn';
