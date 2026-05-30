@@ -455,7 +455,7 @@ export function usePipelineProgress({
       applicable: true,
       failed,
     };
-  }, [scenes, hasLipsyncScenes]);
+  }, [scenes, hasLipsyncScenes, baselineVersion]);
 
   const musicReal = useMemo(() => {
     const m = assemblyConfig?.music;
