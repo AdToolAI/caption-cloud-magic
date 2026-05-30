@@ -1,0 +1,35 @@
+---
+name: Composer hasAudio + v5 sync-segments fix
+description: compose-video-assemble must set Lambda muted=false whenever ANY scene has withAudio=true or there are sceneAudioClips, not just on global VO/music. Also: legacy audio_plan.twoshot.useExternalAudio flag MUST be ignored for v5 cinematic-sync scenes (dialog_shots.engine='sync-segments' or version>=5) because v5 multi-pass bakes the entire multi-speaker audio into clip_url
+type: feature
+---
+
+**Symptom:** Composer-rendered videos with single-speaker or cinematic-sync N-speaker scenes are completely silent in the exported MP4 (preview plays fine).
+
+**Root cause(s) in `supabase/functions/compose-video-assemble/index.ts`:**
+
+1. `hasAudio = !!voiceoverUrl || !!backgroundMusicUrl` ignored per-scene audio. With Composer projects that have no global VO/music, this evaluated to false, so the Lambda payload got `muted: true` and the renderer stripped the ENTIRE audio track — including the lip-sync voice baked into each scene's clip_url. Post-render `mux-audio-to-video` cannot recover because ffmpeg is not available in Supabase Edge Runtime (see `remotion-webhook` line ~228 "forbidden Edge-Runtime ffmpeg").
+
+2. Cinematic-Sync v5 scenes (`dialog_shots.engine='sync-segments'`) still carried the legacy two-shot `audio_plan.twoshot.useExternalAudio=true` flag. That flag (a) added the merged WAV to `sceneAudioClips` causing double audio if mux ever succeeded, and (b) suppressed the `keepEmbeddedLipsyncAudio` override.
+
+**Fix (Composer only):**
+
+```ts
+// in remotionScenes mapping
+const isV5SyncSegmentsScene =
+  !!s.dialog_shots &&
+  (s.dialog_shots.engine === 'sync-segments' || Number(s.dialog_shots.version || 0) >= 5);
+const usesExternalDialogAudio =
+  s?.audio_plan?.twoshot?.useExternalAudio === true && !isV5SyncSegmentsScene;
+const keepEmbeddedLipsyncAudio = !!s.lip_sync_applied_at && !usesExternalDialogAudio;
+// withAudio: s.with_audio === true || keepEmbeddedLipsyncAudio
+
+// twoshotExternalSceneIds: same v5 exclusion
+// hasAudio:
+const anySceneWithAudio = remotionScenes.some(s => s.withAudio === true);
+const hasAudio = !!voiceoverUrl || !!musicUrl || anySceneWithAudio || sceneAudioClipsForMux.length > 0;
+```
+
+Diagnostic log `[compose-video-assemble] hasAudio decision:` reports which of the four conditions made it true. Lambda's `muted` flag is the single point that strips audio at the encoder — never let it be `true` when any scene MP4 carries embedded audio.
+
+**Out of scope:** No changes to `ComposedAdVideo.tsx` / Remotion bundle, `mux-audio-to-video`, Sync.so pipeline, or two-shot legacy path.

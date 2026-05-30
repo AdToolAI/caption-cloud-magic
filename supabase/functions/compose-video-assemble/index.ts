@@ -300,12 +300,18 @@ serve(async (req) => {
       // exported scene is silent (the external voiceover clip is also
       // filtered out further below because it's "already inside the video").
       const isLipSynced = !!s.lip_sync_applied_at;
+      const dsForAudio = s?.dialog_shots;
+      const isV5SyncSegmentsScene =
+        !!dsForAudio &&
+        (dsForAudio.engine === 'sync-segments' || Number(dsForAudio.version || 0) >= 5);
+      // v5 sync-segments bakes the full multi-speaker audio chain into the
+      // scene MP4 — the legacy `useExternalAudio` flag is stale there.
       const usesExternalDialogAudio =
-        s?.audio_plan?.twoshot?.useExternalAudio === true;
+        s?.audio_plan?.twoshot?.useExternalAudio === true && !isV5SyncSegmentsScene;
       const keepEmbeddedLipsyncAudio = isLipSynced && !usesExternalDialogAudio;
       if (keepEmbeddedLipsyncAudio) {
         console.log(
-          `[compose-video-assemble] scene ${s.id}: lipsync embedded audio kept (withAudio override)`,
+          `[compose-video-assemble] scene ${s.id}: lipsync embedded audio kept (withAudio override, v5=${isV5SyncSegmentsScene})`,
         );
       }
       return {
@@ -595,9 +601,22 @@ serve(async (req) => {
     // have the FINAL merged dialogue in a separate WAV — the lipsync MP4
     // only carries the LAST pass's voice. We MUST keep the external track
     // for those, otherwise only one speaker is audible in the export.
+    // Cinematic-Sync v5 (engine='sync-segments' / version>=5) bakes the
+    // FULL multi-speaker audio chain into the scene MP4 — the legacy
+    // `audio_plan.twoshot.useExternalAudio` flag is stale for those rows
+    // and would (a) cause a duplicate VO track via sceneAudioClips and
+    // (b) suppress our embedded-audio override. Only treat as external
+    // when it really is legacy two-shot (no v5 sync-segments marker).
+    const isV5SyncSegments = (s: any) => {
+      const ds = s?.dialog_shots;
+      if (!ds) return false;
+      return ds.engine === 'sync-segments' || Number(ds.version || 0) >= 5;
+    };
     const twoshotExternalSceneIds = new Set(
       (scenes || [])
-        .filter((s: any) => s?.audio_plan?.twoshot?.useExternalAudio === true)
+        .filter((s: any) =>
+          s?.audio_plan?.twoshot?.useExternalAudio === true && !isV5SyncSegments(s),
+        )
         .map((s: any) => s.id),
     );
     const lipSyncedSceneIds = new Set(
@@ -651,7 +670,26 @@ serve(async (req) => {
         .eq('user_id', user.id);
     }
 
-    const hasAudio = !!inputProps.voiceoverUrl || !!inputProps.backgroundMusicUrl;
+    // hasAudio drives Lambda's top-level `muted` flag. If it is FALSE Lambda
+    // strips the entire audio track from the encoded MP4 — that suppresses
+    // per-scene embedded lip-sync audio even when `<Video muted={false}>`.
+    // We therefore consider ANY of these as "has audio":
+    //   - global voiceover or background music
+    //   - any scene with withAudio=true (Sora/Veo native OR baked Sync.so)
+    //   - any per-scene audio clip queued for the (post-render) SFX mux
+    const anySceneWithAudio = remotionScenes.some((s: any) => s.withAudio === true);
+    const hasAudio =
+      !!inputProps.voiceoverUrl ||
+      !!inputProps.backgroundMusicUrl ||
+      anySceneWithAudio ||
+      sceneAudioClipsForMux.length > 0;
+    console.log('[compose-video-assemble] hasAudio decision:', {
+      hasAudio,
+      voiceoverUrl: !!inputProps.voiceoverUrl,
+      backgroundMusicUrl: !!inputProps.backgroundMusicUrl,
+      anySceneWithAudio,
+      sceneAudioClipCount: sceneAudioClipsForMux.length,
+    });
 
     // 10. Build complete Lambda payload
     const lambdaPayload: Record<string, unknown> = {
