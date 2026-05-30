@@ -1138,9 +1138,39 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
+              // Cinematic-Sync REQUIRES a portrait. If we got speakers from
+              // the script but couldn't resolve any portrait (no cast picker
+              // used + no matching brand_character), fail loud BEFORE Hailuo
+              // ever dispatches — otherwise the UI sees a silent 30s timeout.
+              if (portraitUrls.length === 0 && scriptSpeakers.length > 0) {
+                const msg = `cinematic_sync_anchor_missing_single_speaker: Konnte für die Sprecher [${scriptSpeakers.join(", ")}] keine Portraits aus den Brand Characters auflösen. Bitte einen Brand Character mit Portrait im Cast zuweisen.`;
+                console.warn(
+                  `[compose-video-clips] cinematic-sync scene ${scene.id}: ${msg}`,
+                );
+                await supabaseAdmin
+                  .from("composer_scenes")
+                  .update({
+                    clip_status: "failed",
+                    clip_error: msg,
+                    twoshot_stage: "failed",
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", scene.id);
+                results.push({ sceneId: scene.id, status: "failed", error: msg });
+                continue;
+              }
               if (portraitUrls.length >= 1) {
                 const expectedFaces = portraitUrls.length;
                 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+                // Mark anchor stage so the progress bar reflects what's
+                // actually happening — without this the UI shows "audio…"
+                // for the full Nano Banana 2 composition window.
+                try {
+                  await supabaseAdmin
+                    .from("composer_scenes")
+                    .update({ twoshot_stage: "anchor", updated_at: new Date().toISOString() })
+                    .eq("id", scene.id);
+                } catch (_) { /* non-fatal */ }
 
                 // Has the currently-pinned anchor passed the current audit version?
                 const prevAuditRaw =
