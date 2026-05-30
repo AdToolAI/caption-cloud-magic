@@ -1777,11 +1777,10 @@ export default function SceneCard({
                           const next = !scene.lipSyncWithVoiceover;
                           // Optimistic local update so the toggle flips immediately.
                           onUpdate({ lipSyncWithVoiceover: next });
-                          // Persist atomically: the dashboard's realtime refetch
-                          // takes `lip_sync_with_voiceover` from the DB as source
-                          // of truth, so without an immediate write the next
-                          // realtime tick would revert the toggle to the old DB
-                          // value.
+                          // Record the intent so a racing realtime refetch
+                          // (triggered by an unrelated column update) can't
+                          // revert the toggle before the DB commit lands.
+                          markLipSyncPending(scene.id, next);
                           if (isUuid(scene.id)) {
                             try {
                               const { error } = await supabase
@@ -1794,6 +1793,7 @@ export default function SceneCard({
                                 "[SceneCard] lip-sync toggle persist failed",
                                 e,
                               );
+                              clearLipSyncPending(scene.id);
                               onUpdate({ lipSyncWithVoiceover: !next });
                             }
                           }
