@@ -695,7 +695,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         <Button
           size="lg"
           onClick={handleRender}
-          disabled={isRendering || !allReady}
+          disabled={isRendering || !canRender}
           className="gap-2"
         >
           {isRendering ? (
@@ -710,9 +710,11 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           )}
         </Button>
       </div>
-      {!allReady && scenes.length > 0 && (
+      {scenes.length > 0 && !allReady && (
         <p className="text-[10px] text-muted-foreground text-right">
-          {readyClips.length}/{scenes.length} {t('videoComposer.clipsReady')} — {t('videoComposer.allClipsMustBeReady')}
+          {canRender
+            ? `${readyClips.length}/${scenes.length} ${t('videoComposer.clipsReady')} — ${t('videoComposer.partialRenderHint')}`
+            : `${readyClips.length}/${scenes.length} ${t('videoComposer.clipsReady')} — ${t('videoComposer.allClipsMustBeReady')}`}
         </p>
       )}
     </div>
