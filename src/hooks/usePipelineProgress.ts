@@ -154,8 +154,78 @@ export function usePipelineProgress({
         };
       }
       setEventFlags((prev) => ({ ...prev, [phase]: action === 'start' }));
+      setBaselineVersion((v) => v + 1);
     });
   }, []);
+
+  // Bumped whenever baselineRef.current is (re)written so dependent memos
+  // recompute. Without this, lazy baseline initialization (below) silently
+  // mutates the ref but clipsReal / lipsyncReal / etc. keep stale values.
+  const [baselineVersion, setBaselineVersion] = useState(0);
+
+  // ── Lazy baseline initialization ──────────────────────────────────────
+  // If the user navigates to the composer while a scene is already mid-flight
+  // (generating clip / running lipsync), no `*:start` event fires — yet
+  // `clipsReal.running` becomes true and the bar shows up. Without a baseline
+  // snapshot, already-ready scenes count toward the run's progress and the
+  // bar appears at e.g. 48% instead of 0%. Detect raw activity straight from
+  // the scene state and seed the baseline once.
+  useEffect(() => {
+    if (baselineRef.current !== null) return;
+    const ss = scenes;
+    const ac = assemblyConfig;
+    const hasActiveBackend = ss.some((s) => {
+      const sa = s as any;
+      if (sa.clipStatus === 'generating') return true;
+      if (sa.lipSyncStatus === 'running') return true;
+      if (sa.replicatePredictionId) return true;
+      const stage = sa.twoshotStage;
+      if (stage && !['done', 'complete', 'failed'].includes(stage)) return true;
+      const ds = sa.dialogShots ?? sa.dialog_shots ?? null;
+      if (!!ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+      return false;
+    });
+    if (!hasActiveBackend) return;
+    const ai = ss.filter((s) => s.clipSource?.startsWith('ai-'));
+    const lipTargets = ss.filter(
+      (s) =>
+        (s as any).twoshotStage ||
+        s.engineOverride === 'cinematic-sync' ||
+        (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+    );
+    const dsTotals = lipTargets.reduce(
+      (acc, s) => {
+        const ds = (s as any).dialogShots ?? (s as any).dialog_shots ?? null;
+        const shots = Array.isArray(ds?.shots) ? ds.shots : [];
+        acc.total += shots.length;
+        acc.done += shots.filter((sh: any) => sh.status === 'ready').length;
+        return acc;
+      },
+      { done: 0, total: 0 },
+    );
+    baselineRef.current = {
+      clipsReady: ai.filter((s) => s.clipStatus === 'ready').length,
+      clipsTotal: ai.length,
+      lipsyncDone: lipTargets.filter(
+        (s) =>
+          ((s as any).lipSyncStatus === 'done' && !!(s as any).lipSyncAppliedAt) ||
+          (s as any).twoshotStage === 'done' ||
+          (s as any).twoshotStage === 'complete' ||
+          ((s as any).dialogShots ?? (s as any).dialog_shots)?.status === 'done',
+      ).length,
+      lipsyncTotal: lipTargets.length,
+      dialogShotsDone: dsTotals.done,
+      dialogShotsTotal: dsTotals.total,
+      voiceoverHadAudio: !!ac?.voiceover?.audioUrl,
+      musicHad: !!ac?.music,
+    };
+    if (pipelineStartRef.current === null) {
+      pipelineStartRef.current = Date.now();
+      runFloorRef.current = 0;
+    }
+    setBaselineVersion((v) => v + 1);
+  }, [scenes, assemblyConfig]);
+
 
   // ── Derived per-phase progress (from real state, relative to baseline) ──
   const dialogVoiceCount = (s: ComposerScene) =>
@@ -228,7 +298,7 @@ export function usePipelineProgress({
       done: progress >= 1 && !running && failed === 0,
       failed: failed > 0 && !running,
     };
-  }, [aiScenes]);
+  }, [aiScenes, baselineVersion]);
 
   const voiceoverReal = useMemo(() => {
     const vo = assemblyConfig?.voiceover;
@@ -246,7 +316,7 @@ export function usePipelineProgress({
       done: !!vo?.audioUrl,
       applicable: true,
     };
-  }, [assemblyConfig?.voiceover]);
+  }, [assemblyConfig?.voiceover, baselineVersion]);
 
   const lipsyncReal = useMemo(() => {
     if (!hasLipsyncScenes) {
@@ -385,7 +455,7 @@ export function usePipelineProgress({
       applicable: true,
       failed,
     };
-  }, [scenes, hasLipsyncScenes]);
+  }, [scenes, hasLipsyncScenes, baselineVersion]);
 
   const musicReal = useMemo(() => {
     const m = assemblyConfig?.music;
@@ -393,7 +463,7 @@ export function usePipelineProgress({
     if (!m) return { progress: 0, running: false, done: false, applicable: false };
     if (b?.musicHad) return { progress: 1, running: false, done: true, applicable: false };
     return { progress: 1, running: false, done: true, applicable: true };
-  }, [assemblyConfig?.music]);
+  }, [assemblyConfig?.music, baselineVersion]);
 
   const exportReal = useMemo(() => {
     if (!renderRunning && renderPercent <= 0) {

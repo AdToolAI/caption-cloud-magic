@@ -48,7 +48,7 @@ import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import { castSignature } from '@/lib/video-composer/castSignature';
-import { resolveLipSyncValue, getLipSyncPending, resolveDialogModeValue, getDialogModePending } from '@/lib/video-composer/lipSyncPending';
+import { resolveLipSyncValue, getLipSyncPending, resolveDialogModeValue, getDialogModePending, resolveEngineOverrideValue, getEngineOverridePending } from '@/lib/video-composer/lipSyncPending';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -375,7 +375,7 @@ export default function VideoComposerDashboard() {
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
-            engineOverride: ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto',
+            engineOverride: resolveEngineOverrideValue(row.id, ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto'),
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
@@ -505,7 +505,7 @@ export default function VideoComposerDashboard() {
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
-            engineOverride: ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto',
+            engineOverride: resolveEngineOverrideValue(row.id, ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto'),
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
@@ -836,7 +836,7 @@ export default function VideoComposerDashboard() {
           dialog_script: s.dialogScript ?? null,
           dialog_voices: (s.dialogVoices ?? {}) as any,
           dialog_takes: (s.dialogTakes ?? {}) as any,
-          engine_override: s.engineOverride ?? 'auto',
+          engine_override: getEngineOverridePending(s.id) ?? (s.engineOverride ?? 'auto'),
           director_modifiers: (s.directorModifiers ?? {}) as any,
           shot_director: (s.shotDirector ?? {}) as any,
           prompt_slots: (s.promptSlots ?? null) as any,

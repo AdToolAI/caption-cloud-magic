@@ -100,3 +100,42 @@ export function resolveDialogModeValue(sceneId: string, dbValue: boolean): boole
   }
   return pending;
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Same pattern for the `engineOverride` field. The "Dialog & Lip-Sync" toggle
+// now also flips engineOverride between 'auto' and 'cinematic-sync' atomically,
+// so we need a third registry so a racing realtime refetch or debounced scene
+// save can't revert it back to the stale DB value.
+// ──────────────────────────────────────────────────────────────────────────────
+
+type StringEntry = { value: string; expiresAt: number };
+const engineOverrideRegistry = new Map<string, StringEntry>();
+
+export function markEngineOverridePending(sceneId: string, value: string): void {
+  if (!sceneId) return;
+  engineOverrideRegistry.set(sceneId, { value, expiresAt: Date.now() + REGISTRY_TTL_MS });
+}
+
+export function clearEngineOverridePending(sceneId: string): void {
+  engineOverrideRegistry.delete(sceneId);
+}
+
+export function getEngineOverridePending(sceneId: string): string | undefined {
+  const entry = engineOverrideRegistry.get(sceneId);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    engineOverrideRegistry.delete(sceneId);
+    return undefined;
+  }
+  return entry.value;
+}
+
+export function resolveEngineOverrideValue<T extends string>(sceneId: string, dbValue: T): T {
+  const pending = getEngineOverridePending(sceneId);
+  if (pending === undefined) return dbValue;
+  if (pending === dbValue) {
+    engineOverrideRegistry.delete(sceneId);
+    return dbValue;
+  }
+  return pending as T;
+}
