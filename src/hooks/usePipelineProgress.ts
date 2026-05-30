@@ -353,6 +353,7 @@ export function usePipelineProgress({
       s.twoshotStage === 'complete' ||
       s.twoshotStage === 'done' ||
       s.twoshotStage === 'failed' ||
+      s.twoshotStage === 'audio_mux_failed' ||
       getDialogShots(s)?.status === 'done' ||
       getDialogShots(s)?.status === 'failed';
 
