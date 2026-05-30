@@ -856,6 +856,7 @@ serve(async (req) => {
       `[compose-dialog-segments] scene=${sceneId} DISPATCH pass=${currentPassIdx + 1}/${passes.length} ` +
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
+      `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
       `sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
@@ -918,7 +919,7 @@ serve(async (req) => {
         http_status: resp.status, sync_status: "DISPATCH_FAILED",
         error_class: classifySyncError(errTxt),
         error_message: errTxt.slice(0, 500),
-        meta: { pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
+        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, payload_summary: payload },
       });
       await recordCircuitFailure(supabase, "sync.so", classifySyncError(errTxt));
       return json(
@@ -983,11 +984,14 @@ serve(async (req) => {
       window_start_sec: 0, window_end_sec: totalSec,
       http_status: resp.status, sync_status: "DISPATCHED",
       meta: {
+        diagnostic_id: diagnosticId,
         pass_idx: currentPassIdx,
         total_passes: passes.length,
         speaker: pass.speaker_name,
         character_id: pass.character_id,
         coords: pass.coords,
+        retry_variant: retryVariant,
+        model: payload.model,
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
@@ -995,12 +999,16 @@ serve(async (req) => {
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
+        audio_probe: audioProbes[audioProbeIdx] ?? null,
+        video_probe: videoProbe,
+        audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
         payload_summary: {
           model: payload.model,
           input_video: passInputUrl,
           audio: pass.audio_url,
           frame_number: frameNumber,
           coordinates: pass.coords,
+          options: payload.options,
         },
       },
     });
