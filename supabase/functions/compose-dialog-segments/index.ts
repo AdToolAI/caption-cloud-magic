@@ -972,6 +972,9 @@ serve(async (req) => {
       started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
       first_started_at: prevState?.first_started_at ?? prevState?.started_at ?? nowIso,
       retry_count: Number(prevState?.retry_count ?? 0),
+      retry_variant: retryVariant,
+      fallback_history: prevState?.fallback_history ?? [],
+      last_diagnostic_id: diagnosticId,
       final_url: null,
     };
 
