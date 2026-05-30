@@ -789,31 +789,43 @@ serve(async (req) => {
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
+    const retryVariant: RetryVariant = isRetry
+      ? (requestedRetryVariant ?? prevState?.retry_variant ?? "coords-pro")
+      : "coords-pro";
+    const diagnosticId = `${sceneId}:${currentPassIdx + 1}:${retryVariant}:${crypto.randomUUID()}`;
+    pass.retry_variant = retryVariant;
+    pass.diagnostic_id = diagnosticId;
 
     // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
     const firstTurn = pass.segments[0];
     const midSec = firstTurn ? (firstTurn.startTime + firstTurn.endTime) / 2 : totalSec / 2;
     const frameNumber = Math.max(0, Math.floor(midSec * ASSUMED_FPS));
+    const syncOptions: Record<string, unknown> = {
+      // Explicit: keep full video length. Without this, lipsync-2-pro's
+      // default trims output to the shorter input → multi-pass chains
+      // were ending after the first speaker's last turn (3rd sentence
+      // disappeared). cut_off here = "cut to shortest" but with our
+      // silence-padded per-speaker tracks (length = sceneDur) the audio
+      // matches the video, so output stays full.
+      sync_mode: "cut_off",
+      diagnostic_id: diagnosticId,
+    };
+    if (retryVariant === "coords-pro") {
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        frame_number: frameNumber,
+        coordinates: pass.coords,
+      };
+    } else {
+      syncOptions.active_speaker_detection = { auto_detect: true };
+    }
     const payload: Record<string, unknown> = {
-      model: LIPSYNC_MODEL,
+      model: retryVariant === "auto-standard" ? LIPSYNC_FALLBACK_MODEL : LIPSYNC_MODEL,
       input: [
         { type: "video", url: passInputUrl },
         { type: "audio", url: pass.audio_url },
       ],
-      options: {
-        // Explicit: keep full video length. Without this, lipsync-2-pro's
-        // default trims output to the shorter input → multi-pass chains
-        // were ending after the first speaker's last turn (3rd sentence
-        // disappeared). cut_off here = "cut to shortest" but with our
-        // silence-padded per-speaker tracks (length = sceneDur) the audio
-        // matches the video, so output stays full.
-        sync_mode: "cut_off",
-        active_speaker_detection: {
-          auto_detect: false,
-          frame_number: frameNumber,
-          coordinates: pass.coords,
-        },
-      },
+      options: syncOptions,
       webhookUrl,
       webhook_url: webhookUrl,
     };
