@@ -70,7 +70,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
       try {
         const { data, error } = await supabase
           .from('composer_scenes')
-          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
+          .select('id, clip_url, clip_status, engine_override, lip_sync_status, lip_sync_applied_at, lip_sync_source_clip_url, dialog_script, audio_plan, dialog_shots, updated_at, clip_error, twoshot_stage, replicate_prediction_id')
           .eq('project_id', projectId);
         if (error || !data) return;
 
@@ -294,7 +294,24 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (d.lip_sync_applied_at) return false;
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
+          // Treat ALL early stages as "not ready" — only 'master_clip' (Hailuo
+          // master rendered, audio plan written) and 'failed' (retry) qualify.
+          // Previously 'audio'/'preflight'/'anchor' could slip through if
+          // twoshot_stage was momentarily null, causing 422 missing_audio_plan.
           if (d.twoshot_stage && d.twoshot_stage !== 'master_clip' && d.twoshot_stage !== 'failed') return false;
+          // ── Pre-flight gate ──────────────────────────────────────────
+          // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
+          // (merged VO from compose-twoshot-audio) AND a master plate clip.
+          // Without them it returns 422 missing_audio_plan / missing_source_clip,
+          // the in-flight lock expires after 30s, and the user sees a
+          // "Lip-Sync fehlgeschlagen" toast even though the pipeline was
+          // simply still warming up. Skip silently until both are present.
+          const planUrl = d.audio_plan?.twoshot?.url;
+          const sourceClip = d.lip_sync_source_clip_url ?? d.clip_url;
+          if (d.engine_override !== 'cinematic-sync-legacy') {
+            if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
+            if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
+          }
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
           if (
             d.lip_sync_status === 'failed' &&
@@ -369,7 +386,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               const errBody = (lsErr as any)?.context;
               const reason = lsData?.error ?? errBody?.error;
               const message = lsData?.message ?? errBody?.message;
-              if (reason === 'tts_failed' || reason === 'no_voiceover') {
+              // Pre-flight races: edge function said the audio plan or the
+              // master plate isn't ready yet. The pre-flight gate above
+              // normally prevents this, but DB read-your-writes lag can
+              // still slip one through. Treat as silent retry — the next
+              // poll tick will pick it up once the row is consistent.
+              const SILENT_RACE = new Set([
+                'missing_audio_plan',
+                'missing_source_clip',
+                'dialog_pipeline_missing_audio_plan',
+                'master_clip_not_ready',
+              ]);
+              if (reason && SILENT_RACE.has(String(reason))) {
+                console.info(
+                  `[useTwoShotAutoTrigger] silent retry for ${d.id}: ${reason}`,
+                );
+              } else if (reason === 'tts_failed' || reason === 'no_voiceover') {
                 emitPipelineEvent({ type: 'lipsync:end' });
                 toast({
                   title: 'Cinematic-Sync braucht ein Voiceover',
