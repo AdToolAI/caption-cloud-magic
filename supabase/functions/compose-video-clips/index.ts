@@ -1021,7 +1021,7 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
-              if (portraitUrls.length >= 2) {
+              if (portraitUrls.length >= 1) {
                 const expectedFaces = portraitUrls.length;
                 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
