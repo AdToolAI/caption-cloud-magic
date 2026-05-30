@@ -74,6 +74,58 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           .eq('project_id', projectId);
         if (error || !data) return;
 
+        // ── Talking-Head Master Self-Heal ───────────────────────────────
+        // Cinematic-Sync scenes whose `clip_url` is a raw `/talking-head-renders/`
+        // file are invalid masters for v5 lip-sync. compose-dialog-segments
+        // blocks them with `raw_talking_head_source_blocked`; here we reset
+        // BEFORE audio-prep / candidate selection so the next "Alle generieren"
+        // produces a real Hailuo/HappyHorse scene plate instead of looping.
+        const isTalkingHeadUrl = (u: any) =>
+          typeof u === 'string' && u.includes('/talking-head-renders/');
+        const talkingHeadMasters = (data as any[]).filter(
+          (d) =>
+            isDialogEngine(d.engine_override) &&
+            !d.lip_sync_applied_at &&
+            isTalkingHeadUrl(d.clip_url),
+        );
+        if (talkingHeadMasters.length > 0) {
+          console.warn(
+            `[useTwoShotAutoTrigger] self-heal: clearing ${talkingHeadMasters.length} talking-head master(s) for cinematic-sync`,
+          );
+          await Promise.all(
+            talkingHeadMasters.map((d) => {
+              inflight.current.delete(d.id);
+              inflight.current.delete(`audio-prep:${d.id}`);
+              // Mutate in place so this tick's downstream filters see the reset.
+              d.clip_url = null;
+              d.clip_status = 'pending';
+              d.lip_sync_status = 'pending';
+              d.lip_sync_source_clip_url = null;
+              d.lip_sync_applied_at = null;
+              d.twoshot_stage = null;
+              d.dialog_shots = null;
+              d.replicate_prediction_id = null;
+              return supabase
+                .from('composer_scenes')
+                .update({
+                  clip_url: null,
+                  clip_status: 'pending',
+                  lip_sync_status: 'pending',
+                  lip_sync_source_clip_url: null,
+                  lip_sync_applied_at: null,
+                  twoshot_stage: null,
+                  dialog_shots: null,
+                  replicate_prediction_id: null,
+                  clip_error:
+                    'auto-reset: talking_head_master_invalid_for_cinematic_sync — bitte Clip neu generieren',
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
+
         const now = Date.now();
         const STALE_MS = 6 * 60 * 1000; // 6min: pipeline takes ~3min, double for safety
         const STALE_PREFLIGHT_MS = 2 * 60 * 1000; // CPU/preflight abort before a Sync.so job exists
