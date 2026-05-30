@@ -819,6 +819,10 @@ export default function VideoComposerDashboard() {
           // in-flight, prefer the pending value over whatever stale snapshot
           // this debounced flush is holding so we don't undo the user's click.
           lip_sync_with_voiceover: (getLipSyncPending(s.id) ?? (s.lipSyncWithVoiceover === true)) === true,
+          // Same pending-aware logic for the Dialog & Lip-Sync toggle —
+          // without persisting this field, the debounced save wouldn't store
+          // dialogMode at all and the toggle would revert on next hydration.
+          dialog_mode: (getDialogModePending(s.id) ?? (s.dialogMode === true)) === true,
           ai_prompt: s.aiPrompt ?? null,
           stock_keywords: s.stockKeywords ?? null,
           upload_url: s.uploadUrl ?? null,
