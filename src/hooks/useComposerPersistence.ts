@@ -174,6 +174,7 @@ export function useComposerPersistence() {
               duration_seconds: scene.durationSeconds,
               clip_source: scene.clipSource,
               clip_quality: scene.clipQuality || 'standard',
+              lip_sync_with_voiceover: scene.lipSyncWithVoiceover === true,
               ai_prompt: scene.aiPrompt ?? null,
               stock_keywords: scene.stockKeywords ?? null,
               upload_url: scene.uploadUrl ?? null,
