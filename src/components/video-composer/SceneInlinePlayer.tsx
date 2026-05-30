@@ -222,16 +222,37 @@ export default function SceneInlinePlayer({
                 transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
                 className="h-9 w-9 rounded-full border-2 border-primary/40 border-t-primary"
               />
-              <p className="mt-2 text-[11px] font-semibold text-primary tracking-wide">
-                {status === 'ready' && lipsyncRunning
-                  ? (lipSyncStatus === 'running' ? 'Lip-Sync läuft…' : 'Lip-Sync startet…')
-                  : 'Szene wird gebaut…'}
-              </p>
-              <p className="mt-0.5 text-[9px] text-muted-foreground">
-                {status === 'ready' && lipsyncRunning
-                  ? 'Sync.so · ~60 s pro Sprecher-Turn'
-                  : 'VO & Lip-Sync inklusive'}
-              </p>
+              {(() => {
+                // Dreistufiges Label für Cinematic-Sync — spiegelt den
+                // tatsächlichen Fortschritt (Audio-Prep → Master fertig →
+                // Sync.so läuft) statt eines einzigen statischen Spinners.
+                let title = 'Szene wird gebaut…';
+                let sub = 'VO & Lip-Sync inklusive';
+                if (status === 'ready' && lipsyncRunning) {
+                  if (twoshotStage === 'audio') {
+                    title = 'Audio wird vorbereitet…';
+                    sub = 'Sync.so wartet auf Voiceover';
+                  } else if (lipSyncStatus === 'running') {
+                    title = 'Lip-Sync läuft…';
+                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                  } else if (twoshotStage === 'master_clip' || !twoshotStage) {
+                    title = 'Master-Plate fertig — Sync.so wird gestartet…';
+                    sub = 'Gleich geht\'s los';
+                  } else {
+                    title = 'Lip-Sync startet…';
+                    sub = 'Sync.so · ~60 s pro Sprecher-Turn';
+                  }
+                }
+                return (
+                  <>
+                    <p className="mt-2 text-[11px] font-semibold text-primary tracking-wide">
+                      {title}
+                    </p>
+                    <p className="mt-0.5 text-[9px] text-muted-foreground">{sub}</p>
+                  </>
+                );
+              })()}
+
             </motion.div>
           )}
         </AnimatePresence>
