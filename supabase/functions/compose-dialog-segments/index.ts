@@ -287,7 +287,7 @@ serve(async (req) => {
           lip_sync_status: "failed",
           twoshot_stage: "failed",
           clip_error:
-            "raw_talking_head_source_blocked: Cinematic-Sync benötigt eine Scene-Plate (Hailuo/HappyHorse), nicht den rohen Talking-Head-Clip. Bitte „🎥 Clip + Lip-Sync neu rendern" drücken.",
+            'raw_talking_head_source_blocked: Cinematic-Sync benötigt eine Scene-Plate (Hailuo/HappyHorse), nicht den rohen Talking-Head-Clip. Bitte Clip + Lip-Sync neu rendern.',
         })
         .eq("id", sceneId);
       return json(
