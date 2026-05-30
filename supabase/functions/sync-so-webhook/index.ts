@@ -396,6 +396,9 @@ serve(async (req) => {
       // Stage E.6 — persist the full webhook payload so we can post-mortem
       // "unknown error" without grepping logs. Keep it bounded.
       try {
+        const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
+        const currentPass = Number((state as any).current_pass ?? 0);
+        const currentPassState = passes[currentPass] ?? null;
         await logSyncDispatch(supabase, {
           scene_id: sceneId,
           job_id: jobId,
@@ -405,6 +408,16 @@ serve(async (req) => {
           error_class: errClass,
           error_message: rawErr.slice(0, 500),
           meta: {
+            diagnostic_id: currentPassState?.diagnostic_id ?? (state as any).last_diagnostic_id ?? null,
+            pass_idx: currentPass,
+            total_passes: Number((state as any).total_passes ?? passes.length ?? 1),
+            retry_variant: (state as any).retry_variant ?? currentPassState?.retry_variant ?? "coords-pro",
+            input_summary: {
+              video: currentPassState?.input_url ?? (state as any).source_clip_url ?? null,
+              audio: currentPassState?.audio_url ?? null,
+              coords: currentPassState?.coords ?? null,
+              speaker: currentPassState?.speaker_name ?? null,
+            },
             webhook_payload: payload,
             retry_count_seen: retryCount,
             transient: isTransientSyncError(errClass),
@@ -416,17 +429,17 @@ serve(async (req) => {
       // For transient failures (rate_limited, timeout, provider_unknown_error,
       // http_5xx) we re-dispatch instead of refunding. compose-dialog-segments
       // is called with retry=true so it skips re-charging the wallet.
-      // IMPORTANT: provider_unknown_error has historically masked a payload
-      // bug rather than a real transient outage. After the May-2026 retry
-      // storm (71 jobs in 15min) we treat it as NON-retryable until proper
-      // root-cause diagnostics come back — let the user see the failure
-      // instead of looping silently.
-      const treatAsTransient =
-        isTransientSyncError(errClass) && errClass !== "provider_unknown_error";
+      // Provider "unknown error" is opaque but often recoverable with a
+      // payload/model variant. Retry through a bounded fallback ladder:
+      // coords-pro → auto-pro → auto-standard, then refund if all fail.
+      const treatAsTransient = isTransientSyncError(errClass);
       const canRetry = treatAsTransient && retryCount < MAX_V5_RETRIES;
 
 
       if (canRetry) {
+        const nextVariant = nextV5RetryVariant((state as any).retry_variant ?? "coords-pro");
+        const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
+        const currentPass = Number((state as any).current_pass ?? 0);
         await supabase
           .from("composer_scenes")
           .update({
@@ -434,16 +447,29 @@ serve(async (req) => {
               ...state,
               status: "retrying",
               retry_count: retryCount + 1,
+              retry_variant: nextVariant,
               last_error: rawErr.slice(0, 200),
               last_error_class: errClass,
+              fallback_history: [
+                ...((state as any).fallback_history ?? []),
+                {
+                  at: nowIso,
+                  job_id: jobId,
+                  pass_idx: currentPass,
+                  from_variant: (state as any).retry_variant ?? "coords-pro",
+                  to_variant: nextVariant,
+                  error_class: errClass,
+                  error: rawErr.slice(0, 200),
+                },
+              ].slice(-8),
             },
             lip_sync_status: "running",
-            twoshot_stage: "syncso_segments_retry",
+            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((state as any).total_passes ?? passes.length ?? 1)}`,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} → retry ${retryCount + 1}/${MAX_V5_RETRIES}`,
+          `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} → retry ${retryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}`,
         );
         // Fire-and-forget re-dispatch. compose-dialog-segments reads the
         // existing state (cost_credits already debited and stored) and uses
@@ -455,12 +481,12 @@ serve(async (req) => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${serviceKey}`,
             },
-            body: JSON.stringify({ scene_id: sceneId, retry: true }),
+            body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: nextVariant }),
           }).catch(() => {});
         } catch {
           /* ignore */
         }
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true });
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true, retry_variant: nextVariant });
       }
 
       // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
