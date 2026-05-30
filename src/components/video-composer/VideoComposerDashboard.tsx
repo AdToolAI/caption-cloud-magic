@@ -48,7 +48,7 @@ import AdCampaignTree from './AdCampaignTree';
 import { spawnAdCampaignChildren } from '@/lib/adDirector/spawnAdCampaignChildren';
 import { propagateDialogLock } from '@/lib/video-composer/propagateDialogLock';
 import { castSignature } from '@/lib/video-composer/castSignature';
-import { resolveLipSyncValue, getLipSyncPending } from '@/lib/video-composer/lipSyncPending';
+import { resolveLipSyncValue, getLipSyncPending, resolveDialogModeValue, getDialogModePending } from '@/lib/video-composer/lipSyncPending';
 import {
   useComposerPresence,
   useComposerScenesRealtime,
@@ -373,7 +373,7 @@ export default function VideoComposerDashboard() {
               : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
-            dialogMode: ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false,
+            dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
             engineOverride: ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto',
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
@@ -503,7 +503,7 @@ export default function VideoComposerDashboard() {
               : ((row as any).character_shot ? [(row as any).character_shot] : (local?.characterShots ?? [])),
             dialogScript: ((row as any).dialog_script as any) ?? local?.dialogScript,
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
-            dialogMode: ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false,
+            dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
             engineOverride: ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto',
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
@@ -819,6 +819,10 @@ export default function VideoComposerDashboard() {
           // in-flight, prefer the pending value over whatever stale snapshot
           // this debounced flush is holding so we don't undo the user's click.
           lip_sync_with_voiceover: (getLipSyncPending(s.id) ?? (s.lipSyncWithVoiceover === true)) === true,
+          // Same pending-aware logic for the Dialog & Lip-Sync toggle —
+          // without persisting this field, the debounced save wouldn't store
+          // dialogMode at all and the toggle would revert on next hydration.
+          dialog_mode: (getDialogModePending(s.id) ?? (s.dialogMode === true)) === true,
           ai_prompt: s.aiPrompt ?? null,
           stock_keywords: s.stockKeywords ?? null,
           upload_url: s.uploadUrl ?? null,

@@ -88,7 +88,7 @@ import {
   findMentions,
 } from "@/lib/motion-studio/mentionParser";
 import { composePromptLayers } from "@/lib/motion-studio/composePromptLayers";
-import { markLipSyncPending, clearLipSyncPending } from "@/lib/video-composer/lipSyncPending";
+import { markLipSyncPending, clearLipSyncPending, markDialogModePending, clearDialogModePending } from "@/lib/video-composer/lipSyncPending";
 import { sceneFeaturesCharacter } from "@/lib/motion-studio/sceneFeaturesCharacter";
 import {
   useBrandCharacters,
@@ -1194,9 +1194,11 @@ export default function SceneCard({
                               type="button"
                               role="switch"
                               aria-checked={dialogMode}
-                              onClick={() => {
+                              onClick={async () => {
                                 const next = !dialogMode;
                                 const updates: Partial<ComposerScene> = { dialogMode: next };
+                                let dbClipSource: ClipSource | undefined;
+                                let dbClipQuality: ClipQuality | undefined;
                                 if (next) {
                                   const ok = (NATIVE_DIALOGUE_CLIP_SOURCES as ReadonlyArray<string>).includes(
                                     scene.clipSource,
@@ -1204,6 +1206,8 @@ export default function SceneCard({
                                   if (!ok) {
                                     updates.clipSource = DIALOG_FALLBACK_CLIP_SOURCE;
                                     updates.clipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
+                                    dbClipSource = DIALOG_FALLBACK_CLIP_SOURCE;
+                                    dbClipQuality = DIALOG_FALLBACK_CLIP_QUALITY;
                                     toast({
                                       title:
                                         lang === "de"
@@ -1220,7 +1224,37 @@ export default function SceneCard({
                                     });
                                   }
                                 }
+                                // Optimistic local update.
                                 onUpdate(updates);
+                                // Mark pending so a racing realtime refetch or
+                                // debounced scene-save can't revert the toggle
+                                // before the DB commit lands.
+                                markDialogModePending(scene.id, next);
+                                if (isUuid(scene.id)) {
+                                  try {
+                                    const payload: Record<string, unknown> = {
+                                      dialog_mode: next,
+                                    };
+                                    if (dbClipSource) payload.clip_source = dbClipSource;
+                                    if (dbClipQuality) payload.clip_quality = dbClipQuality;
+                                    const { error } = await supabase
+                                      .from("composer_scenes")
+                                      .update(payload)
+                                      .eq("id", scene.id);
+                                    if (error) throw error;
+                                  } catch (e) {
+                                    console.warn(
+                                      "[SceneCard] dialogMode toggle persist failed",
+                                      e,
+                                    );
+                                    clearDialogModePending(scene.id);
+                                    // Roll back local optimistic change.
+                                    const rollback: Partial<ComposerScene> = { dialogMode: !next };
+                                    if (dbClipSource) rollback.clipSource = scene.clipSource;
+                                    if (dbClipQuality) rollback.clipQuality = scene.clipQuality;
+                                    onUpdate(rollback);
+                                  }
+                                }
                               }}
                               className={cn(
                                 "relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors",
