@@ -2790,13 +2790,34 @@ serve(async (req) => {
         .update({ status: "preview", updated_at: new Date().toISOString() })
         .eq("id", projectId);
     }
+    }; // end processScenes()
+
+    // Kick off the heavy per-scene work in the background and return
+    // immediately. The supabase-js client therefore never times out, the UI
+    // keeps showing 'generating' (we pre-marked the DB above), and the user
+    // sees the pipeline bar move while compose/dispatch run server-side.
+    // @ts-ignore — EdgeRuntime is a Deno Deploy global on Supabase Edge
+    if (typeof EdgeRuntime !== "undefined" && (EdgeRuntime as any).waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(
+        processScenes().catch((err) => {
+          console.error(
+            "[compose-video-clips] background processScenes failed:",
+            err instanceof Error ? err.message : String(err),
+          );
+        }),
+      );
+    } else {
+      // Local dev fallback — run inline.
+      await processScenes();
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        results,
-        totalCost: actualCost,
-        generatingCount,
+        async: true,
+        results: optimisticResults,
+        generatingCount: optimisticResults.filter((r) => r.status === "generating").length,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
