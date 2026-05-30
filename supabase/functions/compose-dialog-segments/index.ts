@@ -279,22 +279,32 @@ serve(async (req) => {
       isTalkingHead(clipUrlCandidate);
     if (bothTalkingHead) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} BLOCKED — both clip_url and lip_sync_source_clip_url are raw talking-head plates`,
+        `[compose-dialog-segments] scene=${sceneId} BLOCKED — both clip_url and lip_sync_source_clip_url are raw talking-head plates → resetting clip for re-render`,
       );
+      // Self-heal: clear the invalid talking-head master so the next
+      // "Alle generieren" / per-scene render produces a real scene plate
+      // (Hailuo/HappyHorse i2v) instead of looping back into this block.
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
+          clip_url: null,
+          clip_status: "pending",
+          lip_sync_status: "pending",
+          lip_sync_source_clip_url: null,
+          lip_sync_applied_at: null,
+          twoshot_stage: null,
+          dialog_shots: null,
+          replicate_prediction_id: null,
           clip_error:
-            'raw_talking_head_source_blocked: Cinematic-Sync benötigt eine Scene-Plate (Hailuo/HappyHorse), nicht den rohen Talking-Head-Clip. Bitte Clip + Lip-Sync neu rendern.',
+            'raw_talking_head_source_blocked: Cinematic-Sync benötigt eine Scene-Plate (Hailuo/HappyHorse), nicht den rohen Talking-Head-Clip. Clip wurde zurückgesetzt — bitte erneut „Alle generieren" drücken.',
+          updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       return json(
         {
           error: "raw_talking_head_source_blocked",
           message:
-            "Cinematic-Sync benötigt eine Scene-Plate, nicht den rohen Avatar-Clip. Szene neu rendern.",
+            "Cinematic-Sync benötigt eine Scene-Plate, nicht den rohen Avatar-Clip. Clip wurde zurückgesetzt — bitte erneut generieren.",
         },
         422,
       );
