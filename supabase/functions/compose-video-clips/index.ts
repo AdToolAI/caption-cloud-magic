@@ -2635,28 +2635,36 @@ serve(async (req) => {
           // STAGE 4 (May 30 2026): Cinematic-Sync + HappyHorse must NEVER
           // start without a freshly composed scene-anchor as I2V reference —
           // otherwise HappyHorse invents the scene from text and v5 lip-sync
-          // ends up on a raw avatar bust. Mirror the Hailuo safety reset.
+          // ends up on a raw avatar bust. STAGE 5 (May 30 2026, single-speaker):
+          // Instead of hard-failing the scene (which leaves the user with no
+          // working clip at all), silently migrate to ai-hailuo — Hailuo's
+          // T2V path is stable enough for cinematic-sync as Master-Plate and
+          // the downstream pipeline (compose-twoshot-audio + compose-dialog-
+          // segments) is identical.
           if (isCinematicSyncHH && !isI2V) {
-            const msg =
-              "happyhorse_cinematic_sync_missing_anchor: Es konnte keine Scene-Anchor-Referenz erzeugt werden. Bitte Charakter-Portraits prüfen und Szene neu rendern.";
-            console.error(
-              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id} aborted — no composed reference_image_url`,
+            console.warn(
+              `[compose-video-clips] HappyHorse Cinematic-Sync scene ${scene.id}: no composed reference_image_url — migrating to ai-hailuo (single-speaker safe fallback).`,
             );
+            scene.clipSource = "ai-hailuo";
             await supabaseAdmin
               .from("composer_scenes")
               .update({
-                clip_status: "failed",
-                clip_error: msg,
+                clip_source: "ai-hailuo",
+                clip_error: "auto-migrated: happyhorse_cinematic_sync_no_anchor → hailuo",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", scene.id);
-            results.push({
-              sceneId: scene.id,
-              status: "failed",
-              error: msg,
-            });
+            // Re-enter the per-source dispatcher with the migrated source.
+            // Note: 'continue' would skip the credits/results push; instead we
+            // simulate a re-evaluation by recursively handling the Hailuo
+            // branch via a flag. Simplest: just fall through to next iteration
+            // by pushing a 'generating' marker and skipping HappyHorse.
+            // The scene is now `ai-hailuo`; auto-trigger will pick it up on
+            // the next call. Mark generating so the UI keeps spinning.
+            results.push({ sceneId: scene.id, status: "generating" });
             continue;
           }
+
 
           await supabaseAdmin
             .from("composer_scenes")
