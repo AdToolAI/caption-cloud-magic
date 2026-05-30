@@ -1199,6 +1199,26 @@ export default function SceneCard({
                                 const updates: Partial<ComposerScene> = { dialogMode: next };
                                 let dbClipSource: ClipSource | undefined;
                                 let dbClipQuality: ClipQuality | undefined;
+                                // Snapshot previous engine + lipsync flag for rollback.
+                                const prevEngine = scene.engineOverride ?? "auto";
+                                const prevLipSync = scene.lipSyncWithVoiceover === true;
+                                // When the user turns Dialog & Lip-Sync ON we MUST also
+                                // route the scene through the Cinematic-Sync pipeline
+                                // (Hailuo plate → Sync.so lipsync overlay) — otherwise
+                                // `compose-video-clips` auto-routes single-speaker
+                                // dialog scenes to HeyGen, which produces an isolated
+                                // avatar bust instead of integrating the dialogue into
+                                // the actual scene visual.
+                                const nextEngine: ComposerScene["engineOverride"] = next
+                                  ? "cinematic-sync"
+                                  : prevEngine === "cinematic-sync"
+                                    ? "auto"
+                                    : prevEngine;
+                                const nextLipSync = next ? true : false;
+                                const engineChanged = nextEngine !== prevEngine;
+                                const lipSyncChanged = nextLipSync !== prevLipSync;
+                                if (engineChanged) updates.engineOverride = nextEngine;
+                                if (lipSyncChanged) updates.lipSyncWithVoiceover = nextLipSync;
                                 if (next) {
                                   const ok = (NATIVE_DIALOGUE_CLIP_SOURCES as ReadonlyArray<string>).includes(
                                     scene.clipSource,
@@ -1227,14 +1247,18 @@ export default function SceneCard({
                                 // Optimistic local update.
                                 onUpdate(updates);
                                 // Mark pending so a racing realtime refetch or
-                                // debounced scene-save can't revert the toggle
-                                // before the DB commit lands.
+                                // debounced scene-save can't revert any of the
+                                // toggled fields before the DB commit lands.
                                 markDialogModePending(scene.id, next);
+                                if (lipSyncChanged) markLipSyncPending(scene.id, nextLipSync);
+                                if (engineChanged) markEngineOverridePending(scene.id, nextEngine);
                                 if (isUuid(scene.id)) {
                                   try {
                                     const payload: Record<string, unknown> = {
                                       dialog_mode: next,
                                     };
+                                    if (engineChanged) payload.engine_override = nextEngine;
+                                    if (lipSyncChanged) payload.lip_sync_with_voiceover = nextLipSync;
                                     if (dbClipSource) payload.clip_source = dbClipSource;
                                     if (dbClipQuality) payload.clip_quality = dbClipQuality;
                                     const { error } = await supabase
@@ -1248,8 +1272,12 @@ export default function SceneCard({
                                       e,
                                     );
                                     clearDialogModePending(scene.id);
+                                    if (lipSyncChanged) clearLipSyncPending(scene.id);
+                                    if (engineChanged) clearEngineOverridePending(scene.id);
                                     // Roll back local optimistic change.
                                     const rollback: Partial<ComposerScene> = { dialogMode: !next };
+                                    if (engineChanged) rollback.engineOverride = prevEngine;
+                                    if (lipSyncChanged) rollback.lipSyncWithVoiceover = prevLipSync;
                                     if (dbClipSource) rollback.clipSource = scene.clipSource;
                                     if (dbClipQuality) rollback.clipQuality = scene.clipQuality;
                                     onUpdate(rollback);
