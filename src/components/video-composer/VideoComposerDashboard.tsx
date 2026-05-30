@@ -505,7 +505,7 @@ export default function VideoComposerDashboard() {
             dialogVoices: ((row as any).dialog_voices as any) ?? local?.dialogVoices ?? {},
             dialogMode: resolveDialogModeValue(row.id, ((row as any).dialog_mode as any) ?? local?.dialogMode ?? false),
             dialogTakes: ((row as any).dialog_takes as any) ?? local?.dialogTakes ?? {},
-            engineOverride: ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto',
+            engineOverride: resolveEngineOverrideValue(row.id, ((row as any).engine_override as any) ?? local?.engineOverride ?? 'auto'),
             shotDirector: ((row as any).shot_director as any) ?? local?.shotDirector ?? {},
             promptSlots: ((row as any).prompt_slots as any) ?? local?.promptSlots,
             promptMode: ((row as any).prompt_mode as any) ?? local?.promptMode,
