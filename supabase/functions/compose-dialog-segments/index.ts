@@ -258,8 +258,26 @@ serve(async (req) => {
       );
     }
 
-    const sourceClipUrl =
+    // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
+    // must NEVER use a stale `talking-head-renders/...` URL as the source —
+    // that is a HeyGen avatar bust from an earlier engine, and using it as
+    // the v5 lipsync input produces the "raw avatar instead of the scene"
+    // bug. Prefer `clip_url` (freshly rendered scene plate) and only fall
+    // back to `lip_sync_source_clip_url` when it does not point at the
+    // talking-head bucket.
+    const rawSourceCandidate =
       (scene as any).lip_sync_source_clip_url || (scene as any).clip_url || null;
+    const isTalkingHeadUrl =
+      typeof rawSourceCandidate === "string" &&
+      rawSourceCandidate.includes("/talking-head-renders/");
+    const sourceClipUrl = isTalkingHeadUrl
+      ? ((scene as any).clip_url || null)
+      : rawSourceCandidate;
+    if (isTalkingHeadUrl) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} ignoring stale talking-head source clip → using clip_url=${(scene as any).clip_url ?? "null"}`,
+      );
+    }
     if (!sourceClipUrl) {
       return json(
         { error: "missing_source_clip", message: "Scene has no master plate to lipsync onto." },
