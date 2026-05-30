@@ -275,6 +275,98 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         }
 
+        // ── AUDIO-PLATE SELF-HEAL ────────────────────────────────────────
+        // Cinematic-Sync braucht zwingend `audio_plan.twoshot.url` (gemerged
+        // VO aus compose-twoshot-audio). Bei manchen Flows (Engine nach
+        // Master-Render umgestellt, Dialog-Toggle nachträglich aktiviert,
+        // oder stiller Exception-Abbruch in compose-video-clips' Prep-Block)
+        // existiert die Audio-Plate nie → Pre-Flight-Gate unten überspringt
+        // die Szene endlos → UI hängt bei „Lip-Sync startet…". Wir bauen
+        // sie hier deterministisch nach, BEVOR der eigentliche v5-Dispatch
+        // läuft.
+        const AUDIO_PREP_STALE_MS = 3 * 60 * 1000; // 3min: TTS+Mux dauert ~10–30s
+        const hasDialogScript = (d: any) =>
+          typeof d.dialog_script === 'string' &&
+          /^\s*\[?[A-Za-zÀ-ÿ][\w\s.'-]{1,40}?\]?\s*[:：]/m.test(d.dialog_script);
+
+        // Stale-Watchdog: stage='audio' >3min ohne audio_plan → clear stage
+        // damit nächster Tick einen frischen Versuch startet.
+        const stalePrep = (data as any[]).filter(
+          (d) =>
+            isDialogEngine(d.engine_override) &&
+            d.twoshot_stage === 'audio' &&
+            !d.audio_plan?.twoshot?.url &&
+            d.updated_at &&
+            now - new Date(d.updated_at).getTime() > AUDIO_PREP_STALE_MS,
+        );
+        if (stalePrep.length > 0) {
+          console.warn(
+            `[useTwoShotAutoTrigger] resetting ${stalePrep.length} stale audio-prep stage(s)`,
+          );
+          await Promise.all(
+            stalePrep.map((d) => {
+              inflight.current.delete(`audio-prep:${d.id}`);
+              d.twoshot_stage = null;
+              return supabase
+                .from('composer_scenes')
+                .update({ twoshot_stage: null, clip_error: 'auto-reset: stale audio prep' })
+                .eq('id', d.id);
+            }),
+          );
+        }
+
+        const needsAudioPrep = (data as any[]).filter((d) => {
+          if (!isDialogEngine(d.engine_override)) return false;
+          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          if (d.lip_sync_applied_at) return false;
+          if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
+          if (d.clip_status && d.clip_status !== 'ready') return false;
+          if (d.audio_plan?.twoshot?.url) return false; // schon da
+          if (d.twoshot_stage === 'audio') return false; // läuft gerade
+          if (inflight.current.has(`audio-prep:${d.id}`)) return false;
+          if (!hasDialogScript(d)) return false;
+          return true;
+        });
+        for (const d of needsAudioPrep) {
+          inflight.current.add(`audio-prep:${d.id}`);
+          d.twoshot_stage = 'audio'; // optimistisch — UI zeigt sofort den Stage
+          await supabase
+            .from('composer_scenes')
+            .update({ twoshot_stage: 'audio', updated_at: new Date().toISOString() })
+            .eq('id', d.id);
+          console.info(
+            `[useTwoShotAutoTrigger] self-heal: invoking compose-twoshot-audio for ${d.id}`,
+          );
+          supabase.functions
+            .invoke('compose-twoshot-audio', { body: { scene_id: d.id } })
+            .then(async ({ data: aData, error: aErr }) => {
+              if (aErr || !aData?.success) {
+                const realMsg = aErr ? await extractFunctionsError(aErr) : (aData?.error ?? 'unknown');
+                console.warn(
+                  `[useTwoShotAutoTrigger] audio-prep failed for ${d.id}:`,
+                  realMsg,
+                );
+                await supabase
+                  .from('composer_scenes')
+                  .update({
+                    twoshot_stage: 'failed',
+                    lip_sync_status: 'failed',
+                    clip_error: `twoshot_audio_prep_failed: ${String(realMsg).slice(0, 200)}`,
+                  })
+                  .eq('id', d.id);
+              } else {
+                console.info(
+                  `[useTwoShotAutoTrigger] audio-prep OK for ${d.id} — v5 will start next tick`,
+                );
+              }
+            })
+            .finally(() => {
+              setTimeout(() => inflight.current.delete(`audio-prep:${d.id}`), 30_000);
+            });
+        }
+
+
+
 
         // Recoverable failure reasons we auto-retry exactly once per mount.
         // (Hard refusals like 'no_voiceover' or 'source_clip_unusable' need
