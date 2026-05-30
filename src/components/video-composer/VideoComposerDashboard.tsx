@@ -814,7 +814,11 @@ export default function VideoComposerDashboard() {
           clip_source: s.clipSource,
           clip_quality: s.clipQuality || 'standard',
           with_audio: s.withAudio !== false,
-          lip_sync_with_voiceover: s.lipSyncWithVoiceover === true,
+          // Lip-Sync toggle has its own atomic write path (SceneCard /
+          // SceneAvatarMode → markLipSyncPending). If a click is still
+          // in-flight, prefer the pending value over whatever stale snapshot
+          // this debounced flush is holding so we don't undo the user's click.
+          lip_sync_with_voiceover: (getLipSyncPending(s.id) ?? (s.lipSyncWithVoiceover === true)) === true,
           ai_prompt: s.aiPrompt ?? null,
           stock_keywords: s.stockKeywords ?? null,
           upload_url: s.uploadUrl ?? null,
