@@ -969,7 +969,14 @@ serve(async (req) => {
                 );
               if (remapped.length >= 1) effectiveShots = remapped;
             }
-            if (effectiveShots.length >= 2) {
+            // STAGE 3 (May 30 2026): also enforce scene-aware anchor for
+            // SINGLE-speaker cinematic-sync. Without this, a 1-speaker scene
+            // with a portrait would skip composition entirely and Hailuo /
+            // HappyHorse would either invent the scene from text (drift) or
+            // — far worse — a stale `lip_sync_source_clip_url` from a previous
+            // Talking-Head render would survive into v5 lipsync, making the
+            // final video a raw avatar bust instead of the prompted scene.
+            if (effectiveShots.length >= 1) {
               // Resolve outfit-look cover images so the anchor renders the
               // user-picked Casual/Brand outfit (instead of the bare portrait
               // photo). Falls back to the avatar's base portrait when no
@@ -1014,7 +1021,7 @@ serve(async (req) => {
                 .filter(
                   (n): n is string => typeof n === "string" && n.length > 0,
                 );
-              if (portraitUrls.length >= 2) {
+              if (portraitUrls.length >= 1) {
                 const expectedFaces = portraitUrls.length;
                 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
