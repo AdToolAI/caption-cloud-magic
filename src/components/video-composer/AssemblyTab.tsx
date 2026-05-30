@@ -271,7 +271,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   };
 
   const handleRender = async () => {
-    if (!allReady) {
+    if (!canRender) {
       toast({ title: tt('clipsNotReady'), description: tt('generateClipsFirst'), variant: 'destructive' });
       return;
     }
