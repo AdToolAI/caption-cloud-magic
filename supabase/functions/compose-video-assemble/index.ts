@@ -293,6 +293,21 @@ serve(async (req) => {
 
       const positionTrack = buildPositionTrack(s.subject_track, effectiveDuration);
 
+      // Lip-sync override: when Sync.so has baked the synced voice INTO the
+      // clip (`lip_sync_applied_at` set) AND there is no separate merged
+      // dialog WAV (`audio_plan.twoshot.useExternalAudio`), the embedded
+      // audio IS the final voice — it MUST stay un-muted, otherwise the
+      // exported scene is silent (the external voiceover clip is also
+      // filtered out further below because it's "already inside the video").
+      const isLipSynced = !!s.lip_sync_applied_at;
+      const usesExternalDialogAudio =
+        s?.audio_plan?.twoshot?.useExternalAudio === true;
+      const keepEmbeddedLipsyncAudio = isLipSynced && !usesExternalDialogAudio;
+      if (keepEmbeddedLipsyncAudio) {
+        console.log(
+          `[compose-video-assemble] scene ${s.id}: lipsync embedded audio kept (withAudio override)`,
+        );
+      }
       return {
         videoUrl: s.clip_url,
         // Flag for the renderer: route through <KenBurnsImage> instead of <Video>.
@@ -314,8 +329,10 @@ serve(async (req) => {
         positionTrack: positionTrack && positionTrack.length > 0 ? positionTrack : undefined,
         // "With sound / no sound" toggle — when true, the renderer keeps the
         // native AI audio track (Sora/Veo/Kling). Default = false (muted) so
-        // legacy projects keep playing silently.
-        withAudio: s.with_audio === true,
+        // legacy projects keep playing silently. EXCEPTION: single-speaker
+        // lip-sync scenes (see `keepEmbeddedLipsyncAudio` above) force this
+        // ON so the baked Sync.so voice survives the render.
+        withAudio: s.with_audio === true || keepEmbeddedLipsyncAudio,
       };
     });
 
