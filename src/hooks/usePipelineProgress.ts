@@ -463,7 +463,7 @@ export function usePipelineProgress({
     if (!m) return { progress: 0, running: false, done: false, applicable: false };
     if (b?.musicHad) return { progress: 1, running: false, done: true, applicable: false };
     return { progress: 1, running: false, done: true, applicable: true };
-  }, [assemblyConfig?.music]);
+  }, [assemblyConfig?.music, baselineVersion]);
 
   const exportReal = useMemo(() => {
     if (!renderRunning && renderPercent <= 0) {
