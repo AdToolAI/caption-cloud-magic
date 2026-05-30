@@ -50,6 +50,12 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
 const ASSUMED_MASTER_FPS = 24;
 const MAX_SHOT_RETRIES = 1;
 const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
+const V5_RETRY_VARIANTS = ["coords-pro", "auto-pro", "auto-standard"] as const;
+
+function nextV5RetryVariant(current: unknown) {
+  const idx = V5_RETRY_VARIANTS.indexOf(current as any);
+  return V5_RETRY_VARIANTS[Math.min(idx < 0 ? 1 : idx + 1, V5_RETRY_VARIANTS.length - 1)];
+}
 
 function isMultiSpeakerScene(shots: any[]): boolean {
   return new Set(shots.map((s) => s?.speaker_idx)).size >= 2;
