@@ -96,13 +96,21 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   const pollStartRef = useRef<number>(0);
   const hydratedRef = useRef(false);
 
-  const clipCost = scenes.reduce((sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0);
-  const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
-  const renderCost = 0;
-  const totalCost = clipCost + voCost;
-
   const readyClips = scenes.filter(s => s.clipStatus === 'ready' && s.clipUrl);
   const allReady = readyClips.length === scenes.length && scenes.length > 0;
+  const canRender = readyClips.length > 0;
+
+  // Partial-render cost: only charge for clips that will actually go to Lambda.
+  const readyClipCost = readyClips.reduce(
+    (sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0
+  );
+  const clipCost = scenes.reduce(
+    (sum, s) => sum + getClipCost(s.clipSource, s.clipQuality || 'standard', s.durationSeconds), 0
+  );
+  const voCost = assemblyConfig.voiceover?.enabled ? 0.05 : 0;
+  const renderCost = 0;
+  const totalCost = readyClipCost + voCost;
+  const fullProjectCost = clipCost + voCost;
 
   const stopPolling = () => {
     if (pollTimerRef.current) {
@@ -263,7 +271,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
   };
 
   const handleRender = async () => {
-    if (!allReady) {
+    if (!canRender) {
       toast({ title: tt('clipsNotReady'), description: tt('generateClipsFirst'), variant: 'destructive' });
       return;
     }
@@ -322,9 +330,10 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
       const rid: string = data.renderId;
       setRenderId(rid);
       setRenderStatus('rendering');
+      const skipped = Number(data?.skippedScenes ?? 0);
       toast({
         title: tt('renderStarted'),
-        description: `${data.scenesCount} ${t('videoComposer.scenes')} · ${Math.round(data.totalDuration)}s`,
+        description: `${data.scenesCount} ${t('videoComposer.scenes')} · ${Math.round(data.totalDuration)}s${skipped > 0 ? ` · ${skipped} ${t('videoComposer.scenes')} ${t('videoComposer.skippedSuffix')}` : ''}`,
       });
 
       // Start polling almost immediately so the bar starts moving fast
@@ -686,7 +695,7 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
         <Button
           size="lg"
           onClick={handleRender}
-          disabled={isRendering || !allReady}
+          disabled={isRendering || !canRender}
           className="gap-2"
         >
           {isRendering ? (
@@ -701,9 +710,11 @@ export default function AssemblyTab({ project, assemblyConfig, onUpdateAssembly,
           )}
         </Button>
       </div>
-      {!allReady && scenes.length > 0 && (
+      {scenes.length > 0 && !allReady && (
         <p className="text-[10px] text-muted-foreground text-right">
-          {readyClips.length}/{scenes.length} {t('videoComposer.clipsReady')} — {t('videoComposer.allClipsMustBeReady')}
+          {canRender
+            ? `${readyClips.length}/${scenes.length} ${t('videoComposer.clipsReady')} — ${t('videoComposer.partialRenderHint')}`
+            : `${readyClips.length}/${scenes.length} ${t('videoComposer.clipsReady')} — ${t('videoComposer.allClipsMustBeReady')}`}
         </p>
       )}
     </div>
