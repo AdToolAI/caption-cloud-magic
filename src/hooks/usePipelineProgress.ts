@@ -604,6 +604,37 @@ export function usePipelineProgress({
     ? Math.round((Date.now() - pipelineStartRef.current) / 1000)
     : 0;
 
+  // ── Stall detection ─────────────────────────────────────────────────
+  // Track the highest *real* (non-soft-floor) progress we've seen this run.
+  // If the bar sits ≥ 90 % for > 4 min without any real movement, declare
+  // the pipeline stalled — the UI flips to red + offers a retry, instead of
+  // pretending to load forever (observed 2026-05-31: bar stuck at 95% with
+  // "Slots 0/3" for 21 min after compose-video-clips silently crashed).
+  const STALL_THRESHOLD_MS = 4 * 60 * 1000;
+  const STALL_MIN_PERCENT = 90;
+  const realProgressRef = useRef<{ value: number; at: number }>({ value: 0, at: Date.now() });
+  const realProgressSum =
+    clipsReal.progress * PHASE_WEIGHTS.clips +
+    voiceoverReal.progress * PHASE_WEIGHTS.voiceover +
+    lipsyncReal.progress * PHASE_WEIGHTS.lipsync +
+    musicReal.progress * PHASE_WEIGHTS.music +
+    exportReal.progress * PHASE_WEIGHTS.export;
+  if (realProgressSum > realProgressRef.current.value + 0.001) {
+    realProgressRef.current = { value: realProgressSum, at: Date.now() };
+  }
+  const isStalled =
+    isActive &&
+    !!pipelineStartRef.current &&
+    runFloorRef.current >= STALL_MIN_PERCENT &&
+    Date.now() - realProgressRef.current.at > STALL_THRESHOLD_MS;
+
+  // Reset the stall baseline whenever the pipeline stops being active.
+  useEffect(() => {
+    if (!isActive) {
+      realProgressRef.current = { value: 0, at: Date.now() };
+    }
+  }, [isActive]);
+
   // Once lipsync is terminal (done or failed) AND no export is running, stop
   // letting the run-soft-percent ramp toward RUN_NOMINAL_SECONDS — otherwise
   // the bar visibly keeps "loading" for minutes after Sync.so reported done.
@@ -614,10 +645,10 @@ export function usePipelineProgress({
   const exportIdleOrDone = !exportPhase || exportPhase.status === 'idle' || exportPhase.status === 'done';
   const waitingForExport = lipsyncTerminal && exportIdleOrDone && !renderRunning;
 
-  const runSoftPercent = isActive && pipelineStartRef.current && !waitingForExport
+  const runSoftPercent = isActive && pipelineStartRef.current && !waitingForExport && !isStalled
     ? Math.min(95, Math.max(1, (elapsedSeconds / RUN_NOMINAL_SECONDS) * 95))
     : 0;
-  const hasFailure = phases.some((p) => p.status === 'failed');
+  const hasFailure = phases.some((p) => p.status === 'failed') || isStalled;
   const allDone = phases.length > 0 && phases.every((p) => p.status === 'done');
   const completedCleanly = !isActive && !hasFailure && phases.some((p) => p.status === 'done');
   // When lipsync is terminal and we're waiting for the user to trigger the
@@ -631,11 +662,11 @@ export function usePipelineProgress({
         : hasFailure
           ? runFloorRef.current
           : phaseOverall;
-  runFloorRef.current = isActive && !waitingForExport
+  runFloorRef.current = isActive && !waitingForExport && !isStalled
     ? Math.max(runFloorRef.current, currentOverall)
     : currentOverall;
   const overallPercent = Math.round(allDone || completedCleanly ? 100 : Math.min(99, runFloorRef.current));
-  const etaSeconds = isActive && !waitingForExport ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
+  const etaSeconds = isActive && !waitingForExport && !isStalled ? Math.max(0, RUN_NOMINAL_SECONDS - elapsedSeconds) : 0;
 
   return {
     phases,
@@ -643,7 +674,11 @@ export function usePipelineProgress({
     overallPercent,
     etaSeconds: Math.round(etaSeconds),
     elapsedSeconds,
-    isActive,
+    isActive: isActive && !isStalled,
     hasFailure,
+    isStalled,
+    stallHint: isStalled
+      ? 'Pipeline scheint zu hängen — bitte erneut auf „Alle generieren" klicken.'
+      : null,
   };
 }
