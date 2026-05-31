@@ -31,7 +31,8 @@ function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: numb
   const hasShot = !!shot && !!shot.shotType && shot.shotType !== 'absent';
   // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
   const idMatch = hasShot && shot!.characterId === character.id;
-  const firstName = character.name?.trim().toLowerCase().split(/\s+/)[0] || '';
+  const fullName = (character?.name ?? '').trim().toLowerCase();
+  const firstName = fullName.split(/\s+/)[0] || '';
   const nameMatchInId =
     hasShot &&
     !!shot!.characterId &&
@@ -41,7 +42,7 @@ function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: numb
   const promptText = (scene.aiPrompt || '').toLowerCase();
   const nameMatchInPrompt =
     !!firstName &&
-    (promptText.includes(character.name.toLowerCase()) || promptText.includes(firstName));
+    ((!!fullName && promptText.includes(fullName)) || promptText.includes(firstName));
 
   if (!idMatch && !nameMatchInId && !nameMatchInPrompt) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
