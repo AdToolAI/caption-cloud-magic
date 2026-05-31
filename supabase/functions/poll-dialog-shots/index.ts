@@ -646,7 +646,7 @@ async function startSyncTurnJob(
       (fallback.input as any[])[1] = { type: "audio", url: audioUrl };
       r = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
-        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        headers: syncDispatchHeaders,
         body: JSON.stringify(fallback),
       });
       if (!r.ok) {
