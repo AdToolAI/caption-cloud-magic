@@ -124,13 +124,13 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
               </tr>
             </thead>
             <tbody>
-              {characters.map((c) => (
+              {safeCharacters.map((c) => (
                 <tr key={c.id}>
                   <td className="p-1 sticky left-0 bg-card">
                     <div className="flex items-center gap-1.5">
                       <Avatar className="h-5 w-5">
                         <AvatarFallback className="text-[8px]">
-                          {c.name.slice(0, 2).toUpperCase()}
+                          {(c.name ?? '??').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <span className="truncate max-w-[80px]">{c.name}</span>
