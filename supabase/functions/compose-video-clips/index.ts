@@ -2890,10 +2890,7 @@ serve(async (req) => {
     // if even the body parse failed we just return the error JSON.
     let failedSceneIds: string[] = [];
     try {
-      const body = (globalThis as any).__lastClipBody as
-        | { scenes?: Array<{ id?: string }> }
-        | undefined;
-      failedSceneIds = (body?.scenes ?? [])
+      failedSceneIds = (__parsedBody?.scenes ?? [])
         .map((s) => s?.id)
         .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
       if (failedSceneIds.length > 0) {
