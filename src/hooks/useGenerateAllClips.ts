@@ -284,6 +284,19 @@ export function useGenerateAllClips({
       });
       if (error) throw error;
 
+      // Edge function returns HTTP 200 with `{ok:false}` on early-phase crashes.
+      if (data && (data as any).ok === false) {
+        const reason = (data as any).error || (data as any).message || 'Unbekannter Fehler.';
+        const stage = (data as any).stage ? ` [${(data as any).stage}]` : '';
+        toast({
+          title: 'Generierung fehlgeschlagen',
+          description: `${reason}${stage}`,
+          variant: 'destructive',
+        });
+        emitPipelineEvent({ type: 'clips:end' });
+        return;
+      }
+
       const updatedScenes = optimistic.map((scene) => {
         const result = data?.results?.find((r: any) => r.sceneId === scene.id);
         if (result) {
