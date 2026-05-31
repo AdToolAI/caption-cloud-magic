@@ -181,6 +181,18 @@ export function useGenerateAllClips({
             s.engineOverride === 'cinematic-sync' &&
             !!(s as any).twoshotStage &&
             (s as any).twoshotStage !== 'failed'
+          ) &&
+          // Stage 8 (May 31 2026): don't re-trigger Cinematic-Sync scenes that
+          // are already mid-lipsync — that's the root cause of "5 min later
+          // the scene starts from scratch again with doubled audio". A scene
+          // is mid-lipsync when lip_sync_status is pending/running/stitching
+          // and lip_sync_applied_at hasn't been written yet.
+          !(
+            s.engineOverride === 'cinematic-sync' &&
+            !(s as any).lipSyncAppliedAt &&
+            ['pending', 'running', 'stitching'].includes(
+              String((s as any).lipSyncStatus ?? ''),
+            )
           ),
       );
 
