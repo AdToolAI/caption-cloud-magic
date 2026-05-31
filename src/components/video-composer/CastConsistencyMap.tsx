@@ -77,7 +77,14 @@ const ANCHOR_META: Record<Anchor, { label: string; icon: React.ReactNode; classN
 };
 
 export function CastConsistencyMap({ scenes, characters }: Props) {
-  if (!characters || characters.length === 0 || !scenes || scenes.length === 0) {
+  // Defensive: filter out any cast entries without a usable name. A single
+  // library asset that lost its name (e.g. legacy import, mid-edit draft)
+  // would otherwise crash the whole Storyboard tab via `.name.toLowerCase()`.
+  const safeCharacters = (characters ?? []).filter(
+    (c): c is ComposerCharacter =>
+      !!c && typeof c.name === 'string' && c.name.trim().length > 0,
+  );
+  if (safeCharacters.length === 0 || !scenes || scenes.length === 0) {
     return null;
   }
 
@@ -88,7 +95,7 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
           <Users className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-medium">Cast Consistency Map</h3>
           <Badge variant="outline" className="text-[10px]">
-            {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {characters.length} cast
+            {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {safeCharacters.length} cast
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
