@@ -598,9 +598,13 @@ async function startSyncTurnJob(
     `[poll-dialog-shots] DISPATCH turn=${turnIdx ?? "?"} mode=${mode} window=[${window[0].toFixed(3)},${window[1].toFixed(3)}] dur=${(window[1] - window[0]).toFixed(3)}s coords=${JSON.stringify(coords)} payload=${JSON.stringify(payload).slice(0, 800)}`,
   );
 
+  const syncDispatchHeaders: Record<string, string> = {
+    "x-api-key": apiKey,
+    "Content-Type": "application/json",
+  };
   let r = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
-    headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+    headers: syncDispatchHeaders,
     body: JSON.stringify(payload),
   });
   // Always surface rate-limit headers so we can detect plan throttling.
@@ -642,7 +646,7 @@ async function startSyncTurnJob(
       (fallback.input as any[])[1] = { type: "audio", url: audioUrl };
       r = await fetch(`${SYNC_API_BASE}/generate`, {
         method: "POST",
-        headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+        headers: syncDispatchHeaders,
         body: JSON.stringify(fallback),
       });
       if (!r.ok) {

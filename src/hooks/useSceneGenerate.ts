@@ -126,6 +126,22 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         });
         if (error) throw error;
 
+        // The edge function now returns HTTP 200 with `{ok:false, error, stage}`
+        // on early-phase crashes (so supabase-js doesn't bury the message
+        // behind a generic "non-2xx" string). Detect and surface it.
+        if (data && (data as any).ok === false) {
+          const reason = (data as any).error || (data as any).message || 'Unbekannter Fehler.';
+          const stage = (data as any).stage ? ` [${(data as any).stage}]` : '';
+          opts.onOptimisticPatch?.(scene.id, { clipStatus: 'failed' });
+          toast({
+            title: 'Generierung fehlgeschlagen',
+            description: `${reason}${stage}`,
+            variant: 'destructive',
+          });
+          emitPipelineEvent({ type: 'clips:end' });
+          return;
+        }
+
         const result = data?.results?.[0];
         if (result) {
           opts.onOptimisticPatch?.(workingScene.id, {

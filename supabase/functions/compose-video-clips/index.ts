@@ -166,6 +166,9 @@ serve(async (req) => {
   // Stage marker for diagnostics — updated as we progress so a fatal
   // error in any branch surfaces the exact phase that failed.
   let __stage = "init";
+  // Cached body so the FATAL catch (below) can mark scenes as `failed` even
+  // when the crash happens before processScenes() runs.
+  let __parsedBody: ClipRequest | null = null;
 
   try {
     const supabaseClient = createClient(
@@ -191,6 +194,7 @@ serve(async (req) => {
 
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
+    __parsedBody = body;
     const { projectId, scenes, visualStyle, characters } = body;
 
     if (!projectId) {
@@ -2881,14 +2885,55 @@ serve(async (req) => {
       `[compose-video-clips] FATAL @ stage=${__stage}: ${msg}`,
       stack || "",
     );
+    // Try to flip any scenes the client sent into a visible `failed` state so
+    // the UI doesn't sit on `pending`/`generating` forever. Best-effort only —
+    // if even the body parse failed we just return the error JSON.
+    let failedSceneIds: string[] = [];
+    try {
+      failedSceneIds = (__parsedBody?.scenes ?? [])
+        .map((s) => s?.id)
+        .filter((id): id is string => typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id));
+      if (failedSceneIds.length > 0) {
+        const adminUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const adminKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        if (adminUrl && adminKey) {
+          const admin = createClient(adminUrl, adminKey);
+          await admin
+            .from("composer_scenes")
+            .update({
+              clip_status: "failed",
+              clip_error: `[${__stage}] ${msg}`.slice(0, 500),
+              updated_at: new Date().toISOString(),
+            })
+            .in("id", failedSceneIds);
+        }
+      }
+    } catch (markErr) {
+      console.warn(
+        "[compose-video-clips] post-fatal scene-mark failed:",
+        markErr,
+      );
+    }
+    // Return HTTP 200 with `ok:false` so supabase-js doesn't bury the message
+    // behind a generic "Edge Function returned a non-2xx status code". The
+    // client (useSceneGenerate / useGenerateAllClips / ClipsTab) reads
+    // `data.ok === false` and surfaces `data.error` directly in the toast.
     return new Response(
       JSON.stringify({
+        ok: false,
+        success: false,
         error: msg || "Unknown error",
+        message: msg || "Unknown error",
         code: "INTERNAL",
         stage: __stage,
+        results: failedSceneIds.map((id) => ({
+          sceneId: id,
+          status: "failed",
+          error: msg,
+        })),
       }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
