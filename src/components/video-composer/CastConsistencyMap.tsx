@@ -31,7 +31,8 @@ function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: numb
   const hasShot = !!shot && !!shot.shotType && shot.shotType !== 'absent';
   // Match by exact id OR by name (covers `lib:…` ids and LLM id-drift).
   const idMatch = hasShot && shot!.characterId === character.id;
-  const firstName = character.name?.trim().toLowerCase().split(/\s+/)[0] || '';
+  const fullName = (character?.name ?? '').trim().toLowerCase();
+  const firstName = fullName.split(/\s+/)[0] || '';
   const nameMatchInId =
     hasShot &&
     !!shot!.characterId &&
@@ -41,7 +42,7 @@ function getAnchor(scene: ComposerScene, character: ComposerCharacter, idx: numb
   const promptText = (scene.aiPrompt || '').toLowerCase();
   const nameMatchInPrompt =
     !!firstName &&
-    (promptText.includes(character.name.toLowerCase()) || promptText.includes(firstName));
+    ((!!fullName && promptText.includes(fullName)) || promptText.includes(firstName));
 
   if (!idMatch && !nameMatchInId && !nameMatchInPrompt) return 'absent';
   // Strong signature_items + AI scene → reference-style anchor (Sherlock-Holmes effect)
@@ -76,7 +77,14 @@ const ANCHOR_META: Record<Anchor, { label: string; icon: React.ReactNode; classN
 };
 
 export function CastConsistencyMap({ scenes, characters }: Props) {
-  if (!characters || characters.length === 0 || !scenes || scenes.length === 0) {
+  // Defensive: filter out any cast entries without a usable name. A single
+  // library asset that lost its name (e.g. legacy import, mid-edit draft)
+  // would otherwise crash the whole Storyboard tab via `.name.toLowerCase()`.
+  const safeCharacters = (characters ?? []).filter(
+    (c): c is ComposerCharacter =>
+      !!c && typeof c.name === 'string' && c.name.trim().length > 0,
+  );
+  if (safeCharacters.length === 0 || !scenes || scenes.length === 0) {
     return null;
   }
 
@@ -87,7 +95,7 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
           <Users className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-medium">Cast Consistency Map</h3>
           <Badge variant="outline" className="text-[10px]">
-            {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {characters.length} cast
+            {scenes.length} {scenes.length === 1 ? 'scene' : 'scenes'} · {safeCharacters.length} cast
           </Badge>
         </div>
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -116,13 +124,13 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
               </tr>
             </thead>
             <tbody>
-              {characters.map((c) => (
+              {safeCharacters.map((c) => (
                 <tr key={c.id}>
                   <td className="p-1 sticky left-0 bg-card">
                     <div className="flex items-center gap-1.5">
                       <Avatar className="h-5 w-5">
                         <AvatarFallback className="text-[8px]">
-                          {c.name.slice(0, 2).toUpperCase()}
+                          {(c.name ?? '??').slice(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <span className="truncate max-w-[80px]">{c.name}</span>
