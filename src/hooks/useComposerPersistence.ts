@@ -89,9 +89,29 @@ export interface PersistResult {
 const isUuid = (val?: string) =>
   !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
+/**
+ * Module-scoped in-flight cache to make `ensureProjectPersisted` idempotent
+ * across concurrent callers.
+ *
+ * Without this, a fast double-click on "Alle generieren" — or a parallel
+ * auto-save firing while the button handler is mid-flight — would race two
+ * `INSERT INTO composer_projects` calls and produce TWO projects with two
+ * sets of scenes (observed on 2026-05-31: project `afb52dad` + `d6879016`
+ * both got 6 pending scenes, neither rendered, pipeline stuck at 95%).
+ *
+ * The cache key uses the local project id (UUID once persisted, otherwise a
+ * stable temp string from the dashboard). Every concurrent caller awaits the
+ * SAME promise → guaranteed single INSERT.
+ */
+const inFlightPersists = new Map<string, Promise<PersistResult>>();
+
 export function useComposerPersistence() {
   const ensureProjectPersisted = useCallback(
     async (project: PersistableProject): Promise<PersistResult> => {
+      const cacheKey = project.id || '__new__';
+      const existing = inFlightPersists.get(cacheKey);
+      if (existing) return existing;
+      const promise = (async () => {
       const { data: { user }, error: authError } = await supabase.auth.getUser();
       if (authError || !user) {
         throw new Error('Du musst angemeldet sein, um ein Projekt zu speichern.');
@@ -282,6 +302,13 @@ export function useComposerPersistence() {
       }
 
       return { projectId: projectId!, scenes: persistedScenes };
+      })();
+      inFlightPersists.set(cacheKey, promise);
+      try {
+        return await promise;
+      } finally {
+        inFlightPersists.delete(cacheKey);
+      }
     },
     []
   );
