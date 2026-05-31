@@ -855,7 +855,22 @@ const SceneDialogStudio = forwardRef<HTMLDivElement, SceneDialogStudioProps>(fun
       ? true
       : renderAsSeparateScenes;
 
-    if (blocks.length < 2 || !useProfessionalSrs) {
+    // ── Stage 8 (May 31 2026): single-speaker Cinematic-Sync routing ─────
+    // For 1-speaker scenes that the user explicitly put on the Cinematic-Sync
+    // engine (toggle "Dialog & Lip-Sync" on / `engineOverride='cinematic-sync'`
+    // / `lipSyncWithVoiceover=true`), DO NOT take the legacy inline /
+    // HeyGen-Talking-Head path — that's what produced the "Animorph + double
+    // voice" bug (HeyGen avatar bust + a second compose-video-clips master
+    // running in parallel). Route through the same compose-video-clips
+    // dispatch as the multi-speaker path so there is exactly ONE master clip
+    // + ONE lip-sync pass + ONE audio source per scene.
+    const forceCinematicSync =
+      blocks.length === 1 &&
+      allHavePortraits &&
+      ((scene as any).engineOverride === 'cinematic-sync' ||
+        (scene as any).lipSyncWithVoiceover === true);
+
+    if (!forceCinematicSync && (blocks.length < 2 || !useProfessionalSrs)) {
       await handleGenerateInline();
       return;
     }
