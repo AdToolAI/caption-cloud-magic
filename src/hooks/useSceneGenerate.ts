@@ -51,16 +51,50 @@ export function useSceneGenerate(opts: UseSceneGenerateOpts) {
         let pid = opts.projectId;
         let workingScene = scene;
         if (opts.ensureProject) {
-          const persisted = await opts.ensureProject();
+          let persisted: { projectId: string; scenes: ComposerScene[] } | undefined;
+          try {
+            persisted = await opts.ensureProject();
+          } catch (persistErr: any) {
+            opts.onOptimisticPatch?.(scene.id, { clipStatus: previousStatus });
+            emitPipelineEvent({ type: 'clips:end' });
+            setGenerating((prev) => ({ ...prev, [scene.id]: false }));
+            toast({
+              title: 'Projekt konnte nicht gespeichert werden',
+              description: persistErr?.message || 'Bitte erneut versuchen.',
+              variant: 'destructive',
+            });
+            return;
+          }
           if (!persisted) {
             opts.onOptimisticPatch?.(scene.id, { clipStatus: previousStatus });
             emitPipelineEvent({ type: 'clips:end' });
             setGenerating((prev) => ({ ...prev, [scene.id]: false }));
+            toast({
+              title: 'Projekt konnte nicht gespeichert werden',
+              description: 'Bitte erneut versuchen.',
+              variant: 'destructive',
+            });
             return;
           }
           pid = persisted.projectId;
           const dbScene = persisted.scenes.find((s) => s.orderIndex === scene.orderIndex);
           if (dbScene) workingScene = { ...dbScene, ...scene, id: dbScene.id };
+        }
+
+        // Stage 7: clear any stale `auto-reset:` marker BEFORE the invoke so
+        // the row visibly flips to `generating` even if realtime races the
+        // edge function's own pre-mark. Without this, an old
+        // `talking_head_master_invalid_for_cinematic_sync` marker keeps the
+        // UI on "Wartet" forever for 1-speaker cinematic-sync scenes.
+        if (/^[0-9a-f-]{36}$/i.test(workingScene.id) && workingScene.clipSource?.startsWith('ai-')) {
+          try {
+            await supabase
+              .from('composer_scenes')
+              .update({ clip_status: 'generating', clip_error: null })
+              .eq('id', workingScene.id);
+          } catch (preErr) {
+            console.warn('[useSceneGenerate] pre-mark failed', preErr);
+          }
         }
 
         const { data, error } = await supabase.functions.invoke('compose-video-clips', {
