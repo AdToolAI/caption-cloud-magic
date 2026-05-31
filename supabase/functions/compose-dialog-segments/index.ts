@@ -518,30 +518,37 @@ serve(async (req) => {
         cachedFaceMap,
         lovableKey,
         characters,
+        expectedFaceCount: speakers.length,
       });
     } catch (err) {
       console.warn(
         `[compose-dialog-segments] scene=${sceneId} faceMap resolve failed: ${(err as Error).message}`,
       );
     }
+    const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
         speakerIdx: idx,
         characterId: sp.character_id ?? null,
         faceMap,
+        totalSpeakers: speakers.length,
       });
+      coordSources.push(picked?.source ?? "none");
       return picked?.coords ?? null;
     });
-    // Fallback heuristic when face map is unreliable: left=spk0, right=spk1.
+    // Final safety fallback: evenly spaced along the horizontal midline so
+    // 3+ speakers never collide on the same x.
     for (let i = 0; i < speakerCoords.length; i++) {
       if (!speakerCoords[i]) {
-        speakerCoords[i] = i === 0 ? [0.3, 0.5] : i === 1 ? [0.7, 0.5] : [0.5, 0.5];
+        const total = Math.max(speakers.length, 2);
+        const t = 0.2 + (0.6 * i) / (total - 1);
+        speakerCoords[i] = [t, 0.5];
       }
       speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
     }
     const ASSUMED_FPS = 24;
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} coords=${JSON.stringify(speakerCoords)}`,
+      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
 
     // ── Build PASSES (one per speaker that has turns) ────────────────────
