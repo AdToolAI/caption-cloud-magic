@@ -302,6 +302,13 @@ export function useComposerPersistence() {
       }
 
       return { projectId: projectId!, scenes: persistedScenes };
+      })();
+      inFlightPersists.set(cacheKey, promise);
+      try {
+        return await promise;
+      } finally {
+        inFlightPersists.delete(cacheKey);
+      }
     },
     []
   );
