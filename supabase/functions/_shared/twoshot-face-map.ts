@@ -3,26 +3,38 @@
  * for any Sync.so caller that needs to disambiguate which face each audio
  * segment should drive.
  *
- * Originally inlined inside `compose-twoshot-lipsync` (v4); extracted here
- * so `compose-dialog-segments` (v5 Segments-API) can target the right face
- * per segment instead of letting Sync.so pick whichever face it detects
- * first (which produced the "first character speaks the whole script"
- * regression — DB-confirmed on scene 386381bd…).
+ * Originally inlined inside `compose-twoshot-lipsync` (v4, 2-speaker only,
+ * `side: "left"|"right"`); extracted here so `compose-dialog-segments`
+ * (v5 Segments-API) can target the right face per segment.
+ *
+ * **Stage 3-Speaker (May 31 2026):** generalised from `side` (2 slots) to
+ * `slotIndex` (N slots, 0..N-1, sorted by ascending x of the face center).
+ * The `side` field remains as a derived backwards-compat alias so any
+ * still-cached v5/v4 entry continues to work, and the legacy v4 inline
+ * implementation in `compose-twoshot-lipsync` is untouched.
  *
  * Pipeline:
  *   1. Read cache from `audio_plan.twoshot.faceMap`. If complete (positions
- *      + identities) → return.
- *   2. Resolve character_id → portrait_url via `brand_characters` table.
- *   3. Ask Gemini Vision for face boxes on the scene anchor image.
- *   4. Ask Gemini Vision to identity-match each box against the portraits.
+ *      + identities) → migrate to slotIndex if needed, return.
+ *   2. Resolve character_id → portrait_url via `brand_characters`.
+ *   3. Ask Gemini Vision for face boxes on the scene anchor.
+ *   4. Ask Gemini Vision to identity-match each box against the portraits
+ *      (per-slot assignments).
  *   5. Persist back to `audio_plan.twoshot.faceMap` so retries are free.
  *
  * Returns null on any unrecoverable failure — callers fall back to a
- * heuristic split (left half = speaker 0, right half = speaker 1).
+ * heuristic split (left=spk0, right=spkN-1, evenly spaced in between).
  */
 
+export type FaceSide = "left" | "center" | "right";
+
 export interface FaceMapFace {
-  side: "left" | "right";
+  /** 0..N-1, sorted by ascending x. Authoritative slot identifier. */
+  slotIndex: number;
+  /** Human-readable label (`left`, `center-1`, `center-2`, …, `right`). */
+  slotLabel?: string;
+  /** Backwards-compat alias derived from slotIndex when N≤2. */
+  side?: FaceSide;
   center: [number, number]; // pixel coords in anchor space
   bbox?: [number, number, number, number];
   normCenter?: [number, number]; // 0..1 normalized
@@ -40,6 +52,23 @@ export interface FaceMap {
 
 const DEFAULT_DIMS = { width: 1280, height: 720 };
 const GEMINI_TIMEOUT_MS = 20_000;
+
+/** Derive a friendly slot label given the slot index and total slot count. */
+function labelForSlot(slotIndex: number, total: number): string {
+  if (total <= 1) return "solo";
+  if (slotIndex === 0) return "left";
+  if (slotIndex === total - 1) return "right";
+  if (total === 3) return "center";
+  return `center-${slotIndex}`;
+}
+
+/** Derive the legacy `side` field for N≤2 (kept for backwards compat). */
+function sideForSlot(slotIndex: number, total: number): FaceSide | undefined {
+  if (total <= 1) return "left";
+  if (total === 2) return slotIndex === 0 ? "left" : "right";
+  // For N≥3 the binary side concept is meaningless — leave undefined.
+  return undefined;
+}
 
 /** Probe just the first ~256 KiB of a PNG/JPEG to read width/height. */
 async function probeImageDims(
@@ -90,9 +119,11 @@ async function probeImageDims(
 
 async function askGeminiForFaces(
   anchorUrl: string,
+  expectedCount: number,
   lovableKey: string,
 ): Promise<{ faces: any[] } | null> {
   try {
+    const want = Math.max(1, Math.min(8, expectedCount || 2));
     const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -108,12 +139,12 @@ async function askGeminiForFaces(
               {
                 type: "text",
                 text:
-                  "You see a scene frame with one or two human faces. " +
+                  `You see a scene frame that should contain about ${want} human face(s). ` +
                   "Return STRICT JSON only — no prose, no markdown fences. " +
-                  "Schema: {\"faces\":[{\"side\":\"left\"|\"right\",\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2]}]}. " +
+                  "Schema: {\"faces\":[{\"slot\":<int>,\"center\":[nx,ny],\"bbox\":[nx1,ny1,nx2,ny2]}]}. " +
                   "Coordinates MUST be NORMALIZED 0..1 (0,0 = top-left, 1,1 = bottom-right). " +
-                  "'left' = the face whose center has the SMALLER normalized x. 'right' = the larger x. " +
-                  "If only one face is visible, return one entry. If none, return empty faces array.",
+                  "'slot' is the index after sorting all visible faces by ascending normalized x (left-most face = slot 0, right-most face = slot N-1). " +
+                  "Return EVERY visible human face. If none, return empty faces array.",
               },
               { type: "image_url", image_url: { url: anchorUrl } },
             ],
@@ -134,26 +165,35 @@ async function askGeminiForFaces(
   }
 }
 
+interface IdentityAssignment {
+  slot: number;
+  characterId: string | null;
+}
+
 async function askGeminiForIdentityMatch(
   anchorUrl: string,
   characters: Array<{ characterId: string; portraitUrl: string }>,
+  totalSlots: number,
   lovableKey: string,
-): Promise<{ left?: string | null; right?: string | null; confidence?: number } | null> {
-  if (!characters.length) return null;
+): Promise<{ assignments: IdentityAssignment[]; confidence?: number } | null> {
+  if (!characters.length || totalSlots < 2) return null;
   try {
     const ids = characters.map((c) => c.characterId);
     const content: any[] = [
       {
         type: "text",
         text:
-          "The FIRST image is a scene with up to two visible people (one LEFT, one RIGHT). " +
+          `The FIRST image is a scene with up to ${totalSlots} visible people. ` +
+          "Slots are numbered 0..N-1 after sorting faces left-to-right by ascending horizontal position " +
+          "(slot 0 = LEFT-MOST face, slot " + (totalSlots - 1) + " = RIGHT-MOST face). " +
           "The remaining images are reference portraits, in this order: " +
           ids.map((id, i) => `(${i + 1}) ${id}`).join(", ") + ". " +
-          "Identify which reference portrait matches the LEFT person and which matches the RIGHT person by facial identity. " +
+          "For EACH slot in the scene, identify which reference portrait matches by facial identity. " +
           "Return STRICT JSON only — no prose, no markdown fences. " +
-          "Schema: {\"left\": \"<characterId or null>\", \"right\": \"<characterId or null>\", \"confidence\": <0..1>}. " +
+          "Schema: {\"assignments\":[{\"slot\":<int>,\"characterId\":\"<id or null>\"}],\"confidence\":<0..1>}. " +
           "Use ONLY ids from this list: " + ids.join(", ") + ". " +
-          "Never assign the same id to both sides unless only one character was provided.",
+          "Never assign the same id to two different slots. " +
+          "If a slot's identity is uncertain, use null for that characterId.",
       },
       { type: "image_url", image_url: { url: anchorUrl } },
       ...characters.map((c) => ({ type: "image_url", image_url: { url: c.portraitUrl } })),
@@ -174,16 +214,41 @@ async function askGeminiForIdentityMatch(
     if (!m) return null;
     const parsed = JSON.parse(m[0]);
     const allowed = new Set(ids.map((id) => id.toLowerCase()));
-    const sanitize = (v: any): string | null => {
+    const sanitizeId = (v: any): string | null => {
       const s = v ? String(v).toLowerCase().trim() : "";
       return s && allowed.has(s) ? s : null;
     };
-    const left = sanitize(parsed?.left);
-    const right = sanitize(parsed?.right);
+    const assignments: IdentityAssignment[] = [];
+    const seen = new Set<string>();
+    // Preferred new schema.
+    if (Array.isArray(parsed?.assignments)) {
+      for (const a of parsed.assignments) {
+        const slot = Number(a?.slot);
+        if (!Number.isFinite(slot) || slot < 0 || slot >= totalSlots) continue;
+        const cid = sanitizeId(a?.characterId);
+        if (cid && seen.has(cid)) {
+          assignments.push({ slot, characterId: null });
+        } else {
+          if (cid) seen.add(cid);
+          assignments.push({ slot, characterId: cid });
+        }
+      }
+    } else {
+      // Backwards-compat: old `{left, right}` schema (2-speaker only).
+      const left = sanitizeId(parsed?.left);
+      const right = sanitizeId(parsed?.right);
+      if (left) {
+        seen.add(left);
+        assignments.push({ slot: 0, characterId: left });
+      }
+      if (right && right !== left) {
+        seen.add(right);
+        assignments.push({ slot: 1, characterId: right });
+      }
+    }
     const c = Number(parsed?.confidence);
     return {
-      left,
-      right,
+      assignments,
       confidence: Number.isFinite(c) ? Math.max(0, Math.min(1, c)) : undefined,
     };
   } catch {
@@ -252,12 +317,40 @@ function normalizeFaces(
         normCenter: [Number(f.center[0]) || 0, Number(f.center[1]) || 0] as [number, number],
       };
     })
-    .sort((a, b) => a.center[0] - b.center[0])
-    .map((f, idx, arr) => ({
-      ...f,
-      side: (arr.length === 1 ? "left" : idx === 0 ? "left" : "right") as "left" | "right",
-    }));
-  return { faces: valid, width: W, height: H };
+    .sort((a, b) => a.center[0] - b.center[0]);
+  const total = valid.length;
+  const faces: FaceMapFace[] = valid.map((f, idx) => ({
+    ...f,
+    slotIndex: idx,
+    slotLabel: labelForSlot(idx, total),
+    side: sideForSlot(idx, total),
+  }));
+  return { faces, width: W, height: H };
+}
+
+/**
+ * Lazy-migrate a cached face map from the legacy `side` schema (2 slots)
+ * to the new `slotIndex` schema, so already-paid v5/v4 caches keep working.
+ */
+function migrateCachedFaces(cached: any): FaceMapFace[] | null {
+  if (!Array.isArray(cached?.faces)) return null;
+  const faces = cached.faces.filter((f: any) => f && Array.isArray(f.center));
+  if (!faces.length) return null;
+  // Already migrated.
+  if (faces.every((f: any) => Number.isFinite(f.slotIndex))) {
+    return faces as FaceMapFace[];
+  }
+  // Legacy: sort by x then derive slotIndex.
+  const sorted = [...faces].sort(
+    (a: any, b: any) => Number(a.center?.[0] ?? 0) - Number(b.center?.[0] ?? 0),
+  );
+  const total = sorted.length;
+  return sorted.map((f: any, idx: number) => ({
+    ...f,
+    slotIndex: idx,
+    slotLabel: labelForSlot(idx, total),
+    side: sideForSlot(idx, total),
+  }));
 }
 
 /**
@@ -267,6 +360,9 @@ function normalizeFaces(
  *                    (usually `reference_image_url` or `lock_reference_url`).
  * @param characters - Output of `resolveCharacterPortraits`. Pass `[]` to
  *                     skip identity match (face positions only).
+ * @param expectedFaceCount - Hint for Gemini face detection (defaults to
+ *                            characters.length). When N≥3, we pass this so
+ *                            the prompt knows how many slots to expect.
  */
 export async function resolveSceneFaceMap(args: {
   supabase: any;
@@ -275,23 +371,38 @@ export async function resolveSceneFaceMap(args: {
   cachedFaceMap: any;
   lovableKey: string | undefined;
   characters: Array<{ characterId: string; portraitUrl: string }>;
+  expectedFaceCount?: number;
 }): Promise<FaceMap | null> {
   const { supabase, sceneId, anchorUrl, cachedFaceMap, lovableKey, characters } = args;
+  const expected = Math.max(1, args.expectedFaceCount ?? characters.length ?? 2);
 
+  // Cache validation + lazy migration.
+  let migratedCache: FaceMapFace[] | null = null;
+  if (cachedFaceMap) {
+    migratedCache = migrateCachedFaces(cachedFaceMap);
+  }
   const cacheLooksValid =
-    cachedFaceMap &&
-    Array.isArray(cachedFaceMap.faces) &&
-    cachedFaceMap.faces.length >= 1 &&
+    !!migratedCache &&
+    migratedCache.length >= 1 &&
     Number(cachedFaceMap.width) > 0 &&
     Number(cachedFaceMap.height) > 0;
   const needIdentities = characters.length >= 2;
   const cacheHasIdentities =
     cacheLooksValid &&
-    cachedFaceMap.faces.every(
-      (f: any) => typeof f?.characterId === "string" && f.characterId.length > 0,
+    migratedCache!.every(
+      (f) => typeof f?.characterId === "string" && f.characterId.length > 0,
     );
-  if (cacheLooksValid && (!needIdentities || cacheHasIdentities)) {
-    return { ...cachedFaceMap, source: "cache" } as FaceMap;
+  // Also require that we have at least as many cached faces as we now expect
+  // (N-speaker cast added → recompose).
+  const cacheCountSufficient =
+    cacheLooksValid && migratedCache!.length >= Math.min(expected, characters.length || 1);
+  if (cacheLooksValid && cacheCountSufficient && (!needIdentities || cacheHasIdentities)) {
+    return {
+      faces: migratedCache!,
+      width: Number(cachedFaceMap.width),
+      height: Number(cachedFaceMap.height),
+      source: "cache",
+    };
   }
 
   if (!lovableKey || !anchorUrl) return null;
@@ -301,39 +412,61 @@ export async function resolveSceneFaceMap(args: {
   let norm: { faces: FaceMapFace[]; width: number; height: number };
   if (cacheLooksValid) {
     norm = {
-      faces: cachedFaceMap.faces,
+      faces: migratedCache!,
       width: Number(cachedFaceMap.width),
       height: Number(cachedFaceMap.height),
     };
   } else {
-    const raw = await askGeminiForFaces(anchorUrl, lovableKey);
+    const raw = await askGeminiForFaces(anchorUrl, expected, lovableKey);
     if (!raw) return null;
     norm = normalizeFaces(raw, dims);
     if (norm.faces.length === 0) return null;
   }
 
   if (characters.length >= 2 && norm.faces.length >= 2) {
-    const identity = await askGeminiForIdentityMatch(anchorUrl, characters, lovableKey);
+    const identity = await askGeminiForIdentityMatch(
+      anchorUrl,
+      characters,
+      norm.faces.length,
+      lovableKey,
+    );
     if (identity) {
-      const { left, right, confidence } = identity;
+      const confidence = identity.confidence ?? 0.9;
+      const slotToId = new Map<number, string>();
+      for (const a of identity.assignments) {
+        if (a.characterId) slotToId.set(a.slot, a.characterId);
+      }
       norm.faces = norm.faces.map((f) => {
-        if (f.side === "left" && left) {
-          return { ...f, characterId: left, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
-        }
-        if (f.side === "right" && right) {
-          return { ...f, characterId: right, matchConfidence: confidence ?? 0.9, matchSource: "gemini-identity" };
+        const cid = slotToId.get(f.slotIndex);
+        if (cid) {
+          return {
+            ...f,
+            characterId: cid,
+            matchConfidence: confidence,
+            matchSource: "gemini-identity" as const,
+          };
         }
         return { ...f, matchSource: "unresolved" as const };
       });
-      // Infer leftover when exactly one side resolved + 2 candidates.
+      // Infer leftover when exactly one slot is missing and exactly one
+      // candidate character remains unassigned.
       const ids = characters.map((c) => c.characterId);
-      const assigned = new Set(norm.faces.map((f) => f.characterId).filter(Boolean) as string[]);
-      const missing = ids.filter((id) => !assigned.has(id));
-      if (missing.length === 1) {
+      const assigned = new Set(
+        norm.faces.map((f) => f.characterId).filter(Boolean) as string[],
+      );
+      const missingIds = ids.filter((id) => !assigned.has(id));
+      const missingSlots = norm.faces.filter((f) => !f.characterId);
+      if (missingIds.length === 1 && missingSlots.length === 1) {
+        const fillId = missingIds[0];
         norm.faces = norm.faces.map((f) =>
           f.characterId
             ? f
-            : { ...f, characterId: missing[0], matchConfidence: 0.5, matchSource: "gemini-inferred" as const },
+            : {
+                ...f,
+                characterId: fillId,
+                matchConfidence: 0.5,
+                matchSource: "gemini-inferred" as const,
+              },
         );
       }
     }
@@ -384,16 +517,34 @@ export async function resolveSceneFaceMap(args: {
  * Returns null only when no face map and no fallback dims are available — the
  * caller should then omit per-segment coordinates entirely (and let Sync.so
  * auto-detect, which is at least no worse than what we send today).
+ *
+ * Resolution priority:
+ *   1. Identity match by `characterId` → exact face (robust to slot swap).
+ *   2. Positional by `slotIndex === speakerIdx` (preserves left-to-right cast
+ *      ordering when identity match was unreliable).
+ *   3. Heuristic — evenly spaced along the horizontal midline.
  */
 export function pickSpeakerCoordinates(args: {
   speakerIdx: number;
   characterId: string | null | undefined;
   faceMap: FaceMap | null;
   videoDims?: { width: number; height: number };
-}): { coords: [number, number]; source: "identity" | "side" | "heuristic" } | null {
+  /** Total speakers in the scene — used for the heuristic spacing fallback. */
+  totalSpeakers?: number;
+}): { coords: [number, number]; source: "identity" | "slot" | "heuristic" } | null {
   const { speakerIdx, characterId, faceMap, videoDims } = args;
   const W = videoDims?.width ?? faceMap?.width ?? DEFAULT_DIMS.width;
   const H = videoDims?.height ?? faceMap?.height ?? DEFAULT_DIMS.height;
+
+  const scale = (
+    p: [number, number],
+    srcW: number,
+    srcH: number,
+  ): [number, number] => {
+    const sx = srcW > 0 ? W / srcW : 1;
+    const sy = srcH > 0 ? H / srcH : 1;
+    return [Math.round(p[0] * sx), Math.round(p[1] * sy)];
+  };
 
   // 1. Identity match (preferred, robust against L/R swap).
   if (characterId && faceMap?.faces?.length) {
@@ -402,39 +553,36 @@ export function pickSpeakerCoordinates(args: {
       (f) => String(f.characterId ?? "").toLowerCase() === wanted,
     );
     if (hit?.center) {
-      const scaleX = faceMap.width > 0 ? W / faceMap.width : 1;
-      const scaleY = faceMap.height > 0 ? H / faceMap.height : 1;
       return {
-        coords: [
-          Math.round(hit.center[0] * scaleX),
-          Math.round(hit.center[1] * scaleY),
-        ],
+        coords: scale(hit.center, faceMap.width, faceMap.height),
         source: "identity",
       };
     }
   }
 
-  // 2. Positional by side (speaker 0 = left, speaker 1 = right).
+  // 2. Positional by slotIndex (speaker N → face in slot N, sorted L→R).
   if (faceMap?.faces?.length) {
-    const wantSide: "left" | "right" = speakerIdx === 0 ? "left" : "right";
     const hit =
-      faceMap.faces.find((f) => f.side === wantSide) ??
+      faceMap.faces.find((f) => f.slotIndex === speakerIdx) ??
       faceMap.faces[Math.min(speakerIdx, faceMap.faces.length - 1)];
     if (hit?.center) {
-      const scaleX = faceMap.width > 0 ? W / faceMap.width : 1;
-      const scaleY = faceMap.height > 0 ? H / faceMap.height : 1;
       return {
-        coords: [
-          Math.round(hit.center[0] * scaleX),
-          Math.round(hit.center[1] * scaleY),
-        ],
-        source: "side",
+        coords: scale(hit.center, faceMap.width, faceMap.height),
+        source: "slot",
       };
     }
   }
 
-  // 3. Pure heuristic — left-third / right-third of the frame.
-  const x = speakerIdx === 0 ? Math.round(W * 0.3) : Math.round(W * 0.7);
+  // 3. Heuristic — evenly spaced along the horizontal midline.
+  const total = Math.max(
+    args.totalSpeakers ?? 0,
+    speakerIdx + 1,
+    faceMap?.faces?.length ?? 0,
+    2,
+  );
+  // Map slot index → x position: spread between 20% and 80% of the frame.
+  const t = total === 1 ? 0.5 : 0.2 + (0.6 * speakerIdx) / (total - 1);
+  const x = Math.round(W * t);
   const y = Math.round(H * 0.5);
   return { coords: [x, y], source: "heuristic" };
 }
