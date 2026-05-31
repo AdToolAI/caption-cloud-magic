@@ -913,9 +913,15 @@ serve(async (req) => {
             .filter((m): m is RegExpMatchArray => !!m)
             .map((m) => m[1].trim().toLowerCase()),
         );
-        if (speakerNames.size >= 2) {
+        // Stage 7 (May 31 2026): also migrate the SINGLE-speaker path. The
+        // happyhorse_cinematic_sync_missing_anchor failure mode and the
+        // recurring `auto-reset: talking_head_master_invalid_for_cinematic_sync`
+        // loop both manifest only when HappyHorse is the master plate for a
+        // 1-speaker cinematic-sync scene. Hailuo i2v is the stable default
+        // here. The 2+ speaker pipeline keeps its existing migration.
+        if (speakerNames.size >= 1) {
           console.warn(
-            `[compose-video-clips] Scene ${scene.id}: HappyHorse + cinematic-sync + ${speakerNames.size} speakers — migrating to ai-hailuo (HappyHorse identity-drift is too high for multi-cast lip-sync masters).`,
+            `[compose-video-clips] Scene ${scene.id}: HappyHorse + cinematic-sync + ${speakerNames.size} speaker(s) — migrating to ai-hailuo for stable master-plate generation.`,
           );
           scene.clipSource = "ai-hailuo";
           await supabaseAdmin
