@@ -564,18 +564,19 @@ serve(async (req) => {
     const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
       const cleanNames = names.filter(Boolean);
       // STAGE 6 (May 31 2026): allow n=1 for single-speaker cinematic-sync.
-      // The previous `Math.max(..., 2)` floor forced Nano Banana 2 to invent
-      // a second person into 1-speaker anchors, which then failed the
-      // `humanCount > expectedFaces` audit and aborted the scene before
-      // Replicate ever dispatched. 2-speaker pipelines remain unchanged
-      // (cleanNames.length / fallbackCount already supply n ≥ 2).
+      // STAGE 3-Speaker (May 31 2026): explicit group-shot framing for n≥3 so
+      // Nano Banana 2 lines all faces up left-to-right with equal screen
+      // share — required for slot-based face targeting in
+      // compose-dialog-segments.
       const n = Math.max(cleanNames.length, fallbackCount, 1);
       const named =
-        cleanNames.length > 0 ? `: ${cleanNames.join(" and ")}` : "";
+        cleanNames.length > 0 ? `: ${cleanNames.join(", ")}` : "";
       const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
       const visibility = n === 1
         ? "framed in a clean front or three-quarter angle so the full mouth and jaw are clearly visible and unobstructed by hands, microphones or props"
-        : "each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props";
+        : n === 2
+          ? "each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props"
+          : `arranged in a single horizontal line, left-to-right, with equal screen share and clear gaps between them (no overlap, no person standing in front of another). Wide medium group shot, each face shown clean and front-facing, full mouth and jaw of every person clearly visible and unobstructed by hands, microphones or props. Identical lighting on every face`;
       // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
       // mouth posture — that produces a frozen, ventriloquist-style face that
       // Sync.so cannot meaningfully animate on top of. We only ask for a
