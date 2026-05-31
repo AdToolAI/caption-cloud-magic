@@ -563,16 +563,26 @@ serve(async (req) => {
 
     const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
       const cleanNames = names.filter(Boolean);
-      const n = Math.max(cleanNames.length, fallbackCount, 2);
+      // STAGE 6 (May 31 2026): allow n=1 for single-speaker cinematic-sync.
+      // The previous `Math.max(..., 2)` floor forced Nano Banana 2 to invent
+      // a second person into 1-speaker anchors, which then failed the
+      // `humanCount > expectedFaces` audit and aborted the scene before
+      // Replicate ever dispatched. 2-speaker pipelines remain unchanged
+      // (cleanNames.length / fallbackCount already supply n ≥ 2).
+      const n = Math.max(cleanNames.length, fallbackCount, 1);
       const named =
         cleanNames.length > 0 ? `: ${cleanNames.join(" and ")}` : "";
+      const subject = n === 1 ? "Exactly 1 person" : `Exactly ${n} distinct people`;
+      const visibility = n === 1
+        ? "framed in a clean front or three-quarter angle so the full mouth and jaw are clearly visible and unobstructed by hands, microphones or props"
+        : "each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props";
       // IMPORTANT: do NOT instruct the model to keep lips closed or "rest" the
       // mouth posture — that produces a frozen, ventriloquist-style face that
       // Sync.so cannot meaningfully animate on top of. We only ask for a
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `Exactly ${n} distinct people${named}, each visible exactly once, framed in a clean front or three-quarter angle so the full mouth and jaw of every person are clearly visible and unobstructed by hands, microphones or props. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
