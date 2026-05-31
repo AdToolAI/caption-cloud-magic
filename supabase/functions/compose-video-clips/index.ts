@@ -296,6 +296,36 @@ serve(async (req) => {
       .update({ status: "generating", updated_at: new Date().toISOString() })
       .eq("id", projectId);
 
+    // ── EARLY Pre-Mark (moved up from L806 on 2026-05-31) ─────────────────
+    // If any of the ~500 lines between project-status-update and the
+    // original pre-mark throws (Replicate init, cost calc, anchor compose,
+    // etc.), scenes used to stay on `clip_status='pending'` FOREVER and the
+    // UI would show 95 % with "Slots 0/3" indefinitely. By pre-marking
+    // immediately we guarantee the UI sees `generating` even if the
+    // background dispatch later crashes — and the heartbeat watchdog can
+    // then auto-fail stale `generating` rows after 15 min.
+    try {
+      const earlyAiSceneIds = (scenes as Array<{ id: string; clipSource?: string }>)
+        .filter((s) => s.clipSource?.startsWith("ai-"))
+        .map((s) => s.id);
+      if (earlyAiSceneIds.length > 0) {
+        await supabaseAdmin
+          .from("composer_scenes")
+          .update({
+            clip_status: "generating",
+            clip_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .in("id", earlyAiSceneIds);
+      }
+    } catch (preMarkErr) {
+      console.warn(
+        "[compose-video-clips] EARLY pre-mark failed (non-fatal):",
+        preMarkErr,
+      );
+    }
+
+
     const replicate = new Replicate({
       auth: Deno.env.get("REPLICATE_API_KEY"),
     });
