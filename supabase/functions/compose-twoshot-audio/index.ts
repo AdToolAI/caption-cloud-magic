@@ -799,6 +799,15 @@ serve(async (req) => {
     // that the FINAL spoken audio lives in this merged URL — NOT inside the
     // lipsync video (which only contains the last pass's voice). The preview
     // must mute the embedded video audio and play `mergedUrl` instead.
+    //
+    // Stage 8 (May 31 2026): for SINGLE-speaker scenes the lipsync video
+    // embeds the ONE speaker's voice in full — there is no "last pass only"
+    // problem. Forcing useExternalAudio=true here would make the preview AND
+    // the final mux play the merged WAV ON TOP of the lipsynced video's
+    // embedded audio → the doubled / animorph voiceover the user reported.
+    // Only set useExternalAudio when 2+ speakers actually need the external
+    // merged track.
+    const isMultiSpeaker = publicSpeakerTracks.length >= 2;
     await supabase
       .from("composer_scenes")
       .update({
@@ -811,8 +820,8 @@ serve(async (req) => {
             spokenSec: Math.round(spokenSec * 1000) / 1000,
             totalSec: Math.round(totalSec * 1000) / 1000,
             url: publicUrl,
-            useExternalAudio: true,
-            embeddedAudio: false,
+            useExternalAudio: isMultiSpeaker,
+            embeddedAudio: !isMultiSpeaker,
             generatedAt: new Date().toISOString(),
           },
         },
