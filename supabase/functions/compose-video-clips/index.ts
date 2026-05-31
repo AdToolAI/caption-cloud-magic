@@ -166,6 +166,9 @@ serve(async (req) => {
   // Stage marker for diagnostics — updated as we progress so a fatal
   // error in any branch surfaces the exact phase that failed.
   let __stage = "init";
+  // Cached body so the FATAL catch (below) can mark scenes as `failed` even
+  // when the crash happens before processScenes() runs.
+  let __parsedBody: ClipRequest | null = null;
 
   try {
     const supabaseClient = createClient(
@@ -191,6 +194,7 @@ serve(async (req) => {
 
     __stage = "parse_body";
     const body: ClipRequest = await req.json();
+    __parsedBody = body;
     const { projectId, scenes, visualStyle, characters } = body;
 
     if (!projectId) {
