@@ -277,6 +277,74 @@ serve(async (req) => {
       }
 
       if (!isLastPass) {
+        // ── Re-host intermediate pass output to Supabase ─────────────────
+        // Sync.so does NOT reliably accept its own redirected `result?token=…`
+        // URL as input for the next pass when `coords-pro` is requested — it
+        // returns an opaque `provider_unknown_error`, which forces the
+        // fallback ladder onto `auto-pro` (auto_detect=true, coords dropped),
+        // and the auto-detector then re-targets speaker 0 on the already
+        // lipsynced video. Speakers 2+ stay frozen. Re-hosting to our own
+        // ai-videos bucket makes coords-pro succeed for every pass.
+        let rehostedUrl: string | null = null;
+        try {
+          const { data: row } = await supabase
+            .from("composer_scenes")
+            .select("project_id")
+            .eq("id", sceneId)
+            .single();
+          const { data: proj } = await supabase
+            .from("composer_projects")
+            .select("user_id")
+            .eq("id", (row as any)?.project_id)
+            .single();
+          const uid = (proj as any)?.user_id;
+          if (uid) {
+            const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
+            if (dl.ok) {
+              const bytes = new Uint8Array(await dl.arrayBuffer());
+              const objectPath = `composer/${uid}/${sceneId}-lipsync-pass-${currentPass + 1}.mp4`;
+              const up = await supabase.storage.from("ai-videos").upload(
+                objectPath,
+                bytes,
+                { contentType: "video/mp4", upsert: true },
+              );
+              if (!up.error) {
+                const { data: pub } = supabase.storage
+                  .from("ai-videos")
+                  .getPublicUrl(objectPath);
+                if (pub?.publicUrl) {
+                  rehostedUrl = pub.publicUrl;
+                  console.log(
+                    `[sync-so-webhook] v5 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} re-hosted ${bytes.length} bytes → ${rehostedUrl}`,
+                  );
+                }
+              } else {
+                console.warn(
+                  `[sync-so-webhook] v5 scene=${sceneId} pass ${currentPass + 1} re-host upload failed: ${up.error.message}`,
+                );
+              }
+            } else {
+              console.warn(
+                `[sync-so-webhook] v5 scene=${sceneId} pass ${currentPass + 1} re-host download HTTP ${dl.status}`,
+              );
+            }
+          }
+        } catch (err) {
+          console.warn(
+            `[sync-so-webhook] v5 scene=${sceneId} pass ${currentPass + 1} re-host exception: ${(err as Error).message}`,
+          );
+        }
+
+        // Persist the (re-hosted, or Sync.so-raw as soft fallback) output_url
+        // for this pass so the next dispatch picks it up as input.
+        if (passes[currentPass]) {
+          passes[currentPass] = {
+            ...passes[currentPass],
+            output_url: rehostedUrl ?? outputUrl,
+            rehosted: !!rehostedUrl,
+          };
+        }
+
         // Persist this pass's output, advance cursor, fire-and-forget next dispatch.
         const nextPassIdx = currentPass + 1;
         await supabase
@@ -311,6 +379,7 @@ serve(async (req) => {
         }
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", advanced_to_pass: nextPassIdx + 1 });
       }
+
 
       // ── Last pass complete → re-host + apply ───────────────────────────
       let finalUrl = outputUrl;
