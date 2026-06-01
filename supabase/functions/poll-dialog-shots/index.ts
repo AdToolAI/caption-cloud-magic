@@ -833,14 +833,15 @@ async function processScene(
     const polled = await Promise.allSettled(
       inFlight.map((s) => pollSyncJob(syncKey, s.sync_job_id!)),
     );
-    polled.forEach((res, i) => {
+    for (let i = 0; i < polled.length; i++) {
+      const res = polled[i];
       const shot = inFlight[i];
       if (res.status !== "fulfilled") {
         console.warn(
           `[poll-dialog-shots] turn ${shot.idx} poll error`,
           (res.reason as Error)?.message,
         );
-        return;
+        continue;
       }
       const p = res.value;
       if (p.status === "COMPLETED" && p.outputUrl) {
@@ -857,8 +858,8 @@ async function processScene(
         }
         mutated = true;
       }
+    }
 
-    });
 
 
     // ── Step 1b: per-shot 4-min watchdog (v12 Stability) ─────────────
