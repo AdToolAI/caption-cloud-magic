@@ -1,43 +1,79 @@
-## Was passiert
+## Root cause
 
-Bei der 3-Sprecher-Szene `fda8ac16…` (Matthew, Samuel, Kailee) zeigt der Sync.so Dispatch-Log ein klares Muster:
+`supabase/functions/poll-dialog-shots/index.ts` **fails to boot since the last deploy** with:
 
-| Pass | Speaker | coords-pro | auto-pro |
-|------|---------|-----------|----------|
-| 0 | Matthew | ❌ "An unknown error occurred" | ✅ erfolgreich |
-| 1 | Samuel  | ❌ "An unknown error occurred" | ✅ erfolgreich |
-| 2 | Kailee  | ❌ "An unknown error occurred" | — nie versucht → Refund + Fail |
+```
+Uncaught SyntaxError: Unexpected reserved word
+  at .../poll-dialog-shots/index.ts:643:31
+```
 
-**Zwei kombinierte Bugs:**
+`deno check` reveals the real source location at **lines 852 + 854**:
 
-1. **Shared retry budget über alle Passes.** `sync-so-webhook` schreibt `retry_count` auf das *Top-Level* `dialog_shots`-State (Zeile 502), nicht pro Pass. Mit `MAX_V5_RETRIES = 2` ist das Budget nach Pass 0 + Pass 1 schon aufgebraucht. Pass 2 (Kailee) bekommt nach ihrem ersten coords-pro Fail keinen Retry mehr → Refund + Szene `failed`.
+```ts
+polled.forEach((res, i) => {        // ← sync callback
+  ...
+  if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
+  ...
+});
+```
 
-2. **Lernen pro Szene fehlt.** Wenn Pass 0 von `coords-pro` → `auto-pro` springen musste, weiß der Dispatcher nicht, dass `coords-pro` in dieser Szene generell nicht funktioniert. Pass 1 und 2 starten trotzdem wieder mit `coords-pro` → garantierter Fehlversuch.
+`await` was added inside a non-async `Array.prototype.forEach` callback → TS1308 → edge-runtime refuses to boot the module.
 
-Das ist genau der Grund warum sich die User-Beschwerde "Lipsync schlägt fehl" speziell bei 3 Sprechern reproduziert: Mit 1–2 Sprechern reicht das Shared-Budget noch.
+## Impact on the 3-character pipeline (observed in logs)
 
-## Fix
+- `sync-so-webhook` works fine and pushed both 3-speaker scenes (`b4593473…`, `fda8ac16…`) through `pass 0 → 1 → 2 → audio_muxing/done`.
+- But the **cron poll worker (`poll-dialog-shots`) is completely dead** since the last deploy. That means:
+  - No per-shot 4-min Sync.so timeout watchdog → stuck jobs hang forever.
+  - No re-dispatch of new turns when the webhook is missed/delayed.
+  - No `stitching` recovery path.
+  - Scenes that don't get a clean webhook (e.g. current `b4593473…` stuck at `lip_sync_status='audio_muxing'`) cannot self-heal.
+- This is why the UI shows **"Lipsync 1/3 · Fehler · Bitte Lip-Sync neu rendern"** — the recovery cron that normally moves the badge forward never runs.
 
-### 1. Per-Pass Retry-Budget (`sync-so-webhook/index.ts`)
-- `retry_count` und `retry_variant` zukünftig **auf dem Pass-Objekt** speichern (`passes[currentPass].retry_count` / `.retry_variant`), nicht auf dem Top-Level-State.
-- `MAX_V5_RETRIES = 2` bleibt — gilt nun pro Pass. Jeder Sprecher darf die volle Ladder `coords-pro → auto-pro → auto-standard` durchgehen.
-- Top-Level `retry_count` bleibt nur als aggregierter Diagnostic-Wert erhalten.
+The 1-speaker and 2-speaker code paths are unaffected by the fix because the bug is purely a syntax-level boot failure — fixing it restores the same poll loop they were already relying on.
 
-### 2. Szenen-weite Variant-Empfehlung (`compose-dialog-segments/index.ts`)
-Im Dispatcher (um Zeile 852) vor der Variant-Auswahl prüfen: Wenn ein vorheriger Pass in derselben Szene erfolgreich mit `auto-pro` oder `auto-standard` abgeschlossen hat, starte den nächsten Pass **direkt mit dieser Variante**, statt erneut bei `coords-pro` anzufangen.
-- Quelle: `passes.find(p => p.status === 'done')?.retry_variant`.
-- Greift nur als Default — explizit angeforderte `retry_variant` (vom Webhook-Retry) gewinnt weiterhin.
+## Fix (one file, surgical)
 
-### 3. UI-Hinweis bleibt
-"Bitte ‚Lip-Sync neu rendern' klicken" zeigt der Composer bereits an. Nach dem Fix wird dieser Resume-Pfad nun durchlaufen, ohne dass die letzten Sprecher in derselben Falle hängen bleiben.
+`supabase/functions/poll-dialog-shots/index.ts`, lines ~833–861:
 
-## Verifikation
-1. Failed Szene `fda8ac16…` zurücksetzen (`lip_sync_status='pending'`, `dialog_shots` Pass 2 auf `pending`, Refund-Flag prüfen).
-2. „Lip-Sync neu rendern" klicken.
-3. Erwartet: Pass 2 startet direkt mit `auto-pro` (gelernt aus Pass 0/1), Szene endet als `ready` / `applied`.
-4. Dispatch-Log gegenchecken: keine erneute `coords-pro`-Runde für Pass 2.
+Replace the sync `forEach` over `Promise.allSettled` results with a plain indexed `for` loop inside the existing `async` function so the two `await releaseInflightSyncJob(...)` calls are syntactically valid:
 
-## Nicht im Scope
-- Root-Cause warum Sync.so bei `coords-pro` „unknown error" liefert (Provider-seitig, separates Memo `syncso-stage-g-auto-normalize-and-face-quality` deckt Face-Quality-Heuristiken bereits ab).
-- Keine Änderungen am 2-Speaker-Pfad oder an `compose-twoshot-lipsync`.
-- Keine UI-Änderungen.
+```ts
+const polled = await Promise.allSettled(
+  inFlight.map((s) => pollSyncJob(syncKey, s.sync_job_id!)),
+);
+for (let i = 0; i < polled.length; i++) {
+  const res = polled[i];
+  const shot = inFlight[i];
+  if (res.status !== "fulfilled") {
+    console.warn(`[poll-dialog-shots] turn ${shot.idx} poll error`, (res.reason as Error)?.message);
+    continue;
+  }
+  const p = res.value;
+  if (p.status === "COMPLETED" && p.outputUrl) {
+    shot.output_url = p.outputUrl;
+    shot.status = "ready";
+    shot.completed_at = new Date().toISOString();
+    mutated = true;
+    if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
+  } else if (["FAILED", "REJECTED", "CANCELED"].includes(p.status)) {
+    if (shot.sync_job_id) await releaseInflightSyncJob(supabase, shot.sync_job_id);
+    if (!prepareShotRetry(shot, `sync_${p.status}`, shots)) {
+      degradeShotToMaster(shot, `sync_${p.status}: ${p.error ?? "unknown"}`, shots);
+    }
+    mutated = true;
+  }
+}
+```
+
+Behaviour is byte-identical to the existing logic — the only change is that `await` now sits inside an `async for` body instead of a sync `forEach`. **No change to dispatch logic, no change to single-speaker or two-shot paths, no DB migration, no schema change.**
+
+## Verification
+
+1. After deploy, `supabase--edge_function_logs poll-dialog-shots` no longer shows `worker boot error`; instead the normal `tick …` lines appear once per minute (pg_cron).
+2. Reset stuck scene `b4593473-6be8-4faa-ba6d-d0737118ae53` by clicking "Lip-Sync neu rendern" in the UI → expect it to progress `audio_muxing → applied`.
+3. 1-speaker and 2-speaker regression check: existing scenes with `lip_sync_status='applied'` remain untouched; a fresh single-speaker render still completes end-to-end via the same restored poll loop.
+
+## Not in scope
+
+- Sync.so's `coords-pro` "unknown error" (provider-side; already mitigated by the existing `auto-pro` fallback).
+- The compose-video-clips async dispatch, sync-so-webhook per-pass retry budget, or any UI changes — those stay exactly as they are.
