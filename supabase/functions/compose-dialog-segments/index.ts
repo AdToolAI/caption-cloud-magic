@@ -848,9 +848,27 @@ serve(async (req) => {
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
+    // Stage H — scene-wide variant learning. If an earlier pass in this
+    // scene succeeded with a non-default variant (because coords-pro failed),
+    // start subsequent fresh passes with that variant instead of repeating
+    // the same coords-pro failure for every speaker. Explicit retry payload
+    // still wins.
+    const learnedVariant: RetryVariant | undefined = (() => {
+      if (isRetry || isAdvance === false) {
+        // fresh path: only for advances (currentPassIdx > 0) does the learn
+        // signal apply. For currentPassIdx === 0 there's nothing to learn.
+      }
+      if (currentPassIdx === 0) return undefined;
+      for (let i = currentPassIdx - 1; i >= 0; i--) {
+        const v = passes[i]?.retry_variant as RetryVariant | undefined;
+        if (v && v !== "coords-pro" && passes[i]?.status === "done") return v;
+      }
+      return undefined;
+    })();
     const retryVariant: RetryVariant = isRetry
       ? (requestedRetryVariant ?? prevState?.retry_variant ?? "coords-pro")
-      : "coords-pro";
+      : (learnedVariant ?? "coords-pro");
+
     const diagnosticId = `${sceneId}:${currentPassIdx + 1}:${retryVariant}:${crypto.randomUUID()}`;
     pass.retry_variant = retryVariant;
     pass.diagnostic_id = diagnosticId;
