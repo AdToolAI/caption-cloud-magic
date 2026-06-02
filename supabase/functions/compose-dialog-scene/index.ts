@@ -378,10 +378,12 @@ interface DialogShot {
 }
 
 interface DialogShotsState {
-  /** v4 = per-turn parallel passes + ffmpeg time-slice stitch (current).
+  /** v5 = v4 + per-shot `target_bbox` + `preclip_crop` (face-region preclip
+   *  path for 3+ speaker scenes).
+   *  v4 = per-turn parallel passes + ffmpeg time-slice stitch.
    *  v3 = per-speaker multi-window passes (legacy, ignored by poller).
    *  v2 = per-turn chained passes (legacy, ignored by poller). */
-  version: 4;
+  version: 5;
   status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
   /** Per-turn passes, ordered by window start. */
   shots: DialogShot[];
