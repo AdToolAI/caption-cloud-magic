@@ -1660,6 +1660,96 @@ export default function SceneCard({
                             { body: { scene_id: scene.id } },
                           );
                         if (error) throw error;
+                        const errCode = (data as any)?.error;
+                        const nextAction = (data as any)?.next_action;
+                        if (
+                          errCode === "missing_face_coords" ||
+                          nextAction === "rerender_clip_and_lipsync"
+                        ) {
+                          // Master-Plate shows fewer speakers than needed — pure
+                          // lipsync re-render cannot fix this. Auto-escalate to
+                          // the same code path as "🎥 Clip + Lip-Sync neu rendern".
+                          toast({
+                            title: "Master-Plate zeigt nicht alle Sprecher",
+                            description:
+                              (data as any)?.hint ??
+                              "Lip-Sync ist nicht retryable — Clip + Lip-Sync werden jetzt automatisch neu gerendert.",
+                          });
+                          try {
+                            const prevPlan = ((scene as any).audioPlan ??
+                              {}) as Record<string, any>;
+                            const prevTwoshot = (prevPlan.twoshot ??
+                              {}) as Record<string, any>;
+                            const {
+                              faceMap: _faceMap,
+                              syncJobs: _syncJobs,
+                              heartbeat: _heartbeat,
+                              anchor_face_audit: _anchorAudit,
+                              ...twoshotWithoutAnchorState
+                            } = prevTwoshot;
+                            const resetAudioPlan = {
+                              ...prevPlan,
+                              twoshot: twoshotWithoutAnchorState,
+                            };
+                            await supabase
+                              .from("composer_scenes")
+                              .update({
+                                reference_image_url: null,
+                                clip_url: null,
+                                clip_status: "pending",
+                                clip_error: null,
+                                lip_sync_status: null,
+                                lip_sync_applied_at: null,
+                                lip_sync_source_clip_url: null,
+                                twoshot_stage: null,
+                                replicate_prediction_id: null,
+                                audio_plan: resetAudioPlan,
+                                updated_at: new Date().toISOString(),
+                              })
+                              .eq("id", scene.id);
+                            onUpdate({
+                              referenceImageUrl: undefined,
+                              clipUrl: undefined,
+                              clipStatus: "pending",
+                              lipSyncStatus: null as any,
+                              lipSyncAppliedAt: null as any,
+                            });
+                            const { error: rerollErr } =
+                              await supabase.functions.invoke(
+                                "compose-video-clips",
+                                {
+                                  body: {
+                                    projectId: scene.projectId,
+                                    scenes: [
+                                      {
+                                        id: scene.id,
+                                        clipSource: scene.clipSource,
+                                        clipQuality:
+                                          scene.clipQuality || "standard",
+                                        aiPrompt: scene.aiPrompt,
+                                        durationSeconds: scene.durationSeconds,
+                                        characterShot: scene.characterShot,
+                                        characterShots: scene.characterShots,
+                                        dialogScript: scene.dialogScript,
+                                        dialogVoices: scene.dialogVoices,
+                                        engineOverride: "cinematic-sync",
+                                        withAudio: scene.withAudio !== false,
+                                      },
+                                    ],
+                                    characters,
+                                  },
+                                },
+                              );
+                            if (rerollErr) throw rerollErr;
+                          } catch (rerollE) {
+                            console.warn(
+                              "[SceneCard] auto-escalation to clip+lipsync reroll failed",
+                              rerollE,
+                            );
+                            onUpdate({ clipStatus: "failed" as any });
+                          }
+                          return;
+                        }
                         if (
                           data &&
                           (data as any).status ===
@@ -1680,6 +1770,11 @@ export default function SceneCard({
                         }
                       } catch (e) {
                         console.warn("[SceneCard] re-sync failed", e);
+                        toast({
+                          title: "Lip-Sync fehlgeschlagen",
+                          description: (e as any)?.message ?? "Unbekannter Fehler",
+                          variant: "destructive",
+                        });
                       }
                     }}
                     className="text-[10px] px-2 py-1 rounded border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
