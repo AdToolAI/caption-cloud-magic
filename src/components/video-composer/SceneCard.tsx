@@ -1871,8 +1871,56 @@ export default function SceneCard({
                         {scene.lipSyncWithVoiceover ? "AN" : "AUS"}
                       </button>
                     </div>
+                    {/* v18: Cancel button — visible while lip-sync is in flight so the
+                        user can abort a stuck run cleanly without leaving a zombie
+                        entry that the auto-trigger would keep reviving. */}
+                    {!scene.lipSyncAppliedAt &&
+                      (scene.lipSyncStatus === "running" ||
+                        scene.lipSyncStatus === "stitching" ||
+                        (scene.lipSyncStatus as any) === "audio_muxing" ||
+                        scene.lipSyncStatus === "pending" ||
+                        (!!(scene as any).twoshotStage &&
+                          !["failed", "done", "complete"].includes(
+                            String((scene as any).twoshotStage),
+                          ))) && (
+                        <div className="flex flex-wrap items-center gap-2 self-end">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                // Optimistic local update so the spinner stops immediately.
+                                onUpdate({
+                                  lipSyncStatus: "canceled" as any,
+                                  twoshotStage: null as any,
+                                });
+                                const { error } = await supabase.functions.invoke(
+                                  "cancel-dialog-lipsync",
+                                  { body: { scene_id: scene.id, reset: true } },
+                                );
+                                if (error) throw error;
+                                toast({
+                                  title: "Lip-Sync abgebrochen",
+                                  description:
+                                    "Du kannst jetzt sauber neu starten — keine alten Einträge bleiben.",
+                                });
+                              } catch (e) {
+                                console.warn("[SceneCard] cancel lipsync failed", e);
+                                toast({
+                                  title: "Abbruch fehlgeschlagen",
+                                  description: (e as any)?.message ?? "Unbekannter Fehler",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="text-[9px] text-destructive hover:underline"
+                          >
+                            ✕ Lip-Sync abbrechen
+                          </button>
+                        </div>
+                      )}
                     {(scene.lipSyncAppliedAt ||
                       scene.lipSyncStatus === "failed" ||
+                      (scene.lipSyncStatus as any) === "canceled" ||
                       scene.lipSyncStatus === "no_voiceover") &&
                       scene.clipUrl && (
                         <div className="flex flex-wrap items-center gap-2 self-end">
