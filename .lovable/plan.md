@@ -1,102 +1,79 @@
-# Dialog-Lipsync v19 — Visible Lipsync + Stable Plate + Cancel
+## What's actually happening
 
-Two user-visible problems from the last successful render:
+The screenshot's "Fehler — bitte Lip-Sync neu rendern" is a **false alarm**: the v4 per-turn pipeline is in fact running successfully right now.
 
-1. **Lips don't move** in the final clip — the stitched output is essentially the raw Hailuo plate or a pass-through; Sync.so output is not actually being used or the face wasn't detected.
-2. **Hands/body move uncannily** — the Hailuo i2v plate is generated with too much motion freedom, producing the typical AI "noodle limbs" that no lipsync can rescue.
+DB state for scene `59dda889…`:
 
-Plus the still-open UX gap: a stuck Lip-Sync run has no clean **Cancel/Reset** button, which leads to credit-burning re-loops.
+```
+turn 0  status=ready    output=…dialog-turn-0.mp4   (completed 20:56:10)
+turn 1  status=ready    output=…dialog-turn-1.mp4   (completed 20:55:09)
+turn 2  status=lipsyncing  job=e2aed80c             (in flight)
+lip_sync_status = running
+```
 
----
+So Sync.so per-turn (v4) is working. The reason the user sees "Fehler" is a **prior** v5 attempt that failed seconds before v4 was triggered:
 
-## Diagnose first (before code changes)
+```
+20:53:44  compose-dialog-segments (v5) dispatches master+char0 with coords=[256,360]
+20:54:05  Sync.so → FAILED "An unknown error occurred."  (3 speakers, master plate)
+20:54:08  v5 marks scene failed, refunds 81 credits
+20:54:20  useTwoShotAutoTrigger sees failed → resets and re-routes to compose-dialog-scene (v4)
+20:54:35  v4 dispatches turn 1
+20:55:14  v4 dispatches turn 0
+20:55:21  v4 dispatches turn 2  (currently in flight)
+```
 
-For the most recent finished cinematic-sync scene the user is looking at:
+That `pipelineStartRef` was already past 90% on the bar when v5 failed, so `usePipelineProgress`'s 4-minute stall detector flipped `hasFailure=true` even though v4 is now happily progressing underneath.
 
-- Pull `composer_scenes.audio_plan`, `dialog_shots`, `lip_sync_source_clip_url`, `clip_url`, `clip_source`, `duration_seconds`, `ai_prompt`.
-- Pull the corresponding `syncso_inflight_jobs` rows + Sync.so job status (we already store `sync:<jobId>`) to confirm:
-  - did Sync.so return `completed` with a real `output_url`, or
-  - did it return `degraded`/`failed` and the pipeline silently fell back to the master plate?
-- Pull `video_renders` rows for the preclips to confirm the Hailuo plate prompt that was actually sent.
+## Root cause
 
-This decides which of the three branches below is the real cause.
+`supabase/functions/compose-clip-webhook/index.ts` (line ~291) **unconditionally invokes `compose-dialog-segments` (v5)** for every cinematic-sync scene after the master plate render finishes — including scenes with ≥3 speakers, where v5's multi-pass chain is known-broken (re-encodes its own output, Sync.so rejects with "unknown error").
 
-## Root-cause branches
+Meanwhile the client-side `useTwoShotAutoTrigger` already routes correctly: 1–2 speakers → v5, ≥3 → v4. The server webhook ignores that rule and always picks v5 — so 3+ speaker scenes always burn one v5 attempt + refund + auto-retry loop before v4 can take over. This is the "Fehler banner that then magically recovers" pattern the user keeps hitting.
 
-### A. Lipsync output exists but is not what gets shown
-Symptoms: `dialog_shots[*].output_url` set, `degraded=false`, but stitched `clip_url` ignores them.
-- `stitch-dialog-shots` (or whichever function does the ffmpeg concat) must use `output_url` per turn, never falling back to the master plate when a turn is `ready`.
-- WYSIWYG: the final `composer_scenes.clip_url` must point to the stitched lipsynced result, not to the original Hailuo master.
+## Plan
 
-### B. Sync.so silently degraded → pass-through
-Symptoms: turns marked `ready` with `degraded=true` or `output_url == sourceUrl`.
-- For `degraded=true`, the per-turn segment must be marked **failed** (not ready) so the scene surfaces a clear error instead of stitching a pass-through.
-- For 2+ speaker preclip path: if `auto_detect` finds 0 faces in the preclip frame, Sync.so returns the input unchanged. We must validate `output_url !== sourceUrl` before accepting and otherwise retry once with `coords` mode using the deterministic face center we computed in `compose-dialog-scene`.
+### Stage 1 — Stop v5 from running on 3+ speaker scenes
 
-### C. Hailuo plate has bad face / too much body motion
-Symptoms: Sync.so detects no stable face because the avatar's head turns away, or hands wave through the face area.
-- Constrain the **dialog-scene prompt** sent to Hailuo i2v:
-  - Force `medium close-up, head and shoulders, eye-line to camera, subtle natural motion, no exaggerated hand gestures, hands out of frame or relaxed at sides`.
-  - Add a negative-style suffix: `no waving hands, no overlapping arms, no head turn away from camera, no rapid body movement`.
-- Lock framing per turn to the avatar's portrait crop so Sync.so always sees one clean face.
-- This is the only branch that fixes the "weird hands/body". Lipsync cannot fix the underlying plate.
+`supabase/functions/compose-clip-webhook/index.ts`
+- Just before the `compose-dialog-segments` invoke, compute `speakerCount` from `lipScene.audio_plan.speakers.length` (fallback `audio_plan.twoshot.speakers.length`, then unique `character_id` count, then 1).
+- If `speakerCount >= 3` OR `lipScene.engine_override === 'cinematic-sync-legacy'`, invoke `compose-dialog-scene` (v4) instead. Otherwise keep `compose-dialog-segments` (v5) for 1–2 speakers.
+- This mirrors the routing in `src/hooks/useTwoShotAutoTrigger.ts` (lines 542–557) so the server and client agree.
+- Result: 3+ speaker scenes go straight to v4 per-turn, no failed v5 attempt, no refund-then-retry loop, no false "Fehler" banner.
 
-## Stage 1 — Plate stability (fix the uncanny motion)
+### Stage 2 — Clear stale "Fehler" when the pipeline self-recovers
 
-`supabase/functions/compose-dialog-scene/index.ts`
-- Add a `buildDialogPlatePrompt(turn)` helper that takes the per-speaker portrait + line and emits a constrained Hailuo i2v prompt (framing + motion guard + negative phrases above).
-- Use this prompt for both the master plate and per-speaker preclips. No free-form `ai_prompt` for the dialog plate.
-- Keep duration capped at the turn length + 0.4 s padding so Hailuo has less time to invent body motion.
+`src/hooks/usePipelineProgress.ts`
+- When `lipsyncReal.failed` transitions from `true → false` (auto-retry path resets `lip_sync_status` from `failed` → `pending`), reset `realProgressRef.current = { value: 0, at: Date.now() }` and `runFloorRef.current = 0` for the lipsync slice.
+- Concretely: add a `useEffect` watching `lipsyncReal.failed`. When it flips back to `false` while `isActive`, reset the stall baseline and the run floor so the 4-minute stall window starts fresh and `hasFailure` clears immediately.
+- Also extend `isTerminalScene` / `failed` detection to ignore scenes whose `clip_error` starts with `auto-retry:` (these are recovering, not failed).
 
-## Stage 2 — Lipsync acceptance / fallback (fix the missing lip motion)
+### Stage 3 — Make the existing Cancel button bullet-proof
 
-`supabase/functions/poll-dialog-shots/index.ts` + `supabase/functions/sync-so-webhook/index.ts`
-- On Sync.so `completed`, reject the result if `output_url === sourceUrl` **or** `degraded === true`. Set the shot back to `pending` with `dispatch_mode='coords'` using the deterministic face center, increment `lipsync_retry_count` (cap 1 extra), then fail hard if it still degrades.
-- Document the rule: **a degraded segment is never stitched**.
+`src/components/video-composer/SceneCard.tsx` + `supabase/functions/cancel-dialog-lipsync/index.ts`
+- Confirm the "✕ Lip-Sync abbrechen" button (already added in v18) is visible whenever `lip_sync_status ∈ {pending, running, stitching, audio_muxing}` OR `twoshot_stage` is non-terminal. Tighten the visibility predicate so it also shows during the brief window where `lip_sync_status = 'failed'` but auto-retry hasn't fired yet.
+- In `cancel-dialog-lipsync`, in addition to today's cleanup also DELETE the `syncso_inflight_jobs` rows for the scene and call Sync.so `DELETE /v2/generate/{jobId}` for every in-flight `sync_job_id` found in `dialog_shots.shots[*].sync_job_id` (today's code only walks `audio_plan.twoshot.syncJobs`, which v4 doesn't populate).
+- After cancel, ensure `useTwoShotAutoTrigger` does NOT pick the scene back up (already gated on `lip_sync_status === 'canceled'` per v18).
 
-`supabase/functions/stitch-dialog-shots/index.ts` (whichever stitches the final clip)
-- For every turn use `output_url`; if any turn is `failed`/`degraded`, surface `lip_sync_status='failed'` instead of silently producing a no-lipsync clip.
-- After stitch, set `composer_scenes.clip_url = stitched_url` and `lip_sync_applied_at = now()`. The UI's playback element must read `clip_url`, not `lip_sync_source_clip_url`.
+### Stage 4 — Recovery for the current bad scene
 
-## Stage 3 — Cancel & clean reset (no more stuck loops)
+For scene `59dda889-3548-4d7d-8087-850a92d433f1`: let v4 finish (turn 2 is in flight; webhook will arrive in <90s and the Lambda stitch will run). No DB intervention needed — the v4 path is working. The user just needs the UI to stop lying. Stage 2 fixes that.
 
-New edge function `cancel-dialog-lipsync` (already partially scaffolded — verify and harden):
-- Auth + ownership check via `composer_projects.user_id`.
-- Idempotent: noop on `cancelled` / `done` / `null`.
-- Single atomic UPDATE: `lip_sync_status='cancelled'`, `twoshot_stage=NULL`, `dialog_shots=NULL`, `replicate_prediction_id=NULL`, `clip_error='cancelled_by_user'`.
-- Best-effort provider cancel: Sync.so `DELETE /v2/generate/{jobId}` for every `sync:<jobId>` in `audio_plan.twoshot.syncJobs`; Replicate cancel for any plain UUID.
-- Delete all `syncso_inflight_jobs` rows for the scene.
-- Idempotent credit refund (deterministic key `scene_id + ':cancel'`).
-
-UI — `src/components/video-composer/SceneCard.tsx`
-- Show **✕ Lip-Sync abbrechen** when `lipSyncStatus ∈ {pending, running, stitching, audio_muxing}`.
-- Optimistic update to `cancelled` + `clearLipSyncPending(scene.id)` so realtime can't revert it.
-- After cancel, re-enable **🔁 Lip-Sync neu rendern**.
-
-Auto-trigger guards — `src/components/video-composer/ClipsTab.tsx` + `src/hooks/useTwoShotAutoTrigger.ts`
-- Treat `lip_sync_status === 'cancelled'` as "do not auto-restart". Only the explicit "neu rendern" button may re-arm to `pending`.
-
-## Stage 4 — Recovery for the current bad scene
-
-One-shot migration / SQL via the cancel function on the affected scene id:
-- Mark its current `lip_sync_status='cancelled'`, clear `dialog_shots`, then the user can press "Lip-Sync neu rendern" once and the new pipeline (Stage 1 + 2) takes over.
+If turn 2 also stalls, the user can press the (now-fixed) **✕ Lip-Sync abbrechen** button and start over, and Stage 1 ensures the next start goes straight to v4 without the wasted v5 attempt.
 
 ## Files to touch
 
 ```text
-supabase/functions/compose-dialog-scene/index.ts         (Stage 1 — plate prompt)
-supabase/functions/poll-dialog-shots/index.ts            (Stage 2 — reject pass-through)
-supabase/functions/sync-so-webhook/index.ts              (Stage 2 — degrade = failed)
-supabase/functions/stitch-dialog-shots/index.ts          (Stage 2 — use output_url, fail loud)
-supabase/functions/cancel-dialog-lipsync/index.ts        (Stage 3 — verify/harden)
-src/components/video-composer/SceneCard.tsx              (Stage 3 — Cancel button)
-src/components/video-composer/ClipsTab.tsx               (Stage 3 — auto-trigger guard)
-src/hooks/useTwoShotAutoTrigger.ts                       (Stage 3 — auto-trigger guard)
-mem/architecture/lipsync/sync-so-webhook-stage5          (doc v19)
+supabase/functions/compose-clip-webhook/index.ts        (Stage 1 — route ≥3 speakers to v4)
+src/hooks/usePipelineProgress.ts                        (Stage 2 — clear stale Fehler)
+src/components/video-composer/SceneCard.tsx             (Stage 3 — cancel visibility)
+supabase/functions/cancel-dialog-lipsync/index.ts       (Stage 3 — kill v4 sync jobs)
+mem/architecture/lipsync/sync-so-webhook-stage5         (doc v20)
 ```
 
 ## Out of scope
-- No new providers, no new models.
-- No change to HeyGen path, single-speaker `compose-lipsync-scene`, or video composer engines other than `cinematic-sync`.
+- No new providers, no Hailuo prompt changes.
+- No change to the HeyGen, single-speaker, or 1–2 speaker (v5) paths.
+- No migrations.
 
-Please confirm and I'll execute Stages 1 → 4 in order, verifying the affected scene end-to-end before closing.
+Please confirm and I'll execute Stages 1 → 4 in order.
