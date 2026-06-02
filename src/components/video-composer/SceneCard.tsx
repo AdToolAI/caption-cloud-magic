@@ -1990,6 +1990,61 @@ export default function SceneCard({
                           >
                             🔁 Lip-Sync neu rendern
                           </button>
+                          <button
+                            type="button"
+                            title="Setzt den Lipsync-Eintrag komplett zurück (löscht dialog_shots, clip_url, alle Status-Flags). Beendet auch laufende Sync.so-Jobs und stoppt Auto-Retry-Loops. Keine neuen Credits."
+                            onClick={async () => {
+                              if (!confirm(
+                                "Lipsync-Eintrag wirklich komplett löschen?\n\nDas stoppt laufende Sync.so-Jobs, entfernt alle Dialog-Shots und setzt die Szene zurück auf 'pending'. Du kannst danach sauber von vorne anfangen.",
+                              )) return;
+                              try {
+                                // Best-effort: stop in-flight Sync.so jobs first.
+                                await supabase.functions.invoke(
+                                  "cancel-dialog-lipsync",
+                                  { body: { scene_id: scene.id, reset: true } },
+                                ).catch(() => {});
+                                // Hard wipe of all lipsync state.
+                                await supabase
+                                  .from("composer_scenes")
+                                  .update({
+                                    lip_sync_status: null,
+                                    lip_sync_applied_at: null,
+                                    lip_sync_source_clip_url: null,
+                                    twoshot_stage: null,
+                                    clip_error: null,
+                                    dialog_shots: null,
+                                    clip_url: null,
+                                    clip_status: "pending",
+                                    reference_image_url: null,
+                                    replicate_prediction_id: null,
+                                    updated_at: new Date().toISOString(),
+                                  })
+                                  .eq("id", scene.id);
+                                onUpdate({
+                                  lipSyncStatus: null as any,
+                                  lipSyncAppliedAt: null as any,
+                                  clipUrl: undefined,
+                                  clipStatus: "pending",
+                                  referenceImageUrl: undefined,
+                                });
+                                toast({
+                                  title: "Lipsync-Eintrag gelöscht",
+                                  description:
+                                    "Szene ist sauber zurückgesetzt — keine alten Daten oder Loops mehr aktiv.",
+                                });
+                              } catch (e) {
+                                console.warn("[SceneCard] hard reset failed", e);
+                                toast({
+                                  title: "Löschen fehlgeschlagen",
+                                  description: (e as any)?.message ?? "Unbekannter Fehler",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                            className="text-[9px] text-destructive hover:underline"
+                          >
+                            🗑 Lipsync-Eintrag löschen
+                          </button>
                           {scene.engineOverride === "cinematic-sync" && (
                             <button
                               type="button"
