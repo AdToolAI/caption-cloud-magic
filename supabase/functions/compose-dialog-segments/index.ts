@@ -569,6 +569,24 @@ serve(async (req) => {
         ];
       }
       speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
+      // Bounds-clamp into the inner 90% of the plate. Identity-match coords
+      // are in anchor-space; if anchor/plate aspect-ratios differ (common
+      // for 3+ speaker wide group shots) the rescaled point can land
+      // outside the actual video frame and Sync.so returns the opaque
+      // "An unknown error occurred." Clamp is a no-op when coords already
+      // sit inside the plate — so 1- and 2-speaker scenes are unaffected.
+      if (speakerCoords[i] && plateDims) {
+        const margin = 0.05;
+        const minX = Math.round(plateDims.width * margin);
+        const maxX = Math.round(plateDims.width * (1 - margin));
+        const minY = Math.round(plateDims.height * margin);
+        const maxY = Math.round(plateDims.height * (1 - margin));
+        const [cx, cy] = speakerCoords[i]!;
+        speakerCoords[i] = [
+          Math.min(Math.max(cx, minX), maxX),
+          Math.min(Math.max(cy, minY), maxY),
+        ];
+      }
     }
     const ASSUMED_FPS = 24;
     console.log(

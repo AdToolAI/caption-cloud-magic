@@ -128,38 +128,28 @@ async function probeImageDims(
 export async function probeMp4Dims(
   url: string,
 ): Promise<{ width: number; height: number } | null> {
-  try {
-    const resp = await fetch(url, {
-      headers: { Range: "bytes=0-786431" },
-      signal: AbortSignal.timeout(6_000),
-    });
-    if (!resp.ok && resp.status !== 206) return null;
-    const buf = new Uint8Array(await resp.arrayBuffer());
+  // Phase A: head-range (works for fast-start MP4s with `moov` near the top).
+  // Phase B: tail-range (Hailuo/Replicate often place `moov` at end of file).
+  // If both fail callers fall back to default dims — same behaviour as before.
+  const tkhdParse = (buf: Uint8Array): { width: number; height: number } | null => {
     const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-
-    // Walk top-level boxes; descend into `moov` → `trak` → `tkhd`.
     const readBoxSize = (off: number) => {
       if (off + 8 > buf.length) return null;
       const size = dv.getUint32(off);
       const type = String.fromCharCode(buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 7]);
       return { size, type, headerLen: size === 1 ? 16 : 8 };
     };
-
-    // tkhd parser → returns width/height as integer pixels (16.16 fixed → int)
     const parseTkhd = (off: number, size: number): { w: number; h: number } | null => {
       if (size < 84) return null;
       const version = buf[off];
-      // tkhd layout: version(1) + flags(3) + (creation/mod/track_id/reserved/duration)
-      // v0: 4+4+4+4+4 = 20 bytes after flags. v1: 8+8+4+4+8 = 32 bytes.
       const dynLen = version === 1 ? 32 : 20;
-      const widthOff = off + 4 + dynLen + 8 /*reserved*/ + 8 /*layer/group/vol/res*/ + 36 /*matrix*/;
+      const widthOff = off + 4 + dynLen + 8 + 8 + 36;
       if (widthOff + 8 > off + size) return null;
       const w = dv.getUint32(widthOff) / 65536;
       const h = dv.getUint32(widthOff + 4) / 65536;
       if (w > 0 && h > 0) return { w: Math.round(w), h: Math.round(h) };
       return null;
     };
-
     let bestDims: { w: number; h: number } | null = null;
     const visit = (start: number, end: number) => {
       let i = start;
@@ -182,9 +172,59 @@ export async function probeMp4Dims(
     visit(0, buf.length);
     if (bestDims) return { width: bestDims.w, height: bestDims.h };
     return null;
-  } catch {
-    return null;
+  };
+
+  let phaseAStatus = "skipped";
+  let phaseBStatus = "skipped";
+
+  // Phase A — head range
+  try {
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=0-786431" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    phaseAStatus = `http_${resp.status}`;
+    if (resp.ok || resp.status === 206) {
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const dims = tkhdParse(buf);
+      if (dims) {
+        console.log(
+          `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus}+hit phaseB=skipped dims=${dims.width}x${dims.height}`,
+        );
+        return dims;
+      }
+      phaseAStatus = `${phaseAStatus}+nomoov`;
+    }
+  } catch (e) {
+    phaseAStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
   }
+
+  // Phase B — tail range (last 512 KiB) for files with moov at the end
+  try {
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=-524288" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    phaseBStatus = `http_${resp.status}`;
+    if (resp.ok || resp.status === 206) {
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const dims = tkhdParse(buf);
+      if (dims) {
+        console.log(
+          `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus}+hit dims=${dims.width}x${dims.height}`,
+        );
+        return dims;
+      }
+      phaseBStatus = `${phaseBStatus}+nomoov`;
+    }
+  } catch (e) {
+    phaseBStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
+  }
+
+  console.log(
+    `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} dims=null`,
+  );
+  return null;
 }
 
 async function askGeminiForFaces(
