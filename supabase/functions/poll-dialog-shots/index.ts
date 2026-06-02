@@ -1461,8 +1461,21 @@ async function processScene(
 
 
   // ── Step 3: determine pipeline status ──────────────────────────────
-  const allReady = shots.every((s) => s.status === "ready");
-  const hasFailure = shots.some((s) => s.status === "failed");
+  // Multi-speaker integrity: a `ready` shot WITHOUT a real output_url
+  // (i.e. multi-speaker degrade-to-master) must NOT be counted as ready
+  // here, because render-dialog-stitch's integrity gate (correctly) refuses
+  // it with 409 and we'd loop forever. Single-speaker degrade keeps its
+  // existing pass-through behaviour.
+  const multiSpeakerScene = isMultiSpeakerScene(shots);
+  const allReady = shots.every((s) => {
+    if (s.status !== "ready") return false;
+    if (multiSpeakerScene) return !!s.output_url;
+    return true;
+  });
+  const multiDegradedBlocked = multiSpeakerScene && shots.some(
+    (s) => s.status === "ready" && !s.output_url,
+  );
+  const hasFailure = shots.some((s) => s.status === "failed") || multiDegradedBlocked;
   const hasActive = shots.some((s) => s.status === "lipsyncing" || s.status === "pending");
 
   let pipelineStatus: DialogShotsState["status"] = state.status;
@@ -1475,6 +1488,19 @@ async function processScene(
   } else if (hasActive) {
     pipelineStatus = "lipsyncing";
   }
+
+  // Promote multi-speaker degrade-without-output to terminal failure so the
+  // refund + clip_error happens in Step 5 instead of looping on 409.
+  if (multiDegradedBlocked && !hasActive) {
+    shots.forEach((s) => {
+      if (s.status === "ready" && !s.output_url) {
+        (s as any).status = "failed";
+        (s as any).error =
+          (s as any).error ?? "multi_speaker_degraded_without_output_url";
+      }
+    });
+  }
+
 
   newState = { ...newState, shots, status: pipelineStatus };
 
