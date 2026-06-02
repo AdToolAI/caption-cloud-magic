@@ -74,6 +74,7 @@ import {
 } from "../_shared/syncso-preflight.ts";
 import {
   pickSpeakerCoordinates,
+  probeMp4Dims,
   resolveCharacterPortraits,
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
