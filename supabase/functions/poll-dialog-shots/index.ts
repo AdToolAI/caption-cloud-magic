@@ -441,8 +441,14 @@ interface PreparedAudio {
   longestVoicedRun: number;
 }
 
+// v17: relaxed for short real turns (e.g. "Was denn?" = 0.30s longest run
+// but voicedRatio=0.42 — clearly speech). Only block clearly-silent audio.
 const MIN_VOICED_RATIO = 0.15;
 const MIN_LONGEST_VOICED_RUN_SEC = 0.4;
+/** v17 carve-out: if the average voice density is high enough we accept
+ *  the turn even if no single voiced run exceeds MIN_LONGEST_VOICED_RUN_SEC. */
+const SHORT_TURN_VOICED_RATIO_OVERRIDE = 0.35;
+const SHORT_TURN_MIN_LONGEST_RUN_SEC = 0.15;
 
 async function ensureNormalizedTurnAudio(
   supabase: ReturnType<typeof createClient>,
