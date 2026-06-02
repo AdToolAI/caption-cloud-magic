@@ -642,6 +642,24 @@ export function usePipelineProgress({
     }
   }, [isActive]);
 
+  // v20: When lipsync transitions from failed → not-failed (auto-retry path
+  // resets lip_sync_status from 'failed' back to 'pending' / 'running'), reset
+  // the stall baseline AND the run-floor so the bar doesn't keep showing
+  // "Fehler" while the new attempt is progressing. Without this, the prior
+  // failed-and-recovered v5 attempt leaves runFloorRef ≥90% with no real
+  // movement → the 4-min stall window flips hasFailure=true even though v4 is
+  // actively making progress underneath.
+  const lipsyncFailedRef = useRef<boolean>(false);
+  useEffect(() => {
+    const wasFailed = lipsyncFailedRef.current;
+    lipsyncFailedRef.current = lipsyncReal.failed;
+    if (wasFailed && !lipsyncReal.failed) {
+      realProgressRef.current = { value: 0, at: Date.now() };
+      runFloorRef.current = 0;
+      floorRef.current.lipsync = 0;
+    }
+  }, [lipsyncReal.failed]);
+
   // Once lipsync is terminal (done or failed) AND no export is running, stop
   // letting the run-soft-percent ramp toward RUN_NOMINAL_SECONDS — otherwise
   // the bar visibly keeps "loading" for minutes after Sync.so reported done.
