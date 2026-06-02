@@ -562,22 +562,39 @@ serve(async (req) => {
       // payload/model variant. Retry through a bounded fallback ladder:
       // coords-pro → auto-pro → auto-standard, then refund if all fail.
       const treatAsTransient = isTransientSyncError(errClass);
-      const isMultiSpeaker = passesArr.length >= 2;
+      const speakerCount = passesArr.length;
       const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
       let nextVariant: string | null = nextV5RetryVariant(currentVariant);
-      // ── Multi-speaker safety ────────────────────────────────────────────
-      // For 2+ speaker chains, the `auto-*` fallback variants set
-      // `auto_detect: true` and DROP the per-speaker coordinates. On wide
-      // group shots Sync.so's auto-detector either targets the wrong face
-      // OR silently passes the input through unchanged (no lip movement at
-      // all). Both modes mask the real failure as a "successful" pass and
-      // freeze speakers 2+. Refuse to descend the ladder past coords-pro
-      // for multi-speaker scenes — refund + surface the error instead.
-      if (isMultiSpeaker && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
-        console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} multi-speaker (${passesArr.length} passes) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
+      // ── Multi-speaker safety (3+ only) ─────────────────────────────────
+      // For 1- and 2-speaker scenes the standard ladder
+      // `coords-pro → auto-pro → auto-standard` is unchanged: those
+      // configurations were stable and the previous over-broad block
+      // killed perfectly recoverable 2-shot lipsyncs.
+      // For 3+ speakers `auto_detect: true` discards per-speaker coords
+      // and risks animating the wrong face / passing video through
+      // unchanged. We block the auto-* fallback there, BUT allow a
+      // single last-ditch `auto-pro` attempt on pass 0 if every pass
+      // failed with the "no face found" class — better one moving mouth
+      // than a fully-frozen scene.
+      if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
+        const allPassesFailedNoFace = passesArr.every(
+          (p: any) =>
+            p?.status === "failed" &&
+            /provider_unknown_error|face_not_found/.test(String(p?.last_error_class ?? "")),
         );
-        nextVariant = null;
+        const isFirstPass = currentPass === 0;
+        const lastDitchAllowed =
+          allPassesFailedNoFace && isFirstPass && nextVariant === "auto-pro";
+        if (!lastDitchAllowed) {
+          console.warn(
+            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
+          );
+          nextVariant = null;
+        } else {
+          console.warn(
+            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — last-ditch-lite ${currentVariant} → auto-pro on pass 0`,
+          );
+        }
       }
       const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES && nextVariant !== null;
 
