@@ -49,9 +49,11 @@ export const DialogStitchVideoSchema = z.object({
 
 export type DialogStitchVideoProps = z.infer<typeof DialogStitchVideoSchema>;
 
-/** v11 Smoothness: 3-frame opacity crossfade on overlay edges so the cut
- *  between master plate and lipsynced overlay is invisible. */
-const CROSSFADE_FRAMES = 3;
+/** v20 Smoothness: 6-frame opacity crossfade on overlay edges so the cut
+ *  between master plate and lipsynced overlay (and between consecutive
+ *  speaker overlays) is invisible. Previously 3 frames produced a hard
+ *  visible pop at the Samuel→Matthew boundary. */
+const CROSSFADE_FRAMES = 6;
 const ShotOverlay: React.FC<{
   src: string;
   segDuration: number;
