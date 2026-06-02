@@ -14,6 +14,7 @@ import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest
 import { ComposedAdVideo, ComposedAdVideoSchema } from './templates/ComposedAdVideo';
 import { DialogStitchVideo, DialogStitchVideoSchema } from './templates/DialogStitchVideo';
 import { DialogTurnClipVideo, DialogTurnClipVideoSchema } from './templates/DialogTurnClipVideo';
+import { DialogTurnFaceCropVideo, DialogTurnFaceCropVideoSchema } from './templates/DialogTurnFaceCropVideo';
 
 export const RemotionRoot: React.FC = () => {
   return (
