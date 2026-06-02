@@ -1066,7 +1066,12 @@ serve(async (req) => {
       fallback_history: prevState?.fallback_history ?? [],
       last_diagnostic_id: diagnosticId,
       final_url: null,
-    };
+      // Plate dims (probed once on pass 0) — render-sync-segments-audio-mux
+      // uses these for the Lambda canvas; multi-speaker fix uses them so
+      // pickSpeakerCoordinates produces plate-space coords.
+      video_width: videoDims.width,
+      video_height: videoDims.height,
+    } as SegmentsState;
 
     await logSyncDispatch(supabase, {
       scene_id: sceneId, user_id: userId, engine: "sync-segments",
