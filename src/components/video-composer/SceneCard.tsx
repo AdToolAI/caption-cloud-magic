@@ -1616,6 +1616,226 @@ export default function SceneCard({
                 />
               )}
 
+              {/* v20.1 — Lip-Sync Aktionen Toolbar.
+                  Always visible when ANY lipsync artifact exists, regardless
+                  of the "Mehr ▾" collapse state. Lives in the AUDIO block
+                  next to SceneDialogStudio so the buttons are where users
+                  expect them after a dialog-shot render. */}
+              {(scene.lipSyncAppliedAt ||
+                !!scene.lipSyncStatus ||
+                !!(scene as any).dialogShots ||
+                !!(scene as any).twoshotStage ||
+                scene.engineOverride === "cinematic-sync") && (
+                <div className="flex flex-wrap items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5">
+                  <span className="text-[10px] font-semibold text-primary mr-auto">
+                    🎙️ Lip-Sync Aktionen
+                  </span>
+                  <button
+                    type="button"
+                    disabled={scene.lipSyncStatus === "running"}
+                    onClick={async () => {
+                      try {
+                        // v19: clear all lipsync + clip state so
+                        // compose-dialog-scene re-renders the master plate
+                        // with the constrained head-and-shoulders dialog
+                        // prompt.
+                        await supabase
+                          .from("composer_scenes")
+                          .update({
+                            lip_sync_status: "pending",
+                            twoshot_stage: null,
+                            clip_error: null,
+                            dialog_shots: null,
+                            clip_url: null,
+                            clip_status: "pending",
+                            reference_image_url: null,
+                            lip_sync_source_clip_url: null,
+                            lip_sync_applied_at: null,
+                          })
+                          .eq("id", scene.id);
+
+                        const { data, error } =
+                          await supabase.functions.invoke(
+                            "compose-dialog-scene",
+                            { body: { scene_id: scene.id } },
+                          );
+                        if (error) throw error;
+                        if (
+                          data &&
+                          (data as any).status ===
+                            "master_regenerated_for_lipsync_stability"
+                        ) {
+                          toast({
+                            title: "Master-Plate wird neu erzeugt",
+                            description:
+                              "HappyHorse ist für Multi-Sprecher-Lip-Sync nicht stabil genug. Der Master wird mit Hailuo neu gerendert — Lip-Sync startet danach automatisch.",
+                          });
+                          onUpdate({
+                            clipStatus: "generating",
+                            clipUrl: null,
+                            lipSyncStatus: null,
+                          });
+                        } else {
+                          onUpdate({ lipSyncStatus: "running" });
+                        }
+                      } catch (e) {
+                        console.warn("[SceneCard] re-sync failed", e);
+                      }
+                    }}
+                    className="text-[10px] px-2 py-1 rounded border border-primary/40 text-primary hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    🔁 Lip-Sync neu rendern
+                  </button>
+                  <button
+                    type="button"
+                    title="Setzt den Lipsync-Eintrag komplett zurück (löscht dialog_shots, clip_url, alle Status-Flags). Beendet auch laufende Sync.so-Jobs und stoppt Auto-Retry-Loops. Keine neuen Credits."
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          "Lipsync-Eintrag wirklich komplett löschen?\n\nDas stoppt laufende Sync.so-Jobs, entfernt alle Dialog-Shots und setzt die Szene zurück auf 'pending'. Du kannst danach sauber von vorne anfangen.",
+                        )
+                      )
+                        return;
+                      try {
+                        await supabase.functions
+                          .invoke("cancel-dialog-lipsync", {
+                            body: { scene_id: scene.id, reset: true },
+                          })
+                          .catch(() => {});
+                        await supabase
+                          .from("composer_scenes")
+                          .update({
+                            lip_sync_status: null,
+                            lip_sync_applied_at: null,
+                            lip_sync_source_clip_url: null,
+                            twoshot_stage: null,
+                            clip_error: null,
+                            dialog_shots: null,
+                            clip_url: null,
+                            clip_status: "pending",
+                            reference_image_url: null,
+                            replicate_prediction_id: null,
+                            updated_at: new Date().toISOString(),
+                          })
+                          .eq("id", scene.id);
+                        onUpdate({
+                          lipSyncStatus: null as any,
+                          lipSyncAppliedAt: null as any,
+                          clipUrl: undefined,
+                          clipStatus: "pending",
+                          referenceImageUrl: undefined,
+                        });
+                        toast({
+                          title: "Lipsync-Eintrag gelöscht",
+                          description:
+                            "Szene ist sauber zurückgesetzt — keine alten Daten oder Loops mehr aktiv.",
+                        });
+                      } catch (e) {
+                        console.warn("[SceneCard] hard reset failed", e);
+                        toast({
+                          title: "Löschen fehlgeschlagen",
+                          description:
+                            (e as any)?.message ?? "Unbekannter Fehler",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    className="text-[10px] px-2 py-1 rounded border border-destructive/40 text-destructive hover:bg-destructive/10"
+                  >
+                    🗑 Lipsync komplett zurücksetzen
+                  </button>
+                  {scene.engineOverride === "cinematic-sync" && (
+                    <button
+                      type="button"
+                      disabled={
+                        scene.clipStatus === "generating" ||
+                        scene.lipSyncStatus === "running"
+                      }
+                      title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
+                      onClick={async () => {
+                        try {
+                          const prevPlan = ((scene as any).audioPlan ??
+                            {}) as Record<string, any>;
+                          const prevTwoshot = (prevPlan.twoshot ??
+                            {}) as Record<string, any>;
+                          const {
+                            faceMap: _faceMap,
+                            syncJobs: _syncJobs,
+                            heartbeat: _heartbeat,
+                            anchor_face_audit: _anchorAudit,
+                            ...twoshotWithoutAnchorState
+                          } = prevTwoshot;
+                          const resetAudioPlan = {
+                            ...prevPlan,
+                            twoshot: twoshotWithoutAnchorState,
+                          };
+                          await supabase
+                            .from("composer_scenes")
+                            .update({
+                              reference_image_url: null,
+                              clip_url: null,
+                              clip_status: "pending",
+                              clip_error: null,
+                              lip_sync_status: null,
+                              lip_sync_applied_at: null,
+                              lip_sync_source_clip_url: null,
+                              twoshot_stage: null,
+                              replicate_prediction_id: null,
+                              audio_plan: resetAudioPlan,
+                              updated_at: new Date().toISOString(),
+                            })
+                            .eq("id", scene.id);
+                          onUpdate({
+                            referenceImageUrl: undefined,
+                            clipUrl: undefined,
+                            clipStatus: "pending",
+                            lipSyncStatus: null as any,
+                            lipSyncAppliedAt: null as any,
+                          });
+                          const { error } = await supabase.functions.invoke(
+                            "compose-video-clips",
+                            {
+                              body: {
+                                projectId: scene.projectId,
+                                scenes: [
+                                  {
+                                    id: scene.id,
+                                    clipSource: scene.clipSource,
+                                    clipQuality:
+                                      scene.clipQuality || "standard",
+                                    aiPrompt: scene.aiPrompt,
+                                    durationSeconds: scene.durationSeconds,
+                                    characterShot: scene.characterShot,
+                                    characterShots: scene.characterShots,
+                                    dialogScript: scene.dialogScript,
+                                    dialogVoices: scene.dialogVoices,
+                                    engineOverride: "cinematic-sync",
+                                    withAudio: scene.withAudio !== false,
+                                  },
+                                ],
+                                characters,
+                              },
+                            },
+                          );
+                          if (error) throw error;
+                        } catch (e) {
+                          console.warn(
+                            "[SceneCard] re-roll clip + lipsync failed",
+                            e,
+                          );
+                          onUpdate({ clipStatus: "failed" as any });
+                        }
+                      }}
+                      className="text-[10px] px-2 py-1 rounded border border-amber-400/40 text-amber-300 hover:bg-amber-400/10 disabled:opacity-50"
+                    >
+                      🎥 Clip + Lip-Sync neu rendern
+                    </button>
+                  )}
+                </div>
+              )}
+
+
+
               {/* Director Console — read-only Live Prompt + Audio Plan timeline.
                 Always derived from `scene.audioPlan` + structured slots, never
                 writes back, so the locked Audio Plan is structurally immune to
@@ -1922,228 +2142,14 @@ export default function SceneCard({
                           </button>
                         </div>
                       )}
-                    {(scene.lipSyncAppliedAt ||
-                      !!scene.lipSyncStatus ||
-                      !!(scene as any).dialogShots ||
-                      !!(scene as any).twoshotStage ||
-                      scene.engineOverride === "cinematic-sync") && (
-                        <div className="flex flex-wrap items-center gap-2 self-end">
-                          <button
-                            type="button"
-                            disabled={scene.lipSyncStatus === "running"}
-                            onClick={async () => {
-                              try {
-                                // Unified Dialog-Shot Pipeline: one Hailuo
-                                // plate + one Sync.so lipsync per speaker turn
-                                // (1..N speakers). Clear stale lip-sync flags
-                                // so the new run starts clean.
-                                // v19: also clear clip_url / reference_image_url
-                                // so compose-dialog-scene re-renders the master
-                                // plate with the constrained head-and-shoulders
-                                // dialog prompt (fixes uncanny hand/body motion
-                                // from the original free-form scene prompt).
-                                await supabase
-                                  .from("composer_scenes")
-                                  .update({
-                                    lip_sync_status: "pending",
-                                    twoshot_stage: null,
-                                    clip_error: null,
-                                    dialog_shots: null,
-                                    clip_url: null,
-                                    clip_status: "pending",
-                                    reference_image_url: null,
-                                    lip_sync_source_clip_url: null,
-                                    lip_sync_applied_at: null,
-                                  })
-                                  .eq("id", scene.id);
+                    {/* v20.1: Reset/Re-render buttons moved out of this gated
+                        block (secondaryOpen + clipSource ai-* + shotType !==
+                        absent) into the always-visible Lip-Sync Actions
+                        toolbar rendered directly under <SceneDialogStudio>
+                        in the AUDIO block. They were unreachable here for
+                        dialog/cinematic-sync scenes because "Mehr ▾" was
+                        almost always collapsed. */}
 
-                                const { data, error } =
-                                  await supabase.functions.invoke(
-                                    "compose-dialog-scene",
-                                    { body: { scene_id: scene.id } },
-                                  );
-                                if (error) throw error;
-                                if (
-                                  data &&
-                                  (data as any).status ===
-                                    "master_regenerated_for_lipsync_stability"
-                                ) {
-                                  toast({
-                                    title: "Master-Plate wird neu erzeugt",
-                                    description:
-                                      "HappyHorse ist für 2-Sprecher-Lip-Sync nicht stabil genug. Der Master wird mit Hailuo neu gerendert — Lip-Sync startet danach automatisch.",
-                                  });
-                                  onUpdate({
-                                    clipStatus: "generating",
-                                    clipUrl: null,
-                                    lipSyncStatus: null,
-                                  });
-                                } else {
-                                  onUpdate({ lipSyncStatus: "running" });
-                                }
-
-                              } catch (e) {
-                                console.warn("[SceneCard] re-sync failed", e);
-                              }
-                            }}
-                            className="text-[9px] text-primary hover:underline disabled:opacity-50"
-                          >
-                            🔁 Lip-Sync neu rendern
-                          </button>
-                          <button
-                            type="button"
-                            title="Setzt den Lipsync-Eintrag komplett zurück (löscht dialog_shots, clip_url, alle Status-Flags). Beendet auch laufende Sync.so-Jobs und stoppt Auto-Retry-Loops. Keine neuen Credits."
-                            onClick={async () => {
-                              if (!confirm(
-                                "Lipsync-Eintrag wirklich komplett löschen?\n\nDas stoppt laufende Sync.so-Jobs, entfernt alle Dialog-Shots und setzt die Szene zurück auf 'pending'. Du kannst danach sauber von vorne anfangen.",
-                              )) return;
-                              try {
-                                // Best-effort: stop in-flight Sync.so jobs first.
-                                await supabase.functions.invoke(
-                                  "cancel-dialog-lipsync",
-                                  { body: { scene_id: scene.id, reset: true } },
-                                ).catch(() => {});
-                                // Hard wipe of all lipsync state.
-                                await supabase
-                                  .from("composer_scenes")
-                                  .update({
-                                    lip_sync_status: null,
-                                    lip_sync_applied_at: null,
-                                    lip_sync_source_clip_url: null,
-                                    twoshot_stage: null,
-                                    clip_error: null,
-                                    dialog_shots: null,
-                                    clip_url: null,
-                                    clip_status: "pending",
-                                    reference_image_url: null,
-                                    replicate_prediction_id: null,
-                                    updated_at: new Date().toISOString(),
-                                  })
-                                  .eq("id", scene.id);
-                                onUpdate({
-                                  lipSyncStatus: null as any,
-                                  lipSyncAppliedAt: null as any,
-                                  clipUrl: undefined,
-                                  clipStatus: "pending",
-                                  referenceImageUrl: undefined,
-                                });
-                                toast({
-                                  title: "Lipsync-Eintrag gelöscht",
-                                  description:
-                                    "Szene ist sauber zurückgesetzt — keine alten Daten oder Loops mehr aktiv.",
-                                });
-                              } catch (e) {
-                                console.warn("[SceneCard] hard reset failed", e);
-                                toast({
-                                  title: "Löschen fehlgeschlagen",
-                                  description: (e as any)?.message ?? "Unbekannter Fehler",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                            className="text-[9px] text-destructive hover:underline"
-                          >
-                            🗑 Lipsync komplett zurücksetzen
-                          </button>
-                          {scene.engineOverride === "cinematic-sync" && (
-                            <button
-                              type="button"
-                              disabled={
-                                scene.clipStatus === "generating" ||
-                                scene.lipSyncStatus === "running"
-                              }
-                              title="Setzt Anchor + Clip zurück und rendert beides neu — empfohlen bei 'source_clip_missing_speakers' oder 'anchor_missing_speakers'."
-                              onClick={async () => {
-                                try {
-                                  const prevPlan = ((scene as any).audioPlan ??
-                                    {}) as Record<string, any>;
-                                  const prevTwoshot = (prevPlan.twoshot ??
-                                    {}) as Record<string, any>;
-                                  const {
-                                    faceMap: _faceMap,
-                                    syncJobs: _syncJobs,
-                                    heartbeat: _heartbeat,
-                                    anchor_face_audit: _anchorAudit,
-                                    ...twoshotWithoutAnchorState
-                                  } = prevTwoshot;
-                                  const resetAudioPlan = {
-                                    ...prevPlan,
-                                    twoshot: twoshotWithoutAnchorState,
-                                  };
-                                  // Hard reset: clear composed anchor, clip, and all
-                                  // lipsync state so compose-video-clips re-runs the
-                                  // full cinematic-sync pipeline (multi-cast anchor
-                                  // with face audit → Hailuo i2v → auto-lipsync).
-                                  await supabase
-                                    .from("composer_scenes")
-                                    .update({
-                                      reference_image_url: null,
-                                      clip_url: null,
-                                      clip_status: "pending",
-                                      clip_error: null,
-                                      lip_sync_status: null,
-                                      lip_sync_applied_at: null,
-                                      lip_sync_source_clip_url: null,
-                                      twoshot_stage: null,
-                                      replicate_prediction_id: null,
-                                      audio_plan: resetAudioPlan,
-                                      updated_at: new Date().toISOString(),
-                                    })
-                                    .eq("id", scene.id);
-                                  // Optimistic local update.
-                                  onUpdate({
-                                    referenceImageUrl: undefined,
-                                    clipUrl: undefined,
-                                    clipStatus: "pending",
-                                    lipSyncStatus: null as any,
-                                    lipSyncAppliedAt: null as any,
-                                  });
-                                  const { error } =
-                                    await supabase.functions.invoke(
-                                      "compose-video-clips",
-                                      {
-                                        body: {
-                                          projectId: scene.projectId,
-                                          scenes: [
-                                            {
-                                              id: scene.id,
-                                              clipSource: scene.clipSource,
-                                              clipQuality:
-                                                scene.clipQuality || "standard",
-                                              aiPrompt: scene.aiPrompt,
-                                              durationSeconds:
-                                                scene.durationSeconds,
-                                              characterShot:
-                                                scene.characterShot,
-                                              characterShots:
-                                                scene.characterShots,
-                                              dialogScript: scene.dialogScript,
-                                              dialogVoices: scene.dialogVoices,
-                                              engineOverride: "cinematic-sync",
-                                              withAudio:
-                                                scene.withAudio !== false,
-                                            },
-                                          ],
-                                          characters,
-                                        },
-                                      },
-                                    );
-                                  if (error) throw error;
-                                } catch (e) {
-                                  console.warn(
-                                    "[SceneCard] re-roll clip + lipsync failed",
-                                    e,
-                                  );
-                                  onUpdate({ clipStatus: "failed" as any });
-                                }
-                              }}
-                              className="text-[9px] text-amber-300 hover:underline disabled:opacity-50"
-                            >
-                              🎥 Clip + Lip-Sync neu rendern
-                            </button>
-                          )}
-                        </div>
-                      )}
                   </div>
                 )}
               {scene.clipSource.startsWith("ai-") && (
