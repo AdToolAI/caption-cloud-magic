@@ -221,8 +221,57 @@ export async function probeMp4Dims(
     phaseBStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
   }
 
+  // Phase C — signature scan fallback. Both box-walker phases failed (often
+  // because the tail-range starts mid-box and the walker only descends from
+  // offset 0). Scan the already-fetched tail buffer for the literal `tkhd`
+  // 4-byte signature and read width/height relative to that offset. This is
+  // the same defensive scan the legacy v4 pipeline uses.
+  let phaseCStatus = "skipped";
+  try {
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=-1048575" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    phaseCStatus = `http_${resp.status}`;
+    if (resp.ok || resp.status === 206) {
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      const readU32 = (i: number) => dv.getUint32(i);
+      const maxScan = Math.max(0, buf.length - 100);
+      let best: { width: number; height: number } | null = null;
+      for (let i = 0; i < maxScan; i++) {
+        if (buf[i] !== 0x74 || buf[i + 1] !== 0x6b || buf[i + 2] !== 0x68 || buf[i + 3] !== 0x64) continue;
+        // `tkhd` payload follows immediately after the 4-byte type marker.
+        // version byte at i+4; width/height at offset 80 (v0) or 92 (v1)
+        // from the start of `tkhd` data which is `i+4`. Each is fixed-point
+        // 16.16 — divide by 65536. We try both layouts.
+        for (const dyn of [20, 32]) {
+          const widthOff = i + 4 + dyn + 8 + 8 + 36;
+          if (widthOff + 8 > buf.length) continue;
+          const w = readU32(widthOff) / 65536;
+          const h = readU32(widthOff + 4) / 65536;
+          if (w > 0 && h > 0 && w < 10000 && h < 10000) {
+            const dims = { width: Math.round(w), height: Math.round(h) };
+            if (!best || dims.width * dims.height > best.width * best.height) {
+              best = dims;
+            }
+          }
+        }
+      }
+      if (best) {
+        console.log(
+          `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} phaseC=${phaseCStatus}+sigscan dims=${best.width}x${best.height}`,
+        );
+        return best;
+      }
+      phaseCStatus = `${phaseCStatus}+notkhd`;
+    }
+  } catch (e) {
+    phaseCStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
+  }
+
   console.log(
-    `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} dims=null`,
+    `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} phaseC=${phaseCStatus} dims=null`,
   );
   return null;
 }
