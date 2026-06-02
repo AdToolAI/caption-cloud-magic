@@ -1235,11 +1235,20 @@ async function processSceneLocked(
         continue;
       }
 
-      // ── Stage E.1: VAD guard — block dispatch when audio has no voice ──
-      if (preparedAudio && (
-        preparedAudio.voicedRatio < MIN_VOICED_RATIO ||
-        preparedAudio.longestVoicedRun < MIN_LONGEST_VOICED_RUN_SEC
-      )) {
+      // ── Stage E.1 (v17 relaxed): VAD guard — only block clearly-silent audio ──
+      // Old rule rejected "Was denn?" (voiced=42%, longestRun=0.30s) as
+      // silent. New rule: high voice density (≥0.35) carves out the short
+      // longestRun requirement, so short real turns pass.
+      const vadIsBlocked = !!preparedAudio && (() => {
+        const vr = preparedAudio.voicedRatio;
+        const lr = preparedAudio.longestVoicedRun;
+        if (vr < MIN_VOICED_RATIO) return true;
+        if (vr >= SHORT_TURN_VOICED_RATIO_OVERRIDE) {
+          return lr < SHORT_TURN_MIN_LONGEST_RUN_SEC;
+        }
+        return lr < MIN_LONGEST_VOICED_RUN_SEC;
+      })();
+      if (preparedAudio && vadIsBlocked) {
         const reason = "preflight_audio_no_voice";
         console.warn(
           `[poll-dialog-shots] turn ${nextShot.idx} VAD BLOCK voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}% longestRun=${preparedAudio.longestVoicedRun.toFixed(2)}s`,
