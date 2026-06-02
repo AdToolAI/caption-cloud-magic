@@ -356,6 +356,10 @@ interface DialogShot {
   durSec: number;
   /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
+  /** v21: optional bbox [x1,y1,x2,y2] of the speaker's face in master-plate
+   *  pixel space. Used by render-dialog-turn to compute a tight face-crop
+   *  preclip so Sync.so sees ONE face on 3+ speaker scenes. */
+  target_bbox?: [number, number, number, number] | null;
   /** Per-turn temperature: short turns (<2s) get 1.0 for max articulation. */
   temperature: number;
   /** v7: ISOLATED per-speaker audio (only this speaker's voice + silence
@@ -374,10 +378,12 @@ interface DialogShot {
 }
 
 interface DialogShotsState {
-  /** v4 = per-turn parallel passes + ffmpeg time-slice stitch (current).
+  /** v5 = v4 + per-shot `target_bbox` + `preclip_crop` (face-region preclip
+   *  path for 3+ speaker scenes).
+   *  v4 = per-turn parallel passes + ffmpeg time-slice stitch.
    *  v3 = per-speaker multi-window passes (legacy, ignored by poller).
    *  v2 = per-turn chained passes (legacy, ignored by poller). */
-  version: 4;
+  version: 5;
   status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
   /** Per-turn passes, ordered by window start. */
   shots: DialogShot[];
@@ -681,9 +687,23 @@ serve(async (req) => {
       }
       return m;
     };
+    const buildBboxMap = (fm: typeof faceMap) => {
+      const m = new Map<string, [number, number, number, number]>();
+      if (fm?.faces?.length) {
+        for (const f of fm.faces) {
+          const cid = String(f.characterId ?? "").toLowerCase();
+          const bb = (f as any).bbox;
+          if (cid && Array.isArray(bb) && bb.length === 4 && bb.every((v: any) => Number.isFinite(Number(v)))) {
+            m.set(cid, [Number(bb[0]), Number(bb[1]), Number(bb[2]), Number(bb[3])]);
+          }
+        }
+      }
+      return m;
+    };
 
     let workingFaceMap: any = faceMap;
     let coordsByCharId = buildCoordsMap(workingFaceMap);
+    let bboxByCharId = buildBboxMap(workingFaceMap);
 
     const distinctCharIds = Array.from(
       new Set(
@@ -715,6 +735,7 @@ serve(async (req) => {
         if (rebuilt) {
           workingFaceMap = rebuilt;
           coordsByCharId = buildCoordsMap(rebuilt);
+          bboxByCharId = buildBboxMap(rebuilt);
           console.log(
             `[compose-dialog-scene] faceMap rebuilt: ${rebuilt.faces.length} faces, identities=${rebuilt.faces.map((f) => f.characterId ?? "?").join(",")}`,
           );
@@ -790,6 +811,9 @@ serve(async (req) => {
         const coords = t.character_id
           ? coordsByCharId.get(t.character_id) ?? null
           : null;
+        const bbox = t.character_id
+          ? bboxByCharId.get(t.character_id) ?? null
+          : null;
         return {
           idx: i,
           speaker_idx: t.speaker_idx,
@@ -798,6 +822,7 @@ serve(async (req) => {
           window: [t.start, t.end] as [number, number],
           durSec: dur,
           target_coords: coords,
+          target_bbox: bbox,
           temperature: dur < 2.0 ? 1.0 : 0.9,
           audio_url: t.audio_url,
           deterministic_coords: requireDeterministic && !!coords,
@@ -931,7 +956,7 @@ serve(async (req) => {
 
     const nowIso = new Date().toISOString();
     const state: DialogShotsState = {
-      version: 4,
+      version: 5,
       status: "queued",
       shots: rawShots,
       source_clip_url: sourceClipUrl,
