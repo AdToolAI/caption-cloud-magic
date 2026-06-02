@@ -125,6 +125,13 @@ interface DialogShot {
   /** Tracks which video source was used for the actual Sync.so dispatch.
    *  'preclip' = short clip ab t=0 (preferred). 'master' = legacy segments_secs. */
   sync_source_kind?: "preclip" | "master";
+  /** v21: when set, the preclip is a single-face square CROP (rendered via
+   *  DialogTurnFaceCropVideo) in source-master pixel coordinates. Sync.so
+   *  is dispatched with `auto_detect: true` (single face = unambiguous);
+   *  DialogStitchVideo composites the lipsynced crop back at this region. */
+  preclip_crop?: { x: number; y: number; size: number; outputSize: number };
+  /** v21: optional face bbox in master pixel space (used by render-dialog-turn). */
+  target_bbox?: [number, number, number, number] | null;
   /** Stufe B telemetry — populated by ensureNormalizedTurnAudio. */
   audio_dur_sec?: number;
   audio_lead_in_sec?: number;
@@ -134,7 +141,7 @@ interface DialogShot {
 
 
 interface DialogShotsState {
-  version: 4;
+  version: 4 | 5;
   status: "queued" | "lipsyncing" | "stitching" | "done" | "failed";
   shots: DialogShot[];
   source_clip_url: string;
