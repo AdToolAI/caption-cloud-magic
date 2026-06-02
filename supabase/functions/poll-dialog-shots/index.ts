@@ -883,6 +883,15 @@ async function processSceneLocked(
     .single();
   if (!scene) return { status: "not_found", mutated: false };
   if (scene.lip_sync_applied_at) return { status: "already_done", mutated: false };
+  // v18 Cancel-Guard: a user-cancelled scene must never be revived by a late
+  // webhook or pg_cron tick. The cancel-dialog-lipsync function flips
+  // `lip_sync_status='canceled'` and (optionally) `dialog_shots.status='canceled'`.
+  if (
+    (scene as any).lip_sync_status === "canceled" ||
+    (scene.dialog_shots as any)?.status === "canceled"
+  ) {
+    return { status: "canceled", mutated: false };
+  }
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
@@ -890,7 +899,7 @@ async function processSceneLocked(
     // Legacy v1/v2/v3 state — ignore; user must reset via UI to migrate.
     return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
-  if (state.status === "done" || state.status === "failed") {
+  if (state.status === "done" || state.status === "failed" || (state.status as any) === "canceled") {
     return { status: state.status, mutated: false };
   }
 
