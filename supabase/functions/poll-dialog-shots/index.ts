@@ -441,8 +441,14 @@ interface PreparedAudio {
   longestVoicedRun: number;
 }
 
+// v17: relaxed for short real turns (e.g. "Was denn?" = 0.30s longest run
+// but voicedRatio=0.42 — clearly speech). Only block clearly-silent audio.
 const MIN_VOICED_RATIO = 0.15;
 const MIN_LONGEST_VOICED_RUN_SEC = 0.4;
+/** v17 carve-out: if the average voice density is high enough we accept
+ *  the turn even if no single voiced run exceeds MIN_LONGEST_VOICED_RUN_SEC. */
+const SHORT_TURN_VOICED_RATIO_OVERRIDE = 0.35;
+const SHORT_TURN_MIN_LONGEST_RUN_SEC = 0.15;
 
 async function ensureNormalizedTurnAudio(
   supabase: ReturnType<typeof createClient>,
@@ -1145,7 +1151,15 @@ async function processSceneLocked(
         : win;
       nextShot.sync_source_kind = usePreclip ? "preclip" : "master";
 
-      const mode = dispatchModeForShot(nextShot);
+      // v17 Artlist-Parität: Preclips sind isolierte Single-Face-Clips.
+      // Wide-Plate-Koordinaten aus dem Master sind dort weder nötig noch
+      // sinnvoll (Sync.so antwortet damit reproduzierbar mit "An unknown
+      // error occurred." für Edge-Faces). Auf Preclip → IMMER auto_detect.
+      // Die Coords + frame_number bleiben nur für den Master-Legacy-Pfad.
+      let mode = dispatchModeForShot(nextShot);
+      if (usePreclip) {
+        mode = "auto";
+      }
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
       // Stufe B: audio is always normalized (mono, peak -1 dBFS, 0.25s lead-in,
       // min 3.0s tail-padded) — eliminates the most frequent Sync.so reject
@@ -1221,11 +1235,20 @@ async function processSceneLocked(
         continue;
       }
 
-      // ── Stage E.1: VAD guard — block dispatch when audio has no voice ──
-      if (preparedAudio && (
-        preparedAudio.voicedRatio < MIN_VOICED_RATIO ||
-        preparedAudio.longestVoicedRun < MIN_LONGEST_VOICED_RUN_SEC
-      )) {
+      // ── Stage E.1 (v17 relaxed): VAD guard — only block clearly-silent audio ──
+      // Old rule rejected "Was denn?" (voiced=42%, longestRun=0.30s) as
+      // silent. New rule: high voice density (≥0.35) carves out the short
+      // longestRun requirement, so short real turns pass.
+      const vadIsBlocked = !!preparedAudio && (() => {
+        const vr = preparedAudio.voicedRatio;
+        const lr = preparedAudio.longestVoicedRun;
+        if (vr < MIN_VOICED_RATIO) return true;
+        if (vr >= SHORT_TURN_VOICED_RATIO_OVERRIDE) {
+          return lr < SHORT_TURN_MIN_LONGEST_RUN_SEC;
+        }
+        return lr < MIN_LONGEST_VOICED_RUN_SEC;
+      })();
+      if (preparedAudio && vadIsBlocked) {
         const reason = "preflight_audio_no_voice";
         console.warn(
           `[poll-dialog-shots] turn ${nextShot.idx} VAD BLOCK voiced=${(preparedAudio.voicedRatio * 100).toFixed(0)}% longestRun=${preparedAudio.longestVoicedRun.toFixed(2)}s`,

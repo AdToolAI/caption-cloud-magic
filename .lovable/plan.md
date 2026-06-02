@@ -1,81 +1,100 @@
-## Befund (echtes Root-Cause, mit DB-Beweis)
+## Befund
 
-Szene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73`:
+Der aktuelle Abbruch ist nicht mehr primär der alte Webhook/Poller-Race. Der Backend-Status ist gesund, die Szene läuft bis in die Pipeline hinein, bricht dann aber an zwei Stellen ab:
 
-- 3 Sprecher, Master-Plate 1376×768
-- Shot 0 (Samuel, links, x=315): preclip ✅ → Sync.so ✅
-- Shot 1 (Matthew, Mitte, x=687): preclip ✅ → Sync.so ✅
-- Shot 2 (Kailee, rechts, x=1055): **preclip-Render war ERFOLGREICH** (`video_renders` Eintrag `aeebf60b…` completed 19:08:47), **aber `preclip_url` wurde nie in `dialog_shots` geschrieben**. Stattdessen ist `sync_source_kind='master'`, Sync.so failt 4× mit "An unknown error occurred." auf dem Edge-Gesicht ganz rechts.
+1. **Shot 1 / Matthew wird fälschlich durch den Audio-VAD geblockt**
+   - Log: `preflight_audio_no_voice: voiced=42%`
+   - Tatsächlich ist `voicedRatio=0.424` deutlich über dem Grenzwert `0.15`.
+   - Der Abbruch passiert wegen `longestVoicedRun=0.30s` bei aktuellem Mindestwert `0.40s`.
+   - Das ist für kurze deutsche Antworten wie „Was denn?“ zu streng. Professionell darf so ein Short-Turn nicht als „kein Voice“ gelten.
+
+2. **Shot 2 / Kailee wird weiterhin mit festen Koordinaten an Sync.so geschickt, obwohl der Preclip nur noch ein isolierter Sprecher-Clip ist**
+   - Payload nutzt `active_speaker_detection: { auto_detect:false, coordinates:[711,367], frame_number:... }`.
+   - Auf einem isolierten Per-Speaker-Preclip ist das falsch/unnötig: die Koordinaten stammen aus der Original-Wide-Plate und können im Preclip/Provider-Kontext instabil sein.
+   - Sync.so antwortet 4× mit `An unknown error occurred.`.
+   - Die professionelle „Artlist“-Variante ist: **Single-face Clip + Auto-Speaker**, nicht Wide-Plate-Koordinaten.
+
+3. **sync-so-webhook hat noch alten Degrade-Code**
+   - In `sync-so-webhook` gibt es noch den Pfad `degraded_to_master`, der Multi-Speaker-Failures als „ready ohne Output“ markiert.
+   - Das widerspricht dem v16-Plan und kann 3-Sprecher-Szenen erneut in einen kaputten Endzustand bringen.
+
+## Zielbild
+
+Für 3+ Sprecher wird die Pipeline strikt so stabilisiert:
 
 ```text
-Zeitleiste Shot 2:
-19:07:43  poll-dialog-shots dispatched preclip render → status="rendering"
-19:07:43  parallel: poll-tick flippt sync_source_kind="master"
-          (überschreibt JSON, render_id geht verloren)
-19:08:47  Lambda fertig → remotion-webhook patcht dialog_shots
-          → patcht in einen JSON-Snapshot der NICHT mehr existiert
-          → preclip_url Write geht verloren (RMW-Race)
-19:10:31  Sync.so call auf master+target_coords[1055,170] → unknown error
-19:14    nach 4 Retries → degraded → refunded → status="failed"
+Master-Plate
+  -> pro Sprecher-Turn isolierter Preclip
+  -> pro Preclip isolierte Turn-Audio-Datei
+  -> Sync.so auto_detect auf Single-face-Clip
+  -> am Ende deterministisches Stitching
 ```
 
-Der v15 Lock (`dialog_dispatch_locks`) schützt **nur `poll-dialog-shots`** — `remotion-webhook` macht weiterhin nackte read-modify-write auf `dialog_shots`. Und der `master`-Fallback ist eine Falle: er rettet den Pfad an genau der Stelle, wo Sync.so für 3+ Sprecher zuverlässig scheitert (Edge-Face, falsches Frame).
+Keine Wide-Plate-Koordinaten mehr für Preclips. Keine Master-Degrade-Fallbacks bei 3+ Sprechern. Kurze echte Sätze werden nicht mehr vom VAD geblockt.
 
-Das ist die letzte fehlende Pipeline-Ebene, die professionelle Anbieter (Artlist etc.) anders machen: sie lipsyncen **nie** auf der Wide-Plate mit Koordinaten, sondern **immer** auf isolierten Per-Speaker-Crops (Preclips). Wir haben die Architektur — wir benutzen sie nur nicht konsequent.
+## Umsetzung
 
-## Plan (Artlist-Parität, finale Stabilisierung)
+### 1. Preclip-Dispatch auf Auto-Speaker umstellen
 
-### 1. Race zwischen Webhook und Poller schließen
-Alle Schreibzugriffe auf `dialog_shots` müssen denselben per-Szene-Lock verwenden, den `poll-dialog-shots` bereits nutzt.
+In `poll-dialog-shots`:
 
-- `remotion-webhook` für `source='dialog-turn-preclip'` und `source='dialog-stitch'`: vor jedem RMW `try_acquire_dialog_lock(scene_id, 'webhook', 30)` aufrufen, in `finally` `release_dialog_lock`. Wenn Lock nicht erworben werden kann: 3× kurz retryen mit 200/500/1000 ms, dann normal weitermachen (Webhook darf nicht steckenbleiben, ist aber gleichzeitig die einzige Source-of-Truth-Schreibstelle für `preclip_url`).
-- Identisch für den Sync.so-Webhook-Schreibpfad in `sync-so-webhook` (gleiche Symptomatik möglich beim Patchen von `output_url`).
+- Wenn `usePreclip === true`, wird Sync.so ohne feste `coordinates` und ohne `frame_number` aufgerufen.
+- Für Preclips setzen wir den Dispatch-Modus effektiv auf `auto`, weil der Clip nur eine relevante Person enthalten soll.
+- Feste Koordinaten bleiben nur für den Legacy-Master-Pfad aktiv.
 
-### 2. Self-Healing Reconciliation am Anfang jedes Poll-Ticks
-Wenn der Webhook trotz Lock seine Schreibung verliert (z.B. Funktion crasht), muss der Poller das von selbst aufholen statt master-Fallback zu fahren:
+Technisch:
 
-- Schritt 0 in `processSceneLocked`: für jeden Shot mit `preclip_status='rendering'` (oder `preclip_url` fehlt und `preclip_render_id` gesetzt) → `video_renders` abfragen. Wenn `status='completed'` und eine `video_url` existiert: `preclip_url` aus dem Render rehydrieren, `preclip_status='ready'`, `sync_source_kind='preclip'`.
-- Wenn `status='failed'`: `preclip_status='failed'` mit der echten Fehlermeldung übernehmen (aktuell rätt der Poller blind weiter auf "rendering" bis Timeout).
+- `dispatchModeForShot` bzw. die Payload-Erzeugung wird so angepasst, dass `active_speaker_detection` bei Preclip-Quelle entweder `{ auto_detect: true }` ist oder ganz weggelassen wird, je nachdem was die vorhandene `dispatchSyncJob`-Struktur sauber unterstützt.
+- Logging bekommt ein klares Feld wie `mode=auto_preclip`, damit spätere Fehler eindeutig sichtbar sind.
 
-### 3. Master-Fallback für 3+ Sprecher hart verbieten
-Aus den Logs: Sync.so liefert auf der Wide-Plate mit Edge-Coords reproduzierbar "unknown error" — das ist nicht heilbar mit Retries, Frame-Override oder Temperatur. Verhalten ändern:
+### 2. VAD-Regel für sehr kurze Turns korrigieren
 
-- `MAX_PRECLIP_RETRIES`: 1 → 4
-- `PRECLIP_RENDER_TIMEOUT_MS`: 4 min → 10 min (Lambda-Cold-Start + Queue real beobachtet bei 5 min für Shot 0)
-- `prepareShotRetry` flippt `sync_source_kind` nicht mehr auf `master`, wenn `speakers.length ≥ 3`. Stattdessen: Preclip neu rendern lassen (Reset `preclip_url=undefined`, `preclip_status=undefined`, `preclip_render_id=undefined`, `preclip_retry_count+=1`) und Sync.so-Retry auf neuem Preclip.
-- Wenn alle Preclip-Retries erschöpft sind: terminal `failed` mit Refund — kein master-Fallback mehr. Sauberer Fehler statt stillem Garbage-Output.
+In `poll-dialog-shots`:
 
-### 4. Stale-Lock-Heilung für die Webhook-Schreibungen
-Damit ein abgestürzter Webhook nicht den nächsten 60 Sekunden lang den Poller blockiert:
+- Der harte Mindestwert `MIN_LONGEST_VOICED_RUN_SEC=0.4` wird nicht mehr pauschal auf alle Sätze angewendet.
+- Neue Regel:
+  - Wenn `voicedRatio >= 0.35`, gilt der Turn als echte Sprache, auch wenn der längste zusammenhängende Voice-Run nur 0.25–0.30s ist.
+  - Für wirklich leere/silent Audio bleibt der Block aktiv.
+- Dadurch wird „Was denn?“ nicht mehr blockiert, aber Stille/kaputte Audio-Dateien werden weiterhin abgefangen.
 
-- TTL für Webhook-Lock auf 30 s setzen (vs 60 s für Poller-Lock).
-- Vor `try_acquire_dialog_lock` immer stale Rows >TTL löschen (macht die existierende RPC bereits — sicherstellen, dass sie auch von Webhook-Holdern aufgeräumt werden).
+### 3. `sync-so-webhook` Multi-Speaker-Degrade entfernen
 
-### 5. Recovery der konkreten Szene
-Migration setzt `d47e6e3c-13ca-42b0-abd0-2f3eae919c73` zurück und re-hydratet die zwei vorhandenen guten Preclips:
+In `sync-so-webhook`:
 
-- Shot 0 + Shot 1: `preclip_url` aus den completed `video_renders` (`19e874cb…` / `6abc9a62…`), `preclip_status='ready'`, `sync_source_kind='preclip'`, Sync.so-Felder behalten (sie sind ready)
-- Shot 2: `preclip_url` aus completed render `aeebf60b…` rehydrieren, `preclip_status='ready'`, `sync_source_kind='preclip'`, alle Sync.so-Felder (`sync_job_id`, `started_at`, `status`, `error`, `degraded`, `retry_count`) löschen → wird neu auf dem Preclip versucht
-- Scene: `lip_sync_status='running'`, `twoshot_stage=null`, `clip_error=null`, `dialog_shots.status='lipsyncing'`, `dialog_shots.refunded=false`
+- Der v4-Webhook-Pfad darf bei Multi-Speaker-Szenen nicht mehr `ready + degraded + output_url undefined` setzen.
+- Wenn die Retry-Matrix erschöpft ist:
+  - Für 3+ Sprecher: Shot terminal `failed`, kein Degrade.
+  - Für 1 Sprecher bleibt der alte sichere Degrade erlaubt.
+- Zusätzlich wird die gleiche Preclip-Auto-Regel in `prepareRetryFromWebhook` gespiegelt: 3+ Sprecher mit Preclip bleiben auf Preclip und werden nicht in Koordinaten-/Master-Fallen gezwungen.
 
-### 6. Validierung
-- Edge-Function-Logs `poll-dialog-shots` + `remotion-webhook`: pro Szene-Tick maximal ein aktiver Schreiber (Lock greift überall).
-- `dialog_shots`-Snapshot nach Webhook-Eingang: `preclip_url` bleibt erhalten, auch bei parallelem Poll-Tick.
-- 3-Sprecher-Szene mit Edge-Face muss durchlaufen ohne jemals `sync_source_kind='master'` zu sehen.
-- Wenn ein Preclip-Render echt scheitert: bis zu 4 saubere Preclip-Retries, dann terminal Failed + Refund — keine "An unknown error occurred"-Schleife mehr.
+### 4. Konkrete fehlgeschlagene Szene zurücksetzen
+
+Per Migration/Datensatz-Recovery:
+
+- Szene `6936d98e-efe6-4f44-a4e5-f87a0c30cea8` zurück von `failed` auf `running`.
+- `refunded=false`, `clip_error=null`, `twoshot_stage=null`.
+- Shot 0 bleibt `ready`, weil er bereits ein gültiges Sync.so-Output hat.
+- Shot 1 wird auf `pending` gesetzt, behält `preclip_url`, `audio_url`, `render_window`, aber verliert Retry-/Fehlerfelder.
+- Shot 2 wird auf `pending` gesetzt, behält `preclip_url`, verliert alte Sync.so-Job-/Fehler-/Retry-Felder.
+- Beide werden danach mit der neuen Preclip-Auto-Logik erneut verarbeitet.
+
+### 5. Validierung nach Umsetzung
+
+Nach dem Fix prüfe ich:
+
+- `poll-dialog-shots` Logs zeigen für Shot 1 keinen VAD-Block mehr.
+- Sync.so Dispatch für Shot 2 enthält bei Preclip **keine Wide-Plate-Koordinaten** mehr.
+- `dialog_shots.shots[*].sync_source_kind` bleibt bei 3 Sprechern `preclip`.
+- Kein neuer `degraded_to_master`-Eintrag für 3+ Sprecher.
+- Szene wechselt am Ende entweder sauber auf `done` mit `final_url` oder zeigt einen echten providerseitigen Fehler ohne falschen Fallback.
 
 ## Dateien
 
-- `supabase/functions/remotion-webhook/index.ts` — Lock-Wrapping für `dialog-turn-preclip` + `dialog-stitch` RMW-Blöcke
-- `supabase/functions/sync-so-webhook/index.ts` — Lock-Wrapping für die Shot-Patch-Blöcke
-- `supabase/functions/poll-dialog-shots/index.ts` — Reconciliation Step 0; `MAX_PRECLIP_RETRIES=4`; `PRECLIP_RENDER_TIMEOUT_MS=10min`; `prepareShotRetry` ohne Master-Flip bei ≥3 Sprechern; Hard-Fail statt Master-Fallback
-- Neue Migration: Recovery der Szene + Re-Hydration der drei Preclip-URLs aus `video_renders`
-- `mem/architecture/lipsync/sync-so-webhook-stage5` — v16 Doku: Webhook-Lock + Reconciliation + Hard-Forbid Master ≥3
+- `supabase/functions/poll-dialog-shots/index.ts`
+- `supabase/functions/sync-so-webhook/index.ts`
+- neue Recovery-Migration für Szene `6936d98e-efe6-4f44-a4e5-f87a0c30cea8`
+- `mem/architecture/lipsync/sync-so-webhook-stage5` für die v17-Regel: Preclip = Auto-Speaker, Koordinaten nur Master-Legacy
 
 ## Erwartetes Ergebnis
 
-- 3-Sprecher-Pipeline läuft wie 1- und 2-Sprecher: ausschließlich auf isolierten Per-Speaker-Preclips (eine Face = ein Sync.so-Job, exakt das, was Anbieter wie Artlist machen).
-- Race-Conditions zwischen Lambda-Webhooks und Poller können `preclip_url`-Writes nicht mehr verlieren.
-- Verlorene Webhook-Writes werden vom Poller automatisch aus `video_renders` rekonstruiert.
-- Edge-Faces in Wide-Plates triggern keine "unknown error"-Schleife mehr, weil die Wide-Plate nie wieder direkt an Sync.so geht.
-- Die betroffene Szene rendert nach Apply der Migration ohne weiteren User-Eingriff zu Ende.
+Die letzte 3-Sprecher-Pipeline arbeitet danach wie ein professioneller Anbieter: isolierter Sprecher-Clip, isolierte Audio, Auto-Speaker-Erkennung, kein Wide-Plate-Koordinaten-Fallback und keine falschen VAD-Abbrüche bei kurzen Sätzen.
