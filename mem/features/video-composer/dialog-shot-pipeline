@@ -1,6 +1,6 @@
 ---
 name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v10)
-description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo. v20 fixes (June 2026) — Multi-speaker preclips MUST dispatch with deterministic coords (preclips are NOT single-face clips — DialogTurnClipVideo just temporally crops the full multi-face master); stitch auto-trims totalSec to last shot's endSec to remove muted master tail; CROSSFADE_FRAMES 3→6 for invisible speaker boundaries; SceneCard has a hard 🗑 "Lipsync-Eintrag löschen" button that wipes dialog_shots + cancels Sync.so jobs.
+description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo. v20 fixes — Multi-speaker preclips MUST dispatch with deterministic coords; stitch auto-trims totalSec to last shot's endSec; CROSSFADE_FRAMES 3→6. v20.1 (June 2026) — SceneCard "🔁 Lip-Sync neu rendern" + "🗑 Lipsync komplett zurücksetzen" + "🎥 Clip + Lip-Sync neu rendern" buttons sit in an always-visible Lip-Sync Aktionen toolbar directly under SceneDialogStudio in the AUDIO block, no longer hidden behind the "Mehr ▾" / clipSource-ai / shotType-!=absent triple gate.
 type: feature
 ---
 
