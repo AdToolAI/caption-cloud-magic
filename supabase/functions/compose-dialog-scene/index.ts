@@ -356,6 +356,10 @@ interface DialogShot {
   durSec: number;
   /** Sync.so coords [x, y] in master-plate pixel space. */
   target_coords: [number, number] | null;
+  /** v21: optional bbox [x1,y1,x2,y2] of the speaker's face in master-plate
+   *  pixel space. Used by render-dialog-turn to compute a tight face-crop
+   *  preclip so Sync.so sees ONE face on 3+ speaker scenes. */
+  target_bbox?: [number, number, number, number] | null;
   /** Per-turn temperature: short turns (<2s) get 1.0 for max articulation. */
   temperature: number;
   /** v7: ISOLATED per-speaker audio (only this speaker's voice + silence
