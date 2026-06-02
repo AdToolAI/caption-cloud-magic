@@ -764,14 +764,25 @@ serve(async (req) => {
       shot.completed_at = nowIso;
       shot.error = undefined;
     } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
-      // v12 Graceful Degrade: statt die ganze Szene zu killen, markieren wir
-      // den Turn als "ready ohne Lipsync-Overlay" — DialogStitchVideo zeigt
-      // dann die saubere Master-Plate für dieses Fenster.
-      shot.status = "ready";
-      shot.degraded = true;
-      shot.output_url = undefined;
-      shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
-      shot.completed_at = nowIso;
+      // v17: graceful-degrade darf NIE für 3+ Sprecher passieren — ein Turn
+      // ohne output_url heißt dort: dieser Sprecher hat im Stitch keinen
+      // Lipsync. Lieber hart failen + idempotent refunden (poll-tick erkennt
+      // den Zustand und triggert den Refund-Pfad).
+      const speakerCount = new Set(shots.map((s: any) => s?.speaker_idx)).size;
+      if (speakerCount >= 3) {
+        shot.status = "failed";
+        shot.degraded = false;
+        shot.output_url = undefined;
+        shot.error = `multi_speaker_no_degrade: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
+        shot.completed_at = nowIso;
+      } else {
+        // 1/2 Sprecher: alter sicherer Degrade-Pfad bleibt.
+        shot.status = "ready";
+        shot.degraded = true;
+        shot.output_url = undefined;
+        shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
+        shot.completed_at = nowIso;
+      }
     }
     await supabase
       .from("composer_scenes")
