@@ -104,23 +104,73 @@ serve(async (req) => {
       }
       const state: any = (fresh as any)?.dialog_shots ?? null;
 
-      // Release any inflight Sync.so job slots.
-      const jobIds: string[] = Array.isArray(state?.shots)
-        ? state.shots
-            .map((s: any) => s?.sync_job_id)
-            .filter((j: any): j is string => typeof j === "string" && j.length > 0)
-        : [];
-      if (jobIds.length > 0) {
+      // Collect every Sync.so job id we know about (v4 per-turn shots + v5
+      // master-pass jobs persisted under audio_plan.twoshot.syncJobs).
+      const jobIds: string[] = [];
+      if (Array.isArray(state?.shots)) {
+        for (const s of state.shots) {
+          if (typeof s?.sync_job_id === "string" && s.sync_job_id.length > 0) {
+            jobIds.push(s.sync_job_id);
+          }
+        }
+      }
+      try {
+        const { data: sceneFull } = await supabase
+          .from("composer_scenes")
+          .select("audio_plan, replicate_prediction_id")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const plan: any = (sceneFull as any)?.audio_plan ?? {};
+        const v5Jobs: any[] = plan?.twoshot?.syncJobs?.jobs ?? [];
+        for (const j of v5Jobs) {
+          const id = typeof j === "string" ? j : (j?.id ?? j?.job_id ?? j?.sync_job_id);
+          if (typeof id === "string" && id.length > 0) jobIds.push(id);
+        }
+        const predId = (sceneFull as any)?.replicate_prediction_id;
+        if (typeof predId === "string" && predId.startsWith("sync:")) {
+          jobIds.push(predId.replace(/^sync:/, ""));
+        }
+      } catch {
+        /* best-effort */
+      }
+      const uniqueJobIds = Array.from(new Set(jobIds));
+
+      // Release inflight slot rows.
+      if (uniqueJobIds.length > 0) {
         try {
           await supabase
             .from("syncso_inflight_jobs")
             .delete()
-            .in("job_id", jobIds);
+            .in("job_id", uniqueJobIds);
         } catch (e) {
           console.warn(
             `[cancel-dialog-lipsync] inflight cleanup failed: ${(e as Error).message}`,
           );
         }
+      }
+
+      // Best-effort: tell Sync.so to stop billing for in-flight jobs.
+      // Sync.so DELETE /v2/generations/{id} cancels a queued/running job.
+      const syncSoKey = Deno.env.get("SYNC_SO_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY");
+      if (syncSoKey && uniqueJobIds.length > 0) {
+        await Promise.all(
+          uniqueJobIds.map((id) =>
+            fetch(`https://api.sync.so/v2/generations/${id}`, {
+              method: "DELETE",
+              headers: { "x-api-key": syncSoKey },
+            })
+              .then((r) =>
+                console.log(
+                  `[cancel-dialog-lipsync] sync.so DELETE job=${id} → ${r.status}`,
+                ),
+              )
+              .catch((e) =>
+                console.warn(
+                  `[cancel-dialog-lipsync] sync.so DELETE job=${id} threw: ${(e as Error).message}`,
+                ),
+              ),
+          ),
+        );
       }
 
       const nowIso = new Date().toISOString();
