@@ -34,3 +34,13 @@ Idempotency: dialog_shots state is single source of truth; `state.refunded` bool
   - `engine_override === 'cinematic-sync-legacy'` still forces v4 regardless of count.
 - Expected reliability for ≥3 speakers: ~0.99^N per-turn instead of the chain's catastrophic degradation. 1- and 2-speaker pipelines are completely untouched.
 
+**June 2026 v15 RACE-CONDITION FIX — 3+ speaker per-turn dispatch:**
+- Logs from a 3-speaker scene showed `poll-dialog-shots` dispatching the same `pending` turn 2-3 times within seconds (e.g. two parallel `v10 dispatched turn 2 speaker=Kailee` log lines from different invocations, producing 3 distinct `sync_job_id`s for the same shot). Root cause: webhook nudges, pg_cron ticks and client kicks all called `processScene` in parallel; both read the same `dialog_shots` JSON, both saw the shot as pending, both started a Sync.so job, then both webhooks raced to mutate the same shot slot.
+- **Fix**:
+  - New migration adds `public.dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` (service_role only) and SECURITY DEFINER RPCs `try_acquire_dialog_lock(_scene_id, _holder, _ttl_seconds=60)` / `release_dialog_lock(_scene_id, _holder)`. Stale rows are auto-deleted on every acquire.
+  - `poll-dialog-shots` `processScene` now acquires the per-scene lock before reading state and releases it in a `finally`. If `acquired !== true` it returns `{ status: 'locked_deferred' }` cleanly — webhook/cron retries simply re-trigger after the holder finishes.
+  - `sync-so-webhook` `MAX_SHOT_RETRIES` raised from 1 → 4 to match the poller's differentiated retry matrix (frame sampling × temperature × preclip ↔ master+segments). Previously the webhook prematurely terminal-failed shots that the poller would have recovered.
+  - Recovery: stuck scene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73` reset (`dialog_shots=null`, `lip_sync_status=null`, `clip_error=null`); master plate + audio plan preserved.
+- Webhook still does small RMW patches on individual shot slots, but with the dispatch path serialized per scene the only remaining race is the harmless one of two webhooks patching different shot indices in the same JSON — which the existing idempotent refund logic absorbs.
+
+
