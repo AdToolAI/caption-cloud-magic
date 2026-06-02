@@ -712,7 +712,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.warn(
-        `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} retries=${retryCount} refunded=${cost} reason=${reason}`,
+        `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
       );
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
