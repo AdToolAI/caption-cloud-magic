@@ -18,3 +18,9 @@ type: feature
 - `sync-so-webhook` MUST mirror `poll-dialog-shots` retry logic. In multi-speaker scenes with `target_coords`, a terminal Sync.so failure must retry with `force_coords=true`, `deterministic_coords=true`, and `frame_number_override=round((start+end)/2*24)`. It must never downgrade that turn to `auto_detect`, because that can animate the wrong face and trigger the multi-speaker integrity guard.
 
 Idempotency: dialog_shots state is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` boolean in `audio_plan.twoshot` does the same for legacy path.
+
+**June 2026 fix — 3-speaker pipeline regression:**
+- `probeMp4Dims` (`_shared/twoshot-face-map.ts`) now does a 2-phase probe: head-range `bytes=0-786431` first, tail-range `bytes=-524288` as fallback for Hailuo/Replicate MP4s that place `moov` at the end. Logs `probe-result … phaseA=… phaseB=… dims=…`.
+- `compose-dialog-segments` bounds-clamps speaker coords into the inner 90% of the probed plate (no-op when coords already inside frame → 1/2-speaker scenes unaffected).
+- `sync-so-webhook` E.5 ladder gate switched from `isMultiSpeaker (>=2)` to `speakerCount >= 3`. 1- and 2-speaker scenes keep the full `coords-pro → auto-pro → auto-standard` ladder. 3+ speaker scenes still block `auto-*` by default but get a single "last-ditch-lite" `auto-pro` retry on pass 0 if every pass failed with `provider_unknown_error` / `face_not_found` — better one moving mouth than a fully-frozen scene.
+- Cosmetic: `console.warn(…retries=${retryCount}…)` at the failure tail referenced an undefined variable; now `retries=${passRetryCount}/${aggregateRetryCount}`. Previously crashed the webhook response with `ReferenceError`, polluting Sync.so retry queue.
