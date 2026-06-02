@@ -272,6 +272,9 @@ serve(async (req) => {
         const alreadyRunning =
           lipScene?.lip_sync_status === 'running' ||
           (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
+        const wasCanceled =
+          (lipScene?.lip_sync_status as any) === 'canceled' ||
+          (lipScene?.lip_sync_status as any) === 'cancelled';
 
         const isTalkingHeadClip =
           typeof lipScene?.clip_url === "string" &&
@@ -282,13 +285,41 @@ serve(async (req) => {
           lipScene.clip_url &&
           !isTalkingHeadClip &&
           !alreadyFinal &&
-          !alreadyRunning
+          !alreadyRunning &&
+          !wasCanceled
         ) {
-          // v5 dialog-segments pipeline (one Sync.so call per speaker, chained).
-          // Replaces the legacy v4 `compose-dialog-scene` fallback so the
-          // server-side rescue path never re-introduces the old per-turn flow
-          // that wrote talking-head plates into `lip_sync_source_clip_url`.
-          const fnName = 'compose-dialog-segments';
+          // Route by speaker count (mirrors src/hooks/useTwoShotAutoTrigger.ts):
+          //   • 1–2 speakers → v5 `compose-dialog-segments` (multi-pass chain on
+          //     lipsync-2-pro). Stable in this regime.
+          //   • ≥3 speakers  → v4 `compose-dialog-scene` (per-turn parallel).
+          //     v5's chain feeds Sync.so its own output for pass 2/3, which
+          //     lipsync-2-pro (diffusion model) rejects with opaque "unknown
+          //     error" — observed 2026-06-02 on 3-speaker scenes. Going
+          //     straight to v4 avoids the burn-one-attempt-then-refund-then-
+          //     auto-retry loop that surfaces a false "Fehler" banner.
+          //   • engine_override === 'cinematic-sync-legacy' forces v4.
+          const plan: any = lipScene.audio_plan ?? {};
+          const speakerCount = Math.max(
+            1,
+            Array.isArray(plan?.speakers)
+              ? plan.speakers.length
+              : Array.isArray(plan?.twoshot?.speakers)
+                ? plan.twoshot.speakers.length
+                : Array.isArray(plan?.twoshot?.segments)
+                  ? new Set(
+                      plan.twoshot.segments
+                        .map((s: any) => s?.character_id ?? s?.speaker_slug ?? s?.speaker)
+                        .filter((v: any) => typeof v === 'string' && v.length > 0),
+                    ).size
+                  : 1,
+          );
+          const fnName =
+            (lipScene as any).engine_override === 'cinematic-sync-legacy' || speakerCount >= 3
+              ? 'compose-dialog-scene'
+              : 'compose-dialog-segments';
+          console.log(
+            `[compose-clip-webhook] auto lipsync route: scene=${sceneId} speakers=${speakerCount} fn=${fnName}`,
+          );
           const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${serviceKey}` },

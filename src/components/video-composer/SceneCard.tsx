@@ -1879,6 +1879,10 @@ export default function SceneCard({
                         scene.lipSyncStatus === "stitching" ||
                         (scene.lipSyncStatus as any) === "audio_muxing" ||
                         scene.lipSyncStatus === "pending" ||
+                        // v20: also show during the brief "failed" window
+                        // before useTwoShotAutoTrigger auto-recovers — lets
+                        // the user opt out of the auto-retry loop entirely.
+                        scene.lipSyncStatus === "failed" ||
                         (!!(scene as any).twoshotStage &&
                           !["failed", "done", "complete"].includes(
                             String((scene as any).twoshotStage),
