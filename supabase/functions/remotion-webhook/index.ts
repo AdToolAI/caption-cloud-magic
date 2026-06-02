@@ -199,10 +199,20 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            // v18 Cancel-Guard: do not revive a user-cancelled scene with a
+            // late preclip render — just log the render and exit.
+            if (
+              (sceneRow as any)?.lip_sync_applied_at ||
+              (sceneRow as any)?.lip_sync_status === 'canceled' ||
+              prevState?.status === 'canceled'
+            ) {
+              console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} ignored — scene canceled/applied`);
+              return;
+            }
             const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
             if (shots[shotIdx]) {
               shots[shotIdx] = {
@@ -254,10 +264,18 @@ serve(async (req) => {
           await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
             const { data: sceneRow } = await supabaseAdmin
               .from('composer_scenes')
-              .select('dialog_shots')
+              .select('dialog_shots, lip_sync_status, lip_sync_applied_at')
               .eq('id', composerSceneId)
               .maybeSingle();
             const prevState = (sceneRow?.dialog_shots as any) || {};
+            // v18 Cancel-Guard: do not overwrite clip_url for a cancelled scene.
+            if (
+              (sceneRow as any)?.lip_sync_status === 'canceled' ||
+              prevState?.status === 'canceled'
+            ) {
+              console.log(`💋 [dialog-stitch] scene ${composerSceneId} ignored — scene canceled`);
+              return;
+            }
             const nowIso = new Date().toISOString();
             await supabaseAdmin.from('composer_scenes').update({
               clip_url: finalOutputUrl,

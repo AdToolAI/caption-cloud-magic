@@ -218,7 +218,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -231,7 +231,7 @@ serve(async (req) => {
     // Fallback: scan in-flight scenes for the job id. Bounded scan, low volume.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .in("lip_sync_status", ["running", "stitching"])
       .limit(200);
     for (const r of rows ?? []) {
@@ -251,6 +251,13 @@ serve(async (req) => {
 
   if (scene.lip_sync_applied_at) {
     return ok({ ok: true, skipped: "already_applied" });
+  }
+  // v18 Cancel-Guard: ignore late webhooks for user-cancelled scenes.
+  if (
+    (scene as any).lip_sync_status === "canceled" ||
+    (scene.dialog_shots as any)?.status === "canceled"
+  ) {
+    return ok({ ok: true, skipped: "canceled", scene_id: sceneId });
   }
 
   const state = scene.dialog_shots ?? null;

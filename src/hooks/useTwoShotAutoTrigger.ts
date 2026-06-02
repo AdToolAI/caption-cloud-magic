@@ -474,6 +474,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // Master clip must be READY — never try lip-sync on a failed/generating master.
           if (d.clip_status && d.clip_status !== 'ready') return false;
           if (d.lip_sync_applied_at) return false;
+          // v18: never auto-revive a user-cancelled scene. The Cancel button
+          // explicitly opts the user out — only an explicit "Lip-Sync neu rendern"
+          // click should re-enter the pipeline.
+          if (d.lip_sync_status === 'canceled') return false;
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
           // Treat ALL early stages as "not ready" — only 'master_clip' (Hailuo
