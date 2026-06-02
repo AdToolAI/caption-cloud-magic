@@ -103,16 +103,68 @@ serve(async (req) => {
     const fps = 30;
     const dur = endSec - startSec;
     const durationInFrames = Math.max(3, Math.ceil(dur * fps));
-    const width = evenDimension(state.video_width, 1280);
-    const height = evenDimension(state.video_height, 720);
+    const srcWidth = evenDimension(state.video_width, 1280);
+    const srcHeight = evenDimension(state.video_height, 720);
 
-    const inputProps = {
-      masterVideoUrl: state.source_clip_url,
-      startSec,
-      endSec,
-      targetWidth: width,
-      targetHeight: height,
-    };
+    // v21: For multi-speaker scenes (≥2 distinct speakers), render a
+    // single-face SQUARE CROP preclip instead of the full master frame.
+    // Sync.so on a wide multi-face frame was ignoring `coordinates` and
+    // animating only the leftmost face for every turn. A tight per-speaker
+    // crop eliminates that ambiguity — Sync.so sees ONE face and animates
+    // it deterministically. DialogStitchVideo composites the cropped
+    // output back at its original (x,y,size) region with a soft mask.
+    const distinctSpeakers = new Set(
+      (Array.isArray(state.shots) ? state.shots : []).map((s: any) => s.speaker_idx),
+    ).size;
+    const useFaceCrop = distinctSpeakers >= 2 && Array.isArray(shot.target_coords) && shot.target_coords.length === 2;
+
+    let composition: string;
+    let inputProps: Record<string, unknown>;
+    let outW: number;
+    let outH: number;
+    if (useFaceCrop) {
+      const crop = computeFaceCrop(
+        shot.target_coords as [number, number],
+        (shot.target_bbox as [number, number, number, number] | null | undefined) ?? null,
+        srcWidth,
+        srcHeight,
+        512,
+      );
+      composition = "DialogTurnFaceCropVideo";
+      inputProps = {
+        masterVideoUrl: state.source_clip_url,
+        startSec,
+        endSec,
+        srcWidth,
+        srcHeight,
+        cropX: crop.x,
+        cropY: crop.y,
+        cropSize: crop.size,
+      };
+      outW = crop.outputSize;
+      outH = crop.outputSize;
+      // Persist crop metadata so poll-dialog-shots can disable coords mode
+      // and render-dialog-stitch can position the overlay correctly.
+      shot.preclip_crop = {
+        x: crop.x,
+        y: crop.y,
+        size: crop.size,
+        outputSize: crop.outputSize,
+      };
+    } else {
+      composition = "DialogTurnClipVideo";
+      inputProps = {
+        masterVideoUrl: state.source_clip_url,
+        startSec,
+        endSec,
+        targetWidth: srcWidth,
+        targetHeight: srcHeight,
+      };
+      outW = srcWidth;
+      outH = srcHeight;
+      // Clear any stale crop from previous runs.
+      if (shot.preclip_crop) shot.preclip_crop = undefined;
+    }
 
     const renderId = crypto.randomUUID();
     const outName = `dialog-turn-${sceneId}-${shotIdx}-${Date.now()}.mp4`;
@@ -127,15 +179,16 @@ serve(async (req) => {
         source: "dialog-turn-preclip",
         status: "pending",
         started_at: new Date().toISOString(),
-        format_config: { format: "mp4", aspect_ratio: "16:9", width, height, fps },
+        format_config: { format: "mp4", aspect_ratio: useFaceCrop ? "1:1" : "16:9", width: outW, height: outH, fps },
         content_config: {
           out_name: outName,
           durationInFrames,
           fps,
-          width,
-          height,
+          width: outW,
+          height: outH,
           composer_scene_id: sceneId,
           shot_idx: shotIdx,
+          face_crop: useFaceCrop ? shot.preclip_crop : null,
         },
         subtitle_config: {},
       });
@@ -148,7 +201,7 @@ serve(async (req) => {
     const lambdaPayload: Record<string, unknown> = {
       type: "start",
       serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "",
-      composition: "DialogTurnClipVideo",
+      composition,
       inputProps: { type: "payload", payload: JSON.stringify(inputProps) },
       codec: "h264",
       imageFormat: "jpeg",
@@ -157,8 +210,8 @@ serve(async (req) => {
       logLevel: "warn",
       outName,
       bucketName: DEFAULT_BUCKET_NAME,
-      width,
-      height,
+      width: outW,
+      height: outH,
       fps,
       durationInFrames,
       frameRange: [0, durationInFrames - 1],
