@@ -206,21 +206,45 @@ function prepareShotRetry(
   //               another alternate frame (75%)
   //   attempt 4 → SWITCH back, recompute trimmed audio fresh
   if (attempt === 3 || attempt === 4) {
-    // Force a different transport path to escape provider sticky-failures
-    if (shot.sync_source_kind === "preclip") {
-      shot.sync_source_kind = "master";
-      // Force re-render of preclip on next pass if we ever go back
+    // v16 Hard-Forbid Master-Fallback for ≥3 speakers
+    // ----------------------------------------------
+    // Sync.so's wide-plate + target_coords path is reproducibly broken for
+    // edge faces in 3+ speaker scenes (it returns the opaque "An unknown
+    // error occurred." regardless of frame/temperature/coords). The preclip
+    // path solves this structurally by giving Sync.so a single-face crop.
+    // For 3+ speaker scenes we therefore NEVER flip to master — we re-render
+    // the preclip instead. For 1/2 speaker scenes the legacy preclip↔master
+    // flip stays in place as a useful escape hatch.
+    const speakerCount = new Set(allShots.map((s) => s.speaker_idx)).size;
+    if (speakerCount >= 3) {
+      // Re-render preclip from scratch and stay on the preclip path.
+      shot.sync_source_kind = "preclip";
       shot.preclip_url = undefined;
       shot.preclip_status = undefined;
       shot.preclip_render_id = undefined;
+      // Don't count this against MAX_PRECLIP_RETRIES — the retry happens
+      // because Sync.so failed on the previous preclip, not because the
+      // Lambda preclip render itself failed.
+      console.warn(
+        `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} 3+SPEAKERS preclip-rerender (master fallback forbidden)`,
+      );
     } else {
-      shot.sync_source_kind = "preclip";
+      // Force a different transport path to escape provider sticky-failures.
+      if (shot.sync_source_kind === "preclip") {
+        shot.sync_source_kind = "master";
+        // Force re-render of preclip on next pass if we ever go back
+        shot.preclip_url = undefined;
+        shot.preclip_status = undefined;
+        shot.preclip_render_id = undefined;
+      } else {
+        shot.sync_source_kind = "preclip";
+      }
+      console.warn(
+        `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} SWITCHED source_kind=${shot.sync_source_kind}`,
+      );
     }
     // Invalidate trimmed audio cache so we re-trim with current padding logic
     shot.trimmed_audio_url = undefined;
-    console.warn(
-      `[poll-dialog-shots] turn ${shot.idx} ${reason} → retry ${attempt}/${MAX_SHOT_RETRIES} SWITCHED source_kind=${shot.sync_source_kind}`,
-    );
   }
 
   // Multi-speaker + we have coords → NEVER drop to auto_detect. Auto-detect
@@ -970,8 +994,8 @@ async function processSceneLocked(
   // MP4-Clip ab t=0 via Remotion Lambda (`DialogTurnClipVideo`). Damit
   // muss Sync.so kein langes Master mit `segments_secs` intern auseinander-
   // schneiden — der häufigste Auslöser für "An unknown error occurred".
-  const MAX_PRECLIP_RETRIES = 1;
-  const PRECLIP_RENDER_TIMEOUT_MS = 4 * 60 * 1000;
+  const MAX_PRECLIP_RETRIES = 4;
+  const PRECLIP_RENDER_TIMEOUT_MS = 10 * 60 * 1000;
   const pendingForPreclip = sortedShots.filter(
     (s) => s.status === "pending" && !s.preclip_url,
   );
