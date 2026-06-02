@@ -1160,14 +1160,26 @@ async function processSceneLocked(
         : win;
       nextShot.sync_source_kind = usePreclip ? "preclip" : "master";
 
-      // v17 Artlist-Parität: Preclips sind isolierte Single-Face-Clips.
-      // Wide-Plate-Koordinaten aus dem Master sind dort weder nötig noch
-      // sinnvoll (Sync.so antwortet damit reproduzierbar mit "An unknown
-      // error occurred." für Edge-Faces). Auf Preclip → IMMER auto_detect.
-      // Die Coords + frame_number bleiben nur für den Master-Legacy-Pfad.
+      // v20 KAILEE-FIX: `DialogTurnClipVideo` rendert den Master-Plate nur
+      // temporal cropped (gleiche Auflösung, alle N Gesichter sichtbar) —
+      // der Preclip ist also KEIN Single-Face-Clip wie früher angenommen.
+      // Bei Multi-Speaker-Szenen muss Sync.so daher zwingend die Speaker-
+      // Coords bekommen, sonst lockt es bei jedem Turn auf das mittlere/
+      // größte Gesicht (z.B. Samuel) und Slot 2/3 (Kailee) bewegt nie die
+      // Lippen. Nur reine 1-Speaker-Preclips dürfen auto_detect benutzen.
+      const speakerSet = new Set(shots.map((s) => (s as any).speaker_idx));
+      const isMultiSpeakerScene = speakerSet.size >= 2;
       let mode = dispatchModeForShot(nextShot);
-      if (usePreclip) {
+      if (usePreclip && !isMultiSpeakerScene) {
         mode = "auto";
+      }
+      // Multi-speaker auf Preclip ohne coords wäre garantiert kaputt → harter
+      // Guard. Wenn deterministic_coords fehlen, bleibt es bei auto (Single-
+      // Speaker-Logik), aber wir loggen es zumindest.
+      if (usePreclip && isMultiSpeakerScene && mode !== "coords") {
+        console.warn(
+          `[poll-dialog-shots] turn ${nextShot.idx} multi-speaker PRECLIP without deterministic coords — Sync.so will likely lock wrong face`,
+        );
       }
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
       // Stufe B: audio is always normalized (mono, peak -1 dBFS, 0.25s lead-in,
