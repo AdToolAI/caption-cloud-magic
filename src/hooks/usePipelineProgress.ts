@@ -421,6 +421,13 @@ export function usePipelineProgress({
     const failed = targets.some((s) => {
       const ds = getDialogShots(s);
       if (ds?.status === 'failed') return true;
+      // Ignore scenes mid auto-retry (clip_error starts with "auto-retry:" and
+      // lipSyncStatus has been reset back to pending). Those are recovering,
+      // not failed — surfacing them as failed makes the bar flash red while
+      // the v4 per-turn path is actually progressing underneath.
+      const ce = (s as any).clipError as string | undefined;
+      const isAutoRetry = typeof ce === 'string' && ce.startsWith('auto-retry:');
+      if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
       return (s as any).lipSyncStatus === 'failed' ||
         (s as any).twoshotStage === 'failed' ||
         (s as any).twoshotStage === 'audio_mux_failed';
@@ -634,6 +641,24 @@ export function usePipelineProgress({
       realProgressRef.current = { value: 0, at: Date.now() };
     }
   }, [isActive]);
+
+  // v20: When lipsync transitions from failed → not-failed (auto-retry path
+  // resets lip_sync_status from 'failed' back to 'pending' / 'running'), reset
+  // the stall baseline AND the run-floor so the bar doesn't keep showing
+  // "Fehler" while the new attempt is progressing. Without this, the prior
+  // failed-and-recovered v5 attempt leaves runFloorRef ≥90% with no real
+  // movement → the 4-min stall window flips hasFailure=true even though v4 is
+  // actively making progress underneath.
+  const lipsyncFailedRef = useRef<boolean>(false);
+  useEffect(() => {
+    const wasFailed = lipsyncFailedRef.current;
+    lipsyncFailedRef.current = lipsyncReal.failed;
+    if (wasFailed && !lipsyncReal.failed) {
+      realProgressRef.current = { value: 0, at: Date.now() };
+      runFloorRef.current = 0;
+      floorRef.current.lipsync = 0;
+    }
+  }, [lipsyncReal.failed]);
 
   // Once lipsync is terminal (done or failed) AND no export is running, stop
   // letting the run-soft-percent ramp toward RUN_NOMINAL_SECONDS — otherwise

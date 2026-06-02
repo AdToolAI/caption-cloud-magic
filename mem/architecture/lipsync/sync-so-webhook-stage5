@@ -1,8 +1,17 @@
 ---
-name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17 + v18 + v19)
-description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker; user-cancellable via cancel-dialog-lipsync; late webhooks ignored on canceled scenes; integrity-guard accepts preclip OR deterministic coords; v19 re-hosts every Sync.so per-turn output to ai-videos and injects a constrained head-and-shoulders dialog plate prompt
+name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17 + v18 + v19 + v20)
+description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker; user-cancellable via cancel-dialog-lipsync; late webhooks ignored on canceled scenes; integrity-guard accepts preclip OR deterministic coords; v19 re-hosts every Sync.so per-turn output to ai-videos; v20 routes 3+ speaker scenes straight to v4 in compose-clip-webhook to skip the wasted v5 attempt
 type: feature
 ---
+
+**v20 Server-Side Speaker-Count Routing + Stall Reset (June 2026):**
+- `compose-clip-webhook` previously *always* invoked `compose-dialog-segments` (v5) after the cinematic-sync master plate finished — including for 3+ speaker scenes where v5's multi-pass chain reproducibly returns Sync.so "An unknown error occurred." (diffusion model rejects its own re-encoded output). The client `useTwoShotAutoTrigger` then auto-retried with v4, succeeding — but burning one v5 attempt + 81-credit refund + flashing a false "Fehler" banner first.
+- v20 mirrors the client's routing inside the webhook: compute `speakerCount` from `audio_plan.speakers` / `audio_plan.twoshot.speakers` / unique `character_id` in segments. If `>= 3` (or `engine_override === 'cinematic-sync-legacy'`), invoke `compose-dialog-scene` (v4 per-turn) directly. Otherwise keep v5. Also gates the auto-invoke on `lip_sync_status !== 'canceled'` so a fresh user cancel can't be revived by a late master-plate webhook.
+- `usePipelineProgress`:
+  - `lipsyncReal.failed` now ignores scenes whose `clip_error` starts with `auto-retry:` while `lipSyncStatus !== 'failed'` — recovering scenes shouldn't drive the bar red.
+  - A new `lipsyncFailedRef` effect resets `realProgressRef`, `runFloorRef` and `floorRef.lipsync` when lipsync transitions from `failed → not-failed`. Without this, the 4-min stall detector kept `hasFailure=true` after auto-recovery because the prior v5 attempt had already pushed `runFloorRef` past 90% with no real progress for >4 min.
+- `cancel-dialog-lipsync` now collects job ids from BOTH `dialog_shots.shots[*].sync_job_id` (v4) AND `audio_plan.twoshot.syncJobs.jobs[]` (v5) AND `replicate_prediction_id` (`sync:<id>`), dedupes, then issues `DELETE https://api.sync.so/v2/generations/<id>` for each (best-effort, requires `SYNC_SO_API_KEY`). Stops Sync.so billing on cancel.
+- SceneCard "✕ Lip-Sync abbrechen" button is now also visible during the brief `lip_sync_status === 'failed'` window so the user can opt out of the auto-retry loop entirely.
 
 **v19 Visible-Lipsync + Stable-Plate (June 2026):**
 - `sync-so-webhook` (v4 per-turn path) now downloads the Sync.so result (`https://api.sync.so/v2/generations/<id>/result?token=…`) and re-uploads it to `ai-videos/composer/<uid>/<sceneId>-dialog-turn-<idx>.mp4`, persisting the stable public URL in `shot.output_url` (+ flag `output_url_rehosted`). Without this, Remotion Lambda failed to load the auth-token-protected sync.so URL during DialogStitchVideo and silently fell back to the muted master plate — the stitched clip showed no lip motion at all. Mirrors the v5 multi-pass re-host that already existed.
