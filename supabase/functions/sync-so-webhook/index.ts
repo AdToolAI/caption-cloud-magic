@@ -252,6 +252,13 @@ serve(async (req) => {
   if (scene.lip_sync_applied_at) {
     return ok({ ok: true, skipped: "already_applied" });
   }
+  // v18 Cancel-Guard: ignore late webhooks for user-cancelled scenes.
+  if (
+    (scene as any).lip_sync_status === "canceled" ||
+    (scene.dialog_shots as any)?.status === "canceled"
+  ) {
+    return ok({ ok: true, skipped: "canceled", scene_id: sceneId });
+  }
 
   const state = scene.dialog_shots ?? null;
   if (!state) {
