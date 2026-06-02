@@ -1,6 +1,6 @@
 ---
-name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v10)
-description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo. v20 fixes — Multi-speaker preclips MUST dispatch with deterministic coords; stitch auto-trims totalSec to last shot's endSec; CROSSFADE_FRAMES 3→6. v20.1 (June 2026) — SceneCard "🔁 Lip-Sync neu rendern" + "🗑 Lipsync komplett zurücksetzen" + "🎥 Clip + Lip-Sync neu rendern" buttons sit in an always-visible Lip-Sync Aktionen toolbar directly under SceneDialogStudio in the AUDIO block, no longer hidden behind the "Mehr ▾" / clipSource-ai / shotType-!=absent triple gate.
+name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v21)
+description: Per-turn Sync.so on the ORIGINAL master plate, then deterministic Lambda stitch via DialogStitchVideo. v21 (June 2026) — Multi-speaker (3+) scenes now render single-face SQUARE PRECLIPS via DialogTurnFaceCropVideo (cropped around target_bbox/target_coords). Sync.so receives an unambiguous one-face frame and runs in auto_detect mode (no coords). DialogStitchVideo composites each lipsynced crop back at its original (cropX, cropY, cropSize) region with a soft radial-gradient mask. Fixes "only speaker 1 mouths every line" bug on N≥3 scenes. dialog_shots.version bumped 4→5; legacy v4 shots without preclip_crop still use the full-frame overlay path unchanged.
 type: feature
 ---
 
@@ -10,37 +10,70 @@ Both auto-triggers route to `compose-dialog-scene`:
 - Client: `useTwoShotAutoTrigger` invokes `compose-dialog-scene`.
 - Server: `compose-clip-webhook` rescue-path invokes `compose-dialog-scene`.
 
-**v9 (Artlist parity, May 2026) — KEY RULES:**
-1. **NO VIDEO CHAINING.** Every Sync.so turn job uses `state.source_clip_url` (the original Hailuo master plate) as its video input. Earlier versions chained shot K onto shot K-1's output — that caused later passes to re-animate earlier speakers' mouths with the wrong audio (Charakter 2 sprach den ersten Satz von Charakter 1, dritter Satz landete beim falschen Sprecher). Chaining is now forbidden.
-2. **ISOLATED PER-SPEAKER AUDIO.** Each turn gets the speaker's `track_url` WAV (only that voice + silence elsewhere) as `audio`. Never the merged dialog mix.
-3. **PARALLEL DISPATCH, BOUNDED.** Turns are independent → `poll-dialog-shots` dispatches up to `MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK` (currently 1) new jobs per cron tick, respecting Sync.so Creator-plan concurrency. Ordering no longer matters for correctness.
-4. **DETERMINISTIC LAMBDA STITCH IS MANDATORY.** When all shots are `ready`, `poll-dialog-shots` calls `render-dialog-stitch` which dispatches the `DialogStitchVideo` Remotion composition. The final `clip_url` is written by `remotion-webhook` when Lambda finishes. There is **no fallback** to "last shot output as final clip" — that path produced wrong speaker assignments.
-5. **`render_window` PERSISTED PER SHOT.** The slightly expanded window (lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbours) is computed once in `poll-dialog-shots`, persisted as `dialog_shots.shots[].render_window`, and used as BOTH the Sync.so `segments_secs` AND the Lambda overlay range. Guarantees Sync.so output range and stitch slice match byte-for-byte.
-6. **STITCHING IS RETRYABLE.** `lip_sync_status='stitching'` must be included in poll/watchdog selectors until `lip_sync_applied_at` exists. A transient `render-dialog-stitch` / Lambda dispatch failure is NOT a Sync.so timeout and must not refund or mark final failure unless Lambda returns a terminal webhook error.
-7. **MASTER DIMENSIONS WIN.** `render-dialog-stitch` passes `video_width/video_height` from `dialog_shots` into `DialogStitchVideo` (even-number normalized). Do not hard-code 1280×720 when the master plate is another even size such as 1376×768.
-8. **WINDOW APPLIES TO BOTH INPUTS.** `startSyncTurnJob` MUST attach `segments_secs: [window]` to BOTH the video AND the audio input. Without it Sync.so reads audio from `t=0` (always the first sentence in the per-speaker track) while playing a later video window — result: "unknown error" or wrong-speaker / wrong-sentence animation. This is the one Artlist-parity rule that breaks multi-turn scenes if forgotten. The 400-fallback path (segment-rejected) must symmetrically strip `segments_secs` from BOTH inputs.
+## v21 (June 2026) — Face-Crop Preclips for N≥3 Speakers
 
-**Per-shot lifecycle:**
+**Bug it fixes:** On 3-speaker scenes, Sync.so received the full multi-face master plate plus `coordinates: [x,y]` and `auto_detect: false`. Empirically, coords are ADVISORY on multi-face frames — Sync.so locks onto the most "speakerly" face (driven by audio energy), which in our pipeline was always the leftmost/first-rendered face. Result: speaker 1 mouthed every turn, speakers 2 & 3 stayed closed-mouth.
+
+**Fix — Single-Face Square Preclips:**
+
+1. **`render-dialog-turn`** detects 3+ distinct `speaker_idx` and computes a square crop centered on the turn's `target_coords` / `target_bbox` via `_shared/face-crop.ts`. Crop persisted as `dialog_shots.shots[].preclip_crop = { x, y, size, outputSize }`. Dispatches `DialogTurnFaceCropVideo` (cropSize×cropSize, default 512×512, muted MP4) instead of `DialogTurnClipVideo`. Single-speaker scenes keep `DialogTurnClipVideo` (no behavior change). 2-speaker scenes optionally route to the crop path too.
+
+2. **`poll-dialog-shots`** — when `shot.preclip_crop` is set: dispatch Sync.so with `mode = "auto"` (`active_speaker_detection.auto_detect = true`) and DROP `coordinates`. The preclip contains exactly one face, so auto-detect is now bulletproof and avoids any residual coord misinterpretation.
+
+3. **`compose-dialog-scene`** persists `target_bbox` per shot (from face-map) and bumped `dialog_shots.version` to **5**. Any in-flight v4 entries fall back to legacy full-frame overlay — no retroactive breakage.
+
+4. **`DialogStitchVideo`** gains a `CroppedOverlay` path: when `shot.crop = { x, y, size }` is present, the lipsynced output is positioned absolutely at `{left: crop.x * scaleX, top: crop.y * scaleY, size: crop.size * max(scaleX, scaleY)}` with a soft radial-gradient mask (`#000 0–55% → rgba(0,0,0,0) 95%`) so the cropped face blends into the master plate underneath without a visible square seam. The 6-frame opacity crossfade is unchanged.
+
+5. **`render-dialog-stitch`** forwards `crop` per shot and `srcWidth`/`srcHeight` (master-plate dims) into the Lambda composition props so DialogStitchVideo can map source-master pixel rects into composition pixels.
+
+**Why this fixes the bug:** Every Sync.so job now sees exactly ONE face → no ambiguity for the active-speaker picker → each turn's mouth motion lands on the correct speaker. The stitch composites each lipsynced face back at its original on-screen position.
+
+**Rollback safety:**
+- Single-speaker scenes (1 distinct `speaker_idx`) keep the legacy `DialogTurnClipVideo` path. No crop is computed, no overlay region is set.
+- Legacy v4 dialog_shots without `preclip_crop` render through the unchanged full-frame overlay path in DialogStitchVideo.
+- A failed `DialogTurnFaceCropVideo` render reuses the existing preclip retry budget; final fallback path (`sync_source_kind='master'`) is unchanged for 1-2 speaker scenes.
+
+## v9 (Artlist parity, May 2026) — STILL ACTIVE KEY RULES
+
+1. **NO VIDEO CHAINING.** Every Sync.so turn job uses `state.source_clip_url` (the original master plate) as its video input. Chaining is forbidden.
+2. **ISOLATED PER-SPEAKER AUDIO.** Each turn gets the speaker's `track_url` WAV (only that voice + silence elsewhere) as `audio`. Never the merged dialog mix.
+3. **PARALLEL DISPATCH, BOUNDED.** Up to `MAX_NEW_SYNC_JOBS_PER_SCENE_PER_TICK` (currently 1) new jobs per cron tick.
+4. **DETERMINISTIC LAMBDA STITCH IS MANDATORY.** When all shots are `ready`, `poll-dialog-shots` calls `render-dialog-stitch` → `DialogStitchVideo`. No "last shot as final clip" fallback.
+5. **`render_window` PERSISTED PER SHOT.** Lead-in 0.18s, tail 0.12s, clamped to half the gap to neighbours. Used as BOTH the Sync.so `segments_secs` AND the Lambda overlay range.
+6. **STITCHING IS RETRYABLE.** `lip_sync_status='stitching'` included in poll/watchdog selectors until `lip_sync_applied_at` exists.
+7. **MASTER DIMENSIONS WIN.** `render-dialog-stitch` passes `video_width/video_height` (even-normalized) into `DialogStitchVideo` AND `srcWidth/srcHeight` (v21) for crop mapping.
+8. **WINDOW APPLIES TO BOTH INPUTS.** `startSyncTurnJob` MUST attach `segments_secs: [window]` to BOTH the video AND the audio input. 400-fallback symmetrically strips both.
+
+## Per-shot lifecycle
+
 ```
 pending → lipsyncing (sync_job_id set) → ready (output_url set)
                                        → failed
 (all turns ready) → stitching (state.stitch.render_id) → done (clip_url set by webhook)
 ```
 
-**Stitch composition (`DialogStitchVideo`):**
+## Stitch composition (`DialogStitchVideo`)
+
 - Master plate plays continuously underneath, muted.
-- Per turn: `<Sequence from=startFrame durationInFrames=segDuration>` containing the Sync.so output, also muted, geometrically aligned via `startFrom=startFrame`.
+- Per turn: `<Sequence from=startFrame durationInFrames=segDuration>` containing either:
+  - **CroppedOverlay (v21):** positioned div at (left, top, size) with radial-gradient mask, contains `<Video src={outputUrl}>` scaled to fill.
+  - **FullFrameOverlay (legacy/single-speaker):** AbsoluteFill `<Video>` with `startFrom` for absolute-timing outputs.
 - Single `<Audio>` = master WAV.
-- One Lambda re-encode generation total (vs. N for chaining).
+- One Lambda re-encode generation total.
 
-**External audio policy unchanged:** `audio_plan.twoshot.useExternalAudio: true` keeps the merged master WAV authoritative for preview/export.
+## External audio policy
 
-**Refund policy:**
+`audio_plan.twoshot.useExternalAudio: true` — merged master WAV stays authoritative for preview/export.
+
+## Refund & idempotency policy
+
 - Refund only on terminal failure (≥1 shot failed after retry, or stitch render failed irrecoverably).
-- While shots are `pending`/`lipsyncing` OR stitch is `pending`/`rendering`: NO refund, NO "final = last output". User sees a clean waiting state if AWS is temporarily unavailable; stitch retries on next tick.
-
-**Idempotency:**
+- While shots are `pending`/`lipsyncing` OR stitch is `pending`/`rendering`: NO refund.
 - `render-dialog-stitch` checks `dialog_shots.stitch.render_id` and the `video_renders` row before dispatching again.
-- `poll-dialog-shots` skips stitch dispatch only if the referenced `video_renders` row is `pending`, `rendering`, or `completed`; missing/failed stale stitch rows are cleared and retried.
+- `poll-dialog-shots` skips stitch dispatch only if the referenced render is `pending`/`rendering`/`completed`; stale/failed stitch rows are cleared and retried.
 
-**Legacy:** `dialog_shots.version = 4` preserved (no schema migration). Pre-v9 state without `render_window` falls back to the tight `window` in both Sync.so dispatch and stitch overlay.
+## Schema (no migration — JSON columns)
+
+- `dialog_shots.version = 5` (was 4)
+- `dialog_shots.shots[].preclip_crop?: { x: number; y: number; size: number; outputSize: number }` (v21)
+- `dialog_shots.shots[].target_bbox?: [x, y, w, h]` (persisted in compose-dialog-scene)
