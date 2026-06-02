@@ -472,7 +472,24 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
 
+          const baseAi = String((scene as any).ai_prompt ?? "").trim();
+          const dialogSuffix = buildDialogPlatePromptSuffix(speakerNames.size);
+          const constrainedAi = baseAi
+            ? `${baseAi}\n\n${dialogSuffix}`
+            : dialogSuffix;
           const clipsPayload = {
+            projectId: scene.project_id,
+            scenes: [
+              {
+                id: sceneId,
+                clipSource: "ai-hailuo",
+                clipQuality: (scene as any).clip_quality ?? "standard",
+                aiPrompt: constrainedAi,
+                durationSeconds: Number((scene as any).duration_seconds ?? 6),
+              },
+            ],
+          };
+
             projectId: scene.project_id,
             scenes: [
               {
