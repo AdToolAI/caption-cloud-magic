@@ -26,3 +26,11 @@ Idempotency: dialog_shots state is single source of truth; `state.refunded` bool
 - `poll-dialog-shots` multi-speaker integrity gate: `allReady` no longer counts a `ready` shot without an `output_url` (legacy degrade-to-master), and such shots are promoted to terminal `failed` so refund + clip_error happens instead of looping on `render-dialog-stitch 409 integrity_gate_failed`. Single-speaker degrade pass-through is preserved.
 - Cosmetic: `console.warn(…retries=${retryCount}…)` at the failure tail referenced an undefined variable; now `retries=${passRetryCount}/${aggregateRetryCount}`.
 
+**June 2026 ROOT-CAUSE FIX — 3+ speaker routing (supersedes patches above):**
+- The earlier June fixes (probe phases, coord clamping, gate hardening, retry ladder) only patched symptoms. The actual root cause is that v5 `compose-dialog-segments` is a multi-pass CHAIN: pass N's input is pass N-1's Sync.so output. `lipsync-2-pro` is a diffusion model and **rejects re-encoded diffusion output as input** with the opaque "An unknown error occurred." This is fundamentally unfixable in the chain architecture.
+- **Fix**: `useTwoShotAutoTrigger.ts` now routes by speaker count:
+  - **1–2 speakers** → v5 `compose-dialog-segments` (stable in this regime; the chain only runs 1–2 passes which lipsync-2-pro tolerates).
+  - **≥3 speakers** → v4 `compose-dialog-scene` (true Artlist-style: one Sync.so call per TURN, ALL on the ORIGINAL pristine plate IN PARALLEL via `poll-dialog-shots`, then Lambda-side overlay-stitch via `DialogStitchVideo` Remotion composition with 3-frame opacity crossfade). Sync.so never sees its own output; each per-turn job is as stable as a single-speaker job.
+  - `engine_override === 'cinematic-sync-legacy'` still forces v4 regardless of count.
+- Expected reliability for ≥3 speakers: ~0.99^N per-turn instead of the chain's catastrophic degradation. 1- and 2-speaker pipelines are completely untouched.
+
