@@ -535,12 +535,20 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // Route by engine. Default = v5 1-call Sync.so Segments (Artlist
-          // pattern): one POST with segments[], Sync.so parallelizes internally,
-          // single webhook, single refund — ~3–5 min vs. ~10–15 min for v4.
-          // Only `cinematic-sync-legacy` keeps the old per-turn chain.
+          // Route by speaker count (root-cause fix, June 2026):
+          //   • 1–2 speakers → v5 `compose-dialog-segments` (multi-pass chain
+          //     on lipsync-2-pro). Stable in this regime, faster, single
+          //     webhook, single refund.
+          //   • ≥3 speakers  → v4 `compose-dialog-scene` (true Artlist-style:
+          //     one Sync.so call per TURN, all on the ORIGINAL pristine plate
+          //     in parallel, then Lambda overlay-stitch via DialogStitchVideo
+          //     with crossfade). v5's chain feeds Sync.so its own output for
+          //     pass 2/3, which lipsync-2-pro (diffusion model) rejects with
+          //     opaque "unknown error" — fundamentally unstable, not patchable.
+          //   • `engine_override === 'cinematic-sync-legacy'` forces v4
+          //     regardless of speaker count (manual escape hatch).
           const fnName =
-            d.engine_override === 'cinematic-sync-legacy'
+            d.engine_override === 'cinematic-sync-legacy' || speakers >= 3
               ? 'compose-dialog-scene'
               : 'compose-dialog-segments';
 
