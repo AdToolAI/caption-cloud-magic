@@ -1,117 +1,79 @@
-# 3+ Speaker Lip-Sync: Root-Cause-Fix via Per-Speaker + Mask Composite
+## Ziel
 
-## Das eigentliche Problem (Root Cause)
+Die 3-Sprecher-Pipeline soll nicht mehr durch Orchestrator-Races oder unpräzises Face-Targeting blockieren. Der aktuelle Fehler ist kein reines Sync.so-Provider-Problem mehr: In den Logs wurden für denselben Turn mehrere parallele Dispatches ausgelöst, obwohl der Code pro Tick eigentlich nur einen Job starten soll.
 
-Der aktuelle 3+ Sprecher-Flow ist ein **Multi-Pass-Chain**:
+## Befund
 
-```text
-Plate ──► Sync.so(Speaker A) ──► Output_A ──► Sync.so(Speaker B) ──► Output_B ──► Sync.so(Speaker C) ──► Final
-```
-
-Jeder Pass nimmt das **diffusionsgenerierte Output des vorherigen Passes** als Input. Das ist der Grund warum:
-- Pass 1 (Original-Plate) immer funktioniert
-- Pass 2/3 mit "unknown error" failen – unabhängig von Koordinaten, Frames, Plate-Dims
-- Sync.so `lipsync-2-pro` ist ein Diffusionsmodell und reagiert instabil auf re-encoded Output seiner selbst (Kompressions-Artefakte, Farbshifts, leichte temporale Inkonsistenzen)
-- Die letzten Fixes (Dims-Probe, Coord-Clamp, Frame-Retries) sind alle Symptom-Patches
-
-**Wie Artlist / professionelle Tools das lösen:** Sie chainen nie. Jeder Speaker wird auf der **Original-Plate** generiert, dann werden die Mund-/Gesichtsregionen maskiert und auf die Plate komponiert. Sync.so sieht nie sein eigenes Output.
-
-## Lösung: Per-Speaker Parallel + Mask-Composite
-
-### Architektur
+- Die neue Route greift: `useTwoShotAutoTrigger` ruft bei `speakers=3` korrekt `compose-dialog-scene` auf.
+- Die Szene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73` läuft im v4-Dialog-Shot-Pfad.
+- Turn 0 und Turn 1 wurden erfolgreich von Sync.so verarbeitet.
+- Turn 2 fällt mit `FAILED: An unknown error occurred.` aus.
+- Kritisch: Turn 1 und Turn 2 wurden mehrfach nahezu gleichzeitig dispatched. Das bedeutet: mehrere Poller/Webhooks lesen denselben alten `dialog_shots`-JSON-State und starten denselben pending Turn parallel.
 
 ```text
-                    ┌─► Sync.so(Speaker A on plate, only A audio) ──► Out_A
-Original Plate ─────┼─► Sync.so(Speaker B on plate, only B audio) ──► Out_B
-                    └─► Sync.so(Speaker C on plate, only C audio) ──► Out_C
-                                          │
-                                          ▼
-                         ffmpeg Mask-Composite per Speaker-Region
-                                          │
-                                          ▼
-                                  Final 3-Speaker Clip
+Problemfluss aktuell:
+Poller A liest Turn 2 = pending
+Poller B liest Turn 2 = pending
+A startet Sync.so Job
+B startet kurz danach nochmal Sync.so Job
+Webhook A/B schreiben konkurrierend in denselben JSON-State
+Retries/Failures können fertige Zustände überschreiben oder zu früh terminal failen
 ```
 
-Jeder Sync.so-Job ist exakt so stabil wie ein 1-Speaker-Job (was nachweislich >99% funktioniert).
+## Plan
 
-### Pro Speaker N
-1. **Audio-Track bauen:** Originale Dialog-Audio, aber alle anderen Sprecher-Turns werden mit `volume=0` (Silence) ersetzt. Speaker N hört man, Rest = Stille.
-2. **Sync.so Call:** Input = **Original-Plate** (immer dieselbe), Audio = Speaker-N-only Track, `targetCoords` = Speaker-N Gesicht.
-3. Sync.so animiert nur Speaker N (die anderen bleiben statisch, weil deren Audio Silence ist – das ist genau wie Sync.so designt wurde).
+### 1. Szene-weiten Dispatch-Lock einführen
+- Neue kleine Lock-Struktur in der Datenbank für Lip-Sync-Orchestrierung.
+- `poll-dialog-shots` darf pro Szene nur noch von genau einer Instanz gleichzeitig ausgeführt werden.
+- Webhook-, Cron- und Client-Kicks dürfen den Poller weiter anstoßen, aber wenn ein Lock aktiv ist, steigen sie sauber mit `deferred_locked` aus.
+- Lock bekommt TTL, damit keine Szene dauerhaft hängen bleibt, falls eine Edge Function abstürzt.
 
-### Composite-Stage
-Nach N parallelen Sync.so-Jobs haben wir N Videos, jedes mit nur einem animierten Mund. ffmpeg-Composite:
-1. Aus jedem `Out_N` wird ein **Crop-Rechteck um Speaker-N Gesicht** extrahiert (basierend auf bekannten `targetCoords` + Face-Bbox).
-2. Soft-edge Maske (feathered alpha, 20-30px) verhindert harte Kanten.
-3. Overlay aller N Crops auf die Original-Plate.
-4. Original-Audio (alle Speaker zusammen) wird zurückgemuxt.
+### 2. `poll-dialog-shots` atomar machen
+- Vor jeder Dispatch-Entscheidung Lock holen.
+- Nach jedem Statuswechsel den aktuellsten Scene-State erneut lesen, bevor ein neuer Sync.so-Job gestartet wird.
+- Wenn ein Shot inzwischen nicht mehr `pending` ist, wird kein Provider-Call ausgelöst.
+- Doppelte Sync.so-Jobs für denselben Turn werden damit verhindert.
 
-ffmpeg-Filter (vereinfacht):
-```text
-[plate][crop_A]overlay=x=...:y=...:enable='alpha_mask_A'[v1];
-[v1][crop_B]overlay=...[v2];
-[v2][crop_C]overlay=...[vout]
-```
+### 3. Multi-Speaker Face-Targeting verbessern
+- `compose-dialog-scene` speichert zusätzlich zu `target_coords` auch `target_bbox` aus der vorhandenen FaceMap.
+- `poll-dialog-shots` sendet bei 2+ Sprechern bevorzugt Sync.so `active_speaker_detection.bounding_boxes` statt nur `frame_number + coordinates`.
+- Die Bounding Box wird für die Preclip-Frames wiederholt und ist robuster bei mehreren Gesichtern, weil Sync.so nicht nur einen Punkt, sondern die ganze Ziel-Gesichtsregion bekommt.
+- Fallback bleibt: wenn keine Box vorhanden ist, werden weiterhin Koordinaten genutzt.
 
-## Implementierungs-Schritte
+### 4. Retry-Logik im Webhook angleichen
+- `sync-so-webhook` darf nicht nach nur einem schnellen Failure denselben Shot final degradieren, während der Poller mehr Retry-Strategien kennt.
+- Webhook-Retry und Poller-Retry bekommen dieselbe Retry-Matrix:
+  - anderer Sample-Frame
+  - andere Temperatur
+  - bei Bedarf Wechsel Preclip ↔ Master+segments
+  - aber nie Auto-Detect bei Multi-Speaker, damit nicht das falsche Gesicht animiert wird.
 
-### 1. Neue Edge Function: `compose-dialog-parallel`
-- Triggert für `speakers.length >= 3` (1/2 Sprecher unverändert via existierende Pipeline)
-- Erstellt N parallele `dialog_shots` Rows mit:
-  - `input_video_url` = Original-Plate (bei allen gleich)
-  - `audio_url` = Speaker-N-isolated Track (neu generiert via ffmpeg)
-  - `target_coords` = Speaker-N Koordinaten
-  - `composite_role` = `parallel_speaker_N`
-- Alle N Jobs werden gleichzeitig an Sync.so übergeben
+### 5. Fehlgeschlagene Szene sauber zurücksetzen
+- Die konkret fehlgeschlagene Szene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73` wird zurückgesetzt:
+  - `lip_sync_status` zurück auf pending/null
+  - `twoshot_stage` leeren
+  - `clip_error` leeren
+  - `dialog_shots` leeren
+  - bestehende Master-Plate und AudioPlan bleiben erhalten.
+- Danach kann „Lip-Sync neu rendern“ denselben Clip mit der stabileren Orchestrierung erneut starten.
 
-### 2. Audio-Isolation Helper (`_shared/dialog-audio-isolation.ts`)
-- Input: Dialog-Audio + Turn-Timings + Speaker-Map
-- Output: N Audio-URLs, jeweils mit nur Speaker-N hörbar, Rest Silence
-- ffmpeg via Deno subprocess oder Cloud-ffmpeg edge function
+### 6. Validierung
+- Edge-Function-Logs prüfen: pro Turn darf nur noch ein aktiver Dispatch entstehen.
+- Datenbankstatus prüfen: kein doppelter `lipsyncing`/Retry-Race mehr.
+- Bei 3-Sprecher-Szenen müssen alle Turns entweder echte `output_url`s bekommen oder sauber mit Refund stoppen; kein Zwischenzustand/Loop.
 
-### 3. Composite Edge Function: `composite-dialog-masks`
-- Trigger: alle N `dialog_shots` mit gleicher `scene_id` sind `ready`
-- Lädt alle N Sync.so-Outputs + Original-Plate + Original-Mixed-Audio
-- ffmpeg-Composite mit Soft-Edge-Masken pro Speaker-Region
-- Output: finaler Multi-Speaker Clip → `scene.clip_url`
+## Dateien, die voraussichtlich geändert werden
 
-### 4. Polling-Anpassung: `poll-dialog-shots`
-- Erkennt `composite_role = parallel_speaker_N`
-- Statt sequenzieller Chain → wartet auf alle N parallel, dann triggert `composite-dialog-masks`
-- Refund-Logik unverändert (idempotent per shot)
+- `supabase/functions/poll-dialog-shots/index.ts`
+- `supabase/functions/compose-dialog-scene/index.ts`
+- `supabase/functions/sync-so-webhook/index.ts`
+- Neue Migration für den Szene-Lock/RPC
+- Recovery-Migration oder Datenkorrektur für die betroffene Szene
+- Memory-Dokumentation zum 3-Sprecher-Orchestrator-Fix
 
-### 5. Sicherer Rollout
-- Feature-Flag `dialog_parallel_composite_enabled` (default `true` für 3+ Sprecher)
-- Fallback: Wenn Composite-Stage fehlschlägt → bestehende Chain als Backup (eine Generation lang)
-- Monitoring: Erfolgsrate per Engine im QA Cockpit
+## Erwartetes Ergebnis
 
-### 6. Recovery
-- Migration: Aktuell stuck Scene `c59e6d09-07a9-4764-ab2d-5a679790cbf8` resetten
-
-### 7. Memory Update
-- `mem://architecture/lipsync/sync-so-webhook-stage5` mit neuer Architektur dokumentieren
-
-## Was sich NICHT ändert
-- **1-Speaker Pipeline:** unangetastet (single Sync.so call)
-- **2-Speaker Pipeline:** unangetastet (existierende 2-shot-lipsync chain mit zwei Passes – funktioniert)
-- Aktivierung nur für `speakers.length >= 3`
-
-## Erwartete Erfolgsquote
-- Per-Speaker Job ≈ 1-Speaker-Stabilität (>99%)
-- Bei 3 Speakern: 0.99³ ≈ 97% End-to-End (vs. aktuell ~30-50% durch Chain-Degradation)
-- Refund-Granularität: failt nur Pass N, andere bleiben verwertbar für Retry
-
-## Offene Fragen
-1. **ffmpeg in Edge Functions:** Wir nutzen ffmpeg bereits in `compose-dialog-segments` für Concat. Composite mit Masken ist komplexer aber machbar. Alternative: Replicate ffmpeg-Worker (langsamer, aber stabiler).
-2. **Face-Bbox-Größe für Crop:** Aktuell haben wir nur Center-Coords. Wir brauchen Bbox (W×H). Lösung: Bei Plate-Komposition (`compose-scene-anchor`) bereits Bbox mit-speichern, fallback: feste 25%-Bildbreite-Quadrat um Center.
-3. **Sync.so Verhalten bei Silence-Tracks:** Verifizierung nötig dass Sync.so bei stillem Speaker-Audio diesen Speaker statisch lässt (sollte so sein – kein Phoneme, kein Movement). Schneller Test mit 1 Mock-Job vor Full-Rollout.
-
-## Files (nur 3+ Sprecher Pfad)
-- NEU: `supabase/functions/compose-dialog-parallel/index.ts`
-- NEU: `supabase/functions/composite-dialog-masks/index.ts`
-- NEU: `supabase/functions/_shared/dialog-audio-isolation.ts`
-- EDIT: `supabase/functions/poll-dialog-shots/index.ts` (parallel-mode branch)
-- EDIT: `supabase/functions/compose-dialog-segments/index.ts` (Routing 3+ → parallel)
-- NEU: Migration für `dialog_shots.composite_role` + `scene.composite_strategy` Spalte
-- EDIT: `mem://architecture/lipsync/sync-so-webhook-stage5`
-- Migration: Recovery der gestuckten Scene
+- Keine doppelten Sync.so-Dispatches pro Turn mehr.
+- Stabileres Face-Targeting bei 3 sichtbaren Personen.
+- Webhook und Poller arbeiten nicht mehr gegeneinander.
+- 3-Sprecher-Lip-Sync sollte dadurch deutlich näher an die gewünschte 99%-Stabilität kommen, statt an Race-Conditions zu scheitern.

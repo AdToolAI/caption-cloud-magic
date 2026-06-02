@@ -48,8 +48,13 @@ function dispatchModeForShot(shot: any): "auto" | "coords" {
 }
 
 const ASSUMED_MASTER_FPS = 24;
-const MAX_SHOT_RETRIES = 1;
-const RETRY_TEMPERATURES = [0.85, 1.0, 0.7];
+// v15 Race-Fix: align webhook retry budget with poll-dialog-shots
+// (MAX_SHOT_RETRIES = 4 there). Previously the webhook hard-terminal-failed
+// a shot after a single Sync.so error, which prematurely killed scenes that
+// the poller's differentiated retry matrix (frame, temp, preclip↔master)
+// would have recovered.
+const MAX_SHOT_RETRIES = 4;
+const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 const V5_RETRY_VARIANTS = ["coords-pro", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {

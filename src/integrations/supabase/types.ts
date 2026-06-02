@@ -6714,6 +6714,27 @@ export type Database = {
           },
         ]
       }
+      dialog_dispatch_locks: {
+        Row: {
+          acquired_at: string
+          expires_at: string
+          holder: string
+          scene_id: string
+        }
+        Insert: {
+          acquired_at?: string
+          expires_at: string
+          holder: string
+          scene_id: string
+        }
+        Update: {
+          acquired_at?: string
+          expires_at?: string
+          holder?: string
+          scene_id?: string
+        }
+        Relationships: []
+      }
       direct_messages: {
         Row: {
           content: string
@@ -17602,6 +17623,10 @@ export type Database = {
         Args: { p_amount: number; p_conversation_id: string; p_user_id: string }
         Returns: number
       }
+      release_dialog_lock: {
+        Args: { _holder: string; _scene_id: string }
+        Returns: undefined
+      }
       replace_composer_scene_with_children: {
         Args: {
           p_children: Json
@@ -17620,6 +17645,10 @@ export type Database = {
       syncso_recent_failure_count: {
         Args: { _window_min?: number }
         Returns: number
+      }
+      try_acquire_dialog_lock: {
+        Args: { _holder: string; _scene_id: string; _ttl_seconds?: number }
+        Returns: boolean
       }
       user_owns_comment: { Args: { _comment_id: string }; Returns: boolean }
       verify_license_certificate: {
