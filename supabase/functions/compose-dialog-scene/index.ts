@@ -29,6 +29,26 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { probeImageDims } from "../_shared/image-dims.ts";
 
+// ── v19 Dialog Plate Prompt Constraints ────────────────────────────────
+// Free-form scene prompts (low angles, handheld, hands waving, head turning
+// away) produce "noodle limb" Hailuo plates that no lipsync can rescue and
+// often hide the mouth from Sync.so's face detector entirely. For dialog
+// scenes that go through Sync.so we override the framing/motion clauses so
+// every speaker stays a clean, locked head-and-shoulders subject.
+function buildDialogPlatePromptSuffix(speakerCount: number): string {
+  const framing = speakerCount >= 2
+    ? "two-shot or three-shot medium close-up, all speakers facing camera, head-and-shoulders framing, eye-line to lens"
+    : "medium close-up, head-and-shoulders framing, eye-line to lens";
+  return [
+    `Cinematic dialog plate: ${framing}.`,
+    "Locked-off camera, no handheld shake, no dolly, no orbit, no zoom.",
+    "Subtle natural micro-motion only — relaxed posture, no head turn away from camera, mouths visible at all times, no occlusion of the face.",
+    "Hands relaxed at sides or out of frame, no waving, no pointing, no overlapping arms, no rapid body movement, no exaggerated gestures.",
+    "Photo-realistic skin texture, natural lighting, no on-screen text, no captions, no subtitles, no watermarks, no logos.",
+  ].join(" ");
+}
+
+
 // ── FaceMap helpers (ported from compose-twoshot-lipsync) ──────────────
 // The dialog pipeline needs per-character pixel-space face coordinates so
 // every Sync.so turn lands on the correct mouth. Older anchors only have an
