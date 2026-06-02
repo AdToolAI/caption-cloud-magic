@@ -2043,7 +2043,7 @@ export default function SceneCard({
                             }}
                             className="text-[9px] text-destructive hover:underline"
                           >
-                            🗑 Lipsync-Eintrag löschen
+                            🗑 Lipsync komplett zurücksetzen
                           </button>
                           {scene.engineOverride === "cinematic-sync" && (
                             <button
