@@ -530,9 +530,11 @@ serve(async (req) => {
     // Anchor image (Nano Banana) and Hailuo i2v plate often differ in aspect
     // ratio/crop → coords computed against the anchor land off-face on the
     // plate, Sync.so rejects coords-pro with provider_unknown_error.
+    // NOTE: `state` is built later (after prevState/passes setup). Use the
+    // already-resolved `sourceClipUrl` (master plate) and any cached dims on
+    // the existing dialog_shots row as fallback. This avoids a TDZ crash.
     const platePrimaryUrl =
-      (state.passes?.[0]?.input_url as string | undefined) ||
-      (state.source_clip_url as string | undefined) ||
+      sourceClipUrl ||
       (scene as any).clip_url ||
       null;
     let plateDims: { width: number; height: number } | null = null;
@@ -540,8 +542,8 @@ serve(async (req) => {
       plateDims = await probeMp4Dims(platePrimaryUrl);
     }
     const videoDims = plateDims ?? {
-      width: Number((state as any).video_width) || 1280,
-      height: Number((state as any).video_height) || 720,
+      width: Number((existing as any)?.video_width) || 1280,
+      height: Number((existing as any)?.video_height) || 720,
     };
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
