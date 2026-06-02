@@ -18,6 +18,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
+import { withDialogLock } from "../_shared/dialog-lock.ts";
 import {
   releaseInflightSyncJob,
   classifySyncError,
@@ -728,42 +729,61 @@ serve(async (req) => {
     return ok({ ok: true, skipped: "unknown_state_version" });
   }
 
-  const shots = state.shots.map((s: any) => ({ ...s }));
-  const idx = shots.findIndex((s: any) => s.sync_job_id === jobId);
-  if (idx < 0) {
-    return ok({ ok: true, skipped: "shot_not_found", job_id: jobId });
-  }
+  // v16 race-fix: do the entire read→mutate→update inside the per-scene
+  // dispatch lock. Previously the webhook patched dialog_shots from a stale
+  // snapshot while poll-dialog-shots concurrently wrote, dropping fields
+  // (e.g. preclip_url for turn 2 in 3-speaker scenes).
+  let logLine = "";
+  await withDialogLock(supabase, sceneId, "syncso-webhook", async () => {
+    // Re-read inside the lock so we always patch the latest snapshot.
+    const { data: fresh } = await supabase
+      .from("composer_scenes")
+      .select("dialog_shots, lip_sync_applied_at")
+      .eq("id", sceneId)
+      .maybeSingle();
+    if ((fresh as any)?.lip_sync_applied_at) {
+      logLine = "already_applied";
+      return;
+    }
+    const freshState = (fresh as any)?.dialog_shots ?? state;
+    if (!Array.isArray(freshState.shots)) {
+      logLine = "no_shots";
+      return;
+    }
+    const shots = freshState.shots.map((s: any) => ({ ...s }));
+    const idx = shots.findIndex((s: any) => s.sync_job_id === jobId);
+    if (idx < 0) {
+      logLine = "shot_not_found";
+      return;
+    }
+    const shot = shots[idx];
+    const wasReady = shot.status === "ready";
+    if (status === "COMPLETED" && outputUrl) {
+      shot.status = "ready";
+      shot.output_url = outputUrl;
+      shot.completed_at = nowIso;
+      shot.error = undefined;
+    } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
+      // v12 Graceful Degrade: statt die ganze Szene zu killen, markieren wir
+      // den Turn als "ready ohne Lipsync-Overlay" — DialogStitchVideo zeigt
+      // dann die saubere Master-Plate für dieses Fenster.
+      shot.status = "ready";
+      shot.degraded = true;
+      shot.output_url = undefined;
+      shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
+      shot.completed_at = nowIso;
+    }
+    await supabase
+      .from("composer_scenes")
+      .update({
+        dialog_shots: { ...freshState, shots },
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+    logLine = `scene=${sceneId} job=${jobId} turn=${shot.idx} ${wasReady ? "already_ready" : status}`;
+  }, { ttlSeconds: 30 });
 
-  const shot = shots[idx];
-  const wasReady = shot.status === "ready";
-
-  if (status === "COMPLETED" && outputUrl) {
-    shot.status = "ready";
-    shot.output_url = outputUrl;
-    shot.completed_at = nowIso;
-    shot.error = undefined;
-  } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
-    // v12 Graceful Degrade: statt die ganze Szene zu killen, markieren wir
-    // den Turn als "ready ohne Lipsync-Overlay" — DialogStitchVideo zeigt
-    // dann die saubere Master-Plate für dieses Fenster.
-    shot.status = "ready";
-    shot.degraded = true;
-    shot.output_url = undefined;
-    shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
-    shot.completed_at = nowIso;
-  }
-
-  await supabase
-    .from("composer_scenes")
-    .update({
-      dialog_shots: { ...state, shots },
-      updated_at: nowIso,
-    })
-    .eq("id", sceneId);
-
-  console.log(
-    `[sync-so-webhook] scene=${sceneId} job=${jobId} turn=${shot.idx} ${wasReady ? "already_ready" : status}`,
-  );
+  console.log(`[sync-so-webhook] ${logLine}`);
 
   // Fire-and-forget poll-dialog-shots so the pipeline advances immediately.
   try {
