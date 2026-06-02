@@ -791,7 +791,55 @@ async function dispatchDialogStitch(
 
 // ── Per-scene processor ─────────────────────────────────────────────────
 
+/**
+ * v15 Race-Fix: per-scene dispatch lock.
+ *
+ * Multiple webhook + pg_cron + client kicks used to run `processScene` in
+ * parallel on the same `dialog_shots` JSON. Both pollers saw the same
+ * pending shot, both started a Sync.so job → duplicate provider calls
+ * for the same turn, conflicting state writes, premature terminal-fail.
+ *
+ * We now serialize per scene via `try_acquire_dialog_lock`. If we can't
+ * grab the lock, we exit cleanly — the holder finishes and the next
+ * webhook/cron tick picks up the latest state.
+ */
 async function processScene(
+  supabase: ReturnType<typeof createClient>,
+  syncKey: string,
+  sceneId: string,
+): Promise<{ status: string; mutated: boolean }> {
+  const holder = `poll-${crypto.randomUUID()}`;
+  const { data: acquired, error: lockErr } = await supabase.rpc(
+    "try_acquire_dialog_lock",
+    { _scene_id: sceneId, _holder: holder, _ttl_seconds: 60 },
+  );
+  if (lockErr) {
+    console.warn(
+      `[poll-dialog-shots] scene ${sceneId} lock RPC error: ${lockErr.message} — proceeding without lock`,
+    );
+  } else if (acquired !== true) {
+    return { status: "locked_deferred", mutated: false };
+  }
+
+  try {
+    return await processSceneLocked(supabase, syncKey, sceneId);
+  } finally {
+    if (acquired === true) {
+      try {
+        await supabase.rpc("release_dialog_lock", {
+          _scene_id: sceneId,
+          _holder: holder,
+        });
+      } catch (e) {
+        console.warn(
+          `[poll-dialog-shots] scene ${sceneId} lock release failed: ${(e as Error).message}`,
+        );
+      }
+    }
+  }
+}
+
+async function processSceneLocked(
   supabase: ReturnType<typeof createClient>,
   syncKey: string,
   sceneId: string,
