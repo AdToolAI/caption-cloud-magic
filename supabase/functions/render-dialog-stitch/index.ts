@@ -185,7 +185,21 @@ serve(async (req) => {
 
     // ── Build Lambda payload ────────────────────────────────────────────
     const fps = 30;
-    const totalSec = Number(state.total_sec) || 6;
+    const rawTotalSec = Number(state.total_sec) || 6;
+    // v20 Smooth-Tail: Wenn nach dem letzten Speaker-Turn ein nennenswerter
+    // Master-Tail (>0.15s) ohne Audio/Lipsync übrig bleibt, fühlt sich die
+    // Szene ruckelig an (Charaktere bewegen plötzlich Mund ohne Ton, fremde
+    // Hände-Bewegung etc.). → Szene am Ende des letzten Turns clean
+    // abschneiden. Audio (master WAV) endet ohnehin dort.
+    const lastShotEnd = (state.shots ?? [])
+      .filter((s) => s.output_url)
+      .reduce((acc, s) => {
+        const win = (s.render_window ?? s.window) as [number, number];
+        return Math.max(acc, Number(win?.[1]) || 0);
+      }, 0);
+    const totalSec = lastShotEnd > 0 && lastShotEnd < rawTotalSec - 0.15
+      ? lastShotEnd
+      : rawTotalSec;
     const durationInFrames = Math.max(30, Math.ceil(totalSec * fps));
     const width = evenDimension(state.video_width, 1280);
     const height = evenDimension(state.video_height, 720);
