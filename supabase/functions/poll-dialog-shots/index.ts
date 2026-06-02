@@ -1151,7 +1151,15 @@ async function processSceneLocked(
         : win;
       nextShot.sync_source_kind = usePreclip ? "preclip" : "master";
 
-      const mode = dispatchModeForShot(nextShot);
+      // v17 Artlist-Parität: Preclips sind isolierte Single-Face-Clips.
+      // Wide-Plate-Koordinaten aus dem Master sind dort weder nötig noch
+      // sinnvoll (Sync.so antwortet damit reproduzierbar mit "An unknown
+      // error occurred." für Edge-Faces). Auf Preclip → IMMER auto_detect.
+      // Die Coords + frame_number bleiben nur für den Master-Legacy-Pfad.
+      let mode = dispatchModeForShot(nextShot);
+      if (usePreclip) {
+        mode = "auto";
+      }
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
       // Stufe B: audio is always normalized (mono, peak -1 dBFS, 0.25s lead-in,
       // min 3.0s tail-padded) — eliminates the most frequent Sync.so reject
