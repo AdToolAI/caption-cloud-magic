@@ -580,6 +580,8 @@ serve(async (req) => {
         nextVariant = null;
       }
       const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES && nextVariant !== null;
+
+      if (canRetry) {
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
