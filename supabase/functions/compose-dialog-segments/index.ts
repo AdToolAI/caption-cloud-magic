@@ -526,12 +526,30 @@ serve(async (req) => {
         `[compose-dialog-segments] scene=${sceneId} faceMap resolve failed: ${(err as Error).message}`,
       );
     }
+    // Probe ACTUAL plate dimensions so per-speaker coords are in plate-space.
+    // Anchor image (Nano Banana) and Hailuo i2v plate often differ in aspect
+    // ratio/crop → coords computed against the anchor land off-face on the
+    // plate, Sync.so rejects coords-pro with provider_unknown_error.
+    const platePrimaryUrl =
+      (state.passes?.[0]?.input_url as string | undefined) ||
+      (state.source_clip_url as string | undefined) ||
+      (scene as any).clip_url ||
+      null;
+    let plateDims: { width: number; height: number } | null = null;
+    if (platePrimaryUrl) {
+      plateDims = await probeMp4Dims(platePrimaryUrl);
+    }
+    const videoDims = plateDims ?? {
+      width: Number((state as any).video_width) || 1280,
+      height: Number((state as any).video_height) || 720,
+    };
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
         speakerIdx: idx,
         characterId: sp.character_id ?? null,
         faceMap,
+        videoDims,
         totalSpeakers: speakers.length,
       });
       coordSources.push(picked?.source ?? "none");
@@ -543,13 +561,18 @@ serve(async (req) => {
       if (!speakerCoords[i]) {
         const total = Math.max(speakers.length, 2);
         const t = 0.2 + (0.6 * i) / (total - 1);
-        speakerCoords[i] = [t, 0.5];
+        speakerCoords[i] = [
+          Math.round(videoDims.width * t),
+          Math.round(videoDims.height * 0.5),
+        ];
       }
       speakerCoords[i] = clampSyncCoords(speakerCoords[i]);
     }
     const ASSUMED_FPS = 24;
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
+      `[compose-dialog-segments] scene=${sceneId} faceMap=${faceMap?.source ?? "none"} faces=${faceMap?.faces?.length ?? 0} ` +
+      `anchor=${faceMap?.width ?? "?"}x${faceMap?.height ?? "?"} plate=${plateDims ? `${plateDims.width}x${plateDims.height}` : "probe-failed"} ` +
+      `speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
 
     // ── Build PASSES (one per speaker that has turns) ────────────────────
