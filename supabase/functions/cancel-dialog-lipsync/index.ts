@@ -207,13 +207,13 @@ serve(async (req) => {
       await supabase.from("composer_scenes").update(patch).eq("id", sceneId);
 
       console.log(
-        `[cancel-dialog-lipsync] scene=${sceneId} user=${userId} jobs=${jobIds.length} reset=${reset}`,
+        `[cancel-dialog-lipsync] scene=${sceneId} user=${userId} jobs=${uniqueJobIds.length} reset=${reset}`,
       );
 
       return json({
         ok: true,
         scene_id: sceneId,
-        canceled_jobs: jobIds.length,
+        canceled_jobs: uniqueJobIds.length,
         reset,
       });
     } finally {
