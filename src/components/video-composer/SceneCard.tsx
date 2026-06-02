@@ -1923,10 +1923,10 @@ export default function SceneCard({
                         </div>
                       )}
                     {(scene.lipSyncAppliedAt ||
-                      scene.lipSyncStatus === "failed" ||
-                      (scene.lipSyncStatus as any) === "canceled" ||
-                      scene.lipSyncStatus === "no_voiceover") &&
-                      scene.clipUrl && (
+                      !!scene.lipSyncStatus ||
+                      !!(scene as any).dialogShots ||
+                      !!(scene as any).twoshotStage ||
+                      scene.engineOverride === "cinematic-sync") && (
                         <div className="flex flex-wrap items-center gap-2 self-end">
                           <button
                             type="button"
@@ -2043,7 +2043,7 @@ export default function SceneCard({
                             }}
                             className="text-[9px] text-destructive hover:underline"
                           >
-                            🗑 Lipsync-Eintrag löschen
+                            🗑 Lipsync komplett zurücksetzen
                           </button>
                           {scene.engineOverride === "cinematic-sync" && (
                             <button
