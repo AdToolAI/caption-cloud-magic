@@ -1167,25 +1167,29 @@ async function processSceneLocked(
         : win;
       nextShot.sync_source_kind = usePreclip ? "preclip" : "master";
 
-      // v20 KAILEE-FIX: `DialogTurnClipVideo` rendert den Master-Plate nur
-      // temporal cropped (gleiche Auflösung, alle N Gesichter sichtbar) —
-      // der Preclip ist also KEIN Single-Face-Clip wie früher angenommen.
-      // Bei Multi-Speaker-Szenen muss Sync.so daher zwingend die Speaker-
-      // Coords bekommen, sonst lockt es bei jedem Turn auf das mittlere/
-      // größte Gesicht (z.B. Samuel) und Slot 2/3 (Kailee) bewegt nie die
-      // Lippen. Nur reine 1-Speaker-Preclips dürfen auto_detect benutzen.
+      // v21 FACE-CROP PRECLIP: when render-dialog-turn produced a
+      // single-face square crop (multi-speaker scenes), Sync.so sees ONE
+      // face → auto_detect is unambiguous and the most reliable mode.
+      // Drop coords entirely in that case (coords were in master pixel
+      // space and don't map into the cropped preclip frame anyway).
       const speakerSet = new Set(shots.map((s) => (s as any).speaker_idx));
       const isMultiSpeakerScene = speakerSet.size >= 2;
+      const hasFaceCrop = !!(nextShot as any).preclip_crop;
       let mode = dispatchModeForShot(nextShot);
-      if (usePreclip && !isMultiSpeakerScene) {
+      if (usePreclip && hasFaceCrop) {
+        // Single-face cropped preclip → auto_detect is correct.
+        mode = "auto";
+        // Coords belong to master space; clear them so the dispatcher
+        // doesn't pass them into a 512×512 crop.
+        nextShot.target_coords = null as any;
+        nextShot.deterministic_coords = false;
+        nextShot.force_coords = false;
+      } else if (usePreclip && !isMultiSpeakerScene) {
         mode = "auto";
       }
-      // Multi-speaker auf Preclip ohne coords wäre garantiert kaputt → harter
-      // Guard. Wenn deterministic_coords fehlen, bleibt es bei auto (Single-
-      // Speaker-Logik), aber wir loggen es zumindest.
-      if (usePreclip && isMultiSpeakerScene && mode !== "coords") {
+      if (usePreclip && isMultiSpeakerScene && !hasFaceCrop && mode !== "coords") {
         console.warn(
-          `[poll-dialog-shots] turn ${nextShot.idx} multi-speaker PRECLIP without deterministic coords — Sync.so will likely lock wrong face`,
+          `[poll-dialog-shots] turn ${nextShot.idx} multi-speaker PRECLIP without face-crop AND without deterministic coords — Sync.so will likely lock wrong face`,
         );
       }
       const fullAudioUrl = nextShot.audio_url || state.master_audio_url;
