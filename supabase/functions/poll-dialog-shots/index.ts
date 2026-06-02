@@ -1671,27 +1671,32 @@ async function processSceneLocked(
   // onto the original master plate, trimmed to that turn's window, and
   // remuxes the master WAV as the single canonical audio track.
   if (allReady) {
-    // ── Multi-speaker integrity gate ──────────────────────────────────
-    // For 2+ speakers, every shot MUST have been dispatched with
-    // deterministic coords. A `ready` shot without deterministic_coords
-    // means Sync.so ran in auto_detect and almost certainly animated the
-    // wrong face. Refuse to ship that as final output.
+    // ── v18 Multi-speaker integrity gate ──────────────────────────────
+    // Per turn either deterministic coords on the master plate (legacy) OR a
+    // single-face preclip (v17 Artlist parity) is a valid attention target.
+    // The old guard required `deterministic_coords` everywhere — under v17
+    // preclip dispatch we intentionally send `auto_detect: true` because the
+    // clip only contains one face, so that flag is no longer expected.
     const multi = isMultiSpeakerScene(shots);
     if (multi) {
-      const invalid = shots.filter(
-        (s) =>
-          (s as any).degraded !== true &&
-          (!s.target_coords || s.deterministic_coords !== true),
-      );
+      const invalid = shots.filter((s) => {
+        if ((s as any).degraded === true) return false;
+        // Preclip path: a successful single-face crop is the deterministic
+        // target. As long as a preclip_url exists, treat it as valid.
+        if (s.sync_source_kind === "preclip" && !!s.preclip_url) return false;
+        // Master/legacy path still requires explicit face coords.
+        if (s.target_coords && s.deterministic_coords === true) return false;
+        return true;
+      });
       if (invalid.length > 0) {
         const ids = invalid.map((s) => s.idx).join(",");
         console.error(
-          `[poll-dialog-shots] scene ${sceneId} multi-speaker integrity FAIL — shots [${ids}] missing deterministic coords; refusing stitch.`,
+          `[poll-dialog-shots] scene ${sceneId} multi-speaker integrity FAIL — shots [${ids}] missing deterministic target (preclip OR coords); refusing stitch.`,
         );
         invalid.forEach((s) =>
           markShotTerminalFailed(
             s,
-            `multi_speaker_coords_missing: shot dispatched without deterministic face coords`,
+            `multi_speaker_target_missing: shot lacks both preclip_url and deterministic face coords`,
           ),
         );
         const failedState: DialogShotsState = {
