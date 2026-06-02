@@ -883,7 +883,7 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             lip_sync_status: "failed",
-            twoshot_stage: "failed",
+            twoshot_stage: "needs_clip_rerender",
             clip_error:
               `dialog_missing_face_coords: ${missingChars.join(", ")} — ` +
               `Anchor enthält nur ${facesFound} erkennbare Gesichter für ${distinctSpeakerIdxs.size} Sprecher. ` +
@@ -891,7 +891,13 @@ serve(async (req) => {
           })
           .eq("id", sceneId);
         return json(
-          { error: "missing_face_coords", missing: missingChars, facesFound },
+          {
+            error: "missing_face_coords",
+            missing: missingChars,
+            facesFound,
+            next_action: "rerender_clip_and_lipsync",
+            hint: "Master-Plate zeigt nicht alle Sprecher — Lip-Sync ist nicht retryable. Bitte Clip + Lip-Sync neu rendern.",
+          },
           422,
         );
       }
