@@ -735,6 +735,7 @@ serve(async (req) => {
         if (rebuilt) {
           workingFaceMap = rebuilt;
           coordsByCharId = buildCoordsMap(rebuilt);
+          bboxByCharId = buildBboxMap(rebuilt);
           console.log(
             `[compose-dialog-scene] faceMap rebuilt: ${rebuilt.faces.length} faces, identities=${rebuilt.faces.map((f) => f.characterId ?? "?").join(",")}`,
           );
