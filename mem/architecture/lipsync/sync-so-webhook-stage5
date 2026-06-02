@@ -1,8 +1,23 @@
 ---
-name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16)
-description: All dialog_shots writers (poll-dialog-shots, sync-so-webhook, remotion-webhook) serialize via try_acquire_dialog_lock RPC; poll-tick reconciles preclip_url from video_renders; master fallback hard-forbidden for 3+ speakers
+name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17)
+description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker (no wide-plate coords); VAD relaxed for short turns; master degrade hard-forbidden for 3+ speakers
 type: feature
 ---
+
+**v17 Preclip = Auto-Speaker (Artlist-Parität):**
+- In `poll-dialog-shots` wird bei `usePreclip === true` der Dispatch-Modus IMMER auf `auto` gezwungen. Sync.so bekommt **keine** `coordinates` + `frame_number` mehr, sondern `active_speaker_detection: { auto_detect: true }`.
+- Begründung: Preclips sind isolierte Single-Face-Clips, in denen Wide-Plate-Koordinaten aus dem Master keine Bedeutung haben. Die alten Coords lösten reproduzierbar `An unknown error occurred.` für Edge-Faces in 3-Sprecher-Plates aus.
+- Coords + frame_number bleiben ausschließlich für den Master-Legacy-Pfad (`sync_source_kind === 'master'`).
+- Face-Gate wird für Preclips dadurch automatisch übersprungen (Gate ist `mode === 'coords'`-gated).
+
+**v17 VAD relaxed für kurze Turns:**
+- Alte Regel blockte "Was denn?" (voicedRatio=42%, longestRun=0.30s) als `preflight_audio_no_voice`.
+- Neue Regel: wenn `voicedRatio >= 0.35`, reicht `longestVoicedRun >= 0.15s`. Bei niedrigerer Dichte gilt weiterhin `longestVoicedRun >= 0.4s`. Wirklich silent (< 0.15 ratio) wird unverändert geblockt.
+
+**v17 sync-so-webhook v4 Degrade nur noch ≤2 Sprecher:**
+- Wenn die Webhook-Retry-Matrix erschöpft ist, wird für `speakerCount >= 3` der Shot terminal `failed` markiert (kein `ready+degraded`). Für 1/2 Sprecher bleibt der sichere Degrade-auf-Master-Plate-Pfad aktiv.
+
+
 
 **Per-scene dispatch lock (v15+v16):**
 - `dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` with SECURITY DEFINER RPCs `try_acquire_dialog_lock(_scene_id, _holder, _ttl_seconds)` / `release_dialog_lock`. Stale rows auto-deleted on every acquire.
