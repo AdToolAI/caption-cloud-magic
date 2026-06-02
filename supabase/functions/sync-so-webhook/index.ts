@@ -218,7 +218,7 @@ serve(async (req) => {
   if (sceneHint) {
     const { data } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .eq("id", sceneHint)
       .maybeSingle();
     if (data) {
@@ -231,7 +231,7 @@ serve(async (req) => {
     // Fallback: scan in-flight scenes for the job id. Bounded scan, low volume.
     const { data: rows } = await supabase
       .from("composer_scenes")
-      .select("id, dialog_shots, lip_sync_applied_at")
+      .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
       .in("lip_sync_status", ["running", "stitching"])
       .limit(200);
     for (const r of rows ?? []) {
