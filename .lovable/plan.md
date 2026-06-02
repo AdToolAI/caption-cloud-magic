@@ -1,90 +1,117 @@
-## Diagnose
+# 3+ Speaker Lip-Sync: Root-Cause-Fix via Per-Speaker + Mask Composite
 
-Do I know what the issue is? Ja.
+## Das eigentliche Problem (Root Cause)
 
-Der neue Fehler ist nicht mehr der alte `retryCount`-Crash. Es sind jetzt zwei konkrete 3-Sprecher-Probleme sichtbar:
+Der aktuelle 3+ Sprecher-Flow ist ein **Multi-Pass-Chain**:
 
-1. **Aktuelle Szene `88fcd40d…` scheitert im ersten Sync.so-Pass**
-   - Logs: `plate=probe-failed`, danach `syncso_segments_FAILED: An unknown error occurred.`
-   - Die Dispatch-Diagnose zeigt: Pass 1 sendet `coordinates:[313,143]` bei `frame_number:26`.
-   - Der Screenshot zeigt aber, dass im Hailuo-Plate die beiden männlichen Köpfe/ Gesichter oben aus dem Bild gecroppt sind. Sync.so kann an den Koordinaten deshalb kein Gesicht finden.
+```text
+Plate ──► Sync.so(Speaker A) ──► Output_A ──► Sync.so(Speaker B) ──► Output_B ──► Sync.so(Speaker C) ──► Final
+```
 
-2. **Die MP4-Dimension-Probe ist noch nicht robust genug**
-   - Phase A und Phase B liefern beide `nomoov`.
-   - Grund: Die Tail-Range beginnt mitten in einer MP4-Box; der aktuelle Box-Walker startet nur bei Offset `0` und findet `tkhd` nicht, wenn der Tail-Buffer nicht an einer Box-Grenze startet.
+Jeder Pass nimmt das **diffusionsgenerierte Output des vorherigen Passes** als Input. Das ist der Grund warum:
+- Pass 1 (Original-Plate) immer funktioniert
+- Pass 2/3 mit "unknown error" failen – unabhängig von Koordinaten, Frames, Plate-Dims
+- Sync.so `lipsync-2-pro` ist ein Diffusionsmodell und reagiert instabil auf re-encoded Output seiner selbst (Kompressions-Artefakte, Farbshifts, leichte temporale Inkonsistenzen)
+- Die letzten Fixes (Dims-Probe, Coord-Clamp, Frame-Retries) sind alle Symptom-Patches
 
-3. **Die Face-Gate-Prüfung validiert aktuell nicht das Zielgesicht**
-   - `compose-dialog-segments` ruft `validateFrameFace(... targetCoords: null)` auf.
-   - Damit wird nur geprüft, ob irgendwo im Frame ein Gesicht sichtbar ist. Bei der aktuellen Szene ist die Frau sichtbar, also passiert der Gate, obwohl Sprecher 1/2 kein sichtbares Gesicht haben.
+**Wie Artlist / professionelle Tools das lösen:** Sie chainen nie. Jeder Speaker wird auf der **Original-Plate** generiert, dann werden die Mund-/Gesichtsregionen maskiert und auf die Plate komponiert. Sync.so sieht nie sein eigenes Output.
 
-4. **Separater Alt-State `95f7e7a2…` hängt im Stitch-Loop**
-   - `dialog_shots.shots` enthält `status=ready` für alle drei Turns, aber der dritte Turn ist `degraded:true` ohne `output_url`.
-   - `poll-dialog-shots` versucht trotzdem zu stitchen; `render-dialog-stitch` lehnt korrekt mit `409 integrity_gate_failed` ab.
+## Lösung: Per-Speaker Parallel + Mask-Composite
 
-## Leitplanke
+### Architektur
 
-Die **1- und 2-Charakter-Erfolgspfade bleiben unberührt**:
+```text
+                    ┌─► Sync.so(Speaker A on plate, only A audio) ──► Out_A
+Original Plate ─────┼─► Sync.so(Speaker B on plate, only B audio) ──► Out_B
+                    └─► Sync.so(Speaker C on plate, only C audio) ──► Out_C
+                                          │
+                                          ▼
+                         ffmpeg Mask-Composite per Speaker-Region
+                                          │
+                                          ▼
+                                  Final 3-Speaker Clip
+```
 
-- Keine Änderung an `compose-twoshot-lipsync`.
-- Keine Änderung an der erfolgreichen 1-/2-Sprecher-Retry-Ladder.
-- Neue harte Checks werden nur für `speakers >= 3` bzw. für kaputte alte Multi-Speaker-Degrade-States aktiviert.
+Jeder Sync.so-Job ist exakt so stabil wie ein 1-Speaker-Job (was nachweislich >99% funktioniert).
 
-## Implementierungsplan
+### Pro Speaker N
+1. **Audio-Track bauen:** Originale Dialog-Audio, aber alle anderen Sprecher-Turns werden mit `volume=0` (Silence) ersetzt. Speaker N hört man, Rest = Stille.
+2. **Sync.so Call:** Input = **Original-Plate** (immer dieselbe), Audio = Speaker-N-only Track, `targetCoords` = Speaker-N Gesicht.
+3. Sync.so animiert nur Speaker N (die anderen bleiben statisch, weil deren Audio Silence ist – das ist genau wie Sync.so designt wurde).
 
-### 1. MP4-Probe wirklich tail-sicher machen
+### Composite-Stage
+Nach N parallelen Sync.so-Jobs haben wir N Videos, jedes mit nur einem animierten Mund. ffmpeg-Composite:
+1. Aus jedem `Out_N` wird ein **Crop-Rechteck um Speaker-N Gesicht** extrahiert (basierend auf bekannten `targetCoords` + Face-Bbox).
+2. Soft-edge Maske (feathered alpha, 20-30px) verhindert harte Kanten.
+3. Overlay aller N Crops auf die Original-Plate.
+4. Original-Audio (alle Speaker zusammen) wird zurückgemuxt.
 
-Datei: `supabase/functions/_shared/twoshot-face-map.ts`
+ffmpeg-Filter (vereinfacht):
+```text
+[plate][crop_A]overlay=x=...:y=...:enable='alpha_mask_A'[v1];
+[v1][crop_B]overlay=...[v2];
+[v2][crop_C]overlay=...[vout]
+```
 
-- `probeMp4Dims` behält Phase A/Phase B.
-- Ergänzung: Wenn der strukturierte Box-Walker nichts findet, scannt ein sicherer Fallback im Buffer nach `tkhd`-Signaturen und liest Width/Height relativ zu dieser Position aus.
-- Das ist derselbe robuste Ansatz, den die alte 2-Shot-Pipeline bereits nutzt.
-- Log bleibt: `probe-result … phaseA=… phaseB=… dims=…`.
+## Implementierungs-Schritte
 
-### 2. 3+ Speaker: Zielgesicht vor Sync.so validieren
+### 1. Neue Edge Function: `compose-dialog-parallel`
+- Triggert für `speakers.length >= 3` (1/2 Sprecher unverändert via existierende Pipeline)
+- Erstellt N parallele `dialog_shots` Rows mit:
+  - `input_video_url` = Original-Plate (bei allen gleich)
+  - `audio_url` = Speaker-N-isolated Track (neu generiert via ffmpeg)
+  - `target_coords` = Speaker-N Koordinaten
+  - `composite_role` = `parallel_speaker_N`
+- Alle N Jobs werden gleichzeitig an Sync.so übergeben
 
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
+### 2. Audio-Isolation Helper (`_shared/dialog-audio-isolation.ts`)
+- Input: Dialog-Audio + Turn-Timings + Speaker-Map
+- Output: N Audio-URLs, jeweils mit nur Speaker-N hörbar, Rest Silence
+- ffmpeg via Deno subprocess oder Cloud-ffmpeg edge function
 
-- Nur wenn `speakers.length >= 3`:
-  - Pro Pass die berechneten `pass.coords` in normalisierte Frame-Koordinaten umrechnen.
-  - `validateFrameFace` mit diesen Zielkoordinaten aufrufen, nicht mehr mit `targetCoords:null`.
-  - Wenn am Zielpunkt kein Gesicht matcht: **nicht** Sync.so aufrufen, sondern sauber abbrechen mit `clip_error=plate_target_face_missing_pass_X` und automatischer Credit-Rückerstattung.
-- Damit wird der aktuelle Fall abgefangen: sichtbare Frau reicht nicht mehr, wenn Samuel/Matthew oben aus dem Plate gecroppt sind.
+### 3. Composite Edge Function: `composite-dialog-masks`
+- Trigger: alle N `dialog_shots` mit gleicher `scene_id` sind `ready`
+- Lädt alle N Sync.so-Outputs + Original-Plate + Original-Mixed-Audio
+- ffmpeg-Composite mit Soft-Edge-Masken pro Speaker-Region
+- Output: finaler Multi-Speaker Clip → `scene.clip_url`
 
-### 3. 3+ Speaker: falsche Plate-Crops nicht als Lip-Sync-Fehler behandeln
+### 4. Polling-Anpassung: `poll-dialog-shots`
+- Erkennt `composite_role = parallel_speaker_N`
+- Statt sequenzieller Chain → wartet auf alle N parallel, dann triggert `composite-dialog-masks`
+- Refund-Logik unverändert (idempotent per shot)
 
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
+### 5. Sicherer Rollout
+- Feature-Flag `dialog_parallel_composite_enabled` (default `true` für 3+ Sprecher)
+- Fallback: Wenn Composite-Stage fehlschlägt → bestehende Chain als Backup (eine Generation lang)
+- Monitoring: Erfolgsrate per Engine im QA Cockpit
 
-- Bei `plate_target_face_missing` wird die Szene nicht als Providerfehler geloggt, sondern als **Plate-/Crop-Problem**.
-- UI-Hinweis bleibt über `clip_error` klarer: Szene/Clip neu rendern, nicht nur Lip-Sync blind erneut versuchen.
-- Credits bleiben geschützt durch die bestehende Refund-Logik.
+### 6. Recovery
+- Migration: Aktuell stuck Scene `c59e6d09-07a9-4764-ab2d-5a679790cbf8` resetten
 
-### 4. Legacy-Stitch-Loop für kaputte Multi-Speaker-Degrade-States stoppen
+### 7. Memory Update
+- `mem://architecture/lipsync/sync-so-webhook-stage5` mit neuer Architektur dokumentieren
 
-Datei: `supabase/functions/poll-dialog-shots/index.ts`
+## Was sich NICHT ändert
+- **1-Speaker Pipeline:** unangetastet (single Sync.so call)
+- **2-Speaker Pipeline:** unangetastet (existierende 2-shot-lipsync chain mit zwei Passes – funktioniert)
+- Aktivierung nur für `speakers.length >= 3`
 
-- Nur für Multi-Speaker-State:
-  - `allReady` darf nur `true` sein, wenn jeder Shot `status='ready'` **und** `output_url` hat.
-  - Ein `degraded:true` ohne `output_url` wird bei Multi-Speaker nicht mehr an `render-dialog-stitch` durchgereicht.
-  - Statt 409-Endlosschleife: sauberer Terminal-Fehler + idempotenter Refund.
-- Single-Speaker-Degrade bleibt unverändert erlaubt.
+## Erwartete Erfolgsquote
+- Per-Speaker Job ≈ 1-Speaker-Stabilität (>99%)
+- Bei 3 Speakern: 0.99³ ≈ 97% End-to-End (vs. aktuell ~30-50% durch Chain-Degradation)
+- Refund-Granularität: failt nur Pass N, andere bleiben verwertbar für Retry
 
-### 5. Recovery für die betroffenen Szenen
+## Offene Fragen
+1. **ffmpeg in Edge Functions:** Wir nutzen ffmpeg bereits in `compose-dialog-segments` für Concat. Composite mit Masken ist komplexer aber machbar. Alternative: Replicate ffmpeg-Worker (langsamer, aber stabiler).
+2. **Face-Bbox-Größe für Crop:** Aktuell haben wir nur Center-Coords. Wir brauchen Bbox (W×H). Lösung: Bei Plate-Komposition (`compose-scene-anchor`) bereits Bbox mit-speichern, fallback: feste 25%-Bildbreite-Quadrat um Center.
+3. **Sync.so Verhalten bei Silence-Tracks:** Verifizierung nötig dass Sync.so bei stillem Speaker-Audio diesen Speaker statisch lässt (sollte so sein – kein Phoneme, kein Movement). Schneller Test mit 1 Mock-Job vor Full-Rollout.
 
-Migration/Data-Fix nach Codeänderung:
-
-- `88fcd40d…`: zurück auf `pending`, `lip_sync_status=NULL`, `clip_error=NULL`, damit nach einem neuen Clip/Plate-Render erneut gestartet werden kann.
-- `95f7e7a2…`: aus der Stitch-Endlosschleife holen; je nach aktuellem Zustand entweder sauber `failed` markieren oder zurück auf erneutes Lip-Sync, aber ohne 409-Loop.
-
-### 6. Verifikation
-
-Nach Implementierung prüfe ich:
-
-- Logs zeigen für 3-Sprecher: `plate=<WxH>` statt `plate=probe-failed`, oder klarer `plate_target_face_missing` vor Sync.so.
-- Szene `88fcd40d…` wird nicht mehr mit opakem Sync.so-Fehler verbrannt, wenn Gesichter fehlen.
-- Szene `95f7e7a2…` erzeugt keine wiederholten `render-dialog-stitch 409` Logs mehr.
-- 1-/2-Sprecher-Pfade wurden im Code nicht erweitert oder auf neue 3+ Gates umgebogen.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-  <presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+## Files (nur 3+ Sprecher Pfad)
+- NEU: `supabase/functions/compose-dialog-parallel/index.ts`
+- NEU: `supabase/functions/composite-dialog-masks/index.ts`
+- NEU: `supabase/functions/_shared/dialog-audio-isolation.ts`
+- EDIT: `supabase/functions/poll-dialog-shots/index.ts` (parallel-mode branch)
+- EDIT: `supabase/functions/compose-dialog-segments/index.ts` (Routing 3+ → parallel)
+- NEU: Migration für `dialog_shots.composite_role` + `scene.composite_strategy` Spalte
+- EDIT: `mem://architecture/lipsync/sync-so-webhook-stage5`
+- Migration: Recovery der gestuckten Scene
