@@ -19,6 +19,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { appendWebhookToken } from "../_shared/webhook-auth.ts";
 import { DEFAULT_BUCKET_NAME } from "../_shared/aws-lambda.ts";
+import { computeFaceCrop } from "../_shared/face-crop.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
