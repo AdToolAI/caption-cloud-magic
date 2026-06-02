@@ -621,34 +621,36 @@ serve(async (req) => {
           }).eq('render_id', pendingRenderId);
         }
         if (composerSceneId) {
-          const { data: sceneRow } = await supabaseAdmin
-            .from('composer_scenes')
-            .select('dialog_shots, project_id')
-            .eq('id', composerSceneId)
-            .maybeSingle();
-          const prevState = (sceneRow?.dialog_shots as any) || {};
-          let refundedFlag = !!prevState.refunded;
-          const refundCredits = Number(prevState.cost_credits) || 0;
-          if (!refundedFlag && refundCredits > 0 && userId) {
-            try {
-              await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: refundCredits });
-              refundedFlag = true;
-            } catch (e) {
-              console.warn('💋 [dialog-stitch] refund failed', (e as Error).message);
+          await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch-fail', async () => {
+            const { data: sceneRow } = await supabaseAdmin
+              .from('composer_scenes')
+              .select('dialog_shots, project_id')
+              .eq('id', composerSceneId)
+              .maybeSingle();
+            const prevState = (sceneRow?.dialog_shots as any) || {};
+            let refundedFlag = !!prevState.refunded;
+            const refundCredits = Number(prevState.cost_credits) || 0;
+            if (!refundedFlag && refundCredits > 0 && userId) {
+              try {
+                await supabaseAdmin.rpc('increment_balance', { p_user_id: userId, p_amount: refundCredits });
+                refundedFlag = true;
+              } catch (e) {
+                console.warn('💋 [dialog-stitch] refund failed', (e as Error).message);
+              }
             }
-          }
-          await supabaseAdmin.from('composer_scenes').update({
-            lip_sync_status: 'failed',
-            twoshot_stage: 'failed',
-            clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
-            dialog_shots: {
-              ...prevState,
-              status: 'failed',
-              error: errorMessage.slice(0, 500),
-              refunded: refundedFlag,
-            },
-            updated_at: new Date().toISOString(),
-          }).eq('id', composerSceneId);
+            await supabaseAdmin.from('composer_scenes').update({
+              lip_sync_status: 'failed',
+              twoshot_stage: 'failed',
+              clip_error: `dialog_stitch_lambda_failed: ${errorMessage}`.slice(0, 300),
+              dialog_shots: {
+                ...prevState,
+                status: 'failed',
+                error: errorMessage.slice(0, 500),
+                refunded: refundedFlag,
+              },
+              updated_at: new Date().toISOString(),
+            }).eq('id', composerSceneId);
+          }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} failed: ${errorMessage.slice(0, 120)}`);
         }
       } else if (isDirectorsCut && renderJobId) {
