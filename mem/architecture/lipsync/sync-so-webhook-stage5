@@ -1,46 +1,50 @@
 ---
-name: Sync.so Webhook + 8-min Per-Shot Watchdog (Stage 5 B.1 + B.4)
-description: poll-dialog-shots registers a webhook URL per Sync.so job; sync-so-webhook receives terminal status, patches dialog_shots[idx] and fire-and-forgets poll-dialog-shots; per-shot stuck-after-8min check inside poll-dialog-shots; legacy twoshot-lipsync-watchdog timeout shortened 12→8 min with clip_error 'sync_so_timeout_8min'
+name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16)
+description: All dialog_shots writers (poll-dialog-shots, sync-so-webhook, remotion-webhook) serialize via try_acquire_dialog_lock RPC; poll-tick reconciles preclip_url from video_renders; master fallback hard-forbidden for 3+ speakers
 type: feature
 ---
 
-**B.1 Webhook:**
-- `poll-dialog-shots` builds `webhookUrl = ${SUPABASE_URL}/functions/v1/sync-so-webhook?scene_id={id}` via `appendWebhookToken(...)` (reuses existing `WEBHOOK_SHARED_SECRET`, no new secret).
-- Passed into Sync.so v2 `/generate` payload as both `webhookUrl` and `webhook_url`.
-- `sync-so-webhook` (verify_jwt=false) verifies the `?token=` shared secret, finds the scene by `scene_id` hint or by scanning in-flight scenes for the `sync_job_id`, patches `dialog_shots.shots[idx]` (status=ready+output_url OR failed with `sync_${STATUS}` error), then fire-and-forgets `poll-dialog-shots` for that scene. Always returns 200 so Sync.so never retry-storms.
-- pg_cron polling stays as safety net — webhook is purely additive.
+**Per-scene dispatch lock (v15+v16):**
+- `dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` with SECURITY DEFINER RPCs `try_acquire_dialog_lock(_scene_id, _holder, _ttl_seconds)` / `release_dialog_lock`. Stale rows auto-deleted on every acquire.
+- Shared helper `supabase/functions/_shared/dialog-lock.ts` → `withDialogLock(supabase, sceneId, holderPrefix, fn, {ttlSeconds})`. Retries acquire up to 4× with 200/500/1000/1500 ms backoff; if still not acquired, runs WITHOUT lock (webhooks must never wedge). Poller uses 60 s TTL, webhooks use 30 s.
+- **ALL** read-modify-write of `dialog_shots` runs inside the lock:
+  - `poll-dialog-shots/processScene` (v15)
+  - `remotion-webhook` `dialog-turn-preclip` success + failure (v16)
+  - `remotion-webhook` `dialog-stitch` success + failure (v16)
+  - `sync-so-webhook` v4 per-turn patch — re-reads dialog_shots inside the lock so the patch always lands on the latest snapshot (v16)
 
-**B.4 Per-Shot 8-min Watchdog:**
-- Inside `poll-dialog-shots` Step 1b: any shot with `status='lipsyncing'` whose `started_at` is >8 min old is marked `failed` with `error='sync_so_timeout_8min: job <id> stuck <Xs>'`. Refund happens via existing `state.refunded` boolean in `refundIfNeeded` (idempotent).
-- Legacy two-shot pipeline: `twoshot-lipsync-watchdog` `STALE_SYNC_POLL_MS` shortened from 12 → 8 min; clip_error string is now `sync_so_timeout_8min`.
+**v16 Reconciliation Step 0 (self-healing):**
+- At the start of `processSceneLocked`, for every shot with `preclip_render_id` but no `preclip_url`: query `video_renders`. If the render is `completed` → rehydrate `preclip_url`, set `preclip_status='ready'`, `sync_source_kind='preclip'`. If `failed` → mark `preclip_status='failed'` with the real error.
+- This is the safety net for any lost webhook write — even if `remotion-webhook` crashes mid-flight, the next poll-tick picks up the truth from `video_renders`.
 
-**Webhook Retry Policy:**
-- `sync-so-webhook` MUST mirror `poll-dialog-shots` retry logic. In multi-speaker scenes with `target_coords`, a terminal Sync.so failure must retry with `force_coords=true`, `deterministic_coords=true`, and `frame_number_override=round((start+end)/2*24)`. It must never downgrade that turn to `auto_detect`, because that can animate the wrong face and trigger the multi-speaker integrity guard.
+**v16 Hard-forbid master fallback for ≥3 speakers:**
+- `prepareShotRetry` attempts 3/4: for `speakerCount >= 3` it **re-renders the preclip** instead of flipping to master+segments_secs. For 1/2 speakers the legacy preclip↔master flip stays (it's a useful escape hatch there).
+- "Preclip exhausted" branch: for ≥3 speakers → `markShotTerminalFailed` with refund. For 1/2 speakers → master fallback.
+- Rationale: Sync.so reliably returns opaque "An unknown error occurred." for edge faces on wide multi-face plates (e.g. x=1055 in a 1376-wide 3-shot). The preclip path solves this structurally by giving Sync.so a single-face crop. Falling back to master in that exact regime is what was killing 3-speaker scenes.
 
-Idempotency: dialog_shots state is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` boolean in `audio_plan.twoshot` does the same for legacy path.
+**v16 Tuning constants:**
+- `MAX_PRECLIP_RETRIES` 1 → 4 (Lambda transient failures shouldn't drop us to the known-bad master path).
+- `PRECLIP_RENDER_TIMEOUT_MS` 4 min → 10 min (observed 5 min cold-start renders).
 
-**June 2026 fix — 3-speaker pipeline regression:**
-- `probeMp4Dims` (`_shared/twoshot-face-map.ts`) now does a 3-phase probe: head-range `bytes=0-786431` → tail-range `bytes=-524288` → last-resort 1 MiB tail-range signature scan for the literal `tkhd` bytes (covers Hailuo/Replicate MP4s with `moov` at end where the tail-range starts mid-box). Logs `probe-result … phaseA=… phaseB=… phaseC=… dims=…`.
-- `compose-dialog-segments` face-gate hardened **only for `speakers.length >= 3`**: per-speaker target coords are passed (normalized) to `validate-frame-face` and the pass is blocked with `clip_error=plate_target_face_missing_pass_X_speaker_Y` (auto-refund) when `coordsMatch=false`. 1- and 2-speaker scenes keep the legacy "any face visible" check. Also bounds-clamps coords into the inner 90% of the probed plate.
-- `sync-so-webhook` E.5 ladder gate switched from `isMultiSpeaker (>=2)` to `speakerCount >= 3`. 1/2-speaker scenes keep the full `coords-pro → auto-pro → auto-standard` ladder. 3+ scenes still block `auto-*` by default but get a single "last-ditch-lite" `auto-pro` retry on pass 0 if every pass failed with `provider_unknown_error` / `face_not_found`.
-- `poll-dialog-shots` multi-speaker integrity gate: `allReady` no longer counts a `ready` shot without an `output_url` (legacy degrade-to-master), and such shots are promoted to terminal `failed` so refund + clip_error happens instead of looping on `render-dialog-stitch 409 integrity_gate_failed`. Single-speaker degrade pass-through is preserved.
-- Cosmetic: `console.warn(…retries=${retryCount}…)` at the failure tail referenced an undefined variable; now `retries=${passRetryCount}/${aggregateRetryCount}`.
+**Concrete bug fixed (scene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73`):**
+- Shot 2 preclip Lambda render `aeebf60b-…` actually COMPLETED at 19:08:47.
+- `remotion-webhook` write of `preclip_url` was clobbered by a concurrent poll-tick that had flipped `sync_source_kind='master'`.
+- Result: Sync.so fired 4× on the wide master plate with `target_coords=[1055,170]` (edge face) → 4× "unknown error" → degraded → refunded.
+- Recovery migration rehydrated all three preclip URLs from `video_renders` and reset shot 2 to pending so the next poll-tick re-runs Sync.so on the correct single-face preclip.
 
-**June 2026 ROOT-CAUSE FIX — 3+ speaker routing (supersedes patches above):**
-- The earlier June fixes (probe phases, coord clamping, gate hardening, retry ladder) only patched symptoms. The actual root cause is that v5 `compose-dialog-segments` is a multi-pass CHAIN: pass N's input is pass N-1's Sync.so output. `lipsync-2-pro` is a diffusion model and **rejects re-encoded diffusion output as input** with the opaque "An unknown error occurred." This is fundamentally unfixable in the chain architecture.
-- **Fix**: `useTwoShotAutoTrigger.ts` now routes by speaker count:
-  - **1–2 speakers** → v5 `compose-dialog-segments` (stable in this regime; the chain only runs 1–2 passes which lipsync-2-pro tolerates).
-  - **≥3 speakers** → v4 `compose-dialog-scene` (true Artlist-style: one Sync.so call per TURN, ALL on the ORIGINAL pristine plate IN PARALLEL via `poll-dialog-shots`, then Lambda-side overlay-stitch via `DialogStitchVideo` Remotion composition with 3-frame opacity crossfade). Sync.so never sees its own output; each per-turn job is as stable as a single-speaker job.
-  - `engine_override === 'cinematic-sync-legacy'` still forces v4 regardless of count.
-- Expected reliability for ≥3 speakers: ~0.99^N per-turn instead of the chain's catastrophic degradation. 1- and 2-speaker pipelines are completely untouched.
+**Earlier-stage docs preserved below (Stage 5 B.1, B.4, retry policy, June fixes, v9 chain root-cause, v15 race-fix) — they are still active for 1/2 speaker scenes:**
 
-**June 2026 v15 RACE-CONDITION FIX — 3+ speaker per-turn dispatch:**
-- Logs from a 3-speaker scene showed `poll-dialog-shots` dispatching the same `pending` turn 2-3 times within seconds (e.g. two parallel `v10 dispatched turn 2 speaker=Kailee` log lines from different invocations, producing 3 distinct `sync_job_id`s for the same shot). Root cause: webhook nudges, pg_cron ticks and client kicks all called `processScene` in parallel; both read the same `dialog_shots` JSON, both saw the shot as pending, both started a Sync.so job, then both webhooks raced to mutate the same shot slot.
-- **Fix**:
-  - New migration adds `public.dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` (service_role only) and SECURITY DEFINER RPCs `try_acquire_dialog_lock(_scene_id, _holder, _ttl_seconds=60)` / `release_dialog_lock(_scene_id, _holder)`. Stale rows are auto-deleted on every acquire.
-  - `poll-dialog-shots` `processScene` now acquires the per-scene lock before reading state and releases it in a `finally`. If `acquired !== true` it returns `{ status: 'locked_deferred' }` cleanly — webhook/cron retries simply re-trigger after the holder finishes.
-  - `sync-so-webhook` `MAX_SHOT_RETRIES` raised from 1 → 4 to match the poller's differentiated retry matrix (frame sampling × temperature × preclip ↔ master+segments). Previously the webhook prematurely terminal-failed shots that the poller would have recovered.
-  - Recovery: stuck scene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73` reset (`dialog_shots=null`, `lip_sync_status=null`, `clip_error=null`); master plate + audio plan preserved.
-- Webhook still does small RMW patches on individual shot slots, but with the dispatch path serialized per scene the only remaining race is the harmless one of two webhooks patching different shot indices in the same JSON — which the existing idempotent refund logic absorbs.
+**B.1 Webhook (Stage 5):** `poll-dialog-shots` builds `webhookUrl = ${SUPABASE_URL}/functions/v1/sync-so-webhook?scene_id={id}` via `appendWebhookToken`. `sync-so-webhook` (verify_jwt=false) verifies the `?token=` shared secret, finds the scene by `scene_id` hint or scans in-flight scenes for the `sync_job_id`, patches `dialog_shots.shots[idx]` and fire-and-forgets `poll-dialog-shots`. Always returns 200.
 
+**B.4 Per-Shot 4-min Watchdog:** Inside `poll-dialog-shots` Step 1b, any shot `lipsyncing` with `started_at` >4 min old is treated as terminal-failed (`sync_so_timeout_4min`). Legacy two-shot `twoshot-lipsync-watchdog` uses the same 8-min cutoff.
 
+**Webhook Retry Policy:** `sync-so-webhook` mirrors `poll-dialog-shots` retry logic (`MAX_SHOT_RETRIES=4`, same `RETRY_TEMPERATURES`). In multi-speaker scenes with `target_coords`, never downgrade to `auto_detect` (would animate wrong face). E.5 last-ditch `auto-pro` retry stays as final escape for 3+ scenes only.
+
+**v9 Artlist parity (no chaining):** Each turn lipsyncs the ORIGINAL pristine master plate (or the per-turn preclip ab t=0) with isolated per-speaker WAV. Lambda `DialogStitchVideo` overlay-stitches with 3-frame crossfade. Never chain a turn onto another turn's Sync.so output.
+
+**June 2026 fixes (still active for 1/2 speaker scenes):**
+- `probeMp4Dims` 3-phase probe (head/tail/signature-scan) for Hailuo/Replicate MP4s.
+- `compose-dialog-segments` face-gate hardened for `speakers.length >= 3`.
+- Multi-speaker integrity gate: `ready` shots without `output_url` are promoted to terminal `failed` instead of looping on `integrity_gate_failed`.
+
+**Idempotency:** `dialog_shots` is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` in `audio_plan.twoshot` does the same for legacy path.
