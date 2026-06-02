@@ -562,12 +562,24 @@ serve(async (req) => {
       // payload/model variant. Retry through a bounded fallback ladder:
       // coords-pro → auto-pro → auto-standard, then refund if all fail.
       const treatAsTransient = isTransientSyncError(errClass);
-      const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES;
-
-
-      if (canRetry) {
-        const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
-        const nextVariant = nextV5RetryVariant(currentVariant);
+      const isMultiSpeaker = passesArr.length >= 2;
+      const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
+      let nextVariant: string | null = nextV5RetryVariant(currentVariant);
+      // ── Multi-speaker safety ────────────────────────────────────────────
+      // For 2+ speaker chains, the `auto-*` fallback variants set
+      // `auto_detect: true` and DROP the per-speaker coordinates. On wide
+      // group shots Sync.so's auto-detector either targets the wrong face
+      // OR silently passes the input through unchanged (no lip movement at
+      // all). Both modes mask the real failure as a "successful" pass and
+      // freeze speakers 2+. Refuse to descend the ladder past coords-pro
+      // for multi-speaker scenes — refund + surface the error instead.
+      if (isMultiSpeaker && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} multi-speaker (${passesArr.length} passes) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
+        );
+        nextVariant = null;
+      }
+      const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES && nextVariant !== null;
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
