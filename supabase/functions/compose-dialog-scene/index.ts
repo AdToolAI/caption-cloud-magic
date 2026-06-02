@@ -811,6 +811,9 @@ serve(async (req) => {
         const coords = t.character_id
           ? coordsByCharId.get(t.character_id) ?? null
           : null;
+        const bbox = t.character_id
+          ? bboxByCharId.get(t.character_id) ?? null
+          : null;
         return {
           idx: i,
           speaker_idx: t.speaker_idx,
@@ -819,6 +822,7 @@ serve(async (req) => {
           window: [t.start, t.end] as [number, number],
           durSec: dur,
           target_coords: coords,
+          target_bbox: bbox,
           temperature: dur < 2.0 ? 1.0 : 0.9,
           audio_url: t.audio_url,
           deterministic_coords: requireDeterministic && !!coords,
