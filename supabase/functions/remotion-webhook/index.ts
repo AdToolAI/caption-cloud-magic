@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
+import { withDialogLock } from "../_shared/dialog-lock.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -191,26 +192,39 @@ serve(async (req) => {
         }
         const shotIdx = Number(customData?.shot_idx);
         if (composerSceneId && Number.isFinite(shotIdx)) {
-          const { data: sceneRow } = await supabaseAdmin
-            .from('composer_scenes')
-            .select('dialog_shots')
-            .eq('id', composerSceneId)
-            .maybeSingle();
-          const prevState = (sceneRow?.dialog_shots as any) || {};
-          const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
-          if (shots[shotIdx]) {
-            shots[shotIdx] = {
-              ...shots[shotIdx],
-              preclip_url: finalOutputUrl,
-              preclip_status: 'ready',
-              preclip_error: undefined,
-              preclip_completed_at: new Date().toISOString(),
-            };
-            await supabaseAdmin.from('composer_scenes').update({
-              dialog_shots: { ...prevState, shots },
-              updated_at: new Date().toISOString(),
-            }).eq('id', composerSceneId);
-          }
+          // v16: race-fix — acquire per-scene dispatch lock so a parallel
+          // poll-dialog-shots tick cannot clobber our preclip_url write
+          // (the bug that left turn 2 stuck on master fallback even though
+          // the preclip Lambda render had completed successfully).
+          await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip', async () => {
+            const { data: sceneRow } = await supabaseAdmin
+              .from('composer_scenes')
+              .select('dialog_shots')
+              .eq('id', composerSceneId)
+              .maybeSingle();
+            const prevState = (sceneRow?.dialog_shots as any) || {};
+            const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
+            if (shots[shotIdx]) {
+              shots[shotIdx] = {
+                ...shots[shotIdx],
+                preclip_url: finalOutputUrl,
+                preclip_status: 'ready',
+                preclip_error: undefined,
+                preclip_completed_at: new Date().toISOString(),
+                // v16: if a previous race had flipped this turn to master
+                // fallback, the freshly arrived preclip is still the better
+                // path. Unstick it so the next poll-tick dispatches Sync.so
+                // on the isolated single-face preclip instead of the wide
+                // multi-face master plate (which fails opaquely for edge
+                // faces in 3+ speaker scenes).
+                sync_source_kind: 'preclip',
+              };
+              await supabaseAdmin.from('composer_scenes').update({
+                dialog_shots: { ...prevState, shots },
+                updated_at: new Date().toISOString(),
+              }).eq('id', composerSceneId);
+            }
+          }, { ttlSeconds: 30 });
           // Nudge poll-dialog-shots so Sync.so dispatches immediately.
           try {
             const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
@@ -237,28 +251,30 @@ serve(async (req) => {
           }).eq('render_id', pendingRenderId);
         }
         if (composerSceneId) {
-          const { data: sceneRow } = await supabaseAdmin
-            .from('composer_scenes')
-            .select('dialog_shots')
-            .eq('id', composerSceneId)
-            .maybeSingle();
-          const prevState = (sceneRow?.dialog_shots as any) || {};
-          const nowIso = new Date().toISOString();
-          await supabaseAdmin.from('composer_scenes').update({
-            clip_url: finalOutputUrl,
-            lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
-            lip_sync_applied_at: nowIso,
-            lip_sync_status: 'done',
-            twoshot_stage: 'done',
-            clip_error: null,
-            dialog_shots: {
-              ...prevState,
-              status: 'done',
-              final_url: finalOutputUrl,
-              finished_at: nowIso,
-            },
-            updated_at: nowIso,
-          }).eq('id', composerSceneId);
+          await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-stitch', async () => {
+            const { data: sceneRow } = await supabaseAdmin
+              .from('composer_scenes')
+              .select('dialog_shots')
+              .eq('id', composerSceneId)
+              .maybeSingle();
+            const prevState = (sceneRow?.dialog_shots as any) || {};
+            const nowIso = new Date().toISOString();
+            await supabaseAdmin.from('composer_scenes').update({
+              clip_url: finalOutputUrl,
+              lip_sync_source_clip_url: prevState?.source_clip_url ?? null,
+              lip_sync_applied_at: nowIso,
+              lip_sync_status: 'done',
+              twoshot_stage: 'done',
+              clip_error: null,
+              dialog_shots: {
+                ...prevState,
+                status: 'done',
+                final_url: finalOutputUrl,
+                finished_at: nowIso,
+              },
+              updated_at: nowIso,
+            }).eq('id', composerSceneId);
+          }, { ttlSeconds: 30 });
           console.log(`💋 [dialog-stitch] scene ${composerSceneId} done → ${finalOutputUrl}`);
         } else {
           console.warn('💋 [dialog-stitch] success webhook without composer_scene_id');
@@ -560,26 +576,28 @@ serve(async (req) => {
         }
         const shotIdx = Number(customData?.shot_idx);
         if (composerSceneId && Number.isFinite(shotIdx)) {
-          const { data: sceneRow } = await supabaseAdmin
-            .from('composer_scenes')
-            .select('dialog_shots')
-            .eq('id', composerSceneId)
-            .maybeSingle();
-          const prevState = (sceneRow?.dialog_shots as any) || {};
-          const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
-          if (shots[shotIdx]) {
-            shots[shotIdx] = {
-              ...shots[shotIdx],
-              preclip_status: 'failed',
-              preclip_render_id: undefined,
-              preclip_error: errorMessage.slice(0, 240),
-              preclip_retry_count: (Number(shots[shotIdx].preclip_retry_count) || 0) + 1,
-            };
-            await supabaseAdmin.from('composer_scenes').update({
-              dialog_shots: { ...prevState, shots },
-              updated_at: new Date().toISOString(),
-            }).eq('id', composerSceneId);
-          }
+          await withDialogLock(supabaseAdmin, composerSceneId, 'webhook-preclip-fail', async () => {
+            const { data: sceneRow } = await supabaseAdmin
+              .from('composer_scenes')
+              .select('dialog_shots')
+              .eq('id', composerSceneId)
+              .maybeSingle();
+            const prevState = (sceneRow?.dialog_shots as any) || {};
+            const shots = Array.isArray(prevState.shots) ? [...prevState.shots] : [];
+            if (shots[shotIdx]) {
+              shots[shotIdx] = {
+                ...shots[shotIdx],
+                preclip_status: 'failed',
+                preclip_render_id: undefined,
+                preclip_error: errorMessage.slice(0, 240),
+                preclip_retry_count: (Number(shots[shotIdx].preclip_retry_count) || 0) + 1,
+              };
+              await supabaseAdmin.from('composer_scenes').update({
+                dialog_shots: { ...prevState, shots },
+                updated_at: new Date().toISOString(),
+              }).eq('id', composerSceneId);
+            }
+          }, { ttlSeconds: 30 });
           try {
             const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
             const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
