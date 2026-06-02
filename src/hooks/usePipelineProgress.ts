@@ -421,6 +421,13 @@ export function usePipelineProgress({
     const failed = targets.some((s) => {
       const ds = getDialogShots(s);
       if (ds?.status === 'failed') return true;
+      // Ignore scenes mid auto-retry (clip_error starts with "auto-retry:" and
+      // lipSyncStatus has been reset back to pending). Those are recovering,
+      // not failed — surfacing them as failed makes the bar flash red while
+      // the v4 per-turn path is actually progressing underneath.
+      const ce = (s as any).clipError as string | undefined;
+      const isAutoRetry = typeof ce === 'string' && ce.startsWith('auto-retry:');
+      if (isAutoRetry && (s as any).lipSyncStatus !== 'failed') return false;
       return (s as any).lipSyncStatus === 'failed' ||
         (s as any).twoshotStage === 'failed' ||
         (s as any).twoshotStage === 'audio_mux_failed';
