@@ -36,6 +36,10 @@ interface DialogShot {
   status: string;
   output_url?: string;
   speaker_name?: string;
+  /** v21: single-face square crop in source-master pixel space. When
+   *  present, the per-turn output is a cropped preclip and must be
+   *  composited back at this region in DialogStitchVideo. */
+  preclip_crop?: { x: number; y: number; size: number; outputSize?: number } | null;
 }
 
 interface DialogShotsState {
@@ -210,15 +214,24 @@ serve(async (req) => {
       totalSec,
       targetWidth: width,
       targetHeight: height,
+      // v21: source-master dims so DialogStitchVideo can map per-shot
+      // `crop` (source pixels) into composition pixels.
+      srcWidth: width,
+      srcHeight: height,
       shots: state.shots
         .filter((s) => s.output_url)
         .map((s: any) => {
           const win = (s.render_window ?? s.window) as [number, number];
+          const pc = s.preclip_crop;
+          const crop = pc && Number(pc.size) > 0
+            ? { x: Number(pc.x) || 0, y: Number(pc.y) || 0, size: Number(pc.size) }
+            : null;
           return {
             startSec: Math.max(0, Number(win?.[0]) || 0),
             endSec: Math.min(totalSec, Number(win?.[1]) || totalSec),
             outputUrl: s.output_url as string,
             sourceTiming: s.sync_source_kind === "preclip" ? "relative" : "absolute",
+            crop,
           };
         }),
     };
