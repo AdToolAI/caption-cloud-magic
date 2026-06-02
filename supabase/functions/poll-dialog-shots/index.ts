@@ -899,6 +899,48 @@ async function processSceneLocked(
   let mutated = false;
   let newState: DialogShotsState = { ...state, shots };
 
+  // ── Step 0: Self-Healing Reconciliation (v16) ────────────────────────
+  // Webhooks (remotion-webhook) write preclip_url back to dialog_shots.
+  // If a webhook lost its write to a race (or never arrived because the
+  // function crashed mid-flight), the shot stays stuck on
+  // `preclip_status='rendering'` until the watchdog fires — and may even
+  // get promoted to master fallback, which is exactly where Sync.so
+  // reliably fails for 3+ speaker scenes. Reconcile from the authoritative
+  // `video_renders` table BEFORE any dispatch decisions are made.
+  for (const shot of shots) {
+    if (shot.preclip_url) continue;
+    if (!shot.preclip_render_id) continue;
+    const { data: render } = await supabase
+      .from("video_renders")
+      .select("status, video_url, error_message")
+      .eq("render_id", shot.preclip_render_id)
+      .maybeSingle();
+    if (!render) continue;
+    if (render.status === "completed" && render.video_url) {
+      shot.preclip_url = render.video_url as string;
+      shot.preclip_status = "ready";
+      shot.preclip_error = undefined;
+      shot.preclip_completed_at = shot.preclip_completed_at || new Date().toISOString();
+      // If a previous race had flipped this shot to master, restore preclip
+      // path — the isolated single-face crop is structurally more reliable.
+      shot.sync_source_kind = "preclip";
+      mutated = true;
+      console.log(
+        `[poll-dialog-shots] turn ${shot.idx} reconciled preclip_url from video_renders (${shot.preclip_render_id})`,
+      );
+    } else if (render.status === "failed") {
+      shot.preclip_status = "failed";
+      shot.preclip_render_id = undefined;
+      shot.preclip_error = (render.error_message as string | null)?.slice(0, 240) ||
+        "render_failed_no_message";
+      shot.preclip_retry_count = (Number(shot.preclip_retry_count) || 0) + 1;
+      mutated = true;
+      console.warn(
+        `[poll-dialog-shots] turn ${shot.idx} reconciled preclip FAILED from video_renders: ${shot.preclip_error}`,
+      );
+    }
+  }
+
   // ── Step 1: poll every in-flight shot in parallel ───────────────────
   const inFlight = shots.filter((s) => s.status === "lipsyncing" && s.sync_job_id);
   if (inFlight.length > 0) {
@@ -1018,7 +1060,22 @@ async function processSceneLocked(
     if (shot.preclip_status === "failed") {
       const tries = Number(shot.preclip_retry_count) || 0;
       if (tries >= MAX_PRECLIP_RETRIES) {
-        // Fall back to legacy master+segments_secs path for this shot.
+        // v16: For 3+ speakers, the master+segments_secs path is a known
+        // dead-end (Sync.so returns opaque "unknown error" for edge faces).
+        // Hard-fail with refund instead of silently degrading.
+        const speakerCount = new Set(shots.map((s) => s.speaker_idx)).size;
+        if (speakerCount >= 3) {
+          console.warn(
+            `[poll-dialog-shots] turn ${shot.idx} preclip exhausted (${tries} tries) in 3+ speaker scene — HARD FAIL (master forbidden)`,
+          );
+          markShotTerminalFailed(
+            shot,
+            `preclip_exhausted_3plus_no_master_fallback: ${shot.preclip_error ?? "unknown"}`,
+          );
+          mutated = true;
+          continue;
+        }
+        // 1 or 2 speakers: legacy master+segments_secs fallback is OK.
         console.warn(
           `[poll-dialog-shots] turn ${shot.idx} preclip exhausted (${tries} tries) — falling back to master+segments_secs`,
         );
