@@ -36,6 +36,10 @@ interface DialogShot {
   status: string;
   output_url?: string;
   speaker_name?: string;
+  /** v21: single-face square crop in source-master pixel space. When
+   *  present, the per-turn output is a cropped preclip and must be
+   *  composited back at this region in DialogStitchVideo. */
+  preclip_crop?: { x: number; y: number; size: number; outputSize?: number } | null;
 }
 
 interface DialogShotsState {
