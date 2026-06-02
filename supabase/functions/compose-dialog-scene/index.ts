@@ -687,9 +687,23 @@ serve(async (req) => {
       }
       return m;
     };
+    const buildBboxMap = (fm: typeof faceMap) => {
+      const m = new Map<string, [number, number, number, number]>();
+      if (fm?.faces?.length) {
+        for (const f of fm.faces) {
+          const cid = String(f.characterId ?? "").toLowerCase();
+          const bb = (f as any).bbox;
+          if (cid && Array.isArray(bb) && bb.length === 4 && bb.every((v: any) => Number.isFinite(Number(v)))) {
+            m.set(cid, [Number(bb[0]), Number(bb[1]), Number(bb[2]), Number(bb[3])]);
+          }
+        }
+      }
+      return m;
+    };
 
     let workingFaceMap: any = faceMap;
     let coordsByCharId = buildCoordsMap(workingFaceMap);
+    let bboxByCharId = buildBboxMap(workingFaceMap);
 
     const distinctCharIds = Array.from(
       new Set(
