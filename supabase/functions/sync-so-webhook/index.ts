@@ -766,8 +766,65 @@ serve(async (req) => {
     const shot = shots[idx];
     const wasReady = shot.status === "ready";
     if (status === "COMPLETED" && outputUrl) {
+      // v19 — Re-host per-turn Sync.so output to ai-videos so Remotion
+      // Lambda has a stable, public, redirect-free MP4 URL during the
+      // dialog stitch. Without this, Lambda often fails to load the
+      // auth-token `api.sync.so/v2/generations/…/result?token=…` URL and
+      // silently falls back to the muted master plate — the user sees a
+      // clip where lips don't move at all. The v5 multi-pass path already
+      // re-hosts; we mirror that behavior here for v4 per-turn shots.
+      let rehostedTurnUrl: string | null = null;
+      try {
+        const { data: row } = await supabase
+          .from("composer_scenes")
+          .select("project_id")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const { data: proj } = await supabase
+          .from("composer_projects")
+          .select("user_id")
+          .eq("id", (row as any)?.project_id)
+          .maybeSingle();
+        const uid = (proj as any)?.user_id;
+        if (uid) {
+          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
+          if (dl.ok) {
+            const bytes = new Uint8Array(await dl.arrayBuffer());
+            const objectPath = `composer/${uid}/${sceneId}-dialog-turn-${shot.idx}.mp4`;
+            const up = await supabase.storage.from("ai-videos").upload(
+              objectPath,
+              bytes,
+              { contentType: "video/mp4", upsert: true },
+            );
+            if (!up.error) {
+              const { data: pub } = supabase.storage
+                .from("ai-videos")
+                .getPublicUrl(objectPath);
+              if (pub?.publicUrl) {
+                rehostedTurnUrl = pub.publicUrl;
+                console.log(
+                  `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-hosted ${bytes.length} bytes → ${rehostedTurnUrl}`,
+                );
+              }
+            } else {
+              console.warn(
+                `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host upload failed: ${up.error.message}`,
+              );
+            }
+          } else {
+            console.warn(
+              `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host download HTTP ${dl.status}`,
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host exception: ${(err as Error).message}`,
+        );
+      }
       shot.status = "ready";
-      shot.output_url = outputUrl;
+      shot.output_url = rehostedTurnUrl ?? outputUrl;
+      shot.output_url_rehosted = !!rehostedTurnUrl;
       shot.completed_at = nowIso;
       shot.error = undefined;
     } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {

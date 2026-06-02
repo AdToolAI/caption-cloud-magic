@@ -1,8 +1,15 @@
 ---
-name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17 + v18)
-description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker (no wide-plate coords); user-cancellable via cancel-dialog-lipsync; late webhooks ignored on canceled scenes; integrity-guard accepts preclip OR deterministic coords
+name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17 + v18 + v19)
+description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker; user-cancellable via cancel-dialog-lipsync; late webhooks ignored on canceled scenes; integrity-guard accepts preclip OR deterministic coords; v19 re-hosts every Sync.so per-turn output to ai-videos and injects a constrained head-and-shoulders dialog plate prompt
 type: feature
 ---
+
+**v19 Visible-Lipsync + Stable-Plate (June 2026):**
+- `sync-so-webhook` (v4 per-turn path) now downloads the Sync.so result (`https://api.sync.so/v2/generations/<id>/result?token=…`) and re-uploads it to `ai-videos/composer/<uid>/<sceneId>-dialog-turn-<idx>.mp4`, persisting the stable public URL in `shot.output_url` (+ flag `output_url_rehosted`). Without this, Remotion Lambda failed to load the auth-token-protected sync.so URL during DialogStitchVideo and silently fell back to the muted master plate — the stitched clip showed no lip motion at all. Mirrors the v5 multi-pass re-host that already existed.
+- `compose-dialog-scene` now appends `buildDialogPlatePromptSuffix(speakerCount)` to the master plate prompt whenever the cinematic-sync dialog hotfix re-renders the Hailuo master: locked-off framing, head-and-shoulders, no handheld/dolly/orbit, no waving hands, no head turn away, no exaggerated gestures. Fixes the "noodle limb" body motion that no lipsync can rescue.
+- SceneCard "🔁 Lip-Sync neu rendern" button additionally clears `clip_url / clip_status / reference_image_url / lip_sync_source_clip_url / lip_sync_applied_at` so the hotfix branch fires every time the user manually re-rolls a cinematic-sync dialog scene, guaranteeing the constrained prompt is used.
+
+
 
 **v18 Cancel-Pfad (User-initiierter Abbruch):**
 - Neue Edge Function `cancel-dialog-lipsync` (verify_jwt via getClaims): auth-prüft Project-Owner, holt Dialog-Lock, löscht alle `sync_job_id`s aus `syncso_inflight_jobs`, setzt `dialog_shots.status='canceled'` (+ `canceled_at`, `canceled_by`), `lip_sync_status='canceled'`, `twoshot_stage=null`, `clip_error='lipsync_canceled_by_user'`. Optional `reset:true` setzt zusätzlich `dialog_shots=null` für sauberen Neustart.

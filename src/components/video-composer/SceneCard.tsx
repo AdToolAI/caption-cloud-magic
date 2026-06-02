@@ -1933,6 +1933,11 @@ export default function SceneCard({
                                 // plate + one Sync.so lipsync per speaker turn
                                 // (1..N speakers). Clear stale lip-sync flags
                                 // so the new run starts clean.
+                                // v19: also clear clip_url / reference_image_url
+                                // so compose-dialog-scene re-renders the master
+                                // plate with the constrained head-and-shoulders
+                                // dialog prompt (fixes uncanny hand/body motion
+                                // from the original free-form scene prompt).
                                 await supabase
                                   .from("composer_scenes")
                                   .update({
@@ -1940,8 +1945,14 @@ export default function SceneCard({
                                     twoshot_stage: null,
                                     clip_error: null,
                                     dialog_shots: null,
+                                    clip_url: null,
+                                    clip_status: "pending",
+                                    reference_image_url: null,
+                                    lip_sync_source_clip_url: null,
+                                    lip_sync_applied_at: null,
                                   })
                                   .eq("id", scene.id);
+
                                 const { data, error } =
                                   await supabase.functions.invoke(
                                     "compose-dialog-scene",
