@@ -1,6 +1,6 @@
 ---
-name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v9)
-description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo that overlays each turn's output on its window and remuxes the master WAV. Final clip is NEVER the last Sync.so output.
+name: Dialog-Shot Pipeline (Cinematic-Sync N-Sprecher, Artlist-Style v10)
+description: Per-turn Sync.so on the ORIGINAL master plate (no chaining), then deterministic Lambda stitch via DialogStitchVideo. v20 fixes (June 2026) — Multi-speaker preclips MUST dispatch with deterministic coords (preclips are NOT single-face clips — DialogTurnClipVideo just temporally crops the full multi-face master); stitch auto-trims totalSec to last shot's endSec to remove muted master tail; CROSSFADE_FRAMES 3→6 for invisible speaker boundaries; SceneCard has a hard 🗑 "Lipsync-Eintrag löschen" button that wipes dialog_shots + cancels Sync.so jobs.
 type: feature
 ---
 
