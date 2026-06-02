@@ -117,6 +117,76 @@ async function probeImageDims(
   }
 }
 
+/**
+ * Probe an MP4 for its visual width/height by walking the ISO BMFF box tree
+ * until we hit the first `tkhd` whose matrix-resolved (width, height) fields
+ * are non-zero (= a visual track). Pure TypeScript, no ffmpeg dependency.
+ *
+ * Reads up to ~768 KiB. Returns null if the file isn't MP4 or the moov box
+ * sits past the read window — callers fall back to DEFAULT_DIMS.
+ */
+export async function probeMp4Dims(
+  url: string,
+): Promise<{ width: number; height: number } | null> {
+  try {
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=0-786431" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!resp.ok && resp.status !== 206) return null;
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+
+    // Walk top-level boxes; descend into `moov` → `trak` → `tkhd`.
+    const readBoxSize = (off: number) => {
+      if (off + 8 > buf.length) return null;
+      const size = dv.getUint32(off);
+      const type = String.fromCharCode(buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 7]);
+      return { size, type, headerLen: size === 1 ? 16 : 8 };
+    };
+
+    // tkhd parser → returns width/height as integer pixels (16.16 fixed → int)
+    const parseTkhd = (off: number, size: number): { w: number; h: number } | null => {
+      if (size < 84) return null;
+      const version = buf[off];
+      // tkhd layout: version(1) + flags(3) + (creation/mod/track_id/reserved/duration)
+      // v0: 4+4+4+4+4 = 20 bytes after flags. v1: 8+8+4+4+8 = 32 bytes.
+      const dynLen = version === 1 ? 32 : 20;
+      const widthOff = off + 4 + dynLen + 8 /*reserved*/ + 8 /*layer/group/vol/res*/ + 36 /*matrix*/;
+      if (widthOff + 8 > off + size) return null;
+      const w = dv.getUint32(widthOff) / 65536;
+      const h = dv.getUint32(widthOff + 4) / 65536;
+      if (w > 0 && h > 0) return { w: Math.round(w), h: Math.round(h) };
+      return null;
+    };
+
+    let bestDims: { w: number; h: number } | null = null;
+    const visit = (start: number, end: number) => {
+      let i = start;
+      while (i + 8 <= end) {
+        const box = readBoxSize(i);
+        if (!box || box.size < 8 || i + box.size > end + 8) break;
+        const childStart = i + box.headerLen;
+        const childEnd = i + box.size;
+        if (box.type === "moov" || box.type === "trak" || box.type === "mdia") {
+          visit(childStart, Math.min(childEnd, buf.length));
+        } else if (box.type === "tkhd") {
+          const dims = parseTkhd(childStart, box.size - box.headerLen);
+          if (dims && (!bestDims || dims.w * dims.h > bestDims.w * bestDims.h)) {
+            bestDims = dims;
+          }
+        }
+        i += box.size;
+      }
+    };
+    visit(0, buf.length);
+    if (bestDims) return { width: bestDims.w, height: bestDims.h };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 async function askGeminiForFaces(
   anchorUrl: string,
   expectedCount: number,
