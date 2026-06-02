@@ -1,8 +1,23 @@
 ---
-name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17)
-description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker (no wide-plate coords); VAD relaxed for short turns; master degrade hard-forbidden for 3+ speakers
+name: Sync.so Webhook + Per-Scene Dialog Lock (Stage 5 + v16 + v17 + v18)
+description: All dialog_shots writers serialize via try_acquire_dialog_lock; preclip dispatch uses auto-speaker (no wide-plate coords); user-cancellable via cancel-dialog-lipsync; late webhooks ignored on canceled scenes; integrity-guard accepts preclip OR deterministic coords
 type: feature
 ---
+
+**v18 Cancel-Pfad (User-initiierter Abbruch):**
+- Neue Edge Function `cancel-dialog-lipsync` (verify_jwt via getClaims): auth-prüft Project-Owner, holt Dialog-Lock, löscht alle `sync_job_id`s aus `syncso_inflight_jobs`, setzt `dialog_shots.status='canceled'` (+ `canceled_at`, `canceled_by`), `lip_sync_status='canceled'`, `twoshot_stage=null`, `clip_error='lipsync_canceled_by_user'`. Optional `reset:true` setzt zusätzlich `dialog_shots=null` für sauberen Neustart.
+- `poll-dialog-shots/processSceneLocked` returnt sofort `status='canceled'` wenn `lip_sync_status==='canceled'` ODER `dialog_shots.status==='canceled'` → keine neuen Preclip/Sync.so/Stitch-Dispatches mehr.
+- `sync-so-webhook` (v4-Pfad) returnt 200 mit `skipped:'canceled'` wenn die Szene cancelled ist → kein Retry, kein Degrade, kein State-Overwrite.
+- `remotion-webhook` (`dialog-turn-preclip` UND `dialog-stitch` Branches): innerhalb des Dialog-Locks Cancel-State erkennen und das Schreiben von `preclip_url`/`clip_url`/`lip_sync_applied_at` skippen → späte Lambda-Renderings können den Abbruch nicht aufheben.
+- `useTwoShotAutoTrigger` Candidate-Filter ignoriert `lip_sync_status==='canceled'` komplett → kein Auto-Retry. Explizites "Lip-Sync neu rendern" bleibt der einzige Wiedereinstieg.
+- UI: SceneCard zeigt während `running/stitching/audio_muxing/pending` oder aktiver `twoshot_stage` den Button "✕ Lip-Sync abbrechen". Optimistic local update + invoke('cancel-dialog-lipsync', { reset: true }).
+
+**v18 Integrity-Guard Korrektur (kompatibel mit v17 Preclip = Auto-Speaker):**
+- Alte Regel verlangte für Multi-Speaker-Szenen pro Shot `target_coords && deterministic_coords === true`. Das kollidierte mit v17, wo Preclips bewusst mit `auto_detect:true` ohne Koordinaten dispatched werden.
+- Neue Regel akzeptiert pro Shot EINEN der beiden deterministischen Pfade:
+  - `sync_source_kind === 'preclip' && !!preclip_url` → Single-Face-Crop, Auto-Speaker ist deterministisch
+  - `sync_source_kind === 'master' && target_coords && deterministic_coords === true` → Wide-Plate mit fixen Koordinaten
+- Sonst: terminal failed + Refund + `clip_error='lipsync_wrong_face_guard'`.
 
 **v17 Preclip = Auto-Speaker (Artlist-Parität):**
 - In `poll-dialog-shots` wird bei `usePreclip === true` der Dispatch-Modus IMMER auf `auto` gezwungen. Sync.so bekommt **keine** `coordinates` + `frame_number` mehr, sondern `active_speaker_detection: { auto_detect: true }`.
@@ -17,49 +32,13 @@ type: feature
 **v17 sync-so-webhook v4 Degrade nur noch ≤2 Sprecher:**
 - Wenn die Webhook-Retry-Matrix erschöpft ist, wird für `speakerCount >= 3` der Shot terminal `failed` markiert (kein `ready+degraded`). Für 1/2 Sprecher bleibt der sichere Degrade-auf-Master-Plate-Pfad aktiv.
 
-
-
 **Per-scene dispatch lock (v15+v16):**
-- `dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` with SECURITY DEFINER RPCs `try_acquire_dialog_lock(_scene_id, _holder, _ttl_seconds)` / `release_dialog_lock`. Stale rows auto-deleted on every acquire.
-- Shared helper `supabase/functions/_shared/dialog-lock.ts` → `withDialogLock(supabase, sceneId, holderPrefix, fn, {ttlSeconds})`. Retries acquire up to 4× with 200/500/1000/1500 ms backoff; if still not acquired, runs WITHOUT lock (webhooks must never wedge). Poller uses 60 s TTL, webhooks use 30 s.
-- **ALL** read-modify-write of `dialog_shots` runs inside the lock:
-  - `poll-dialog-shots/processScene` (v15)
-  - `remotion-webhook` `dialog-turn-preclip` success + failure (v16)
-  - `remotion-webhook` `dialog-stitch` success + failure (v16)
-  - `sync-so-webhook` v4 per-turn patch — re-reads dialog_shots inside the lock so the patch always lands on the latest snapshot (v16)
+- `dialog_dispatch_locks(scene_id PK, holder, acquired_at, expires_at)` mit SECURITY DEFINER RPCs `try_acquire_dialog_lock` / `release_dialog_lock`. Shared helper `_shared/dialog-lock.ts` → `withDialogLock(...)`.
+- ALLE read-modify-write von `dialog_shots` laufen im Lock: poll-dialog-shots/processScene, remotion-webhook (dialog-turn-preclip + dialog-stitch), sync-so-webhook v4 per-turn patch, cancel-dialog-lipsync.
 
-**v16 Reconciliation Step 0 (self-healing):**
-- At the start of `processSceneLocked`, for every shot with `preclip_render_id` but no `preclip_url`: query `video_renders`. If the render is `completed` → rehydrate `preclip_url`, set `preclip_status='ready'`, `sync_source_kind='preclip'`. If `failed` → mark `preclip_status='failed'` with the real error.
-- This is the safety net for any lost webhook write — even if `remotion-webhook` crashes mid-flight, the next poll-tick picks up the truth from `video_renders`.
+**v16 Reconciliation Step 0 + Hard-forbid Master-Fallback für ≥3 Sprecher** bleiben aktiv (siehe Code in `poll-dialog-shots`).
 
-**v16 Hard-forbid master fallback for ≥3 speakers:**
-- `prepareShotRetry` attempts 3/4: for `speakerCount >= 3` it **re-renders the preclip** instead of flipping to master+segments_secs. For 1/2 speakers the legacy preclip↔master flip stays (it's a useful escape hatch there).
-- "Preclip exhausted" branch: for ≥3 speakers → `markShotTerminalFailed` with refund. For 1/2 speakers → master fallback.
-- Rationale: Sync.so reliably returns opaque "An unknown error occurred." for edge faces on wide multi-face plates (e.g. x=1055 in a 1376-wide 3-shot). The preclip path solves this structurally by giving Sync.so a single-face crop. Falling back to master in that exact regime is what was killing 3-speaker scenes.
+**Bestätigte erfolgreiche 3-Sprecher-Pipeline (Lauf 699e85ff…):**
+- 3× Preclip via Remotion Lambda → 3× Sync.so dispatch mit `mode=auto` → 3× ready → Lambda DialogStitchVideo Stitch → `lip_sync_status='done'`, `final_url` gesetzt. Bestätigt v17-Preclip-Pfad + v16-Lock + v18-Integrity-Guard.
 
-**v16 Tuning constants:**
-- `MAX_PRECLIP_RETRIES` 1 → 4 (Lambda transient failures shouldn't drop us to the known-bad master path).
-- `PRECLIP_RENDER_TIMEOUT_MS` 4 min → 10 min (observed 5 min cold-start renders).
-
-**Concrete bug fixed (scene `d47e6e3c-13ca-42b0-abd0-2f3eae919c73`):**
-- Shot 2 preclip Lambda render `aeebf60b-…` actually COMPLETED at 19:08:47.
-- `remotion-webhook` write of `preclip_url` was clobbered by a concurrent poll-tick that had flipped `sync_source_kind='master'`.
-- Result: Sync.so fired 4× on the wide master plate with `target_coords=[1055,170]` (edge face) → 4× "unknown error" → degraded → refunded.
-- Recovery migration rehydrated all three preclip URLs from `video_renders` and reset shot 2 to pending so the next poll-tick re-runs Sync.so on the correct single-face preclip.
-
-**Earlier-stage docs preserved below (Stage 5 B.1, B.4, retry policy, June fixes, v9 chain root-cause, v15 race-fix) — they are still active for 1/2 speaker scenes:**
-
-**B.1 Webhook (Stage 5):** `poll-dialog-shots` builds `webhookUrl = ${SUPABASE_URL}/functions/v1/sync-so-webhook?scene_id={id}` via `appendWebhookToken`. `sync-so-webhook` (verify_jwt=false) verifies the `?token=` shared secret, finds the scene by `scene_id` hint or scans in-flight scenes for the `sync_job_id`, patches `dialog_shots.shots[idx]` and fire-and-forgets `poll-dialog-shots`. Always returns 200.
-
-**B.4 Per-Shot 4-min Watchdog:** Inside `poll-dialog-shots` Step 1b, any shot `lipsyncing` with `started_at` >4 min old is treated as terminal-failed (`sync_so_timeout_4min`). Legacy two-shot `twoshot-lipsync-watchdog` uses the same 8-min cutoff.
-
-**Webhook Retry Policy:** `sync-so-webhook` mirrors `poll-dialog-shots` retry logic (`MAX_SHOT_RETRIES=4`, same `RETRY_TEMPERATURES`). In multi-speaker scenes with `target_coords`, never downgrade to `auto_detect` (would animate wrong face). E.5 last-ditch `auto-pro` retry stays as final escape for 3+ scenes only.
-
-**v9 Artlist parity (no chaining):** Each turn lipsyncs the ORIGINAL pristine master plate (or the per-turn preclip ab t=0) with isolated per-speaker WAV. Lambda `DialogStitchVideo` overlay-stitches with 3-frame crossfade. Never chain a turn onto another turn's Sync.so output.
-
-**June 2026 fixes (still active for 1/2 speaker scenes):**
-- `probeMp4Dims` 3-phase probe (head/tail/signature-scan) for Hailuo/Replicate MP4s.
-- `compose-dialog-segments` face-gate hardened for `speakers.length >= 3`.
-- Multi-speaker integrity gate: `ready` shots without `output_url` are promoted to terminal `failed` instead of looping on `integrity_gate_failed`.
-
-**Idempotency:** `dialog_shots` is single source of truth; `state.refunded` boolean prevents double-refund; `syncJobs.refunded` in `audio_plan.twoshot` does the same for legacy path.
+**Earlier-stage docs (Stage 5 B.1/B.4, retry policy, v9 chain root-cause) bleiben für 1/2-Sprecher-Szenen aktiv — siehe Git-Historie.**
