@@ -772,21 +772,52 @@ serve(async (req) => {
     }
 
     // ── Face-gate per pass (one frame check per speaker's first turn) ────
+    // For 1- and 2-speaker scenes: keep the legacy "any face visible" check
+    // unchanged (those flows were stable). For 3+ speakers we additionally
+    // validate that a face actually exists at the per-speaker target
+    // coordinates BEFORE paying Sync.so — otherwise Sync.so returns the
+    // opaque "An unknown error occurred." and burns credits / time.
     if (!isAdvance) {
+      const strictTargetCheck = speakers.length >= 3 && !!plateDims;
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
         if (!firstTurn) continue;
         const midSec = (firstTurn.startTime + firstTurn.endTime) / 2;
         const frame = Math.max(0, Math.round(midSec * ASSUMED_FPS));
+        // For 3+ speakers, hand the per-speaker pixel coords as normalized
+        // [x,y] (0..1) so validate-frame-face can verify they land on a face.
+        let targetCoordsForCheck: [number, number] | null = null;
+        if (strictTargetCheck && plateDims) {
+          const c = pass.coords;
+          if (Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+            targetCoordsForCheck = [
+              Math.min(1, Math.max(0, Number(c[0]) / plateDims.width)),
+              Math.min(1, Math.max(0, Number(c[1]) / plateDims.height)),
+            ];
+          }
+        }
         const v = await validateFrameFace({
           supabaseUrl, serviceKey,
           videoUrl: sourceClipUrl,
           frameNumber: frame, fps: ASSUMED_FPS,
-          targetCoords: null,
+          targetCoords: targetCoordsForCheck,
         });
-        if (v.ok && !v.faceVisible) {
+        // Legacy gate (unchanged for 1/2 speakers): block if frame has NO face at all.
+        const noFaceAtAll = v.ok && !v.faceVisible;
+        // 3+ speaker hard gate: target coords must overlap a face. coordsMatch=false
+        // means Gemini found face(s) but none overlap this speaker's anchor point.
+        const targetMissing =
+          strictTargetCheck &&
+          v.ok &&
+          v.faceVisible &&
+          targetCoordsForCheck !== null &&
+          v.coordsMatch === false;
+        if (noFaceAtAll || targetMissing) {
+          const reason = targetMissing
+            ? `plate_target_face_missing_pass_${pass.idx}_speaker_${pass.speaker_name}`
+            : `face_validation_failed_pass_${pass.idx}_frame_${frame}`;
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame}`,
+            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} reason=${reason}`,
           );
           const { data: w0 } = await supabase
             .from("wallets").select("balance").eq("user_id", userId).single();
@@ -802,21 +833,24 @@ serve(async (req) => {
             .update({
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `face_validation_failed_pass_${pass.idx}_frame_${frame}`,
+              clip_error: reason,
             })
             .eq("id", sceneId);
           return json(
             {
-              error: "face_validation_failed",
-              details: `no face for ${pass.speaker_name} at frame ${frame}`,
+              error: targetMissing ? "plate_target_face_missing" : "face_validation_failed",
+              details: targetMissing
+                ? `target face for ${pass.speaker_name} not present on plate — re-render scene clip with all heads in frame`
+                : `no face for ${pass.speaker_name} at frame ${frame}`,
               refunded: totalCost,
-              hint: "switch_to_cinematic_sync_engine",
+              hint: targetMissing ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
             },
             422,
           );
         }
       }
     }
+
 
     // ── Concurrency guard ────────────────────────────────────────────────
     const MAX_INFLIGHT = 3;
