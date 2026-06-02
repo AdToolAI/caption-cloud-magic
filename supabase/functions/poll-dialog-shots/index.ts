@@ -1911,7 +1911,7 @@ serve(async (req) => {
       sceneIds = (rows ?? [])
         .filter(
           (r: any) =>
-            r?.dialog_shots?.version === 4 &&
+            (r?.dialog_shots?.version === 4 || r?.dialog_shots?.version === 5) &&
             ["queued", "lipsyncing", "stitching"].includes(
               String(r.dialog_shots?.status),
             ),
