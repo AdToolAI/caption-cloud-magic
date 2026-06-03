@@ -172,6 +172,41 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   );
 };
 
+interface FaceMaskOverlayProps {
+  src: string;
+  /** Source-master pixel coords / radius mapped into composition space. */
+  cxPx: number;
+  cyPx: number;
+  radiusPx: number;
+}
+/** v25: full-frame Sync.so output, shown only inside a soft circular mask
+ *  around the target face. Plays for the entire scene (no time window). */
+const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx }) => {
+  // Feathered radial mask: solid in the inner 70% of radius, fading to 0
+  // at radius edge so the lipsynced face blends seamlessly into the base.
+  const inner = Math.max(2, Math.round(radiusPx * 0.68));
+  const outer = Math.max(inner + 8, Math.round(radiusPx));
+  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0.85) ${Math.round((inner + outer) / 2)}px, rgba(0,0,0,0) ${outer}px)`;
+  return (
+    <AbsoluteFill
+      style={{
+        pointerEvents: 'none',
+        WebkitMaskImage: mask,
+        maskImage: mask,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+      }}
+    >
+      <Video
+        src={src}
+        muted
+        playbackRate={1}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </AbsoluteFill>
+  );
+};
+
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterAudioUrl,
