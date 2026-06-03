@@ -254,6 +254,38 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         const segDuration = Math.max(1, endFrame - startFrame);
         if (segDuration <= 0) return null;
 
+        // v25 fan-out face-mask path (highest priority): full Sync.so output
+        // for this speaker, masked to a soft circle around their face. Spans
+        // the full scene; multiple speakers stack as additive masked layers.
+        const useFaceMask =
+          !!shot.faceMask &&
+          Number(shot.faceMask?.radius) > 0 &&
+          Number.isFinite(Number(shot.faceMask?.cx)) &&
+          Number.isFinite(Number(shot.faceMask?.cy));
+        if (useFaceMask) {
+          const fm = shot.faceMask!;
+          const cxPx = Number(fm.cx) * scaleX;
+          const cyPx = Number(fm.cy) * scaleY;
+          // Radius uses the smaller axis scale so the mask never exceeds the
+          // intended face region on either dimension.
+          const radiusPx = Number(fm.radius) * Math.min(scaleX, scaleY);
+          return (
+            <Sequence
+              key={`facemask-${idx}-${startFrame}`}
+              from={startFrame}
+              durationInFrames={segDuration}
+              layout="none"
+            >
+              <FaceMaskOverlay
+                src={shot.outputUrl}
+                cxPx={cxPx}
+                cyPx={cyPx}
+                radiusPx={radiusPx}
+              />
+            </Sequence>
+          );
+        }
+
         const useCrop = !!shot.crop && Number(shot.crop?.size) > 0;
         if (useCrop) {
           const crop = shot.crop!;
