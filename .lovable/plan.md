@@ -1,63 +1,112 @@
-## Ziel
+## Diagnose
 
-Den echten Sync.so-Fehler isolieren, anzeigen und je nach Fehlerklasse gezielt reagieren — statt jeden Fehler als „An unknown error occurred" zu sehen.
+Ja — wir konnten den aktuellen Failure deutlich genauer isolieren.
 
-## Root Cause
+**Betroffene Szene:** `bd60c826-a5d3-4857-a22a-aa7cfd7d6f6e`
 
-Sync.so liefert laut offizieller Webhook-Spec im `FAILED`-Payload zwei klar definierte Felder:
+**Was passiert ist:**
+- Pass 1, Samuel, `coords-pro` → erfolgreich.
+- Pass 2, Matthew, `coords-pro` → fehlgeschlagen.
+- Pass 3, Kailee, `coords-pro` → ebenfalls fehlgeschlagen.
+- Sync.so sendet im Webhook weiterhin nur:
+  - `error: "An unknown error occurred."`
+  - **kein** `error_code`
 
-- `error` — menschenlesbare Fehlermeldung
-- `error_code` — maschinenlesbarer Code aus einer festen Enum (z.B. `generation_input_audio_invalid`, `generation_pipeline_failed`, `generation_timeout`, `generation_infra_resource_exhausted`, `generation_audio_length_exceeded`, `generation_unhandled_error`)
+**Wichtig:** Die neue Diagnose liest `error` und `error_code` korrekt. In diesem konkreten Sync.so-Payload existiert aber tatsächlich kein `error_code`. Dadurch steht in unserem State weiter `sync_error_code: null`.
 
-Unser `extractError` in `sync-so-webhook` liest nur `error_message` / verschachtelte Varianten, aber **nicht** das offizielle Feld `error`. Ergebnis: wir loggen den generischen Fallback-String statt der echten Diagnose, und in `poll-dialog-shots` / `compose-dialog-segments` retryen wir blind, obwohl der Code uns sagen würde, ob Retry überhaupt sinnvoll ist.
+## Exakter Befund
 
-## Plan
+Der Fehler ist kein allgemeiner UI-Fehler und kein fehlender Parser mehr. Der Live-Failure hängt an dieser Kombination:
 
-### 1. Sync.so Webhook richtig parsen (`supabase/functions/sync-so-webhook/index.ts`)
+```text
+3 Sprecher
++ coords-pro / manual active_speaker_detection
++ einzelne Sprecher-WAVs mit langer Stille vor dem Sprachbeginn
++ Sync.so lipsync-2-pro
+= Sync.so gibt generischen Provider-Fehler ohne error_code zurück
+```
 
-- `extractError(payload)` erweitern um die offiziellen Spec-Felder: `payload.error`, `payload.error_code`, sowie `payload.data?.error` / `payload.data?.error_code` als Fallback.
-- Zwei separate Werte zurückgeben: `errorMessage` (string) **und** `errorCode` (string | null).
-- Beim Persistieren der fehlgeschlagenen Pass-Row in `dialog_shots` / `dialog_segments` beide Felder speichern (neue Spalte `sync_error_code TEXT`, plus `error_message` für den Text).
-- Falls Webhook-Payload trotzdem leer ist (kommt vor): einen GET-Call auf `https://api.sync.so/v2/generate/{job_id}` mit dem `SYNC_API_KEY` machen und Felder dort holen — das ist die offizielle Recovery-Methode.
+Aus den gespeicherten Dispatch-Diagnosen für Matthew:
 
-### 2. Fehlercode-Klassifizierung (neuer Helper `_shared/syncSoErrorPolicy.ts`)
+```text
+audio_dur_sec: 9.0
+leadInSec: 2.746s
+voicedSec: 0.52s
+coords: [639, 220]
+frame_number: 76
+variant: coords-pro
+Sync.so result: FAILED, error_code: null
+```
 
-Eine zentrale Funktion `classifySyncError(code)` mit drei Buckets:
+Damit ist die wahrscheinlichste technische Ursache: **Sync.so scheitert bei per-speaker Full-Length-WAVs, wenn die Stimme erst mehrere Sekunden nach t=0 beginnt und gleichzeitig manuelles Face-Targeting auf einer 3-Personen-Plate aktiv ist.**
 
-| Bucket | Codes | Aktion |
-|---|---|---|
-| `retry_transient` | `generation_timeout`, `generation_infra_resource_exhausted`, `generation_infra_service_unavailable`, `generation_infra_storage_error`, `generation_database_error`, `generation_pipeline_failed`, `generation_unhandled_error` | Exponential Backoff, max 2 Retries auf demselben Pass |
-| `retry_with_repair` | `generation_input_audio_invalid`, `generation_media_metadata_missing` | Audio einmalig über ffmpeg neu encoden (`pcm_s16le`, sauberes WAV-Header) und genau 1× retryen |
-| `fail_fast` | `generation_audio_length_exceeded`, `generation_unsupported_model`, `generation_text_length_exceeded`, `generation_audio_missing`, `generation_video_missing` | Sofort als endgültig fehlgeschlagen markieren, Credit-Refund triggern, Code in UI surfacen |
+## Zusätzlich gefundene Schwachstellen in unserem Code
 
-Unbekannte Codes → wie `retry_transient` (1 Retry), danach als `fail_fast` mit Code im Fehlertext.
+1. **GET-Fallback wird zu selten ausgelöst**
+   - Aktuell fragen wir Sync.so per GET nur nach, wenn gar keine Fehlermeldung vorhanden ist.
+   - Hier ist aber eine generische Fehlermeldung vorhanden: `An unknown error occurred.`
+   - Deshalb wurde der GET-Fallback nicht ausgeführt, obwohl genau dieser Fall dafür relevant ist.
 
-### 3. Pass-Dispatch & Polling anpassen
+2. **3+-Sprecher-Fallback blockiert den Retry sofort**
+   - Bei 3+ Speakern blockieren wir `coords-pro → auto-pro`, um Face-Swaps zu vermeiden.
+   - Das ist grundsätzlich richtig, führt hier aber dazu, dass Matthew/Kailee nach einem einzigen generischen Provider-Failure direkt als endgültig fehlgeschlagen behandelt werden.
 
-- `sync-so-webhook`: bei `FAILED` Bucket bestimmen → bei `retry_*` Pass auf `pending` zurücksetzen und Retry-Counter inkrementieren statt sofort die ganze Szene zu kippen.
-- `poll-dialog-shots` / `compose-dialog-segments`: Retry-Counter (`sync_retry_count`) respektieren, max 2, danach Szene als `failed` mit dem klaren Code im `error_message`.
-- Bei `retry_with_repair`: vor dem nächsten Dispatch das WAV durch eine kleine `repairAudio()`-Routine schicken (FFmpeg via vorhandene Stack, gleiches Pattern wie in `poll-dialog-shots` `normalize_failed`-Pfad).
+3. **Failed-Pass-State bleibt inkonsistent**
+   - Die Szene wird oben als `failed` markiert, aber einzelne Passes bleiben in `rendering` stehen.
+   - Das erschwert Diagnose, UI und Watchdog-Recovery.
 
-### 4. UI: Fehlercode anzeigen
+## Plan zur Behebung
 
-- In der Szenen-Karte / Dialog-Shot-Statusanzeige zusätzlich zum „failed"-Badge den `sync_error_code` und eine 1-zeilige menschenlesbare Erklärung anzeigen (Mapping aus `classifySyncError`-Helper).
-- So sieht der User direkt z.B. „`generation_pipeline_failed` — Sync.so-Pipeline-Fehler, Retry läuft (2/2)" statt „An unknown error occurred".
+### 1. GET-Fallback auch bei generischem Sync.so-Fehler erzwingen
 
-### 5. Backfill der aktuell fehlgeschlagenen Szenen
+In `sync-so-webhook`:
+- Wenn `status=FAILED` und `error` exakt/ähnlich `An unknown error occurred.` ist, trotzdem `GET /v2/generate/{job_id}` ausführen.
+- Falls GET weiterhin keinen `error_code` liefert, speichern wir explizit:
+  - `sync_error_code: null`
+  - `sync_error_bucket: provider_unknown_no_code`
+  - `sync_error_explain: Sync.so returned only a generic provider failure`
 
-- Einmal-Skript (oder Edge-Function `lipsync-watchdog`-Erweiterung) das alle `dialog_shots` mit `status='failed'` der letzten 24h nimmt, deren `job_id` per GET an Sync.so abfragt und `sync_error_code` nachträgt — damit wir endlich datenbasiert sehen, ob die 3-Sprecher-Failures wirklich alle `generation_pipeline_failed` sind oder z.B. `generation_input_audio_invalid` (was Audio-Repair als Lösung bestätigen würde).
-- Szene `6d00a2b8…` und die anderen aktuell roten Szenen werden anschließend auf `pending` resettet (ohne neuen Credit-Abzug) und durchlaufen den neuen Pfad.
+### 2. Provider-Unknown bei 3+ Speakern nicht mehr über Auto-Fallback lösen
 
-## Betroffene Dateien
+Statt bei 3+ Speakern `auto-pro` zu versuchen oder sofort zu failen:
+- `provider_unknown_error` + `coords-pro` + `speakerCount >= 3` wird als **input-shape issue** behandelt.
+- Nächster Retry bleibt `coords-pro`, aber mit repariertem Audio.
+- Kein `auto_detect: true`, damit keine Sprecher-/Face-Swaps entstehen.
 
-- `supabase/functions/sync-so-webhook/index.ts` — Parser + Retry-Routing
-- `supabase/functions/poll-dialog-shots/index.ts` — Retry-Counter + Audio-Repair-Pfad
-- `supabase/functions/compose-dialog-segments/index.ts` — gleiche Retry-Logik
-- `supabase/functions/_shared/syncSoErrorPolicy.ts` (neu) — Klassifizierung
-- `supabase/functions/lipsync-watchdog/index.ts` — Backfill-Endpoint
-- DB-Migration: `dialog_shots.sync_error_code TEXT`, `dialog_shots.sync_retry_count INT DEFAULT 0` (analog für `dialog_segments`)
-- Frontend: Dialog-Shot-Status-Komponente (1 Komponente in `src/components/`-Composer-Bereich) für Code-Anzeige
+### 3. Per-speaker Audio vor Sync.so trimmen oder reparieren
 
-## Warum das das eigentliche Problem löst
+In `compose-dialog-segments`:
+- Für jeden Pass wird nicht mehr das 9s Full-Length-WAV mit langer Stille geschickt.
+- Stattdessen erzeugen wir eine provider-freundliche Audio-Version:
+  - Stimme beginnt bei t≈0.
+  - Minimaler Lead-in ca. 0.15–0.25s.
+  - WAV bleibt PCM 16-bit.
+  - Original Timing wird im späteren Fan-in/Compositor weiter berücksichtigt.
 
-Sobald wir den echten `error_code` haben, brauchen wir nicht mehr zu raten ob 3-Sprecher-Plates das Provider-Modell überfordern (`generation_pipeline_failed` → Provider-Issue, Retry hilft) oder ob unser WAV mit dem Lead-In fehlerhaft ist (`generation_input_audio_invalid` → Audio-Repair behebt es deterministisch). Erst dann wissen wir, ob Routing-Umbau (poll-dialog-shots-Pfad) überhaupt nötig ist oder ob Audio-Repair + Retry reicht.
+Das adressiert genau den Live-Befund: Matthew hat nur 0.52s Sprache, aber 2.746s Stille vor dem Einsatz.
+
+### 4. Pass-State korrekt patchen
+
+Bei endgültigem Failure:
+- Den betroffenen Pass explizit auf `failed` setzen.
+- `last_error`, `sync_error_code`, `sync_error_bucket`, `finished_at` direkt am Pass speichern.
+- Nicht betroffene laufende/pending Passes entweder sauber abbrechen oder als `canceled_by_scene_failure` markieren.
+
+### 5. UI-Diagnose klarer machen
+
+Wenn Sync.so keinen Code liefert, soll die UI nicht nur `An unknown error occurred` zeigen, sondern:
+
+```text
+Sync.so hat keinen error_code geliefert.
+Wahrscheinliche Ursache: 3-Sprecher-Plate + lange Stille vor Sprecher-Audio + Face-Targeting.
+Audio-Reparatur/Trim-Retry wird verwendet.
+```
+
+## Erwartetes Ergebnis
+
+Nach Umsetzung wird der nächste 3-Sprecher-Lip-Sync nicht mehr nach dem ersten generischen Sync.so-Fehler abbrechen. Stattdessen wird:
+
+1. der echte GET-Fallback versucht,
+2. bei weiterhin fehlendem `error_code` die bekannte `provider_unknown_no_code`-Klasse gespeichert,
+3. der betroffene Sprecher mit getrimmtem/repariertem Audio erneut als `coords-pro` gestartet,
+4. der State konsistent bleiben, falls Sync.so trotzdem endgültig scheitert.
