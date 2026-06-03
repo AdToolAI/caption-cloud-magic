@@ -146,7 +146,12 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const dialogShotRows = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
-            d.dialog_shots?.version === 4 &&
+            // v4 = legacy per-turn pipeline; v5 with shots[] = new per-turn
+            // pipeline produced by compose-dialog-scene. Both are advanced by
+            // poll-dialog-shots. v5 sync-segments has `passes[]` (no shots[])
+            // and runs via sync-so-webhook — skip it here.
+            (d.dialog_shots?.version === 4 ||
+              (d.dialog_shots?.version === 5 && Array.isArray(d.dialog_shots?.shots))) &&
             !d.lip_sync_applied_at &&
             (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching') &&
             ['queued', 'lipsyncing', 'stitching'].includes(String(d.dialog_shots?.status)) &&
