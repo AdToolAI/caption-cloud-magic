@@ -271,10 +271,21 @@ serve(async (req) => {
           lipScene?.twoshot_stage === 'complete';
         const alreadyRunning =
           lipScene?.lip_sync_status === 'running' ||
+          lipScene?.lip_sync_status === 'queued' ||
+          lipScene?.twoshot_stage === 'composing_dialog' ||
+          lipScene?.twoshot_stage === 'dialog_chain' ||
           (typeof lipScene?.replicate_prediction_id === 'string' && lipScene.replicate_prediction_id.startsWith('sync:'));
         const wasCanceled =
           (lipScene?.lip_sync_status as any) === 'canceled' ||
           (lipScene?.lip_sync_status as any) === 'cancelled';
+        // v22: do NOT auto-replay a previously-failed dialog setup. Webhook
+        // retries from Replicate would otherwise nuke the failed state via
+        // compose-dialog-scene's reset paths and loop forever. User must
+        // manually re-trigger "Clip + Lip-Sync neu rendern" to retry.
+        const alreadyFailed =
+          (lipScene?.lip_sync_status as any) === 'failed' ||
+          (lipScene?.twoshot_stage as any) === 'failed' ||
+          (lipScene?.twoshot_stage as any) === 'needs_clip_rerender';
 
         const isTalkingHeadClip =
           typeof lipScene?.clip_url === "string" &&
