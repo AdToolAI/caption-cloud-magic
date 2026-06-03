@@ -377,9 +377,21 @@ serve(async (req) => {
         console.warn(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1} re-host: ${(err as Error).message}`);
       }
 
-      if (passes[currentPass]) {
-        passes[currentPass] = {
-          ...passes[currentPass],
+      // v29: Re-read the latest passes[] from the DB and merge ONLY our
+      // pass's done-patch so concurrent COMPLETED/FAILED webhooks for sibling
+      // passes don't clobber each other's job_ids/status.
+      const { data: freshDoneRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
+      const freshDonePasses: any[] = Array.isArray(freshDoneState?.passes)
+        ? freshDoneState.passes.map((p: any) => ({ ...p }))
+        : passes;
+      if (freshDonePasses[currentPass]) {
+        freshDonePasses[currentPass] = {
+          ...freshDonePasses[currentPass],
           status: "done",
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
@@ -387,15 +399,15 @@ serve(async (req) => {
         };
       }
 
-      const doneCount = passes.filter((p: any) => p?.status === "done").length;
-      const failedCount = passes.filter((p: any) => p?.status === "failed").length;
+      const doneCount = freshDonePasses.filter((p: any) => p?.status === "done").length;
+      const failedCount = freshDonePasses.filter((p: any) => p?.status === "failed").length;
       const allDone = doneCount === totalPasses && failedCount === 0;
 
       // Find pending passes (deferred earlier or never dispatched). These
       // need an explicit advance dispatch — without this, scenes whose
       // fan-out hit the Sync.so concurrency limit on initial dispatch
       // would never complete the remaining speakers.
-      const pendingIdxs = passes
+      const pendingIdxs = freshDonePasses
         .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
         .filter((i: number) => i >= 0);
 
@@ -404,7 +416,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: { ...state, passes, status: "rendering", updated_at: nowIso },
+            dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
             lip_sync_status: "running",
             twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
             updated_at: nowIso,
@@ -428,7 +440,7 @@ serve(async (req) => {
       }
 
       // ── All passes complete ──────────────────────────────────────────
-      const finalUrl = (passes[passes.length - 1] as any)?.output_url ?? outputUrl;
+      const finalUrl = (freshDonePasses[freshDonePasses.length - 1] as any)?.output_url ?? outputUrl;
 
       // Single-speaker fast path: no fan-in needed, audio already matches.
       if (totalPasses === 1) {
@@ -436,7 +448,7 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: {
-              ...state, passes,
+              ...freshDoneState, passes: freshDonePasses,
               status: "done",
               final_url: finalUrl,
               sync_so_url: outputUrl,
@@ -460,7 +472,7 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: {
-            ...state, passes,
+            ...freshDoneState, passes: freshDonePasses,
             status: "audio_muxing",
             final_url: finalUrl,
             sync_so_url: outputUrl,
@@ -572,17 +584,19 @@ serve(async (req) => {
       let forceCoordsRepair = false;
       const isProviderUnknown =
         codeBucket === "unknown" && errClass === "provider_unknown_error";
+      // v29: For 3+ speakers with provider_unknown_error (no error_code),
+      // stay on coords-pro and force audio repair on EVERY retry up to
+      // MAX_V5_RETRIES instead of jumping to auto-* (face-swap risk).
       if (
         speakerCount >= 3 &&
         currentVariant === "coords-pro" &&
         isProviderUnknown &&
-        !currentPassState?.repair_audio &&
-        passRetryCount === 0
+        passRetryCount < MAX_V5_RETRIES
       ) {
         nextVariant = "coords-pro";
         forceCoordsRepair = true;
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry instead of auto-* fallback`,
+          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES} (no auto-* fallback)`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
@@ -613,8 +627,19 @@ serve(async (req) => {
       if (canRetry) {
         const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
 
-        // Patch the failed pass in-place with per-pass retry bookkeeping.
-        const updatedPasses = passesArr.map((p, i) =>
+        // v29: Re-read scene right before write so parallel pass webhooks
+        // don't clobber each other's job_ids. We only own the row at
+        // `currentPass` — everything else is merged from the freshest state.
+        const { data: freshRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const freshState: any = (freshRow as any)?.dialog_shots ?? state;
+        const freshPasses: any[] = Array.isArray(freshState?.passes)
+          ? freshState.passes
+          : passesArr;
+        const updatedPasses = freshPasses.map((p: any, i: number) =>
           i === currentPass
             ? {
                 ...p,
@@ -633,11 +658,9 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: {
-              ...state,
+              ...freshState,
               passes: updatedPasses,
               status: "retrying",
-              // Top-level mirrors the active pass for backward-compat with
-              // any downstream code still reading `state.retry_variant`.
               retry_variant: nextVariant,
               retry_count: aggregateRetryCount + 1,
               last_error: rawErr.slice(0, 200),
@@ -645,7 +668,7 @@ serve(async (req) => {
               sync_error_code: errorCode ?? null,
               sync_error_bucket: codeBucket,
               fallback_history: [
-                ...((state as any).fallback_history ?? []),
+                ...((freshState as any).fallback_history ?? []),
                 {
                   at: nowIso,
                   job_id: jobId,
@@ -660,7 +683,7 @@ serve(async (req) => {
               ].slice(-16),
             },
             lip_sync_status: "running",
-            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((state as any).total_passes ?? passesArr.length ?? 1)}`,
+            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((freshState as any).total_passes ?? freshPasses.length ?? 1)}`,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
@@ -707,7 +730,26 @@ serve(async (req) => {
         : codeBucket;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
-      if (cost > 0 && !alreadyRefunded) {
+      // v29: Determine scene survivability FIRST (re-read state below). Only
+      // refund + mark scene failed if no sibling pass is still alive.
+      const { data: freshFailRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshFailState: any = (freshFailRow as any)?.dialog_shots ?? state;
+      const freshFailPasses: any[] = Array.isArray(freshFailState?.passes)
+        ? freshFailState.passes
+        : passesArr;
+      const aliveSiblings = freshFailPasses
+        .map((p: any, i: number) => ({ p, i }))
+        .filter(({ p, i }) =>
+          i !== currentPass &&
+          ["rendering", "retrying", "pending"].includes(String(p?.status ?? "")),
+        );
+      const sceneWillFail = aliveSiblings.length === 0;
+
+      if (sceneWillFail && cost > 0 && !alreadyRefunded) {
         const { data: row } = await supabase
           .from("composer_scenes")
           .select("project_id")
@@ -731,55 +773,71 @@ serve(async (req) => {
             .eq("user_id", uid);
         }
       }
-      // Patch the failing pass + cancel any still-running siblings so the
-      // state is consistent (previously sibling passes stayed in 'rendering'
-      // forever and the watchdog had to clean them up).
-      const finalPasses = passesArr.map((p: any, i: number) => {
-        if (i === currentPass) {
-          return {
-            ...p,
-            status: "failed",
-            finished_at: nowIso,
-            last_error: rawErr.slice(0, 200),
-            last_error_class: errClass,
-            sync_error_code: errorCode ?? null,
-            sync_error_bucket: effectiveBucket,
-          };
-        }
-        if (p?.status === "rendering" || p?.status === "pending" || p?.status === "retrying") {
-          return {
-            ...p,
-            status: "canceled_by_scene_failure",
-            finished_at: nowIso,
-          };
+      // (freshFailState/freshFailPasses/aliveSiblings/sceneWillFail are
+      // already computed above for the refund decision.)
+      const patchedThisPass = (p: any) => ({
+        ...p,
+        status: "failed",
+        finished_at: nowIso,
+        last_error: rawErr.slice(0, 200),
+        last_error_class: errClass,
+        sync_error_code: errorCode ?? null,
+        sync_error_bucket: effectiveBucket,
+      });
+
+      const finalPasses = freshFailPasses.map((p: any, i: number) => {
+        if (i === currentPass) return patchedThisPass(p);
+        if (!sceneWillFail) return p; // keep siblings untouched
+        // Scene-wide fail: cancel anything still alive.
+        if (["rendering", "retrying", "pending"].includes(String(p?.status ?? ""))) {
+          return { ...p, status: "canceled_by_scene_failure", finished_at: nowIso };
         }
         return p;
       });
-      await supabase
-        .from("composer_scenes")
-        .update({
-          dialog_shots: {
-            ...state,
-            passes: finalPasses,
-            status: "failed",
-            finished_at: nowIso,
-            refunded: cost > 0,
-            error: reason,
-            last_error_class: errClass,
-            sync_error_code: errorCode ?? null,
-            sync_error_bucket: effectiveBucket,
-            sync_error_explain: codeExplain ?? null,
-          },
-          lip_sync_status: "failed",
-          twoshot_stage: "failed",
-          clip_error: reason,
-          updated_at: nowIso,
-        })
-        .eq("id", sceneId);
 
-      console.warn(
-        `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
-      );
+      if (sceneWillFail) {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...freshFailState,
+              passes: finalPasses,
+              status: "failed",
+              finished_at: nowIso,
+              refunded: cost > 0,
+              error: reason,
+              last_error_class: errClass,
+              sync_error_code: errorCode ?? null,
+              sync_error_bucket: effectiveBucket,
+              sync_error_explain: codeExplain ?? null,
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: reason,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
+        );
+      } else {
+        // Roll back the refund decision: scene still has alive siblings, so
+        // we must NOT refund yet. Only patch this pass and keep going.
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...freshFailState,
+              passes: finalPasses,
+              // keep top-level status as-is (rendering/audio_muxing/retrying)
+            },
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but ${aliveSiblings.length} sibling(s) still alive — scene kept running, no refund yet`,
+        );
+      }
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
   }
