@@ -407,20 +407,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // Route by speaker count (root-cause fix, June 2026):
-          //   • 1–2 speakers → v5 `compose-dialog-segments` (multi-pass chain
-          //     on lipsync-2-pro). Stable in this regime, faster, single
-          //     webhook, single refund.
-          //   • ≥3 speakers  → v4 `compose-dialog-scene` (true Artlist-style:
-          //     one Sync.so call per TURN, all on the ORIGINAL pristine plate
-          //     in parallel, then Lambda overlay-stitch via DialogStitchVideo
-          //     with crossfade). v5's chain feeds Sync.so its own output for
-          //     pass 2/3, which lipsync-2-pro (diffusion model) rejects with
-          //     opaque "unknown error" — fundamentally unstable, not patchable.
-          //   • `engine_override === 'cinematic-sync-legacy'` forces v4
-          //     regardless of speaker count (manual escape hatch).
+          // v25 Fan-Out (June 2026): ALL 1–4 speaker scenes route to
+          // `compose-dialog-segments`. Segments now dispatches N parallel
+          // Sync.so jobs, each on the ORIGINAL pristine master plate, and
+          // the feathered-mask compositor in `render-sync-segments-audio-mux`
+          // fans them back in. No more chained Sync.so outputs ⇒ no more
+          // opaque "unknown error" on pass 2/3.
+          // `cinematic-sync-legacy` keeps the old per-turn forwarder as a
+          // manual escape hatch.
           const fnName =
-            d.engine_override === 'cinematic-sync-legacy' || speakers >= 3
+            d.engine_override === 'cinematic-sync-legacy'
               ? 'compose-dialog-scene'
               : 'compose-dialog-segments';
 
