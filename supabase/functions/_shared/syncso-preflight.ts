@@ -894,6 +894,108 @@ export function isTransientSyncError(errorClass: string): boolean {
   ].includes(errorClass);
 }
 
+/**
+ * Map the OFFICIAL Sync.so `error_code` enum (from the webhook spec) to a
+ * routing bucket. Source of truth:
+ *   https://sync.so/docs/developer-guides/error-handling
+ *
+ * Returns:
+ *   - "retry_transient"   → safe to retry as-is (infra / provider blips)
+ *   - "retry_with_repair" → retry after re-encoding the input audio (WAV repair)
+ *   - "fail_fast"         → permanent: refund + surface code to user
+ *   - "unknown"           → no official code → fall back to message classifier
+ */
+export type SyncCodeBucket = "retry_transient" | "retry_with_repair" | "fail_fast" | "unknown";
+
+export function classifySyncErrorCode(code?: string | null): SyncCodeBucket {
+  if (!code) return "unknown";
+  const c = String(code).trim().toLowerCase();
+  // Transient — provider/infra issues, retry with same payload
+  if ([
+    "generation_timeout",
+    "generation_pipeline_failed",
+    "generation_unhandled_error",
+    "generation_database_error",
+    "generation_infra_storage_error",
+    "generation_infra_resource_exhausted",
+    "generation_infra_service_unavailable",
+  ].includes(c)) return "retry_transient";
+  // Audio invalid — re-encode WAV (pcm_s16le) and retry once
+  if ([
+    "generation_input_audio_invalid",
+    "generation_media_metadata_missing",
+  ].includes(c)) return "retry_with_repair";
+  // Permanent input errors — no retry helps
+  if ([
+    "generation_audio_length_exceeded",
+    "generation_text_length_exceeded",
+    "generation_unsupported_model",
+    "generation_audio_missing",
+    "generation_video_missing",
+    "generation_input_validation_failed",
+    "generation_internal_auth",
+  ].includes(c)) return "fail_fast";
+  return "unknown";
+}
+
+/** Human-readable explanation for a Sync.so error_code (UI/diagnostics). */
+export function explainSyncErrorCode(code?: string | null): string | null {
+  if (!code) return null;
+  const map: Record<string, string> = {
+    generation_timeout: "Sync.so timed out (provider under load) — retrying",
+    generation_pipeline_failed: "Sync.so pipeline error — retrying with variant ladder",
+    generation_unhandled_error: "Sync.so unexpected error — retrying",
+    generation_database_error: "Sync.so database error — retrying",
+    generation_infra_storage_error: "Sync.so storage error — retrying",
+    generation_infra_resource_exhausted: "Sync.so capacity full — retrying",
+    generation_infra_service_unavailable: "Sync.so service unavailable — retrying",
+    generation_input_audio_invalid: "Audio metadata invalid — re-encoding and retrying",
+    generation_media_metadata_missing: "Audio/video metadata missing — re-encoding and retrying",
+    generation_audio_length_exceeded: "Audio over 300s — cannot lipsync (split the dialog)",
+    generation_text_length_exceeded: "Script over 5000 chars — shorten the dialog",
+    generation_unsupported_model: "Selected lipsync model not available",
+    generation_audio_missing: "Voiceover audio missing — regenerate the dialog",
+    generation_video_missing: "Source video missing — regenerate the scene clip",
+    generation_input_validation_failed: "Sync.so rejected the input — check audio/video format",
+    generation_internal_auth: "Sync.so authentication failed — contact support",
+  };
+  return map[String(code).toLowerCase()] ?? null;
+}
+
+/**
+ * GET-fallback: when a FAILED webhook arrives with an empty payload, hit
+ * `https://api.sync.so/v2/generate/{job_id}` to fetch the official
+ * `error` + `error_code` fields. Returns null on any failure (callers
+ * keep the original webhook fields).
+ */
+export async function fetchSyncJobError(jobId: string): Promise<{
+  error?: string | null;
+  error_code?: string | null;
+} | null> {
+  const apiKey = Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY");
+  if (!apiKey || !jobId) return null;
+  try {
+    const r = await fetch(`https://api.sync.so/v2/generate/${encodeURIComponent(jobId)}`, {
+      method: "GET",
+      headers: { "x-api-key": apiKey, "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!r.ok) {
+      console.warn(`[syncso-preflight] GET generation ${jobId} → HTTP ${r.status}`);
+      return null;
+    }
+    const j = await r.json().catch(() => null);
+    if (!j) return null;
+    return {
+      error: typeof j.error === "string" ? j.error : null,
+      error_code: typeof j.error_code === "string" ? j.error_code : null,
+    };
+  } catch (e) {
+    console.warn(`[syncso-preflight] GET generation ${jobId} crash: ${(e as Error)?.message ?? e}`);
+    return null;
+  }
+}
+
 // ── Face validation helper (Stage D) ────────────────────────────────────
 
 export interface FaceValidationResult {
