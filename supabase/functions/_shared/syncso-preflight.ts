@@ -996,6 +996,70 @@ export async function fetchSyncJobError(jobId: string): Promise<{
   }
 }
 
+// ── WAV lead-in trim (Stage v28) ────────────────────────────────────────
+/**
+ * Strip leading silence from a 16-bit PCM WAV so the voice starts at
+ * `keepLeadInSec` (default 0.2s). Sync.so `lipsync-2-pro` fails opaquely
+ * ("An unknown error occurred." with no error_code) when given a 9s WAV
+ * whose voice only starts at t=2.7s on a multi-face plate with manual
+ * `active_speaker_detection`. Trimming to voice-onset removes the trigger
+ * without changing voice content. Returns a fresh RIFF/WAVE.
+ */
+export function trimWavLeadIn(
+  wav: Uint8Array,
+  opts: { keepLeadInSec?: number } = {},
+): { bytes: Uint8Array; info: WavInfo; trimmedSec: number } {
+  const keep = Math.max(0, opts.keepLeadInSec ?? 0.2);
+  const info = inspectWav(wav);
+  if (info.leadInSec <= keep + 0.05) {
+    // Nothing meaningful to trim.
+    return { bytes: wav, info, trimmedSec: 0 };
+  }
+  const sr = info.sampleRate;
+  const channels = info.channels;
+  const bytesPerFrame = channels * 2;
+  const dv = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+
+  const dropFrames = Math.max(0, Math.round((info.leadInSec - keep) * sr));
+  const remainingFrames = Math.max(0, info.totalFrames - dropFrames);
+  const outDataLen = remainingFrames * bytesPerFrame;
+
+  const out = new ArrayBuffer(44 + outDataLen);
+  const ov = new DataView(out);
+  ov.setUint32(0, 0x52494646, false);
+  ov.setUint32(4, 36 + outDataLen, true);
+  ov.setUint32(8, 0x57415645, false);
+  ov.setUint32(12, 0x666d7420, false);
+  ov.setUint32(16, 16, true);
+  ov.setUint16(20, 1, true);
+  ov.setUint16(22, channels, true);
+  ov.setUint32(24, sr, true);
+  ov.setUint32(28, sr * bytesPerFrame, true);
+  ov.setUint16(32, bytesPerFrame, true);
+  ov.setUint16(34, 16, true);
+  ov.setUint32(36, 0x64617461, false);
+  ov.setUint32(40, outDataLen, true);
+
+  const srcByteOff = info.dataOff + dropFrames * bytesPerFrame;
+  const srcSlice = new Uint8Array(
+    wav.buffer,
+    wav.byteOffset + srcByteOff,
+    outDataLen,
+  );
+  new Uint8Array(out, 44, outDataLen).set(srcSlice);
+
+  const outBytes = new Uint8Array(out);
+  const outInfo: WavInfo = {
+    ...info,
+    totalFrames: remainingFrames,
+    durSec: remainingFrames / sr,
+    leadInSec: keep,
+    dataOff: 44,
+    dataLen: outDataLen,
+  };
+  return { bytes: outBytes, info: outInfo, trimmedSec: dropFrames / sr };
+}
+
 // ── Face validation helper (Stage D) ────────────────────────────────────
 
 export interface FaceValidationResult {
