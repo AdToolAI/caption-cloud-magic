@@ -590,6 +590,7 @@ serve(async (req) => {
         && nextVariant !== null;
 
       if (canRetry) {
+        const needsAudioRepair = codeBucket === "retry_with_repair";
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
@@ -600,6 +601,9 @@ serve(async (req) => {
                 retry_variant: nextVariant,
                 last_error: rawErr.slice(0, 200),
                 last_error_class: errClass,
+                sync_error_code: errorCode ?? null,
+                sync_error_bucket: codeBucket,
+                repair_audio: needsAudioRepair || !!p.repair_audio,
               }
             : p,
         );
@@ -616,6 +620,8 @@ serve(async (req) => {
               retry_count: aggregateRetryCount + 1,
               last_error: rawErr.slice(0, 200),
               last_error_class: errClass,
+              sync_error_code: errorCode ?? null,
+              sync_error_bucket: codeBucket,
               fallback_history: [
                 ...((state as any).fallback_history ?? []),
                 {
@@ -625,6 +631,8 @@ serve(async (req) => {
                   from_variant: currentVariant,
                   to_variant: nextVariant,
                   error_class: errClass,
+                  sync_error_code: errorCode ?? null,
+                  sync_error_bucket: codeBucket,
                   error: rawErr.slice(0, 200),
                 },
               ].slice(-16),
@@ -635,7 +643,7 @@ serve(async (req) => {
           })
           .eq("id", sceneId);
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}`,
+          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}${needsAudioRepair ? " +repair_audio" : ""}`,
         );
         // Fire-and-forget re-dispatch. compose-dialog-segments reads the
         // existing state (cost_credits already debited and stored) and uses
@@ -647,18 +655,28 @@ serve(async (req) => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${serviceKey}`,
             },
-            body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: nextVariant }),
+            body: JSON.stringify({
+              scene_id: sceneId,
+              retry: true,
+              retry_variant: nextVariant,
+              repair_audio: needsAudioRepair,
+              pass_idx: currentPass,
+            }),
           }).catch(() => {});
         } catch {
           /* ignore */
         }
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true, retry_variant: nextVariant });
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true, retry_variant: nextVariant, sync_error_code: errorCode ?? null });
       }
 
 
 
       // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
-      const reason = `syncso_segments_${status}: ${rawErr.slice(0, 200)}`;
+      // Prefix the reason with the official error_code (when present) so the
+      // UI badge surfaces a real diagnostic instead of "unknown error".
+      const codePrefix = errorCode ? `[${errorCode}] ` : "";
+      const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
+      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}`;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
@@ -695,6 +713,9 @@ serve(async (req) => {
             refunded: cost > 0,
             error: reason,
             last_error_class: errClass,
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: codeBucket,
+            sync_error_explain: codeExplain ?? null,
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
@@ -703,7 +724,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.warn(
-        `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
+        `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
       );
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
