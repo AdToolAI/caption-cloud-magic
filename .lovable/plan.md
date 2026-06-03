@@ -1,101 +1,130 @@
 ## Befund
 
-Der neue fehlgeschlagene Run ist Szene `ace1a0d0-f9bd-4982-b306-3414db03c12b`.
+Ja — der Fehler ist jetzt deutlich genauer isoliert.
 
-Was wir jetzt genauer isolieren konnten:
+Der aktuelle fehlgeschlagene Run ist Szene `24998e98-b53f-4b52-aed6-95ce26ee7ffa`.
 
-1. **Sync.so liefert weiterhin keinen echten Fehlercode**
-   - Webhook und GET-Fallback melden beide nur:
+Was wir sicher sehen:
+
+1. **Sync.so bricht weiterhin mit einem Provider-Fehler ohne Fehlercode ab**
+   - Webhook und GET-Fallback melden weiter nur:
      - `error: "An unknown error occurred."`
      - `error_code: null`
-   - Damit ist der externe Provider-Fehler selbst nicht weiter maschinenlesbar klassifizierbar.
+   - Das ist kein normaler Validierungsfehler mit offizieller Fehlernummer, sondern ein interner/undurchsichtiger Sync.so-Fehler.
 
-2. **Unsere Audio-Trim-Reparatur hat teilweise gegriffen**
-   - Matthew wurde von `2.46s` Lead-In auf `0.20s` getrimmt.
-   - Kailee wurde von `3.75s` Lead-In auf `0.20s` getrimmt.
-   - Samuel hatte nur `0.10s` Lead-In und wurde im ersten Versuch nicht getrimmt.
+2. **Das Problem tritt bei `lipsync-2-pro` + manueller Sprecher-Auswahl auf**
+   - Payload nutzt:
+     - Modell: `lipsync-2-pro`
+     - `active_speaker_detection.auto_detect=false`
+     - feste Koordinaten pro Sprecher
+   - Sync.so-Doku bestätigt: manuelle Sprecher-Auswahl erfolgt über `frame_number + coordinates` oder alternativ über `bounding_boxes`.
 
-3. **Der eigentliche neue Blocker ist ein Multi-Pass-Race im Retry-State**
-   - Pass 2 und Pass 3 wurden parallel gestartet.
-   - Als deren FAILED-Webhooks ankamen, fand `sync-so-webhook` deren `job_id` nicht mehr in `dialog_shots.passes[]`:
-     - `job=... not in passes[] (count=3) and not top-level — skip`
-   - Ursache: Der Retry von Pass 1 schreibt einen älteren `passes[]`-Snapshot zurück und überschreibt dadurch parallel gestartete Pass-Job-IDs.
-   - Dadurch werden die Webhooks von Pass 2/3 verworfen, und die Szene fällt anschließend anhand von Pass 1 hart durch.
+3. **Audio-Reparatur wurde tatsächlich benutzt, aber löst den Provider-Fehler nicht zuverlässig**
+   - Die fehlgeschlagenen Payloads verwenden bereits `*-trim.wav`.
+   - Damit ist „zu viel Lead-In-Silence im WAV“ nicht mehr die Hauptursache.
 
-4. **Der Retry-Ladder-Guard ist zu streng für 3+ Sprecher**
-   - Nach `coords-pro + repair_audio` blockiert der Code `auto-pro`, um Face-Swaps zu vermeiden.
-   - Das ist grundsätzlich richtig, aber aktuell führt es dazu, dass nach nur einem reparierten Versuch sofort endgültig failed/refunded wird.
+4. **Unser Circuit Breaker hat danach weitere Versuche blockiert**
+   - Nach mehreren `provider_unknown_error`-Fehlern wurde der Sync.so-Circuit geöffnet:
+     - `CIRCUIT_OPEN state=open reason=rolling_threshold`
+     - danach `syncso_circuit_open:circuit_open`
+   - Der UI-Abbruch ist daher aktuell nicht nur der Provider-Fehler selbst, sondern auch unser Schutzmechanismus, der nach der Fehlerserie korrekt „zumacht“.
 
-## Ziel
+5. **Ein Pass hat funktioniert, zwei nicht**
+   - Aktueller State:
+     - Samuel: `failed`, `retry_count=2`
+     - Matthew: `done`
+     - Kailee: `retrying`, aber wegen Circuit Open nicht weiter dispatchbar
+   - Das spricht gegen ein generelles Auth/API/Storage-Problem. Es ist spezifisch für einzelne Sprecher-Zielpunkte/Frames/Face-Targeting in dieser 3-Personen-Plate.
 
-Lip-Sync bei 3-Sprecher-Szenen stabilisieren, ohne Face-Swaps zu riskieren und ohne Credits doppelt zu belasten.
+## Wahrscheinliche Root Cause
 
-## Plan
+Der eigentliche technische Kern ist jetzt:
 
-### 1. Webhook-State-Merge statt Snapshot-Overwrite
+**Sync.so `lipsync-2-pro` scheitert auf dieser 3-Personen-Scene-Plate bei manueller Face-Koordinaten-Auswahl für bestimmte Sprecher mit einem undokumentierten Provider-Fehler.**
 
-In `supabase/functions/sync-so-webhook/index.ts`:
+Unsere bisherigen Fixes haben Nebenprobleme verbessert:
 
-- Vor jedem Retry-Update die Szene erneut aus der Datenbank laden.
-- `passes[]` gezielt nach `idx` mergen statt den alten Array-Snapshot komplett zurückzuschreiben.
-- Bereits vorhandene `job_id`, `status`, `started_at`, `diagnostic_id` anderer parallel laufender Pässe dürfen nicht überschrieben werden.
-- Damit können Pass-2/Pass-3-Webhooks wieder zuverlässig zugeordnet werden.
+- Webhook-Race wurde entschärft.
+- Audio-Trim/Re-Encode wurde angewendet.
+- Retries laufen merge-sicherer.
 
-### 2. `compose-dialog-segments` Retry-State ebenfalls merge-sicher machen
+Aber der externe Provider lehnt bestimmte `coords-pro`-Jobs weiterhin ab, ohne einen offiziellen Fehlercode zu liefern.
 
-In `supabase/functions/compose-dialog-segments/index.ts`:
+## Nächster gezielter Fix
 
-- Beim Retry/Advance vor dem Speichern erneut den aktuellen `dialog_shots`-State laden.
-- Nur den gerade gestarteten Pass ersetzen.
-- Alle anderen Pass-Objekte aus dem neuesten DB-Stand übernehmen, falls dort bereits neuere `job_id`s existieren.
+Statt weiter blind Audio-Retries zu machen, würde ich den Fallback auf eine provider-kompatiblere Sprecher-Auswahl umbauen:
 
-### 3. 3+ Sprecher: keine komplette Szene beim ersten Pass-Fehler abbrechen
+### 1. Für 3+ Sprecher `bounding_boxes` statt nur `coordinates` testen
 
-In `sync-so-webhook`:
+In `compose-dialog-segments`:
 
-- Wenn 3+ Sprecher parallel laufen und ein Pass fehlschlägt, nicht sofort alle anderen Pässe canceln, solange andere Passes noch `rendering` sind.
-- Stattdessen:
-  - fehlgeschlagenen Pass markieren,
-  - laufende Geschwister weiter auswerten lassen,
-  - erst final failen, wenn klar ist, dass kein verwertbarer/repairbarer Pfad mehr offen ist.
+- Für jeden Sprecher aus vorhandener Face-Map/Koordinaten eine kleine Bounding Box um das Zielgesicht ableiten.
+- Sync.so-Payload für `coords-pro` ändern von:
 
-### 4. Reparatur-Ladder für `provider_unknown_no_code` erweitern
+```json
+"active_speaker_detection": {
+  "auto_detect": false,
+  "frame_number": 27,
+  "coordinates": [284, 232]
+}
+```
 
-Für 3+ Sprecher mit `error_code=null`:
+zu einer stabileren Variante:
 
-- Nicht auf `auto-pro` wechseln, solange Face-Swap-Risiko besteht.
-- Stattdessen eine zweite sichere `coords-pro`-Reparatur erlauben:
-  - Audio immer re-encoden/trimmen, auch bei Pass 1.
-  - Optionales `force_pcm_s16le`/normalisierte WAV-Metadaten setzen, falls die vorhandene Trim-Funktion nur Lead-In entfernt.
-- Erst danach endgültig failen/refunden.
+```json
+"active_speaker_detection": {
+  "auto_detect": false,
+  "bounding_boxes": [null, null, [x1, y1, x2, y2], null, ...]
+}
+```
 
-### 5. Diagnose im UI präziser machen
+bzw. mit einer kompakten per-frame Box-Liste an den relevanten Frames, sofern Sync.so die Liste clipweit verlangt.
 
-In `src/components/video-composer/ComposerSequencePreview.tsx`:
+Ziel: Sync.so bekommt nicht nur einen Punkt, sondern eine echte Face-Region. Das reduziert Fehlinterpretation bei mehreren Gesichtern.
 
-- Wenn `sync_error_bucket = provider_unknown_no_code`, anzeigen:
-  - Sync.so hat keinen offiziellen Fehlercode geliefert.
-  - Der Run wurde mit Audio-Repair und merge-sicherem Pass-Retry versucht.
-  - Falls danach noch failed: Ursache liegt sehr wahrscheinlich bei Sync.so `lipsync-2-pro` + manuelles Face-Targeting auf 3-Personen-Plate.
+### 2. Retry-Ladder anpassen
 
-### 6. Nach Implementierung deployen und validieren
+Für 3-Personen-Szenen:
 
-- Betroffene Edge Functions deployen:
-  - `sync-so-webhook`
+- Versuch 1: `coords-pro` mit Koordinate
+- Versuch 2: `coords-pro` mit Audio-Reparatur
+- Versuch 3: `coords-pro-box` mit Bounding Box
+- Erst danach optional `auto-pro`, aber nur wenn der Nutzer Face-Swap-Risiko akzeptiert oder als interner Notfall-Fallback für nur einen Sprecher-Pass.
+
+### 3. Circuit Breaker differenzieren
+
+Der Circuit Breaker darf nicht eine einzelne problematische 3-Sprecher-Szene so behandeln, als wäre der gesamte Sync.so-Dienst down.
+
+Anpassung:
+
+- `provider_unknown_error` bei `coords-pro` + 3+ Sprecher nicht sofort in den globalen Circuit-Breaker zählen lassen.
+- Stattdessen scene/pass-spezifisch zählen.
+- So blockiert ein kaputter Multi-Speaker-Run nicht weitere Reparaturpfade oder andere Szenen.
+
+### 4. Szene sauber terminieren statt „running + circuit_open“ hängen lassen
+
+Wenn der Circuit offen ist und keine Reparatur mehr möglich ist:
+
+- Scene final auf `failed` setzen.
+- Refund idempotent ausführen.
+- UI-Meldung präzise:
+  - „Sync.so hat bei manueller Sprecher-Zielauswahl auf einer 3-Personen-Plate ohne Fehlercode abgebrochen.“
+  - „Audio-Reparatur wurde versucht; nächster stabiler Pfad ist Bounding-Box-Targeting oder Scene neu rendern mit klareren Gesichtern.“
+
+### 5. Validierung
+
+Nach Implementierung:
+
+- Edge Functions deployen:
   - `compose-dialog-segments`
-- Logs prüfen, dass:
-  - Pass-2/Pass-3-Webhooks nicht mehr mit `not in passes[]` verworfen werden.
-  - `passes[]`-Job-IDs bei parallelen Writes erhalten bleiben.
-  - Refund weiterhin nur einmal erfolgt.
+  - `sync-so-webhook`
+- Neuen Test-Run starten.
+- Prüfen:
+  - keine `not in passes[]`-Drops
+  - keine unnötige globale Circuit-Blockade
+  - Payload enthält `bounding_boxes` beim neuen Fallback
+  - bei finalem Fehlschlag wird sauber failed/refunded statt endlos running/circuit_open
 
-## Technische Kurzfassung
+## Kurzantwort
 
-Das Problem ist jetzt klarer isoliert: **Sync.so bleibt bei `error_code=null`, aber unser System verliert durch parallele Pass-Updates Job-IDs im State. Dadurch werden Webhooks verworfen und der Retry wird zu früh als endgültig ausgeschöpft behandelt.**
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Ja: Wir wissen jetzt, dass es sehr wahrscheinlich **kein Audio-Problem mehr** ist, sondern ein **Sync.so-Providerproblem mit `lipsync-2-pro` + manueller Face-Koordinaten-Auswahl auf einer 3-Sprecher-Plate**. Der nächste sinnvolle Fix ist nicht noch mehr Audio-Repair, sondern **Bounding-Box-Targeting + scene-spezifischer Circuit Breaker**.

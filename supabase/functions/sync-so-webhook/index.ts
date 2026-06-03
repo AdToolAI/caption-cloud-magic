@@ -59,7 +59,9 @@ const ASSUMED_MASTER_FPS = 24;
 // would have recovered.
 const MAX_SHOT_RETRIES = 4;
 const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
-const V5_RETRY_VARIANTS = ["coords-pro", "auto-pro", "auto-standard"] as const;
+// v30 — Added "coords-pro-box" (bounding-box targeting) as a safer fallback
+// for 3+ speaker plates BEFORE jumping to auto-* (face-swap risk).
+const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
@@ -243,11 +245,21 @@ serve(async (req) => {
   await releaseInflightSyncJob(supabase, jobId);
 
   // Stage F.3 — feed the provider circuit breaker on terminal status.
+  // v30: Do NOT tick the global breaker on `provider_unknown_error` — that
+  // class is opaque and routinely triggered by single problematic multi-speaker
+  // plates (Sync.so refuses certain coords-pro jobs without an error_code).
+  // Counting these globally caused a single bad 3-speaker scene to slam the
+  // breaker OPEN and block every Sync.so dispatch (including its own
+  // bbox/repair retries) for 30 min.
   if (status === "COMPLETED") {
     await recordCircuitSuccess(supabase, "sync.so");
   } else {
     const cls = classifySyncError((errorMsg ?? "").toString());
-    await recordCircuitFailure(supabase, "sync.so", cls);
+    if (cls !== "provider_unknown_error") {
+      await recordCircuitFailure(supabase, "sync.so", cls);
+    } else {
+      console.log(`[sync-so-webhook] skip circuit-breaker tick (class=provider_unknown_error, scoped per-scene)`);
+    }
   }
 
 
@@ -519,7 +531,7 @@ serve(async (req) => {
       // budget per pass instead; keep top-level as aggregate for diagnostics.
       const passRetryCount = Number(currentPassState?.retry_count ?? 0);
       const aggregateRetryCount = Number((state as any).retry_count ?? 0);
-      const MAX_V5_RETRIES = 2;
+      const MAX_V5_RETRIES = 3;
 
       // Stage E.6 — persist the full webhook payload so we can post-mortem
       // "unknown error" without grepping logs. Keep it bounded.
@@ -584,19 +596,32 @@ serve(async (req) => {
       let forceCoordsRepair = false;
       const isProviderUnknown =
         codeBucket === "unknown" && errClass === "provider_unknown_error";
-      // v29: For 3+ speakers with provider_unknown_error (no error_code),
-      // stay on coords-pro and force audio repair on EVERY retry up to
-      // MAX_V5_RETRIES instead of jumping to auto-* (face-swap risk).
+      // v30: For 3+ speakers with provider_unknown_error (no error_code),
+      // walk a face-swap-safe ladder before exhausting:
+      //   retry 1: coords-pro + repair_audio  (existing)
+      //   retry 2: coords-pro-box             (NEW — bounding-box targeting)
+      // We never fall back to auto-* on 3+ speakers (face-swap risk).
       if (
         speakerCount >= 3 &&
-        currentVariant === "coords-pro" &&
         isProviderUnknown &&
-        passRetryCount < MAX_V5_RETRIES
+        currentVariant === "coords-pro" &&
+        passRetryCount === 0
       ) {
         nextVariant = "coords-pro";
         forceCoordsRepair = true;
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES} (no auto-* fallback)`,
+          `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
+        );
+      } else if (
+        speakerCount >= 3 &&
+        isProviderUnknown &&
+        (currentVariant === "coords-pro" || currentVariant === "coords-pro-box") &&
+        passRetryCount === 1
+      ) {
+        nextVariant = "coords-pro-box";
+        forceCoordsRepair = true; // also re-emit canonical WAV
+        console.warn(
+          `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro-box (bounding-box ASD) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
@@ -609,12 +634,12 @@ serve(async (req) => {
           allPassesFailedNoFace && isFirstPass && nextVariant === "auto-pro";
         if (!lastDitchAllowed) {
           console.warn(
-            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
+            `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
           );
           nextVariant = null;
         } else {
           console.warn(
-            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — last-ditch-lite ${currentVariant} → auto-pro on pass 0`,
+            `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — last-ditch-lite ${currentVariant} → auto-pro on pass 0`,
           );
         }
       }
