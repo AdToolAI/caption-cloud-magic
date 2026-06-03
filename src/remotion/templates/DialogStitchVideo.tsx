@@ -35,6 +35,18 @@ const CropSchema = z.object({
   size: z.number().positive(),
 });
 
+/** v25 (Fan-Out): masked full-frame overlay. The Sync.so output covers the
+ *  whole plate (only THIS speaker's lips moving on the original scene); we
+ *  composite it on top of the master plate but ONLY through a feathered
+ *  circular hole around the speaker's face. All N speaker passes are
+ *  layered this way → every face animates correctly without the chained
+ *  Sync.so-on-Sync.so artifact. cx/cy/radius are in source-master pixels. */
+const FaceMaskSchema = z.object({
+  cx: z.number(),
+  cy: z.number(),
+  radius: z.number().positive(),
+});
+
 const ShotSchema = z.object({
   startSec: z.number().min(0),
   endSec: z.number().min(0),
@@ -48,6 +60,10 @@ const ShotSchema = z.object({
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
+  /** v25 fan-out: when present the output is a FULL-frame Sync.so render
+   *  with only this speaker's lips moving; composite via soft circular
+   *  mask around (cx,cy) with feathered radius. Spans the full scene. */
+  faceMask: FaceMaskSchema.optional().nullable(),
 });
 
 
@@ -156,6 +172,41 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   );
 };
 
+interface FaceMaskOverlayProps {
+  src: string;
+  /** Source-master pixel coords / radius mapped into composition space. */
+  cxPx: number;
+  cyPx: number;
+  radiusPx: number;
+}
+/** v25: full-frame Sync.so output, shown only inside a soft circular mask
+ *  around the target face. Plays for the entire scene (no time window). */
+const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx }) => {
+  // Feathered radial mask: solid in the inner 70% of radius, fading to 0
+  // at radius edge so the lipsynced face blends seamlessly into the base.
+  const inner = Math.max(2, Math.round(radiusPx * 0.68));
+  const outer = Math.max(inner + 8, Math.round(radiusPx));
+  const mask = `radial-gradient(circle at ${cxPx}px ${cyPx}px, #000 0px, #000 ${inner}px, rgba(0,0,0,0.85) ${Math.round((inner + outer) / 2)}px, rgba(0,0,0,0) ${outer}px)`;
+  return (
+    <AbsoluteFill
+      style={{
+        pointerEvents: 'none',
+        WebkitMaskImage: mask,
+        maskImage: mask,
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+      }}
+    >
+      <Video
+        src={src}
+        muted
+        playbackRate={1}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    </AbsoluteFill>
+  );
+};
+
 export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
   masterVideoUrl,
   masterAudioUrl,
@@ -202,6 +253,38 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
         );
         const segDuration = Math.max(1, endFrame - startFrame);
         if (segDuration <= 0) return null;
+
+        // v25 fan-out face-mask path (highest priority): full Sync.so output
+        // for this speaker, masked to a soft circle around their face. Spans
+        // the full scene; multiple speakers stack as additive masked layers.
+        const useFaceMask =
+          !!shot.faceMask &&
+          Number(shot.faceMask?.radius) > 0 &&
+          Number.isFinite(Number(shot.faceMask?.cx)) &&
+          Number.isFinite(Number(shot.faceMask?.cy));
+        if (useFaceMask) {
+          const fm = shot.faceMask!;
+          const cxPx = Number(fm.cx) * scaleX;
+          const cyPx = Number(fm.cy) * scaleY;
+          // Radius uses the smaller axis scale so the mask never exceeds the
+          // intended face region on either dimension.
+          const radiusPx = Number(fm.radius) * Math.min(scaleX, scaleY);
+          return (
+            <Sequence
+              key={`facemask-${idx}-${startFrame}`}
+              from={startFrame}
+              durationInFrames={segDuration}
+              layout="none"
+            >
+              <FaceMaskOverlay
+                src={shot.outputUrl}
+                cxPx={cxPx}
+                cyPx={cyPx}
+                radiusPx={radiusPx}
+              />
+            </Sequence>
+          );
+        }
 
         const useCrop = !!shot.crop && Number(shot.crop?.size) > 0;
         if (useCrop) {

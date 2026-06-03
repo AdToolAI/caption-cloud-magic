@@ -153,20 +153,63 @@ serve(async (req) => {
     const userId = (project as any)?.user_id;
     if (!userId) return json({ error: "project user_id missing" }, 500);
 
-    // ── Build Lambda payload (DialogStitchVideo with shots=[] is an audio swap) ──
+    // ── Build Lambda payload ─────────────────────────────────────────────
+    // v25 Fan-Out: for multi-pass scenes the master video is the ORIGINAL
+    // pristine plate, and each speaker pass overlays via a soft circular
+    // face-mask through its full-frame Sync.so output. For single-speaker
+    // scenes we keep the legacy audio-swap path (shots: []).
     const fps = 30;
     const durationInFrames = Math.max(30, Math.ceil(totalSec * fps));
     const width = evenDimension(state.video_width, 1280);
     const height = evenDimension(state.video_height, 720);
 
+    const passes = Array.isArray((state as any).passes) ? (state as any).passes : [];
+    const donePasses = passes.filter(
+      (p: any) =>
+        p?.status === "done" &&
+        typeof p?.output_url === "string" &&
+        Array.isArray(p?.coords) &&
+        Number.isFinite(Number(p.coords[0])) &&
+        Number.isFinite(Number(p.coords[1])),
+    );
+    const isFanout = donePasses.length >= 2;
+    const sourcePlateUrl = String((state as any).source_clip_url ?? "");
+    const masterVideoUrlForMux = isFanout && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl;
+    // Face-mask radius: smaller for crowded scenes; uses smaller plate axis
+    // so the circle never exceeds the frame. ~22% of min-axis for 2 speakers,
+    // scales down for 3 (≈18%) and 4 (≈15%).
+    const minAxis = Math.min(width, height);
+    const radiusForCount =
+      donePasses.length <= 2 ? minAxis * 0.22 :
+      donePasses.length === 3 ? minAxis * 0.18 :
+      minAxis * 0.15;
+    const fanoutShots = isFanout
+      ? donePasses.map((p: any) => ({
+          startSec: 0,
+          endSec: totalSec,
+          outputUrl: String(p.output_url),
+          faceMask: {
+            cx: Number(p.coords[0]),
+            cy: Number(p.coords[1]),
+            radius: radiusForCount,
+          },
+        }))
+      : [];
+
     const inputProps = {
-      masterVideoUrl: finalLipsyncUrl,
+      masterVideoUrl: masterVideoUrlForMux,
       masterAudioUrl,
       totalSec,
       targetWidth: width,
       targetHeight: height,
-      shots: [] as Array<unknown>,
+      srcWidth: width,
+      srcHeight: height,
+      shots: fanoutShots,
     };
+
+    console.log(
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${isFanout ? `fanout-${donePasses.length}-speakers` : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
+    );
 
     const renderId = crypto.randomUUID();
     const outName = `dialog-stitch-muxed-${sceneId}-${Date.now()}.mp4`;
