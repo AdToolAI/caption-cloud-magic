@@ -1,122 +1,124 @@
-# Bug
+## Was wirklich passiert (aus Logs + DB)
 
-In 3-speaker dialog scenes, only the **first speaker's** lips move — speakers 2 and 3 stay closed-mouth, even though:
+Szene `1b877978-…` (engine=`cinematic-sync`, 3 Sprecher) loopt seit Minuten, weil `compose-dialog-scene` immer wieder gestartet wird, aber **nie bis `render-dialog-turn` kommt**. Belege:
 
-- All 3 turns produced Sync.so outputs (`output_url` set for shots 0, 1, 2)
-- Each shot has **distinct, correct `target_coords`** (e.g. `[414,175]`, `[687,175]`, `[1075,261]`)
-- Each shot uses the isolated per-speaker WAV trimmed to its window
-- The stitch (`DialogStitchVideo`) overlays each Sync.so output at the right time window
+- `composer_scenes`: `clip_url = null`, `clip_status = 'pending'`, `clip_source = 'ai-hailuo'`, `lip_sync_status = null`, `dialog_shots = null`, `updated_at = 00:14:52` (immer noch frisch).
+- `compose-dialog-scene` Logs zeigen 2 parallele Invocations innerhalb von 1 s ("faceMap rebuilt … identities=samuel-dusatko,kailee,kailee" — also nur 2 distinkte IDs für 3 Sprecher). Der "positional-fallback recovered **1** missing face coords"-Warn erscheint zweimal — heißt: identity-mapping ist ambiguous (zwei "kailee" für zwei verschiedene Sprecher).
+- `render-dialog-turn`: **0 Logs jemals** — der Per-Turn-Render läuft also nie an.
+- `extract-video-last-frame`: schlägt mit **`REPLICATE_API_TOKEN missing`** fehl (separate Sekundärursache; nicht der Loop-Trigger, aber Continuity-Frame ist tot).
 
-# Root Cause
+### Drei zusammenwirkende Bugs
 
-The current preclip path renders each turn's preclip as a **time-slice of the full master** (`DialogTurnClipVideo` keeps the full 1280×720 frame, all 3 faces visible). Sync.so then receives a wide multi-face frame plus `coordinates: [x,y]` and `auto_detect: false`.
+**Bug 1 — Duplicate auto-trigger:** `compose-clip-webhook` wird bei jedem Replicate-Webhook-Retry erneut zugestellt und feuert `compose-dialog-scene` jedes Mal neu via `EdgeRuntime.waitUntil` (zwei Invocations < 1 s belegen das). Die Idempotency-Guard in `compose-dialog-scene` greift nicht, weil `dialog_shots` nach jedem Fehlschlag wieder `null` ist → kein "existing"-Resume möglich → Vollneubau bei jedem Trigger.
 
-Empirically (and documented in `syncso-stage-f-artlist-reliability`), **Sync.so's coords are advisory on multi-face frames** — it locks onto the most "speakerly" face (driven by audio energy of the loudest detected mouth region), which in our case is always **the leftmost / first-rendered face**. Since speaker 1's face is in every preclip, all 3 lipsynced outputs end up animating only speaker 1, and the stitch then overlays "speaker 1 moving lips" three times.
+**Bug 2 — Identity-Map kollabiert auf 3 Sprecher:** Gemini-Vision-Anchor liefert für 3 Personen `identities=samuel-dusatko, kailee, kailee` (zwei "kailee" — dieselbe Identity auf zwei Gesichter). Die positional-fallback rettet nur 1 von 3 fehlenden coords, weil der Map-Key per `character_id.toLowerCase()` deduppt → 2. Auftritt von kailee überschreibt 1. → fehlende coord bleibt. Folge: missing_face_coords 422, keine Shots persistiert.
 
-This matches the user's observation: speaker 1 mouths every line, speakers 2 & 3 never open their mouths.
+**Bug 3 — Loop verschleiert weil State nicht persistiert wird:** Wenn compose-dialog-scene 422 returnt, wird `dialog_shots` NICHT auf `{status: 'failed'}` gesetzt (nur `no_turns`-Pfad tut das). Damit sieht der nächste Webhook-Retry "nichts da" und feuert wieder. → Endlosschleife.
 
-# Fix: Face-Crop Preclips + Positioned Region Overlay
+**Bug 4 (Nebenbefund):** `REPLICATE_API_TOKEN` Secret fehlt für `extract-video-last-frame`. Frame-Continuity zur nächsten Szene fällt komplett aus. Kein Loop-Trigger, aber sollte gesetzt werden.
 
-For 3+ speaker scenes (and as a more reliable default for 2-speaker scenes too) we must give Sync.so a **single-face frame** so coords cannot be misinterpreted, then composite the lipsynced face back at its original screen position during stitch.
+---
 
-## 1. New Remotion template `DialogTurnFaceCropVideo`
+## Plan
 
-`src/remotion/templates/DialogTurnFaceCropVideo.tsx`
+### Step 1 — `compose-dialog-scene`: positional fallback nach `speaker_idx` (nicht character_id)
 
-- Inputs: `masterVideoUrl`, `startSec`, `endSec`, source-master dims `(srcW, srcH)`, `cropCenter [x,y]`, `cropSize` (square, e.g. `min(srcH, srcW) * 0.5` ≈ 360-640px), `outputSize` (default 512).
-- Renders a square preclip showing only the cropped face region, scaled to `outputSize × outputSize`, muted, MP4.
-- Registered in `src/remotion/index.ts`.
+In `supabase/functions/compose-dialog-scene/index.ts` im positional-fallback-Block (~Zeile 870):
 
-## 2. Crop metadata helper
+- `appearanceOrder` per `speaker_idx` aufbauen (unique, in script-Reihenfolge), nicht per `character_id`. So überleben zwei Sprecher mit derselben Identity nebeneinander.
+- `positional` Map als `Map<number /*speaker_idx*/, [x,y]>` führen.
+- Im Recovery-Loop per `s.speaker_idx` nachschlagen.
+- Dasselbe für `target_bbox` (paralleler Block analog).
 
-`supabase/functions/_shared/face-crop.ts` (new)
+Dadurch werden bei "3 Gesichter im Anchor, 3 distinkte `speaker_idx`" immer alle 3 coords gemappt — auch wenn 2 davon dieselbe `character_id` haben.
 
-Given `target_coords`, face `bbox` (from `audio_plan.twoshot.faceMap.faces[slot].bbox` when present), and source dims:
-- Compute a square crop that:
-  - Is centered on `target_coords`
-  - Has size = `max(bbox_diagonal × 2.0, srcH × 0.55)` clamped to fit inside source
-  - Snapped to even pixels
-- Return `{ x, y, size }` in source-master pixel space.
+### Step 2 — `compose-dialog-scene`: bei jedem 4xx **persistieren**, damit Idempotency greift
 
-Fallback when no bbox is available: `size = floor(srcH * 0.6)` centered on coords, clamped to frame.
+Vor jedem `return json({error: ...}, 4xx)` in der Setup-Phase einen Eintrag schreiben:
 
-## 3. `render-dialog-turn` switches template per shot
-
-- Detect 3+ speakers via `state.shots` distinct `speaker_idx`.
-- For each shot in 3+ speaker scenes (and optionally 2-speaker), compute `crop` via the helper, persist on the shot as `preclip_crop = { x, y, size, outputSize }`, dispatch `DialogTurnFaceCropVideo` instead of `DialogTurnClipVideo`.
-- Single-speaker scenes keep `DialogTurnClipVideo` (no behavior change).
-
-## 4. `poll-dialog-shots` dispatch tweak
-
-When `shot.preclip_crop` is set, the Sync.so preclip is single-face → switch to `mode = "auto"` (`active_speaker_detection.auto_detect = true`) and drop `coordinates`. With one face, auto-detect is now perfectly reliable and avoids any residual coord misinterpretation.
-
-## 5. `DialogStitchVideo` overlay becomes a positioned region
-
-`src/remotion/templates/DialogStitchVideo.tsx`
-
-Per shot, if `crop` is present:
-- Overlay `<Video src={outputUrl}>` absolutely-positioned at `{left: crop.x - crop.size/2, top: crop.y - crop.size/2, width: crop.size, height: crop.size}` (scaled to composition dims via `targetWidth/targetHeight` ratios).
-- Apply a soft circular/feathered mask (radial-gradient `mask-image`) so the crop edges blend into the master plate underneath.
-- Existing 6-frame crossfade stays.
-
-When `crop` is absent (single-speaker scenes), keep current full-frame overlay behavior.
-
-`render-dialog-stitch` passes `crop` for each shot into the composition props.
-
-## 6. Schema additions (no migration needed — JSON columns)
-
-- `dialog_shots.shots[].preclip_crop?: { x: number; y: number; size: number; outputSize: number }`
-- Bump `dialog_shots.version` from 4 → 5 so any in-flight pre-fix shots get re-rendered with the new path.
-
-## 7. UI feedback
-
-- `useTwoShotAutoTrigger`: no change; existing retry/refund logic still applies.
-- `SceneCard` "🎥 Clip + Lip-Sync neu rendern": no change — already triggers full reroll which will now go through the cropped path.
-
-# Technical Section
-
-| File | Change |
-|---|---|
-| `src/remotion/templates/DialogTurnFaceCropVideo.tsx` | NEW — square face-region preclip composition |
-| `src/remotion/index.ts` | Register new composition |
-| `supabase/functions/_shared/face-crop.ts` | NEW — helper computes square crop from coords + bbox + source dims |
-| `supabase/functions/render-dialog-turn/index.ts` | Multi-speaker path → use FaceCrop template, persist `preclip_crop` on shot |
-| `supabase/functions/poll-dialog-shots/index.ts` | When `preclip_crop` set: dispatch Sync.so with `auto_detect: true`, no coords; bump version 4→5 in shape guard |
-| `supabase/functions/render-dialog-stitch/index.ts` | Pass per-shot `crop` into DialogStitchVideo props |
-| `src/remotion/templates/DialogStitchVideo.tsx` | Schema gains `crop?`; ShotOverlay positions+sizes overlay to crop region with soft mask when crop is present |
-| Memory `mem/features/video-composer/dialog-shot-pipeline` | Document v21 face-crop preclip rule |
-
-## Crop sizing diagram
-
-```text
-source master frame (1280×720)
-+----------------------------------------+
-|        face1     face2        face3    |
-|     (414,175) (687,175)    (1075,261)  |
-|       ┌───┐    ┌───┐         ┌───┐     |
-|       │   │    │   │         │   │     |
-|       └───┘    └───┘         └───┘     |
-+----------------------------------------+
-        ↓ per-shot square crop (≈ 400×400)
-+-------+   +-------+   +-------+
-| face1 |   | face2 |   | face3 |
-+-------+   +-------+   +-------+
-        ↓ Sync.so (auto_detect, single face)
-+-------+   +-------+   +-------+
-| LS 1  |   | LS 2  |   | LS 3  |  ← each face actually animates
-+-------+   +-------+   +-------+
-        ↓ stitch overlays cropped lipsync back at original (x,y,size)
-+----------------------------------------+
-|      [LS1]    [LS2]         [LS3]      |  on top of muted master plate
-+----------------------------------------+
+```ts
+await supabase.from('composer_scenes').update({
+  dialog_shots: { version: 5, status: 'failed', error: '<code>', shots: [], updated_at: ... },
+  lip_sync_status: 'failed',
+  twoshot_stage: 'failed',
+  clip_error: '<code>',
+}).eq('id', sceneId);
 ```
 
-## Why this fixes the bug
+Anschließend greift die existierende Idempotency-Guard (`existing.status === 'failed'` → keine Resume, aber auch kein Replay aus dem Webhook, weil `compose-clip-webhook` bei `lip_sync_status='failed'` nicht erneut auto-triggern darf — siehe Step 3).
 
-After the change, every Sync.so job sees exactly ONE face — there is no ambiguity for the active-speaker picker, so each turn's mouth motion lands on the correct speaker. The stitch composites each lipsynced face back at its original on-screen position, so the final video shows all 3 speakers moving their lips on their respective turns.
+### Step 3 — `compose-clip-webhook`: auto-lipsync-Replay verhindern
 
-## Rollback safety
+Im Block, der `compose-dialog-scene` auto-triggert (~Zeile 318), zusätzlich prüfen:
 
-- Old single-speaker path is untouched.
-- Existing scenes (version 4, no `preclip_crop`) still render with the legacy overlay — no retroactive breakage.
-- A failed `DialogTurnFaceCropVideo` render reuses the existing preclip retry budget; final fallback path (`sync_source_kind='master'`) is unchanged for 1-2 speaker scenes.
+```ts
+const alreadyFailed = String(preUpdateScene?.lip_sync_status ?? '') === 'failed';
+const alreadyDone = !!preUpdateScene?.lip_sync_applied_at;
+if (alreadyFailed || alreadyDone) {
+  console.log('[compose-clip-webhook] skip auto-lipsync — already', { alreadyFailed, alreadyDone });
+} else {
+  // existing dispatch
+}
+```
+
+Damit stoppt ein Replicate-Webhook-Retry den Loop.
+
+### Step 4 — Dedup-Lock in `compose-dialog-scene` gegen parallele Invocations
+
+Am Start, direkt nach Scene-Load und vor faceMap-Rebuild:
+
+```ts
+// Atomic claim: only one invocation per scene at a time
+const claim = await supabase.from('composer_scenes')
+  .update({ twoshot_stage: 'composing_dialog', updated_at: new Date().toISOString() })
+  .eq('id', sceneId)
+  .neq('twoshot_stage', 'composing_dialog')
+  .select('id').maybeSingle();
+if (!claim.data) {
+  return json({ ok: true, status: 'already_composing', scene_id: sceneId }, 202);
+}
+```
+
+Bei jedem Erfolgs/Fehler-Exit `twoshot_stage` wieder auf den finalen Wert setzen (`'shots_ready'` / `'failed'` etc.).
+
+### Step 5 — Secret setzen: `REPLICATE_API_TOKEN`
+
+`extract-video-last-frame` wirft `REPLICATE_API_TOKEN missing`. Es gibt im Projekt bereits `REPLICATE_API_KEY` (von Picture/Video Studios). Zwei Varianten:
+
+- (a) `REPLICATE_API_TOKEN` zusätzlich als Secret setzen (Wert = `REPLICATE_API_KEY`), oder
+- (b) Code-Patch: `Deno.env.get('REPLICATE_API_TOKEN') ?? Deno.env.get('REPLICATE_API_KEY')`.
+
+Ich gehe mit **(b)**, weil das ohne Secret-UI-Interaktion sofort wirkt und dem Pattern anderer Functions im Projekt entspricht.
+
+### Step 6 — Akut-Cleanup der hängenden Szene
+
+Einmaliges SQL (Migration), das die festsitzende Szene zurücksetzt, damit der User sie neu starten kann:
+
+```sql
+UPDATE composer_scenes
+SET clip_status = 'pending', clip_url = NULL, lip_sync_status = NULL,
+    twoshot_stage = NULL, dialog_shots = NULL, clip_error = NULL,
+    updated_at = now()
+WHERE id = '1b877978-29da-4a20-9fb4-813042a60f9c';
+```
+
+### Step 7 — Memory aktualisieren
+
+`mem/features/video-composer/dialog-shot-pipeline` um Abschnitt "v22 — speaker_idx positional fallback + failure persistence + claim lock" ergänzen.
+
+---
+
+## Geänderte Dateien
+
+- `supabase/functions/compose-dialog-scene/index.ts` (Steps 1, 2, 4)
+- `supabase/functions/compose-clip-webhook/index.ts` (Step 3)
+- `supabase/functions/extract-video-last-frame/index.ts` (Step 5b)
+- Migration: SQL aus Step 6
+- `mem/features/video-composer/dialog-shot-pipeline` (Step 7)
+
+Keine Schema-Änderung, keine UI-Änderung.
+
+## Out of scope
+
+- Verbesserung der Gemini-Vision Identity-Disambiguation (das ist die Wurzel-Ursache für "kailee, kailee"). Workaround per `speaker_idx` reicht für den Loop-Stop.
+- Sync.so-spezifische Änderungen (v21 face-crop bleibt unangetastet).
