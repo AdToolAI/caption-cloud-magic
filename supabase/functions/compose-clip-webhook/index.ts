@@ -297,6 +297,7 @@ serve(async (req) => {
           !isTalkingHeadClip &&
           !alreadyFinal &&
           !alreadyRunning &&
+          !alreadyFailed &&
           !wasCanceled
         ) {
           // Route by speaker count (mirrors src/hooks/useTwoShotAutoTrigger.ts):
