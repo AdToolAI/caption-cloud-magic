@@ -22,6 +22,9 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 import {
   releaseInflightSyncJob,
   classifySyncError,
+  classifySyncErrorCode,
+  explainSyncErrorCode,
+  fetchSyncJobError,
   isTransientSyncError,
   recordCircuitFailure,
   recordCircuitSuccess,
