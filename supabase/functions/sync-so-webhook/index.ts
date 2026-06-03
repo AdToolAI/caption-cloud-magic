@@ -437,8 +437,9 @@ serve(async (req) => {
         }).catch(() => {});
       } catch { /* ignore */ }
       return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
-
+    } else {
       // FAILED / REJECTED / CANCELED
+
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
       const passesArr: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
