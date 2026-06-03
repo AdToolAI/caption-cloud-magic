@@ -65,6 +65,14 @@ timeout_sec = 120
 [functions.verify-license-certificate]
 verify_jwt = false
 
+[functions.lipsync-watchdog]
+verify_jwt = false
+timeout_sec = 120
+
+[functions.reset-lipsync-scene]
+verify_jwt = true
+timeout_sec = 60
+
 [auth]
 site_url = "https://8e97f8e1-59d6-4796-9a44-4c05ca0bfc66.lovableproject.com"
 enabled = true
