@@ -865,33 +865,46 @@ serve(async (req) => {
           .filter((f: any) => Array.isArray(f?.center) && f.center.length === 2)
           .sort((a: any, b: any) => Number(a.center[0]) - Number(b.center[0]));
         if (sortedFaces.length >= distinctSpeakerIdxs.size) {
-          // Build positional map: script-appearance order → leftmost-first face
-          const appearanceOrder: string[] = [];
+          // v22: keyed by `speaker_idx` instead of `character_id` — multiple
+          // distinct speakers may share the same character_id (e.g. Gemini
+          // returns "kailee, kailee" for two different faces). Keying by
+          // character_id collapses them; keying by speaker_idx preserves
+          // every speaker.
+          const appearanceOrder: number[] = [];
           for (const s of rawShots) {
-            const key = String(s.character_id ?? `__spk_${s.speaker_idx}`).toLowerCase();
-            if (!appearanceOrder.includes(key)) appearanceOrder.push(key);
+            if (!appearanceOrder.includes(s.speaker_idx)) appearanceOrder.push(s.speaker_idx);
           }
-          const positional = new Map<string, [number, number]>();
-          appearanceOrder.forEach((key, idx) => {
-            const f = sortedFaces[idx];
-            if (f) positional.set(key, [Number(f.center[0]), Number(f.center[1])]);
+          const positionalCoords = new Map<number, [number, number]>();
+          const positionalBbox = new Map<number, [number, number, number, number]>();
+          appearanceOrder.forEach((idx, pos) => {
+            const f: any = sortedFaces[pos];
+            if (f && Array.isArray(f.center) && f.center.length === 2) {
+              positionalCoords.set(idx, [Number(f.center[0]), Number(f.center[1])]);
+            }
+            if (f && Array.isArray(f.bbox) && f.bbox.length === 4 && f.bbox.every((v: any) => Number.isFinite(Number(v)))) {
+              positionalBbox.set(idx, [Number(f.bbox[0]), Number(f.bbox[1]), Number(f.bbox[2]), Number(f.bbox[3])]);
+            }
           });
           let recovered = 0;
           for (const s of rawShots) {
-            if (s.target_coords) continue;
-            const key = String(s.character_id ?? `__spk_${s.speaker_idx}`).toLowerCase();
-            const c = positional.get(key);
-            if (c) {
-              s.target_coords = c;
-              s.deterministic_coords = true;
-              recovered++;
+            if (!s.target_coords) {
+              const c = positionalCoords.get(s.speaker_idx);
+              if (c) {
+                s.target_coords = c;
+                s.deterministic_coords = true;
+                recovered++;
+              }
+            }
+            if (!s.target_bbox) {
+              const bb = positionalBbox.get(s.speaker_idx);
+              if (bb) s.target_bbox = bb;
             }
           }
           if (recovered > 0) {
             console.warn(
-              `[compose-dialog-scene] scene ${sceneId} positional-fallback recovered ` +
-                `${recovered} missing face coords (identity mapping ambiguous, ` +
-                `${sortedFaces.length} faces in anchor, ${distinctSpeakerIdxs.size} speakers).`,
+              `[compose-dialog-scene] scene ${sceneId} positional-fallback (v22 speaker_idx) recovered ` +
+                `${recovered} missing face coords (${sortedFaces.length} faces in anchor, ` +
+                `${distinctSpeakerIdxs.size} distinct speakers).`,
             );
           }
           missing = rawShots.filter((s) => !s.target_coords);
