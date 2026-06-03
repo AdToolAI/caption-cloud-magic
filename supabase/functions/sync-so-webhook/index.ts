@@ -615,8 +615,19 @@ serve(async (req) => {
       if (canRetry) {
         const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
 
-        // Patch the failed pass in-place with per-pass retry bookkeeping.
-        const updatedPasses = passesArr.map((p, i) =>
+        // v29: Re-read scene right before write so parallel pass webhooks
+        // don't clobber each other's job_ids. We only own the row at
+        // `currentPass` — everything else is merged from the freshest state.
+        const { data: freshRow } = await supabase
+          .from("composer_scenes")
+          .select("dialog_shots")
+          .eq("id", sceneId)
+          .maybeSingle();
+        const freshState: any = (freshRow as any)?.dialog_shots ?? state;
+        const freshPasses: any[] = Array.isArray(freshState?.passes)
+          ? freshState.passes
+          : passesArr;
+        const updatedPasses = freshPasses.map((p: any, i: number) =>
           i === currentPass
             ? {
                 ...p,
@@ -635,11 +646,9 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: {
-              ...state,
+              ...freshState,
               passes: updatedPasses,
               status: "retrying",
-              // Top-level mirrors the active pass for backward-compat with
-              // any downstream code still reading `state.retry_variant`.
               retry_variant: nextVariant,
               retry_count: aggregateRetryCount + 1,
               last_error: rawErr.slice(0, 200),
@@ -647,7 +656,7 @@ serve(async (req) => {
               sync_error_code: errorCode ?? null,
               sync_error_bucket: codeBucket,
               fallback_history: [
-                ...((state as any).fallback_history ?? []),
+                ...((freshState as any).fallback_history ?? []),
                 {
                   at: nowIso,
                   job_id: jobId,
@@ -662,7 +671,7 @@ serve(async (req) => {
               ].slice(-16),
             },
             lip_sync_status: "running",
-            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((state as any).total_passes ?? passesArr.length ?? 1)}`,
+            twoshot_stage: `syncso_retry_${nextVariant}_pass_${currentPass + 1}_of_${Number((freshState as any).total_passes ?? freshPasses.length ?? 1)}`,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
