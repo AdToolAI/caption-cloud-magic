@@ -137,19 +137,33 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const hasRecordedProviderJob = (d: any) => {
           const plan = d.audio_plan as any;
           const jobs = plan?.twoshot?.syncJobs?.jobs;
-          const dialogJobs = d.dialog_shots?.version === 4 && Array.isArray(d.dialog_shots?.shots)
-            ? d.dialog_shots.shots.some((s: any) => s?.sync_job_id || s?.status === 'ready' || s?.status === 'lipsyncing')
-            : false;
-          return hasSyncSoJob(d) || dialogJobs || !!plan?.twoshot?.heartbeat?.syncJobId || (Array.isArray(jobs) && jobs.length > 0);
+          const ds = d.dialog_shots as any;
+          // v4 OR v5+shots[] (per-turn) — any shot with a sync_job_id or
+          // non-terminal status counts as an active provider job.
+          const shotsArr = Array.isArray(ds?.shots) ? ds.shots : [];
+          const dialogJobs = shotsArr.some(
+            (s: any) =>
+              s?.sync_job_id ||
+              ['lipsyncing', 'ready', 'pending', 'generated'].includes(String(s?.status ?? '')),
+          );
+          // v5 sync-segments multi-pass passes[]
+          const passesArr = Array.isArray(ds?.passes) ? ds.passes : [];
+          const passJobs = passesArr.some((p: any) => p?.job_id || p?.status === 'rendering');
+          const v5SegmentsJob =
+            ds?.version === 5 && ds?.engine === 'sync-segments' && !!ds?.sync_job_id;
+          return (
+            hasSyncSoJob(d) ||
+            dialogJobs ||
+            passJobs ||
+            v5SegmentsJob ||
+            !!plan?.twoshot?.heartbeat?.syncJobId ||
+            (Array.isArray(jobs) && jobs.length > 0)
+          );
         };
 
         const dialogShotRows = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
-            // v4 = legacy per-turn pipeline; v5 with shots[] = new per-turn
-            // pipeline produced by compose-dialog-scene. Both are advanced by
-            // poll-dialog-shots. v5 sync-segments has `passes[]` (no shots[])
-            // and runs via sync-so-webhook — skip it here.
             (d.dialog_shots?.version === 4 ||
               (d.dialog_shots?.version === 5 && Array.isArray(d.dialog_shots?.shots))) &&
             !d.lip_sync_applied_at &&
@@ -164,172 +178,22 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             .finally(() => setTimeout(() => inflight.current.delete(`poll-dialog:${d.id}`), 30_000));
         }
 
-        // ── v5 (Sync.so Segments) stale-watchdog ──────────────────────
-        // v5 has no per-turn shots and relies entirely on the webhook.
-        // If updated_at is older than STALE_SYNC_MS without a final_url,
-        // mark failed so the auto-retry below can re-dispatch (refund is
-        // handled inside compose-dialog-segments + sync-so-webhook).
-        const staleV5 = (data as any[]).filter(
-          (d) =>
-            d.engine_override !== 'cinematic-sync-legacy' &&
-            isDialogEngine(d.engine_override) &&
-            d.dialog_shots?.version === 5 &&
-            d.lip_sync_status === 'running' &&
-            !d.lip_sync_applied_at &&
-            !d.dialog_shots?.final_url &&
-            d.updated_at &&
-            now - new Date(d.updated_at).getTime() > STALE_SYNC_MS,
-        );
-        if (staleV5.length > 0) {
-          await Promise.all(
-            staleV5.map((d) =>
-              supabase
-                .from('composer_scenes')
-                .update({
-                  lip_sync_status: 'failed',
-                  twoshot_stage: 'failed',
-                  clip_error: 'syncso_segments_poll_timeout',
-                })
-                .eq('id', d.id),
-            ),
-          );
-        }
-
-        const staleSyncJobs = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            d.dialog_shots?.version !== 4 &&
-            d.dialog_shots?.version !== 5 &&
-            d.lip_sync_status === 'running' &&
-            !d.lip_sync_applied_at &&
-            hasSyncSoJob(d) &&
-            d.updated_at &&
-            now - new Date(d.updated_at).getTime() > STALE_SYNC_MS,
-        );
-        if (staleSyncJobs.length > 0) {
-          await Promise.all(
-            staleSyncJobs.map((d) =>
-              supabase
-                .from('composer_scenes')
-                .update({ lip_sync_status: 'failed', twoshot_stage: 'failed', clip_error: 'syncso_poll_timeout' })
-                .eq('id', d.id),
-            ),
-          );
-        }
-
+        // v23 ARCHITECTURE: client NEVER resets running/failed scenes.
+        // All stale-detection / refund / reset is owned by the server
+        // (`lipsync-watchdog` cron + `reset-lipsync-scene` user action).
+        // The previous client-side stale resets caused the infinite loop:
+        // a real provider job was misclassified as "stale" → set to pending
+        // → re-dispatched → old Sync.so jobs orphaned, new ones queued.
         const runningSyncJobs = (data as any[]).filter(
           (d) =>
             isDialogEngine(d.engine_override) &&
-            d.dialog_shots?.version !== 4 &&
             d.lip_sync_status === 'running' &&
             !d.lip_sync_applied_at &&
-            hasSyncSoJob(d) &&
-            !staleSyncJobs.some((s) => s.id === d.id) &&
-            !inflight.current.has(`poll:${d.id}`),
+            hasRecordedProviderJob(d),
         );
         if (runningSyncJobs.length > 0 && !progressActive.current) {
           progressActive.current = true;
           emitPipelineEvent({ type: 'lipsync:start' });
-        }
-        // Note: poll-dialog-shots runs server-side via pg_cron every minute
-        // AND as a Replicate webhook receiver — no client-side polling needed.
-
-        // Preflight/CPU-abort recovery: running but no provider job was ever
-        // recorded. Clear the stage too so the candidate filter can re-invoke.
-        const preflightAborts = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            d.lip_sync_status === 'running' &&
-            !d.lip_sync_applied_at &&
-            !hasRecordedProviderJob(d) &&
-            (d.twoshot_stage === 'preflight' || /^lipsync_/i.test(String(d.twoshot_stage ?? ''))) &&
-            d.updated_at &&
-            now - new Date(d.updated_at).getTime() > STALE_PREFLIGHT_MS,
-        );
-        if (preflightAborts.length > 0) {
-          await Promise.all(
-            preflightAborts.map((d) => {
-              inflight.current.delete(d.id);
-              d.lip_sync_status = 'pending';
-              d.twoshot_stage = null;
-              d.replicate_prediction_id = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  lip_sync_status: 'pending',
-                  twoshot_stage: null,
-                  replicate_prediction_id: null,
-                  clip_error: 'auto-retry: preflight_cpu_abort_recovered',
-                })
-                .eq('id', d.id);
-            }),
-          );
-        }
-
-        // Stale-recovery: 'running' >6min ohne lip_sync_applied_at → reset
-        const stale = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            d.lip_sync_status === 'running' &&
-            !d.lip_sync_applied_at &&
-            !hasRecordedProviderJob(d) &&
-            d.updated_at &&
-            now - new Date(d.updated_at).getTime() > STALE_MS,
-        );
-        if (stale.length > 0) {
-          console.warn(
-            `[useTwoShotAutoTrigger] resetting ${stale.length} stale 'running' scenes`,
-          );
-          await Promise.all(
-            stale.map((d) => {
-              inflight.current.delete(d.id);
-              return supabase
-                .from('composer_scenes')
-                .update({ lip_sync_status: 'pending', twoshot_stage: null, replicate_prediction_id: null, clip_error: 'auto-reset: stale running' })
-                .eq('id', d.id);
-            }),
-          );
-        }
-
-        // ── Zombie state: lipsync_* stage but no real Sync.so job. Caused
-        // by stale-reset clearing status while leaving the stage marker.
-        // Both client and watchdog previously skipped this; UI hung at 95%.
-        // Reset stage AND status atomically so the candidate-filter below
-        // picks it up in the same tick.
-        const zombies = (data as any[]).filter((d) => {
-          if (!isDialogEngine(d.engine_override)) return false;
-          if (d.lip_sync_applied_at) return false;
-          if (d.lip_sync_status !== 'pending') return false;
-          if (typeof d.twoshot_stage !== 'string' || !/^lipsync_/i.test(d.twoshot_stage)) return false;
-          if (hasSyncSoJob(d)) return false;
-          const plan = d.audio_plan as any;
-          const jobs = plan?.twoshot?.syncJobs?.jobs;
-          const heartbeatJob = plan?.twoshot?.heartbeat?.syncJobId;
-          if (heartbeatJob) return false;
-          if (Array.isArray(jobs) && jobs.length > 0) return false;
-          return true;
-        });
-        if (zombies.length > 0) {
-          console.warn(
-            `[useTwoShotAutoTrigger] clearing ${zombies.length} zombie lipsync_* stage(s)`,
-          );
-          await Promise.all(
-            zombies.map((d) => {
-              inflight.current.delete(d.id);
-              // Mutate in-place so the candidate filter below sees the
-              // cleared stage immediately without waiting for a re-tick.
-              d.twoshot_stage = null;
-              d.replicate_prediction_id = null;
-              return supabase
-                .from('composer_scenes')
-                .update({
-                  twoshot_stage: null,
-                  replicate_prediction_id: null,
-                  clip_error: 'auto-retry: zombie_lipsync_stage_without_sync_job',
-                })
-                .eq('id', d.id);
-            }),
-          );
         }
 
         // ── AUDIO-PLATE SELF-HEAL ────────────────────────────────────────
