@@ -424,22 +424,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
               ? 'compose-dialog-scene'
               : 'compose-dialog-segments';
 
-          // For retry-candidates (previously 'failed'), clear the failure
-          // markers first so the edge function's running-takeover guard sees a
-          // clean slate instead of stale 'failed'/twoshot_stage='failed'.
-          if (d.lip_sync_status === 'failed') {
-            autoRetried.current.add(d.id); // ensures only one auto-recovery per mount
-            await supabase
-              .from('composer_scenes')
-              .update({
-                lip_sync_status: 'pending',
-                twoshot_stage: null,
-                clip_error: `auto-retry: ${d.clip_error ?? 'failed'}`,
-                replicate_prediction_id: null,
-                dialog_shots: null,
-              })
-              .eq('id', d.id);
-          }
+          // v23: `failed` candidates are no longer accepted by the candidate
+          // filter — the only way back into the pipeline is a user-triggered
+          // `reset-lipsync-scene` call. So we never clear failure markers here.
 
           console.info(
             `[useTwoShotAutoTrigger] invoking ${fnName} for scene ${d.id} (speakers=${speakers})`,
