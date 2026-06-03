@@ -4,6 +4,23 @@ description: Per-turn Sync.so on the ORIGINAL master plate, then deterministic L
 type: feature
 ---
 
+## v22 (June 2026) — Loop-Stop: claim-lock + speaker_idx fallback + no-replay on failure
+
+**Bug it fixes:** 3-speaker scenes with ambiguous Gemini identity matches (e.g. `identities=samuel-dusatko, kailee, kailee`) looped forever in "Lipsync wird gestartet" without ever invoking `render-dialog-turn`. Three causes stacked:
+
+1. **Positional fallback was keyed by `character_id`** — two distinct speakers with the same character_id collapsed to one map entry, so only N-1 of N missing coords were recovered. The remaining `missing_face_coords` failure persisted `lip_sync_status='failed'`, BUT…
+2. **`compose-clip-webhook` ignored the failure** — Replicate webhook retries kept re-invoking `compose-dialog-scene`, and the Stage-2 HappyHorse hotfix or other resets nuked the failed state, restarting the loop.
+3. **Two parallel webhook deliveries within <1s** raced compose-dialog-scene without any dedup, so even single-shot rebuilds duplicated work.
+
+**Fix v22:**
+
+- `compose-dialog-scene` positional-fallback is now keyed by `speaker_idx` (not `character_id`). Two speakers sharing the same identity each get their own face from the leftmost-sorted anchor face list. Also recovers `target_bbox` from the same positional mapping.
+- `compose-dialog-scene` atomic **claim-lock** at start: transitions `twoshot_stage` → `'composing_dialog'` only when not already that value. Duplicate invocations return 202 `already_composing` and exit. Resume path restores stage to `'dialog_chain'` so future legitimate resumes can win the lock.
+- `compose-clip-webhook` auto-lipsync trigger now also guards on `alreadyFailed` (`lip_sync_status='failed'` OR `twoshot_stage in ('failed','needs_clip_rerender')`) AND treats `lip_sync_status='queued'` + `twoshot_stage='composing_dialog'/'dialog_chain'` as `alreadyRunning`. Replicate webhook retries can no longer restart a failed setup; user must manually re-trigger "Clip + Lip-Sync neu rendern".
+- `extract-video-last-frame` falls back from `REPLICATE_API_TOKEN` to `REPLICATE_API_KEY` (the actual secret name used throughout the project). Was throwing on every continuity-frame call.
+
+
+
 Trigger: `engine_override = 'cinematic-sync'` on a composer_scene.
 
 Both auto-triggers route to `compose-dialog-scene`:

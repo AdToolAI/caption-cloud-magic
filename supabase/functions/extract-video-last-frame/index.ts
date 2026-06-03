@@ -35,8 +35,9 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
-    if (!REPLICATE_API_TOKEN) throw new Error("REPLICATE_API_TOKEN missing");
+    const REPLICATE_API_TOKEN =
+      Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY");
+    if (!REPLICATE_API_TOKEN) throw new Error("REPLICATE_API_TOKEN/REPLICATE_API_KEY missing");
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
