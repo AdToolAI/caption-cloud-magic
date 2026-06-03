@@ -443,7 +443,11 @@ serve(async (req) => {
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
       const passesArr: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
-      const currentPass = Number((state as any).current_pass ?? 0);
+      // v25 Fan-Out: failure applies to the pass owning THIS job_id, not the
+      // stale top-level current_pass cursor (which always points to the last
+      // dispatched pass). Without this fix, a pass-0 FAILED webhook arriving
+      // after pass-2 was dispatched would patch pass-2 instead.
+      const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
       const currentPassState = passesArr[currentPass] ?? null;
       // ── PER-PASS retry budget (Stage H) ──
       // Previously `retry_count` was stored only on the TOP-LEVEL state, so a
