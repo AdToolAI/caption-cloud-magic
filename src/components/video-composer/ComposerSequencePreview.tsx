@@ -1083,13 +1083,38 @@ export default function ComposerSequencePreview({
           (currentScene as any).lipSyncStatus === 'failed' ? (
             (() => {
               const err = String((currentScene as any).clipError ?? '');
+              // sync-so-webhook now prefixes the reason with [error_code]
+              // (e.g. "syncso_segments_FAILED: [generation_pipeline_failed] …")
+              // so we can extract the official Sync.so code and show a
+              // concrete diagnostic instead of "unknown error".
+              const codeMatch = err.match(/\[([a-z][a-z0-9_]+)\]/i);
+              const syncCode = codeMatch ? codeMatch[1] : null;
+              const SYNC_CODE_LABELS: Record<string, string> = {
+                generation_timeout: 'Sync.so Timeout — bitte „Lip-Sync neu rendern"',
+                generation_pipeline_failed: 'Sync.so Pipeline-Fehler — bitte „Lip-Sync neu rendern"',
+                generation_unhandled_error: 'Sync.so unerwarteter Fehler — bitte „Lip-Sync neu rendern"',
+                generation_database_error: 'Sync.so DB-Fehler — bitte „Lip-Sync neu rendern"',
+                generation_infra_storage_error: 'Sync.so Storage-Fehler — bitte „Lip-Sync neu rendern"',
+                generation_infra_resource_exhausted: 'Sync.so überlastet — bitte „Lip-Sync neu rendern"',
+                generation_infra_service_unavailable: 'Sync.so nicht erreichbar — bitte „Lip-Sync neu rendern"',
+                generation_input_audio_invalid: 'Audio-Metadaten ungültig — Voiceover neu generieren',
+                generation_media_metadata_missing: 'Audio-/Video-Metadaten fehlen — Voiceover neu generieren',
+                generation_audio_length_exceeded: 'Audio länger als 300s — Dialog kürzen',
+                generation_text_length_exceeded: 'Script zu lang (>5000 Zeichen) — kürzen',
+                generation_unsupported_model: 'Sync.so Modell nicht verfügbar',
+                generation_audio_missing: 'Voiceover fehlt — Dialog neu generieren',
+                generation_video_missing: 'Quell-Video fehlt — Szene neu rendern',
+                generation_input_validation_failed: 'Sync.so hat Input abgelehnt — Format prüfen',
+                generation_internal_auth: 'Sync.so Auth-Fehler — Support kontaktieren',
+              };
               const willAutoRetry =
                 err === 'multi_speaker_scene_routed_to_single_lipsync' ||
                 err === 'watchdog_stuck_lipsync_refunded' ||
                 /^lipsync_pass_\d+_failed/.test(err) ||
                 err.startsWith('auto-retry:');
               const friendly =
-                err.startsWith('anchor_identity_clone_detected') || err.startsWith('anchor_identity_duplicate_detected') ? 'Charakter wurde doppelt erkannt — bitte „Clip + Lip-Sync neu rendern" klicken'
+                syncCode && SYNC_CODE_LABELS[syncCode] ? SYNC_CODE_LABELS[syncCode]
+                : err.startsWith('anchor_identity_clone_detected') || err.startsWith('anchor_identity_duplicate_detected') ? 'Charakter wurde doppelt erkannt — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('anchor_extra_person_detected') ? 'Anchor enthält eine zusätzliche Person — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('anchor_identity_missing_detected') ? 'Ein Charakter fehlt im Anchor — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('anchor_identity_ambiguous') ? 'Anchor-Identitäten unklar — bitte „Clip + Lip-Sync neu rendern" klicken'
@@ -1100,9 +1125,14 @@ export default function ComposerSequencePreview({
                   ? 'Lip-Sync fehlgeschlagen — wird neu angestoßen'
                   : 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken';
               return (
-                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20">
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20" title={syncCode ? `Sync.so error_code: ${syncCode}` : err.slice(0, 200)}>
                   <span>⚠️</span>
                   <span>{friendly}</span>
+                  {syncCode && (
+                    <span className="ml-1 px-1.5 py-0.5 rounded bg-black/30 text-[9px] font-mono uppercase tracking-wide">
+                      {syncCode.replace(/^generation_/, '')}
+                    </span>
+                  )}
                 </div>
               );
             })()
