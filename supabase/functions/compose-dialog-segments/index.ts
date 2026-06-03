@@ -1226,6 +1226,32 @@ serve(async (req) => {
       })
       .eq("id", sceneId);
 
+    // ── v25 Fan-Out: on fresh dispatch, kick off all remaining passes in
+    //    parallel via background self-invokes. Each runs as an independent
+    //    Sync.so job against the SAME original plate (no chaining). The
+    //    Sync.so 3-slot concurrency guard upstream handles back-pressure.
+    if (!isAdvance && !isRetry && passes.length > 1) {
+      for (let i = 1; i < passes.length; i++) {
+        // Small jitter so the inflight counter check doesn't race-fire.
+        const delayMs = i * 250;
+        setTimeout(() => {
+          fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: i }),
+          }).catch((err) =>
+            console.warn(`[compose-dialog-segments] fan-out pass=${i} dispatch threw: ${(err as Error).message}`),
+          );
+        }, delayMs);
+      }
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} FAN-OUT scheduled ${passes.length - 1} additional passes in parallel`,
+      );
+    }
+
     return json(
       {
         ok: true,
