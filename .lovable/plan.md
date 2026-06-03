@@ -1,89 +1,63 @@
-## Befund
+## Ziel
 
-Der Fehler ist jetzt konkret sichtbar:
+Den echten Sync.so-Fehler isolieren, anzeigen und je nach Fehlerklasse gezielt reagieren — statt jeden Fehler als „An unknown error occurred" zu sehen.
 
-- Szene `4a56d6a1…` ist mit `sync_so_timeout_8min` fehlgeschlagen, obwohl bereits 2 Sync.so-Pässe liefen und Pass 3 noch `pending` war.
-- Szene `85ecc55a…` hängt in `pending/deferred`, weil `compose-dialog-segments` seit Minuten `DEFER inflight=3/3` schreibt.
-- Hauptursache ist nicht mehr die alte Sync.so-Output-Kette, sondern die neue v25-Fan-Out-Orchestrierung:
-  - Sie startet mehrere Pässe, aber hat keinen robusten Server-Queue-/Polling-Fallback, wenn Webhooks fehlen oder alle Slots belegt sind.
-  - Sync.so-Dokumentation bestätigt: verlorene Webhooks werden nicht automatisch erneut zugestellt; wir müssen terminale Jobs aktiv pollen.
-  - Der aktuelle Watchdog markiert nach Timeout nur fehlgeschlagen, statt offene Sync.so-Jobs zuerst abzufragen und fertige Passes zu übernehmen.
+## Root Cause
 
-## Fix-Plan
+Sync.so liefert laut offizieller Webhook-Spec im `FAILED`-Payload zwei klar definierte Felder:
 
-### 1. Webhook-Matching für Fan-Out korrigieren
+- `error` — menschenlesbare Fehlermeldung
+- `error_code` — maschinenlesbarer Code aus einer festen Enum (z.B. `generation_input_audio_invalid`, `generation_pipeline_failed`, `generation_timeout`, `generation_infra_resource_exhausted`, `generation_audio_length_exceeded`, `generation_unhandled_error`)
 
-In `supabase/functions/sync-so-webhook/index.ts`:
+Unser `extractError` in `sync-so-webhook` liest nur `error_message` / verschachtelte Varianten, aber **nicht** das offizielle Feld `error`. Ergebnis: wir loggen den generischen Fallback-String statt der echten Diagnose, und in `poll-dialog-shots` / `compose-dialog-segments` retryen wir blind, obwohl der Code uns sagen würde, ob Retry überhaupt sinnvoll ist.
 
-- Webhook darf nicht nur `dialog_shots.sync_job_id` prüfen.
-- Er muss den Job in `dialog_shots.passes[].job_id` suchen.
-- Damit werden Pass-1/Pass-2-Webhooks nicht ignoriert, wenn `sync_job_id` inzwischen auf einen anderen Pass zeigt.
-- Bei `COMPLETED` wird exakt der passende Pass als `done` markiert.
+## Plan
 
-### 2. Slot-aware Fan-Out statt blindem Parallelstart
+### 1. Sync.so Webhook richtig parsen (`supabase/functions/sync-so-webhook/index.ts`)
 
-In `supabase/functions/compose-dialog-segments/index.ts`:
+- `extractError(payload)` erweitern um die offiziellen Spec-Felder: `payload.error`, `payload.error_code`, sowie `payload.data?.error` / `payload.data?.error_code` als Fallback.
+- Zwei separate Werte zurückgeben: `errorMessage` (string) **und** `errorCode` (string | null).
+- Beim Persistieren der fehlgeschlagenen Pass-Row in `dialog_shots` / `dialog_segments` beide Felder speichern (neue Spalte `sync_error_code TEXT`, plus `error_message` für den Text).
+- Falls Webhook-Payload trotzdem leer ist (kommt vor): einen GET-Call auf `https://api.sync.so/v2/generate/{job_id}` mit dem `SYNC_API_KEY` machen und Felder dort holen — das ist die offizielle Recovery-Methode.
 
-- Fresh dispatch startet Pass 1.
-- Weitere Pässe werden nur gestartet, wenn ein Sync.so-Slot frei ist.
-- Bei `inflight=3/3` bleibt die Szene in einem serverseitigen Wartezustand mit bestehendem `dialog_shots`, statt immer wieder ohne Fortschritt `deferred` zu schreiben.
-- Nach jedem fertigen Pass triggert Webhook/Watchdog den nächsten pending Pass.
+### 2. Fehlercode-Klassifizierung (neuer Helper `_shared/syncSoErrorPolicy.ts`)
 
-Ziel:
+Eine zentrale Funktion `classifySyncError(code)` mit drei Buckets:
 
-```text
-Pass pending -> slot frei -> dispatch
-Pass rendering -> webhook/poll -> done
-alle done -> compositor/audio mux
-```
+| Bucket | Codes | Aktion |
+|---|---|---|
+| `retry_transient` | `generation_timeout`, `generation_infra_resource_exhausted`, `generation_infra_service_unavailable`, `generation_infra_storage_error`, `generation_database_error`, `generation_pipeline_failed`, `generation_unhandled_error` | Exponential Backoff, max 2 Retries auf demselben Pass |
+| `retry_with_repair` | `generation_input_audio_invalid`, `generation_media_metadata_missing` | Audio einmalig über ffmpeg neu encoden (`pcm_s16le`, sauberes WAV-Header) und genau 1× retryen |
+| `fail_fast` | `generation_audio_length_exceeded`, `generation_unsupported_model`, `generation_text_length_exceeded`, `generation_audio_missing`, `generation_video_missing` | Sofort als endgültig fehlgeschlagen markieren, Credit-Refund triggern, Code in UI surfacen |
 
-### 3. Polling-Fallback in den Watchdog einbauen
+Unbekannte Codes → wie `retry_transient` (1 Retry), danach als `fail_fast` mit Code im Fehlertext.
 
-In `supabase/functions/lipsync-watchdog/index.ts`:
+### 3. Pass-Dispatch & Polling anpassen
 
-- Für v5 `sync-segments` mit `passes[].status='rendering'`:
-  - Sync.so `GET /v2/generate/{job_id}` abfragen.
-  - `COMPLETED` wie Webhook behandeln: Output re-hosten/Pass `done` setzen.
-  - `FAILED/REJECTED` wie Webhook behandeln: bounded retry oder Refund + terminal fail.
-- Erst wenn Polling ebenfalls keinen Fortschritt bringt und die harte TTL überschritten ist, wird die Szene fehlgeschlagen.
+- `sync-so-webhook`: bei `FAILED` Bucket bestimmen → bei `retry_*` Pass auf `pending` zurücksetzen und Retry-Counter inkrementieren statt sofort die ganze Szene zu kippen.
+- `poll-dialog-shots` / `compose-dialog-segments`: Retry-Counter (`sync_retry_count`) respektieren, max 2, danach Szene als `failed` mit dem klaren Code im `error_message`.
+- Bei `retry_with_repair`: vor dem nächsten Dispatch das WAV durch eine kleine `repairAudio()`-Routine schicken (FFmpeg via vorhandene Stack, gleiches Pattern wie in `poll-dialog-shots` `normalize_failed`-Pfad).
 
-### 4. Audio-Mux/Fan-In nur einmal auslösen
+### 4. UI: Fehlercode anzeigen
 
-In `sync-so-webhook` und ggf. `lipsync-watchdog`:
+- In der Szenen-Karte / Dialog-Shot-Statusanzeige zusätzlich zum „failed"-Badge den `sync_error_code` und eine 1-zeilige menschenlesbare Erklärung anzeigen (Mapping aus `classifySyncError`-Helper).
+- So sieht der User direkt z.B. „`generation_pipeline_failed` — Sync.so-Pipeline-Fehler, Retry läuft (2/2)" statt „An unknown error occurred".
 
-- Wenn alle Pässe `done` sind, exakt einmal `render-sync-segments-audio-mux` starten.
-- Vor dem Dispatch prüfen, ob `dialog_shots.audio_mux.render_id` bereits existiert.
-- Dadurch keine doppelten Lambda-Renders.
+### 5. Backfill der aktuell fehlgeschlagenen Szenen
 
-### 5. Stuck Scenes sauber zurücksetzen
+- Einmal-Skript (oder Edge-Function `lipsync-watchdog`-Erweiterung) das alle `dialog_shots` mit `status='failed'` der letzten 24h nimmt, deren `job_id` per GET an Sync.so abfragt und `sync_error_code` nachträgt — damit wir endlich datenbasiert sehen, ob die 3-Sprecher-Failures wirklich alle `generation_pipeline_failed` sind oder z.B. `generation_input_audio_invalid` (was Audio-Repair als Lösung bestätigen würde).
+- Szene `6d00a2b8…` und die anderen aktuell roten Szenen werden anschließend auf `pending` resettet (ohne neuen Credit-Abzug) und durchlaufen den neuen Pfad.
 
-Nach Code-Fix:
+## Betroffene Dateien
 
-- `4a56d6a1…` und `85ecc55a…` auf einen konsistenten Zustand setzen.
-- Alte `syncso_inflight_jobs` freigeben/entfernen, damit `inflight=3/3` nicht künstlich blockiert.
-- Szene danach sauber auf `pending/master_clip` setzen, damit der neue Queue-Pfad übernimmt.
+- `supabase/functions/sync-so-webhook/index.ts` — Parser + Retry-Routing
+- `supabase/functions/poll-dialog-shots/index.ts` — Retry-Counter + Audio-Repair-Pfad
+- `supabase/functions/compose-dialog-segments/index.ts` — gleiche Retry-Logik
+- `supabase/functions/_shared/syncSoErrorPolicy.ts` (neu) — Klassifizierung
+- `supabase/functions/lipsync-watchdog/index.ts` — Backfill-Endpoint
+- DB-Migration: `dialog_shots.sync_error_code TEXT`, `dialog_shots.sync_retry_count INT DEFAULT 0` (analog für `dialog_segments`)
+- Frontend: Dialog-Shot-Status-Komponente (1 Komponente in `src/components/`-Composer-Bereich) für Code-Anzeige
 
-### 6. Validierung
+## Warum das das eigentliche Problem löst
 
-Ich prüfe danach:
-
-- Logs zeigen keine dauerhafte `DEFER inflight=3/3`-Schleife mehr.
-- Rendering-Pässe werden per Webhook oder Polling als `done` übernommen.
-- Pass 3 startet automatisch, sobald ein Slot frei ist.
-- Bei verlorenen Webhooks beendet der Watchdog nicht blind, sondern pollt Sync.so zuerst.
-- Bei echtem Provider-Fail: einmaliger Refund, terminaler Fehler, kein Loop.
-
-## Dateien
-
-- `supabase/functions/sync-so-webhook/index.ts`
-- `supabase/functions/compose-dialog-segments/index.ts`
-- `supabase/functions/lipsync-watchdog/index.ts`
-- ggf. kleine Datenbereinigung für die beiden stuck scenes
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Sobald wir den echten `error_code` haben, brauchen wir nicht mehr zu raten ob 3-Sprecher-Plates das Provider-Modell überfordern (`generation_pipeline_failed` → Provider-Issue, Retry hilft) oder ob unser WAV mit dem Lead-In fehlerhaft ist (`generation_input_audio_invalid` → Audio-Repair behebt es deterministisch). Erst dann wissen wir, ob Routing-Umbau (poll-dialog-shots-Pfad) überhaupt nötig ist oder ob Audio-Repair + Retry reicht.
