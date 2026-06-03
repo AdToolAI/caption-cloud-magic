@@ -718,7 +718,26 @@ serve(async (req) => {
         : codeBucket;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
-      if (cost > 0 && !alreadyRefunded) {
+      // v29: Determine scene survivability FIRST (re-read state below). Only
+      // refund + mark scene failed if no sibling pass is still alive.
+      const { data: freshFailRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshFailState: any = (freshFailRow as any)?.dialog_shots ?? state;
+      const freshFailPasses: any[] = Array.isArray(freshFailState?.passes)
+        ? freshFailState.passes
+        : passesArr;
+      const aliveSiblings = freshFailPasses
+        .map((p: any, i: number) => ({ p, i }))
+        .filter(({ p, i }) =>
+          i !== currentPass &&
+          ["rendering", "retrying", "pending"].includes(String(p?.status ?? "")),
+        );
+      const sceneWillFail = aliveSiblings.length === 0;
+
+      if (sceneWillFail && cost > 0 && !alreadyRefunded) {
         const { data: row } = await supabase
           .from("composer_scenes")
           .select("project_id")
