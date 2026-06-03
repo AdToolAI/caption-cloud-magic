@@ -198,20 +198,30 @@ serve(async (req) => {
   };
   let { message: errorMsg, code: errorCode } = extractErrorFields(payload);
 
-  // GET-fallback: terminal FAILED with no error fields at all → ask Sync.so
-  // directly. This is the official recovery path per their error-handling
-  // docs and turns "unknown error" into a concrete error_code.
+  // GET-fallback (v28): terminal FAILED with NO `error_code` AND either no
+  // message OR only the generic "An unknown error occurred." string → ask
+  // Sync.so directly via `GET /v2/generate/{job_id}`. Previously we only
+  // fell back when both fields were missing, but the live failure path
+  // returns the generic message *without* a code — exactly the case where
+  // GET-fallback was supposed to help.
+  const isGenericMsg = (m?: string | null) =>
+    !m || /^an unknown error occurred\.?$/i.test(String(m).trim());
   if (
     ["FAILED", "REJECTED", "CANCELED"].includes(status) &&
-    !errorMsg && !errorCode && jobId
+    !errorCode &&
+    isGenericMsg(errorMsg) &&
+    jobId
   ) {
     const fetched = await fetchSyncJobError(jobId);
     if (fetched) {
-      errorMsg = fetched.error ?? errorMsg;
-      errorCode = fetched.error_code ?? errorCode;
+      if (fetched.error && !isGenericMsg(fetched.error)) {
+        errorMsg = fetched.error;
+      }
+      if (fetched.error_code) errorCode = fetched.error_code;
       console.log(`[sync-so-webhook] GET-fallback job=${jobId} code=${errorCode ?? "null"} msg=${(errorMsg ?? "").slice(0, 200)}`);
     }
   }
+
 
   if (status !== "COMPLETED") {
     // Log the full payload once so we can post-mortem the "unknown error"
