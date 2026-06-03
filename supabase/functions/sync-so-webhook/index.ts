@@ -476,6 +476,13 @@ serve(async (req) => {
 
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
+      // OFFICIAL Sync.so error_code routing (overrides message-based heuristic
+      // when the provider gives us a real enum value). Decides whether we:
+      //   • retry as-is (transient)         → run the variant ladder
+      //   • retry with audio repair          → mark for re-encode + retry
+      //   • fail-fast (permanent input err)  → skip ladder, refund immediately
+      const codeBucket = classifySyncErrorCode(errorCode);
+      const codeExplain = explainSyncErrorCode(errorCode);
       const passesArr: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
       // v25 Fan-Out: failure applies to the pass owning THIS job_id, not the
       // stale top-level current_pass cursor (which always points to the last
@@ -518,6 +525,8 @@ serve(async (req) => {
             pass_retry_count_seen: passRetryCount,
             aggregate_retry_count_seen: aggregateRetryCount,
             transient: isTransientSyncError(errClass),
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: codeBucket,
           },
         });
       } catch (_e) { /* ignore log errors */ }
