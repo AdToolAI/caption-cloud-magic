@@ -476,7 +476,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const RETRYABLE_REGEX = /^(syncso_circuit_open|syncso_concurrency|http_429|audio_mux_dispatch)/i;
         // Reasons that must NEVER auto-retry — surfaced to the user as terminal.
         const HARD_FAIL_REGEX = /^(cast_invalid_|source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|dialog_pipeline_no_per_speaker_tracks|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_|dialog_missing_face_coords|raw_talking_head_source_blocked|dialog_shots_failed|syncso_segments_FAILED|sync_FAILED|multi_speaker_)/i;
-        const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_)/i;
+        
 
         const candidates = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
