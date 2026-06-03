@@ -383,8 +383,35 @@ serve(async (req) => {
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
       }
 
-      // ── All passes complete → dispatch fan-in compositor ─────────────
+      // ── All passes complete ──────────────────────────────────────────
       const finalUrl = (passes[passes.length - 1] as any)?.output_url ?? outputUrl;
+
+      // Single-speaker fast path: no fan-in needed, audio already matches.
+      if (totalPasses === 1) {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...state, passes,
+              status: "done",
+              final_url: finalUrl,
+              sync_so_url: outputUrl,
+              finished_at: nowIso,
+            },
+            clip_url: finalUrl,
+            clip_status: "ready",
+            lip_sync_status: "applied",
+            lip_sync_applied_at: nowIso,
+            twoshot_stage: "complete",
+            clip_error: null,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE`);
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
+      }
+
+      // Multi-speaker: dispatch fan-in compositor (idempotent via audio_mux.render_id).
       await supabase
         .from("composer_scenes")
         .update({
@@ -409,137 +436,8 @@ serve(async (req) => {
           body: JSON.stringify({ scene_id: sceneId }),
         }).catch(() => {});
       } catch { /* ignore */ }
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
 
-
-
-      // ── Last pass complete → re-host + apply ───────────────────────────
-      let finalUrl = outputUrl;
-      try {
-        const { data: row } = await supabase
-          .from("composer_scenes")
-          .select("project_id")
-          .eq("id", sceneId)
-          .single();
-        const { data: proj } = await supabase
-          .from("composer_projects")
-          .select("user_id")
-          .eq("id", (row as any)?.project_id)
-          .single();
-        const uid = (proj as any)?.user_id;
-        if (uid) {
-          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
-          if (dl.ok) {
-            const bytes = new Uint8Array(await dl.arrayBuffer());
-            const objectPath = `composer/${uid}/${sceneId}-lipsync.mp4`;
-            const up = await supabase.storage.from("ai-videos").upload(
-              objectPath,
-              bytes,
-              { contentType: "video/mp4", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage
-                .from("ai-videos")
-                .getPublicUrl(objectPath);
-              if (pub?.publicUrl) {
-                finalUrl = pub.publicUrl;
-                console.log(
-                  `[sync-so-webhook] v5 scene=${sceneId} re-hosted ${bytes.length} bytes → ${finalUrl}`,
-                );
-              }
-            } else {
-              console.warn(
-                `[sync-so-webhook] v5 scene=${sceneId} re-host upload failed: ${up.error.message}`,
-              );
-            }
-          } else {
-            console.warn(
-              `[sync-so-webhook] v5 scene=${sceneId} re-host download HTTP ${dl.status}`,
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} re-host exception: ${(err as Error).message}`,
-        );
-      }
-
-      // ── Multi-speaker fix ────────────────────────────────────────────
-      // Sync.so v2 replaces the entire audio track of its output with the
-      // audio submitted to that pass. For chained multi-pass (passes >=2)
-      // the final video therefore contains ONLY the last speaker's voice.
-      // The merged master WAV (with all speakers) already exists in
-      // audio_plan.twoshot.url — we dispatch a small Lambda audio-mux step
-      // (DialogStitchVideo with shots=[]) that swaps the audio back. The
-      // muxed render finalizes clip_url + lip_sync_applied_at via the
-      // existing dialog-stitch webhook branch.
-      const needsAudioMux = Array.isArray(passes) && passes.length >= 2;
-      if (needsAudioMux) {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...state,
-              passes,
-              status: "audio_muxing",
-              final_url: finalUrl,
-              sync_so_url: outputUrl,
-              finished_at: nowIso,
-            },
-            // clip_url intentionally NOT updated yet — wait for muxed url.
-            lip_sync_status: "audio_muxing",
-            twoshot_stage: "audio_muxing",
-            clip_error: null,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(
-          `[sync-so-webhook] v5 scene=${sceneId} last pass done (${passes.length} speakers) → dispatching audio mux`,
-        );
-        try {
-          // Fire-and-forget — render-sync-segments-audio-mux is idempotent.
-          fetch(
-            `${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${serviceKey}`,
-              },
-              body: JSON.stringify({ scene_id: sceneId }),
-            },
-          ).catch(() => {});
-        } catch {
-          /* ignore */
-        }
-      } else {
-        // Single-speaker (passes.length <= 1): the single pass's audio IS
-        // the speaker's full track — no mismatch with the master WAV.
-        // Finalize directly as before.
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...state,
-              passes,
-              status: "done",
-              final_url: finalUrl,
-              sync_so_url: outputUrl,
-              finished_at: nowIso,
-            },
-            clip_url: finalUrl,
-            clip_status: "ready",
-            lip_sync_status: "applied",
-            lip_sync_applied_at: nowIso,
-            twoshot_stage: "complete",
-            clip_error: null,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(
-          `[sync-so-webhook] v5 scene=${sceneId} FINAL pass ${currentPass + 1}/${totalPasses} → clip_url updated, lip_sync_applied (single speaker)`,
-        );
-      }
-    } else {
       // FAILED / REJECTED / CANCELED
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
