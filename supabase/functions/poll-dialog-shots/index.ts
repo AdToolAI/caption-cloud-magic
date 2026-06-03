@@ -902,8 +902,12 @@ async function processSceneLocked(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.version !== 4) {
-    // Legacy v1/v2/v3 state — ignore; user must reset via UI to migrate.
+  // Accept v4 (legacy per-turn) AND v5 (per-turn + face-crop preclip / target_bbox).
+  // v5 produced by compose-dialog-segments uses `passes[]` instead of `shots[]`
+  // and is handled by sync-so-webhook + EdgeRuntime chains — we skip those here.
+  const hasShots = Array.isArray((state as any).shots);
+  if (state.version !== 4 && !(state.version === 5 && hasShots)) {
+    // Legacy / unrelated v5-segments state — ignore.
     return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
   if (state.status === "done" || state.status === "failed" || (state.status as any) === "canceled") {
