@@ -279,8 +279,17 @@ serve(async (req) => {
   // ── v5: Sync.so Segments (1-call pipeline) ────────────────────────────
   // No per-turn shots; the webhook output IS the final clip.
   if (state.version === 5 && state.engine === "sync-segments") {
-    if (state.sync_job_id !== jobId) {
-      return ok({ ok: true, skipped: "v5_job_mismatch", job_id: jobId });
+    // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
+    // the legacy top-level state.sync_job_id (single-pass scenes). Previously
+    // we required state.sync_job_id === jobId which dropped EVERY pass
+    // webhook except the most recently dispatched pass — causing scenes to
+    // hang indefinitely with only the last pass marked done.
+    const passesPre = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
+    const matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
+    const isLegacySingle = matchedIdx < 0 && state.sync_job_id === jobId;
+    if (matchedIdx < 0 && !isLegacySingle) {
+      console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} not in passes[] (count=${passesPre.length}) and not top-level — skip`);
+      return ok({ ok: true, skipped: "v5_job_not_in_passes", job_id: jobId });
     }
     if (status === "COMPLETED" && outputUrl) {
       // ── v25 Fan-Out: passes run in parallel, all against the ORIGINAL
@@ -288,10 +297,9 @@ serve(async (req) => {
       //    (so the compositor has a stable URL), and dispatches the final
       //    compositor only when EVERY pass is done. No chained next-pass
       //    dispatch (compose-dialog-segments fans them out itself).
-      const passes = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
+      const passes = passesPre;
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
-      const myIdx = passes.findIndex((p: any) => p?.job_id === jobId);
-      const currentPass = myIdx >= 0 ? myIdx : Number((state as any).current_pass ?? 0);
+      const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
 
       // Re-host this pass's output to ai-videos for a stable, redirect-free URL.
       let rehostedUrl: string | null = null;
@@ -339,6 +347,14 @@ serve(async (req) => {
       const failedCount = passes.filter((p: any) => p?.status === "failed").length;
       const allDone = doneCount === totalPasses && failedCount === 0;
 
+      // Find pending passes (deferred earlier or never dispatched). These
+      // need an explicit advance dispatch — without this, scenes whose
+      // fan-out hit the Sync.so concurrency limit on initial dispatch
+      // would never complete the remaining speakers.
+      const pendingIdxs = passes
+        .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
+        .filter((i: number) => i >= 0);
+
       if (!allDone) {
         // Just persist this pass — let the fan-out parallel dispatches finish.
         await supabase
@@ -350,15 +366,24 @@ serve(async (req) => {
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, waiting)`);
+        console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
+
+        // Kick the next pending pass — now that we freed a slot, advance.
+        if (pendingIdxs.length > 0) {
+          const nextIdx = pendingIdxs[0];
+          try {
+            fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+              body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: nextIdx }),
+            }).catch(() => {});
+            console.log(`[sync-so-webhook] v25 scene=${sceneId} advancing pending pass ${nextIdx + 1}/${totalPasses}`);
+          } catch { /* ignore */ }
+        }
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
       }
 
       // ── All passes complete → dispatch fan-in compositor ─────────────
-      // Use last completed pass's output as a fallback final_url; the actual
-      // composite happens in render-sync-segments-audio-mux which reads
-      // passes[] and overlays each speaker via face-mask circles onto the
-      // original plate.
       const finalUrl = (passes[passes.length - 1] as any)?.output_url ?? outputUrl;
       await supabase
         .from("composer_scenes")
@@ -384,6 +409,7 @@ serve(async (req) => {
           body: JSON.stringify({ scene_id: sceneId }),
         }).catch(() => {});
       } catch { /* ignore */ }
+
 
 
       // ── Last pass complete → re-host + apply ───────────────────────────
