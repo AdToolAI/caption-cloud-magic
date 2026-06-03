@@ -596,19 +596,32 @@ serve(async (req) => {
       let forceCoordsRepair = false;
       const isProviderUnknown =
         codeBucket === "unknown" && errClass === "provider_unknown_error";
-      // v29: For 3+ speakers with provider_unknown_error (no error_code),
-      // stay on coords-pro and force audio repair on EVERY retry up to
-      // MAX_V5_RETRIES instead of jumping to auto-* (face-swap risk).
+      // v30: For 3+ speakers with provider_unknown_error (no error_code),
+      // walk a face-swap-safe ladder before exhausting:
+      //   retry 1: coords-pro + repair_audio  (existing)
+      //   retry 2: coords-pro-box             (NEW — bounding-box targeting)
+      // We never fall back to auto-* on 3+ speakers (face-swap risk).
       if (
         speakerCount >= 3 &&
-        currentVariant === "coords-pro" &&
         isProviderUnknown &&
-        passRetryCount < MAX_V5_RETRIES
+        currentVariant === "coords-pro" &&
+        passRetryCount === 0
       ) {
         nextVariant = "coords-pro";
         forceCoordsRepair = true;
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES} (no auto-* fallback)`,
+          `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
+        );
+      } else if (
+        speakerCount >= 3 &&
+        isProviderUnknown &&
+        (currentVariant === "coords-pro" || currentVariant === "coords-pro-box") &&
+        passRetryCount === 1
+      ) {
+        nextVariant = "coords-pro-box";
+        forceCoordsRepair = true; // also re-emit canonical WAV
+        console.warn(
+          `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro-box (bounding-box ASD) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
@@ -621,12 +634,12 @@ serve(async (req) => {
           allPassesFailedNoFace && isFirstPass && nextVariant === "auto-pro";
         if (!lastDitchAllowed) {
           console.warn(
-            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
+            `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — blocking auto-* fallback (from=${currentVariant} blocked=${nextVariant}); marking exhausted`,
           );
           nextVariant = null;
         } else {
           console.warn(
-            `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — last-ditch-lite ${currentVariant} → auto-pro on pass 0`,
+            `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — last-ditch-lite ${currentVariant} → auto-pro on pass 0`,
           );
         }
       }
