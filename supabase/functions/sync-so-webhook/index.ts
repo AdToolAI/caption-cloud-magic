@@ -761,20 +761,8 @@ serve(async (req) => {
             .eq("user_id", uid);
         }
       }
-      // v29: Re-read scene so a concurrent webhook for another pass cannot
-      // be overwritten. Determine scene survivability from the FRESHEST
-      // passes[]: only mark the whole scene failed when no sibling is still
-      // running/retrying/pending with a live job — otherwise wait for them.
-      const { data: freshFailRow } = await supabase
-        .from("composer_scenes")
-        .select("dialog_shots")
-        .eq("id", sceneId)
-        .maybeSingle();
-      const freshFailState: any = (freshFailRow as any)?.dialog_shots ?? state;
-      const freshFailPasses: any[] = Array.isArray(freshFailState?.passes)
-        ? freshFailState.passes
-        : passesArr;
-
+      // (freshFailState/freshFailPasses/aliveSiblings/sceneWillFail are
+      // already computed above for the refund decision.)
       const patchedThisPass = (p: any) => ({
         ...p,
         status: "failed",
@@ -784,17 +772,6 @@ serve(async (req) => {
         sync_error_code: errorCode ?? null,
         sync_error_bucket: effectiveBucket,
       });
-
-      // Sibling survivors = passes (other than currentPass) still rendering/
-      // retrying/pending with a job_id (or pending without job_id but not yet
-      // terminal). If any survive, keep the scene alive.
-      const siblings = freshFailPasses
-        .map((p: any, i: number) => ({ p, i }))
-        .filter(({ i }) => i !== currentPass);
-      const aliveSiblings = siblings.filter(({ p }) =>
-        ["rendering", "retrying", "pending"].includes(String(p?.status ?? "")),
-      );
-      const sceneWillFail = aliveSiblings.length === 0;
 
       const finalPasses = freshFailPasses.map((p: any, i: number) => {
         if (i === currentPass) return patchedThisPass(p);
