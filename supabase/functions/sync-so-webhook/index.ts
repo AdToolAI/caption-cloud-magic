@@ -572,17 +572,19 @@ serve(async (req) => {
       let forceCoordsRepair = false;
       const isProviderUnknown =
         codeBucket === "unknown" && errClass === "provider_unknown_error";
+      // v29: For 3+ speakers with provider_unknown_error (no error_code),
+      // stay on coords-pro and force audio repair on EVERY retry up to
+      // MAX_V5_RETRIES instead of jumping to auto-* (face-swap risk).
       if (
         speakerCount >= 3 &&
         currentVariant === "coords-pro" &&
         isProviderUnknown &&
-        !currentPassState?.repair_audio &&
-        passRetryCount === 0
+        passRetryCount < MAX_V5_RETRIES
       ) {
         nextVariant = "coords-pro";
         forceCoordsRepair = true;
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry instead of auto-* fallback`,
+          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry ${passRetryCount + 1}/${MAX_V5_RETRIES} (no auto-* fallback)`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
