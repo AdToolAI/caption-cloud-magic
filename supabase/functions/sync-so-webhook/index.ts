@@ -531,7 +531,7 @@ serve(async (req) => {
       // budget per pass instead; keep top-level as aggregate for diagnostics.
       const passRetryCount = Number(currentPassState?.retry_count ?? 0);
       const aggregateRetryCount = Number((state as any).retry_count ?? 0);
-      const MAX_V5_RETRIES = 2;
+      const MAX_V5_RETRIES = 3;
 
       // Stage E.6 — persist the full webhook payload so we can post-mortem
       // "unknown error" without grepping logs. Keep it bounded.
