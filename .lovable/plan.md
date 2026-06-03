@@ -1,112 +1,101 @@
-## Diagnose
+## Befund
 
-Ja — wir konnten den aktuellen Failure deutlich genauer isolieren.
+Der neue fehlgeschlagene Run ist Szene `ace1a0d0-f9bd-4982-b306-3414db03c12b`.
 
-**Betroffene Szene:** `bd60c826-a5d3-4857-a22a-aa7cfd7d6f6e`
+Was wir jetzt genauer isolieren konnten:
 
-**Was passiert ist:**
-- Pass 1, Samuel, `coords-pro` → erfolgreich.
-- Pass 2, Matthew, `coords-pro` → fehlgeschlagen.
-- Pass 3, Kailee, `coords-pro` → ebenfalls fehlgeschlagen.
-- Sync.so sendet im Webhook weiterhin nur:
-  - `error: "An unknown error occurred."`
-  - **kein** `error_code`
+1. **Sync.so liefert weiterhin keinen echten Fehlercode**
+   - Webhook und GET-Fallback melden beide nur:
+     - `error: "An unknown error occurred."`
+     - `error_code: null`
+   - Damit ist der externe Provider-Fehler selbst nicht weiter maschinenlesbar klassifizierbar.
 
-**Wichtig:** Die neue Diagnose liest `error` und `error_code` korrekt. In diesem konkreten Sync.so-Payload existiert aber tatsächlich kein `error_code`. Dadurch steht in unserem State weiter `sync_error_code: null`.
+2. **Unsere Audio-Trim-Reparatur hat teilweise gegriffen**
+   - Matthew wurde von `2.46s` Lead-In auf `0.20s` getrimmt.
+   - Kailee wurde von `3.75s` Lead-In auf `0.20s` getrimmt.
+   - Samuel hatte nur `0.10s` Lead-In und wurde im ersten Versuch nicht getrimmt.
 
-## Exakter Befund
+3. **Der eigentliche neue Blocker ist ein Multi-Pass-Race im Retry-State**
+   - Pass 2 und Pass 3 wurden parallel gestartet.
+   - Als deren FAILED-Webhooks ankamen, fand `sync-so-webhook` deren `job_id` nicht mehr in `dialog_shots.passes[]`:
+     - `job=... not in passes[] (count=3) and not top-level — skip`
+   - Ursache: Der Retry von Pass 1 schreibt einen älteren `passes[]`-Snapshot zurück und überschreibt dadurch parallel gestartete Pass-Job-IDs.
+   - Dadurch werden die Webhooks von Pass 2/3 verworfen, und die Szene fällt anschließend anhand von Pass 1 hart durch.
 
-Der Fehler ist kein allgemeiner UI-Fehler und kein fehlender Parser mehr. Der Live-Failure hängt an dieser Kombination:
+4. **Der Retry-Ladder-Guard ist zu streng für 3+ Sprecher**
+   - Nach `coords-pro + repair_audio` blockiert der Code `auto-pro`, um Face-Swaps zu vermeiden.
+   - Das ist grundsätzlich richtig, aber aktuell führt es dazu, dass nach nur einem reparierten Versuch sofort endgültig failed/refunded wird.
 
-```text
-3 Sprecher
-+ coords-pro / manual active_speaker_detection
-+ einzelne Sprecher-WAVs mit langer Stille vor dem Sprachbeginn
-+ Sync.so lipsync-2-pro
-= Sync.so gibt generischen Provider-Fehler ohne error_code zurück
-```
+## Ziel
 
-Aus den gespeicherten Dispatch-Diagnosen für Matthew:
+Lip-Sync bei 3-Sprecher-Szenen stabilisieren, ohne Face-Swaps zu riskieren und ohne Credits doppelt zu belasten.
 
-```text
-audio_dur_sec: 9.0
-leadInSec: 2.746s
-voicedSec: 0.52s
-coords: [639, 220]
-frame_number: 76
-variant: coords-pro
-Sync.so result: FAILED, error_code: null
-```
+## Plan
 
-Damit ist die wahrscheinlichste technische Ursache: **Sync.so scheitert bei per-speaker Full-Length-WAVs, wenn die Stimme erst mehrere Sekunden nach t=0 beginnt und gleichzeitig manuelles Face-Targeting auf einer 3-Personen-Plate aktiv ist.**
+### 1. Webhook-State-Merge statt Snapshot-Overwrite
 
-## Zusätzlich gefundene Schwachstellen in unserem Code
+In `supabase/functions/sync-so-webhook/index.ts`:
 
-1. **GET-Fallback wird zu selten ausgelöst**
-   - Aktuell fragen wir Sync.so per GET nur nach, wenn gar keine Fehlermeldung vorhanden ist.
-   - Hier ist aber eine generische Fehlermeldung vorhanden: `An unknown error occurred.`
-   - Deshalb wurde der GET-Fallback nicht ausgeführt, obwohl genau dieser Fall dafür relevant ist.
+- Vor jedem Retry-Update die Szene erneut aus der Datenbank laden.
+- `passes[]` gezielt nach `idx` mergen statt den alten Array-Snapshot komplett zurückzuschreiben.
+- Bereits vorhandene `job_id`, `status`, `started_at`, `diagnostic_id` anderer parallel laufender Pässe dürfen nicht überschrieben werden.
+- Damit können Pass-2/Pass-3-Webhooks wieder zuverlässig zugeordnet werden.
 
-2. **3+-Sprecher-Fallback blockiert den Retry sofort**
-   - Bei 3+ Speakern blockieren wir `coords-pro → auto-pro`, um Face-Swaps zu vermeiden.
-   - Das ist grundsätzlich richtig, führt hier aber dazu, dass Matthew/Kailee nach einem einzigen generischen Provider-Failure direkt als endgültig fehlgeschlagen behandelt werden.
+### 2. `compose-dialog-segments` Retry-State ebenfalls merge-sicher machen
 
-3. **Failed-Pass-State bleibt inkonsistent**
-   - Die Szene wird oben als `failed` markiert, aber einzelne Passes bleiben in `rendering` stehen.
-   - Das erschwert Diagnose, UI und Watchdog-Recovery.
+In `supabase/functions/compose-dialog-segments/index.ts`:
 
-## Plan zur Behebung
+- Beim Retry/Advance vor dem Speichern erneut den aktuellen `dialog_shots`-State laden.
+- Nur den gerade gestarteten Pass ersetzen.
+- Alle anderen Pass-Objekte aus dem neuesten DB-Stand übernehmen, falls dort bereits neuere `job_id`s existieren.
 
-### 1. GET-Fallback auch bei generischem Sync.so-Fehler erzwingen
+### 3. 3+ Sprecher: keine komplette Szene beim ersten Pass-Fehler abbrechen
 
 In `sync-so-webhook`:
-- Wenn `status=FAILED` und `error` exakt/ähnlich `An unknown error occurred.` ist, trotzdem `GET /v2/generate/{job_id}` ausführen.
-- Falls GET weiterhin keinen `error_code` liefert, speichern wir explizit:
-  - `sync_error_code: null`
-  - `sync_error_bucket: provider_unknown_no_code`
-  - `sync_error_explain: Sync.so returned only a generic provider failure`
 
-### 2. Provider-Unknown bei 3+ Speakern nicht mehr über Auto-Fallback lösen
+- Wenn 3+ Sprecher parallel laufen und ein Pass fehlschlägt, nicht sofort alle anderen Pässe canceln, solange andere Passes noch `rendering` sind.
+- Stattdessen:
+  - fehlgeschlagenen Pass markieren,
+  - laufende Geschwister weiter auswerten lassen,
+  - erst final failen, wenn klar ist, dass kein verwertbarer/repairbarer Pfad mehr offen ist.
 
-Statt bei 3+ Speakern `auto-pro` zu versuchen oder sofort zu failen:
-- `provider_unknown_error` + `coords-pro` + `speakerCount >= 3` wird als **input-shape issue** behandelt.
-- Nächster Retry bleibt `coords-pro`, aber mit repariertem Audio.
-- Kein `auto_detect: true`, damit keine Sprecher-/Face-Swaps entstehen.
+### 4. Reparatur-Ladder für `provider_unknown_no_code` erweitern
 
-### 3. Per-speaker Audio vor Sync.so trimmen oder reparieren
+Für 3+ Sprecher mit `error_code=null`:
 
-In `compose-dialog-segments`:
-- Für jeden Pass wird nicht mehr das 9s Full-Length-WAV mit langer Stille geschickt.
-- Stattdessen erzeugen wir eine provider-freundliche Audio-Version:
-  - Stimme beginnt bei t≈0.
-  - Minimaler Lead-in ca. 0.15–0.25s.
-  - WAV bleibt PCM 16-bit.
-  - Original Timing wird im späteren Fan-in/Compositor weiter berücksichtigt.
+- Nicht auf `auto-pro` wechseln, solange Face-Swap-Risiko besteht.
+- Stattdessen eine zweite sichere `coords-pro`-Reparatur erlauben:
+  - Audio immer re-encoden/trimmen, auch bei Pass 1.
+  - Optionales `force_pcm_s16le`/normalisierte WAV-Metadaten setzen, falls die vorhandene Trim-Funktion nur Lead-In entfernt.
+- Erst danach endgültig failen/refunden.
 
-Das adressiert genau den Live-Befund: Matthew hat nur 0.52s Sprache, aber 2.746s Stille vor dem Einsatz.
+### 5. Diagnose im UI präziser machen
 
-### 4. Pass-State korrekt patchen
+In `src/components/video-composer/ComposerSequencePreview.tsx`:
 
-Bei endgültigem Failure:
-- Den betroffenen Pass explizit auf `failed` setzen.
-- `last_error`, `sync_error_code`, `sync_error_bucket`, `finished_at` direkt am Pass speichern.
-- Nicht betroffene laufende/pending Passes entweder sauber abbrechen oder als `canceled_by_scene_failure` markieren.
+- Wenn `sync_error_bucket = provider_unknown_no_code`, anzeigen:
+  - Sync.so hat keinen offiziellen Fehlercode geliefert.
+  - Der Run wurde mit Audio-Repair und merge-sicherem Pass-Retry versucht.
+  - Falls danach noch failed: Ursache liegt sehr wahrscheinlich bei Sync.so `lipsync-2-pro` + manuelles Face-Targeting auf 3-Personen-Plate.
 
-### 5. UI-Diagnose klarer machen
+### 6. Nach Implementierung deployen und validieren
 
-Wenn Sync.so keinen Code liefert, soll die UI nicht nur `An unknown error occurred` zeigen, sondern:
+- Betroffene Edge Functions deployen:
+  - `sync-so-webhook`
+  - `compose-dialog-segments`
+- Logs prüfen, dass:
+  - Pass-2/Pass-3-Webhooks nicht mehr mit `not in passes[]` verworfen werden.
+  - `passes[]`-Job-IDs bei parallelen Writes erhalten bleiben.
+  - Refund weiterhin nur einmal erfolgt.
 
-```text
-Sync.so hat keinen error_code geliefert.
-Wahrscheinliche Ursache: 3-Sprecher-Plate + lange Stille vor Sprecher-Audio + Face-Targeting.
-Audio-Reparatur/Trim-Retry wird verwendet.
-```
+## Technische Kurzfassung
 
-## Erwartetes Ergebnis
+Das Problem ist jetzt klarer isoliert: **Sync.so bleibt bei `error_code=null`, aber unser System verliert durch parallele Pass-Updates Job-IDs im State. Dadurch werden Webhooks verworfen und der Retry wird zu früh als endgültig ausgeschöpft behandelt.**
 
-Nach Umsetzung wird der nächste 3-Sprecher-Lip-Sync nicht mehr nach dem ersten generischen Sync.so-Fehler abbrechen. Stattdessen wird:
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
 
-1. der echte GET-Fallback versucht,
-2. bei weiterhin fehlendem `error_code` die bekannte `provider_unknown_no_code`-Klasse gespeichert,
-3. der betroffene Sprecher mit getrimmtem/repariertem Audio erneut als `coords-pro` gestartet,
-4. der State konsistent bleiben, falls Sync.so trotzdem endgültig scheitert.
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
