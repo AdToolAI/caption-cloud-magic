@@ -39,7 +39,7 @@ interface SceneRow {
   updated_at: string;
 }
 
-function hasRecordedProviderJob(d: SceneRow): boolean {
+function hasRecordedProviderJobLocal(d: SceneRow): boolean {
   if (typeof d.replicate_prediction_id === "string" && d.replicate_prediction_id.startsWith("sync:")) {
     return true;
   }
@@ -54,6 +54,33 @@ function hasRecordedProviderJob(d: SceneRow): boolean {
   const jobs = plan?.twoshot?.syncJobs?.jobs;
   if (Array.isArray(jobs) && jobs.length > 0) return true;
   return false;
+}
+
+/**
+ * Fallback check: per-turn dispatches store the Sync.so job id only in
+ * `syncso_dispatch_log`, never on the shot row (compose-dialog-scene v23
+ * pre-redirect behavior). Without this query the watchdog mis-classifies
+ * scenes that DO have provider jobs in flight as `watchdog_preflight_aborted`
+ * (4 min TTL) instead of `watchdog_provider_timeout` (10 min TTL).
+ */
+async function hasRecordedProviderJob(
+  supabase: any,
+  d: SceneRow,
+): Promise<boolean> {
+  if (hasRecordedProviderJobLocal(d)) return true;
+  try {
+    const { count } = await supabase
+      .from("syncso_dispatch_log")
+      .select("id", { count: "exact", head: true })
+      .eq("scene_id", d.id)
+      .gte(
+        "created_at",
+        new Date(new Date(d.updated_at).getTime() - 5 * 60_000).toISOString(),
+      );
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 async function userIdForProject(supabase: any, projectId: string): Promise<string | null> {
@@ -101,7 +128,7 @@ serve(async (req) => {
 
   for (const d of (rows ?? []) as SceneRow[]) {
     const ageMs = now - new Date(d.updated_at).getTime();
-    const hasJob = hasRecordedProviderJob(d);
+    const hasJob = await hasRecordedProviderJob(supabase, d);
 
     let reason: string | null = null;
     if (ageMs > STALE_HARD_MS) {
