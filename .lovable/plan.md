@@ -1,93 +1,168 @@
-## Diagnose (verifiziert anhand der Logs)
+## Diagnose
 
-**Was wirklich passiert** für Scene `85ecc55a` (3 Sprecher):
+Ich kenne den Fehler jetzt: Es ist **kein UI-Loop als Hauptursache**, sondern die neue v24-Pipeline ist immer noch provider-instabil.
 
-- Per-Turn-Pipeline rendert 2 Preclips (Turn 1 = 1.3s, Turn 2 = 3.17s).
-- Beide Preclips werden an Sync.so `lipsync-2-pro` mit `coordinates`+`frame_number`+`sync_mode=cut_off` geschickt.
-- **Jeder einzelne Dispatch failt mit `"An unknown error occurred."`** — 6 von 6 Versuchen (3 retries pro Turn mit variierten Frames/Coords). Sync.so kann diese Preclip+Coord+ASR-Payload strukturell nicht verarbeiten.
-- Scene `f3e2e8b4` davor: identisches Symptom (`sync_FAILED: An unknown error occurred.`).
+Was bei Scene `4a56d6a1-2f0b-4ef1-8bef-20fa0477ff68` passiert ist:
 
-**Zwei eindeutige Befunde**:
+```text
+Pass 1/3: Original Scene-Plate + Samuel-Audio -> Sync.so OK
+Pass 2/3: Pass-1-Output + Matthew-Audio -> Sync.so FAILED: "An unknown error occurred."
+Pass 3/3: nie gestartet
+```
 
-1. Der 3-4-Sprecher Per-Turn-Pfad (`compose-dialog-scene` + per-turn Preclips) ist strukturell tot bei Sync.so — Coord-/Frame-/Temperature-Retries helfen nicht.
-2. Der 1-2-Sprecher Multi-Pass-Pfad (`compose-dialog-segments` mit `segments[]` auf EINEM Master-Clip) läuft seit Wochen stabil.
-3. Bonus-Bug: `lipsync-watchdog.hasRecordedProviderJob()` erkennt Per-Turn-Jobs nicht (Job-ID wird auf shot nie persistiert, nur im `syncso_dispatch_log`). Folge: falsches `watchdog_preflight_aborted` statt `watchdog_provider_timeout` — Symptom identisch, Reason irreführend.
+Der entscheidende Fehler: Die aktuelle `compose-dialog-segments`-Pipeline ist **keine echte parallele Multi-Speaker-Pipeline**, sondern eine **Kette**:
+
+```text
+Original -> Speaker 1 -> Speaker 2 -> Speaker 3
+```
+
+Sync.so akzeptiert den ersten Job, lehnt aber den zweiten Job auf dem bereits von Sync.so erzeugten Zwischenvideo ab. Genau das zeigen die Logs: Pass 1 wurde re-hosted, Pass 2 mit diesem re-hosted Video wurde rejected.
+
+Zusätzlich:
+- `useTwoShotAutoTrigger.ts` routed 3+ Sprecher weiterhin explizit zu `compose-dialog-scene`; der Forwarder kaschiert das nur.
+- `sync-so-webhook.ts` blockiert bei 3+ Sprechern den Auto-Fallback, deshalb endet die Szene terminal mit `syncso_segments_FAILED`.
+- Die UI zeigt noch die alte/irreführende „3 Dialog-Shots“-Sprache, obwohl der aktuelle Pfad inzwischen anders arbeitet.
+- Das Credit-Modell in `compose-dialog-segments` berechnet aktuell nur `ceil(duration) × 9`, obwohl bei N Sprechern N Sync.so-Jobs laufen. Das muss für korrekte Refunds/Spend-Control auf `× speakerPasses` korrigiert werden.
 
 ## Ziel
 
-Eine einzige, stabile Lipsync-Pipeline für **1–4 Sprecher**, modelliert auf dem bewährten 2-Sprecher-Pfad. Per-Turn-Architektur wird ausgemustert. Cast hart auf 4 unterschiedliche Charaktere limitiert (Artlist erlaubt typisch 4 — siehe Recherche).
+Eine robuste, dauerhafte Pipeline für 1–4 Sprecher, ohne Sync.so-Output wieder als Sync.so-Input zu verwenden.
 
-## Architektur (vereinheitlicht)
+Neue Architektur:
 
 ```text
-N Sprecher (1..4)
-  ↓
-1× Master-Clip (Hailuo i2v, ganze Szene, alle Personen sichtbar)
-  ↓
-N parallele Sync.so-Passes (1 pro distinct character_id)
-  jeder Pass: { input: [video=master, audio=joined-vo-for-this-speaker],
-                options.segments=[{start,end} pro Turn dieses Sprechers],
-                options.active_speaker_detection.coordinates=[face des Sprechers im Master] }
-  ↓
-ffmpeg-Overlay/Stitch der N Pass-Outputs → finaler Szenen-Clip
+Original Scene-Plate
+  ├─ Sync.so Job A: Original + Sprecher A Full-Length-Audio
+  ├─ Sync.so Job B: Original + Sprecher B Full-Length-Audio
+  ├─ Sync.so Job C: Original + Sprecher C Full-Length-Audio
+  └─ Sync.so Job D: Original + Sprecher D Full-Length-Audio
+        ↓
+Face-/Mouth-Mask-Compositor
+        ↓
+Final video + gemerged master audio
 ```
 
-Vorteile vs. Per-Turn:
-- 1 Master-Clip statt N Preclips → keine Preclip-Coord-Drift, Sync.so akzeptiert Payload nachweislich
-- 1 Sync.so-Job pro Sprecher (max 4) statt 1 pro Turn (kann 10+ sein) → drastisch weniger Provider-Calls
-- Identische Payload-Form wie 2-Sprecher-Pfad → ein Code-Pfad, ein Verifikationspfad
+Das ist der stabile Provider-Pattern: **fan-out auf unveränderte Original-Inputs, fan-in über eigenen Compositor**. Keine Kette, keine Preclip-Drift, kein Provider-Loop.
 
-## Umsetzungsschritte
+## Umsetzungsplan
 
-### 1. `compose-dialog-segments` auf N=1..4 erweitern
-- Cast-Validation (`_shared/cast-validation.ts`) vor jedem Debit: 1–4 distinct `character_id`, keine Duplikate, keine zeitlichen Overlaps.
-- Für jeden distinct Sprecher: bestehende Multi-Pass-Logik durchlaufen lassen — pro Pass `segments[]` aus den Turns dieses Sprechers bauen, `coordinates` aus der Face-Map des Masters für genau diesen Charakter.
-- Audio-Pre-Mix pro Sprecher: alle seine Turn-VOs in einen einzelnen Audio-Stream einfügen, Stille zwischen Turns, gleiche Länge wie Master.
-- Stitch (ffmpeg) wie bei 2-Sprecher: Pass-Outputs übereinanderlegen, jeder Pass stellt nur den Mund seines Bereichs zur Verfügung.
+### 1. Chained Multi-Pass entfernen
 
-### 2. Per-Turn-Pfad einfrieren
-- `compose-dialog-scene` (per-turn) wird in `compose-dialog-segments` umgeleitet (sanftes Fallthrough; gleiche Eingangs-Payload).
-- `dialog_shots.version = 5 + shots[]` wird weiter unterstützt für laufende historische Szenen, aber neue Runs gehen ausschließlich auf `version = 6` (Multi-Pass-Format).
-- `poll-dialog-shots` per-shot-Branch bleibt für Übergangszeit aktiv, Watchdog killt sie aber jetzt korrekt.
+In `supabase/functions/compose-dialog-segments/index.ts`:
+- `passInputUrl` wird für jeden Sprecher immer `sourceClipUrl` sein.
+- Kein `Pass N input = Pass N-1 output` mehr.
+- Jeder Sprecher-Pass bekommt:
+  - dasselbe Originalvideo,
+  - seinen full-length padded WAV-Track,
+  - seine eigenen `active_speaker_detection.coordinates`,
+  - denselben stabilen `sync_mode`.
+- State wird von „current_pass chain“ auf „fanout passes“ umgestellt:
 
-### 3. Cast-Limit hart auf 4 erzwingen
-- `validateCast()` rejected `>4` mit `cast_invalid_too_many_speakers`.
-- UI (`SceneDialogStudio`/`SceneCard`): Sprecher-5 Button disabled + Tooltip „Max 4 Sprecher pro Szene (Artlist-Standard)".
+```text
+passes[] = pending/rendering/done/failed pro Sprecher
+status = rendering bis alle done sind
+```
 
-### 4. Watchdog reparieren
-- `lipsync-watchdog.hasRecordedProviderJob()` checkt zusätzlich:
-  ```
-  EXISTS(SELECT 1 FROM syncso_dispatch_log
-         WHERE scene_id=$1 AND created_at > scene.updated_at - 5min)
-  ```
-- Damit klassifiziert er laufende Multi-Pass-Szenen korrekt als `provider_timeout` (10 min TTL) statt `preflight_aborted` (4 min).
+### 2. Webhook auf Fan-In statt Chain umstellen
 
-### 5. Aktuelle stuck Szene bereinigen
-- Über bestehenden `reset-lipsync-scene`-Endpoint (SQL-Insert via Insert-Tool, nicht Migration): `85ecc55a-…` auf clean `pending` zurücksetzen, Inflight-Jobs leeren, Credits refunden falls nicht refundet.
+In `supabase/functions/sync-so-webhook/index.ts`:
+- Bei completed pass: nur diesen pass als `done` speichern.
+- Nicht mehr automatisch `advance: true` starten.
+- Wenn alle passes `done` sind: neuen Compositor/Mux starten.
+- Bei failed pass:
+  - bounded retry pro pass,
+  - danach terminal failure über `failLipSync()` mit idempotentem Refund,
+  - keine automatische Rücksetzung auf `pending`.
 
-### 6. Verifikation
-- 3-Sprecher-Szene starten → erwartet: 1 Master-Render + 3 parallele Sync.so-Passes → finaler Clip mit korrekter Mund-Animation pro Person.
-- 1- und 2-Sprecher-Szenen weiterhin grün (gleicher Code-Pfad, gleiche Payload).
-- 4-Sprecher-Szene: akzeptiert. 5-Sprecher: hart abgelehnt vor Debit.
-- Doppelter Charakter in derselben Szene: hart abgelehnt vor Debit.
-- Watchdog killt eine künstlich hängende Szene mit korrekter Reason.
+### 3. Initiale Fan-Out-Dispatches kontrolliert starten
 
-### Technische Details (für Code-Pfade)
+In `compose-dialog-segments`:
+- Nach Preflight/Face-Gate werden alle Sprecher-Jobs gestartet, aber mit Sync.so-Slotlimit.
+- Wenn nicht genug Slots frei sind:
+  - Szene bleibt serverseitig `running/deferred`,
+  - keine Client-Reset-Logik,
+  - nächster Cron/Trigger dispatcht die restlichen pending passes.
+- Damit gibt es keinen doppelten Start und keine orphaned Jobs.
 
-**Geänderte/neue Dateien:**
-- `supabase/functions/compose-dialog-segments/index.ts` — Speaker-Loop von 2 auf 1–4 ausweiten, pro-Sprecher Audio-Mix, pro-Sprecher Face-Coords aus Master-Face-Map ziehen.
-- `supabase/functions/compose-dialog-scene/index.ts` — Internal-Redirect auf `compose-dialog-segments` für alle N, oder Wrapper, der die Payload auf das v6-Multi-Pass-Format transformiert.
-- `supabase/functions/lipsync-watchdog/index.ts` — `hasRecordedProviderJob` um `syncso_dispatch_log`-Check erweitern.
-- `supabase/functions/_shared/cast-validation.ts` — `MAX_SPEAKERS = 4` (bereits gesetzt), kein Funktions-Change nötig.
-- `src/components/video-composer/SceneDialogStudio.tsx` (oder Equivalent) — Add-Speaker-Button bei N=4 disabled.
-- `mem/architecture/lipsync/unified-multi-pass-v6.md` (NEU) — Architektur-Doku.
+### 4. Neuer Mask-Compositor für finale Szene
 
-**Pricing**: bleibt `ceil(durSec) × 9 × N_passes` (N_passes = distinct speakers, max 4) — entspricht aktueller `sync-so-pro-model-policy`.
+Neuer/erweiterter Render-Schritt, z. B. `render-sync-segments-audio-mux` erweitern oder neue Function `render-dialog-fanout-composite`:
+- Input:
+  - Original Scene-Plate,
+  - alle per-speaker Sync.so Outputs,
+  - Face-Box/Coords pro Sprecher,
+  - master WAV aus `audio_plan.twoshot.url`.
+- Render-Logik:
+  - Originalvideo als Base.
+  - Pro Sprecher nur den Face-/Mouth-Bereich aus seinem Sync.so-Output darüberlegen.
+  - Weiche Feather-Maske, damit keine sichtbaren harten Kanten entstehen.
+  - Master-Audio final muxen, damit alle Stimmen hörbar sind.
+- Ergebnis schreibt wie bisher `clip_url`, `lip_sync_applied_at`, `lip_sync_status='applied'`.
 
-**Refund**: idempotent via `failLipSync()` (unverändert).
+### 5. Face-Box-Daten stabilisieren
 
-**Webhook**: `sync-so-webhook` v5-segments-Zweig bleibt, weil Multi-Pass v6 dieselbe Webhook-Form liefert.
+In `_shared/twoshot-face-map.ts` / bestehender Face-Gate-Logik:
+- Neben `coords` auch eine sichere `box` pro Sprecher speichern.
+- Wenn nur ein Punkt vorhanden ist, Box deterministisch schätzen:
 
-## Erwartetes Ergebnis
+```text
+center = speaker coords
+box width ≈ 14–18% video width / speaker count adjusted
+box height ≈ 22–28% video height
+focus = lower face / mouth zone
+```
 
-Eine Pipeline für 1–4 Sprecher. Keine eigene Per-Turn-Architektur mehr. Sync.so bekommt nur noch die nachweislich akzeptierte Multi-Pass-Payload. Watchdog killt Hänger korrekt. UI blockiert ungültige Casts vor jedem Provider-Call. Wir stochern nicht mehr im Dunkeln — wir nutzen den einen Pfad, der nachweislich funktioniert.
+- Für 3+ Sprecher ist das besser als Sync.so-Auto-Fallback, weil wir deterministisch die richtige Person maskieren.
+
+### 6. Trigger-Routing bereinigen
+
+In `src/hooks/useTwoShotAutoTrigger.ts`:
+- 1–4 Sprecher gehen direkt zu `compose-dialog-segments`.
+- `compose-dialog-scene` bleibt nur noch Legacy/Backcompat oder wird hart deaktiviert.
+- Die Kommentarlogik, die 3+ Sprecher wieder auf `compose-dialog-scene` schickt, wird entfernt.
+
+### 7. UI ehrlich machen
+
+In `SceneDialogStudio` / `PipelineProgressBar`:
+- Texte von „3 Dialog-Shots“ ändern zu „3 Sprecher-Lip-Syncs werden kombiniert“.
+- Bei `failed` klar anzeigen:
+  - echter `clip_error`,
+  - „Sauber neu starten“ bleibt der einzige Restart-Weg,
+  - kein automatischer Loop.
+
+### 8. Credits/Refunds korrekt machen
+
+In `compose-dialog-segments` und `failLipSync()`-State:
+- Kosten = `ceil(totalSec) × 9 × numberOfSpeakerPasses`.
+- Bei Teilerfolg + späterem Fail: voller reservierter Betrag wird einmalig refundet.
+- Bei deferred Slots: keine doppelte Abbuchung.
+- `dialog_shots.cost_credits` wird die einzige Refund-Quelle.
+
+### 9. Stuck-Szenen sauber zurücksetzen
+
+Nach Code-Fix:
+- Die aktuelle failed Scene `4a56d6a1-2f0b-4ef1-8bef-20fa0477ff68` wird über den bestehenden Reset-Pfad bzw. ein gezieltes Daten-Update sauber auf `pending` zurückgesetzt.
+- Alte inflight Sync.so-Jobs werden entfernt.
+- Refund bleibt idempotent.
+
+### 10. Verifikation
+
+Ich prüfe nach Umsetzung:
+- 1 Sprecher: single Sync.so pass → applied.
+- 2 Sprecher: fanout oder vorhandener stabiler Pfad → applied.
+- 3 Sprecher: 3 unabhängige Jobs auf Originalvideo → Composite → applied.
+- 4 Sprecher: 4 unabhängige Jobs → Composite → applied.
+- Sync.so-Fail: terminal failed + Refund + kein Auto-Loop.
+- Reset-Button: failed → clean pending → neuer sauberer Start.
+
+## Ergebnis
+
+Der dauerhafte Fix ist: **keine Sync.so-Kette mehr**. Jeder Sync.so-Job bekommt nur noch das Originalvideo. Die Kombination passiert vollständig in unserer eigenen Render-Pipeline. Dadurch hängen wir nicht mehr an Sync.so-Zwischenoutputs, und der aktuelle Pass-2-Fail kann strukturell nicht mehr auftreten.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
