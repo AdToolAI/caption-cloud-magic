@@ -447,7 +447,12 @@ serve(async (req) => {
       console.warn(`[compose-dialog-segments] scene=${sceneId} segments auto-repaired: ${segValidation.repairs.join(", ")}`);
     }
     const segments = segValidation.fixed as typeof rawSegments;
-    const totalCost = computeCost(totalSec);
+    // v25 Fan-Out pricing: N Sync.so passes (1 per distinct speaker) on the
+    // SAME original plate (no chaining). Cost = ceil(totalSec)*9 * speakers.
+    // Min 1 to cover the single-speaker case. validateCast() above already
+    // capped speakers at 4 distinct character_ids.
+    const speakerCount = Math.max(1, speakers.length);
+    const totalCost = computeCost(totalSec) * speakerCount;
 
     // ── Stage F.3 — Circuit Breaker (BEFORE wallet debit) ────────────────
     // If Sync.so is in OPEN state, don't charge the user — defer with retry.
