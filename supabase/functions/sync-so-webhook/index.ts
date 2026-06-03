@@ -377,9 +377,21 @@ serve(async (req) => {
         console.warn(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1} re-host: ${(err as Error).message}`);
       }
 
-      if (passes[currentPass]) {
-        passes[currentPass] = {
-          ...passes[currentPass],
+      // v29: Re-read the latest passes[] from the DB and merge ONLY our
+      // pass's done-patch so concurrent COMPLETED/FAILED webhooks for sibling
+      // passes don't clobber each other's job_ids/status.
+      const { data: freshDoneRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshDoneState: any = (freshDoneRow as any)?.dialog_shots ?? state;
+      const freshDonePasses: any[] = Array.isArray(freshDoneState?.passes)
+        ? freshDoneState.passes.map((p: any) => ({ ...p }))
+        : passes;
+      if (freshDonePasses[currentPass]) {
+        freshDonePasses[currentPass] = {
+          ...freshDonePasses[currentPass],
           status: "done",
           output_url: rehostedUrl ?? outputUrl,
           rehosted: !!rehostedUrl,
@@ -387,15 +399,15 @@ serve(async (req) => {
         };
       }
 
-      const doneCount = passes.filter((p: any) => p?.status === "done").length;
-      const failedCount = passes.filter((p: any) => p?.status === "failed").length;
+      const doneCount = freshDonePasses.filter((p: any) => p?.status === "done").length;
+      const failedCount = freshDonePasses.filter((p: any) => p?.status === "failed").length;
       const allDone = doneCount === totalPasses && failedCount === 0;
 
       // Find pending passes (deferred earlier or never dispatched). These
       // need an explicit advance dispatch — without this, scenes whose
       // fan-out hit the Sync.so concurrency limit on initial dispatch
       // would never complete the remaining speakers.
-      const pendingIdxs = passes
+      const pendingIdxs = freshDonePasses
         .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
         .filter((i: number) => i >= 0);
 
@@ -404,7 +416,7 @@ serve(async (req) => {
         await supabase
           .from("composer_scenes")
           .update({
-            dialog_shots: { ...state, passes, status: "rendering", updated_at: nowIso },
+            dialog_shots: { ...freshDoneState, passes: freshDonePasses, status: "rendering", updated_at: nowIso },
             lip_sync_status: "running",
             twoshot_stage: `syncso_fanout_${doneCount}_of_${totalPasses}`,
             updated_at: nowIso,
@@ -428,7 +440,7 @@ serve(async (req) => {
       }
 
       // ── All passes complete ──────────────────────────────────────────
-      const finalUrl = (passes[passes.length - 1] as any)?.output_url ?? outputUrl;
+      const finalUrl = (freshDonePasses[freshDonePasses.length - 1] as any)?.output_url ?? outputUrl;
 
       // Single-speaker fast path: no fan-in needed, audio already matches.
       if (totalPasses === 1) {
@@ -436,7 +448,7 @@ serve(async (req) => {
           .from("composer_scenes")
           .update({
             dialog_shots: {
-              ...state, passes,
+              ...freshDoneState, passes: freshDonePasses,
               status: "done",
               final_url: finalUrl,
               sync_so_url: outputUrl,
@@ -460,7 +472,7 @@ serve(async (req) => {
         .from("composer_scenes")
         .update({
           dialog_shots: {
-            ...state, passes,
+            ...freshDoneState, passes: freshDonePasses,
             status: "audio_muxing",
             final_url: finalUrl,
             sync_so_url: outputUrl,
