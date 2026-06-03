@@ -924,34 +924,51 @@ serve(async (req) => {
       );
     }
 
-    // ── Determine which pass to dispatch ─────────────────────────────────
+    // ── Determine which pass to dispatch (v25 Fan-Out) ───────────────────
+    // CRITICAL: every pass uses the ORIGINAL source plate as input. We no
+    // longer feed pass N-1's Sync.so output back into Sync.so for pass N —
+    // that's exactly what caused the "An unknown error occurred." failures
+    // on pass 2+ (Sync.so lipsync-2-pro rejects its own redirected outputs
+    // in coords-pro mode). Instead, every pass produces a full-frame
+    // lipsync of its own speaker on the pristine plate; the final compositor
+    // (render-sync-segments-audio-mux) overlays them via face-mask circles.
     const prevState = (existing && (existing as any).version === 5) ? (existing as SegmentsState) : null;
     let passes: PassState[];
     let currentPassIdx: number;
-    let passInputUrl: string;
+    const passInputUrl: string = sourceClipUrl;
 
     if (isAdvance && prevState?.passes && typeof prevState.current_pass === "number") {
-      // Webhook is chaining us forward. Use the persisted passes, advance the cursor.
+      // Webhook fan-in advance: dispatch the next pending pass (or the
+      // explicitly requested one). Each pass is independent of all others.
       passes = prevState.passes.map((p) => ({ ...p }));
-      currentPassIdx = prevState.current_pass;
-      const prevPass = passes[currentPassIdx - 1];
-      passInputUrl = prevPass?.output_url || sourceClipUrl;
+      const requested = Number(body?.pass_idx);
+      if (Number.isFinite(requested) && requested >= 0 && requested < passes.length) {
+        currentPassIdx = requested;
+      } else {
+        // Pick first pending/failed-without-job pass, else advance the cursor.
+        const pendingIdx = passes.findIndex((p) => p.status === "pending" && !p.job_id);
+        currentPassIdx = pendingIdx >= 0 ? pendingIdx : prevState.current_pass;
+      }
       if (!passes[currentPassIdx]) {
         console.warn(`[compose-dialog-segments] scene=${sceneId} advance but no pass at idx=${currentPassIdx}`);
         return json({ ok: true, skipped: "no_pass_at_cursor" }, 200);
       }
+      if (passes[currentPassIdx].status === "done" || passes[currentPassIdx].status === "rendering") {
+        return json({ ok: true, skipped: `pass_${currentPassIdx}_already_${passes[currentPassIdx].status}` }, 200);
+      }
     } else if (isRetry && prevState?.passes && typeof prevState.current_pass === "number") {
-      // Retry the same pass that just failed.
+      // Retry the same pass that just failed — still against original plate.
       passes = prevState.passes.map((p) => ({ ...p }));
-      currentPassIdx = prevState.current_pass;
-      const prevPass = passes[currentPassIdx - 1];
-      passInputUrl = prevPass?.output_url || sourceClipUrl;
+      const requested = Number(body?.pass_idx);
+      currentPassIdx = Number.isFinite(requested) && requested >= 0 && requested < passes.length
+        ? requested
+        : prevState.current_pass;
     } else {
       // Fresh dispatch: start at pass 0.
       passes = builtPasses;
       currentPassIdx = 0;
-      passInputUrl = sourceClipUrl;
     }
+
 
     const pass = passes[currentPassIdx];
     pass.input_url = passInputUrl;
