@@ -593,6 +593,29 @@ serve(async (req) => {
       );
     }
 
+    // ── Cast validation (max 4, no duplicate character_id, no overlap) ──
+    // Run BEFORE any wallet debit so an invalid cast never costs credits.
+    {
+      const castCheck = validateCast(speakers as any[]);
+      if (!castCheck.ok) {
+        await failLipSync({
+          supabase,
+          sceneId,
+          userId,
+          reason: `${castCheck.reason}: ${castCheck.message ?? "invalid cast"}`,
+          syncApiKey: getSyncApiKey() || null,
+        });
+        return json(
+          {
+            error: castCheck.reason,
+            message: castCheck.message,
+            offenders: castCheck.offenders ?? [],
+          },
+          422,
+        );
+      }
+    }
+
     // ── v8 staleness guard: detect the per-speaker-track bug ────────────
     // Older `compose-twoshot-audio` builds aligned `sampleBuffers[i]` to the
     // segment index, but `sampleBuffers` also contained inter-speaker
