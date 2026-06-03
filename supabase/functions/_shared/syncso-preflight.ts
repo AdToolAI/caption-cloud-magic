@@ -1007,11 +1007,11 @@ export async function fetchSyncJobError(jobId: string): Promise<{
  */
 export function trimWavLeadIn(
   wav: Uint8Array,
-  opts: { keepLeadInSec?: number } = {},
+  opts: { keepLeadInSec?: number; force?: boolean } = {},
 ): { bytes: Uint8Array; info: WavInfo; trimmedSec: number } {
   const keep = Math.max(0, opts.keepLeadInSec ?? 0.2);
   const info = inspectWav(wav);
-  if (info.leadInSec <= keep + 0.05) {
+  if (info.leadInSec <= keep + 0.05 && !opts.force) {
     // Nothing meaningful to trim.
     return { bytes: wav, info, trimmedSec: 0 };
   }
