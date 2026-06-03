@@ -1087,6 +1087,33 @@ serve(async (req) => {
         frame_number: frameNumber,
         coordinates: pass.coords,
       };
+    } else if (retryVariant === "coords-pro-box") {
+      // v30 — Bounding-box ASD fallback for 3+ speaker plates where
+      // Sync.so rejects single-point coords-pro with the opaque
+      // "An unknown error occurred." A small box around the speaker's
+      // anchor gives the model a face REGION (not just a point), which
+      // is what the docs recommend when several faces share the frame.
+      // Per Sync.so spec, `bounding_boxes` is a per-frame array — one
+      // entry per video frame, [x1,y1,x2,y2] or null. We emit the same
+      // box on every frame (the speaker barely moves in a talking shot).
+      const dims = plateDims ?? videoDims;
+      const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
+      const boxW = Math.round(dims.width * 0.18);
+      const boxH = Math.round(dims.height * 0.28);
+      const x1 = Math.max(0, Math.round(cx - boxW / 2));
+      const y1 = Math.max(0, Math.round(cy - boxH / 2));
+      const x2 = Math.min(dims.width, Math.round(cx + boxW / 2));
+      const y2 = Math.min(dims.height, Math.round(cy + boxH / 2));
+      const box: [number, number, number, number] = [x1, y1, x2, y2];
+      const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
+      const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
+      syncOptions.active_speaker_detection = {
+        auto_detect: false,
+        bounding_boxes: boundingBoxes,
+      };
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} frames=${frameCount}`,
+      );
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
