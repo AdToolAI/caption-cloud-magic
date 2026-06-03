@@ -14,6 +14,7 @@ import { AlertCircle, Check, Loader2, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePipelineProgress } from '@/hooks/usePipelineProgress';
 import { supabase } from '@/integrations/supabase/client';
+import { useResetLipSync } from '@/hooks/useResetLipSync';
 import type { AssemblyConfig, ComposerScene } from '@/types/video-composer';
 
 const SYNCSO_MAX_SLOTS = 3;
@@ -178,11 +179,37 @@ export default function PipelineProgressBar({
               {hasFailure ? 'Fehler' : `${overallPercent}%`}
             </span>
             <span className="text-muted-foreground/70 tabular-nums hidden sm:inline">
-              {hasFailure ? 'Bitte „Lip-Sync neu rendern“ klicken' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
+              {hasFailure ? 'Lip-Sync abgebrochen' : `${formatTime(elapsedSeconds)} / ~${formatTime(elapsedSeconds + etaSeconds)}`}
             </span>
+            {hasFailure && (
+              <ResetFailedButton scenes={scenes} />
+            )}
           </div>
         </div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function ResetFailedButton({ scenes }: { scenes: ComposerScene[] }) {
+  const { reset, resettingId } = useResetLipSync();
+  const failed = scenes.find(
+    (s) =>
+      (s as any).lipSyncStatus === 'failed' ||
+      (s as any).twoshotStage === 'failed' ||
+      (s as any).twoshotStage === 'audio_mux_failed',
+  );
+  if (!failed) return null;
+  const busy = resettingId === failed.id;
+  return (
+    <button
+      type="button"
+      onClick={() => reset(failed.id)}
+      disabled={busy}
+      className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-[11px] font-medium hover:bg-destructive/20 disabled:opacity-60"
+      title="Storniert offene Jobs, refundiert Credits und startet einen sauberen neuen Versuch."
+    >
+      {busy ? 'Setze zurück…' : 'Sauber neu starten'}
+    </button>
   );
 }
