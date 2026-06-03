@@ -1024,7 +1024,10 @@ serve(async (req) => {
     // pre-flight diagnostic detected a lead-in > 0.6s.
     const passDiag = audioDiagnostics.find((d: any) => d.pass === pass.idx) as any;
     const detectedLeadIn = Number(passDiag?.wav?.leadInSec ?? 0);
-    const needsTrim = repairAudio || (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.6);
+    // v29: lower auto-trim threshold (0.6→0.3) and always re-emit canonical
+    // PCM 16-bit WAV when repair_audio is set, even if no trim is needed —
+    // that strips any non-canonical chunks Sync.so may choke on.
+    const needsTrim = repairAudio || (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.3);
     const prevPassAudioUrl = (prevState?.passes?.[currentPassIdx] as any)?.audio_url;
     const alreadyTrimmed = typeof prevPassAudioUrl === "string" && /-trim\.wav(\?|$)/.test(prevPassAudioUrl);
     if (needsTrim && !alreadyTrimmed) {
@@ -1032,8 +1035,10 @@ serve(async (req) => {
         const audioResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
         if (audioResp.ok) {
           const origBytes = new Uint8Array(await audioResp.arrayBuffer());
-          const trimmed = trimWavLeadIn(origBytes, { keepLeadInSec: 0.2 });
-          if (trimmed.trimmedSec > 0.05) {
+          const trimmed = trimWavLeadIn(origBytes, { keepLeadInSec: 0.2, force: repairAudio });
+          // Always upload when repair_audio (canonical re-encode), OR when we
+          // actually trimmed >0.05s of silence.
+          if (repairAudio || trimmed.trimmedSec > 0.05) {
             const trimPath = `${userId}/twoshot-vo/${sceneId}-pass-${currentPassIdx + 1}-trim.wav`;
             const up = await supabase.storage.from("voiceover-audio").upload(
               trimPath,
@@ -1046,7 +1051,7 @@ serve(async (req) => {
                 .getPublicUrl(trimPath);
               if (pub?.publicUrl) {
                 console.log(
-                  `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} AUDIO_TRIM leadIn=${detectedLeadIn.toFixed(2)}s → ${trimmed.info.leadInSec.toFixed(2)}s (saved ${trimmed.trimmedSec.toFixed(2)}s) url=${pub.publicUrl.slice(0, 80)}`,
+                  `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} AUDIO_TRIM leadIn=${detectedLeadIn.toFixed(2)}s → ${trimmed.info.leadInSec.toFixed(2)}s (saved ${trimmed.trimmedSec.toFixed(2)}s, force=${!!repairAudio}) url=${pub.publicUrl.slice(0, 80)}`,
                 );
                 pass.audio_url = pub.publicUrl;
                 (pass as any).audio_repaired = true;
