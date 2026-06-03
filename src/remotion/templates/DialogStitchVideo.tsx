@@ -35,6 +35,18 @@ const CropSchema = z.object({
   size: z.number().positive(),
 });
 
+/** v25 (Fan-Out): masked full-frame overlay. The Sync.so output covers the
+ *  whole plate (only THIS speaker's lips moving on the original scene); we
+ *  composite it on top of the master plate but ONLY through a feathered
+ *  circular hole around the speaker's face. All N speaker passes are
+ *  layered this way → every face animates correctly without the chained
+ *  Sync.so-on-Sync.so artifact. cx/cy/radius are in source-master pixels. */
+const FaceMaskSchema = z.object({
+  cx: z.number(),
+  cy: z.number(),
+  radius: z.number().positive(),
+});
+
 const ShotSchema = z.object({
   startSec: z.number().min(0),
   endSec: z.number().min(0),
@@ -48,6 +60,10 @@ const ShotSchema = z.object({
   /** v21: when present the output is a square face-crop in source-master
    *  pixel space; overlay positioned/scaled to (x,y,size) with soft mask. */
   crop: CropSchema.optional().nullable(),
+  /** v25 fan-out: when present the output is a FULL-frame Sync.so render
+   *  with only this speaker's lips moving; composite via soft circular
+   *  mask around (cx,cy) with feathered radius. Spans the full scene. */
+  faceMask: FaceMaskSchema.optional().nullable(),
 });
 
 
