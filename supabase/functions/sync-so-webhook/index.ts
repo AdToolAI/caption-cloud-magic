@@ -198,20 +198,30 @@ serve(async (req) => {
   };
   let { message: errorMsg, code: errorCode } = extractErrorFields(payload);
 
-  // GET-fallback: terminal FAILED with no error fields at all → ask Sync.so
-  // directly. This is the official recovery path per their error-handling
-  // docs and turns "unknown error" into a concrete error_code.
+  // GET-fallback (v28): terminal FAILED with NO `error_code` AND either no
+  // message OR only the generic "An unknown error occurred." string → ask
+  // Sync.so directly via `GET /v2/generate/{job_id}`. Previously we only
+  // fell back when both fields were missing, but the live failure path
+  // returns the generic message *without* a code — exactly the case where
+  // GET-fallback was supposed to help.
+  const isGenericMsg = (m?: string | null) =>
+    !m || /^an unknown error occurred\.?$/i.test(String(m).trim());
   if (
     ["FAILED", "REJECTED", "CANCELED"].includes(status) &&
-    !errorMsg && !errorCode && jobId
+    !errorCode &&
+    isGenericMsg(errorMsg) &&
+    jobId
   ) {
     const fetched = await fetchSyncJobError(jobId);
     if (fetched) {
-      errorMsg = fetched.error ?? errorMsg;
-      errorCode = fetched.error_code ?? errorCode;
+      if (fetched.error && !isGenericMsg(fetched.error)) {
+        errorMsg = fetched.error;
+      }
+      if (fetched.error_code) errorCode = fetched.error_code;
       console.log(`[sync-so-webhook] GET-fallback job=${jobId} code=${errorCode ?? "null"} msg=${(errorMsg ?? "").slice(0, 200)}`);
     }
   }
+
 
   if (status !== "COMPLETED") {
     // Log the full payload once so we can post-mortem the "unknown error"
@@ -552,18 +562,29 @@ serve(async (req) => {
       const speakerCount = passesArr.length;
       const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
       let nextVariant: string | null = nextV5RetryVariant(currentVariant);
-      // ── Multi-speaker safety (3+ only) ─────────────────────────────────
-      // For 1- and 2-speaker scenes the standard ladder
-      // `coords-pro → auto-pro → auto-standard` is unchanged: those
-      // configurations were stable and the previous over-broad block
-      // killed perfectly recoverable 2-shot lipsyncs.
-      // For 3+ speakers `auto_detect: true` discards per-speaker coords
-      // and risks animating the wrong face / passing video through
-      // unchanged. We block the auto-* fallback there, BUT allow a
-      // single last-ditch `auto-pro` attempt on pass 0 if every pass
-      // failed with the "no face found" class — better one moving mouth
-      // than a fully-frozen scene.
-      if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
+      // v28: For 3+ speaker scenes the generic "An unknown error occurred."
+      // path on `coords-pro` is almost always triggered by per-speaker WAVs
+      // with multi-second leading silence (live confirmed: Matthew/Kailee on
+      // scene bd60c826…). Instead of jumping to `auto-*` (face-swap risk)
+      // or instantly exhausting, allow ONE coords-pro retry with audio
+      // repair (lead-in trim handled in compose-dialog-segments). Only
+      // after that do we fall back to the legacy block.
+      let forceCoordsRepair = false;
+      const isProviderUnknown =
+        codeBucket === "unknown" && errClass === "provider_unknown_error";
+      if (
+        speakerCount >= 3 &&
+        currentVariant === "coords-pro" &&
+        isProviderUnknown &&
+        !currentPassState?.repair_audio &&
+        passRetryCount === 0
+      ) {
+        nextVariant = "coords-pro";
+        forceCoordsRepair = true;
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry instead of auto-* fallback`,
+        );
+      } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
           (p: any) =>
             p?.status === "failed" &&
@@ -585,12 +606,13 @@ serve(async (req) => {
       }
       // fail_fast codes short-circuit the ladder entirely.
       const canRetry = codeBucket !== "fail_fast"
-        && treatAsTransient
+        && (treatAsTransient || forceCoordsRepair)
         && passRetryCount < MAX_V5_RETRIES
         && nextVariant !== null;
 
       if (canRetry) {
-        const needsAudioRepair = codeBucket === "retry_with_repair";
+        const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
+
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
@@ -674,9 +696,15 @@ serve(async (req) => {
       // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
       // Prefix the reason with the official error_code (when present) so the
       // UI badge surfaces a real diagnostic instead of "unknown error".
+      const noCodeSuffix = !errorCode && isGenericMsg(rawErr)
+        ? " — Sync.so lieferte keinen error_code (3-Sprecher-Plate + Audio-Lead-In wahrscheinliche Ursache)"
+        : "";
       const codePrefix = errorCode ? `[${errorCode}] ` : "";
       const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
-      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}`;
+      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}${noCodeSuffix}`;
+      const effectiveBucket = codeBucket === "unknown" && !errorCode && isGenericMsg(rawErr)
+        ? "provider_unknown_no_code"
+        : codeBucket;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
@@ -703,18 +731,43 @@ serve(async (req) => {
             .eq("user_id", uid);
         }
       }
+      // Patch the failing pass + cancel any still-running siblings so the
+      // state is consistent (previously sibling passes stayed in 'rendering'
+      // forever and the watchdog had to clean them up).
+      const finalPasses = passesArr.map((p: any, i: number) => {
+        if (i === currentPass) {
+          return {
+            ...p,
+            status: "failed",
+            finished_at: nowIso,
+            last_error: rawErr.slice(0, 200),
+            last_error_class: errClass,
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: effectiveBucket,
+          };
+        }
+        if (p?.status === "rendering" || p?.status === "pending" || p?.status === "retrying") {
+          return {
+            ...p,
+            status: "canceled_by_scene_failure",
+            finished_at: nowIso,
+          };
+        }
+        return p;
+      });
       await supabase
         .from("composer_scenes")
         .update({
           dialog_shots: {
             ...state,
+            passes: finalPasses,
             status: "failed",
             finished_at: nowIso,
             refunded: cost > 0,
             error: reason,
             last_error_class: errClass,
             sync_error_code: errorCode ?? null,
-            sync_error_bucket: codeBucket,
+            sync_error_bucket: effectiveBucket,
             sync_error_explain: codeExplain ?? null,
           },
           lip_sync_status: "failed",
@@ -723,6 +776,7 @@ serve(async (req) => {
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+
       console.warn(
         `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
       );
