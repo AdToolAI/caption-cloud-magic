@@ -435,6 +435,26 @@ serve(async (req) => {
     const userId = project?.user_id;
     if (!userId) return json({ error: "missing_user" }, 403);
 
+    // v22: atomic dedup-claim. Replicate webhook retries can deliver the
+    // same auto-trigger multiple times within seconds; without a lock both
+    // invocations rebuild the faceMap in parallel and race the dialog_shots
+    // write. We claim by transitioning twoshot_stage → 'composing_dialog'
+    // only when it's not already that value. Loser returns 202 and exits.
+    {
+      const claim = await supabase
+        .from("composer_scenes")
+        .update({ twoshot_stage: "composing_dialog", updated_at: new Date().toISOString() })
+        .eq("id", sceneId)
+        .neq("twoshot_stage", "composing_dialog")
+        .select("id")
+        .maybeSingle();
+      if (!claim.data) {
+        console.log(`[compose-dialog-scene] scene ${sceneId} already composing — skip duplicate invocation`);
+        return json({ ok: true, status: "already_composing", scene_id: sceneId }, 202);
+      }
+    }
+
+
     // ─── STAGE 2 HOTFIX (May 2026): retroactive HappyHorse-master guard ────
     // Only invalidate when the master plate is NOT yet a usable rendered clip.
     // If clip_url already exists and clip_status='ready', the master was either
