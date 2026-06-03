@@ -28,6 +28,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { probeImageDims } from "../_shared/image-dims.ts";
+import { validateCast } from "../_shared/cast-validation.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
+import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 // ── v19 Dialog Plate Prompt Constraints ────────────────────────────────
 // Free-form scene prompts (low angles, handheld, hands waving, head turning
@@ -588,6 +591,29 @@ serve(async (req) => {
         },
         422,
       );
+    }
+
+    // ── Cast validation (max 4, no duplicate character_id, no overlap) ──
+    // Run BEFORE any wallet debit so an invalid cast never costs credits.
+    {
+      const castCheck = validateCast(speakers as any[]);
+      if (!castCheck.ok) {
+        await failLipSync({
+          supabase,
+          sceneId,
+          userId,
+          reason: `${castCheck.reason}: ${castCheck.message ?? "invalid cast"}`,
+          syncApiKey: getSyncApiKey() || null,
+        });
+        return json(
+          {
+            error: castCheck.reason,
+            message: castCheck.message,
+            offenders: castCheck.offenders ?? [],
+          },
+          422,
+        );
+      }
     }
 
     // ── v8 staleness guard: detect the per-speaker-track bug ────────────

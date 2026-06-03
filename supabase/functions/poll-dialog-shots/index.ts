@@ -37,6 +37,7 @@ import {
   SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
 } from "../_shared/syncso-preflight.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 
 const corsHeaders = {
@@ -902,8 +903,12 @@ async function processSceneLocked(
 
   const state = (scene.dialog_shots ?? null) as DialogShotsState | null;
   if (!state) return { status: "no_state", mutated: false };
-  if (state.version !== 4) {
-    // Legacy v1/v2/v3 state — ignore; user must reset via UI to migrate.
+  // Accept v4 (legacy per-turn) AND v5 (per-turn + face-crop preclip / target_bbox).
+  // v5 produced by compose-dialog-segments uses `passes[]` instead of `shots[]`
+  // and is handled by sync-so-webhook + EdgeRuntime chains — we skip those here.
+  const hasShots = Array.isArray((state as any).shots);
+  if (state.version !== 4 && !(state.version === 5 && hasShots)) {
+    // Legacy / unrelated v5-segments state — ignore.
     return { status: `legacy_v${(state as any).version ?? "?"}_ignored`, mutated: false };
   }
   if (state.status === "done" || state.status === "failed" || (state.status as any) === "canceled") {
@@ -1833,22 +1838,31 @@ async function processSceneLocked(
   }
 
 
-  // ── Step 5: terminal failure → refund + persist ─────────────────────
+  // ── Step 5: terminal failure → central failLipSync (refund + free inflight jobs) ──
   if (pipelineStatus === "failed") {
-    if (userId) newState = await refundIfNeeded(supabase, userId, newState);
     const firstErr = shots.find((s) => s.error)?.error ?? "unknown";
+    // Persist the failed shot details first so the helper can see cost_credits.
     await supabase
       .from("composer_scenes")
       .update({
-        dialog_shots: newState,
-        lip_sync_status: "failed",
-        twoshot_stage: "failed",
-        clip_error: `dialog_shots_failed: ${firstErr}`.slice(0, 300),
+        dialog_shots: { ...newState, status: "failed" },
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
+    await failLipSync({
+      supabase,
+      sceneId,
+      userId: userId ?? null,
+      reason: `dialog_shots_failed: ${firstErr}`,
+      refundCredits: state.cost_credits ?? 0,
+      syncApiKey: Deno.env.get("SYNC_API_KEY") ??
+        Deno.env.get("SYNC_SO_API_KEY") ??
+        Deno.env.get("SYNCSO_API_KEY") ??
+        null,
+    });
     return { status: "failed", mutated: true };
   }
+
 
   // ── Step 6: mid-flight persist ─────────────────────────────────────
   if (mutated) {
