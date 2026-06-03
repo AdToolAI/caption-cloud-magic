@@ -28,6 +28,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { probeImageDims } from "../_shared/image-dims.ts";
+import { validateCast } from "../_shared/cast-validation.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
+import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
 
 // ── v19 Dialog Plate Prompt Constraints ────────────────────────────────
 // Free-form scene prompts (low angles, handheld, hands waving, head turning
