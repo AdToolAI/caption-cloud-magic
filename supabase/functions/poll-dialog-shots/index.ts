@@ -1838,22 +1838,31 @@ async function processSceneLocked(
   }
 
 
-  // ── Step 5: terminal failure → refund + persist ─────────────────────
+  // ── Step 5: terminal failure → central failLipSync (refund + free inflight jobs) ──
   if (pipelineStatus === "failed") {
-    if (userId) newState = await refundIfNeeded(supabase, userId, newState);
     const firstErr = shots.find((s) => s.error)?.error ?? "unknown";
+    // Persist the failed shot details first so the helper can see cost_credits.
     await supabase
       .from("composer_scenes")
       .update({
-        dialog_shots: newState,
-        lip_sync_status: "failed",
-        twoshot_stage: "failed",
-        clip_error: `dialog_shots_failed: ${firstErr}`.slice(0, 300),
+        dialog_shots: { ...newState, status: "failed" },
         updated_at: new Date().toISOString(),
       })
       .eq("id", sceneId);
+    await failLipSync({
+      supabase,
+      sceneId,
+      userId: userId ?? null,
+      reason: `dialog_shots_failed: ${firstErr}`,
+      refundCredits: state.cost_credits ?? 0,
+      syncApiKey: Deno.env.get("SYNC_API_KEY") ??
+        Deno.env.get("SYNC_SO_API_KEY") ??
+        Deno.env.get("SYNCSO_API_KEY") ??
+        null,
+    });
     return { status: "failed", mutated: true };
   }
+
 
   // ── Step 6: mid-flight persist ─────────────────────────────────────
   if (mutated) {
