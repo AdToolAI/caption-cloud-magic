@@ -696,9 +696,15 @@ serve(async (req) => {
       // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
       // Prefix the reason with the official error_code (when present) so the
       // UI badge surfaces a real diagnostic instead of "unknown error".
+      const noCodeSuffix = !errorCode && isGenericMsg(rawErr)
+        ? " — Sync.so lieferte keinen error_code (3-Sprecher-Plate + Audio-Lead-In wahrscheinliche Ursache)"
+        : "";
       const codePrefix = errorCode ? `[${errorCode}] ` : "";
       const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
-      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}`;
+      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}${noCodeSuffix}`;
+      const effectiveBucket = codeBucket === "unknown" && !errorCode && isGenericMsg(rawErr)
+        ? "provider_unknown_no_code"
+        : codeBucket;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
@@ -725,18 +731,43 @@ serve(async (req) => {
             .eq("user_id", uid);
         }
       }
+      // Patch the failing pass + cancel any still-running siblings so the
+      // state is consistent (previously sibling passes stayed in 'rendering'
+      // forever and the watchdog had to clean them up).
+      const finalPasses = passesArr.map((p: any, i: number) => {
+        if (i === currentPass) {
+          return {
+            ...p,
+            status: "failed",
+            finished_at: nowIso,
+            last_error: rawErr.slice(0, 200),
+            last_error_class: errClass,
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: effectiveBucket,
+          };
+        }
+        if (p?.status === "rendering" || p?.status === "pending" || p?.status === "retrying") {
+          return {
+            ...p,
+            status: "canceled_by_scene_failure",
+            finished_at: nowIso,
+          };
+        }
+        return p;
+      });
       await supabase
         .from("composer_scenes")
         .update({
           dialog_shots: {
             ...state,
+            passes: finalPasses,
             status: "failed",
             finished_at: nowIso,
             refunded: cost > 0,
             error: reason,
             last_error_class: errClass,
             sync_error_code: errorCode ?? null,
-            sync_error_bucket: codeBucket,
+            sync_error_bucket: effectiveBucket,
             sync_error_explain: codeExplain ?? null,
           },
           lip_sync_status: "failed",
@@ -745,6 +776,7 @@ serve(async (req) => {
           updated_at: nowIso,
         })
         .eq("id", sceneId);
+
       console.warn(
         `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
       );
