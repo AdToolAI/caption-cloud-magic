@@ -229,14 +229,23 @@ serve(async (req) => {
 
   if (!scene) {
     // Fallback: scan in-flight scenes for the job id. Bounded scan, low volume.
+    // v25: a fan-out scene tracks job ids in `dialog_shots.passes[].job_id`,
+    // not only `shots[]` (v4) or the top-level `sync_job_id` (v5 single-call).
+    // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
       .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
-      .in("lip_sync_status", ["running", "stitching"])
+      .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
-      const shots = (r as any)?.dialog_shots?.shots ?? [];
-      if (Array.isArray(shots) && shots.some((s: any) => s?.sync_job_id === jobId)) {
+      const ds = (r as any)?.dialog_shots ?? {};
+      const shots = Array.isArray(ds.shots) ? ds.shots : [];
+      const passes = Array.isArray(ds.passes) ? ds.passes : [];
+      const hit =
+        shots.some((s: any) => s?.sync_job_id === jobId) ||
+        passes.some((p: any) => p?.job_id === jobId) ||
+        ds?.sync_job_id === jobId;
+      if (hit) {
         sceneId = r.id;
         scene = r;
         break;
@@ -270,8 +279,17 @@ serve(async (req) => {
   // ── v5: Sync.so Segments (1-call pipeline) ────────────────────────────
   // No per-turn shots; the webhook output IS the final clip.
   if (state.version === 5 && state.engine === "sync-segments") {
-    if (state.sync_job_id !== jobId) {
-      return ok({ ok: true, skipped: "v5_job_mismatch", job_id: jobId });
+    // v25 Fan-Out: match the job_id against passes[].job_id (preferred) OR
+    // the legacy top-level state.sync_job_id (single-pass scenes). Previously
+    // we required state.sync_job_id === jobId which dropped EVERY pass
+    // webhook except the most recently dispatched pass — causing scenes to
+    // hang indefinitely with only the last pass marked done.
+    const passesPre = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
+    const matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
+    const isLegacySingle = matchedIdx < 0 && state.sync_job_id === jobId;
+    if (matchedIdx < 0 && !isLegacySingle) {
+      console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} not in passes[] (count=${passesPre.length}) and not top-level — skip`);
+      return ok({ ok: true, skipped: "v5_job_not_in_passes", job_id: jobId });
     }
     if (status === "COMPLETED" && outputUrl) {
       // ── v25 Fan-Out: passes run in parallel, all against the ORIGINAL
@@ -279,10 +297,9 @@ serve(async (req) => {
       //    (so the compositor has a stable URL), and dispatches the final
       //    compositor only when EVERY pass is done. No chained next-pass
       //    dispatch (compose-dialog-segments fans them out itself).
-      const passes = Array.isArray((state as any).passes) ? [...(state as any).passes] : [];
+      const passes = passesPre;
       const totalPasses = Number((state as any).total_passes ?? passes.length ?? 1);
-      const myIdx = passes.findIndex((p: any) => p?.job_id === jobId);
-      const currentPass = myIdx >= 0 ? myIdx : Number((state as any).current_pass ?? 0);
+      const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
 
       // Re-host this pass's output to ai-videos for a stable, redirect-free URL.
       let rehostedUrl: string | null = null;
@@ -330,6 +347,14 @@ serve(async (req) => {
       const failedCount = passes.filter((p: any) => p?.status === "failed").length;
       const allDone = doneCount === totalPasses && failedCount === 0;
 
+      // Find pending passes (deferred earlier or never dispatched). These
+      // need an explicit advance dispatch — without this, scenes whose
+      // fan-out hit the Sync.so concurrency limit on initial dispatch
+      // would never complete the remaining speakers.
+      const pendingIdxs = passes
+        .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
+        .filter((i: number) => i >= 0);
+
       if (!allDone) {
         // Just persist this pass — let the fan-out parallel dispatches finish.
         await supabase
@@ -341,16 +366,52 @@ serve(async (req) => {
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, waiting)`);
+        console.log(`[sync-so-webhook] v25 scene=${sceneId} pass ${currentPass + 1}/${totalPasses} done (${doneCount} done, ${pendingIdxs.length} pending)`);
+
+        // Kick the next pending pass — now that we freed a slot, advance.
+        if (pendingIdxs.length > 0) {
+          const nextIdx = pendingIdxs[0];
+          try {
+            fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+              body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: nextIdx }),
+            }).catch(() => {});
+            console.log(`[sync-so-webhook] v25 scene=${sceneId} advancing pending pass ${nextIdx + 1}/${totalPasses}`);
+          } catch { /* ignore */ }
+        }
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
       }
 
-      // ── All passes complete → dispatch fan-in compositor ─────────────
-      // Use last completed pass's output as a fallback final_url; the actual
-      // composite happens in render-sync-segments-audio-mux which reads
-      // passes[] and overlays each speaker via face-mask circles onto the
-      // original plate.
+      // ── All passes complete ──────────────────────────────────────────
       const finalUrl = (passes[passes.length - 1] as any)?.output_url ?? outputUrl;
+
+      // Single-speaker fast path: no fan-in needed, audio already matches.
+      if (totalPasses === 1) {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...state, passes,
+              status: "done",
+              final_url: finalUrl,
+              sync_so_url: outputUrl,
+              finished_at: nowIso,
+            },
+            clip_url: finalUrl,
+            clip_status: "ready",
+            lip_sync_status: "applied",
+            lip_sync_applied_at: nowIso,
+            twoshot_stage: "complete",
+            clip_error: null,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE`);
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
+      }
+
+      // Multi-speaker: dispatch fan-in compositor (idempotent via audio_mux.render_id).
       await supabase
         .from("composer_scenes")
         .update({
@@ -375,141 +436,18 @@ serve(async (req) => {
           body: JSON.stringify({ scene_id: sceneId }),
         }).catch(() => {});
       } catch { /* ignore */ }
-
-
-      // ── Last pass complete → re-host + apply ───────────────────────────
-      let finalUrl = outputUrl;
-      try {
-        const { data: row } = await supabase
-          .from("composer_scenes")
-          .select("project_id")
-          .eq("id", sceneId)
-          .single();
-        const { data: proj } = await supabase
-          .from("composer_projects")
-          .select("user_id")
-          .eq("id", (row as any)?.project_id)
-          .single();
-        const uid = (proj as any)?.user_id;
-        if (uid) {
-          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
-          if (dl.ok) {
-            const bytes = new Uint8Array(await dl.arrayBuffer());
-            const objectPath = `composer/${uid}/${sceneId}-lipsync.mp4`;
-            const up = await supabase.storage.from("ai-videos").upload(
-              objectPath,
-              bytes,
-              { contentType: "video/mp4", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage
-                .from("ai-videos")
-                .getPublicUrl(objectPath);
-              if (pub?.publicUrl) {
-                finalUrl = pub.publicUrl;
-                console.log(
-                  `[sync-so-webhook] v5 scene=${sceneId} re-hosted ${bytes.length} bytes → ${finalUrl}`,
-                );
-              }
-            } else {
-              console.warn(
-                `[sync-so-webhook] v5 scene=${sceneId} re-host upload failed: ${up.error.message}`,
-              );
-            }
-          } else {
-            console.warn(
-              `[sync-so-webhook] v5 scene=${sceneId} re-host download HTTP ${dl.status}`,
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} re-host exception: ${(err as Error).message}`,
-        );
-      }
-
-      // ── Multi-speaker fix ────────────────────────────────────────────
-      // Sync.so v2 replaces the entire audio track of its output with the
-      // audio submitted to that pass. For chained multi-pass (passes >=2)
-      // the final video therefore contains ONLY the last speaker's voice.
-      // The merged master WAV (with all speakers) already exists in
-      // audio_plan.twoshot.url — we dispatch a small Lambda audio-mux step
-      // (DialogStitchVideo with shots=[]) that swaps the audio back. The
-      // muxed render finalizes clip_url + lip_sync_applied_at via the
-      // existing dialog-stitch webhook branch.
-      const needsAudioMux = Array.isArray(passes) && passes.length >= 2;
-      if (needsAudioMux) {
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...state,
-              passes,
-              status: "audio_muxing",
-              final_url: finalUrl,
-              sync_so_url: outputUrl,
-              finished_at: nowIso,
-            },
-            // clip_url intentionally NOT updated yet — wait for muxed url.
-            lip_sync_status: "audio_muxing",
-            twoshot_stage: "audio_muxing",
-            clip_error: null,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(
-          `[sync-so-webhook] v5 scene=${sceneId} last pass done (${passes.length} speakers) → dispatching audio mux`,
-        );
-        try {
-          // Fire-and-forget — render-sync-segments-audio-mux is idempotent.
-          fetch(
-            `${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${serviceKey}`,
-              },
-              body: JSON.stringify({ scene_id: sceneId }),
-            },
-          ).catch(() => {});
-        } catch {
-          /* ignore */
-        }
-      } else {
-        // Single-speaker (passes.length <= 1): the single pass's audio IS
-        // the speaker's full track — no mismatch with the master WAV.
-        // Finalize directly as before.
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...state,
-              passes,
-              status: "done",
-              final_url: finalUrl,
-              sync_so_url: outputUrl,
-              finished_at: nowIso,
-            },
-            clip_url: finalUrl,
-            clip_status: "ready",
-            lip_sync_status: "applied",
-            lip_sync_applied_at: nowIso,
-            twoshot_stage: "complete",
-            clip_error: null,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.log(
-          `[sync-so-webhook] v5 scene=${sceneId} FINAL pass ${currentPass + 1}/${totalPasses} → clip_url updated, lip_sync_applied (single speaker)`,
-        );
-      }
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", compositor: "dispatched" });
     } else {
       // FAILED / REJECTED / CANCELED
+
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
       const passesArr: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
-      const currentPass = Number((state as any).current_pass ?? 0);
+      // v25 Fan-Out: failure applies to the pass owning THIS job_id, not the
+      // stale top-level current_pass cursor (which always points to the last
+      // dispatched pass). Without this fix, a pass-0 FAILED webhook arriving
+      // after pass-2 was dispatched would patch pass-2 instead.
+      const currentPass = matchedIdx >= 0 ? matchedIdx : Number((state as any).current_pass ?? 0);
       const currentPassState = passesArr[currentPass] ?? null;
       // ── PER-PASS retry budget (Stage H) ──
       // Previously `retry_count` was stored only on the TOP-LEVEL state, so a
