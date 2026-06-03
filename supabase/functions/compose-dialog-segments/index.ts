@@ -903,20 +903,37 @@ serve(async (req) => {
           .eq("user_id", userId);
       }
       const jitterMs = 5_000 + Math.floor(Math.random() * 10_000);
-      await supabase
-        .from("composer_scenes")
-        .update({
-          lip_sync_status: isAdvance ? "running" : "pending",
-          twoshot_stage: isAdvance ? "syncso_segments_advance_deferred" : "deferred",
-          clip_error: `syncso_concurrency_deferred:${inflightCount}`,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", sceneId);
+      // For advance/retry (fan-out): leave the scene in `running` with the
+      // existing dialog_shots untouched. The pass row keeps status='pending'
+      // and the lipsync-watchdog poller will dispatch it when a Sync.so slot
+      // frees. Previously we wrote `syncso_segments_advance_deferred` here
+      // which the client filter never advanced — pending passes hung forever.
+      if (isAdvance || isRetry) {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            // Status unchanged. Just touch updated_at + leave a soft marker
+            // so we can debug from clip_error without changing routing.
+            clip_error: `syncso_concurrency_deferred:${inflightCount}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      } else {
+        await supabase
+          .from("composer_scenes")
+          .update({
+            lip_sync_status: "pending",
+            twoshot_stage: "deferred",
+            clip_error: `syncso_concurrency_deferred:${inflightCount}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", sceneId);
+      }
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "DEFERRED", error_class: "rate_limited",
         error_message: `inflight ${inflightCount} >= ${MAX_INFLIGHT}`,
-        meta: { inflight_count: inflightCount, retry_in_ms: jitterMs, is_advance: isAdvance },
+        meta: { inflight_count: inflightCount, retry_in_ms: jitterMs, is_advance: isAdvance, is_retry: isRetry },
       });
       return json(
         { ok: false, status: "deferred", inflight: inflightCount, retry_in_ms: jitterMs },
