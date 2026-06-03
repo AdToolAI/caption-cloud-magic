@@ -672,6 +672,12 @@ serve(async (req) => {
       existing.status &&
       !["failed", "done"].includes(String(existing.status))
     ) {
+      // v22: claim-lock above set stage to 'composing_dialog'; restore it to
+      // 'dialog_chain' so the next genuine resume can also win the lock.
+      await supabase
+        .from("composer_scenes")
+        .update({ twoshot_stage: "dialog_chain", updated_at: new Date().toISOString() })
+        .eq("id", sceneId);
       const resume = async () => {
         try {
           await fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
