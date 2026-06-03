@@ -538,7 +538,17 @@ serve(async (req) => {
       // Provider "unknown error" is opaque but often recoverable with a
       // payload/model variant. Retry through a bounded fallback ladder:
       // coords-pro → auto-pro → auto-standard, then refund if all fail.
-      const treatAsTransient = isTransientSyncError(errClass);
+      // The official Sync.so error_code takes priority over the message
+      // heuristic: `fail_fast` codes mean retrying CANNOT help (wrong
+      // model, audio too long, missing input), so we skip the ladder and
+      // refund immediately. `retry_transient` codes mean provider/infra
+      // hiccup → ladder is the right move. `retry_with_repair` means the
+      // audio metadata is broken → retry once after a re-encode (handled
+      // by compose-dialog-segments via the `repair_audio` flag).
+      const treatAsTransient =
+        codeBucket === "retry_transient" ||
+        codeBucket === "retry_with_repair" ||
+        (codeBucket === "unknown" && isTransientSyncError(errClass));
       const speakerCount = passesArr.length;
       const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
       let nextVariant: string | null = nextV5RetryVariant(currentVariant);
@@ -573,7 +583,11 @@ serve(async (req) => {
           );
         }
       }
-      const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES && nextVariant !== null;
+      // fail_fast codes short-circuit the ladder entirely.
+      const canRetry = codeBucket !== "fail_fast"
+        && treatAsTransient
+        && passRetryCount < MAX_V5_RETRIES
+        && nextVariant !== null;
 
       if (canRetry) {
         // Patch the failed pass in-place with per-pass retry bookkeeping.
