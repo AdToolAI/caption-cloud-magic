@@ -229,14 +229,23 @@ serve(async (req) => {
 
   if (!scene) {
     // Fallback: scan in-flight scenes for the job id. Bounded scan, low volume.
+    // v25: a fan-out scene tracks job ids in `dialog_shots.passes[].job_id`,
+    // not only `shots[]` (v4) or the top-level `sync_job_id` (v5 single-call).
+    // We must check ALL three so late/parallel pass webhooks find their scene.
     const { data: rows } = await supabase
       .from("composer_scenes")
       .select("id, dialog_shots, lip_sync_applied_at, lip_sync_status")
-      .in("lip_sync_status", ["running", "stitching"])
+      .in("lip_sync_status", ["running", "stitching", "audio_muxing"])
       .limit(200);
     for (const r of rows ?? []) {
-      const shots = (r as any)?.dialog_shots?.shots ?? [];
-      if (Array.isArray(shots) && shots.some((s: any) => s?.sync_job_id === jobId)) {
+      const ds = (r as any)?.dialog_shots ?? {};
+      const shots = Array.isArray(ds.shots) ? ds.shots : [];
+      const passes = Array.isArray(ds.passes) ? ds.passes : [];
+      const hit =
+        shots.some((s: any) => s?.sync_job_id === jobId) ||
+        passes.some((p: any) => p?.job_id === jobId) ||
+        ds?.sync_job_id === jobId;
+      if (hit) {
         sceneId = r.id;
         scene = r;
         break;
