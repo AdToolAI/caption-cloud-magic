@@ -1288,18 +1288,54 @@ serve(async (req) => {
       },
     });
 
-    await supabase
-      .from("composer_scenes")
-      .update({
-        dialog_shots: state,
-        lip_sync_status: "running",
-        twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
-        lip_sync_source_clip_url: sourceClipUrl,
-        replicate_prediction_id: `sync:${jobId}`,
-        clip_error: null,
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
+    // v29: For retry/advance dispatches, re-read the DB and merge ONLY our
+    // pass into the freshest passes[] so a concurrent webhook for a sibling
+    // pass can't be overwritten by our stale `passes` snapshot.
+    if (isRetry || isAdvance) {
+      const { data: freshRow } = await supabase
+        .from("composer_scenes")
+        .select("dialog_shots")
+        .eq("id", sceneId)
+        .maybeSingle();
+      const freshState: any = (freshRow as any)?.dialog_shots ?? state;
+      const freshPasses: any[] = Array.isArray(freshState?.passes)
+        ? freshState.passes.map((p: any) => ({ ...p }))
+        : passes;
+      freshPasses[currentPassIdx] = pass;
+      const mergedState: any = {
+        ...freshState,
+        ...state,
+        passes: freshPasses,
+        // Preserve fields that may have been advanced by other passes:
+        cost_credits: Number(freshState?.cost_credits ?? state.cost_credits ?? totalCost),
+        fallback_history: freshState?.fallback_history ?? state.fallback_history ?? [],
+      };
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: mergedState,
+          lip_sync_status: "running",
+          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
+          lip_sync_source_clip_url: sourceClipUrl,
+          replicate_prediction_id: `sync:${jobId}`,
+          clip_error: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+    } else {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: state,
+          lip_sync_status: "running",
+          twoshot_stage: passes.length > 1 ? `syncso_pass_${currentPassIdx + 1}_of_${passes.length}` : "syncso_segments",
+          lip_sync_source_clip_url: sourceClipUrl,
+          replicate_prediction_id: `sync:${jobId}`,
+          clip_error: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+    }
 
     // ── v25 Fan-Out: on fresh dispatch, kick off all remaining passes in
     //    parallel via background self-invokes. Each runs as an independent
