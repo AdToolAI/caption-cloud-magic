@@ -1,21 +1,29 @@
 /**
  * lipsync-watchdog — server-side single source of truth for stale lip-sync runs.
  *
- * Runs every 2 min via pg_cron. Finds composer_scenes where:
- *   • lip_sync_status = 'running' AND
- *   • lip_sync_applied_at IS NULL AND
- *   • updated_at older than the per-phase TTL AND
- *   • no provider job has progressed in that window
+ * Runs every 2 min via pg_cron. Two responsibilities:
  *
- * For each match: calls the shared `failLipSync()` helper → cancels open
- * Sync.so jobs, refunds credits idempotently, sets the scene terminal `failed`.
+ *  1. POLLING FALLBACK (v25 Fan-Out):
+ *     Sync.so does NOT retry missed webhook deliveries. For every v5
+ *     sync-segments scene with `rendering` passes we GET the Sync.so job
+ *     status and apply COMPLETED/FAILED exactly like the webhook would —
+ *     so a lost webhook never strands a scene.
+ *
+ *  2. DISPATCH FALLBACK (v25 Fan-Out):
+ *     For scenes with `pending` passes (deferred by Sync.so concurrency
+ *     on initial dispatch) we trigger compose-dialog-segments advance so
+ *     the pass actually runs when slots are free.
+ *
+ *  3. STALE-FAILURE (last resort):
+ *     Only after polling + dispatching, if a scene is still stuck past
+ *     the hard TTL, mark it terminal-failed with refund via `failLipSync`.
  *
  * Replaces the previous client-side stale-reset code that caused the loop.
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.75.0";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
-import { getSyncApiKey } from "../_shared/syncso-preflight.ts";
+import { getSyncApiKey, releaseInflightSyncJob } from "../_shared/syncso-preflight.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +34,8 @@ const corsHeaders = {
 const STALE_PROVIDER_MS = 10 * 60_000;   // Sync.so jobs in flight w/o update
 const STALE_PREFLIGHT_MS = 4 * 60_000;   // running but never produced a provider job
 const STALE_HARD_MS = 20 * 60_000;       // safety cap regardless of state
+
+const SYNC_API_BASE = "https://api.sync.so/v2";
 
 interface SceneRow {
   id: string;
@@ -56,17 +66,7 @@ function hasRecordedProviderJobLocal(d: SceneRow): boolean {
   return false;
 }
 
-/**
- * Fallback check: per-turn dispatches store the Sync.so job id only in
- * `syncso_dispatch_log`, never on the shot row (compose-dialog-scene v23
- * pre-redirect behavior). Without this query the watchdog mis-classifies
- * scenes that DO have provider jobs in flight as `watchdog_preflight_aborted`
- * (4 min TTL) instead of `watchdog_provider_timeout` (10 min TTL).
- */
-async function hasRecordedProviderJob(
-  supabase: any,
-  d: SceneRow,
-): Promise<boolean> {
+async function hasRecordedProviderJob(supabase: any, d: SceneRow): Promise<boolean> {
   if (hasRecordedProviderJobLocal(d)) return true;
   try {
     const { count } = await supabase
@@ -96,24 +96,82 @@ async function userIdForProject(supabase: any, projectId: string): Promise<strin
   }
 }
 
+/**
+ * Poll Sync.so for a single job_id and forward terminal status to our own
+ * sync-so-webhook so the existing v25 fan-out branch handles re-host, pass
+ * advance, and compositor dispatch. Returns true when the job had a terminal
+ * status (regardless of success/failure).
+ */
+async function pollAndForward(opts: {
+  syncApiKey: string;
+  jobId: string;
+  sceneId: string;
+  supabaseUrl: string;
+  serviceKey: string;
+}): Promise<{ terminal: boolean; status?: string }> {
+  const { syncApiKey, jobId, sceneId, supabaseUrl, serviceKey } = opts;
+  try {
+    const r = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
+      method: "GET",
+      headers: { "x-api-key": syncApiKey },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!r.ok) {
+      console.warn(`[lipsync-watchdog] poll job=${jobId} HTTP ${r.status}`);
+      return { terminal: false };
+    }
+    const body: any = await r.json().catch(() => ({}));
+    const status = String(body?.status ?? "").toUpperCase();
+    if (!["COMPLETED", "FAILED", "REJECTED", "CANCELED"].includes(status)) {
+      return { terminal: false, status };
+    }
+    // Forward to our own webhook so the v25 branch (re-host, pass advance,
+    // compositor dispatch, retry/refund) runs unchanged. Include the
+    // scene_id query hint and shared-secret token so verifyWebhookRequest
+    // accepts it.
+    const sharedSecret = Deno.env.get("WEBHOOK_SHARED_SECRET") ?? "";
+    const webhookUrl =
+      `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}` +
+      (sharedSecret ? `&token=${encodeURIComponent(sharedSecret)}` : "");
+    try {
+      await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serviceKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      console.warn(`[lipsync-watchdog] forward webhook crash: ${(e as Error).message}`);
+    }
+    console.log(`[lipsync-watchdog] polled job=${jobId} status=${status} → forwarded to webhook scene=${sceneId}`);
+    return { terminal: true, status };
+  } catch (e) {
+    console.warn(`[lipsync-watchdog] poll crash job=${jobId}: ${(e as Error).message}`);
+    return { terminal: false };
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceKey);
   const syncApiKey = getSyncApiKey() || null;
 
-  const cutoff = new Date(Date.now() - STALE_PREFLIGHT_MS).toISOString();
+  // Scan a wide window: include `audio_muxing` (compositor stuck) plus any
+  // scene with deferred-pending passes that hasn't moved in a while.
+  const scanCutoff = new Date(Date.now() - 60_000).toISOString();
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
       "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
-    .eq("lip_sync_status", "running")
+    .in("lip_sync_status", ["running", "audio_muxing"])
     .is("lip_sync_applied_at", null)
-    .lt("updated_at", cutoff)
+    .lt("updated_at", scanCutoff)
     .limit(200);
 
   if (error) {
@@ -125,9 +183,62 @@ serve(async (req) => {
 
   const now = Date.now();
   const failed: Array<{ scene_id: string; reason: string }> = [];
+  const polled: Array<{ scene_id: string; job_id: string; status: string }> = [];
+  const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
     const ageMs = now - new Date(d.updated_at).getTime();
+    const ds: any = d.dialog_shots ?? {};
+    const isV5Fanout =
+      ds?.version === 5 &&
+      ds?.engine === "sync-segments" &&
+      Array.isArray(ds?.passes);
+
+    // ── (1) v25 Polling fallback: forward terminal Sync.so jobs we missed ──
+    if (isV5Fanout && syncApiKey) {
+      const renderingPasses = (ds.passes as any[])
+        .map((p, i) => ({ p, i }))
+        .filter(({ p }) => p?.status === "rendering" && typeof p?.job_id === "string");
+      for (const { p, i } of renderingPasses) {
+        const r = await pollAndForward({
+          syncApiKey, jobId: p.job_id, sceneId: d.id, supabaseUrl, serviceKey,
+        });
+        if (r.terminal) {
+          polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
+          // Also free the inflight slot — webhook does this too, but doing
+          // it here unblocks dispatch in the same watchdog tick.
+          await releaseInflightSyncJob(supabase, p.job_id);
+        }
+        void i;
+      }
+    }
+
+    // ── (2) Dispatch deferred-pending fan-out passes ─────────────────────
+    if (isV5Fanout) {
+      const pendingIdxs = (ds.passes as any[])
+        .map((p, i) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
+        .filter((i) => i >= 0);
+      if (pendingIdxs.length > 0) {
+        // Trigger the first pending pass; webhook will chain the rest.
+        const next = pendingIdxs[0];
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceKey}`,
+            },
+            body: JSON.stringify({ scene_id: d.id, advance: true, pass_idx: next }),
+          });
+          advanced.push({ scene_id: d.id, pass_idx: next });
+        } catch (e) {
+          console.warn(`[lipsync-watchdog] advance dispatch crash scene=${d.id}: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // ── (3) Stale-failure (last resort, only past hard TTL or true preflight) ─
+    if (ageMs < STALE_PREFLIGHT_MS) continue;
     const hasJob = await hasRecordedProviderJob(supabase, d);
 
     let reason: string | null = null;
@@ -136,7 +247,11 @@ serve(async (req) => {
     } else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
       reason = "watchdog_preflight_aborted";
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
-      reason = "watchdog_provider_timeout";
+      // Only fail provider-timeout scenes when polling above didn't already
+      // forward a terminal status this tick (which will have reset
+      // updated_at when the webhook patched the scene).
+      const polledThisTick = polled.some((p) => p.scene_id === d.id);
+      if (!polledThisTick) reason = "watchdog_provider_timeout";
     }
     if (!reason) continue;
 
@@ -153,9 +268,11 @@ serve(async (req) => {
     failed.push({ scene_id: d.id, reason });
   }
 
-  console.log(`[lipsync-watchdog] scanned=${rows?.length ?? 0} failed=${failed.length}`);
-  return new Response(JSON.stringify({ ok: true, scanned: rows?.length ?? 0, failed }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  console.log(
+    `[lipsync-watchdog] scanned=${rows?.length ?? 0} polled=${polled.length} advanced=${advanced.length} failed=${failed.length}`,
+  );
+  return new Response(
+    JSON.stringify({ ok: true, scanned: rows?.length ?? 0, polled, advanced, failed }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 });
