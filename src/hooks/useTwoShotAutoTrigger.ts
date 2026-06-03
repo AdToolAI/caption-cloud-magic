@@ -374,15 +374,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
             if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
             if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
           }
+          // v23: ONLY `pending` (or null) is a valid start state on the client.
+          // `failed` requires explicit user reset via `reset-lipsync-scene`.
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
-          if (
-            d.lip_sync_status === 'failed' &&
-            typeof d.clip_error === 'string' &&
-            !HARD_FAIL_REGEX.test(d.clip_error) &&
-            (RETRYABLE_ERRORS.has(d.clip_error) || RETRYABLE_REGEX.test(d.clip_error))
-          ) {
-            return true;
-          }
           return false;
         });
         if (candidates.length === 0) {
