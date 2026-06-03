@@ -466,11 +466,16 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // Recoverable failure reasons we auto-retry exactly once per mount.
         // (Hard refusals like 'no_voiceover' or 'source_clip_unusable' need
         // user action — never auto-retry those.)
+        // Auto-retry is intentionally NARROW: only truly transient classes
+        // (Sync.so concurrency, circuit-open, audio-mux dispatch glitch).
+        // Every other `failed` waits for an explicit "Lip-Sync neu rendern"
+        // user click — otherwise the bar loops forever and burns credits.
         const RETRYABLE_ERRORS = new Set([
-          'multi_speaker_scene_routed_to_single_lipsync',
           'watchdog_stuck_lipsync_refunded',
         ]);
-        const RETRYABLE_REGEX = /^(lipsync_pass_\d+_failed|syncso_(failed|rejected|canceled)|syncso_segments_(dispatch_\d+|FAILED|REJECTED|CANCELED|poll_timeout)|twoshot_presync_timeout|syncso_poll_timeout|dialog_shots_failed|dialog_stitch_failed|dialog_all_hailuo_dispatches_failed|dialog_missing_face_coords|audio_mux_dispatch)/i;
+        const RETRYABLE_REGEX = /^(syncso_circuit_open|syncso_concurrency|http_429|audio_mux_dispatch)/i;
+        // Reasons that must NEVER auto-retry — surfaced to the user as terminal.
+        const HARD_FAIL_REGEX = /^(cast_invalid_|source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|dialog_pipeline_no_per_speaker_tracks|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_|dialog_missing_face_coords|raw_talking_head_source_blocked|dialog_shots_failed|syncso_segments_FAILED|sync_FAILED|multi_speaker_)/i;
         const HARD_FAIL_REGEX = /^(source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_)/i;
 
         const candidates = (data as any[]).filter((d) => {
