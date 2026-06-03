@@ -217,12 +217,20 @@ serve(async (req) => {
     const sceneId = body?.scene_id;
     const isRetry = body?.retry === true;
     const requestedRetryVariant = isRetryVariant(body?.retry_variant) ? body.retry_variant : null;
+    // Set by sync-so-webhook when the official error_code maps to
+    // `retry_with_repair` (generation_input_audio_invalid / metadata_missing).
+    // Surfaced in dispatch logs + downstream so an upcoming WAV-repair pass
+    // (ffmpeg re-encode) can hook in without another routing change.
+    const repairAudio = body?.repair_audio === true;
     // `advance: true` is sent by the webhook to chain to the next pass after
     // a successful pass completion. Skips wallet debit + face-gate (already
     // validated on pass 0) and dispatches passes[current_pass].
     const isAdvance = body?.advance === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
+    }
+    if (repairAudio) {
+      console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
     }
 
     const { data: scene, error: sceneErr } = await supabase
