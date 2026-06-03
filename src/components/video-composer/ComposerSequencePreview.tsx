@@ -1120,10 +1120,13 @@ export default function ComposerSequencePreview({
                 : err.startsWith('anchor_identity_ambiguous') ? 'Anchor-Identitäten unklar — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('anchor_missing_speakers') ? 'Anchor zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
                 : err.startsWith('source_clip_missing_speakers') ? 'Video zeigt nicht alle Sprecher — bitte „Clip + Lip-Sync neu rendern" klicken'
-                : err.startsWith('syncso_') ? `Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken`
+                : err.includes('Sync.so lieferte keinen error_code')
+                  ? '3-Sprecher-Szene: Sync.so meldete einen generischen Fehler — Audio-Trim wurde versucht. Bitte „Lip-Sync neu rendern" klicken'
+                  : err.startsWith('syncso_') ? `Sync.so Providerfehler — bitte „Lip-Sync neu rendern" klicken`
                 : willAutoRetry
                   ? 'Lip-Sync fehlgeschlagen — wird neu angestoßen'
                   : 'Lip-Sync fehlgeschlagen — bitte „Lip-Sync neu rendern" klicken';
+
               return (
                 <div className="absolute top-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-red-500/90 backdrop-blur text-[11px] text-white font-semibold flex items-center gap-1.5 z-20" title={syncCode ? `Sync.so error_code: ${syncCode}` : err.slice(0, 200)}>
                   <span>⚠️</span>
