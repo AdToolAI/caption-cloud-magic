@@ -22,6 +22,9 @@ import { withDialogLock } from "../_shared/dialog-lock.ts";
 import {
   releaseInflightSyncJob,
   classifySyncError,
+  classifySyncErrorCode,
+  explainSyncErrorCode,
+  fetchSyncJobError,
   isTransientSyncError,
   recordCircuitFailure,
   recordCircuitSuccess,
@@ -147,24 +150,29 @@ serve(async (req) => {
     payload?.output_url ??
     payload?.data?.outputUrl ??
     payload?.data?.output_url;
-  // Sync.so wraps the real cause in nested fields. Walk every known shape so
-  // we stop persisting the useless "An unknown error occurred." placeholder.
-  const extractError = (p: any): string | undefined => {
-    if (!p) return undefined;
-    const candidates = [
-      p.error,
+  // Sync.so terminal webhooks expose TWO official fields per the spec
+  // (https://sync.so/docs/api-reference/api/webhooks-payload-reference/...):
+  //   • `error`       — human message
+  //   • `error_code`  — machine enum (e.g. generation_pipeline_failed)
+  // Previously we only read `error_message` (which doesn't exist in the spec)
+  // and fell back to the useless "An unknown error occurred" string. Now we
+  // read both official fields, walk every legacy/nested variant as a safety
+  // net, and — if the payload is STILL empty — issue a GET against
+  // /v2/generate/{job_id} to fetch the canonical fields from Sync.so.
+  const extractErrorFields = (p: any): { message?: string; code?: string } => {
+    if (!p) return {};
+    const msgCandidates = [
+      p.error,                  // official
+      p?.data?.error,           // official (nested)
       p.errorMessage,
       p.error_message,
       p.message,
       p.failureReason,
       p.failure_reason,
-      p.errorCode,
-      p.error_code,
       p?.error?.message,
       p?.error?.details,
       p?.error?.detail,
       p?.error?.reason,
-      p?.data?.error,
       p?.data?.errorMessage,
       p?.data?.error_message,
       p?.data?.failureReason,
@@ -173,17 +181,43 @@ serve(async (req) => {
       p?.data?.error?.detail,
       p?.data?.error?.reason,
     ].filter((x) => typeof x === "string" && x.trim().length > 0);
-    const meaningful = candidates.find(
+    const codeCandidates = [
+      p.error_code,             // official
+      p?.data?.error_code,      // official (nested)
+      p.errorCode,
+      p?.error?.code,
+      p?.data?.error?.code,
+    ].filter((x) => typeof x === "string" && x.trim().length > 0);
+    const message = msgCandidates.find(
       (s) => !/^an unknown error occurred\.?$/i.test(String(s).trim()),
-    );
-    return meaningful ?? candidates[0];
+    ) ?? msgCandidates[0];
+    return {
+      message: typeof message === "string" ? message : undefined,
+      code: typeof codeCandidates[0] === "string" ? codeCandidates[0] : undefined,
+    };
   };
-  const errorMsg: string | undefined = extractError(payload);
+  let { message: errorMsg, code: errorCode } = extractErrorFields(payload);
+
+  // GET-fallback: terminal FAILED with no error fields at all → ask Sync.so
+  // directly. This is the official recovery path per their error-handling
+  // docs and turns "unknown error" into a concrete error_code.
+  if (
+    ["FAILED", "REJECTED", "CANCELED"].includes(status) &&
+    !errorMsg && !errorCode && jobId
+  ) {
+    const fetched = await fetchSyncJobError(jobId);
+    if (fetched) {
+      errorMsg = fetched.error ?? errorMsg;
+      errorCode = fetched.error_code ?? errorCode;
+      console.log(`[sync-so-webhook] GET-fallback job=${jobId} code=${errorCode ?? "null"} msg=${(errorMsg ?? "").slice(0, 200)}`);
+    }
+  }
+
   if (status !== "COMPLETED") {
     // Log the full payload once so we can post-mortem the "unknown error"
     // class without re-instrumenting the webhook.
     console.log(
-      `[sync-so-webhook] terminal=${status} job=${payload?.id ?? payload?.job_id} extractedErr=${JSON.stringify(errorMsg ?? null)} fullPayload=${JSON.stringify(payload).slice(0, 1500)}`,
+      `[sync-so-webhook] terminal=${status} job=${payload?.id ?? payload?.job_id} code=${errorCode ?? "null"} extractedErr=${JSON.stringify(errorMsg ?? null)} fullPayload=${JSON.stringify(payload).slice(0, 1500)}`,
     );
   }
 
@@ -442,6 +476,13 @@ serve(async (req) => {
 
       const rawErr = (errorMsg ?? "unknown").toString();
       const errClass = classifySyncError(rawErr);
+      // OFFICIAL Sync.so error_code routing (overrides message-based heuristic
+      // when the provider gives us a real enum value). Decides whether we:
+      //   • retry as-is (transient)         → run the variant ladder
+      //   • retry with audio repair          → mark for re-encode + retry
+      //   • fail-fast (permanent input err)  → skip ladder, refund immediately
+      const codeBucket = classifySyncErrorCode(errorCode);
+      const codeExplain = explainSyncErrorCode(errorCode);
       const passesArr: any[] = Array.isArray((state as any).passes) ? (state as any).passes : [];
       // v25 Fan-Out: failure applies to the pass owning THIS job_id, not the
       // stale top-level current_pass cursor (which always points to the last
@@ -484,6 +525,8 @@ serve(async (req) => {
             pass_retry_count_seen: passRetryCount,
             aggregate_retry_count_seen: aggregateRetryCount,
             transient: isTransientSyncError(errClass),
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: codeBucket,
           },
         });
       } catch (_e) { /* ignore log errors */ }
@@ -495,7 +538,17 @@ serve(async (req) => {
       // Provider "unknown error" is opaque but often recoverable with a
       // payload/model variant. Retry through a bounded fallback ladder:
       // coords-pro → auto-pro → auto-standard, then refund if all fail.
-      const treatAsTransient = isTransientSyncError(errClass);
+      // The official Sync.so error_code takes priority over the message
+      // heuristic: `fail_fast` codes mean retrying CANNOT help (wrong
+      // model, audio too long, missing input), so we skip the ladder and
+      // refund immediately. `retry_transient` codes mean provider/infra
+      // hiccup → ladder is the right move. `retry_with_repair` means the
+      // audio metadata is broken → retry once after a re-encode (handled
+      // by compose-dialog-segments via the `repair_audio` flag).
+      const treatAsTransient =
+        codeBucket === "retry_transient" ||
+        codeBucket === "retry_with_repair" ||
+        (codeBucket === "unknown" && isTransientSyncError(errClass));
       const speakerCount = passesArr.length;
       const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
       let nextVariant: string | null = nextV5RetryVariant(currentVariant);
@@ -530,9 +583,14 @@ serve(async (req) => {
           );
         }
       }
-      const canRetry = treatAsTransient && passRetryCount < MAX_V5_RETRIES && nextVariant !== null;
+      // fail_fast codes short-circuit the ladder entirely.
+      const canRetry = codeBucket !== "fail_fast"
+        && treatAsTransient
+        && passRetryCount < MAX_V5_RETRIES
+        && nextVariant !== null;
 
       if (canRetry) {
+        const needsAudioRepair = codeBucket === "retry_with_repair";
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
@@ -543,6 +601,9 @@ serve(async (req) => {
                 retry_variant: nextVariant,
                 last_error: rawErr.slice(0, 200),
                 last_error_class: errClass,
+                sync_error_code: errorCode ?? null,
+                sync_error_bucket: codeBucket,
+                repair_audio: needsAudioRepair || !!p.repair_audio,
               }
             : p,
         );
@@ -559,6 +620,8 @@ serve(async (req) => {
               retry_count: aggregateRetryCount + 1,
               last_error: rawErr.slice(0, 200),
               last_error_class: errClass,
+              sync_error_code: errorCode ?? null,
+              sync_error_bucket: codeBucket,
               fallback_history: [
                 ...((state as any).fallback_history ?? []),
                 {
@@ -568,6 +631,8 @@ serve(async (req) => {
                   from_variant: currentVariant,
                   to_variant: nextVariant,
                   error_class: errClass,
+                  sync_error_code: errorCode ?? null,
+                  sync_error_bucket: codeBucket,
                   error: rawErr.slice(0, 200),
                 },
               ].slice(-16),
@@ -578,7 +643,7 @@ serve(async (req) => {
           })
           .eq("id", sceneId);
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}`,
+          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} → retry ${passRetryCount + 1}/${MAX_V5_RETRIES} variant=${nextVariant}${needsAudioRepair ? " +repair_audio" : ""}`,
         );
         // Fire-and-forget re-dispatch. compose-dialog-segments reads the
         // existing state (cost_credits already debited and stored) and uses
@@ -590,18 +655,28 @@ serve(async (req) => {
               "Content-Type": "application/json",
               Authorization: `Bearer ${serviceKey}`,
             },
-            body: JSON.stringify({ scene_id: sceneId, retry: true, retry_variant: nextVariant }),
+            body: JSON.stringify({
+              scene_id: sceneId,
+              retry: true,
+              retry_variant: nextVariant,
+              repair_audio: needsAudioRepair,
+              pass_idx: currentPass,
+            }),
           }).catch(() => {});
         } catch {
           /* ignore */
         }
-        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true, retry_variant: nextVariant });
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", retried: true, retry_variant: nextVariant, sync_error_code: errorCode ?? null });
       }
 
 
 
       // Non-retryable OR retry budget exhausted → refund (idempotent) + mark failed
-      const reason = `syncso_segments_${status}: ${rawErr.slice(0, 200)}`;
+      // Prefix the reason with the official error_code (when present) so the
+      // UI badge surfaces a real diagnostic instead of "unknown error".
+      const codePrefix = errorCode ? `[${errorCode}] ` : "";
+      const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
+      const reason = `syncso_segments_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}`;
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
@@ -638,6 +713,9 @@ serve(async (req) => {
             refunded: cost > 0,
             error: reason,
             last_error_class: errClass,
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: codeBucket,
+            sync_error_explain: codeExplain ?? null,
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
@@ -646,7 +724,7 @@ serve(async (req) => {
         })
         .eq("id", sceneId);
       console.warn(
-        `[sync-so-webhook] v5 scene=${sceneId} ${status} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
+        `[sync-so-webhook] v5 scene=${sceneId} ${status} code=${errorCode ?? "null"} bucket=${codeBucket} class=${errClass} retries=${passRetryCount}/${aggregateRetryCount} refunded=${cost} reason=${reason}`,
       );
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
