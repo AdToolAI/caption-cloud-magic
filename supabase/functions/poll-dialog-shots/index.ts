@@ -37,6 +37,7 @@ import {
   SYNCSO_DEFAULT_MAX_PARALLEL,
   validateFrameFace,
 } from "../_shared/syncso-preflight.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 
 const corsHeaders = {
