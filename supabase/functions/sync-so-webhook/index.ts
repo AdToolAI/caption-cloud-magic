@@ -562,18 +562,29 @@ serve(async (req) => {
       const speakerCount = passesArr.length;
       const currentVariant = currentPassState?.retry_variant ?? (state as any).retry_variant ?? "coords-pro";
       let nextVariant: string | null = nextV5RetryVariant(currentVariant);
-      // ── Multi-speaker safety (3+ only) ─────────────────────────────────
-      // For 1- and 2-speaker scenes the standard ladder
-      // `coords-pro → auto-pro → auto-standard` is unchanged: those
-      // configurations were stable and the previous over-broad block
-      // killed perfectly recoverable 2-shot lipsyncs.
-      // For 3+ speakers `auto_detect: true` discards per-speaker coords
-      // and risks animating the wrong face / passing video through
-      // unchanged. We block the auto-* fallback there, BUT allow a
-      // single last-ditch `auto-pro` attempt on pass 0 if every pass
-      // failed with the "no face found" class — better one moving mouth
-      // than a fully-frozen scene.
-      if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
+      // v28: For 3+ speaker scenes the generic "An unknown error occurred."
+      // path on `coords-pro` is almost always triggered by per-speaker WAVs
+      // with multi-second leading silence (live confirmed: Matthew/Kailee on
+      // scene bd60c826…). Instead of jumping to `auto-*` (face-swap risk)
+      // or instantly exhausting, allow ONE coords-pro retry with audio
+      // repair (lead-in trim handled in compose-dialog-segments). Only
+      // after that do we fall back to the legacy block.
+      let forceCoordsRepair = false;
+      const isProviderUnknown =
+        codeBucket === "unknown" && errClass === "provider_unknown_error";
+      if (
+        speakerCount >= 3 &&
+        currentVariant === "coords-pro" &&
+        isProviderUnknown &&
+        !currentPassState?.repair_audio &&
+        passRetryCount === 0
+      ) {
+        nextVariant = "coords-pro";
+        forceCoordsRepair = true;
+        console.warn(
+          `[sync-so-webhook] v5 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro+repair_audio retry instead of auto-* fallback`,
+        );
+      } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
           (p: any) =>
             p?.status === "failed" &&
@@ -595,12 +606,13 @@ serve(async (req) => {
       }
       // fail_fast codes short-circuit the ladder entirely.
       const canRetry = codeBucket !== "fail_fast"
-        && treatAsTransient
+        && (treatAsTransient || forceCoordsRepair)
         && passRetryCount < MAX_V5_RETRIES
         && nextVariant !== null;
 
       if (canRetry) {
-        const needsAudioRepair = codeBucket === "retry_with_repair";
+        const needsAudioRepair = codeBucket === "retry_with_repair" || forceCoordsRepair;
+
         // Patch the failed pass in-place with per-pass retry bookkeeping.
         const updatedPasses = passesArr.map((p, i) =>
           i === currentPass
