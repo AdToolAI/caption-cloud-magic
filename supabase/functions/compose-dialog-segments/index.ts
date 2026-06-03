@@ -68,6 +68,7 @@ import {
   recordCircuitSuccess,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
+  trimWavLeadIn,
   validateFrameFace,
   validateSegments,
   validateSyncResponseShape,
@@ -80,6 +81,7 @@ import {
 } from "../_shared/twoshot-face-map.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
+
 
 
 const corsHeaders = {
