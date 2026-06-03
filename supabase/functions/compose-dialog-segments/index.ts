@@ -78,6 +78,8 @@ import {
   resolveCharacterPortraits,
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
+import { validateCast } from "../_shared/cast-validation.ts";
+import { failLipSync } from "../_shared/lipsync-fail.ts";
 
 
 const corsHeaders = {
@@ -257,6 +259,30 @@ serve(async (req) => {
         },
         422,
       );
+    }
+
+    // ── Cast validation (max 4, no duplicate character_id, no overlap) ──
+    // Run BEFORE wallet debit / Sync.so dispatch so an invalid cast never
+    // costs credits and never reaches the provider.
+    {
+      const castCheck = validateCast(speakers as any[]);
+      if (!castCheck.ok) {
+        await failLipSync({
+          supabase,
+          sceneId,
+          userId,
+          reason: `${castCheck.reason}: ${castCheck.message ?? "invalid cast"}`,
+          syncApiKey: syncApiKey || null,
+        });
+        return json(
+          {
+            error: castCheck.reason,
+            message: castCheck.message,
+            offenders: castCheck.offenders ?? [],
+          },
+          422,
+        );
+      }
     }
 
     // Pick the master plate for lipsync. CRITICAL: for cinematic-sync we
