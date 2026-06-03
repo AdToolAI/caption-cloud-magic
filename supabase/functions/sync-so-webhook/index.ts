@@ -150,24 +150,29 @@ serve(async (req) => {
     payload?.output_url ??
     payload?.data?.outputUrl ??
     payload?.data?.output_url;
-  // Sync.so wraps the real cause in nested fields. Walk every known shape so
-  // we stop persisting the useless "An unknown error occurred." placeholder.
-  const extractError = (p: any): string | undefined => {
-    if (!p) return undefined;
-    const candidates = [
-      p.error,
+  // Sync.so terminal webhooks expose TWO official fields per the spec
+  // (https://sync.so/docs/api-reference/api/webhooks-payload-reference/...):
+  //   • `error`       — human message
+  //   • `error_code`  — machine enum (e.g. generation_pipeline_failed)
+  // Previously we only read `error_message` (which doesn't exist in the spec)
+  // and fell back to the useless "An unknown error occurred" string. Now we
+  // read both official fields, walk every legacy/nested variant as a safety
+  // net, and — if the payload is STILL empty — issue a GET against
+  // /v2/generate/{job_id} to fetch the canonical fields from Sync.so.
+  const extractErrorFields = (p: any): { message?: string; code?: string } => {
+    if (!p) return {};
+    const msgCandidates = [
+      p.error,                  // official
+      p?.data?.error,           // official (nested)
       p.errorMessage,
       p.error_message,
       p.message,
       p.failureReason,
       p.failure_reason,
-      p.errorCode,
-      p.error_code,
       p?.error?.message,
       p?.error?.details,
       p?.error?.detail,
       p?.error?.reason,
-      p?.data?.error,
       p?.data?.errorMessage,
       p?.data?.error_message,
       p?.data?.failureReason,
@@ -176,17 +181,43 @@ serve(async (req) => {
       p?.data?.error?.detail,
       p?.data?.error?.reason,
     ].filter((x) => typeof x === "string" && x.trim().length > 0);
-    const meaningful = candidates.find(
+    const codeCandidates = [
+      p.error_code,             // official
+      p?.data?.error_code,      // official (nested)
+      p.errorCode,
+      p?.error?.code,
+      p?.data?.error?.code,
+    ].filter((x) => typeof x === "string" && x.trim().length > 0);
+    const message = msgCandidates.find(
       (s) => !/^an unknown error occurred\.?$/i.test(String(s).trim()),
-    );
-    return meaningful ?? candidates[0];
+    ) ?? msgCandidates[0];
+    return {
+      message: typeof message === "string" ? message : undefined,
+      code: typeof codeCandidates[0] === "string" ? codeCandidates[0] : undefined,
+    };
   };
-  const errorMsg: string | undefined = extractError(payload);
+  let { message: errorMsg, code: errorCode } = extractErrorFields(payload);
+
+  // GET-fallback: terminal FAILED with no error fields at all → ask Sync.so
+  // directly. This is the official recovery path per their error-handling
+  // docs and turns "unknown error" into a concrete error_code.
+  if (
+    ["FAILED", "REJECTED", "CANCELED"].includes(status) &&
+    !errorMsg && !errorCode && jobId
+  ) {
+    const fetched = await fetchSyncJobError(jobId);
+    if (fetched) {
+      errorMsg = fetched.error ?? errorMsg;
+      errorCode = fetched.error_code ?? errorCode;
+      console.log(`[sync-so-webhook] GET-fallback job=${jobId} code=${errorCode ?? "null"} msg=${(errorMsg ?? "").slice(0, 200)}`);
+    }
+  }
+
   if (status !== "COMPLETED") {
     // Log the full payload once so we can post-mortem the "unknown error"
     // class without re-instrumenting the webhook.
     console.log(
-      `[sync-so-webhook] terminal=${status} job=${payload?.id ?? payload?.job_id} extractedErr=${JSON.stringify(errorMsg ?? null)} fullPayload=${JSON.stringify(payload).slice(0, 1500)}`,
+      `[sync-so-webhook] terminal=${status} job=${payload?.id ?? payload?.job_id} code=${errorCode ?? "null"} extractedErr=${JSON.stringify(errorMsg ?? null)} fullPayload=${JSON.stringify(payload).slice(0, 1500)}`,
     );
   }
 
