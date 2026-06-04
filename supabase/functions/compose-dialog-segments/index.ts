@@ -432,10 +432,13 @@ serve(async (req) => {
     if (
       !isRetry &&
       !isAdvance &&
+      !isV41Retry &&
       existing &&
-      existing.version === 5 &&
-      existing.engine === "sync-segments" &&
-      ["queued", "rendering"].includes(String(existing.status))
+      (
+        (existing.version === 5 && existing.engine === "sync-segments") ||
+        (existing as any).version === 41
+      ) &&
+      ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
       return json({ ok: true, status: "already_running", scene_id: sceneId }, 202);
     }
