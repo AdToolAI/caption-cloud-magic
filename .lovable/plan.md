@@ -1,59 +1,132 @@
-Ich habe Sync.so-Doku, aktuelle Logs und unsere Pipeline verglichen. Der aktuelle Fehler ist nicht mehr der alte MP4-Probe-Fehler: Szene `64b2ae86-c70d-4097-ae4e-89570edad884` wird vor Sync.so blockiert mit `plate_target_face_missing_pass_0_speaker_Samuel Dusatko`.
+## Befund
 
-Wichtigster Befund: Sync.so verlangt, dass `frame_number` und `coordinates` aus demselben echten Video-Frame stammen. Unsere Pipeline nimmt die Koordinaten aktuell aus dem Anchor/Kompositionsbild und überträgt sie auf das finale Hailuo-Video. Wenn Hailuo den Bildausschnitt verschiebt/croppt oder Gesichter im Sprecherzeitpunkt nicht sichtbar sind, landen die Koordinaten nicht auf dem Gesicht. Genau das passiert hier.
+Der aktuelle Run `632370bc-7b58-466d-87d9-a65b8e163106` erklärt exakt dein sichtbares Ergebnis:
+
+- Pass 1 / Charakter 1: fehlgeschlagen
+- Pass 2 / Charakter 2: erfolgreich
+- Pass 3 / Charakter 3: fehlgeschlagen
+- Danach hat unsere Pipeline trotzdem per `partialMux` ein finales Video gebaut. Deshalb bewegt nur der zweite Charakter die Lippen.
+
+Das ist nicht mehr nur ein Sync.so-Fehler, sondern ein Pipeline-Fehler: Wir deklarieren einen teilweise erfolgreichen 3-Sprecher-Lip-Sync als fertig.
+
+## Vergleich mit offizieller Sync.so-Doku
+
+Sync.so sagt öffentlich:
+
+- Bei mehreren Personen muss `options.active_speaker_detection` verwendet werden.
+- Für manuelle Sprecherwahl müssen `frame_number` und `coordinates` aus demselben echten Video-Frame stammen.
+- `coordinates` müssen im Pixel-Koordinatensystem des extrahierten Frames liegen.
+- Alternativ können `bounding_boxes` pro Frame geliefert werden.
+- `lipsync-2` / `lipsync-2-pro` brauchen natürliche sichtbare Sprech-/Mundbewegung im Inputvideo. Statische Gesichter oder nicht aktive Sprecher funktionieren schlecht oder gar nicht.
+- Für schwierige Winkel, verdeckte/kleine/statische Gesichter empfiehlt Sync.so `sync-3`.
+
+Unsere Pipeline macht inzwischen vieles richtig:
+
+```text
+POST /v2/generate
+model: lipsync-2-pro
+input: [video, per-speaker-audio]
+options.active_speaker_detection.auto_detect: false
+options.active_speaker_detection.frame_number: N
+options.active_speaker_detection.coordinates: [x, y]
+```
+
+Aber es gibt drei Abweichungen, die den aktuellen Fehler erklären:
+
+1. **Partial-Mux ist falsch für Pflichtsprecher**
+   - Wenn 1 von 3 Passes klappt, bauen wir trotzdem ein Ergebnis.
+   - Für den Nutzer sieht das aus wie “Lip-Sync fertig, aber zwei Charaktere bewegen sich nicht”.
+   - Korrekt wäre: Szene nicht als fertig markieren, sondern failen/refunden oder automatisch mit besserem Modell/Plate neu versuchen.
+
+2. **Face-Gate-Reparatur beweist, dass die Plate nicht Sync.so-tauglich ist**
+   - Bei Pass 1 und 3 wurde `face_count: 1` repariert.
+   - Das heißt: Am gewählten Sprecher-Frame wurde nur ein Gesicht zuverlässig erkannt, obwohl 3 Sprecher existieren.
+   - Die Reparatur mappt dann Slot 0 auf beide fehlgeschlagenen Sprecher. Formal entsteht eine Payload, aber inhaltlich ist sie nicht Sync.so-konform genug, weil das Zielgesicht nicht eindeutig sichtbar ist.
+
+3. **Wir bleiben zu lange auf `lipsync-2-pro`**
+   - Die Doku sagt explizit: `lipsync-2/pro` brauchen natürliche sichtbare Sprechbewegung.
+   - In AI-generierten 3-Personen-Szenen sind oft nur ein bis zwei Gesichter groß/frontal/bewegt genug.
+   - Für diese Fälle muss der Fallback `sync-3` sein, nicht noch ein `coords-pro-box` Versuch mit derselben problematischen Plate.
 
 ## Plan
 
-### 1. Sync.so-konforme Face-Selection aus dem echten finalen Video
-- Statt bei `coordsMatch=false` sofort hart zu scheitern, verwende die im Face-Gate bereits erkannten Face-Boxes des echten Video-Frames.
-- Sortiere erkannte Gesichter links-nach-rechts und mappe sie auf die Sprecher-Slots.
-- Ersetze die alten Anchor-Koordinaten durch echte Plate-Koordinaten aus dem validierten Frame.
-- Speichere diese korrigierten Koordinaten im `dialog_shots.passes[]`, damit Sync.so `frame_number + coordinates` aus derselben Video-Quelle bekommt.
+### 1. Partial-Mux für 3+ Sprecher abschalten
 
-### 2. Mehrere Referenzframes pro Sprecher testen
-- Pro Sprecher nicht nur den Mittel-Frame prüfen, sondern eine kleine sichere Frame-Liste:
-  - Turn-Start + kurzer Offset
-  - Turn-Mitte
-  - Turn-Ende - kurzer Offset
-  - optional ±1 Sekunde, wenn das Modell einen besseren Frame vorschlägt
-- Wenn ein Frame alle erwarteten Gesichter oder zumindest das Zielgesicht sichtbar hat, wird dieser Frame als Sync.so-Referenz verwendet.
-- Wenn wirklich kein Gesicht sichtbar ist, bleibt der Fehler bewusst hart: Dann ist das Quellvideo für Lip-Sync ungeeignet und muss neu gerendert werden.
+In `sync-so-webhook` ändere ich die v5-Failure-Logik:
 
-### 3. Face-Gate-Fehler verständlicher machen
-- `plate_target_face_missing...` wird nicht mehr als generischer Lip-Sync-Abbruch angezeigt.
-- Neue Meldung: „Im finalen Szene-Video ist das Zielgesicht an der Sprecherstelle nicht sichtbar oder anders positioniert; Koordinaten werden automatisch repariert / Clip muss neu gerendert werden.“
-- Dispatch-Logs bekommen zusätzlich `face_repair_source`, `reference_frame_number`, `original_coords`, `repaired_coords`.
+- Bei `total_passes >= 3` darf kein `partialMux` mehr als finales Ergebnis entstehen.
+- Wenn nach Retry-Budget nicht alle Pflichtsprecher erfolgreich sind:
+  - Szene bleibt nicht `done`/`applied`.
+  - `lip_sync_status` wird `failed` oder `retrying_sync3`.
+  - Credits werden idempotent refundet, falls kein automatischer Fallback mehr läuft.
+  - UI zeigt klar: “Charakter 1/3 konnte nicht gelip-synct werden”.
 
-### 4. Fake-`repair_audio` entfernen bzw. echt machen
-- Der aktuelle Retry-Pfad setzt `repair_audio=true`, aber `compose-dialog-segments` loggt nur „nicht implementiert“ und sendet dieselbe WAV erneut.
-- Ich werde diesen nutzlosen Retry entfernen oder durch eine echte timeline-erhaltende WAV-Reparatur ersetzen:
-  - keine Lead-In-Trimmung
-  - Dauer bleibt identisch zur Szene
-  - WAV-Header/PCM wird sauber neu geschrieben
-  - Upload einer reparierten Audio-Datei nur für den Retry
+### 2. Sync.so-Doku-konforme Sprecher-Gates verschärfen
 
-### 5. Webhook-State-Maschine stabilisieren
-- Wenn ein Pass final scheitert, aber weitere Passes noch pending sind, soll der Webhook sofort den nächsten pending Pass starten statt auf den Watchdog zu warten.
-- Der Audio-Mux-Compositor soll starten, sobald alle Passes terminal sind und mindestens ein gültiger Pass fertig ist, statt endlos auf „alle erfolgreich“ zu warten.
-- `final_url` wird aus dem letzten erfolgreichen Pass gewählt, nicht blind aus dem letzten Pass.
+In `compose-dialog-segments`:
 
-### 6. UI-Fortschritt für v5 Multi-Pass anzeigen
-- Die UI liest aktuell nur `dialog_shots.shots[]`; unsere Sync.so-Pipeline schreibt aber `dialog_shots.passes[]`.
-- Ich mappe `passes[]` auf die vorhandene Fortschrittsanzeige, damit du pro Sprecher siehst: pending, running, done, failed.
+- Für 3+ Sprecher akzeptieren wir eine Face-Gate-Reparatur nicht mehr, wenn im Frame weniger Gesichter erkannt wurden als Sprecher bzw. als sinnvolle Mindestanzahl.
+- Ein reparierter Sprecher darf nicht mehrfach auf denselben einzigen Face-Box-Slot fallen.
+- Wenn nur `face_count: 1` bei einer 3-Sprecher-Szene erkannt wird, wird nicht blind an Sync.so geschickt.
+- Stattdessen wird sofort ein sauberer Fallback ausgelöst: `sync-3` oder Szene/Plate neu rendern.
 
-### 7. Aktuelle Szene nach Deployment sauber neu starten
-- Nach den Änderungen wird die betroffene Szene `64b2ae86-c70d-4097-ae4e-89570edad884` zurückgesetzt, damit sie mit echter Plate-Face-Reparatur neu startet.
-- Danach prüfe ich Logs: Erst Face-Gate, dann Sync.so-Dispatch, dann Webhook/Fan-In-Mux.
+### 3. `sync-3` Fallback für schwierige 3-Sprecher-Szenen
 
-## Betroffene Dateien
+Nach offiziellen Docs ist `sync-3` genau für komplexe Winkel, Obstructions und statischere/schwierigere Gesichter gedacht.
+
+Ich baue eine begrenzte Fallback-Stufe:
+
+```text
+lipsync-2-pro coords
+→ lipsync-2-pro bbox
+→ sync-3 coords/bbox
+→ final fail + refund
+```
+
+Wichtig:
+
+- Kein `auto_detect` bei 3+ Sprechern, weil das Sprecher-Swaps erzeugen kann.
+- `sync-3` bekommt weiter manuelle Sprecherzielung über `active_speaker_detection`.
+- Retry wird pro Pass getrackt, damit ein erfolgreicher Sprecher nicht neu gerechnet werden muss.
+
+### 4. Doku-konformes Bounding-Box-Verhalten korrigieren
+
+Unsere aktuelle `coords-pro-box` Variante füllt denselben Box-Wert für jedes Frame.
+
+Sync.so beschreibt `bounding_boxes` als “pro-frame array”; das ist formal erlaubt, aber bei 3 Personen in einer dynamischen AI-Plate zu grob.
+
+Ich ändere die sichere Variante so:
+
+- Für kurze 3-Sprecher-Clips lieber `frame_number + coordinates`, wenn ein eindeutiger Frame existiert.
+- `bounding_boxes` nur nutzen, wenn die Box wirklich aus der echten Plate kommt und zum Zielsprecher gehört.
+- Keine synthetische Anchor-Box mehr als letzter Versuch für 3+ Sprecher.
+
+### 5. Output-Zustand und UI ehrlich machen
+
+In der Progress-/Statuslogik:
+
+- `applied/done` nur, wenn alle Pflichtsprecher-Passes `done` sind.
+- Wenn ein Pass scheitert, wird der betroffene Sprecher sichtbar aufgeführt.
+- Partial-Mux darf höchstens als Debug-/Preview-Zwischenstand gespeichert werden, nicht als finales `clip_url`.
+
+### 6. Betroffene Szene sauber zurücksetzen
+
+Nach der Änderung setze ich die aktuelle Szene `632370bc-7b58-466d-87d9-a65b8e163106` zurück, damit sie nicht weiter mit dem teilweise gemuxten Ergebnis arbeitet.
+
+Danach prüfe ich:
+
+- Dispatch-Logs: alle Sprecher haben eigene valide `frame_number + coordinates`.
+- Webhook-Logs: kein `partialMux` als Erfolg bei 3 Sprechern.
+- Ergebnis: entweder alle 3 Lippen bewegen sich oder die Szene scheitert sauber mit Refund/Fallback statt falschem “done”.
+
+## Dateien
+
 - `supabase/functions/compose-dialog-segments/index.ts`
-- `supabase/functions/_shared/syncso-preflight.ts`
 - `supabase/functions/sync-so-webhook/index.ts`
-- `supabase/functions/reset-lipsync-scene/index.ts` falls Reset stale Face-Reparaturen löschen muss
+- `supabase/functions/render-sync-segments-audio-mux/index.ts`
 - `src/components/video-composer/SceneClipProgress.tsx`
+- optional: `supabase/functions/reset-lipsync-scene/index.ts` für Reset alter Partial-Mux-Zustände
 
-## Erwartetes Ergebnis
-- Sync.so bekommt Koordinaten nach offizieller Anleitung: echte Frame-Nummer + echter Punkt auf dem Gesicht aus genau diesem Frame.
-- Szenen mit verschobenem Hailuo-Crop werden automatisch repariert statt sofort abzubrechen.
-- Szenen ohne sichtbare Gesichter scheitern früh mit klarer Ursache, ohne Credits bei Sync.so zu verbrennen.
-- Multi-Speaker-Retry und Webhook-Fortschritt laufen deterministischer und hängen nicht mehr im Zwischenstatus.
+## Ergebnis
+
+Nach Umsetzung darf es nicht mehr passieren, dass eine 3-Sprecher-Szene als fertig gilt, wenn nur ein Charakter erfolgreich gelip-synct wurde. Entweder alle Pflichtsprecher funktionieren, oder die Pipeline wechselt auf den passenden Sync.so-Fallback bzw. bricht sauber mit Refund und klarer Ursache ab.
