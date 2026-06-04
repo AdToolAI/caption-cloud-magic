@@ -122,6 +122,21 @@ function prepareRetryFromWebhook(shot: any, reason: string, allShots: any[]): bo
   return true;
 }
 
+function triggerV5Advance(supabaseUrl: string, serviceKey: string, sceneId: string, passIdx: number, totalPasses: number) {
+  fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+    body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: passIdx }),
+  }).catch(() => {});
+  console.log(`[sync-so-webhook] v5 scene=${sceneId} advancing pending pass ${passIdx + 1}/${totalPasses}`);
+}
+
+function terminalV5Counts(passes: any[]) {
+  const doneCount = passes.filter((p: any) => p?.status === "done").length;
+  const failedCount = passes.filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? ""))).length;
+  return { doneCount, failedCount, allTerminal: doneCount + failedCount >= passes.length };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
