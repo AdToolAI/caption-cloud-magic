@@ -58,7 +58,7 @@ serve(async (req) => {
   // Ownership: scene → project → user
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, project_id, dialog_shots, lip_sync_applied_at")
+    .select("id, project_id, dialog_shots, lip_sync_applied_at, audio_plan")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
