@@ -111,6 +111,15 @@ serve(async (req) => {
       const hasAnyRecordedProviderJob = hasSyncJob || hasHeartbeat || jobs.length > 0;
       const dialogState = (s as any).dialog_shots;
       const isDialogShotPipeline = dialogState?.version === 4;
+      // v5 "segments" pipeline (compose-dialog-segments + sync-so-webhook)
+      // owns its own retry ladder, circuit breaker and per-pass refund.
+      // The legacy watchdog has no idea about `passes[]` and would otherwise
+      // overwrite real provider errors with `sync_so_timeout_8min`.
+      const isV5SegmentsPipeline =
+        dialogState?.version === 5 && Array.isArray(dialogState?.passes);
+      if (isV5SegmentsPipeline) {
+        continue;
+      }
 
       // ── v9 Artlist pipeline: server-side poll/retry, including stitching ─
       // A scene with all turns ready can sit at `lip_sync_status='stitching'`
@@ -130,6 +139,7 @@ serve(async (req) => {
         }
         continue;
       }
+
 
       // ── Job 0: ZOMBIE STATE — lipsync_* stage but no real provider job.
       // This is the "stuck at 95%" symptom: client reset status to pending
