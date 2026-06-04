@@ -944,7 +944,7 @@ serve(async (req) => {
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v46 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
+            `[compose-dialog-segments] scene=${sceneId} v47 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -955,49 +955,48 @@ serve(async (req) => {
             .update({
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: "v41_no_segments_built",
+              clip_error: "v47_no_segments_built",
             })
             .eq("id", sceneId);
-          return json({ error: "v41_no_segments_built" }, 422);
+          return json({ error: "v47_no_segments_built" }, 422);
         }
 
         // Pre-dispatch validation: every segment refId must exist in inputs.
         const inputRefSet = new Set(
-          v41Inputs.filter((i) => i.type === "audio").map((i: any) => i.ref_id ?? i.refId),
+          v41Inputs.filter((i) => i.type === "audio").map((i: any) => i.refId),
         );
         for (const seg of v41Segments) {
           const refId = (seg as any).audioInput?.refId;
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
-              `[compose-dialog-segments] scene=${sceneId} v46 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
+              `[compose-dialog-segments] scene=${sceneId} v47 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
             );
             await supabase
               .from("composer_scenes")
-              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v46_segment_refid_missing" })
+              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v47_segment_refid_missing" })
               .eq("id", sceneId);
-            return json({ error: "v46_segment_refid_missing", refId }, 422);
+            return json({ error: "v47_segment_refid_missing", refId }, 422);
           }
         }
 
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v46 — docs-exact model: lipsync-2-pro is the only model that
+        // v47 — docs-exact model: lipsync-2-pro is the only model that
         // supports `segments[]` per the official Multi-Speaker Segments
-        // example. sync-3 silently ignores segments (full-shot global model)
-        // — that was the v45 regression.
-        const V46_MODEL = LIPSYNC_MODEL; // "lipsync-2-pro"
+        // example. sync-3 silently ignores segments (full-shot global model).
+        const V47_MODEL = LIPSYNC_MODEL; // "lipsync-2-pro"
         const v41Payload = {
-          model: V46_MODEL,
+          model: V47_MODEL,
           input: v41Inputs,
           segments: v41Segments,
           options: { sync_mode: "cut_off" },
+          // Only the documented camelCase `webhookUrl` field.
           webhookUrl: v41Webhook,
-          webhook_url: v41Webhook,
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v46_official_segments_payload model=${V46_MODEL} asd=coords ` +
+          `[compose-dialog-segments] scene=${sceneId} v47_official_segments_payload model=${V47_MODEL} asd=plate_native ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off video=${videoDims.width}x${videoDims.height}`,
         );
@@ -1011,7 +1010,7 @@ serve(async (req) => {
         if (!v41Resp.ok) {
           const errTxt = await v41Resp.text().catch(() => "");
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v41 dispatch FAILED status=${v41Resp.status} body=${errTxt.slice(0, 600)}`,
+            `[compose-dialog-segments] scene=${sceneId} v47 dispatch FAILED status=${v41Resp.status} body=${errTxt.slice(0, 600)}`,
           );
           const alreadyRefunded = !!(v41PrevState as any)?.refunded;
           if (!alreadyRefunded && !isV41Retry) {
@@ -1020,7 +1019,7 @@ serve(async (req) => {
             await supabase
               .from("wallets")
               .update({
-                balance: Number(wRef?.balance ?? 0) + totalCost,
+                balance: Number(wRef?.balance ?? 0) + v47Cost,
                 updated_at: new Date().toISOString(),
               })
               .eq("user_id", userId);
@@ -1030,43 +1029,43 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 46,
+                version: 47,
                 engine: "sync-official-segments",
-                asd_mode: "coordinates",
+                asd_mode: "plate_native",
                 status: "failed",
                 model: "lipsync-2-pro",
-                cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
+                cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
                 refunded: !alreadyRefunded,
-                error: `v46_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v47_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v46_dispatch_${v41Resp.status}`,
+              clip_error: `v47_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-            sync_source_kind: "v46_segments", video_url: sourceClipUrl,
+            sync_source_kind: "v47_segments", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
             meta: { payload_summary: { model: "lipsync-2-pro", segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
-          return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
+          return json({ error: "v47_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
 
         const v41Data = await v41Resp.json();
         const v41Shape = validateSyncResponseShape(v41Data);
         if (!v41Shape.ok) {
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v41 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
+            `[compose-dialog-segments] scene=${sceneId} v47 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
           );
-          return json({ error: "v41_schema_drift", missing: v41Shape.missingKeys }, 502);
+          return json({ error: "v47_schema_drift", missing: v41Shape.missingKeys }, 502);
         }
         const v41JobId = String(v41Data.id ?? "");
-        if (!v41JobId) return json({ error: "v41_no_job_id" }, 502);
+        if (!v41JobId) return json({ error: "v47_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
           job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments",
@@ -1076,9 +1075,9 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 46,
+          version: 47,
           engine: "sync-official-segments",
-          asd_mode: "coordinates",
+          asd_mode: "plate_native",
           status: "rendering",
           model: "lipsync-2-pro",
           sync_job_id: v41JobId,
@@ -1086,7 +1085,7 @@ serve(async (req) => {
           total_sec: totalSec,
           segments: v41Segments,
           speaker_refs: v41SpeakerRefs,
-          cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
+          cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
           refunded: false,
           retry_count: v41RetryCount,
           started_at: v41PrevState?.first_started_at ?? v41NowIso,
@@ -1100,7 +1099,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v46_official_segments",
+            twoshot_stage: "syncso_v47_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1110,12 +1109,12 @@ serve(async (req) => {
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-          job_id: v41JobId, sync_source_kind: "v46_segments",
+          job_id: v41JobId, sync_source_kind: "v47_segments",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: "sync-3",
+            model: "lipsync-2-pro",
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             input_refs: v41SpeakerRefs.map((s) => s.refId),
