@@ -18,8 +18,8 @@ Updated: today
 - **Lip-Sync Multi-Speaker (v46)**: For 3+ speaker scenes, `compose-dialog-segments` sends the canonical Sync.so Segments payload exactly as documented: `model: "lipsync-2-pro"` (sync-3 silently ignores segments[]), per-segment ASD `{frame_number, coordinates}` only (no `auto_detect` — variants are exclusive), `options.sync_mode: "cut_off"`, audio inputs carry both `ref_id` and `refId`. Webhook accepts v41–v46. Refund idempotent on dispatch fail. See `mem://architecture/lipsync/v46-lipsync2pro-official-segments`.
 
 ## Memories
-- [v43 Bounding-Boxes ASD](mem://architecture/lipsync/v43-bounding-boxes-asd) — Per-frame `bounding_boxes` ASD for 3+ speakers; faceMap → plate-space + pad; retry escalates pad 0.08→0.18→0.28
-- [v41/v42 Official Segments (superseded)](mem://architecture/lipsync/v41-official-segments-payload) — Canonical Sync.so multi-speaker shape, superseded by v43
+- [v46 Official Segments (current)](mem://architecture/lipsync/v46-lipsync2pro-official-segments) — docs-exact lipsync-2-pro + frame_number/coordinates ASD + ref_id/refId both; webhook v41–v46
+- [v41–v45 Lip-Sync (superseded)](mem://architecture/lipsync/v43-bounding-boxes-asd) — historical iterations
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
 - [Sync-3 Fallback + Identity Soft-Pass v37](mem://architecture/lipsync/sync-3-fallback-and-identity-soft-pass-v37) — sync-3 retry variant + identity-match face-gate soft-pass for 3+ speakers
 - [Multi-Speaker Honesty Policy v36](mem://architecture/lipsync/multi-speaker-honesty-policy-v36) — Partial-mux forbidden for 3+ speakers; full refund on missing speaker
