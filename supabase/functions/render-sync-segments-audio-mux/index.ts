@@ -183,16 +183,27 @@ serve(async (req) => {
       donePasses.length <= 2 ? minAxis * 0.22 :
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
-    // v38 — Per-turn windowed overlay. Each pass's Sync.so output is overlaid
-    // ONLY during that speaker's voiced turn window(s); the rest of the time
-    // the master plate underneath is visible. This guarantees no cross-speaker
-    // mouth-animation leakage even if Sync.so's internal timing drifts.
-    // A small ~0.08s pad on each end keeps consonant onsets/offsets natural
-    // and mirrors `segments_secs` sent to Sync.so in compose-dialog-segments.
+    // v38/v39 — Per-turn windowed overlay. Each pass's Sync.so output is
+    // overlaid ONLY during that speaker's voiced turn window(s); the rest
+    // of the time the master plate underneath is visible. This guarantees
+    // no cross-speaker mouth-animation leakage even if Sync.so's internal
+    // timing drifts. A small ~0.08s pad on each end keeps consonant
+    // onsets/offsets natural and mirrors `segments_secs` sent to Sync.so.
+    //
+    // v39 — When the pass was dispatched with a TIGHT per-turn WAV
+    // (`audio_tight` field set in compose-dialog-segments), Sync.so's
+    // output already equals the turn duration and starts with animation
+    // at t=0. We tag the shot `sourceTiming: 'relative'` so the Remotion
+    // compositor plays it from the output's own t=0 instead of seeking to
+    // the absolute timeline frame — making the pipeline INDEPENDENT of
+    // the deployed Lambda bundle version (old bundles ignore the unknown
+    // field and default to relative play; new bundles honour it).
     const SHOT_PAD = 0.08;
     const fanoutShots = isFanout
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
+          const isTight = !!(p as any).audio_tight;
+          const sourceTiming: "relative" | "absolute" = isTight ? "relative" : "absolute";
           const faceMask = {
             cx: Number(p.coords[0]),
             cy: Number(p.coords[1]),
@@ -204,6 +215,7 @@ serve(async (req) => {
               endSec: totalSec,
               outputUrl: String(p.output_url),
               faceMask,
+              sourceTiming,
             }];
           }
           return passSegs
@@ -216,6 +228,7 @@ serve(async (req) => {
                 endSec: e,
                 outputUrl: String(p.output_url),
                 faceMask,
+                sourceTiming,
               };
             })
             .filter(Boolean);

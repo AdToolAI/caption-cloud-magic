@@ -62,6 +62,7 @@ import {
   inspectWav,
   logSyncDispatch,
   normalizeWav,
+  sliceWavToWindows,
   openCircuit,
   probeAsset,
   readPreferredSyncSourceKind,
@@ -1304,9 +1305,56 @@ serve(async (req) => {
       })
       .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s + 0.05);
 
+    // ── v39 — Per-Turn Tight WAV ─────────────────────────────────────────
+    // For multi-speaker scenes we slice this pass's silence-padded WAV down
+    // to ONLY the speaker's voiced turn windows. Sync.so then receives an
+    // audio file that equals the turn duration; with `sync_mode=cut_off`
+    // the output video is naturally cut to that length and animation starts
+    // at output-t=0. The Remotion compositor can replay it at the original
+    // absolute timeline with a plain `<Sequence from={turnStart}>` and NO
+    // `startFrom` seek — making the pipeline INDEPENDENT of the deployed
+    // Lambda bundle version (v38 needed a bundle-redeploy; v39 doesn't).
+    let tightAudioInfo: { url: string; durSec: number } | null = null;
+    if (passes.length >= 2 && speakerWindowsSecs.length > 0) {
+      try {
+        const wavResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
+        if (!wavResp.ok) throw new Error(`fetch ${wavResp.status}`);
+        const wavBytes = new Uint8Array(await wavResp.arrayBuffer());
+        const sliced = sliceWavToWindows(
+          wavBytes,
+          speakerWindowsSecs.map(([s, e]) => ({ startSec: s, endSec: e })),
+          { gapSec: 0.05 },
+        );
+        const tightPath = `${userId}/twoshot-vo/${sceneId}-pass-${pass.idx + 1}-tight-${Date.now()}.wav`;
+        const up = await supabase.storage.from("voiceover-audio").upload(
+          tightPath,
+          sliced.bytes,
+          { contentType: "audio/wav", upsert: true },
+        );
+        if (up.error) throw new Error(`upload: ${up.error.message}`);
+        const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(tightPath);
+        if (!pub?.publicUrl) throw new Error("publicUrl missing");
+        (pass as any).audio_url_full = pass.audio_url;
+        pass.audio_url = pub.publicUrl;
+        (pass as any).audio_tight = {
+          url: pub.publicUrl,
+          dur_sec: Number(sliced.durSec.toFixed(3)),
+          windows_secs: speakerWindowsSecs,
+        };
+        tightAudioInfo = { url: pub.publicUrl, durSec: sliced.durSec };
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight_audio dur=${sliced.durSec.toFixed(2)}s windows=${JSON.stringify(speakerWindowsSecs)} url=${pub.publicUrl.slice(0, 80)}`,
+        );
+      } catch (sliceErr) {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight_audio_failed: ${(sliceErr as Error)?.message} — falling back to full-length WAV + segments_secs`,
+        );
+      }
+    }
+
     const syncOptions: Record<string, unknown> = {
-      // cut_off = "cut to shortest input length". Our per-speaker WAV is
-      // silence-padded to the full scene plate, so output stays full-length.
+      // cut_off = "cut to shortest input length". With v39 tight audio the
+      // per-speaker WAV equals the turn duration, so output is naturally tight.
       sync_mode: "cut_off",
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords") {
@@ -1391,11 +1439,12 @@ serve(async (req) => {
           ? LIPSYNC_FALLBACK_MODEL
           : LIPSYNC_MODEL;
 
-    // v38 — Restrict animation window to this speaker's turn(s) via
-    // segments_secs on the VIDEO input. Only applied for multi-speaker scenes
-    // (≥2 passes); single-speaker monologues need the full plate.
+    // v38/v39 — Restrict animation window via segments_secs ONLY when the
+    // tight-audio slicer failed (fallback path). With v39 tight audio
+    // active, the audio itself equals the turn duration so segments_secs
+    // becomes redundant and we omit it to avoid double-cutting issues.
     const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
-    if (passes.length >= 2 && speakerWindowsSecs.length > 0) {
+    if (passes.length >= 2 && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       videoInput.segments_secs = speakerWindowsSecs;
     }
     const payload: Record<string, unknown> = {
@@ -1409,7 +1458,7 @@ serve(async (req) => {
       webhook_url: diagnosticWebhookUrl,
     };
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v38_windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "fallback_full+segments"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
 
     // ── Length sanity log ────────────────────────────────────────────────

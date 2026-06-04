@@ -1,104 +1,71 @@
-# v38 — Per-Turn Tight-Window Lip-Sync (Sync.so-konform)
+## Befund aus den echten Daten (Scene `55608377…`)
 
-## Was du im Video siehst
+`dialog_shots` für die jüngste Szene zeigt:
 
-- Sprecher 1: korrekt synchron.
-- Sprecher 2: VO läuft, Lippen bleiben zu — Lippenbewegung erscheint erst, wenn schon Sprecher 3 redet.
-- Sprecher 3: wieder korrekt.
+- `engine: sync-segments`, `multi_pass: true`, `total_passes: 3`, `status: done`, `final_url` gesetzt.
+- Alle 3 Passes laufen **parallel** (nicht chained): `input_url` ist für Pass 1/2/3 identisch = die rohe Master-Plate. Jeder Pass animiert nur seinen Sprecher.
+- Pass-Zeiten: Samuel 0–2.37s, Matthew 2.62–3.55s, Kailee 3.80–6.68s.
+- `coords` korrekt pro Gesicht, `retry_variant: coords-pro` für alle Passes, kein Fehler-Refund.
+- Pass 3 (Kailee) brauchte 4:50 min — daher die 10-Min-Fehlermeldung (vermutlich ein zwischenzeitlicher Sync.so-Watchdog-Hit), aber er ist trotzdem `done` geworden.
 
-Das ist kein Face-Targeting-Fehler. Das Gesicht von Sprecher 2 wird richtig getroffen. Es ist ein **Audio/Video Timing-Versatz** im Sync.so-Output für Sprecher 2.
+## Warum nur Sprecher 1 Lip-Sync zeigt — die echte Schwachstelle
 
-## Warum es passiert (konkret, mit Quellen)
-
-Unsere v25-Fan-Out-Pipeline schickt pro Sprecher einen Sync.so-Call mit:
-- der vollständigen Master-Plate (0…totalSec)
-- einer **full-length WAV** in der die Stimme des Sprechers an seinem Turn-Offset eingebettet ist, der Rest ist Stille
-  - z.B. Sprecher 2: `[~3.5s Stille][~2.5s Sprache][~3s Stille]`
-- `options.active_speaker_detection.frame_number` = **Mittelpunkt** des ersten Turns dieses Sprechers (`compose-dialog-segments/index.ts:1280`)
-- KEIN `segments[]`, KEIN `segments_secs` auf dem Video-Input
-
-Das Resultat (Hypothese 1 + 2 aus der Code-Analyse):
-1. Sync.so `lipsync-2-pro` detektiert den Voiced-Onset in der WAV und ankert die Lippenanimation um den übergebenen `frame_number` herum (Turn-Mittelpunkt ≈ t=4.75s bei Sprecher 2).
-2. Die ~2.5s Sprachanimation laufen dann ab Mittelpunkt → enden ~7.25s → **landen genau in Sprecher 3's Fenster.**
-3. Sprecher 1 fällt nicht auf, weil Start ≈ 0s. Sprecher 3 fällt nicht auf, weil Overshoot in End-Stille läuft.
-
-Zusätzlich: der Face-Mask-Compositor (`render-sync-segments-audio-mux/index.ts:186` + `DialogStitchVideo.tsx:265`) blendet **jeden Sprecher-Output über die volle Szenendauer** ein. Es gibt keine Zeit-Fenster-Begrenzung pro Sprecher. Dadurch ist der Versatz von Sprecher 2 ungekürzt sichtbar.
-
-## Was Sync.so offiziell vorgibt
-
-Doku: https://sync.so/docs/developer-guides/speaker-selection und https://sync.so/docs/api-reference/endpoints/generate
-
-Für Multi-Speaker mit klaren Turn-Fenstern ist der dokumentierte Weg:
-- pro Audio einen `segments_secs: [[start, end]]` auf dem Video-Input, der das Video-Fenster auf den Turn beschränkt
-- `optionsOverride.active_speaker_detection.frame_number` = ein Frame **innerhalb** dieses Fensters mit sichtbarem Gesicht
-- `coordinates` in Plate-Pixel-Space
-
-Wir machen das aktuell nicht — wir senden Volltext-Plate + Volltext-WAV und überlassen Sync.so das Alignment.
-
-## Plan
-
-### 1. Per-Turn-Tight-Audio statt Full-Length-Silence-WAV
-
-`compose-dialog-segments` baut pro Pass nicht mehr eine 9s-WAV mit eingebetteter Stimme, sondern eine **tight WAV** = nur der voiced Bereich des Turns plus ~0.15s Lead-In/Lead-Out. Wenn ein Sprecher mehrere Turns hat: pro Turn ein eigener Pass mit eigenem Audio.
-
-Effekt: Sync.so kann die Voiced-Onset-Heuristik nicht mehr "ankern lassen", weil die WAV bei t≈0 startet und bei t≈turnDur endet. Die Animation muss zwangsläufig im Turn-Fenster liegen.
-
-### 2. Video-Input mit `segments_secs` auf den Turn beschränken
-
-Im Sync.so-Payload pro Pass:
+v38 verlässt sich darauf, dass das Compositor-Template `DialogStitchVideo.tsx` die **neue** `startFrom`-Prop auf `FaceMaskOverlay` rendert:
 
 ```text
-input: [
-  { type: "video", url: plateUrl, segments_secs: [[turnStart, turnEnd]] },
-  { type: "audio", url: tightTurnAudioUrl }
-],
-options: {
-  sync_mode: "cut_off",
-  active_speaker_detection: {
-    auto_detect: false,
-    frame_number: floor(turnStart * fps) + faceVisibleOffset,
-    coordinates: [cx, cy]
-  }
-}
+<Sequence from={startFrame}>                  // Window startet bei Sprecher-Turn
+  <Video startFrom={startFrame} ... />        // <-- entscheidend: Seek in die Sync-Output-Zeitachse
+</Sequence>
 ```
 
-Dadurch ist der Sync.so-Output exakt so lang wie der Turn und kann nicht mehr in ein anderes Sprecher-Fenster ragen.
+Sync.so liefert pro Pass eine **stille-gepaddete Volllängen-Datei**, in der die Mund-Animation nur im `segments_secs`-Fenster des jeweiligen Sprechers liegt (Matthew: Frames 76–109, Kailee: Frames 114–203). Ohne den `startFrom`-Seek spielt das `<Video>` ab Frame 0 → es zeigt nur die geschlossen-stillen ersten ~1.1s der Datei → keine Lippenbewegung sichtbar.
 
-### 3. `frame_number` = Turn-Start (mit Face-Visible-Offset), nicht Mittelpunkt
+**Genau das ergibt das gemeldete Bild:**
+- Sprecher 1: Window startet bei Frame 0, Animation auch bei Frame 0 → richtig (egal ob altes oder neues Bundle).
+- Sprecher 2/3: Window startet später → ohne `startFrom`-Seek nur Stille zu sehen.
 
-Mittelpunkt-Anker ist die wahrscheinlichste Ursache für die Vorverlagerung der Animation. Wir nehmen den ersten Frame im Turn-Fenster, in dem `validate-frame-face` ein passendes Gesicht an den Koordinaten meldet (Face-Gate existiert schon, `validate-frame-face` Edge Function).
+`DialogStitchVideo.tsx` wurde im Repo zwar im letzten Loop auf v38 gepatcht, aber das **deployte Remotion-Lambda-Bundle** wird mit `scripts/deploy-remotion-bundle.sh` separat gebaut. Solange dieses Script nicht läuft, rendert Lambda weiterhin die alte Template-Version. Die Pipeline ist also korrekt — die deployte Render-Engine hinkt nur hinterher.
 
-### 4. Compositor: Sprecher-Output nur im eigenen Turn-Fenster overlayen
+Memory `mem://infrastructure/remotion/lambda-bundle-deployment-and-verification` schreibt einen Bundle-Versions-Check vor; der greift derzeit nicht für `render-sync-segments-audio-mux`.
 
-`render-sync-segments-audio-mux` + `DialogStitchVideo.FaceMaskOverlay`:
-- statt `startSec: 0, endSec: totalSec` → `startSec: turnStart, endSec: turnEnd` pro Pass
-- `<Sequence from={turnStartFrame} durationInFrames={turnDurFrames}>` mit `<Video startFrom={0}>` auf dem (jetzt tight) Sync.so-Output
+## Plan v39 — zwei-stufige Härtung
 
-So ist garantiert: außerhalb seines Turn-Fensters ist der Sprecher-Output schlicht nicht im Bild.
+### Stufe A — Pipeline bundle-unabhängig machen (Hauptfix)
 
-### 5. Sync-3 Fallback unverändert lassen
+Per-Pass-Output **server-seitig auf das Sprecher-Fenster trimmen**, bevor wir an Lambda übergeben. Dann reicht das alte `<Video>`-Verhalten (`from={startFrame}`, kein `startFrom`-Seek nötig) — alte und neue Bundle-Versionen rendern identisch korrekt.
 
-Das v37 Retry-Ladder (`coords-pro → coords-pro-box → sync3-coords → auto-pro`) bleibt. Nur die Payload-Form ändert sich.
+Konkret in `supabase/functions/render-sync-segments-audio-mux/index.ts`:
 
-### 6. Verifikation vor Release
+1. Vor dem Lambda-Dispatch für jeden `donePass` mit Turn-Fenstern eine Remotion-Lambda-`stillRender`-Stil-Trim-Composition aufrufen (oder eine kleine neue `TrimVideo`-Composition, die `<OffthreadVideo startFrom>` nutzt und `durationInFrames = windowFrames` setzt). Output landet in `dialog-shots-trimmed/{sceneId}/pass-{idx}-turn-{i}.mp4`.
+2. Ergebnis-URLs werden im `fanoutShots`-Array statt `outputUrl: p.output_url` verwendet — jeder Shot zeigt dann ein Video, dessen Frame 0 echt die Animation enthält.
+3. Die Trim-URLs werden in `dialog_shots.passes[].trimmed_urls[]` persistiert (für Recovery/Debug).
+4. Wenn Trim fehlschlägt (Lambda-Timeout o.Ä.), Fallback auf bisherige `startFrom`-Variante mit deutlichem Log-Marker `v39_trim_skipped` — keine Schweigeflugzonen.
 
-- Eine 3-Sprecher-Testszene fahren.
-- Die rohen Sync.so-Output-URLs aus `dialog_shots.passes[].output_url` herunterladen und einzeln anschauen.
-- Erwartung: jedes Pass-Video ist nur noch `turnDur` Sekunden lang und zeigt die Lippenanimation von Sekunde 0 bis turnDur — sauber synchron zur tight WAV.
-- Erst danach den finalen Compositor-Mux ansehen.
+Vorteil: WYSIWYG für jede Lambda-Bundle-Version, kein manueller Deploy mehr nötig, Pass-Output bleibt unverändert nachprüfbar (wir trimmen, wir lipsyncen nicht neu).
 
-### 7. Memory + Doku
+Alternative wenn Lambda-Trim zu schwergewichtig wirkt: ffmpeg über eine dedizierte Container-Edge-Function (kein Edge-Runtime, da ffmpeg dort verboten ist — also via Lambda). Lambda-Trim ist der pragmatische Weg.
 
-- Neue Memory: `mem://architecture/lipsync/per-turn-tight-window-v38`.
-- v25 Multi-Pass-Architektur bleibt, aber Payload-Schicht ist jetzt Sync.so-konform pro Turn.
+### Stufe B — Bundle-Drift-Wächter
 
-## Technische Details (für später)
+In `render-sync-segments-audio-mux` vor jedem Dispatch:
 
-- `compose-twoshot-audio` produziert schon `voicedRange.turns[]` mit `startSec/endSec/_startSample/_endSample`. Wir bauen daraus per Turn eine eigene WAV durch Slicing der Original-Speech-Samples (kein neues TTS).
-- Wenn ein Sprecher zwei Turns hat → zwei Passes für denselben Sprecher mit denselben Koordinaten.
-- `pass.window_start_sec` / `pass.window_end_sec` werden bereits gespeichert; der Compositor liest sie statt 0/totalSec.
-- Backwards-Compat: 1- und 2-Sprecher-Pfade bleiben unberührt (sie funktionieren bereits).
+1. Aus `system_config.remotion.bundle` die deployte `bundleId` + Build-Hash lesen.
+2. Mit dem zur Build-Zeit eingebetteten `__BUNDLE_TEMPLATE_HASHES.DialogStitchVideo` vergleichen (kleine `scripts/deploy-remotion-bundle.sh`-Erweiterung schreibt diese Map nach jedem Build).
+3. Bei Drift: `bundle_drift_detected` in `dialog_shots.audio_mux` markieren, Status auf `failed`, Refund, klare Fehlermeldung in UI: *„Render-Bundle ist veraltet — Admin: `scripts/deploy-remotion-bundle.sh` ausführen."*
 
-## Erwartetes Ergebnis
+So fällt das Problem in Zukunft sofort auf, statt sich als „nur Sprecher 1 spricht" zu tarnen.
 
-Sprecher 2 öffnet den Mund exakt dann, wenn seine Stimme zu hören ist — weil Sync.so ein 2.5s-Video aus einem 2.5s-Audio gegen ein 2.5s-Video-Fenster rendert. Keine Vorverlagerung, keine Verschiebung in ein anderes Sprecher-Fenster mehr möglich.
+### Stufe C — Verifikation an Live-Szene `55608377…`
+
+1. Reset via `useResetLipSync` → frischer Run mit v39.
+2. Sync.so-Pass-Outputs unverändert prüfen (`dialog_shots.passes[].output_url`) — müssen weiter die 3 Volllängen-Dateien sein.
+3. Neue `passes[].trimmed_urls[]` einzeln im Browser öffnen — jede muss ab Frame 0 sofort Mundbewegung zeigen und exakt `turnDur` Sekunden lang sein.
+4. Finale `final_url` im UI prüfen: alle drei Sprecher synchron in ihren eigenen Fenstern.
+5. Memory aktualisieren: `mem://architecture/lipsync/bundle-independent-per-turn-trim-v39`.
+
+## Out of Scope
+
+- Sync.so-Modellwahl / Retry-Ladder (v37 bleibt unverändert).
+- `compose-dialog-segments` Payload (v38 `segments_secs` + Turn-Start-Frame bleibt — wir nutzen es weiter, nur Compositor-Vertrauensbasis wird gehärtet).
+- 1- und 2-Sprecher-Pfade — werden vom Trim-Schritt nur durchgereicht, keine Verhaltensänderung.
+- Sora/Hailuo/Vidu Pipeline — nicht betroffen.
