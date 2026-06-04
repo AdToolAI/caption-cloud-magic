@@ -15,10 +15,11 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Multi-Speaker (v46)**: For 3+ speaker scenes, `compose-dialog-segments` sends the canonical Sync.so Segments payload exactly as documented: `model: "lipsync-2-pro"` (sync-3 silently ignores segments[]), per-segment ASD `{frame_number, coordinates}` only (no `auto_detect` — variants are exclusive), `options.sync_mode: "cut_off"`, audio inputs carry both `ref_id` and `refId`. Webhook accepts v41–v46. Refund idempotent on dispatch fail. See `mem://architecture/lipsync/v46-lipsync2pro-official-segments`.
+- **Lip-Sync Pipeline (v48 canonical)**: Single active 3+ speaker path = `compose-dialog-scene` → `compose-dialog-segments` (v5 multi-pass, one Sync.so call per speaker, chained) → `sync-so-webhook` → `render-sync-segments-audio-mux`. Official Sync.so single-call segments + bounding_boxes is STRUCTURALLY broken with `lipsync-2-pro` (proven repeatedly) — do not try to replace v5 multi-pass with it. Legacy two-shot stack deleted. See `mem://architecture/lipsync/v48-cleanup`.
 
 ## Memories
-- [v46 Official Segments (current)](mem://architecture/lipsync/v46-lipsync2pro-official-segments) — docs-exact lipsync-2-pro + frame_number/coordinates ASD + ref_id/refId both; webhook v41–v46
+- [Lip-Sync Cleanup v48 (current)](mem://architecture/lipsync/v48-cleanup) — Single canonical pipeline, legacy two-shot deleted, partial-mux race fixed in COMPLETED webhook branch
+- [v46 Official Segments (superseded)](mem://architecture/lipsync/v46-lipsync2pro-official-segments) — failed single-call attempt, kept for context
 - [v41–v45 Lip-Sync (superseded)](mem://architecture/lipsync/v43-bounding-boxes-asd) — historical iterations
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
 - [Sync-3 Fallback + Identity Soft-Pass v37](mem://architecture/lipsync/sync-3-fallback-and-identity-soft-pass-v37) — sync-3 retry variant + identity-match face-gate soft-pass for 3+ speakers
