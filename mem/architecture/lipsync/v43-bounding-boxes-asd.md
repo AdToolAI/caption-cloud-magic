@@ -1,6 +1,6 @@
 ---
 name: v43 Bounding-Boxes ASD for Multi-Speaker Segments
-description: For 3+ speaker dialog scenes, compose-dialog-segments now sends Sync.so's official per-frame `active_speaker_detection: { bounding_boxes: [null, ..., [x1,y1,x2,y2], ...] }` per segment instead of v42's `{ frame_number, coordinates: [x,y] }`. Boxes come from faceMap (anchor → plate-space rescale + pad) with fallback to a square around the point. Pad escalates on retry (0.08 → 0.18 → 0.28) so shoulder-to-shoulder shots where the face drifts a few px off the point no longer return "An unknown error occurred." after 10–13 min.
+description: For 3+ speaker dialog scenes, compose-dialog-segments now sends Sync.so's official per-frame `active_speaker_detection: { bounding_boxes: [[x1,y1,x2,y2], ...] }` per segment instead of v42's `{ frame_number, coordinates: [x,y] }`. The resolved target speaker box is repeated across frames. Boxes come from faceMap (anchor → plate-space rescale + pad) with fallback to a square around the point. Pad escalates on retry (0.08 → 0.18 → 0.28) so shoulder-to-shoulder shots where the face drifts a few px off the point no longer return "An unknown error occurred." after 10–13 min.
 type: architecture
 ---
 
@@ -23,7 +23,7 @@ POST https://api.sync.so/v2/generate
       audioInput: { refId: "speaker_N", startTime, endTime },
       optionsOverride: {
         active_speaker_detection: {
-          bounding_boxes: [null, ..., [x1, y1, x2, y2], ..., null]   // v43 per-frame array
+          bounding_boxes: [[x1, y1, x2, y2], ..., [x1, y1, x2, y2]]   // v43 per-frame array
         }
       } },
     ...
