@@ -337,9 +337,13 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         const RETRYABLE_ERRORS = new Set([
           'watchdog_stuck_lipsync_refunded',
         ]);
-        const RETRYABLE_REGEX = /^(syncso_circuit_open|syncso_concurrency|http_429|audio_mux_dispatch)/i;
+        // v32: `syncso_circuit_open` removed — circuit-open is a backend wait
+        // state owned by the server-side watchdog. Auto-retrying from the
+        // client just hits the open circuit again and creates a pending/
+        // circuit_open loop. The watchdog finalises the scene after TTL.
+        const RETRYABLE_REGEX = /^(syncso_concurrency|http_429|audio_mux_dispatch)/i;
         // Reasons that must NEVER auto-retry — surfaced to the user as terminal.
-        const HARD_FAIL_REGEX = /^(cast_invalid_|source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|dialog_pipeline_no_per_speaker_tracks|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_|dialog_missing_face_coords|raw_talking_head_source_blocked|dialog_shots_failed|syncso_segments_FAILED|sync_FAILED|multi_speaker_)/i;
+        const HARD_FAIL_REGEX = /^(cast_invalid_|source_clip_unusable|source_clip_missing_speakers|no_voiceover|tts_failed|INSUFFICIENT_CREDITS|dialog_pipeline_missing_audio_plan|dialog_pipeline_no_turns|dialog_pipeline_no_per_speaker_tracks|cinematic_sync_anchor_missing|anchor_missing_speakers|anchor_extra_person_detected|anchor_identity_|dialog_missing_face_coords|raw_talking_head_source_blocked|dialog_shots_failed|syncso_segments_FAILED|sync_FAILED|multi_speaker_|syncso_provider_unknown_no_code_after_retries|syncso_circuit_open)/i;
         
 
         const candidates = (data as any[]).filter((d) => {
@@ -355,11 +359,11 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           if (inflight.current.has(d.id)) return false;
           if (autoRetried.current.has(d.id)) return false;
           // Treat ALL early stages as "not ready" — only 'master_clip' (Hailuo
-          // master rendered, audio plan written), 'failed' (retry), and
-          // wartende v5-Backend-Stages ('deferred', 'circuit_open') qualify.
-          // 'audio'/'preflight'/'anchor' bedeuten die Audio-Plate ist noch
-          // nicht da → würde sonst 422 missing_audio_plan auslösen.
-          const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed', 'deferred', 'circuit_open']);
+          // master rendered, audio plan written) and 'failed' (retry) qualify.
+          // v32: `circuit_open` and `deferred` are server-owned wait states
+          // — DO NOT auto-advance them from the client, otherwise we re-enter
+          // the dispatch loop that flipped the breaker open in the first place.
+          const ADVANCEABLE_STAGES = new Set(['master_clip', 'failed']);
           if (d.twoshot_stage && !ADVANCEABLE_STAGES.has(d.twoshot_stage)) return false;
           // ── Pre-flight gate ──────────────────────────────────────────
           // v5 (compose-dialog-segments) hard-requires audio_plan.twoshot.url
