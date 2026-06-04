@@ -1,0 +1,1 @@
+UPDATE public.ai_video_wallets SET balance_euros = 250.00, total_purchased_euros = total_purchased_euros + GREATEST(0, 250.00 - balance_euros), updated_at = now() WHERE user_id = '8948d3d9-2c5e-4405-9e9c-1624448e7189';
