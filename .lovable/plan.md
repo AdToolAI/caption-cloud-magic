@@ -1,143 +1,76 @@
-Ja. Bevor wir nochmal generieren, sollten wir die Lip-Sync-Schicht auf **eine einzige relevante Pipeline** reduzieren. Der Fehler ist inzwischen nicht mehr nur „Sync.so Payload falsch“, sondern dass zu viele alte Fallbacks, Versionen und Nebenpfade aktiv sind und sich gegenseitig überstimmen.
-
 ## Ziel
 
-Eine klare, wartbare Pipeline:
+Wir richten den Single-Call Segments-Pfad **wortwörtlich** nach der offiziellen Sync.so-Doku aus (`docs.sync.so/developer-guides/segments` + `/speaker-selection`) und beweisen mit einem echten Test-Call, was die API akzeptiert, bevor wir Production-Code umstellen. v5 Multi-Pass bleibt bis zum Beweis aktiv.
+
+## Befund aus der aktuellen Doku-Lektüre
+
+Direkt aus `docs.sync.so/developer-guides/segments`:
+
+| Feld | Doku sagt | Unser v47 macht |
+|---|---|---|
+| `model` | `"lipsync-2"` in **allen** Multi-Speaker- und Segments-Beispielen | `"lipsync-2-pro"` ❌ |
+| `input[].ref_id` | snake_case (Python) bzw. ohne `ref_id` (TS) | nur `refId` camelCase |
+| `segments[].audioInput.refId` | camelCase | ✅ camelCase |
+| `optionsOverride.active_speaker_detection.frame_number/coordinates` | snake_case | ✅ snake_case |
+| `options.sync_mode` | snake_case | ✅ |
+| Webhook-Feld | `webhookUrl` (camelCase) im REST-Body | ✅ |
+
+→ Die wahrscheinlichste Wurzelursache der reproduzierbaren „unknown error" ist **`lipsync-2-pro` + `segments[]`**. Die Doku nennt `lipsync-2-pro` an keiner Stelle als kompatibel mit Segments; die Multi-Speaker-Beispiele nutzen ausschließlich `lipsync-2`.
+
+## Vorgehen
 
 ```text
-3+ Sprecher
-  → Sync.so Official Segments Single-Call
-  → Sync.so Webhook
-  → Szene fertig oder sauber fehlgeschlagen
-
-1–2 Sprecher
-  → bewährter einfacher Pfad
-  → keine 3-Speaker-Fallback-Vermischung
+1. Doku-Audit (read-only)        →  Diff-Tabelle fixieren
+2. Live Probe-Call gegen Sync.so →  beweisen welcher Payload akzeptiert wird
+3. v49 implementieren            →  nur das, was Sync.so per Test bestätigt
+4. Cleanup v47 + Memory          →  alte Pfade abklemmen, neue Regel speichern
 ```
 
-Keine alten v41–v47 Experimente, kein stiller Fan-Out-Fallback, kein kaputtes Partial-Muxing, kein `sync-3`-Fallback in einer Segments-Pipeline.
+### Schritt 1 — Doku-Audit (manuell, schon erledigt)
+Resultat siehe Tabelle oben. Kernregel: **Segments + Multi-Speaker = `lipsync-2`**, nicht `-pro`.
 
-## Cleanup-Plan
+### Schritt 2 — Live Probe-Call (kein User-Geld)
+Neue Test-Edge-Function `sync-so-probe` (admin-only, JWT-gated), die das offizielle Beispiel mit unseren echten Assets durchspielt:
 
-### 1. Relevante Ziel-Pipeline festlegen
-Für 3+ Sprecher bleibt nur noch:
+- Input = die `source_clip_url` der bereits bezahlten Szene `61edb887…` und ihre 3 Speaker-Track-URLs aus `audio_plan.twoshot.tracks`.
+- Vier Probe-Varianten nacheinander, jeweils Polling bis `COMPLETED` oder `FAILED`:
+  1. `lipsync-2` + `segments[]` + ASD `frame_number/coordinates` (Doku-exakt)
+  2. `lipsync-2` + `segments[]` ohne ASD (auto)
+  3. `lipsync-2-pro` + `segments[]` + ASD (= unser aktueller v47-Payload, Kontrollgruppe)
+  4. `lipsync-2` + nur `options.active_speaker_detection` ohne Segments (1-Sprecher-Sanity)
+- Output: Tabelle mit `model | segments | status | error | duration` als JSON-Response.
 
-```json
-{
-  "model": "lipsync-2-pro",
-  "input": [
-    { "type": "video", "url": "..." },
-    { "type": "audio", "url": "...", "refId": "speaker_1" },
-    { "type": "audio", "url": "...", "refId": "speaker_2" },
-    { "type": "audio", "url": "...", "refId": "speaker_3" }
-  ],
-  "segments": [
-    {
-      "startTime": 0,
-      "endTime": 2.3,
-      "audioInput": { "refId": "speaker_1" },
-      "optionsOverride": {
-        "active_speaker_detection": {
-          "frame_number": 12,
-          "coordinates": [385, 171]
-        }
-      }
-    }
-  ],
-  "options": { "sync_mode": "cut_off" },
-  "webhookUrl": "..."
-}
-```
+Das gibt uns in einem einzigen Tool-Lauf den faktischen Beweis, welche Kombination Sync.so wirklich akzeptiert.
 
-Das ist die Sync.so-Dokumentation. Daran richten wir den Code aus.
+### Schritt 3 — v49 implementieren (nur das, was Test bestätigt)
+Annahme nach Probe (zu validieren): Variante 1 grün, Variante 3 rot.
 
-### 2. Alte 3+ Sprecher-Pfade deaktivieren/entfernen
-Aus `compose-dialog-segments` werden für 3+ Sprecher entfernt oder hart blockiert:
+- `compose-dialog-segments`: Konstante `LIPSYNC_MODEL` bleibt `lipsync-2-pro` **für den v5 Per-Speaker-Pfad** (1 Audio pro Call, dort funktioniert -pro). Neu: `LIPSYNC_SEGMENTS_MODEL = "lipsync-2"` ausschließlich im Single-Call-Segments-Block (heute „v47").
+- v47-Block umbenennen auf v49, State-Felder konsistent (`version: 49`, `engine: "sync-official-segments"`, `model: "lipsync-2"`).
+- `input[]` bekommt beide Schlüssel `ref_id` (snake_case) UND `refId` (camelCase), wie schon v46-Memo beschreibt — schadet nicht, deckt beide Parser ab.
+- Pre-Dispatch-Validator bleibt: jede `segments[i].audioInput.refId` muss in `input[]` existieren, sonst 422 vor dem Sync.so-Call.
+- Diagnostic-Log: `v49_official_segments_payload model=lipsync-2 ...`.
 
-- v5 Fan-Out-Fallback für 3+ Sprecher
-- `coords-pro-box` Bounding-Box-Retry
-- `sync3-coords` Retry
-- `auto-pro` / `auto-standard` Fallbacks für 3+ Sprecher
-- `segments_secs` für 3+ Sprecher
-- alte Version-Kommentare und Branches v41–v47, soweit sie die Zielpipeline verwirren
+### Schritt 4 — Webhook + Cleanup
+- `sync-so-webhook` Versions-Gate erweitern auf `41..49`.
+- `COMPLETED` für v49 setzt `dialog_shots.status='done'`, `clip_url = outputUrl`, `lip_sync_applied_at`. Kein Audio-Mux nötig — Single-Call hat schon das richtige gemischte Audio drin (sync_mode `cut_off`).
+- `FAILED` für v49 → genau ein Retry (mit `repair_audio: true`), danach harter Fail + idempotenter Refund. Kein Fallback in v5 (das wäre wieder Vermischung).
+- Memory: `mem://architecture/lipsync/v49-docs-exact-segments` neu, `v46`/`v47` als superseded markieren, `mem/index.md` Core-Regel aktualisieren auf „Single-Call Segments nutzt **lipsync-2**, niemals lipsync-2-pro".
 
-Wichtig: Wenn die Official-Segments-Pipeline nicht sicher gebaut werden kann, soll sie **vor dem Sync.so-Call klar fehlschlagen**, statt in einen alten Pfad auszuweichen.
+### Was NICHT passiert
+- Kein Anfassen des v5 Multi-Pass für 1–2 Sprecher (läuft stabil).
+- Kein Audio-Mux-Lambda-Pfad für v49 (Single-Call hat fertiges Audio).
+- Kein automatischer v49→v5 Hybrid-Fallback (du hast in Option A explizit nur eine Pipeline gewollt).
+- Keine UI-Änderungen.
 
-### 3. Einen neuen kanonischen State einführen
-Für die bereinigte Pipeline verwenden wir z. B.:
+## Akzeptanzkriterien
 
-```json
-{
-  "version": 48,
-  "engine": "sync-official-segments",
-  "status": "rendering",
-  "model": "lipsync-2-pro",
-  "sync_job_id": "...",
-  "segments": [...],
-  "speaker_refs": [...],
-  "asd_mode": "coordinates",
-  "source_clip_url": "..."
-}
-```
+1. `sync-so-probe` zeigt schwarz auf weiß: Variante 1 (`lipsync-2` + segments) ergibt `COMPLETED` mit korrektem `outputUrl`, Variante 3 (`lipsync-2-pro` + segments) ergibt `FAILED`/unknown error. Damit ist die Memory-Behauptung „official single-call ist strukturell broken" widerlegt — und wir wissen warum.
+2. Frischer Generate-Run auf Szene `61edb887…` produziert `v49_official_segments_payload model=lipsync-2 …` im Log und endet in `COMPLETED` mit fertigem MP4, alle 3 Sprecher korrekt lipgesynct.
+3. Keine Szene wird mehr als „done" markiert, wenn ein Sprecher fehlt (v48-Schutz bleibt).
+4. Wallet wird bei Fehler refundiert (idempotent).
 
-Webhook und Watchdog akzeptieren dann gezielt diese neue Version, statt viele historische Versionen gleich zu behandeln.
+## Risiken
 
-### 4. Webhook vereinfachen und absichern
-In `sync-so-webhook`:
-
-- v48 Official Segments bekommt einen eigenen, kleinen Handler.
-- `COMPLETED` setzt nur dann final auf fertig, wenn `outputUrl` vorhanden ist.
-- `FAILED` macht maximal einen sauberen Retry, danach klarer Fail + Refund.
-- Keine Vermischung mit v5/Fan-Out-Logik.
-- Alte v41–v47 Retry-Ladder wird entfernt oder nur noch legacy-lesend behandelt.
-
-### 5. Partial-Muxing endgültig verhindern
-Der aktuell konkrete Freeze entstand, weil bei 3 Sprechern nur 1 Pass fertig war, aber trotzdem der Mux gestartet wurde.
-
-Daher:
-
-- `render-sync-segments-audio-mux` darf bei Multi-Speaker nie mit unvollständigen Passes starten.
-- Wenn `expected_speakers >= 3`, aber weniger als alle Outputs vorhanden sind: sofort fail, kein `single-audio-swap`.
-- Kein finaler `done`-Status bei Teilresultaten.
-
-### 6. Alte Legacy-Funktionen markieren oder stilllegen
-Wir prüfen und bereinigen diese Funktionsfamilie:
-
-- `compose-dialog-scene`
-- `compose-dialog-segments`
-- `poll-dialog-shots`
-- `sync-so-webhook`
-- `render-sync-segments-audio-mux`
-- `lipsync-watchdog`, falls vorhanden
-- `_shared/syncso-preflight.ts`
-- `_shared/twoshot-face-map.ts`
-
-Nicht blind löschen: Nur entfernen, wenn keine aktive Pipeline mehr darauf angewiesen ist. Wo Löschen zu riskant ist, wird ein harter Guard eingebaut: „nicht für 3+ Sprecher“.
-
-### 7. Datenbank-State der kaputten Szene bereinigen
-Für die betroffene Szene `61edb887-10c7-432d-b777-600707bf7d9a`:
-
-- falsches `lip_sync_applied_at` entfernen
-- falschen finalen Mux-Output entfernen
-- `dialog_shots` zurücksetzen
-- stale Sync.so Inflight-Jobs bereinigen
-- Szene wieder auf `pending` setzen
-
-Damit der nächste Trigger wirklich frisch startet.
-
-### 8. Memory/Plan aktualisieren
-Die Architektur-Memory bekommt eine neue Regel:
-
-```text
-3+ Speaker Lip-Sync uses only Sync.so Official Segments v48.
-No v5 fan-out, no sync-3 fallback, no bounding-box retry, no partial mux.
-```
-
-Damit wir später nicht wieder alte Pfade reaktivieren.
-
-## Was danach anders ist
-
-- Es gibt für 3 Sprecher nur noch eine Pipeline.
-- Wenn Sync.so fehlschlägt, sieht man einen klaren Fehler statt ein eingefrorenes „fertiges“ Video.
-- Kein alter Fallback kann mehr heimlich ein falsches Resultat als erfolgreich markieren.
-- Die nächste Generierung ist sauber messbar: entweder `v48_official_segments_payload` → `COMPLETED`, oder ein eindeutiger Fail mit Refund.
+- Probe kostet ~3× 9 ¢/s × ~10 s = ~3 € echtes Sync.so-Budget. Klein, aber real.
+- Wenn die Probe zeigt, dass auch `lipsync-2` + `segments[]` scheitert, fallen wir auf Option B (bei v5 bleiben) zurück und sparen den Code-Umbau.
