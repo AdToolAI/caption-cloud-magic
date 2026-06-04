@@ -1021,7 +1021,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v41_official_segments",
+            twoshot_stage: "syncso_v45_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1031,12 +1031,12 @@ serve(async (req) => {
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-          job_id: v41JobId, sync_source_kind: "v41_segments",
+          job_id: v41JobId, sync_source_kind: "v45_segments",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: LIPSYNC_MODEL,
+            model: "sync-3",
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             input_refs: v41SpeakerRefs.map((s) => s.refId),
@@ -1052,7 +1052,7 @@ serve(async (req) => {
             scene_id: sceneId,
             sync_job_id: v41JobId,
             engine: "sync-official-segments",
-            model: LIPSYNC_MODEL,
+            model: "sync-3",
             segments: v41Segments.length,
             speakers: v41SpeakerRefs.length,
             cost_credits: v41State.cost_credits,
