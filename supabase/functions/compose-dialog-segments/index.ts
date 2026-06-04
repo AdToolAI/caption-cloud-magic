@@ -991,8 +991,17 @@ serve(async (req) => {
           const sortedBoxes = faceBoxes
             .filter((b: any) => Number(b?.w) > 0.02 && Number(b?.h) > 0.02)
             .sort((a: any, b: any) => Number(a.x) - Number(b.x));
-          const slot = Math.min(Math.max(0, pass.speaker_idx), sortedBoxes.length - 1);
-          const box = sortedBoxes[slot];
+          // v36: For 3+ speaker scenes we MUST NOT silently collapse a
+          // missing speaker slot onto an existing face (slot=0 fallback).
+          // That mapped two speakers to the same face → Sync.so animated
+          // only one, the others stayed silent → the user saw a video
+          // where 1 of 3 characters lip-synced. Require that the plate
+          // actually contains enough distinct faces for the speaker index.
+          const enoughFaces = sortedBoxes.length >= Math.max(1, speakers.length);
+          const speakerHasOwnSlot = pass.speaker_idx < sortedBoxes.length;
+          const canRepair = speakerHasOwnSlot && (speakers.length < 3 || enoughFaces);
+          const slot = canRepair ? pass.speaker_idx : -1;
+          const box = slot >= 0 ? sortedBoxes[slot] : null;
           if (box && plateDims) {
             const repaired: [number, number] = [
               Math.round((Number(box.x) + Number(box.w) / 2) * plateDims.width),
