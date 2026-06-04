@@ -109,7 +109,7 @@ const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
 // detection and can open closed lips, which lipsync-2-pro cannot).
 // Order is intentional: try lipsync-2-pro first (better fidelity when it
 // works), then sync-3 BEFORE the auto-* face-swap-risk variants.
-const LIPSYNC_MODEL = "sync-3";
+const SYNC3_MODEL = "sync-3";
 const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
 
