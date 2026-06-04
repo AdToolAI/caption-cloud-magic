@@ -15,10 +15,10 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Multi-Speaker (v43)**: For 3+ speaker scenes, `compose-dialog-segments` sends Sync.so's official `segments[]` with audio input `refId` matching `audioInput.refId` and per-segment `optionsOverride.active_speaker_detection: { frame_number, bounding_boxes: [[x1,y1,x2,y2]] }` against `lipsync-2-pro`. Boxes from faceMap (anchor→plate rescale + pad) or fallback square. `bbox_pad_factor` escalates on retry (0.08→0.18→0.28). Webhook accepts v41/v42/v43. 1–2 speakers keep v5 fan-out. See `mem://architecture/lipsync/v43-bounding-boxes-asd`.
+- **Lip-Sync Multi-Speaker (v43)**: For 3+ speaker scenes, `compose-dialog-segments` sends Sync.so's official `segments[]` with audio input `refId` matching `audioInput.refId` and per-segment `optionsOverride.active_speaker_detection: { bounding_boxes: [null, ..., [x1,y1,x2,y2], ...] }` against `lipsync-2-pro`. Boxes from faceMap (anchor→plate rescale + pad) or fallback square. `bbox_pad_factor` escalates on retry (0.08→0.18→0.28). Webhook accepts v41/v42/v43. 1–2 speakers keep v5 fan-out. See `mem://architecture/lipsync/v43-bounding-boxes-asd`.
 
 ## Memories
-- [v43 Bounding-Boxes ASD](mem://architecture/lipsync/v43-bounding-boxes-asd) — Per-segment `bounding_boxes` ASD for 3+ speakers; faceMap → plate-space + pad; retry escalates pad 0.08→0.18→0.28
+- [v43 Bounding-Boxes ASD](mem://architecture/lipsync/v43-bounding-boxes-asd) — Per-frame `bounding_boxes` ASD for 3+ speakers; faceMap → plate-space + pad; retry escalates pad 0.08→0.18→0.28
 - [v41/v42 Official Segments (superseded)](mem://architecture/lipsync/v41-official-segments-payload) — Canonical Sync.so multi-speaker shape, superseded by v43
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
 - [Sync-3 Fallback + Identity Soft-Pass v37](mem://architecture/lipsync/sync-3-fallback-and-identity-soft-pass-v37) — sync-3 retry variant + identity-match face-gate soft-pass for 3+ speakers
