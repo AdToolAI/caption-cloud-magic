@@ -242,6 +242,32 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
     }
 
+    // ── v33: strict single-flight lock ───────────────────────────────────
+    // Without this the client + sync-so-webhook + fan-out self-invoke can all
+    // fire compose-dialog-segments for the same scene within ~ms, producing
+    // duplicate Sync.so jobs that never match the latest passes[] state and
+    // burn provider credits. `withDialogLock` falls back to "no lock" on
+    // contention which is exactly what we must avoid here.
+    {
+      const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
+      const { data: acquired, error: lockErr } = await supabase.rpc(
+        "try_acquire_dialog_lock",
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90 },
+      );
+      if (lockErr) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} lock rpc error: ${lockErr.message} — proceeding without lock`);
+      } else if (acquired !== true) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} BUSY — another dispatcher holds the lock; skipping`);
+        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId }, 202);
+      } else {
+        lockSupabase = supabase;
+        lockSceneId = sceneId;
+        lockHolder = holder;
+      }
+    }
+
+
+
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
