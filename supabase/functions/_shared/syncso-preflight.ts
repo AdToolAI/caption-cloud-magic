@@ -1415,3 +1415,112 @@ export async function readPreferredSyncSourceKind(
     return null;
   }
 }
+
+// ── v39 — Per-Turn Tight WAV slicer ─────────────────────────────────────
+
+export interface SliceWindow {
+  startSec: number;
+  endSec: number;
+}
+
+/**
+ * v39 — Slice a 16-bit PCM mono/stereo WAV to the union of [start,end]
+ * windows and return a fresh RIFF/WAVE. Discontiguous windows are joined
+ * with `gapSec` of silence (default 0.05s) so a single speaker with
+ * multiple turns still gets one tight audio file. The output keeps the
+ * source sample rate, bit depth and channel count.
+ *
+ * Used by compose-dialog-segments to convert silence-padded full-length
+ * per-speaker WAVs into tight per-turn WAVs so Sync.so naturally returns
+ * an output equal to the turn duration (no `startFrom` seek needed in the
+ * Remotion compositor, bundle-version-independent).
+ */
+export function sliceWavToWindows(
+  wav: Uint8Array,
+  windows: SliceWindow[],
+  opts: { gapSec?: number } = {},
+): { bytes: Uint8Array; durSec: number; info: WavInfo } {
+  const { gapSec = 0.05 } = opts;
+  const info = inspectWav(wav);
+  const { channels, sampleRate, bitsPerSample, dataOff, dataLen } = info;
+  if (bitsPerSample !== 16) throw new Error(`sliceWav: unsupported bits=${bitsPerSample}`);
+  const bytesPerFrame = channels * 2;
+  const totalFrames = Math.floor(dataLen / bytesPerFrame);
+
+  // Sort + clamp + drop empty windows.
+  const norm = windows
+    .map((w) => ({
+      s: Math.max(0, Math.min(totalFrames / sampleRate, Number(w.startSec))),
+      e: Math.max(0, Math.min(totalFrames / sampleRate, Number(w.endSec))),
+    }))
+    .filter((w) => Number.isFinite(w.s) && Number.isFinite(w.e) && w.e > w.s + 0.01)
+    .sort((a, b) => a.s - b.s);
+  if (norm.length === 0) throw new Error("sliceWav: no valid windows");
+
+  // Merge overlapping windows.
+  const merged: { s: number; e: number }[] = [];
+  for (const w of norm) {
+    const last = merged[merged.length - 1];
+    if (last && w.s <= last.e + 0.01) last.e = Math.max(last.e, w.e);
+    else merged.push({ s: w.s, e: w.e });
+  }
+
+  const gapFrames = Math.max(0, Math.round(gapSec * sampleRate));
+  let outFrames = 0;
+  for (let i = 0; i < merged.length; i++) {
+    const w = merged[i];
+    outFrames += Math.max(1, Math.round((w.e - w.s) * sampleRate));
+    if (i < merged.length - 1) outFrames += gapFrames;
+  }
+
+  const outDataLen = outFrames * bytesPerFrame;
+  const out = new Uint8Array(44 + outDataLen);
+  const odv = new DataView(out.buffer);
+
+  // RIFF header
+  odv.setUint32(0, 0x52494646, false); // "RIFF"
+  odv.setUint32(4, 36 + outDataLen, true);
+  odv.setUint32(8, 0x57415645, false); // "WAVE"
+  odv.setUint32(12, 0x666d7420, false); // "fmt "
+  odv.setUint32(16, 16, true);
+  odv.setUint16(20, 1, true); // PCM
+  odv.setUint16(22, channels, true);
+  odv.setUint32(24, sampleRate, true);
+  odv.setUint32(28, sampleRate * bytesPerFrame, true);
+  odv.setUint16(32, bytesPerFrame, true);
+  odv.setUint16(34, bitsPerSample, true);
+  odv.setUint32(36, 0x64617461, false); // "data"
+  odv.setUint32(40, outDataLen, true);
+
+  // Copy samples
+  let writeFrame = 0;
+  for (let i = 0; i < merged.length; i++) {
+    const w = merged[i];
+    const startFrame = Math.floor(w.s * sampleRate);
+    const endFrame = Math.min(totalFrames, Math.floor(w.e * sampleRate));
+    const nFrames = Math.max(0, endFrame - startFrame);
+    if (nFrames > 0) {
+      const srcByteOff = dataOff + startFrame * bytesPerFrame;
+      const dstByteOff = 44 + writeFrame * bytesPerFrame;
+      out.set(
+        wav.subarray(srcByteOff, srcByteOff + nFrames * bytesPerFrame),
+        dstByteOff,
+      );
+      writeFrame += nFrames;
+    }
+    if (i < merged.length - 1) writeFrame += gapFrames; // silence gap = zeroes (already zero-initialised)
+  }
+
+  const outInfo: WavInfo = {
+    channels,
+    sampleRate,
+    bitsPerSample,
+    totalFrames: outFrames,
+    durSec: outFrames / sampleRate,
+    dataOff: 44,
+    dataLen: outDataLen,
+    peakDbFs: info.peakDbFs,
+    leadInSec: 0,
+  };
+  return { bytes: out, durSec: outInfo.durSec, info: outInfo };
+}
