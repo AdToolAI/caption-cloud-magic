@@ -1088,23 +1088,52 @@ serve(async (req) => {
         coordinates: pass.coords,
       };
     } else if (retryVariant === "coords-pro-box") {
-      // v30 — Bounding-box ASD fallback for 3+ speaker plates where
-      // Sync.so rejects single-point coords-pro with the opaque
-      // "An unknown error occurred." A small box around the speaker's
-      // anchor gives the model a face REGION (not just a point), which
-      // is what the docs recommend when several faces share the frame.
-      // Per Sync.so spec, `bounding_boxes` is a per-frame array — one
-      // entry per video frame, [x1,y1,x2,y2] or null. We emit the same
-      // box on every frame (the speaker barely moves in a talking shot).
+      // v31 — Prefer the REAL face bounding box from the resolved faceMap
+      // (anchor-space) and rescale to plate-space. Falls back to a synthetic
+      // box around `pass.coords` only when no faceMap match exists.
       const dims = plateDims ?? videoDims;
-      const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
-      const boxW = Math.round(dims.width * 0.18);
-      const boxH = Math.round(dims.height * 0.28);
-      const x1 = Math.max(0, Math.round(cx - boxW / 2));
-      const y1 = Math.max(0, Math.round(cy - boxH / 2));
-      const x2 = Math.min(dims.width, Math.round(cx + boxW / 2));
-      const y2 = Math.min(dims.height, Math.round(cy + boxH / 2));
-      const box: [number, number, number, number] = [x1, y1, x2, y2];
+      let box: [number, number, number, number] | null = null;
+      let bboxSource = "synthetic";
+      const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
+        ? (faceMap as any).faces
+        : [];
+      const matchedFace =
+        fmFaces.find((f) => f?.characterId && f.characterId === pass.character_id) ??
+        fmFaces.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
+        null;
+      const fmW = Number((faceMap as any)?.width) || dims.width;
+      const fmH = Number((faceMap as any)?.height) || dims.height;
+      if (
+        matchedFace &&
+        Array.isArray(matchedFace.bbox) &&
+        matchedFace.bbox.length === 4 &&
+        fmW > 0 && fmH > 0
+      ) {
+        const [bx1, by1, bx2, by2] = matchedFace.bbox.map((n: any) => Number(n));
+        const sx = dims.width / fmW;
+        const sy = dims.height / fmH;
+        // Tight pad (~15%) around the detected face for stable ASD.
+        const padX = (bx2 - bx1) * 0.15;
+        const padY = (by2 - by1) * 0.15;
+        const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
+        const y1 = Math.max(0, Math.round((by1 - padY) * sy));
+        const x2 = Math.min(dims.width, Math.round((bx2 + padX) * sx));
+        const y2 = Math.min(dims.height, Math.round((by2 + padY) * sy));
+        if (x2 > x1 + 4 && y2 > y1 + 4) {
+          box = [x1, y1, x2, y2];
+          bboxSource = `facemap:${matchedFace.matchSource ?? "unknown"}`;
+        }
+      }
+      if (!box) {
+        const [cx, cy] = pass.coords ?? [Math.round(dims.width / 2), Math.round(dims.height / 2)];
+        const boxW = Math.round(dims.width * 0.18);
+        const boxH = Math.round(dims.height * 0.28);
+        const x1 = Math.max(0, Math.round(cx - boxW / 2));
+        const y1 = Math.max(0, Math.round(cy - boxH / 2));
+        const x2 = Math.min(dims.width, Math.round(cx + boxW / 2));
+        const y2 = Math.min(dims.height, Math.round(cy + boxH / 2));
+        box = [x1, y1, x2, y2];
+      }
       const frameCount = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS));
       const boundingBoxes: (number[] | null)[] = new Array(frameCount).fill(box);
       syncOptions.active_speaker_detection = {
@@ -1112,8 +1141,9 @@ serve(async (req) => {
         bounding_boxes: boundingBoxes,
       };
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} frames=${frameCount}`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} BBOX_ASD speaker=${pass.speaker_name} box=${JSON.stringify(box)} source=${bboxSource} frames=${frameCount}`,
       );
+
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
