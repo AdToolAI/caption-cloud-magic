@@ -1728,7 +1728,7 @@ serve(async (req) => {
     // remains the default for first-pass quality.
     const payloadModel =
       retryVariant === "sync3-coords"
-        ? LIPSYNC_MODEL
+        ? SYNC3_MODEL
         : retryVariant === "auto-standard"
           ? LIPSYNC_FALLBACK_MODEL
           : LIPSYNC_MODEL;
