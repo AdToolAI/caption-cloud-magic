@@ -869,37 +869,104 @@ serve(async (req) => {
         // Roll back the refund decision: scene still has alive siblings, so
         // we must NOT refund yet. Only patch this pass and keep going.
         const { doneCount, allTerminal } = terminalV5Counts(finalPasses);
+        const totalSpeakers = Number(freshFailState?.total_passes ?? finalPasses.length ?? 1);
         const pendingIdxs = finalPasses
           .map((p: any, i: number) => ((p?.status === "pending" || (!p?.job_id && p?.status !== "failed")) ? i : -1))
           .filter((i: number) => i >= 0);
-        const partialMux = allTerminal && doneCount > 0;
+        // v36: Honesty policy — for 3+ speaker scenes a partial mux is NOT
+        // an acceptable final result. If even one pflicht-speaker pass
+        // failed and no further retries remain, fail the scene cleanly so
+        // the user sees the truth ("Sprecher 1/3 konnte nicht lip-synct
+        // werden") instead of a video where 2 of 3 characters are silent.
+        // For 1- and 2-speaker scenes the legacy partial-mux behaviour
+        // stays: a single bad speaker should not lose the rest.
+        const failedCount = finalPasses.filter((p: any) =>
+          ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? ""))
+        ).length;
+        const partialMuxAllowed = totalSpeakers <= 2;
+        const partialMux = allTerminal && doneCount > 0 && partialMuxAllowed;
         const lastDonePass = [...finalPasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
-        await supabase
-          .from("composer_scenes")
-          .update({
-            dialog_shots: {
-              ...freshFailState,
-              passes: finalPasses,
-              status: partialMux ? "audio_muxing" : (freshFailState?.status ?? "rendering"),
-              final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
-              partial_mux: partialMux ? true : freshFailState?.partial_mux,
-            },
-            lip_sync_status: partialMux ? "audio_muxing" : "running",
-            twoshot_stage: partialMux ? "audio_muxing" : `syncso_fanout_${doneCount}_of_${Number(freshFailState?.total_passes ?? finalPasses.length ?? 1)}`,
-            updated_at: nowIso,
-          })
-          .eq("id", sceneId);
-        console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
-        );
-        if (partialMux) {
-          fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-            body: JSON.stringify({ scene_id: sceneId }),
-          }).catch(() => {});
-        } else if (pendingIdxs.length > 0) {
-          triggerV5Advance(supabaseUrl, serviceKey, sceneId, pendingIdxs[0], Number(freshFailState?.total_passes ?? finalPasses.length ?? 1));
+
+        // v36: 3+ speakers with a failure AND no more pending work → scene fails.
+        const mustFailScene = !partialMuxAllowed && allTerminal && failedCount > 0;
+
+        if (mustFailScene) {
+          // Mirror the sceneWillFail refund/fail path so credits are
+          // returned and the UI flips to a clear failed state.
+          const costFinal = Number((freshFailState as any)?.cost_credits ?? cost);
+          const alreadyRefundedFinal = !!(freshFailState as any)?.refunded;
+          if (costFinal > 0 && !alreadyRefundedFinal) {
+            const { data: row2 } = await supabase
+              .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+            const { data: proj2 } = await supabase
+              .from("composer_projects").select("user_id").eq("id", (row2 as any)?.project_id).single();
+            const uid2 = (proj2 as any)?.user_id;
+            if (uid2) {
+              const { data: w2 } = await supabase
+                .from("wallets").select("balance").eq("user_id", uid2).single();
+              await supabase
+                .from("wallets")
+                .update({ balance: Number((w2 as any)?.balance ?? 0) + costFinal, updated_at: nowIso })
+                .eq("user_id", uid2);
+            }
+          }
+          const failedSpeakers = finalPasses
+            .filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? "")))
+            .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`);
+          const failReason = `multi_speaker_incomplete_${doneCount}_of_${totalSpeakers}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`;
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: {
+                ...freshFailState,
+                passes: finalPasses,
+                status: "failed",
+                finished_at: nowIso,
+                refunded: costFinal > 0,
+                error: failReason,
+                last_error_class: errClass,
+                sync_error_code: errorCode ?? null,
+                sync_error_bucket: effectiveBucket,
+                partial_done_count: doneCount,
+                partial_failed_speakers: failedSpeakers,
+              },
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: failReason,
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+          console.warn(
+            `[sync-so-webhook] v36 scene=${sceneId} 3+ speakers — refusing partial mux (${doneCount}/${totalSpeakers} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal} alreadyRefunded=${alreadyRefundedFinal}`,
+          );
+        } else {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: {
+                ...freshFailState,
+                passes: finalPasses,
+                status: partialMux ? "audio_muxing" : (freshFailState?.status ?? "rendering"),
+                final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
+                partial_mux: partialMux ? true : freshFailState?.partial_mux,
+              },
+              lip_sync_status: partialMux ? "audio_muxing" : "running",
+              twoshot_stage: partialMux ? "audio_muxing" : `syncso_fanout_${doneCount}_of_${totalSpeakers}`,
+              updated_at: nowIso,
+            })
+            .eq("id", sceneId);
+          console.warn(
+            `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
+          );
+          if (partialMux) {
+            fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+              body: JSON.stringify({ scene_id: sceneId }),
+            }).catch(() => {});
+          } else if (pendingIdxs.length > 0) {
+            triggerV5Advance(supabaseUrl, serviceKey, sceneId, pendingIdxs[0], totalSpeakers);
+          }
         }
       }
     }
