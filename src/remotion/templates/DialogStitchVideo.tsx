@@ -178,10 +178,15 @@ interface FaceMaskOverlayProps {
   cxPx: number;
   cyPx: number;
   radiusPx: number;
+  /** v38: when the Sync.so output is a full-length silence-padded render,
+   *  we play it from its absolute frame (matching the window start) so the
+   *  mouth animation lines up with the master plate timeline. */
+  startFrom?: number;
 }
-/** v25: full-frame Sync.so output, shown only inside a soft circular mask
- *  around the target face. Plays for the entire scene (no time window). */
-const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx }) => {
+/** v25/v38: full-length Sync.so output shown only inside a soft circular
+ *  mask around the target face — and only inside this speaker's voiced turn
+ *  window(s) via the parent <Sequence>. */
+const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx, startFrom }) => {
   // Feathered radial mask: solid in the inner 70% of radius, fading to 0
   // at radius edge so the lipsynced face blends seamlessly into the base.
   const inner = Math.max(2, Math.round(radiusPx * 0.68));
@@ -201,6 +206,7 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
         src={src}
         muted
         playbackRate={1}
+        {...(startFrom !== undefined ? { startFrom } : {})}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
     </AbsoluteFill>
