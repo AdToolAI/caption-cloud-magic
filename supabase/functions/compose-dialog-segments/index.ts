@@ -583,7 +583,7 @@ serve(async (req) => {
 
     // E.5: on retry path, wallet was already debited at the original dispatch
     // and the cost is preserved in state.cost_credits. Skip re-charging.
-    if (!isRetry) {
+    if (!isRetry && !isV41Retry) {
       const { data: wallet } = await supabase
         .from("wallets")
         .select("balance")
