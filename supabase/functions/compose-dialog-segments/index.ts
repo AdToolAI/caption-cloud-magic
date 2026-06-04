@@ -1058,57 +1058,28 @@ serve(async (req) => {
     pass.retry_variant = retryVariant;
     pass.diagnostic_id = diagnosticId;
 
-    // ── v28: Audio lead-in trim for Sync.so reliability ──────────────────
-    // Sync.so lipsync-2-pro fails with the generic "An unknown error
-    // occurred." when given per-speaker WAVs with several seconds of
-    // leading silence on 3+ speaker plates with manual ASD. Trim the
-    // lead-in so the voice starts at ~0.2s. Triggered either by an
-    // explicit repair_audio flag (from the webhook retry) OR when the
-    // pre-flight diagnostic detected a lead-in > 0.6s.
+    // ── v33: Audio lead-in trim DISABLED for v25 fan-out passes ──────────
+    // Each per-speaker WAV is silence-padded to the FULL plate duration so
+    // its absolute timeline matches the 9s scene plate. Trimming the lead-in
+    // (v28/v29 logic) shifted the voice forward by 2.5-4s, so Sync.so saw a
+    // video where the active speaker's mouth opens at t=3s while the audio
+    // says them speaking at t=0s. With `sync_mode=cut_off` that mismatch
+    // routinely produces the opaque "An unknown error occurred." failures
+    // we have been chasing for days. We keep the diagnostic log so we can
+    // see when a track HAS a long lead-in (now informational only).
     const passDiag = audioDiagnostics.find((d: any) => d.pass === pass.idx) as any;
     const detectedLeadIn = Number(passDiag?.wav?.leadInSec ?? 0);
-    // v29: lower auto-trim threshold (0.6→0.3) and always re-emit canonical
-    // PCM 16-bit WAV when repair_audio is set, even if no trim is needed —
-    // that strips any non-canonical chunks Sync.so may choke on.
-    const needsTrim = repairAudio || (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.3);
-    const prevPassAudioUrl = (prevState?.passes?.[currentPassIdx] as any)?.audio_url;
-    const alreadyTrimmed = typeof prevPassAudioUrl === "string" && /-trim\.wav(\?|$)/.test(prevPassAudioUrl);
-    if (needsTrim && !alreadyTrimmed) {
-      try {
-        const audioResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
-        if (audioResp.ok) {
-          const origBytes = new Uint8Array(await audioResp.arrayBuffer());
-          const trimmed = trimWavLeadIn(origBytes, { keepLeadInSec: 0.2, force: repairAudio });
-          // Always upload when repair_audio (canonical re-encode), OR when we
-          // actually trimmed >0.05s of silence.
-          if (repairAudio || trimmed.trimmedSec > 0.05) {
-            const trimPath = `${userId}/twoshot-vo/${sceneId}-pass-${currentPassIdx + 1}-trim.wav`;
-            const up = await supabase.storage.from("voiceover-audio").upload(
-              trimPath,
-              trimmed.bytes,
-              { contentType: "audio/wav", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage
-                .from("voiceover-audio")
-                .getPublicUrl(trimPath);
-              if (pub?.publicUrl) {
-                console.log(
-                  `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} AUDIO_TRIM leadIn=${detectedLeadIn.toFixed(2)}s → ${trimmed.info.leadInSec.toFixed(2)}s (saved ${trimmed.trimmedSec.toFixed(2)}s, force=${!!repairAudio}) url=${pub.publicUrl.slice(0, 80)}`,
-                );
-                pass.audio_url = pub.publicUrl;
-                (pass as any).audio_repaired = true;
-                (pass as any).audio_trim_sec = trimmed.trimmedSec;
-              }
-            } else {
-              console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} audio trim upload failed: ${up.error.message}`);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} audio trim crash: ${(err as Error).message}`);
-      }
+    if (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.3) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} leadIn=${detectedLeadIn.toFixed(2)}s (preserved — timeline must match full plate)`,
+      );
     }
+    if (repairAudio) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio requested but trim disabled — timeline-preserving repair not implemented yet`,
+      );
+    }
+
 
 
     // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
