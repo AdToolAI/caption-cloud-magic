@@ -1,10 +1,10 @@
 ---
 name: v43 Bounding-Boxes ASD for Multi-Speaker Segments
-description: For 3+ speaker dialog scenes, compose-dialog-segments now sends `active_speaker_detection: { frame_number, bounding_boxes: [[x1,y1,x2,y2]] }` per segment instead of v42's `{ frame_number, coordinates: [x,y] }`. Boxes come from faceMap (anchor → plate-space rescale + pad) with fallback to a square around the point. Pad escalates on retry (0.08 → 0.18 → 0.28) so shoulder-to-shoulder shots where the face drifts a few px off the point no longer return "An unknown error occurred." after 10–13 min.
+description: For 3+ speaker dialog scenes, compose-dialog-segments now sends Sync.so's official per-frame `active_speaker_detection: { bounding_boxes: [null, ..., [x1,y1,x2,y2], ...] }` per segment instead of v42's `{ frame_number, coordinates: [x,y] }`. Boxes come from faceMap (anchor → plate-space rescale + pad) with fallback to a square around the point. Pad escalates on retry (0.08 → 0.18 → 0.28) so shoulder-to-shoulder shots where the face drifts a few px off the point no longer return "An unknown error occurred." after 10–13 min.
 type: architecture
 ---
 
-**Why:** Sync.so ASD has 4 exclusive variants (`auto_detect`, `v3`, `frame_number+coordinates`, `frame_number+bounding_boxes`). v41/v42 used the point variant. On shoulder-to-shoulder 3+ speaker plates the face can land a few pixels off the point, and Sync.so fails the whole job with a generic `An unknown error occurred.` after the full run. Boxes give Sync.so a tolerance window per speaker.
+**Why:** Sync.so ASD has exclusive variants (`auto_detect`, `v3`, `frame_number+coordinates`, `bounding_boxes`). v41/v42 used the point variant. On shoulder-to-shoulder 3+ speaker plates the face can land a few pixels off the point, and Sync.so fails the whole job with a generic `An unknown error occurred.` after the full run. Boxes give Sync.so a tolerance window per speaker.
 
 **Payload (3+ speakers, unchanged outside ASD):**
 
@@ -23,8 +23,7 @@ POST https://api.sync.so/v2/generate
       audioInput: { refId: "speaker_N", startTime, endTime },
       optionsOverride: {
         active_speaker_detection: {
-          frame_number: <int>,
-          bounding_boxes: [[x1, y1, x2, y2]]   // v43
+          bounding_boxes: [null, ..., [x1, y1, x2, y2], ..., null]   // v43 per-frame array
         }
       } },
     ...
