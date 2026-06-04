@@ -1468,9 +1468,16 @@ serve(async (req) => {
     //    parallel via background self-invokes. Each runs as an independent
     //    Sync.so job against the SAME original plate (no chaining). The
     //    Sync.so 3-slot concurrency guard upstream handles back-pressure.
-    if (!isAdvance && !isRetry && passes.length > 1) {
+    // v33: For 3+ speaker scenes, do NOT fan out passes in parallel. The
+    // webhook chains the next pass on completion (pendingIdxs[0]), so the
+    // pipeline still completes — just one Sync.so job at a time per scene.
+    // This eliminates the dispatch race we saw on scene 1a9bf866…: two pass-0
+    // jobs within ms, one of which the webhook later reports as
+    // "job ... not in passes[]". Two-speaker scenes still fan out (no race
+    // reported there).
+    const fanOutAllowed = passes.length > 1 && passes.length <= 2;
+    if (!isAdvance && !isRetry && fanOutAllowed) {
       for (let i = 1; i < passes.length; i++) {
-        // Small jitter so the inflight counter check doesn't race-fire.
         const delayMs = i * 250;
         setTimeout(() => {
           fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
@@ -1488,7 +1495,12 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} FAN-OUT scheduled ${passes.length - 1} additional passes in parallel`,
       );
+    } else if (!isAdvance && !isRetry && passes.length > 2) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers) — webhook will chain pass 2..N as pass 1..N-1 complete`,
+      );
     }
+
 
     return json(
       {
