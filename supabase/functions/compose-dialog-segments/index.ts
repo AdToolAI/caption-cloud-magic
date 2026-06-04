@@ -62,6 +62,7 @@ import {
   inspectWav,
   logSyncDispatch,
   normalizeWav,
+  sliceWavToWindows,
   openCircuit,
   probeAsset,
   readPreferredSyncSourceKind,
