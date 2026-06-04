@@ -625,12 +625,30 @@ serve(async (req) => {
     if (platePrimaryUrl) {
       plateDims = await probeMp4Dims(platePrimaryUrl);
     }
-    // v33: HARD-FAIL if we can't measure the plate for 3+ speakers. The old
-    // silent fallback to 1280x720 produced face coordinates that landed off
-    // the actual frame, and Sync.so answered with the opaque
-    // "An unknown error occurred." — exactly the failure mode we have been
-    // chasing. For 1/2 speakers the fallback is still acceptable (single
-    // central face).
+    // v33+: HARD-FAIL if we can't measure the plate for 3+ speakers — but
+    // first try the anchor-derived dimensions from the cached faceMap. Some
+    // Hailuo MP4 muxers write a tkhd with zero dimensions, so probeMp4Dims
+    // returns null even though the clip is visually valid. The anchor
+    // faceMap was built from the same scene composition so its aspect
+    // ratio is a safe trusted fallback for per-speaker coordinates.
+    let plateDimsSource: "mp4_probe" | "anchor_facemap_fallback" | "default" = "default";
+    if (plateDims) {
+      plateDimsSource = "mp4_probe";
+    } else if (speakers.length >= 3 && !isAdvance) {
+      const fmW = Number((cachedFaceMap as any)?.width);
+      const fmH = Number((cachedFaceMap as any)?.height);
+      const anchorOk =
+        Number.isFinite(fmW) && Number.isFinite(fmH) &&
+        fmW >= 256 && fmH >= 256 && fmW <= 8192 && fmH <= 8192;
+      if (anchorOk) {
+        plateDims = { width: Math.round(fmW), height: Math.round(fmH) };
+        plateDimsSource = "anchor_facemap_fallback";
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} probeMp4Dims=null — using anchor faceMap dims ${fmW}x${fmH} as trusted fallback for 3+ speakers`,
+        );
+      }
+    }
+
     if (!plateDims && speakers.length >= 3 && !isAdvance) {
       const alreadyRefunded = !!(existing as any)?.refunded;
       if (!alreadyRefunded && !isRetry) {
@@ -656,15 +674,15 @@ serve(async (req) => {
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: "plate_probe_failed_3plus_speakers: Video-Dimensionen konnten nicht ermittelt werden — Sync.so braucht echte Plate-Geometrie für 3+ Sprecher. Bitte Szene neu rendern.",
+          clip_error: "plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte „Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.",
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
       await logSyncDispatch(supabase, {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "PREFLIGHT_BLOCKED", error_class: "plate_probe_failed",
-        error_message: "probeMp4Dims returned null for 3+ speaker scene",
-        meta: { plate_url: platePrimaryUrl, speaker_count: speakers.length },
+        error_message: "probeMp4Dims returned null AND no anchor faceMap dims available for 3+ speaker scene",
+        meta: { plate_url: platePrimaryUrl, speaker_count: speakers.length, anchor_facemap_present: !!cachedFaceMap },
       });
       return json(
         {
@@ -679,6 +697,9 @@ serve(async (req) => {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
     };
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} plateDims source=${plateDimsSource} dims=${videoDims.width}x${videoDims.height}`,
+    );
 
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
