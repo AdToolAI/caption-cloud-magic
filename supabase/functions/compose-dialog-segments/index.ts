@@ -436,7 +436,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41
+        (existing as any).version === 41 || (existing as any).version === 42
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -803,7 +803,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = (existing as any)?.version === 41 ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
       const ASSUMED_FPS_V41 = 24;
       // Build inputs: 1 video + N audio (one per speaker with track_url).
@@ -862,7 +862,12 @@ serve(async (req) => {
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
                 active_speaker_detection: {
-                  auto_detect: false,
+                  // v42: only documented ASD fields. `frame_number` +
+                  // `coordinates` is one of the four exclusive variants
+                  // per https://docs.sync.so/developer-guides/segments .
+                  // No `auto_detect:false` — not a documented field, and
+                  // lipsync-2-pro can reject undocumented options with
+                  // an opaque "An unknown error occurred.".
                   frame_number: frameNumber,
                   coordinates: asdCoords,
                 },
@@ -888,7 +893,7 @@ serve(async (req) => {
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
         const v41Payload = {
-          model: SYNC3_MODEL,
+          model: LIPSYNC_MODEL,
           input: v41Inputs,
           segments: v41Segments,
           options: { sync_mode: "loop" },
@@ -897,7 +902,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v41_official_segments_payload model=${SYNC3_MODEL} ` +
+          `[compose-dialog-segments] scene=${sceneId} v41_official_segments_payload model=${LIPSYNC_MODEL} ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec}`,
         );
@@ -930,10 +935,10 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 41,
+                version: 42,
                 engine: "sync-official-segments",
                 status: "failed",
-                model: SYNC3_MODEL,
+                model: LIPSYNC_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
                 refunded: !alreadyRefunded,
                 error: `v41_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
@@ -951,7 +956,7 @@ serve(async (req) => {
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: SYNC3_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length } },
+            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length } },
           });
           return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -975,10 +980,10 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 41,
+          version: 42,
           engine: "sync-official-segments",
           status: "rendering",
-          model: SYNC3_MODEL,
+          model: LIPSYNC_MODEL,
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
           total_sec: totalSec,
@@ -1013,7 +1018,7 @@ serve(async (req) => {
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: SYNC3_MODEL,
+            model: LIPSYNC_MODEL,
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             is_retry: isV41Retry,
@@ -1028,7 +1033,7 @@ serve(async (req) => {
             scene_id: sceneId,
             sync_job_id: v41JobId,
             engine: "sync-official-segments",
-            model: SYNC3_MODEL,
+            model: LIPSYNC_MODEL,
             segments: v41Segments.length,
             speakers: v41SpeakerRefs.length,
             cost_credits: v41State.cost_credits,
