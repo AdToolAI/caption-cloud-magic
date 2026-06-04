@@ -939,10 +939,10 @@ serve(async (req) => {
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
-            const midSec = (s + e) / 2;
-            const frameNumber = Math.max(0, Math.round(midSec * ASSUMED_FPS_V41));
-            const boundingBoxes = Array.from({ length: totalFramesV41 }, () => null as [number, number, number, number] | null);
-            boundingBoxes[Math.min(totalFramesV41 - 1, frameNumber)] = bbox;
+            const boundingBoxes = Array.from(
+              { length: totalFramesV41 },
+              () => bbox as [number, number, number, number],
+            );
             v41Segments.push({
               startTime: s,
               endTime: e,
@@ -951,6 +951,8 @@ serve(async (req) => {
                 active_speaker_detection: {
                   // v43: bounding_boxes is a per-frame array and must NOT be
                   // combined with frame_number/coordinates per Sync.so docs.
+                  // We repeat the resolved target face box for every frame so
+                  // Sync.so always has a valid speaker detection entry.
                   bounding_boxes: boundingBoxes,
                 },
               },
