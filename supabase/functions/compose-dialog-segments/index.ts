@@ -674,7 +674,7 @@ serve(async (req) => {
           },
           lip_sync_status: "failed",
           twoshot_stage: "failed",
-          clip_error: "plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte „Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.",
+          clip_error: 'plate_probe_failed_3plus_speakers: Video-Geometrie konnte nicht gelesen werden. Bitte "Sauber neu starten" drücken — beim erneuten Versuch nutzt das System die Anchor-Dimensionen als Fallback.',
           updated_at: new Date().toISOString(),
         })
         .eq("id", sceneId);
