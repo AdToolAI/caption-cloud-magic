@@ -989,10 +989,9 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 43,
+          version: 44,
           engine: "sync-official-segments",
-          asd_mode: "bounding_boxes",
-          bbox_pad_factor: bboxPadFactor,
+          asd_mode: "coordinates",
           status: "rendering",
           model: LIPSYNC_MODEL,
           sync_job_id: v41JobId,
