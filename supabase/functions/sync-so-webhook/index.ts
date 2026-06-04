@@ -350,6 +350,170 @@ serve(async (req) => {
 
   const nowIso = new Date().toISOString();
 
+  // ── v41: Official Sync.so Multi-Speaker Segments (single-call) ────────
+  // 1 generation owns the whole scene. Webhook output IS the final clip.
+  if ((state as any).version === 41 && (state as any).engine === "sync-official-segments") {
+    if ((state as any).sync_job_id !== jobId) {
+      console.warn(`[sync-so-webhook] v41 scene=${sceneId} job=${jobId} ORPHAN (state.sync_job_id=${(state as any).sync_job_id ?? "null"}) — cleaning up`);
+      try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
+      const apiKey = Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? "";
+      if (apiKey && status !== "COMPLETED") {
+        fetch(`https://api.sync.so/v2/generations/${encodeURIComponent(jobId)}`, {
+          method: "DELETE",
+          headers: { "x-api-key": apiKey },
+        }).catch(() => { /* best-effort */ });
+      }
+      return ok({ ok: true, skipped: "v41_job_orphan", job_id: jobId });
+    }
+
+    if (status === "COMPLETED" && outputUrl) {
+      // Rehost to ai-videos for a stable, redirect-free URL.
+      let rehostedUrl: string | null = null;
+      try {
+        const { data: row } = await supabase
+          .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+        const { data: proj } = await supabase
+          .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+        const uid = (proj as any)?.user_id;
+        if (uid) {
+          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(120_000) });
+          if (dl.ok) {
+            const bytes = new Uint8Array(await dl.arrayBuffer());
+            const objectPath = `composer/${uid}/${sceneId}-v41-lipsync.mp4`;
+            const up = await supabase.storage.from("ai-videos").upload(
+              objectPath, bytes, { contentType: "video/mp4", upsert: true },
+            );
+            if (!up.error) {
+              const { data: pub } = supabase.storage.from("ai-videos").getPublicUrl(objectPath);
+              if (pub?.publicUrl) rehostedUrl = pub.publicUrl;
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`[sync-so-webhook] v41 scene=${sceneId} re-host failed: ${(err as Error).message}`);
+      }
+      const finalUrl = rehostedUrl ?? outputUrl;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(state as any),
+            status: "done",
+            final_url: finalUrl,
+            sync_so_url: outputUrl,
+            rehosted: !!rehostedUrl,
+            finished_at: nowIso,
+          },
+          clip_url: finalUrl,
+          clip_status: "ready",
+          lip_sync_status: "applied",
+          lip_sync_applied_at: nowIso,
+          twoshot_stage: "complete",
+          clip_error: null,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      console.log(`[sync-so-webhook] v41 scene=${sceneId} DONE final=${finalUrl.slice(0, 80)}`);
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-official-segments", applied: true });
+    }
+
+    // FAILED / REJECTED / CANCELED
+    const rawErr = (errorMsg ?? "unknown").toString();
+    const errClass = classifySyncError(rawErr);
+    const codeBucket = classifySyncErrorCode(errorCode);
+    const codeExplain = explainSyncErrorCode(errorCode);
+    const retryCount = Number((state as any).retry_count ?? 0);
+    const MAX_V41_RETRIES = 1;
+    const isTransient =
+      codeBucket === "retry_transient" ||
+      (codeBucket === "unknown" && isTransientSyncError(errClass));
+    const canRetry = codeBucket !== "fail_fast" && isTransient && retryCount < MAX_V41_RETRIES;
+
+    try {
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, job_id: jobId, engine: "sync-official-segments",
+        sync_status: status, http_status: 200,
+        error_class: errClass, error_message: rawErr.slice(0, 500),
+        meta: {
+          sync_error_code: errorCode ?? null,
+          sync_error_bucket: codeBucket,
+          retry_count: retryCount,
+          will_retry: canRetry,
+          webhook_payload: payload,
+        },
+      });
+    } catch { /* ignore log errors */ }
+
+    if (canRetry) {
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(state as any),
+            status: "retrying",
+            last_error: rawErr.slice(0, 200),
+            last_error_class: errClass,
+            sync_error_code: errorCode ?? null,
+            updated_at: nowIso,
+          },
+          lip_sync_status: "running",
+          twoshot_stage: `syncso_v41_retry_${retryCount + 1}`,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      console.warn(`[sync-so-webhook] v41 scene=${sceneId} ${status} code=${errorCode ?? "null"} → retry ${retryCount + 1}/${MAX_V41_RETRIES}`);
+      fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+        body: JSON.stringify({ scene_id: sceneId, retry_v41: true }),
+      }).catch(() => {});
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, retried: true });
+    }
+
+    // Refund (idempotent) + mark failed
+    const cost = Number((state as any).cost_credits ?? 0);
+    const alreadyRefunded = !!(state as any).refunded;
+    if (cost > 0 && !alreadyRefunded) {
+      const { data: row } = await supabase
+        .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+      const { data: proj } = await supabase
+        .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+      const uid = (proj as any)?.user_id;
+      if (uid) {
+        const { data: w } = await supabase
+          .from("wallets").select("balance").eq("user_id", uid).single();
+        await supabase
+          .from("wallets")
+          .update({ balance: Number((w as any)?.balance ?? 0) + cost, updated_at: nowIso })
+          .eq("user_id", uid);
+      }
+    }
+    const codePrefix = errorCode ? `[${errorCode}] ` : "";
+    const explainSuffix = codeExplain ? ` — ${codeExplain}` : "";
+    const reason = `v41_${status}: ${codePrefix}${rawErr.slice(0, 200)}${explainSuffix}`;
+    await supabase
+      .from("composer_scenes")
+      .update({
+        dialog_shots: {
+          ...(state as any),
+          status: "failed",
+          finished_at: nowIso,
+          refunded: cost > 0,
+          error: reason,
+          last_error_class: errClass,
+          sync_error_code: errorCode ?? null,
+          sync_error_bucket: codeBucket,
+        },
+        lip_sync_status: "failed",
+        twoshot_stage: "failed",
+        clip_error: reason,
+        updated_at: nowIso,
+      })
+      .eq("id", sceneId);
+    console.warn(`[sync-so-webhook] v41 scene=${sceneId} ${status} code=${errorCode ?? "null"} class=${errClass} → FAILED refunded=${cost > 0 && !alreadyRefunded ? cost : 0}`);
+    return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, failed: true });
+  }
+
   // ── v5: Sync.so Segments (1-call pipeline) ────────────────────────────
   // No per-turn shots; the webhook output IS the final clip.
   if (state.version === 5 && state.engine === "sync-segments") {

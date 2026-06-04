@@ -263,11 +263,17 @@ serve(async (req) => {
     // a successful pass completion. Skips wallet debit + face-gate (already
     // validated on pass 0) and dispatches passes[current_pass].
     const isAdvance = body?.advance === true;
+    // v41 — single-call official Sync.so segments retry path (no re-charge,
+    // bypasses v5 fan-out, re-dispatches the canonical segments[] payload).
+    const isV41Retry = body?.retry_v41 === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
     if (repairAudio) {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
+    }
+    if (isV41Retry) {
+      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch)`);
     }
 
     // ── v33: strict single-flight lock ───────────────────────────────────
@@ -426,10 +432,13 @@ serve(async (req) => {
     if (
       !isRetry &&
       !isAdvance &&
+      !isV41Retry &&
       existing &&
-      existing.version === 5 &&
-      existing.engine === "sync-segments" &&
-      ["queued", "rendering"].includes(String(existing.status))
+      (
+        (existing.version === 5 && existing.engine === "sync-segments") ||
+        (existing as any).version === 41
+      ) &&
+      ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
       return json({ ok: true, status: "already_running", scene_id: sceneId }, 202);
     }
@@ -574,7 +583,7 @@ serve(async (req) => {
 
     // E.5: on retry path, wallet was already debited at the original dispatch
     // and the cost is preserved in state.cost_credits. Skip re-charging.
-    if (!isRetry) {
+    if (!isRetry && !isV41Retry) {
       const { data: wallet } = await supabase
         .from("wallets")
         .select("balance")
@@ -778,6 +787,258 @@ serve(async (req) => {
       `anchor=${faceMap?.width ?? "?"}x${faceMap?.height ?? "?"} plate=${plateDims ? `${plateDims.width}x${plateDims.height}` : "probe-failed"} ` +
       `speakers=${speakers.length} coords=${JSON.stringify(speakerCoords)} sources=${JSON.stringify(coordSources)}`,
     );
+
+    // ─────────────────────────────────────────────────────────────────────
+    // v41 — Official Sync.so Multi-Speaker Segments (for 3+ speakers)
+    // ─────────────────────────────────────────────────────────────────────
+    // Sync.so's Segments Guide (https://sync.so/docs/developer-guides/segments)
+    // documents the canonical multi-speaker path: ONE generation, top-level
+    // `segments[]`, each segment with `audioInput.refId` + `optionsOverride.
+    // active_speaker_detection`. lipsync-2-pro previously rejected this in
+    // 2025 (the old MAY 2026 comment below records that history); sync-3
+    // accepts the official shape today and is the documented model for
+    // 3+ speaker / multi-person / static plates.
+    //
+    // We use v41 for 3+ speaker scenes (and only on fresh dispatch or an
+    // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
+    // (it has been stable for them) so we don't regress simpler dialogs.
+    const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
+    const v41PrevState = (existing as any)?.version === 41 ? (existing as any) : null;
+    if (useV41Official && !isAdvance) {
+      const ASSUMED_FPS_V41 = 24;
+      // Build inputs: 1 video + N audio (one per speaker with track_url).
+      type V41Input =
+        | { type: "video"; url: string }
+        | { type: "audio"; url: string; ref_id: string };
+      const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
+      const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
+      speakers.forEach((sp, idx) => {
+        const audioUrl = String(sp.track_url ?? "").trim();
+        if (!audioUrl) return;
+        const refId = `speaker_${idx + 1}`;
+        v41Inputs.push({ type: "audio", url: audioUrl, ref_id: refId });
+        v41SpeakerRefs.push({
+          idx,
+          refId,
+          audioUrl,
+          coords: clampSyncCoords(speakerCoords[idx]) ?? null,
+          name: String(sp.speaker ?? `Speaker ${idx + 1}`),
+          characterId: sp.character_id ?? null,
+        });
+      });
+
+      if (v41SpeakerRefs.length < 3) {
+        // Missing per-speaker tracks → fall through to legacy v5 path below
+        // (which has its own no-tracks refund/fail handling).
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v41 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
+        );
+      } else {
+        // Build segments — one per voiced turn, attaching the segment's
+        // audioInput.refId (the speaker who owns the turn) AND a per-segment
+        // optionsOverride.active_speaker_detection so Sync.so animates the
+        // CORRECT face for each turn (no global ASD, no segments_secs).
+        const v41Segments: Array<Record<string, unknown>> = [];
+        v41SpeakerRefs.forEach(({ idx, refId, coords, name }) => {
+          const sp = speakers[idx];
+          const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
+            ? (sp!.voicedRange!.turns as Turn[])
+            : [];
+          for (const t of turns) {
+            const sRaw = Math.max(0, Number(t.startSec));
+            const eRaw = Math.min(totalSec, Math.max(sRaw + MIN_TURN_DUR_SEC, Number(t.endSec)));
+            if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
+            const s = Number(sRaw.toFixed(3));
+            const e = Number(eRaw.toFixed(3));
+            const midSec = (s + e) / 2;
+            const frameNumber = Math.max(0, Math.round(midSec * ASSUMED_FPS_V41));
+            const asdCoords = coords ?? [
+              Math.round(videoDims.width * 0.5),
+              Math.round(videoDims.height * 0.5),
+            ];
+            v41Segments.push({
+              startTime: s,
+              endTime: e,
+              audioInput: { refId, startTime: s, endTime: e },
+              optionsOverride: {
+                active_speaker_detection: {
+                  auto_detect: false,
+                  frame_number: frameNumber,
+                  coordinates: asdCoords,
+                },
+              },
+            });
+          }
+        });
+        v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
+
+        if (v41Segments.length === 0) {
+          await supabase
+            .from("composer_scenes")
+            .update({
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: "v41_no_segments_built",
+            })
+            .eq("id", sceneId);
+          return json({ error: "v41_no_segments_built" }, 422);
+        }
+
+        const v41Webhook = appendWebhookToken(
+          `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
+        );
+        const v41Payload = {
+          model: SYNC3_MODEL,
+          input: v41Inputs,
+          segments: v41Segments,
+          options: { sync_mode: "loop" },
+          webhookUrl: v41Webhook,
+          webhook_url: v41Webhook,
+        };
+
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v41_official_segments_payload model=${SYNC3_MODEL} ` +
+          `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
+          `segments=${v41Segments.length} totalSec=${totalSec}`,
+        );
+
+        const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
+          method: "POST",
+          headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
+          body: JSON.stringify(v41Payload),
+        });
+
+        if (!v41Resp.ok) {
+          const errTxt = await v41Resp.text().catch(() => "");
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v41 dispatch FAILED status=${v41Resp.status} body=${errTxt.slice(0, 600)}`,
+          );
+          const alreadyRefunded = !!(v41PrevState as any)?.refunded;
+          if (!alreadyRefunded && !isV41Retry) {
+            const { data: wRef } = await supabase
+              .from("wallets").select("balance").eq("user_id", userId).single();
+            await supabase
+              .from("wallets")
+              .update({
+                balance: Number(wRef?.balance ?? 0) + totalCost,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("user_id", userId);
+          }
+          await supabase
+            .from("composer_scenes")
+            .update({
+              dialog_shots: {
+                ...(v41PrevState ?? {}),
+                version: 41,
+                engine: "sync-official-segments",
+                status: "failed",
+                model: SYNC3_MODEL,
+                cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
+                refunded: !alreadyRefunded,
+                error: `v41_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                finished_at: new Date().toISOString(),
+              },
+              lip_sync_status: "failed",
+              twoshot_stage: "failed",
+              clip_error: `v41_dispatch_${v41Resp.status}`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", sceneId);
+          await logSyncDispatch(supabase, {
+            scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
+            sync_source_kind: "v41_segments", video_url: sourceClipUrl,
+            http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
+            error_class: classifySyncError(errTxt),
+            error_message: errTxt.slice(0, 500),
+            meta: { payload_summary: { model: SYNC3_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length } },
+          });
+          return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
+        }
+
+        const v41Data = await v41Resp.json();
+        const v41Shape = validateSyncResponseShape(v41Data);
+        if (!v41Shape.ok) {
+          console.error(
+            `[compose-dialog-segments] scene=${sceneId} v41 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
+          );
+          return json({ error: "v41_schema_drift", missing: v41Shape.missingKeys }, 502);
+        }
+        const v41JobId = String(v41Data.id ?? "");
+        if (!v41JobId) return json({ error: "v41_no_job_id" }, 502);
+
+        await registerInflightSyncJob(supabase, {
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments",
+        });
+        await recordCircuitSuccess(supabase, "sync.so");
+
+        const v41NowIso = new Date().toISOString();
+        const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
+        const v41State = {
+          version: 41,
+          engine: "sync-official-segments",
+          status: "rendering",
+          model: SYNC3_MODEL,
+          sync_job_id: v41JobId,
+          source_clip_url: sourceClipUrl,
+          total_sec: totalSec,
+          segments: v41Segments,
+          speaker_refs: v41SpeakerRefs,
+          cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
+          refunded: false,
+          retry_count: v41RetryCount,
+          started_at: v41PrevState?.first_started_at ?? v41NowIso,
+          first_started_at: v41PrevState?.first_started_at ?? v41NowIso,
+          video_width: videoDims.width,
+          video_height: videoDims.height,
+        };
+
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: v41State,
+            lip_sync_status: "running",
+            twoshot_stage: "syncso_v41_official_segments",
+            lip_sync_source_clip_url: sourceClipUrl,
+            replicate_prediction_id: `sync:${v41JobId}`,
+            clip_error: null,
+            updated_at: v41NowIso,
+          })
+          .eq("id", sceneId);
+
+        await logSyncDispatch(supabase, {
+          scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
+          job_id: v41JobId, sync_source_kind: "v41_segments",
+          video_url: sourceClipUrl,
+          window_start_sec: 0, window_end_sec: totalSec,
+          http_status: v41Resp.status, sync_status: "DISPATCHED",
+          meta: {
+            model: SYNC3_MODEL,
+            segments_count: v41Segments.length,
+            speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
+            is_retry: isV41Retry,
+            retry_count: v41RetryCount,
+          },
+        });
+
+        return json(
+          {
+            ok: true,
+            status: "rendering",
+            scene_id: sceneId,
+            sync_job_id: v41JobId,
+            engine: "sync-official-segments",
+            model: SYNC3_MODEL,
+            segments: v41Segments.length,
+            speakers: v41SpeakerRefs.length,
+            cost_credits: v41State.cost_credits,
+          },
+          202,
+        );
+      }
+    }
+
+
 
     // ── Build PASSES (one per speaker that has turns) ────────────────────
     // MAY 2026 pivot: instead of one Sync.so call with segments[]+ASD (which
