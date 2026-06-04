@@ -1202,6 +1202,34 @@ serve(async (req) => {
     pass.input_url = passInputUrl;
     pass.status = "rendering";
     pass.started_at = new Date().toISOString();
+
+    // ── v40 — Canonical audio restore (FIX for v39 retry bug) ────────────
+    // v39 bug: the first dispatch overwrote `pass.audio_url` with the
+    // sliced "tight" WAV (turn-only, ~3.27s). On retry the cloned pass
+    // still pointed at that tight URL, so the v39 slicer tried to cut
+    // ABSOLUTE windows like [3.81, 7.082] out of a 3.27s file → throws
+    // "sliceWav: no valid windows" → falls back to FULL-LENGTH path which
+    // then sends `segments_secs:[[3.81,7.082]]` on the video input plus
+    // the still-mutated 3.27s tight audio → Sync.so returns the opaque
+    // "An unknown error occurred" because audio length and animation
+    // window are incompatible.
+    //
+    // Fix: ALWAYS restore the canonical full-length per-speaker WAV from
+    // `audio_url_full` before re-slicing. Also clear stale `audio_tight`
+    // so the downstream slicer either rebuilds it cleanly or — if slicing
+    // fails — falls back to the genuinely full-length audio (which IS
+    // compatible with `segments_secs`).
+    const canonicalAudioUrl = String(
+      (pass as any).audio_url_full ?? pass.audio_url ?? "",
+    );
+    if (canonicalAudioUrl && canonicalAudioUrl !== pass.audio_url) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v40_restore_canonical_audio from=…${String(pass.audio_url).slice(-60)} to=…${canonicalAudioUrl.slice(-60)}`,
+      );
+    }
+    if (canonicalAudioUrl) pass.audio_url = canonicalAudioUrl;
+    (pass as any).audio_tight = null;
+
     // Each pass targets a DIFFERENT face with its own validated coords. Never
     // inherit a fallback variant from a sibling pass — that would drop the
     // coords for speakers 2+ and let Sync.so re-detect speaker 0 (causing
