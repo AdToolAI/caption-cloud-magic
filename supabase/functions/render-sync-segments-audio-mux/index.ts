@@ -183,17 +183,43 @@ serve(async (req) => {
       donePasses.length <= 2 ? minAxis * 0.22 :
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
+    // v38 — Per-turn windowed overlay. Each pass's Sync.so output is overlaid
+    // ONLY during that speaker's voiced turn window(s); the rest of the time
+    // the master plate underneath is visible. This guarantees no cross-speaker
+    // mouth-animation leakage even if Sync.so's internal timing drifts.
+    // A small ~0.08s pad on each end keeps consonant onsets/offsets natural
+    // and mirrors `segments_secs` sent to Sync.so in compose-dialog-segments.
+    const SHOT_PAD = 0.08;
     const fanoutShots = isFanout
-      ? donePasses.map((p: any) => ({
-          startSec: 0,
-          endSec: totalSec,
-          outputUrl: String(p.output_url),
-          faceMask: {
+      ? donePasses.flatMap((p: any) => {
+          const passSegs = Array.isArray(p?.segments) ? p.segments : [];
+          const faceMask = {
             cx: Number(p.coords[0]),
             cy: Number(p.coords[1]),
             radius: radiusForCount,
-          },
-        }))
+          };
+          if (passSegs.length === 0) {
+            return [{
+              startSec: 0,
+              endSec: totalSec,
+              outputUrl: String(p.output_url),
+              faceMask,
+            }];
+          }
+          return passSegs
+            .map((t: any) => {
+              const s = Math.max(0, Number(t.startTime) - SHOT_PAD);
+              const e = Math.min(totalSec, Number(t.endTime) + SHOT_PAD);
+              if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s + 0.05) return null;
+              return {
+                startSec: s,
+                endSec: e,
+                outputUrl: String(p.output_url),
+                faceMask,
+              };
+            })
+            .filter(Boolean);
+        })
       : [];
 
     const inputProps = {
