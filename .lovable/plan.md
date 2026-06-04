@@ -1,73 +1,64 @@
-## Ziel
+## Befund
 
-Für 3+ Sprecher-Szenen `active_speaker_detection` von `{ frame_number, coordinates: [x, y] }` auf `{ frame_number, bounding_boxes: [[x1, y1, x2, y2]] }` umstellen. Damit trifft Sync.so das Gesicht auch dann, wenn es im Zielframe leicht versetzt ist (Schulter-an-Schulter Two-/Three-Shots) — der Punkt-Hit-Test ist dort der häufigste Auslöser für "active speaker not found".
-
-## v43 Payload-Änderung (nur 3+ Sprecher)
+Der Lip-Sync ist nicht erst während des Renderings fehlgeschlagen, sondern Sync.so hat den Job sofort beim Dispatch abgelehnt:
 
 ```text
-segments[i].optionsOverride.active_speaker_detection = {
-  frame_number: <int>,
-  bounding_boxes: [[x1, y1, x2, y2]]   // statt coordinates: [x, y]
-}
+422: Segment at index 0 references unknown refId 'speaker_1'
 ```
 
-Alle anderen Felder bleiben unverändert (`model: lipsync-2-pro`, top-level `segments[]`, `audioInput.refId`, `sync_mode: "loop"`, Webhook).
+Die v43-Pipeline baut aktuell die Audio-Inputs mit `ref_id`, die Segmente referenzieren aber `audioInput.refId`. Laut aktueller Sync.so-Doku müssen diese Referenzen exakt übereinstimmen; in der API-Beschreibung steht für Segments ausdrücklich `refId`.
 
-## Wo die Box herkommt
+## Ziel
 
-Drei Quellen, in dieser Prio-Reihenfolge:
+v43 soll wieder exakt im Sync.so-Segments-Schema dispatchen:
 
-1. **`twoshot-face-map` Cache** — liefert pro Sprecher bereits `{ cx, cy, w, h }` aus der Plate-Analyse. Daraus
-   ```
-   x1 = clamp(cx - w/2 - pad, 0, W)
-   y1 = clamp(cy - h/2 - pad, 0, H)
-   x2 = clamp(cx + w/2 + pad, 0, W)
-   y2 = clamp(cy + h/2 + pad, 0, H)
-   ```
-   mit `pad = 0.08 * max(w, h)` (~8% Margin gegen Mikro-Drift).
+```text
+input: [
+  { type: "video", url },
+  { type: "audio", url, refId: "speaker_1" },
+  { type: "audio", url, refId: "speaker_2" },
+  { type: "audio", url, refId: "speaker_3" }
+]
+segments: [
+  {
+    startTime,
+    endTime,
+    audioInput: { refId: "speaker_1", startTime, endTime },
+    optionsOverride: {
+      active_speaker_detection: {
+        frame_number,
+        bounding_boxes: [[x1, y1, x2, y2]]
+      }
+    }
+  }
+]
+```
 
-2. **`frame_face_cache` / `validate-frame-face`** (Stage D) — falls die Face-Map nur `(cx, cy)` ohne `w/h` hat, Box aus dem Face-Gate-Result nehmen (das prüft sowieso schon pro Sprecher einen Plate-Frame).
+## Umsetzung
 
-3. **Fallback Quadrat** — wenn weder Face-Map noch Face-Gate eine echte Box liefern: Quadrat um den bestehenden Punkt mit Kantenlänge `min(W, H) * 0.18`. Logging-Marker `v43_bbox_fallback_square` damit wir sehen, wie oft das passiert.
+1. In `supabase/functions/compose-dialog-segments/index.ts` den v43-Input-Typ und Payload ändern:
+   - Audio-Inputs von `ref_id` auf `refId` umstellen.
+   - Logs weiterhin `audio_refs` ausgeben, damit wir im nächsten Run direkt sehen, dass die Referenzen identisch sind.
+   - Optional in `meta.payload_summary` auch die tatsächlichen Input-Refs mitschreiben.
 
-## Validierung vor Dispatch
+2. Fehlerstatus der betroffenen Szene `4992cff4-e351-461c-aaae-a765696acf12` gezielt zurücksetzen:
+   - `lip_sync_status` zurück auf `pending` oder den bestehenden UI-Reset-Pfad auslösen.
+   - `dialog_shots` nur so weit bereinigen, dass der nächste Dispatch v43 frisch mit `refId` sendet.
+   - Keine allgemeine Datenmüll-Bereinigung; nur diese fehlgeschlagene Szene reparieren.
 
-In `compose-dialog-segments` direkt vor der Sync.so-POST:
+3. Deployment/Validierung:
+   - `compose-dialog-segments` neu deployen.
+   - Danach die Funktion für die Szene erneut anstoßen.
+   - Erwarteter Log-Marker:
 
-- Box-Koordinaten sind Integer und liegen in `[0, W]` / `[0, H]`
-- `x2 > x1`, `y2 > y1`, Min-Fläche ≥ `(W*H) * 0.005`
-- Boxen verschiedener Sprecher dürfen sich überlappen (Two-Shot ist normal), aber nicht identisch sein → ansonsten Warn-Log `v43_bbox_speaker_collision` und 4px-Shift der zweiten Box, damit Sync.so eindeutig disambiguieren kann
-- Fail-fast Refund + klare Fehlermeldung, wenn für irgendeinen Sprecher keine valide Box gebaut werden konnte (statt 13-min Sync.so-Run ins Leere)
+```text
+v43_official_segments_payload model=lipsync-2-pro asd=bbox ... audio_refs=["speaker_1","speaker_2","speaker_3"]
+```
 
-## State & Webhook
+   - Erwartet: kein 422 `unknown refId` mehr. Danach läuft der Sync.so-Job normal weiter bis Webhook/Polling.
 
-- `composer_scenes.dialog_shots.version: 43`, `engine: "sync-official-segments"`, `model: "lipsync-2-pro"`, neues Feld `asd_mode: "bounding_boxes"`
-- `sync-so-webhook` akzeptiert weiterhin v41/v42/v43 — keine Migrationen nötig, in-flight Jobs sterben sauber
-- Retry-Pfad (`retry_v41: true`) baut die Boxen frisch neu (kein Caching des Payload-Bodys), damit bei Plate-Re-Render auch neue Box-Geometrie wirkt
+## Nicht-Ziele
 
-## Telemetrie / Logs
-
-- Dispatch: `v43_official_segments_payload model=lipsync-2-pro asd=bbox speakers=N segments=N`
-- Pro Sprecher: `v43 speaker=speaker_2 bbox=[x1,y1,x2,y2] source=face-map|face-gate|fallback`
-- Wenn Sync.so trotzdem mit "active speaker not found" failt → automatisch im selben Run einen Retry mit erweiterter Box (pad 8% → 18%) versuchen, dann erst Refund
-
-## Verifikation
-
-1. Szene `5f43e669-b154-4ac9-a516-b46acb7ee288` wird **nicht** automatisch resettet — wir warten, bis erst der v42-Run dieser Szene durch ist und vergleichen. Falls v42 grün: v43 wird auf der **nächsten neuen** 3+ Sprecher-Szene scharf geschaltet. Falls v42 erneut "An unknown error" / "active speaker not found" wirft: gezielter Reset dieser Szene auf v43.
-2. Logs müssen `v43_official_segments_payload … asd=bbox` zeigen, kein `coordinates:` mehr in der ausgehenden Payload für 3+ Sprecher.
-3. Keine v39/v40 Tight-WAV oder `segments_secs` Marker mehr.
-4. Bei Erfolg: `lip_sync_status='applied'`, ein Output-Video mit allen N Sprechern animiert.
-
-## Dateien
-
-- `supabase/functions/compose-dialog-segments/index.ts` — ASD-Builder von Point auf BBox umstellen, Validation + Fallback-Quadrat + Collision-Shift
-- `supabase/functions/_shared/twoshot-face-map.ts` (oder Äquivalent) — falls nötig, `bbox()` Helper exportieren der `(cx, cy, w, h) → [x1,y1,x2,y2]` mit Padding macht
-- `supabase/functions/sync-so-webhook/index.ts` — v43 in der Versions-Akzeptanzliste, plus 1× Bbox-Pad-Retry (18%) vor finalem Refund
-- `mem/architecture/lipsync/v43-bounding-boxes-asd.md` (neu) — kanonische Doku für v43
-- `mem/index.md` — Core-Eintrag v41 → v43 aktualisieren
-
-## Nicht-Ziele (bewusst raus aus diesem Plan)
-
-- Kein Cleanup von v5/v23/v26/v32–v42 Code, keine Memory-Konsolidierung, kein Entfernen von `render-sync-segments-audio-mux` — kommt erst nach mindestens einem grünen v43-Run auf einer 3+ Sprecher-Szene.
-- 1–2 Sprecher-Szenen bleiben unverändert auf v5 Fan-out — die waren nie das Problem.
-- Kein Wechsel des Modells (`lipsync-2-pro` bleibt), kein zweiter ASD-Modus parallel.
+- Keine Änderung an `bounding_boxes`/ASD-v43-Logik.
+- Kein Wechsel zurück zu Fan-out.
+- Kein Cleanup alter v5-v42-Daten oder Memories, bis ein echter v43-Run grün durchgelaufen ist.

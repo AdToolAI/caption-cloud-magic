@@ -818,7 +818,7 @@ serve(async (req) => {
       // Build inputs: 1 video + N audio (one per speaker with track_url).
       type V41Input =
         | { type: "video"; url: string }
-        | { type: "audio"; url: string; ref_id: string };
+        | { type: "audio"; url: string; refId: string };
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
       // ── v43 — Per-speaker bounding-box builder ──────────────────────────
@@ -883,7 +883,7 @@ serve(async (req) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
         const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, ref_id: refId });
+        v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         const built = buildBoxForSpeaker(idx, sp.character_id ?? null, coords);
         v41SpeakerRefs.push({
@@ -1041,7 +1041,7 @@ serve(async (req) => {
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length } },
+            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -1108,6 +1108,7 @@ serve(async (req) => {
             model: LIPSYNC_MODEL,
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
+            input_refs: v41SpeakerRefs.map((s) => s.refId),
             is_retry: isV41Retry,
             retry_count: v41RetryCount,
           },
