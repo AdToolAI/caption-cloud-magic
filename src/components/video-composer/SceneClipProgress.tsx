@@ -120,7 +120,20 @@ export function SceneClipProgress({ scene, index, aspectRatio }: SceneClipProgre
     speaker_name?: string;
     status: 'pending' | 'generating' | 'generated' | 'lipsyncing' | 'ready' | 'failed';
     error?: string;
-  }> = Array.isArray(dialogShotsState?.shots) ? dialogShotsState.shots : [];
+  }> = Array.isArray(dialogShotsState?.shots)
+    ? dialogShotsState.shots
+    : Array.isArray(dialogShotsState?.passes)
+      ? dialogShotsState.passes.map((p: any) => ({
+          idx: Number(p?.idx ?? 0),
+          speaker_name: p?.speaker_name,
+          status:
+            p?.status === 'done' ? 'ready'
+              : p?.status === 'rendering' || p?.status === 'retrying' ? 'lipsyncing'
+                : p?.status === 'failed' || p?.status === 'canceled_by_scene_failure' ? 'failed'
+                  : 'pending',
+          error: p?.error ?? p?.last_error,
+        }))
+      : [];
   const isDialog = isCinematic && (dialogShots.length > 0 || lipSyncRunning);
   const dialogReady = dialogShots.filter((s) => s.status === 'ready').length;
   const dialogTotal = dialogShots.length;
