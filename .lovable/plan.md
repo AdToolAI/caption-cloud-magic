@@ -1,51 +1,59 @@
-Do I know what the issue is? Yes.
+Ich habe Sync.so-Doku, aktuelle Logs und unsere Pipeline verglichen. Der aktuelle Fehler ist nicht mehr der alte MP4-Probe-Fehler: Szene `64b2ae86-c70d-4097-ae4e-89570edad884` wird vor Sync.so blockiert mit `plate_target_face_missing_pass_0_speaker_Samuel Dusatko`.
 
-The currently failed scene `f03cdc20-cc7b-48e2-9175-f54f2b8456ed` failed before any Sync.so job was dispatched. The database and logs show:
-
-- `clip_error = plate_probe_failed_3plus_speakers`
-- `syncso_dispatch_log.sync_status = PREFLIGHT_BLOCKED`
-- `error_message = probeMp4Dims returned null for 3+ speaker scene`
-- Edge log: `probe-result ... phaseA=http_206+nomoov phaseB=http_206+nomoov phaseC=http_206+notkhd dims=null`
-
-So the v33 hard-preflight is doing what we added: it blocks 3-speaker Sync.so dispatch when it cannot determine the actual video plate dimensions. The problem is that our MP4 dimension probe is not robust enough for the Hailuo-hosted MP4 layout, so it false-fails even though the clip is visibly valid and ready.
+Wichtigster Befund: Sync.so verlangt, dass `frame_number` und `coordinates` aus demselben echten Video-Frame stammen. Unsere Pipeline nimmt die Koordinaten aktuell aus dem Anchor/Kompositionsbild und überträgt sie auf das finale Hailuo-Video. Wenn Hailuo den Bildausschnitt verschiebt/croppt oder Gesichter im Sprecherzeitpunkt nicht sichtbar sind, landen die Koordinaten nicht auf dem Gesicht. Genau das passiert hier.
 
 ## Plan
 
-1. Fix the MP4 dimension probe
-   - Extend `probeMp4Dims` in `_shared/twoshot-face-map.ts` so it does not rely only on `tkhd` discovery.
-   - Add additional MP4 parsing fallbacks:
-     - scan/parse visual sample entries (`avc1`, `avc3`, `hvc1`, `hev1`) for width/height,
-     - reuse the existing `probeMp4Stream` width/height logic where suitable,
-     - log which probe path succeeded.
-   - Keep the hard-fail for real unknown dimensions, but stop false-blocking valid Hailuo clips.
+### 1. Sync.so-konforme Face-Selection aus dem echten finalen Video
+- Statt bei `coordsMatch=false` sofort hart zu scheitern, verwende die im Face-Gate bereits erkannten Face-Boxes des echten Video-Frames.
+- Sortiere erkannte Gesichter links-nach-rechts und mappe sie auf die Sprecher-Slots.
+- Ersetze die alten Anchor-Koordinaten durch echte Plate-Koordinaten aus dem validierten Frame.
+- Speichere diese korrigierten Koordinaten im `dialog_shots.passes[]`, damit Sync.so `frame_number + coordinates` aus derselben Video-Quelle bekommt.
 
-2. Add a safe 3-speaker fallback when the anchor and clip aspect match
-   - If MP4 probing still fails but `audio_plan.twoshot.faceMap.width/height` is present and has a sane video aspect ratio, use those dimensions as `trusted_anchor_dims_fallback`.
-   - Only allow this fallback for matching wide scene plates, not arbitrary portrait/talking-head sources.
-   - Record the fallback source in dispatch logs so we can tell whether the scene used exact MP4 dims or anchor-derived dims.
+### 2. Mehrere Referenzframes pro Sprecher testen
+- Pro Sprecher nicht nur den Mittel-Frame prüfen, sondern eine kleine sichere Frame-Liste:
+  - Turn-Start + kurzer Offset
+  - Turn-Mitte
+  - Turn-Ende - kurzer Offset
+  - optional ±1 Sekunde, wenn das Modell einen besseren Frame vorschlägt
+- Wenn ein Frame alle erwarteten Gesichter oder zumindest das Zielgesicht sichtbar hat, wird dieser Frame als Sync.so-Referenz verwendet.
+- Wenn wirklich kein Gesicht sichtbar ist, bleibt der Fehler bewusst hart: Dann ist das Quellvideo für Lip-Sync ungeeignet und muss neu gerendert werden.
 
-3. Fix the reset path so failed preflight scenes can actually start fresh
-   - Update `reset-lipsync-scene` to clear the stale `audio_plan.twoshot.faceMap` / preflight cache fields when doing a full lip-sync reset.
-   - Keep the master clip intact unless the failure says the clip itself is unusable.
-   - This prevents “Sauber neu starten” from reusing a bad cached geometry map forever.
+### 3. Face-Gate-Fehler verständlicher machen
+- `plate_target_face_missing...` wird nicht mehr als generischer Lip-Sync-Abbruch angezeigt.
+- Neue Meldung: „Im finalen Szene-Video ist das Zielgesicht an der Sprecherstelle nicht sichtbar oder anders positioniert; Koordinaten werden automatisch repariert / Clip muss neu gerendert werden.“
+- Dispatch-Logs bekommen zusätzlich `face_repair_source`, `reference_frame_number`, `original_coords`, `repaired_coords`.
 
-4. Improve user-visible error handling
-   - Treat `plate_probe_failed_3plus_speakers` as a recoverable technical preflight failure in the UI copy.
-   - Make the message say the system could not read video geometry and will retry after reset, instead of implying Sync.so failed.
+### 4. Fake-`repair_audio` entfernen bzw. echt machen
+- Der aktuelle Retry-Pfad setzt `repair_audio=true`, aber `compose-dialog-segments` loggt nur „nicht implementiert“ und sendet dieselbe WAV erneut.
+- Ich werde diesen nutzlosen Retry entfernen oder durch eine echte timeline-erhaltende WAV-Reparatur ersetzen:
+  - keine Lead-In-Trimmung
+  - Dauer bleibt identisch zur Szene
+  - WAV-Header/PCM wird sauber neu geschrieben
+  - Upload einer reparierten Audio-Datei nur für den Retry
 
-5. Validation after implementation
-   - Deploy the changed edge functions.
-   - Re-run the affected scene through `compose-dialog-segments` and confirm it gets past preflight into `DISPATCHED` instead of `PREFLIGHT_BLOCKED`.
-   - Check logs for real dimensions or the explicit trusted fallback.
-   - Confirm the watchdog no longer shows `scanned=0` for a scene that should be running.
+### 5. Webhook-State-Maschine stabilisieren
+- Wenn ein Pass final scheitert, aber weitere Passes noch pending sind, soll der Webhook sofort den nächsten pending Pass starten statt auf den Watchdog zu warten.
+- Der Audio-Mux-Compositor soll starten, sobald alle Passes terminal sind und mindestens ein gültiger Pass fertig ist, statt endlos auf „alle erfolgreich“ zu warten.
+- `final_url` wird aus dem letzten erfolgreichen Pass gewählt, nicht blind aus dem letzten Pass.
 
-## Files to change
+### 6. UI-Fortschritt für v5 Multi-Pass anzeigen
+- Die UI liest aktuell nur `dialog_shots.shots[]`; unsere Sync.so-Pipeline schreibt aber `dialog_shots.passes[]`.
+- Ich mappe `passes[]` auf die vorhandene Fortschrittsanzeige, damit du pro Sprecher siehst: pending, running, done, failed.
 
-- `supabase/functions/_shared/twoshot-face-map.ts`
+### 7. Aktuelle Szene nach Deployment sauber neu starten
+- Nach den Änderungen wird die betroffene Szene `64b2ae86-c70d-4097-ae4e-89570edad884` zurückgesetzt, damit sie mit echter Plate-Face-Reparatur neu startet.
+- Danach prüfe ich Logs: Erst Face-Gate, dann Sync.so-Dispatch, dann Webhook/Fan-In-Mux.
+
+## Betroffene Dateien
 - `supabase/functions/compose-dialog-segments/index.ts`
-- `supabase/functions/reset-lipsync-scene/index.ts`
-- optionally `src/hooks/useTwoShotAutoTrigger.ts` or the progress/error component if the hard-fail copy is surfaced there
+- `supabase/functions/_shared/syncso-preflight.ts`
+- `supabase/functions/sync-so-webhook/index.ts`
+- `supabase/functions/reset-lipsync-scene/index.ts` falls Reset stale Face-Reparaturen löschen muss
+- `src/components/video-composer/SceneClipProgress.tsx`
 
-## Important note
-
-This is separate from the earlier Sync.so `unknown error` loop. That loop appears stopped for the current scene. The current blocker is our own preflight geometry reader falsely failing on a valid 3-character Hailuo plate.
+## Erwartetes Ergebnis
+- Sync.so bekommt Koordinaten nach offizieller Anleitung: echte Frame-Nummer + echter Punkt auf dem Gesicht aus genau diesem Frame.
+- Szenen mit verschobenem Hailuo-Crop werden automatisch repariert statt sofort abzubrechen.
+- Szenen ohne sichtbare Gesichter scheitern früh mit klarer Ursache, ohne Credits bei Sync.so zu verbrennen.
+- Multi-Speaker-Retry und Webhook-Fortschritt laufen deterministischer und hängen nicht mehr im Zwischenstatus.
