@@ -270,11 +270,61 @@ export async function probeMp4Dims(
     phaseCStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
   }
 
+  // Phase D — sample-entry scan. Some MP4 muxers (notably Hailuo) write a
+  // `tkhd` with width=height=0 (transform-matrix only) and put the real
+  // visual size in the AVC/HEVC visual sample entry inside `stsd`. Scan the
+  // already-fetched tail for `avc1`/`avc3`/`hvc1`/`hev1` FourCCs and read
+  // width@+32, height@+34 (uint16, big-endian) inside the sample entry.
+  let phaseDStatus = "skipped";
+  try {
+    const resp = await fetch(url, {
+      headers: { Range: "bytes=-1048575" },
+      signal: AbortSignal.timeout(6_000),
+    });
+    phaseDStatus = `http_${resp.status}`;
+    if (resp.ok || resp.status === 206) {
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      const dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+      const codecs = ["avc1", "avc3", "hvc1", "hev1", "vp09", "av01"];
+      let best: { width: number; height: number } | null = null;
+      const maxScan = Math.max(0, buf.length - 40);
+      for (let i = 0; i < maxScan; i++) {
+        const fourcc = String.fromCharCode(buf[i], buf[i + 1], buf[i + 2], buf[i + 3]);
+        if (!codecs.includes(fourcc)) continue;
+        // Visual sample entry layout: 6 reserved + 2 data_ref_index + 16 pre-defined/reserved + 2 width + 2 height
+        // So width is at fourcc_offset + 4 (skip fourcc) + 24 = +28? Actually fourcc IS at the
+        // start of the entry body (after entry size). Width is at +32 from entry-size start,
+        // i.e. +28 from fourcc start. Try both common offsets.
+        for (const off of [24, 28, 32]) {
+          if (i + off + 4 > buf.length) continue;
+          const w = dv.getUint16(i + off, false);
+          const h = dv.getUint16(i + off + 2, false);
+          if (w >= 64 && h >= 64 && w <= 8192 && h <= 8192) {
+            const dims = { width: w, height: h };
+            if (!best || dims.width * dims.height > best.width * best.height) {
+              best = dims;
+            }
+          }
+        }
+      }
+      if (best) {
+        console.log(
+          `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} phaseC=${phaseCStatus} phaseD=${phaseDStatus}+sampleentry dims=${best.width}x${best.height}`,
+        );
+        return best;
+      }
+      phaseDStatus = `${phaseDStatus}+nosampleentry`;
+    }
+  } catch (e) {
+    phaseDStatus = `error:${(e as Error)?.message?.slice(0, 40) ?? "unknown"}`;
+  }
+
   console.log(
-    `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} phaseC=${phaseCStatus} dims=null`,
+    `[twoshot-face-map] probe-result url=${url.slice(0, 80)} phaseA=${phaseAStatus} phaseB=${phaseBStatus} phaseC=${phaseCStatus} phaseD=${phaseDStatus} dims=null`,
   );
   return null;
 }
+
 
 async function askGeminiForFaces(
   anchorUrl: string,
