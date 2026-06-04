@@ -1197,7 +1197,7 @@ serve(async (req) => {
     }
     if (repairAudio) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio requested but trim disabled — timeline-preserving repair not implemented yet`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio requested — re-encoding WAV without trimming timeline`,
       );
       try {
         const rawAudio = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
@@ -1360,7 +1360,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -1501,6 +1501,9 @@ serve(async (req) => {
         speaker: pass.speaker_name,
         character_id: pass.character_id,
         coords: pass.coords,
+          reference_frame_number: referenceFrameNumber,
+          face_repair: pass.face_repair ?? null,
+          audio_repair: (pass as any).audio_repair ?? null,
         retry_variant: retryVariant,
         model: payload.model,
         is_retry: isRetry,
@@ -1517,7 +1520,7 @@ serve(async (req) => {
           model: payload.model,
           input_video: passInputUrl,
           audio: pass.audio_url,
-          frame_number: frameNumber,
+          frame_number: referenceFrameNumber,
           coordinates: pass.coords,
           options: payload.options,
         },
