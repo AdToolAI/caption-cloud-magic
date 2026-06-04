@@ -985,7 +985,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v41_official_segments_payload model=${LIPSYNC_MODEL} ` +
+          `[compose-dialog-segments] scene=${sceneId} v43_official_segments_payload model=${LIPSYNC_MODEL} asd=bbox pad=${bboxPadFactor.toFixed(2)} ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec}`,
         );
