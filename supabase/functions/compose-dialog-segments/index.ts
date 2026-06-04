@@ -1058,12 +1058,12 @@ serve(async (req) => {
         const v41Shape = validateSyncResponseShape(v41Data);
         if (!v41Shape.ok) {
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v47 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
+            `[compose-dialog-segments] scene=${sceneId} v49 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
           );
-          return json({ error: "v47_schema_drift", missing: v41Shape.missingKeys }, 502);
+          return json({ error: "v49_schema_drift", missing: v41Shape.missingKeys }, 502);
         }
         const v41JobId = String(v41Data.id ?? "");
-        if (!v41JobId) return json({ error: "v47_no_job_id" }, 502);
+        if (!v41JobId) return json({ error: "v49_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
           job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments",
