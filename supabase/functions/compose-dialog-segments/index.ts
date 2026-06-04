@@ -978,12 +978,14 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v47 — docs-exact model: lipsync-2-pro is the only model that
-        // supports `segments[]` per the official Multi-Speaker Segments
-        // example. sync-3 silently ignores segments (full-shot global model).
-        const V47_MODEL = LIPSYNC_MODEL; // "lipsync-2-pro"
+        // v49 — Sync.so probe-proven: `segments[]` works with `lipsync-2`
+        // ONLY when no per-segment ASD coordinates are attached. `lipsync-2-pro`
+        // is aliased to `sync-2-pro` server-side and also accepts segments,
+        // but the docs' multi-speaker examples all use `lipsync-2`, so we
+        // align with the canonical example for stability.
+        const V49_MODEL = "lipsync-2";
         const v41Payload = {
-          model: V47_MODEL,
+          model: V49_MODEL,
           input: v41Inputs,
           segments: v41Segments,
           options: { sync_mode: "cut_off" },
@@ -992,7 +994,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v47_official_segments_payload model=${V47_MODEL} asd=plate_native ` +
+          `[compose-dialog-segments] scene=${sceneId} v49_official_segments_payload model=${V49_MODEL} asd=auto ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off video=${videoDims.width}x${videoDims.height}`,
         );
