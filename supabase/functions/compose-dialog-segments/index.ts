@@ -436,7 +436,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 42 || (state as any).version === 41
+        (existing as any).version === 41 || (existing as any).version === 42
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
