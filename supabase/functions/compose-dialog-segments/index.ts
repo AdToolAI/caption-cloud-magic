@@ -1439,11 +1439,12 @@ serve(async (req) => {
           ? LIPSYNC_FALLBACK_MODEL
           : LIPSYNC_MODEL;
 
-    // v38 — Restrict animation window to this speaker's turn(s) via
-    // segments_secs on the VIDEO input. Only applied for multi-speaker scenes
-    // (≥2 passes); single-speaker monologues need the full plate.
+    // v38/v39 — Restrict animation window via segments_secs ONLY when the
+    // tight-audio slicer failed (fallback path). With v39 tight audio
+    // active, the audio itself equals the turn duration so segments_secs
+    // becomes redundant and we omit it to avoid double-cutting issues.
     const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
-    if (passes.length >= 2 && speakerWindowsSecs.length > 0) {
+    if (passes.length >= 2 && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       videoInput.segments_secs = speakerWindowsSecs;
     }
     const payload: Record<string, unknown> = {
@@ -1457,7 +1458,7 @@ serve(async (req) => {
       webhook_url: diagnosticWebhookUrl,
     };
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v38_windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "fallback_full+segments"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
 
     // ── Length sanity log ────────────────────────────────────────────────
