@@ -1073,11 +1073,11 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 47,
+          version: 49,
           engine: "sync-official-segments",
-          asd_mode: "plate_native",
+          asd_mode: "auto",
           status: "rendering",
-          model: "lipsync-2-pro",
+          model: "lipsync-2",
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
           total_sec: totalSec,
@@ -1097,7 +1097,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v47_official_segments",
+            twoshot_stage: "syncso_v49_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1107,12 +1107,12 @@ serve(async (req) => {
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-          job_id: v41JobId, sync_source_kind: "v47_segments",
+          job_id: v41JobId, sync_source_kind: "v49_segments",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: "lipsync-2-pro",
+            model: "lipsync-2",
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             input_refs: v41SpeakerRefs.map((s) => s.refId),
