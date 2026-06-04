@@ -1484,5 +1484,17 @@ serve(async (req) => {
   } catch (e) {
     console.error("[compose-dialog-segments] error", e);
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+  } finally {
+    if (lockSupabase && lockSceneId && lockHolder) {
+      try {
+        await lockSupabase.rpc("release_dialog_lock", {
+          _scene_id: lockSceneId,
+          _holder: lockHolder,
+        });
+      } catch (e) {
+        console.warn(`[compose-dialog-segments] lock release failed: ${(e as Error)?.message ?? e}`);
+      }
+    }
   }
 });
+
