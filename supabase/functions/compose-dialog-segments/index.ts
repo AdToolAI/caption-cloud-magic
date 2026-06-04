@@ -803,7 +803,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
       // v44 — ASD per segment via `frame_number + coordinates` (Sync.so's
       // official multi-speaker Segments example, /developer-guides/segments
