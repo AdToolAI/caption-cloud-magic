@@ -263,11 +263,17 @@ serve(async (req) => {
     // a successful pass completion. Skips wallet debit + face-gate (already
     // validated on pass 0) and dispatches passes[current_pass].
     const isAdvance = body?.advance === true;
+    // v41 — single-call official Sync.so segments retry path (no re-charge,
+    // bypasses v5 fan-out, re-dispatches the canonical segments[] payload).
+    const isV41Retry = body?.retry_v41 === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
     if (repairAudio) {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
+    }
+    if (isV41Retry) {
+      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch)`);
     }
 
     // ── v33: strict single-flight lock ───────────────────────────────────
