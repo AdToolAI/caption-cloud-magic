@@ -1199,6 +1199,42 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio requested but trim disabled — timeline-preserving repair not implemented yet`,
       );
+      try {
+        const rawAudio = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
+        if (rawAudio.ok) {
+          const repaired = normalizeWav(new Uint8Array(await rawAudio.arrayBuffer()), {
+            leadInSec: 0,
+            minTotalSec: totalSec,
+            peakDbFs: -1,
+            forceMono: true,
+            targetLufs: -16,
+          });
+          const repairPath = `${userId}/twoshot-vo/${sceneId}-pass-${pass.idx + 1}-repair-${Date.now()}.wav`;
+          const up = await supabase.storage.from("voiceover-audio").upload(
+            repairPath,
+            repaired.bytes,
+            { contentType: "audio/wav", upsert: true },
+          );
+          if (!up.error) {
+            const { data: pub } = supabase.storage.from("voiceover-audio").getPublicUrl(repairPath);
+            if (pub?.publicUrl) {
+              pass.audio_url = pub.publicUrl;
+              (pass as any).audio_repair = {
+                source_url: passDiag?.pass != null ? "speaker_track" : "unknown",
+                repaired_url: pub.publicUrl,
+                dur_sec: repaired.info.durSec,
+                peak_dbfs: repaired.info.peakDbFs,
+                lead_in_sec: repaired.info.leadInSec,
+              };
+              console.log(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio uploaded ${repairPath}`);
+            }
+          } else {
+            console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio upload failed: ${up.error.message}`);
+          }
+        }
+      } catch (err) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio failed: ${(err as Error)?.message ?? err}`);
+      }
     }
 
 
@@ -1207,6 +1243,9 @@ serve(async (req) => {
     const firstTurn = pass.segments[0];
     const midSec = firstTurn ? (firstTurn.startTime + firstTurn.endTime) / 2 : totalSec / 2;
     const frameNumber = Math.max(0, Math.floor(midSec * ASSUMED_FPS));
+    const referenceFrameNumber = Number.isFinite(pass.reference_frame_number)
+      ? Math.max(0, Math.round(Number(pass.reference_frame_number)))
+      : frameNumber;
     const syncOptions: Record<string, unknown> = {
       // Explicit: keep full video length. Without this, lipsync-2-pro's
       // default trims output to the shorter input → multi-pass chains
@@ -1219,8 +1258,8 @@ serve(async (req) => {
     if (retryVariant === "coords-pro") {
       syncOptions.active_speaker_detection = {
         auto_detect: false,
-        frame_number: frameNumber,
-        coordinates: pass.coords,
+        frame_number: referenceFrameNumber,
+        coordinates: clampSyncCoords(pass.coords),
       };
     } else if (retryVariant === "coords-pro-box") {
       // v31 — Prefer the REAL face bounding box from the resolved faceMap
