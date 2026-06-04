@@ -200,6 +200,12 @@ interface SegmentsState {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // v33: strict per-scene single-flight lock. Released in `finally` below so
+  // every return path (including early 202s, 422s, and thrown errors) frees it.
+  let lockSupabase: any = null;
+  let lockSceneId: string | null = null;
+  let lockHolder: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
