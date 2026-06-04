@@ -15,9 +15,10 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Multi-Speaker (v39)**: Multi-speaker scenes (≥2 passes) MUST slice each per-speaker WAV down to its voiced turn windows BEFORE Sync.so dispatch (`sliceWavToWindows`); with `sync_mode=cut_off` the output naturally equals the turn duration and animation starts at t=0. Compositor tags those shots `sourceTiming:'relative'` so it works regardless of deployed Lambda bundle version. `segments_secs` on the video input is now only a fallback if slicing fails. See `mem://architecture/lipsync/per-turn-tight-audio-v39`.
+- **Lip-Sync Multi-Speaker (v41)**: For 3+ speaker scenes, `compose-dialog-segments` now uses Sync.so's OFFICIAL top-level `segments[]` payload (one generation, `audioInput.refId` per turn + per-segment `optionsOverride.active_speaker_detection`) with `sync-3`. No more v5 fan-out / tight-WAV / `segments_secs` / bbox ladder for 3+. 1–2 speaker scenes keep v5 fan-out. State: `version: 41, engine: 'sync-official-segments'`. See `mem://architecture/lipsync/v41-official-segments-payload`.
 
 ## Memories
+- [v41 Official Segments Payload](mem://architecture/lipsync/v41-official-segments-payload) — Canonical Sync.so multi-speaker shape for 3+ speakers, sync-3 model, 1 transient retry then refund
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
 - [Sync-3 Fallback + Identity Soft-Pass v37](mem://architecture/lipsync/sync-3-fallback-and-identity-soft-pass-v37) — sync-3 retry variant + identity-match face-gate soft-pass for 3+ speakers
 - [Multi-Speaker Honesty Policy v36](mem://architecture/lipsync/multi-speaker-honesty-policy-v36) — Partial-mux forbidden for 3+ speakers; full refund on missing speaker
