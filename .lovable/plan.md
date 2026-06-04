@@ -1,70 +1,89 @@
-## Befund: drei Abweichungen vom offiziellen Sync.so Segments-Spec
+## Befund
 
-Quelle: https://docs.sync.so/developer-guides/segments
+**Do I know what the issue is?** Ja.
 
-### 1. KRITISCH — Falsches Modell (`sync-3` statt `lipsync-2-pro`)
+Der erneute Failure war kein Frontend-Problem. Der konkrete Sync.so-Job für Szene `e5445b67…` wurde zweimal erfolgreich an Sync.so übergeben, kam aber beide Male nach wenigen Sekunden mit `FAILED: An unknown error occurred` zurück.
 
-Die offizielle Doku zeigt in **allen** Multi-Speaker-Segments-Beispielen (Basic, Multiple Audio, optionsOverride, Multi-Speaker ASD) ausschließlich `model: "lipsync-2"` / `lipsync-2-pro`. `sync-3` wird in der Segments-Guide nirgends als unterstütztes Modell genannt.
+Der wichtigste Befund aus Logs + Frame-Inspektion:
 
-Unsere eigene v42-Memory (`mem://architecture/lipsync/v42-lipsync2pro-segments`) hat genau diesen Punkt schon einmal gefixt:
+- Unsere v46-Payload nutzt zwar die offizielle Segments-Struktur (`segments[]`, `audioInput.refId`, `optionsOverride.active_speaker_detection`, `lipsync-2-pro`, `sync_mode: cut_off`).
+- Aber die ASD-Koordinaten kommen aus dem **Anchor/Identity-FaceMap** und werden nur geometrisch auf das Video skaliert.
+- Im echten Video liegen diese Punkte sichtbar zu hoch bzw. nicht sauber auf den Gesichtern. Sync.so verlangt laut Speaker-Selection-Doku: `coordinates` müssen im selben Frame-Koordinatensystem auf dem Gesicht liegen.
+- Wir haben den strikten Plate-Frame-Check für 3+ Sprecher bewusst übersprungen, sobald alle Identitäten im Anchor gematcht waren. Genau das ist hier falsch: Identity-Match ≠ plate-native Sync.so-Koordinaten.
 
-> v41 sent the same shape against sync-3, which silently ignores `segments[]` (sync-3 is a "full-shot global" model with no segments support in the docs) — only the dominant speaker got lipsync and the job ended in opaque "An unknown error occurred." after 10–13 min.
+Zusätzlich sind kleinere Fehler sichtbar:
 
-v45 hat das Modell wieder auf `sync-3` umgestellt → **gleicher Fehler, gleiches Symptom**. Die jüngsten Failures sind damit erklärt.
+- v46-Dispatch-Logs schreiben fälschlich `model: "sync-3"`, obwohl real `lipsync-2-pro` geschickt wird.
+- v46 nutzt weiter alte `v41_*` Fehlernamen/Retry-Labels, was Diagnose erschwert.
+- Der 3-Sprecher-Single-Call wird mit Sprecheranzahl multipliziert bepreist, obwohl es nur ein Sync.so-Call ist.
+- Der Retry wiederholt denselben falschen Koordinaten-Payload, statt vorher plate-native Koordinaten zu reparieren.
 
-### 2. `auto_detect: false` ist nicht Teil der Doku
+## Plan
 
-Die Doku listet die ASD-Varianten als **exklusiv** auf:
-- `auto_detect` ODER
-- `v3` ODER
-- `frame_number + coordinates` ODER
-- `bounding_boxes` / `bounding_boxes_url`
+### 1. v47: Plate-native Face Targeting vor Sync.so-Dispatch
 
-Das offizielle Multi-Speaker-Beispiel sendet **nur** `{frame_number, coordinates}` — kein `auto_detect`-Feld daneben. Unser Payload kombiniert beide Varianten, was Sync.so als ungültig verwerfen kann.
+In `compose-dialog-segments` wird die 3+ Sprecher Segments-Route so geändert:
 
-### 3. Input-Audio-`ref_id` vs. `refId`
+- Für jeden Sprecher/Turn den tatsächlichen Referenzframe aus dem Video nehmen.
+- Auf diesem Frame die vorhandene `validate-frame-face`-Logik nutzen, um echte Gesichtsboxen im **Video-Koordinatensystem** zu bekommen.
+- Gesichter links-nach-rechts sortieren und Speaker-Slot sauber auf Face-Box mappen.
+- Sync.so-Koordinate nicht mehr aus Anchor-Scaling ableiten, sondern aus der echten Plate-Face-Box:
+  - x = Box-Mitte
+  - y = Mund-/untere Gesichtszone statt Stirn/Anchor-Zentrum
+- Nur wenn genügend echte Gesichter gefunden werden, wird der offizielle Segments-Single-Call dispatched.
+- Wenn nicht genügend Gesichter gefunden werden, wird **kein kaputter Sync.so-Call** gestartet; die Szene geht in einen klaren reparierbaren Zustand oder fällt auf die stabilere per-speaker Pipeline zurück.
 
-Doku-Beispiele:
-- Top-level Input: `Audio(url=…, ref_id="audio_1")` → snake_case `ref_id`
-- Innerhalb `audioInput`: `{"refId": "audio_1"}` → camelCase `refId`
+### 2. Retry-Logik reparieren
 
-Unser Code sendet im Input-Array `{ type: "audio", url, refId }` (camelCase). Die offizielle REST-Form ist `ref_id`. Beides defensiv setzen kostet nichts und macht den Job doku-konform.
+Der Retry darf nicht denselben fehlerhaften Payload erneut senden.
 
-## Plan v46
+- Bei Sync.so `unknown error` in v47 zuerst Koordinaten/Frame neu validieren.
+- Retry nur mit reparierten plate-native Koordinaten.
+- Maximal ein Provider-Retry bleibt bestehen, aber mit echter Payload-Änderung.
+- Fehlertexte werden von `v41_FAILED` auf `v47_FAILED` aktualisiert.
 
-### A) `compose-dialog-segments/index.ts`
+### 3. Payload und Logging aufräumen
 
-1. Modell zurück auf `lipsync-2-pro` (Konstante `V46_MODEL = LIPSYNC_MODEL`).
-2. `active_speaker_detection` exakt wie im offiziellen Multi-Speaker-Beispiel:
-   ```text
-   { frame_number, coordinates: [x, y] }
-   ```
-   `auto_detect: false` entfernen.
-3. Im Input-Array zusätzlich `ref_id` setzen (beide Schreibweisen):
-   ```text
-   { type: "audio", url, ref_id: "speaker_N", refId: "speaker_N" }
-   ```
-4. State-Felder bumpen: `version: 46`, `model: "lipsync-2-pro"`, `asd_mode: "coordinates"`, Log-Marker `v46_official_segments_payload`.
-5. Defensive Pre-Dispatch-Validierung beibehalten: jedes Segment hat `audioInput.refId`, jeder `refId` existiert im Input-Array, Koordinaten innerhalb `videoDims`, Segmente sortiert. Diagnose-Summary bleibt im Log.
+- Dispatch-Meta schreibt künftig `model: "lipsync-2-pro"`, nicht mehr `sync-3`.
+- `webhook_url` wird entfernt; nur offizielles `webhookUrl` bleibt.
+- Audio-Inputs bleiben mit `refId` offiziell kompatibel; `ref_id` kann optional defensiv bleiben oder entfernt werden.
+- `auto_detect: false` wird nicht mehr mit `frame_number + coordinates` gemischt, wo die Doku die Varianten trennen will.
 
-### B) `sync-so-webhook/index.ts`
+### 4. Kosten-/Refund-Bug korrigieren
 
-- Akzeptierten Versions-Gate um `46` erweitern (`41 | 42 | 43 | 44 | 45 | 46`), damit Retry/Refund/Apply für v46 greifen.
-- Bestehende Retry- (1x) und idempotente Refund-Pfade unverändert.
+- Für die v47 Single-Call Segments-Route wird nur `ceil(duration) × 9` berechnet.
+- Die alte fan-out Route bleibt bei `speakerCount × ceil(duration) × 9`.
+- Bereits fehlgeschlagene Jobs bleiben idempotent refundiert; keine Doppel-Rückerstattung.
 
-### C) Memory
+### 5. Webhook akzeptiert v47
 
-- Neue Memory `v46-lipsync2pro-official-segments` als aktuelle Wahrheit.
-- v41/v42/v43/v44/v45-Memories als `superseded` markieren.
-- Core-Memory auf v46 aktualisieren: `lipsync-2-pro`, `segments[]`, `audioInput.refId`, `frame_number + coordinates` (ohne `auto_detect`), `sync_mode: "cut_off"`, Input mit `ref_id`+`refId`.
+In `sync-so-webhook`:
 
-### D) Szenen-Reset
+- Versions-Gate um `47` erweitern.
+- v47-Fehler sauber klassifizieren und loggen.
+- Bestehende Refund- und Inflight-Cleanup-Pfade unverändert lassen.
 
-Erst NACH Deploy: die fehlgeschlagenen Szenen (`4992cff4…`, `7dcdcfc7…`) auf `pending` zurücksetzen, `dialog_shots` leeren, in-flight Jobs entfernen. Refund bleibt idempotent.
+### 6. Szene nach Deploy sauber zurücksetzen
+
+Nach Deployment:
+
+- Szene `e5445b67-c3c1-4d09-b7db-11187265586c` auf `pending` setzen.
+- `dialog_shots`, `lip_sync_status`, `twoshot_stage`, `replicate_prediction_id`, `clip_error` bereinigen.
+- Stale Sync.so Inflight-Jobs für diese Szene entfernen.
+
+### 7. Validierung vor neuem Trigger
+
+Vor dem nächsten echten Trigger prüfen:
+
+- v47-Logs zeigen pro Sprecher echte plate-native Koordinaten, nicht Anchor-Skaling.
+- Koordinaten liegen sichtbar auf den Gesichtern im extrahierten Frame.
+- Dispatch-Log zeigt `model: lipsync-2-pro`, `segments=3`, `sync_mode=cut_off`, `version=47`.
+- Bei Sync.so-Fehlern wird automatisch refundiert und kein Retry mit identischem Payload gemacht.
 
 ## Erwartetes Ergebnis
 
-- Payload entspricht 1:1 dem offiziellen Sync.so Multi-Speaker-Segments-Beispiel.
-- `lipsync-2-pro` verarbeitet `segments[]` tatsächlich (statt sie wie sync-3 stillschweigend zu ignorieren).
-- `An unknown error occurred.` nach 10–13 min sollte verschwinden.
-- Webhook closed v46-Jobs sauber, kein Hängenbleiben mehr.
+Der nächste Trigger sendet nicht mehr denselben formal richtigen, aber praktisch falschen ASD-Payload. Sync.so bekommt pro Segment einen Referenzframe und einen Punkt, der wirklich auf dem jeweiligen Gesicht im Video liegt.
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
