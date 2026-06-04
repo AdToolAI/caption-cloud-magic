@@ -1,84 +1,84 @@
-## Antwort vorab: Nein — noch nicht alle Fehler bereinigt.
+## Befund
 
-Der **422 "unknown refId"** ist behoben (camelCase `refId` wird jetzt korrekt verwendet). Der letzte Run ist aber wieder **FAILED** — diesmal mit `An unknown error occurred.` von Sync.so direkt nach dem Dispatch (Job `5dc21163…` und Retry `55ef5688…`).
+Nein — die Pipeline ist aktuell noch nicht vollständig so, wie Sync.so sie erwartet.
 
-### Was ich gefunden habe
+Die Logs zeigen zwei unterschiedliche Probleme:
 
-Logs zeigen: Payload geht durch, Sync.so akzeptiert ihn (200 OK beim POST `/v2/generate`), bricht aber dann beim Rendern ab. Im Webhook-Echo fehlt das `segments`-Feld komplett — also hat Sync.so unsere Segments-Struktur entweder verworfen oder beim Verarbeiten verworfen.
+1. **Der v44-Webhook wird nicht verarbeitet**
+   - `compose-dialog-segments` speichert neue Jobs als `version: 44`.
+   - `sync-so-webhook` akzeptiert aber nur `41 | 42 | 43`.
+   - Ergebnis: Sync.so meldet `FAILED`, aber unser Backend ignoriert den Terminal-Webhook. Die Szene bleibt auf `running/rendering`, Retry/Refund greifen nicht sauber.
 
-**Root cause laut Sync.so-Doku (Speaker Selection Guide, Zeilen 30 + 48):**
+2. **Sync.so verwirft weiterhin die `segments` intern**
+   - Im Sync.so-Failure-Echo fehlen die `segments` komplett.
+   - Das deutet darauf hin, dass der Request zwar angenommen wird, aber die Kombination noch nicht robust genug ist.
+   - Besonders auffällig: v44 sendet `model: "lipsync-2-pro"`, obwohl Sync.so `sync-3` als Default/robusteres Modell für komplexe Multi-Person-Shots beschreibt und unser eigener Code bereits sync-3 als schwierige Multi-Speaker-Fallback-Variante kennt.
 
-> `bounding_boxes` ist eine **per-frame array über das gesamte Video**. Jeder Eintrag entspricht **exakt einem Frame** der Quelle. "The number of entries must match the total frame count."
+## Plan
 
-Wir bauen den Array aber mit einer **hardcodierten Annahme** `ASSUMED_FPS_V41 = 24` (Zeile 808 von `compose-dialog-segments/index.ts`). Wenn die Talking-Head-Plate nicht exakt 24 fps hat (Hailuo/HeyGen liefern oft 25 oder 30 fps), stimmt die Array-Länge nicht mit der echten Frame-Anzahl überein → Sync.so wirft "unknown error".
+### 1. Webhook-Gate für v44 reparieren
 
-Zusätzlich füllen wir aktuell den **gesamten Array** (auch außerhalb des Segment-Bereichs) mit derselben Speaker-Bbox — laut Doku sollten Frames ohne Speaker `null` sein.
+In `sync-so-webhook/index.ts`:
 
-### Sync.so's eigener Vorschlag für Multi-Speaker-Segments
+- `version === 44` in den Branch für `engine: "sync-official-segments"` aufnehmen.
+- Damit werden `COMPLETED`, `FAILED`, `REJECTED`, `CANCELED` für v44 korrekt verarbeitet.
+- Retry, Refund und finales Speichern des Output-Videos greifen dann wieder.
 
-Im offiziellen Segments-Guide (Zeile 251 ff. "Target Different Speakers Per Segment") verwendet Sync.so **nicht** `bounding_boxes`, sondern **`frame_number + coordinates`** pro Segment:
+### 2. Offiziellen Multi-Speaker-Payload auf v45 härten
 
-```json
-"optionsOverride": {
-  "active_speaker_detection": {
-    "frame_number": 0,
-    "coordinates": [200, 300]
-  }
+In `compose-dialog-segments/index.ts`:
+
+- Für 3+ Sprecher einen separaten v45-Konstantenpfad verwenden.
+- Modell auf `sync-3` setzen, statt `lipsync-2-pro`, weil Sync.so `sync-3` für schwierige Multi-Person-/Obstruction-/Static-Lip-Fälle empfiehlt.
+- `options.sync_mode` von `loop` auf `cut_off` ändern, damit Segment-Audio nicht wiederholt wird.
+- In jedem Segment explizit setzen:
+
+```text
+optionsOverride.active_speaker_detection = {
+  auto_detect: false,
+  frame_number: <frame im Segment>,
+  coordinates: [x, y]
 }
 ```
 
-Das ist genau unser Use-Case (3 Sprecher, je ein Segment pro Turn) — und es umgeht die fps/Frame-Count-Falle komplett.
+- `refId` bleibt camelCase und muss exakt mit `audioInput.refId` übereinstimmen.
 
-### Plan (v44)
+### 3. Sync.so-Kompatibilität validieren, bevor ein Job bezahlt wird
 
-**1. `compose-dialog-segments/index.ts` — ASD-Variante wechseln**
+Vor Dispatch:
 
-Im v43-Block (Zeilen 929–965) den `optionsOverride.active_speaker_detection` so umbauen:
+- Prüfen, dass jedes Segment einen gültigen `audioInput.refId` hat.
+- Prüfen, dass alle `refId`s im `input[]` existieren.
+- Prüfen, dass Koordinaten innerhalb der echten Video-Dimensionen liegen.
+- Prüfen, dass Segmentzeiten gültig und sortiert sind.
+- Den finalen Payload als kompaktes Diagnose-Summary loggen: Modell, Segmentanzahl, RefIds, ASD-Modus, Video-Dimensionen.
 
-```ts
-optionsOverride: {
-  active_speaker_detection: {
-    frame_number: Math.max(0, Math.round(((s + e) / 2) * fpsHint)),
-    coordinates: [cx, cy],   // Gesichtsmittelpunkt aus faceMap
-  },
-},
-```
+### 4. Alte fehleranfällige Bounding-Box-Fallbacks entschärfen
 
-- `cx, cy` aus der bereits resolvten `speakerCoords` (Log Zeile 5: `coords=[[261,257],[477,257],[653,288]]`) — die haben wir schon.
-- `frame_number` muss nur auf einem Frame des Segments liegen, nicht exakt; Mittelpunkt ist robust.
-- `fpsHint` aus dem mp4-Probe (`plateDims`), Fallback 24 — Genauigkeit ist hier nicht kritisch, da nur **ein** Frame referenziert wird.
-- `ASSUMED_FPS_V41`-Array komplett entfernen, ebenso `boundingBoxes`-Generierung und den Collision-Shift (für coordinates irrelevant).
+Im v5/Fallback-Bereich:
 
-**2. Logging & Memory**
+- Keine per-frame `bounding_boxes` mehr mit hardcoded 24fps erzeugen.
+- Entweder auf `frame_number + coordinates` umstellen oder nur dann Bounding-Boxes nutzen, wenn eine echte Frame-Count/FPS-Probe verfügbar ist.
+- Das verhindert denselben Fehler, den v43 bereits ausgelöst hat.
 
-- Log-Zeile umstellen: `asd=coords frame=… coords=[x,y]` statt `asd=bbox pad=…`.
-- `mem/architecture/lipsync/v43-bounding-boxes-asd.md` umbenennen/aktualisieren → `v44-coordinates-asd.md` mit Begründung (Sync.so-Beispiel + fps-Frame-Count-Problem).
-- `mem/index.md` Eintrag entsprechend updaten.
+### 5. Failed/Stuck-Szenen sauber zurücksetzen
 
-**3. Optional Hardening (gleicher Edit)**
+Nach Deploy:
 
-- Pad-Escalation (0.08→0.18→0.28) entfernen — bei Punkt-ASD irrelevant.
-- Bbox-Collision-Shift entfernen — für coordinates nicht nötig.
-- `bounding_boxes_url`-Pfad **nicht** bauen — wir brauchen ihn nicht, coords reicht.
+- Die aktuell fehlgeschlagenen Szenen `4992cff4...` und `7dcdcfc7...` sauber auf `pending` setzen.
+- `dialog_shots` leeren, `clip_error` entfernen.
+- Danach v45 neu triggern.
+- Bestehende Refund-Logik bleibt idempotent, damit keine Doppelgutschrift entsteht.
 
-**4. Failed Scene zurücksetzen**
+### 6. Dokumentation/Memory aktualisieren
 
-- Scene `4992cff4-e351-461c-aaae-a765696acf12`: `lip_sync_status='pending'`, `clip_error=null`, `dialog_shots='{}'::jsonb` → erlaubt Re-Dispatch ohne weiteren Credit-Abzug (Refund war bereits = true).
+- v43/v44-Memory als superseded markieren.
+- Neue Memory `v45-sync3-official-segments` anlegen.
+- Core-Memory auf v45 aktualisieren: `sync-3`, `segments[]`, `refId`, `frame_number + coordinates`, `auto_detect:false`, `cut_off`, Webhook akzeptiert v41–v45.
 
-**5. Deploy & Verify**
+## Erwartetes Ergebnis
 
-- `compose-dialog-segments` deployen.
-- Scene manuell triggern.
-- Erwartete Log-Zeile:
-  `v44_official_segments_payload model=lipsync-2-pro asd=coords speakers=3 segments=3`
-- Webhook-Echo muss `status=COMPLETED` und ein gültiges `outputUrl` liefern.
-
-### Was bleibt unverändert
-
-- Top-Level-Struktur: `model: lipsync-2-pro`, `input[]` mit `refId` (camelCase), Top-Level `segments[]`, `options.sync_mode: "loop"`, async Webhook.
-- v5 Fan-out für 1–2-Sprecher-Szenen — nicht angefasst.
-- Credit-Refund-Logik und Idempotency-Guard (`version: 43` → wird auf `44` gebumpt).
-
-### Restrisiko
-
-Sollte auch `frame_number + coordinates` an **dieser** Plate fehlschlagen, bleibt als Fallback Variante 1 (`auto_detect: true`) — würde aber bei 3 nahe stehenden Sprechern wahrscheinlich den falschen erwischen. Erst nach v44-Failure einbauen.
+- Sync.so-Webhook verarbeitet v45 terminal korrekt.
+- Multi-Speaker-Szenen laufen über den robusteren Sync.so-Standardpfad.
+- Fehlversuche führen zu Retry oder Refund statt zu hängenden Szenen.
+- Die Pipeline ist danach deutlich näher an Sync.so-Doku und dem aktuellen Modellverhalten.

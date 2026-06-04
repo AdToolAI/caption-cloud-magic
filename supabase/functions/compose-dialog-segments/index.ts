@@ -436,7 +436,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44
+        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -803,7 +803,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
       // v44 — ASD per segment via `frame_number + coordinates` (Sync.so's
       // official multi-speaker Segments example, /developer-guides/segments
@@ -870,9 +870,11 @@ serve(async (req) => {
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
+                sync_mode: "cut_off",
                 active_speaker_detection: {
-                  // v44: single point per segment (Sync.so official example).
-                  // Exclusive with auto_detect/v3/bounding_boxes.
+                  // v45: single point per segment (Sync.so official multi-speaker example).
+                  // Exclusive with v3/bounding_boxes. `auto_detect: false` to honor manual point.
+                  auto_detect: false,
                   frame_number: frameNumber,
                   coordinates: [cx, cy],
                 },
@@ -880,7 +882,7 @@ serve(async (req) => {
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v44 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
+            `[compose-dialog-segments] scene=${sceneId} v45 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -900,19 +902,25 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
+        // v45 — Sync.so multi-speaker official path: model `sync-3` (built-in
+        // obstruction detection + multi-speaker support per docs), top-level
+        // `sync_mode: cut_off` (no audio looping), per-segment ASD with
+        // explicit `auto_detect: false`. Coordinates are plate-pixel ints
+        // already clamped to the video frame.
+        const V45_MODEL = SYNC3_MODEL;
         const v41Payload = {
-          model: LIPSYNC_MODEL,
+          model: V45_MODEL,
           input: v41Inputs,
           segments: v41Segments,
-          options: { sync_mode: "loop" },
+          options: { sync_mode: "cut_off" },
           webhookUrl: v41Webhook,
           webhook_url: v41Webhook,
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v44_official_segments_payload model=${LIPSYNC_MODEL} asd=coords ` +
+          `[compose-dialog-segments] scene=${sceneId} v45_official_segments_payload model=${V45_MODEL} asd=coords ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} totalSec=${totalSec}`,
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -943,29 +951,29 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 44,
+                version: 45,
                 engine: "sync-official-segments",
                 asd_mode: "coordinates",
                 status: "failed",
-                model: LIPSYNC_MODEL,
+                model: "sync-3",
                 cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
                 refunded: !alreadyRefunded,
-                error: `v44_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v45_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v41_dispatch_${v41Resp.status}`,
+              clip_error: `v45_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-            sync_source_kind: "v41_segments", video_url: sourceClipUrl,
+            sync_source_kind: "v45_segments", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { payload_summary: { model: "sync-3", segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -989,11 +997,11 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 44,
+          version: 45,
           engine: "sync-official-segments",
           asd_mode: "coordinates",
           status: "rendering",
-          model: LIPSYNC_MODEL,
+          model: "sync-3",
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
           total_sec: totalSec,
@@ -1013,7 +1021,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v41_official_segments",
+            twoshot_stage: "syncso_v45_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1023,12 +1031,12 @@ serve(async (req) => {
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-          job_id: v41JobId, sync_source_kind: "v41_segments",
+          job_id: v41JobId, sync_source_kind: "v45_segments",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: LIPSYNC_MODEL,
+            model: "sync-3",
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             input_refs: v41SpeakerRefs.map((s) => s.refId),
@@ -1044,7 +1052,7 @@ serve(async (req) => {
             scene_id: sceneId,
             sync_job_id: v41JobId,
             engine: "sync-official-segments",
-            model: LIPSYNC_MODEL,
+            model: "sync-3",
             segments: v41Segments.length,
             speakers: v41SpeakerRefs.length,
             cost_credits: v41State.cost_credits,
