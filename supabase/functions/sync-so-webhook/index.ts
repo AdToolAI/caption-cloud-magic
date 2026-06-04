@@ -122,6 +122,21 @@ function prepareRetryFromWebhook(shot: any, reason: string, allShots: any[]): bo
   return true;
 }
 
+function triggerV5Advance(supabaseUrl: string, serviceKey: string, sceneId: string, passIdx: number, totalPasses: number) {
+  fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+    body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: passIdx }),
+  }).catch(() => {});
+  console.log(`[sync-so-webhook] v5 scene=${sceneId} advancing pending pass ${passIdx + 1}/${totalPasses}`);
+}
+
+function terminalV5Counts(passes: any[]) {
+  const doneCount = passes.filter((p: any) => p?.status === "done").length;
+  const failedCount = passes.filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? ""))).length;
+  return { doneCount, failedCount, allTerminal: doneCount + failedCount >= passes.length };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -422,9 +437,8 @@ serve(async (req) => {
         };
       }
 
-      const doneCount = freshDonePasses.filter((p: any) => p?.status === "done").length;
-      const failedCount = freshDonePasses.filter((p: any) => p?.status === "failed").length;
-      const allDone = doneCount === totalPasses && failedCount === 0;
+      const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
+      const allDone = allTerminal && doneCount > 0;
 
       // Find pending passes (deferred earlier or never dispatched). These
       // need an explicit advance dispatch — without this, scenes whose
@@ -450,20 +464,14 @@ serve(async (req) => {
         // Kick the next pending pass — now that we freed a slot, advance.
         if (pendingIdxs.length > 0) {
           const nextIdx = pendingIdxs[0];
-          try {
-            fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-              body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: nextIdx }),
-            }).catch(() => {});
-            console.log(`[sync-so-webhook] v25 scene=${sceneId} advancing pending pass ${nextIdx + 1}/${totalPasses}`);
-          } catch { /* ignore */ }
+          try { triggerV5Advance(supabaseUrl, serviceKey, sceneId, nextIdx, totalPasses); } catch { /* ignore */ }
         }
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
       }
 
       // ── All passes complete ──────────────────────────────────────────
-      const finalUrl = (freshDonePasses[freshDonePasses.length - 1] as any)?.output_url ?? outputUrl;
+      const lastDonePass = [...freshDonePasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
+      const finalUrl = (lastDonePass as any)?.output_url ?? outputUrl;
 
       // Single-speaker fast path: no fan-in needed, audio already matches.
       if (totalPasses === 1) {
@@ -783,7 +791,8 @@ serve(async (req) => {
           i !== currentPass &&
           ["rendering", "retrying", "pending"].includes(String(p?.status ?? "")),
         );
-      const sceneWillFail = aliveSiblings.length === 0;
+      const doneSiblings = freshFailPasses.filter((p: any, i: number) => i !== currentPass && p?.status === "done").length;
+      const sceneWillFail = aliveSiblings.length === 0 && doneSiblings === 0;
 
       if (sceneWillFail && cost > 0 && !alreadyRefunded) {
         const { data: row } = await supabase
@@ -859,20 +868,39 @@ serve(async (req) => {
       } else {
         // Roll back the refund decision: scene still has alive siblings, so
         // we must NOT refund yet. Only patch this pass and keep going.
+        const { doneCount, allTerminal } = terminalV5Counts(finalPasses);
+        const pendingIdxs = finalPasses
+          .map((p: any, i: number) => ((p?.status === "pending" || (!p?.job_id && p?.status !== "failed")) ? i : -1))
+          .filter((i: number) => i >= 0);
+        const partialMux = allTerminal && doneCount > 0;
+        const lastDonePass = [...finalPasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
         await supabase
           .from("composer_scenes")
           .update({
             dialog_shots: {
               ...freshFailState,
               passes: finalPasses,
-              // keep top-level status as-is (rendering/audio_muxing/retrying)
+              status: partialMux ? "audio_muxing" : (freshFailState?.status ?? "rendering"),
+              final_url: partialMux ? ((lastDonePass as any)?.output_url ?? freshFailState?.final_url ?? null) : freshFailState?.final_url,
+              partial_mux: partialMux ? true : freshFailState?.partial_mux,
             },
+            lip_sync_status: partialMux ? "audio_muxing" : "running",
+            twoshot_stage: partialMux ? "audio_muxing" : `syncso_fanout_${doneCount}_of_${Number(freshFailState?.total_passes ?? finalPasses.length ?? 1)}`,
             updated_at: nowIso,
           })
           .eq("id", sceneId);
         console.warn(
-          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but ${aliveSiblings.length} sibling(s) still alive — scene kept running, no refund yet`,
+          `[sync-so-webhook] v5 scene=${sceneId} pass=${currentPass} FAILED but scene can continue (alive=${aliveSiblings.length}, done=${doneCount}, partialMux=${partialMux}) — no refund yet`,
         );
+        if (partialMux) {
+          fetch(`${supabaseUrl}/functions/v1/render-sync-segments-audio-mux`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+            body: JSON.stringify({ scene_id: sceneId }),
+          }).catch(() => {});
+        } else if (pendingIdxs.length > 0) {
+          triggerV5Advance(supabaseUrl, serviceKey, sceneId, pendingIdxs[0], Number(freshFailState?.total_passes ?? finalPasses.length ?? 1));
+        }
       }
     }
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
