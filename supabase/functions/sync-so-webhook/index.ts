@@ -344,9 +344,20 @@ serve(async (req) => {
     const matchedIdx = passesPre.findIndex((p: any) => p?.job_id === jobId);
     const isLegacySingle = matchedIdx < 0 && state.sync_job_id === jobId;
     if (matchedIdx < 0 && !isLegacySingle) {
-      console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} not in passes[] (count=${passesPre.length}) and not top-level — skip`);
-      return ok({ ok: true, skipped: "v5_job_not_in_passes", job_id: jobId });
+      console.warn(`[sync-so-webhook] v5 scene=${sceneId} job=${jobId} ORPHAN (not in passes[] count=${passesPre.length}) — releasing inflight slot + best-effort provider cancel`);
+      // v33: clean up the orphan so we don't leak a Sync.so concurrency slot
+      // and don't keep paying for a generation whose state we no longer track.
+      try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
+      const apiKey = Deno.env.get("SYNC_API_KEY") ?? Deno.env.get("SYNCSO_API_KEY") ?? "";
+      if (apiKey && status !== "COMPLETED") {
+        fetch(`https://api.sync.so/v2/generations/${encodeURIComponent(jobId)}`, {
+          method: "DELETE",
+          headers: { "x-api-key": apiKey },
+        }).catch(() => { /* best-effort */ });
+      }
+      return ok({ ok: true, skipped: "v5_job_orphan_cleaned", job_id: jobId });
     }
+
     if (status === "COMPLETED" && outputUrl) {
       // ── v25 Fan-Out: passes run in parallel, all against the ORIGINAL
       //    plate. Webhook simply marks THIS pass done, re-hosts its output
