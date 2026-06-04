@@ -68,7 +68,7 @@ import {
   recordCircuitSuccess,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
-  trimWavLeadIn,
+  // trimWavLeadIn intentionally NOT imported (v33: lead-in trim disabled).
   validateFrameFace,
   validateSegments,
   validateSyncResponseShape,
