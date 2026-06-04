@@ -645,6 +645,18 @@ serve(async (req) => {
         console.warn(
           `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro-box (bounding-box ASD) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
         );
+      } else if (
+        // v37 — After coords-pro-box, escalate to Sync.so's recommended
+        // sync-3 model for difficult plates rather than jumping to auto-*
+        // (which carries face-swap risk for 3+ speaker scenes).
+        speakerCount >= 3 &&
+        (currentVariant === "coords-pro-box" || currentVariant === "sync3-coords") &&
+        passRetryCount < MAX_V5_RETRIES
+      ) {
+        nextVariant = "sync3-coords";
+        console.warn(
+          `[sync-so-webhook] v37 scene=${sceneId} 3+ speakers (${speakerCount}) — escalating to sync-3 (model fallback) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
+        );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(
           (p: any) =>
