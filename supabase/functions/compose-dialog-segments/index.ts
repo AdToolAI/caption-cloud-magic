@@ -1008,11 +1008,11 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 45,
+          version: 46,
           engine: "sync-official-segments",
           asd_mode: "coordinates",
           status: "rendering",
-          model: "sync-3",
+          model: "lipsync-2-pro",
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
           total_sec: totalSec,
