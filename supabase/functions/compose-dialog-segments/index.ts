@@ -862,7 +862,12 @@ serve(async (req) => {
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
                 active_speaker_detection: {
-                  auto_detect: false,
+                  // v42: only documented ASD fields. `frame_number` +
+                  // `coordinates` is one of the four exclusive variants
+                  // per https://docs.sync.so/developer-guides/segments .
+                  // No `auto_detect:false` — not a documented field, and
+                  // lipsync-2-pro can reject undocumented options with
+                  // an opaque "An unknown error occurred.".
                   frame_number: frameNumber,
                   coordinates: asdCoords,
                 },
