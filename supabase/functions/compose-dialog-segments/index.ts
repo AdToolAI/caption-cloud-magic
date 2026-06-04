@@ -805,15 +805,15 @@ serve(async (req) => {
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
-      const ASSUMED_FPS_V41 = 24;
-      // v43 — bbox padding factor. Escalates on retry (0.08 → 0.18 → 0.28)
-      // to give Sync.so progressively more slack when "active speaker not
-      // found" hits on shoulder-to-shoulder shots.
-      const bboxPadFactor: number = (() => {
-        const fromState = Number(v41PrevState?.bbox_pad_factor);
-        if (Number.isFinite(fromState) && fromState > 0) return Math.min(0.35, fromState);
-        return isV41Retry ? 0.18 : 0.08;
-      })();
+      // v44 — ASD per segment via `frame_number + coordinates` (Sync.so's
+      // official multi-speaker Segments example, /developer-guides/segments
+      // "Target Different Speakers Per Segment"). Replaces the v43 per-frame
+      // `bounding_boxes` array which required the array length to match the
+      // exact total frame count of the source video — our hardcoded
+      // ASSUMED_FPS=24 silently mismatched 25/30fps Hailuo/HeyGen plates and
+      // caused Sync.so to fail with "An unknown error occurred." after
+      // accepting the dispatch.
+      const FPS_HINT_V44 = 24;
 
       // Build inputs: 1 video + N audio (one per speaker with track_url).
       type V41Input =
@@ -821,78 +821,18 @@ serve(async (req) => {
         | { type: "audio"; url: string; refId: string };
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
-      // ── v43 — Per-speaker bounding-box builder ──────────────────────────
-      // Sync.so ASD has exclusive variants. v41/v42 used `frame_number+
-      // coordinates` (a single point); v43 switches to per-frame
-      // `bounding_boxes` — more robust for shoulder-to-shoulder 3+ speaker
-      // plates where the face can drift a few pixels off the point and
-      // Sync.so returns "An unknown error occurred." after 10-13 min.
-      //
-      // Priority for box source:
-      //   1. faceMap match (real face bbox, anchor-space → plate-space + pad)
-      //   2. fallback square around the resolved point coordinate
-      const fmFaces: any[] = Array.isArray((faceMap as any)?.faces)
-        ? (faceMap as any).faces
-        : [];
-      const fmW = Number((faceMap as any)?.width) || videoDims.width;
-      const fmH = Number((faceMap as any)?.height) || videoDims.height;
-      const sxRatio = videoDims.width / Math.max(1, fmW);
-      const syRatio = videoDims.height / Math.max(1, fmH);
-
-      const buildBoxForSpeaker = (
-        spIdx: number,
-        characterId: string | null,
-        point: [number, number] | null,
-      ): { box: [number, number, number, number]; source: string } => {
-        const matchedFace =
-          (characterId && fmFaces.find((f) => f?.characterId && f.characterId === characterId)) ||
-          fmFaces.find((f) => Number(f?.slotIndex) === Number(spIdx)) ||
-          null;
-        if (
-          matchedFace &&
-          Array.isArray(matchedFace.bbox) &&
-          matchedFace.bbox.length === 4 &&
-          fmW > 0 && fmH > 0
-        ) {
-          const [bx1, by1, bx2, by2] = (matchedFace.bbox as any[]).map((n) => Number(n));
-          const bw = Math.max(0, bx2 - bx1);
-          const bh = Math.max(0, by2 - by1);
-          const pad = Math.max(bw, bh) * bboxPadFactor;
-          const x1 = Math.max(0, Math.round((bx1 - pad) * sxRatio));
-          const y1 = Math.max(0, Math.round((by1 - pad) * syRatio));
-          const x2 = Math.min(videoDims.width, Math.round((bx2 + pad) * sxRatio));
-          const y2 = Math.min(videoDims.height, Math.round((by2 + pad) * syRatio));
-          if (x2 > x1 + 4 && y2 > y1 + 4) {
-            return { box: [x1, y1, x2, y2], source: `facemap:${matchedFace.matchSource ?? "slot"}` };
-          }
-        }
-        // Fallback: square-ish box around the resolved point. Head+shoulders
-        // ≈ 18% × 28% of plate, expanded by bboxPadFactor.
-        const [cx, cy] = point ?? [Math.round(videoDims.width / 2), Math.round(videoDims.height / 2)];
-        const baseW = Math.round(videoDims.width * (0.16 + bboxPadFactor));
-        const baseH = Math.round(videoDims.height * (0.24 + bboxPadFactor));
-        const x1 = Math.max(0, Math.round(cx - baseW / 2));
-        const y1 = Math.max(0, Math.round(cy - baseH / 2));
-        const x2 = Math.min(videoDims.width, Math.round(cx + baseW / 2));
-        const y2 = Math.min(videoDims.height, Math.round(cy + baseH / 2));
-        return { box: [x1, y1, x2, y2], source: "v43_bbox_fallback_square" };
-      };
-
-      const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; bbox: [number, number, number, number]; bboxSource: string; name: string; characterId: string | null }> = [];
+      const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
       speakers.forEach((sp, idx) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
         const refId = `speaker_${idx + 1}`;
         v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
-        const built = buildBoxForSpeaker(idx, sp.character_id ?? null, coords);
         v41SpeakerRefs.push({
           idx,
           refId,
           audioUrl,
           coords,
-          bbox: built.box,
-          bboxSource: built.source,
           name: String(sp.speaker ?? `Speaker ${idx + 1}`),
           characterId: sp.character_id ?? null,
         });
@@ -902,64 +842,45 @@ serve(async (req) => {
         // Missing per-speaker tracks → fall through to legacy v5 path below
         // (which has its own no-tracks refund/fail handling).
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v41 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
+          `[compose-dialog-segments] scene=${sceneId} v44 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
         );
       } else {
-        // v43 — collision disambiguation: identical boxes (rare) get a 4px
-        // horizontal shift so Sync.so can tell speakers apart.
-        for (let i = 1; i < v41SpeakerRefs.length; i++) {
-          const a = v41SpeakerRefs[i].bbox;
-          for (let j = 0; j < i; j++) {
-            const b = v41SpeakerRefs[j].bbox;
-            if (a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3]) {
-              const shift = 4 * i;
-              a[0] = Math.min(videoDims.width - 8, a[0] + shift);
-              a[2] = Math.min(videoDims.width, a[2] + shift);
-              console.warn(
-                `[compose-dialog-segments] scene=${sceneId} v43_bbox_speaker_collision speaker=${v41SpeakerRefs[i].refId} shifted=${shift}px`,
-              );
-              break;
-            }
-          }
-        }
-
         // Build segments — one per voiced turn, attaching the segment's
-        // audioInput.refId AND a per-segment optionsOverride.
-        // active_speaker_detection with the speaker's bounding_boxes (v43).
+        // audioInput.refId AND optionsOverride.active_speaker_detection
+        // with frame_number + coordinates pointing at the speaker's face.
         const v41Segments: Array<Record<string, unknown>> = [];
-        const totalFramesV41 = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS_V41) + 1);
-        v41SpeakerRefs.forEach(({ idx, refId, bbox, bboxSource, name }) => {
+        v41SpeakerRefs.forEach(({ idx, refId, coords, name }) => {
           const sp = speakers[idx];
           const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
             ? (sp!.voicedRange!.turns as Turn[])
             : [];
+          const fallbackCx = Math.round(videoDims.width / 2);
+          const fallbackCy = Math.round(videoDims.height / 2);
+          const [cx, cy] = coords ?? [fallbackCx, fallbackCy];
           for (const t of turns) {
             const sRaw = Math.max(0, Number(t.startSec));
             const eRaw = Math.min(totalSec, Math.max(sRaw + MIN_TURN_DUR_SEC, Number(t.endSec)));
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
-            const boundingBoxes = Array.from(
-              { length: totalFramesV41 },
-              () => bbox as [number, number, number, number],
-            );
+            const midSec = (s + e) / 2;
+            const frameNumber = Math.max(0, Math.round(midSec * FPS_HINT_V44));
             v41Segments.push({
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
                 active_speaker_detection: {
-                  // v43: bounding_boxes is a per-frame array and must NOT be
-                  // combined with frame_number/coordinates per Sync.so docs.
-                  // We repeat the resolved target face box for every frame so
-                  // Sync.so always has a valid speaker detection entry.
-                  bounding_boxes: boundingBoxes,
+                  // v44: single point per segment (Sync.so official example).
+                  // Exclusive with auto_detect/v3/bounding_boxes.
+                  frame_number: frameNumber,
+                  coordinates: [cx, cy],
                 },
               },
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v43 speaker=${refId} name=${name} bbox=${JSON.stringify(bbox)} source=${bboxSource} pad=${bboxPadFactor.toFixed(2)}`,
+            `[compose-dialog-segments] scene=${sceneId} v44 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
