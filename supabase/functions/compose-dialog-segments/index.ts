@@ -962,29 +962,29 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 45,
+                version: 46,
                 engine: "sync-official-segments",
                 asd_mode: "coordinates",
                 status: "failed",
-                model: "sync-3",
+                model: "lipsync-2-pro",
                 cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
                 refunded: !alreadyRefunded,
-                error: `v45_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v46_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v45_dispatch_${v41Resp.status}`,
+              clip_error: `v46_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-            sync_source_kind: "v45_segments", video_url: sourceClipUrl,
+            sync_source_kind: "v46_segments", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: "sync-3", segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { payload_summary: { model: "lipsync-2-pro", segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
