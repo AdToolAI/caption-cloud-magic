@@ -1,112 +1,123 @@
 ## Diagnose
 
-Der aktuelle Fehler ist nicht mehr der alte Lambda-Bundle-Seek-Fehler. Die Logs zeigen eine neue Schwachstelle in v39:
-
-- Szene `0272076d-33db-42b9-9cd6-948289b1fce6`
-- Sprecher 1 und 2 wurden fertig.
-- Sprecher 3 `Kailee` scheitert mehrfach mit Sync.so `An unknown error occurred.`
-- Der kritische Log-Hinweis ist: `v39_tight_audio_failed: sliceWav: no valid windows`.
-
 **Do I know what the issue is?** Ja.
 
-Die v39-Pipeline mutiert `pass.audio_url` von der ursprünglichen, zeitlich korrekt gepaddeten Sprecher-Spur auf eine kurze `tight`-WAV. Beim Retry wird diese kurze WAV dann erneut mit absoluten Zeitfenstern wie `3.81–7.082s` geschnitten. Das kann nicht funktionieren, weil die kurze WAV nur ca. `3.27s` lang ist. Danach fällt die Pipeline in einen hybriden Fallback zurück: kurze/verschobene Audio-Datei + Full-Plate/`segments_secs` + absoluter `frame_number`. Das ist nicht mehr Sync.so-konform stabil.
+Der fehlgeschlagene Run ist Szene `5f43e669-b154-4ac9-a516-b46acb7ee288`. Die Logs zeigen:
 
-Die offizielle Sync.so-Dokumentation bestätigt den besseren Weg:
+- Alle 3 Sprecher-Passes laufen in die Sync.so-Fehlermeldung `An unknown error occurred.` ohne `error_code`.
+- Die Payloads nutzen weiter den alten Hybrid:
+  - `input[0].segments_secs=[[...]]` auf dem Video
+  - ein einzelnes Audio ohne `refId`
+  - globale `options.active_speaker_detection`
+  - pro Sprecher separate Retries mit Tight-WAV / Repair-WAV
+- Bei Pass 3 fällt v39/v40 sogar wieder in `v39_tight_audio_failed: offset is out of bounds` zurück und sendet danach `full-length WAV + segments_secs`.
 
-- Multi-Speaker soll über top-level `segments` laufen.
-- Pro Segment wird `audioInput.refId` gesetzt.
-- Pro Segment wird `optionsOverride.active_speaker_detection` gesetzt.
-- `frame_number + coordinates` sollen nur ein sichtbares Gesicht referenzieren, nicht als Timing-Anker missbraucht werden.
+Die offizielle Sync.so-Doku sagt inzwischen klar etwas anderes:
+
+- Multi-Speaker soll über **top-level `segments[]`** laufen.
+- Jedes Audio bekommt ein eigenes `refId` im `input`.
+- Jedes Segment nutzt `audioInput: { refId, startTime, endTime }`.
+- Jeder Sprecher bekommt im Segment `optionsOverride.active_speaker_detection` mit `frame_number + coordinates` oder `bounding_boxes`.
+- Für komplexe Multi-Person-/statische Szenen ist `sync-3` der robusteste Qualitätsmodus.
+
+Zusätzlich ist in unserem Code ein alter Kommentar/Annahmeblock falsch geworden: `compose-dialog-segments` behauptet noch, es gäbe keine per-segment ASD-Felder. Die aktuelle Sync.so-Doku bestätigt aber genau diese Felder.
 
 ## Plan
 
-### 1. v40: Sync.so-konformer Segment-Payload
+### 1. v41 Official Multi-Speaker Engine für 3+ Sprecher
 
-In `compose-dialog-segments` ersetze ich den fragilen v39-Hybrid für 3+ Sprecher:
-
-Aktuell problematisch:
+In `supabase/functions/compose-dialog-segments/index.ts` baue ich für Szenen mit mindestens 3 Sprechern einen neuen Dispatch-Pfad:
 
 ```text
-video input: full plate oder segments_secs
-input audio: mutierte tight wav
-options.active_speaker_detection: absoluter frame_number
-sync_mode: cut_off
-```
-
-Neu:
-
-```text
+POST /v2/generate
+model: sync-3
 input:
-  - full video plate
-  - original full-length per-speaker wav mit refId
+  - full scene video
+  - audio_1 full-length speaker WAV
+  - audio_2 full-length speaker WAV
+  - audio_3 full-length speaker WAV
 segments:
-  - startTime/endTime des Sprecher-Turns
-  - audioInput: { refId, startTime, endTime }
+  - startTime/endTime
+  - audioInput.refId + audio crop window
   - optionsOverride.active_speaker_detection für genau diesen Sprecher
 options:
-  - keine globale Timing-Hacks mehr
+  - sync_mode: cut_off oder loop/bounce nur wenn Segmentlänge es verlangt
 ```
 
-Damit bleibt die Audio-Zeitachse absolut korrekt, Sync.so bekommt aber trotzdem nur den relevanten Segmentbereich.
+Wichtig: Kein `segments_secs` mehr, keine Tight-WAVs mehr, kein erneutes Audio-Slicing, keine per-speaker Provider-Kette für 3+.
 
-### 2. Canonical Audio nie wieder überschreiben
+### 2. Offizielle Face-Selection erzwingen
 
-Ich trenne künftig strikt:
+Ich entferne für 3+ Sprecher die riskante `face-gate SOFT-PASS`-Abkürzung. Stattdessen gilt:
 
-- `audio_url`: immer die originale, full-length, silence-padded Sprecher-Spur
-- `prepared_audio_url` / `audio_tight`: nur temporäre Diagnose oder Legacy-Fallback
-- Retry-Pfade starten immer wieder von der originalen Sprecher-Spur
+- `frame_number + coordinates` müssen aus der echten Scene-Plate stammen, nicht nur aus dem Anchor-Bild.
+- Wenn die echten Plate-Frames kein Gesicht am Zielpunkt enthalten, fail-fast mit Refund und klarer Meldung: Szene neu rendern mit sichtbaren Gesichtern.
+- Optional vorhandene Bounding-Boxes werden nur verwendet, wenn sie wirklich zur Plate-Frame-Geometrie passen.
 
-Damit kann ein Retry nicht mehr versehentlich eine bereits getrimmte Datei erneut mit absoluten Fenstern schneiden.
+### 3. Retry-Ladder vereinfachen
 
-### 3. Sprecher-Frame korrekt wählen
+In `supabase/functions/sync-so-webhook/index.ts` trenne ich den neuen v41-Pfad vom alten v5-Fanout:
 
-Ich ändere die ASD-Logik so, dass `frame_number` wieder ein stabil sichtbarer Frame des jeweiligen Gesichts ist, idealerweise aus der bestehenden Face-Validation / Segmentmitte. Das Segment selbst übernimmt das Timing. Der Frame ist nur für Speaker Selection da.
+- v41 hat nur eine Provider-Generation für die ganze Szene.
+- Bei Sync.so `FAILED/REJECTED`:
+  - echte `error_code`s werden geloggt und geroutet
+  - transiente Fehler bekommen maximal einen idempotenten Retry
+  - kein Wechsel auf `auto-pro`/`auto-standard`
+  - keine Tight-WAV/Repair-WAV-Kette
+  - bei finalem Fehler automatische Rückerstattung
 
-### 4. 3+ Sprecher: Filmreifer Qualitätsmodus
+### 4. Compositor nur noch für Legacy/Fanout
 
-Für 3+ Sprecher in einer Gruppenaufnahme nutze ich `sync-3` als Primärmodell statt erst nach zwei fehlgeschlagenen Pro-Retries. Sync.so empfiehlt `sync-3` für komplexe Multi-Person-, statische, verdeckte oder schwierige Winkel-Szenen.
+`render-sync-segments-audio-mux` bleibt für alte/in-flight Fanout-Rows erhalten, wird aber für v41 nicht benötigt:
 
-1–2 Sprecher bleiben auf `lipsync-2-pro`, außer sie fallen in bekannte Problemfälle.
+- Sync.so liefert bereits ein komplettes Video mit allen Sprechersegmenten.
+- Der Webhook setzt `clip_url`, `lip_sync_status='applied'`, `lip_sync_applied_at` direkt.
 
-### 5. Fallback-Ladder vereinfachen
+### 5. State sauber versionieren
 
-Ich entferne für 3+ Sprecher die instabilen Misch-Fallbacks:
-
-- keine `auto-pro` / `auto-standard` Fallbacks, die falsche Gesichter wählen können
-- keine erneute Tight-WAV-Slice-Kette auf Retry
-- kein `segments_secs`-Fallback, wenn top-level `segments` möglich ist
-
-Fallbacks werden:
+`dialog_shots` bekommt einen neuen klaren State, z. B.:
 
 ```text
-sync-3 + segment ASD
-→ lipsync-2-pro + segment ASD, falls sync-3 API-seitig scheitert
-→ hard fail + Refund, wenn Face/Audio/Provider ungültig ist
+version: 41
+engine: sync-official-segments
+status: rendering | done | failed
+sync_job_id
+segments
+audio_inputs
+speaker_targets
+model: sync-3
 ```
 
-### 6. Aktuelle Szene sauber zurücksetzen
+Damit kollidieren neue Runs nicht mit alten v5/v39/v40-Feldern wie `audio_tight`, `audio_url_full`, `passes[]`.
 
-Nach dem Code-Fix:
+### 6. Reset der betroffenen Szene
 
-- betroffene Szene `0272076d-33db-42b9-9cd6-948289b1fce6` zurücksetzen
-- alte mutierte `pass.audio_url`-States ignorieren/normalisieren
-- Edge Functions deployen
-- neuen Lauf starten lassen
+Nach dem Code-Fix wird Szene `5f43e669-b154-4ac9-a516-b46acb7ee288` sauber zurückgesetzt:
+
+- `dialog_shots = null`
+- `lip_sync_status = pending`
+- alte Sync.so Job-IDs werden ignoriert/canceled, soweit möglich
+- Credits bleiben geschützt durch idempotente Refund-Logik
 
 ### 7. Verifikation
 
 Ich prüfe danach:
 
-- Logs enthalten `v40_official_segments_payload`
-- jeder Sprecher-Pass verwendet originale full-length Audio-Quelle mit `refId`
-- `segments[]` enthält die korrekten Sprecherfenster
-- keine `sliceWav: no valid windows` Logs mehr
-- finaler Mux startet erst, wenn alle 3 Sprecher `done` sind
+- Logs enthalten `v41_official_segments_payload`.
+- Payload enthält `segments[]`, `audioInput.refId`, `optionsOverride.active_speaker_detection`.
+- Es gibt keine `v39_tight_audio_failed` Logs mehr.
+- Es gibt keine `segments_secs` im Sync.so Payload für 3+ Sprecher.
+- Bei Erfolg wird die Szene direkt als angewendet markiert, ohne Fanout-Mux.
+- Bei Fehler erfolgt automatischer Refund und eine klare, technische Diagnose statt nur `An unknown error occurred.`.
 
-## Betroffene Dateien
+## Dateien
 
 - `supabase/functions/compose-dialog-segments/index.ts`
-- `supabase/functions/sync-so-webhook/index.ts` falls Retry-Ladder angepasst werden muss
-- optional `supabase/functions/render-sync-segments-audio-mux/index.ts` nur wenn `sourceTiming` für die neue v40-Ausgabe markiert werden muss
-- Memory-Dokumentation für v40
+- `supabase/functions/sync-so-webhook/index.ts`
+- optional `supabase/functions/render-sync-segments-audio-mux/index.ts` nur für Legacy-Guard/Logs
+- Memory-Dokumentation für v41
+- einmaliger Reset der betroffenen Szene nach Deployment
+
+## Warum das der richtige Wechsel ist
+
+Die bisherigen Fixes haben Symptome an einer selbstgebauten Pipeline repariert. Der aktuelle Fehler zeigt, dass die Pipeline grundsätzlich zu fragil ist: Tight-WAVs, `segments_secs`, separate Sprecherjobs und spätes Mask-Compositing kämpfen gegen Sync.so statt mit Sync.so. v41 stellt den 3-Sprecher-Fall auf den offiziell dokumentierten Multi-Speaker-Mechanismus um.
