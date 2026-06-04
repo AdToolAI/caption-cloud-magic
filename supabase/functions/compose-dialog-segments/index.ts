@@ -466,16 +466,26 @@ serve(async (req) => {
 
     // ── Stage F.3 — Circuit Breaker (BEFORE wallet debit) ────────────────
     // If Sync.so is in OPEN state, don't charge the user — defer with retry.
+    // v32: for an in-flight retry/advance against an existing v5 state, we
+    // MUST NOT flip the scene back to `pending`. That kicked the scene out
+    // of the running-scene watchdog scan and created a `pending+circuit_open`
+    // loop the client kept re-triggering. Keep `lip_sync_status='running'`
+    // so the watchdog can finalize it after TTL.
     const circuit = await evaluateCircuit(supabase, "sync.so");
     if (!circuit.allow) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} CIRCUIT_OPEN state=${circuit.state} reason=${circuit.reason} recent=${circuit.recentFailures}`,
+        `[compose-dialog-segments] scene=${sceneId} CIRCUIT_OPEN state=${circuit.state} reason=${circuit.reason} recent=${circuit.recentFailures} isRetry=${isRetry} isAdvance=${isAdvance}`,
       );
       const retryInMs = circuit.retryInMs ?? 30 * 60_000;
+      const hasActiveV5 =
+        (existing as any)?.version === 5 &&
+        (existing as any)?.engine === "sync-segments" &&
+        Array.isArray((existing as any)?.passes);
+      const keepRunning = isRetry || isAdvance || hasActiveV5;
       await supabase
         .from("composer_scenes")
         .update({
-          lip_sync_status: "pending",
+          lip_sync_status: keepRunning ? "running" : "pending",
           twoshot_stage: "circuit_open",
           clip_error: `syncso_circuit_open:${circuit.reason ?? "unknown"}`,
           updated_at: new Date().toISOString(),
@@ -485,7 +495,7 @@ serve(async (req) => {
         scene_id: sceneId, user_id: userId, engine: "sync-segments",
         sync_status: "CIRCUIT_BLOCKED", error_class: "rate_limited",
         error_message: `circuit ${circuit.state}: ${circuit.reason}`,
-        meta: { circuit_state: circuit.state, recent_failures: circuit.recentFailures, retry_in_ms: retryInMs },
+        meta: { circuit_state: circuit.state, recent_failures: circuit.recentFailures, retry_in_ms: retryInMs, kept_running: keepRunning },
       });
       return json(
         {
