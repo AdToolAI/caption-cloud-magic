@@ -822,9 +822,9 @@ serve(async (req) => {
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
       // ── v43 — Per-speaker bounding-box builder ──────────────────────────
-      // Sync.so ASD has 4 exclusive variants. v41/v42 used `frame_number+
-      // coordinates` (a single point); v43 switches to `frame_number+
-      // bounding_boxes` — more robust for shoulder-to-shoulder 3+ speaker
+      // Sync.so ASD has exclusive variants. v41/v42 used `frame_number+
+      // coordinates` (a single point); v43 switches to per-frame
+      // `bounding_boxes` — more robust for shoulder-to-shoulder 3+ speaker
       // plates where the face can drift a few pixels off the point and
       // Sync.so returns "An unknown error occurred." after 10-13 min.
       //
