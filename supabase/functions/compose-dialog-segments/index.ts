@@ -68,7 +68,7 @@ import {
   recordCircuitSuccess,
   registerInflightSyncJob,
   SYNCSO_DEFAULT_MAX_PARALLEL,
-  trimWavLeadIn,
+  // trimWavLeadIn intentionally NOT imported (v33: lead-in trim disabled).
   validateFrameFace,
   validateSegments,
   validateSyncResponseShape,
@@ -81,6 +81,7 @@ import {
 } from "../_shared/twoshot-face-map.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
+import { withDialogLock } from "../_shared/dialog-lock.ts";
 
 
 
@@ -199,6 +200,12 @@ interface SegmentsState {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  // v33: strict per-scene single-flight lock. Released in `finally` below so
+  // every return path (including early 202s, 422s, and thrown errors) frees it.
+  let lockSupabase: any = null;
+  let lockSceneId: string | null = null;
+  let lockHolder: string | null = null;
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -234,6 +241,32 @@ serve(async (req) => {
     if (repairAudio) {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
     }
+
+    // ── v33: strict single-flight lock ───────────────────────────────────
+    // Without this the client + sync-so-webhook + fan-out self-invoke can all
+    // fire compose-dialog-segments for the same scene within ~ms, producing
+    // duplicate Sync.so jobs that never match the latest passes[] state and
+    // burn provider credits. `withDialogLock` falls back to "no lock" on
+    // contention which is exactly what we must avoid here.
+    {
+      const holder = `compose-dialog-segments-${crypto.randomUUID()}`;
+      const { data: acquired, error: lockErr } = await supabase.rpc(
+        "try_acquire_dialog_lock",
+        { _scene_id: sceneId, _holder: holder, _ttl_seconds: 90 },
+      );
+      if (lockErr) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} lock rpc error: ${lockErr.message} — proceeding without lock`);
+      } else if (acquired !== true) {
+        console.warn(`[compose-dialog-segments] scene=${sceneId} BUSY — another dispatcher holds the lock; skipping`);
+        return json({ ok: true, status: "scene_lock_busy", scene_id: sceneId }, 202);
+      } else {
+        lockSupabase = supabase;
+        lockSceneId = sceneId;
+        lockHolder = holder;
+      }
+    }
+
+
 
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
@@ -592,10 +625,61 @@ serve(async (req) => {
     if (platePrimaryUrl) {
       plateDims = await probeMp4Dims(platePrimaryUrl);
     }
+    // v33: HARD-FAIL if we can't measure the plate for 3+ speakers. The old
+    // silent fallback to 1280x720 produced face coordinates that landed off
+    // the actual frame, and Sync.so answered with the opaque
+    // "An unknown error occurred." — exactly the failure mode we have been
+    // chasing. For 1/2 speakers the fallback is still acceptable (single
+    // central face).
+    if (!plateDims && speakers.length >= 3 && !isAdvance) {
+      const alreadyRefunded = !!(existing as any)?.refunded;
+      if (!alreadyRefunded && !isRetry) {
+        const { data: w0 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(existing ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+            refunded: !alreadyRefunded,
+            error: "plate_probe_failed_3plus_speakers",
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: "plate_probe_failed_3plus_speakers: Video-Dimensionen konnten nicht ermittelt werden — Sync.so braucht echte Plate-Geometrie für 3+ Sprecher. Bitte Szene neu rendern.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED", error_class: "plate_probe_failed",
+        error_message: "probeMp4Dims returned null for 3+ speaker scene",
+        meta: { plate_url: platePrimaryUrl, speaker_count: speakers.length },
+      });
+      return json(
+        {
+          error: "plate_probe_failed_3plus_speakers",
+          message: "Plate dimensions could not be measured. Re-render the scene clip.",
+          refunded: alreadyRefunded || isRetry ? 0 : totalCost,
+        },
+        422,
+      );
+    }
     const videoDims = plateDims ?? {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
     };
+
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
@@ -1025,57 +1109,28 @@ serve(async (req) => {
     pass.retry_variant = retryVariant;
     pass.diagnostic_id = diagnosticId;
 
-    // ── v28: Audio lead-in trim for Sync.so reliability ──────────────────
-    // Sync.so lipsync-2-pro fails with the generic "An unknown error
-    // occurred." when given per-speaker WAVs with several seconds of
-    // leading silence on 3+ speaker plates with manual ASD. Trim the
-    // lead-in so the voice starts at ~0.2s. Triggered either by an
-    // explicit repair_audio flag (from the webhook retry) OR when the
-    // pre-flight diagnostic detected a lead-in > 0.6s.
+    // ── v33: Audio lead-in trim DISABLED for v25 fan-out passes ──────────
+    // Each per-speaker WAV is silence-padded to the FULL plate duration so
+    // its absolute timeline matches the 9s scene plate. Trimming the lead-in
+    // (v28/v29 logic) shifted the voice forward by 2.5-4s, so Sync.so saw a
+    // video where the active speaker's mouth opens at t=3s while the audio
+    // says them speaking at t=0s. With `sync_mode=cut_off` that mismatch
+    // routinely produces the opaque "An unknown error occurred." failures
+    // we have been chasing for days. We keep the diagnostic log so we can
+    // see when a track HAS a long lead-in (now informational only).
     const passDiag = audioDiagnostics.find((d: any) => d.pass === pass.idx) as any;
     const detectedLeadIn = Number(passDiag?.wav?.leadInSec ?? 0);
-    // v29: lower auto-trim threshold (0.6→0.3) and always re-emit canonical
-    // PCM 16-bit WAV when repair_audio is set, even if no trim is needed —
-    // that strips any non-canonical chunks Sync.so may choke on.
-    const needsTrim = repairAudio || (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.3);
-    const prevPassAudioUrl = (prevState?.passes?.[currentPassIdx] as any)?.audio_url;
-    const alreadyTrimmed = typeof prevPassAudioUrl === "string" && /-trim\.wav(\?|$)/.test(prevPassAudioUrl);
-    if (needsTrim && !alreadyTrimmed) {
-      try {
-        const audioResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
-        if (audioResp.ok) {
-          const origBytes = new Uint8Array(await audioResp.arrayBuffer());
-          const trimmed = trimWavLeadIn(origBytes, { keepLeadInSec: 0.2, force: repairAudio });
-          // Always upload when repair_audio (canonical re-encode), OR when we
-          // actually trimmed >0.05s of silence.
-          if (repairAudio || trimmed.trimmedSec > 0.05) {
-            const trimPath = `${userId}/twoshot-vo/${sceneId}-pass-${currentPassIdx + 1}-trim.wav`;
-            const up = await supabase.storage.from("voiceover-audio").upload(
-              trimPath,
-              trimmed.bytes,
-              { contentType: "audio/wav", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage
-                .from("voiceover-audio")
-                .getPublicUrl(trimPath);
-              if (pub?.publicUrl) {
-                console.log(
-                  `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} AUDIO_TRIM leadIn=${detectedLeadIn.toFixed(2)}s → ${trimmed.info.leadInSec.toFixed(2)}s (saved ${trimmed.trimmedSec.toFixed(2)}s, force=${!!repairAudio}) url=${pub.publicUrl.slice(0, 80)}`,
-                );
-                pass.audio_url = pub.publicUrl;
-                (pass as any).audio_repaired = true;
-                (pass as any).audio_trim_sec = trimmed.trimmedSec;
-              }
-            } else {
-              console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} audio trim upload failed: ${up.error.message}`);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn(`[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} audio trim crash: ${(err as Error).message}`);
-      }
+    if (Number.isFinite(detectedLeadIn) && detectedLeadIn > 0.3) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} leadIn=${detectedLeadIn.toFixed(2)}s (preserved — timeline must match full plate)`,
+      );
     }
+    if (repairAudio) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} repair_audio requested but trim disabled — timeline-preserving repair not implemented yet`,
+      );
+    }
+
 
 
     // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
@@ -1413,9 +1468,16 @@ serve(async (req) => {
     //    parallel via background self-invokes. Each runs as an independent
     //    Sync.so job against the SAME original plate (no chaining). The
     //    Sync.so 3-slot concurrency guard upstream handles back-pressure.
-    if (!isAdvance && !isRetry && passes.length > 1) {
+    // v33: For 3+ speaker scenes, do NOT fan out passes in parallel. The
+    // webhook chains the next pass on completion (pendingIdxs[0]), so the
+    // pipeline still completes — just one Sync.so job at a time per scene.
+    // This eliminates the dispatch race we saw on scene 1a9bf866…: two pass-0
+    // jobs within ms, one of which the webhook later reports as
+    // "job ... not in passes[]". Two-speaker scenes still fan out (no race
+    // reported there).
+    const fanOutAllowed = passes.length > 1 && passes.length <= 2;
+    if (!isAdvance && !isRetry && fanOutAllowed) {
       for (let i = 1; i < passes.length; i++) {
-        // Small jitter so the inflight counter check doesn't race-fire.
         const delayMs = i * 250;
         setTimeout(() => {
           fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
@@ -1433,7 +1495,12 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} FAN-OUT scheduled ${passes.length - 1} additional passes in parallel`,
       );
+    } else if (!isAdvance && !isRetry && passes.length > 2) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers) — webhook will chain pass 2..N as pass 1..N-1 complete`,
+      );
     }
+
 
     return json(
       {
@@ -1451,5 +1518,17 @@ serve(async (req) => {
   } catch (e) {
     console.error("[compose-dialog-segments] error", e);
     return json({ error: e instanceof Error ? e.message : "unknown" }, 500);
+  } finally {
+    if (lockSupabase && lockSceneId && lockHolder) {
+      try {
+        await lockSupabase.rpc("release_dialog_lock", {
+          _scene_id: lockSceneId,
+          _holder: lockHolder,
+        });
+      } catch (e) {
+        console.warn(`[compose-dialog-segments] lock release failed: ${(e as Error)?.message ?? e}`);
+      }
+    }
   }
 });
+
