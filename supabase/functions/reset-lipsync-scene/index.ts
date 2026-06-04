@@ -58,7 +58,7 @@ serve(async (req) => {
   // Ownership: scene → project → user
   const { data: scene } = await admin
     .from("composer_scenes")
-    .select("id, project_id, dialog_shots, lip_sync_applied_at")
+    .select("id, project_id, dialog_shots, lip_sync_applied_at, audio_plan")
     .eq("id", sceneId)
     .maybeSingle();
   if (!scene) return json({ error: "scene_not_found" }, 404);
@@ -87,6 +87,17 @@ serve(async (req) => {
   });
 
   // Hard reset → ready for a brand-new auto-trigger pick-up.
+  // Also clear the cached faceMap inside audio_plan.twoshot so the next run
+  // re-detects faces against the current plate; a stale faceMap from a
+  // previous (different aspect-ratio) clip would otherwise feed wrong
+  // coordinates into Sync.so on every retry.
+  const prevPlan = ((scene as any).audio_plan ?? {}) as Record<string, unknown>;
+  const prevTwoshot = (prevPlan as any).twoshot ?? {};
+  const cleanedTwoshot = { ...prevTwoshot };
+  delete (cleanedTwoshot as any).faceMap;
+  delete (cleanedTwoshot as any).anchor_face_audit;
+  const cleanedPlan = { ...prevPlan, twoshot: cleanedTwoshot };
+
   await admin
     .from("composer_scenes")
     .update({
@@ -96,6 +107,7 @@ serve(async (req) => {
       dialog_shots: null,
       clip_error: null,
       lip_sync_source_clip_url: null,
+      audio_plan: cleanedPlan,
       updated_at: new Date().toISOString(),
     })
     .eq("id", sceneId);

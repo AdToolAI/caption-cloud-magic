@@ -1,156 +1,51 @@
-## Befund: Was gerade wirklich passiert
+Do I know what the issue is? Yes.
 
-Ja — wir haben jetzt eine klarere Ursache als nur „Sync.so ist fehlgeschlagen“.
+The currently failed scene `f03cdc20-cc7b-48e2-9175-f54f2b8456ed` failed before any Sync.so job was dispatched. The database and logs show:
 
-Die aktuelle Szene `1a9bf866-61fb-4952-8f33-e45985097b6e` ist terminal fehlgeschlagen, nicht mehr im alten Endlos-Loop:
+- `clip_error = plate_probe_failed_3plus_speakers`
+- `syncso_dispatch_log.sync_status = PREFLIGHT_BLOCKED`
+- `error_message = probeMp4Dims returned null for 3+ speaker scene`
+- Edge log: `probe-result ... phaseA=http_206+nomoov phaseB=http_206+nomoov phaseC=http_206+notkhd dims=null`
 
-- `lip_sync_status = failed`
-- `twoshot_stage = failed`
-- `dialog_shots.version = 5`
-- `total_passes = 3`
-- alle 3 Sprecher-Passes enden mit `provider_unknown_error`
-- Sync.so liefert weiterhin nur `An unknown error occurred.` ohne `error_code`
-- Circuit ist aktuell wieder `closed`, also nicht mehr die Hauptursache
+So the v33 hard-preflight is doing what we added: it blocks 3-speaker Sync.so dispatch when it cannot determine the actual video plate dimensions. The problem is that our MP4 dimension probe is not robust enough for the Hailuo-hosted MP4 layout, so it false-fails even though the clip is visibly valid and ready.
 
-Die Logs zeigen aber drei sehr starke Eigenfehler in unserer Pipeline, die diese Provider-Fails wahrscheinlich auslösen oder massiv verschärfen.
+## Plan
 
-## Die wahrscheinlichen Fehler
+1. Fix the MP4 dimension probe
+   - Extend `probeMp4Dims` in `_shared/twoshot-face-map.ts` so it does not rely only on `tkhd` discovery.
+   - Add additional MP4 parsing fallbacks:
+     - scan/parse visual sample entries (`avc1`, `avc3`, `hvc1`, `hev1`) for width/height,
+     - reuse the existing `probeMp4Stream` width/height logic where suitable,
+     - log which probe path succeeded.
+   - Keep the hard-fail for real unknown dimensions, but stop false-blocking valid Hailuo clips.
 
-### 1. Doppel-Dispatch derselben Szene
+2. Add a safe 3-speaker fallback when the anchor and clip aspect match
+   - If MP4 probing still fails but `audio_plan.twoshot.faceMap.width/height` is present and has a sane video aspect ratio, use those dimensions as `trusted_anchor_dims_fallback`.
+   - Only allow this fallback for matching wide scene plates, not arbitrary portrait/talking-head sources.
+   - Record the fallback source in dispatch logs so we can tell whether the scene used exact MP4 dims or anchor-derived dims.
 
-In den Dispatch-Logs gibt es zwei Jobs für denselben ersten Pass innerhalb weniger Millisekunden. Später meldet der Webhook:
+3. Fix the reset path so failed preflight scenes can actually start fresh
+   - Update `reset-lipsync-scene` to clear the stale `audio_plan.twoshot.faceMap` / preflight cache fields when doing a full lip-sync reset.
+   - Keep the master clip intact unless the failure says the clip itself is unusable.
+   - This prevents “Sauber neu starten” from reusing a bad cached geometry map forever.
 
-```text
-job ... not in passes[] and not top-level — skip
-```
+4. Improve user-visible error handling
+   - Treat `plate_probe_failed_3plus_speakers` as a recoverable technical preflight failure in the UI copy.
+   - Make the message say the system could not read video geometry and will retry after reset, instead of implying Sync.so failed.
 
-Das heißt: Wir schicken mindestens einmal einen Sync.so-Job raus, der danach nicht mehr sauber dem aktuellen `dialog_shots.passes[]`-State gehört. Das verbrennt Provider-Jobs, erzeugt Late-Webhooks und macht die Fehlerdiagnose unsauber.
+5. Validation after implementation
+   - Deploy the changed edge functions.
+   - Re-run the affected scene through `compose-dialog-segments` and confirm it gets past preflight into `DISPATCHED` instead of `PREFLIGHT_BLOCKED`.
+   - Check logs for real dimensions or the explicit trusted fallback.
+   - Confirm the watchdog no longer shows `scanned=0` for a scene that should be running.
 
-Ursache: `compose-dialog-segments` hat keinen harten per-scene Single-Flight-Lock, obwohl ein Lock-System bereits existiert.
+## Files to change
 
-### 2. Audio-Repair trimmt absolute Sprecher-WAVs kaputt
+- `supabase/functions/_shared/twoshot-face-map.ts`
+- `supabase/functions/compose-dialog-segments/index.ts`
+- `supabase/functions/reset-lipsync-scene/index.ts`
+- optionally `src/hooks/useTwoShotAutoTrigger.ts` or the progress/error component if the hard-fail copy is surfaced there
 
-Die Pipeline erzeugt für jeden Sprecher eine 9s-WAV mit Stille an den Stellen, an denen andere Sprecher reden. Diese absolute Timeline ist notwendig, weil jeder Sync.so-Pass auf die vollständige 9s-Scene-Plate läuft.
+## Important note
 
-Beim Retry wird aber der Lead-In entfernt:
-
-- Matthew: ca. `2.45s` entfernt
-- Kailee: ca. `3.82s` entfernt
-
-Dadurch ist die Sprecher-WAV nicht mehr zeitlich deckungsgleich mit der 9s-Video-Plate. Mit `sync_mode: cut_off` kann das genau zu Sync.so-Fehlern oder falscher zeitlicher Zuordnung führen.
-
-Das ist sehr wahrscheinlich ein Hauptfehler: Für Full-Length-Passes darf Audio repariert/re-encodiert werden, aber nicht durch Trimmen der absoluten Timeline verschoben werden.
-
-### 3. Face-Koordinaten/BBox werden trotz fehlender echter Video-Dimension weiterverwendet
-
-Die Logs zeigen mehrfach:
-
-```text
-plate=probe-failed
-```
-
-Danach nutzt die Funktion Fallback-Dimensionen `1280x720`, obwohl das echte Hailuo-Video anders codiert oder gecroppt sein kann. Für 3 Personen ist das gefährlich: Schon kleine Koordinatenfehler treffen nicht mehr das Gesicht, Sync.so bekommt eine manuelle ASD-Zielperson, die nicht zur tatsächlichen Frame-Geometrie passt, und antwortet nur mit `unknown error`.
-
-Bei `coords-pro-box` wird zusätzlich eine statische Bounding Box über alle Frames gesendet. Die Sync.so-Doku erlaubt Bounding Boxes pro Frame; eine starre Box über die ganze Szene ist bei bewegten Köpfen riskant.
-
-## Do I know what the issue is?
-
-Ja, ausreichend konkret für einen Fix-Plan:
-
-Der Fehler ist sehr wahrscheinlich eine Kombination aus:
-
-1. fehlendem strict Single-Flight in `compose-dialog-segments`,
-2. falschem Audio-Trim bei Full-Length-Speaker-Tracks,
-3. unsicheren Face-Koordinaten/BBoxes bei `plate=probe-failed`,
-4. zu aggressiver Fan-Out-Parallelität für 3 Sprecher.
-
-Sync.so gibt zwar den finalen Provider-Fehler aus, aber unsere Payload- und State-Pipeline hat noch mehrere Punkte, die diese Fehler reproduzierbar provozieren können.
-
-## Implementierungsplan
-
-### 1. `compose-dialog-segments` strikt serialisieren
-
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
-
-- Vor Wallet-Abzug und vor jedem Sync.so-Dispatch einen harten scene-level Lock setzen.
-- Wenn der Lock nicht erworben wird: sofort `202 scene_lock_busy` zurückgeben.
-- Kein „proceed without lock“ für diese Funktion.
-- Dadurch verhindern wir doppelte Pass-0-Jobs und verwaiste Webhooks.
-
-### 2. Audio-Repair korrigieren
-
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
-
-- Für Full-Length-Multi-Speaker-Passes keine Lead-In-Trims mehr anwenden.
-- `repair_audio` soll nur noch kanonisch re-encoden bzw. WAV normalisieren, aber die ursprüngliche Dauer und Stille-Positionen erhalten.
-- Lead-In-Trim nur erlauben, wenn später wirklich mit einem passend getrimmten Video-Preclip gearbeitet wird — nicht bei vollständiger Scene-Plate.
-
-### 3. Video-Dimensionen und Face-Targeting hart validieren
-
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
-
-- Bei 3+ Sprecher-Szenen darf `plate=probe-failed` nicht mehr still auf `1280x720` fallen.
-- Wenn echte Video-Dimensionen nicht ermittelt werden können: preflight fail mit Refund und klarer Meldung.
-- `coords-pro-box` nur nutzen, wenn die Box aus einer verifizierten FaceMap in echter Plate-Geometrie stammt.
-- Wenn keine sichere Box vorliegt: nicht mit synthetischen Boxes weiterfeuern, sondern sauber failen oder auf einen anderen sicheren Pfad wechseln.
-
-### 4. 3-Sprecher-Fan-Out entschärfen
-
-Datei: `supabase/functions/compose-dialog-segments/index.ts`
-
-- Für 3+ Sprecher nicht mehr alle Passes parallel an Sync.so senden.
-- Stattdessen seriell oder maximal 1 aktiver Pass pro Szene.
-- Das reduziert Provider-Stress und verhindert Race-Webhooks.
-
-### 5. Webhook-Orphans sauber behandeln
-
-Datei: `supabase/functions/sync-so-webhook/index.ts`
-
-- Wenn ein Job nicht mehr in `passes[]` gefunden wird, wird er als orphan geloggt und aus `syncso_inflight_jobs` entfernt.
-- Optional best-effort Provider-Cancel, falls Job noch läuft.
-- Keine stummen Skips mehr, die später Slots/Diagnostik verfälschen.
-
-### 6. Reset-Verhalten nach Fix
-
-Datei: `supabase/functions/reset-lipsync-scene/index.ts`
-
-- Der Reset bleibt grundsätzlich richtig.
-- Nach den Code-Fixes sollte ein sauberer Reset die Szene wieder als neuen Versuch starten, aber dann ohne Doppel-Dispatch und ohne Timeline-Trim.
-
-### 7. Validierung
-
-Nach Umsetzung prüfe ich:
-
-- Edge-Logs: kein doppelter Pass-0-Dispatch mehr.
-- DB-State: keine Jobs mehr, die „not in passes[]“ melden.
-- Dispatch-Logs: `audio_trim_sec` bleibt bei Full-Length-Passes `0`.
-- Logs: bei 3+ Sprecher kein `plate=probe-failed` mit trotzdem gesendetem Sync.so-Payload.
-- Falls Sync.so danach noch fehlschlägt, muss die Meldung eine echte Preflight-Ursache oder einen isolierten Provider-Fail enthalten — aber kein Loop, kein verwaister Job, kein fehlerhafter Retry-Payload.
-
-## Erwartetes Ergebnis
-
-Die Multi-Charakter-Lip-Sync-Pipeline wird nicht einfach erneut retryen, sondern strukturell repariert:
-
-```text
-Vorher:
-parallel/doppelt dispatchen
-→ absolute Sprecher-WAV trimmen
-→ unsichere Face-Koordinaten bei probe-failed
-→ Sync.so unknown error
-→ Retry mit ähnlichem kaputtem Payload
-
-Nachher:
-strict single-flight
-→ timeline-erhaltende Audio-Reparatur
-→ harte Face-/Dimension-Preflights
-→ serieller 3-Sprecher-Dispatch
-→ klare Success- oder klare terminale Fehlerursache
-```
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+This is separate from the earlier Sync.so `unknown error` loop. That loop appears stopped for the current scene. The current blocker is our own preflight geometry reader falsely failing on a valid 3-character Hailuo plate.
