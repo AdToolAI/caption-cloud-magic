@@ -102,7 +102,14 @@ function json(body: unknown, status = 200) {
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
-const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "auto-pro", "auto-standard"] as const;
+// v37 — `sync3-coords` added as the Sync.so-recommended fallback for
+// difficult / static / occluded / multi-speaker plates per
+// https://sync.so/docs/models/lipsync (sync-3 has built-in obstruction
+// detection and can open closed lips, which lipsync-2-pro cannot).
+// Order is intentional: try lipsync-2-pro first (better fidelity when it
+// works), then sync-3 BEFORE the auto-* face-swap-risk variants.
+const SYNC3_MODEL = "sync-3";
+const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
