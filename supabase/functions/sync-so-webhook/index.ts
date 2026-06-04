@@ -624,6 +624,63 @@ serve(async (req) => {
         .map((p: any, i: number) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
         .filter((i: number) => i >= 0);
 
+      // v48 — partial-mux race fix.
+      // The COMPLETED branch used to dispatch the multi-speaker mux as soon
+      // as `allTerminal && doneCount > 0`. If a sibling FAILED webhook
+      // arrived BEFORE this COMPLETED webhook, `failedCount>0` was silently
+      // ignored and we muxed a video where one speaker was silent / had
+      // wrong audio (the scene-freeze bug for 3+ speakers).
+      // For 3+ speaker scenes we now mirror the FAILED-branch policy:
+      // any failed pass → fail the scene cleanly + refund. No partial mux.
+      if (allDone && failedCount > 0 && totalPasses >= 3) {
+        const failedSpeakers = freshDonePasses
+          .filter((p: any) => ["failed", "canceled_by_scene_failure"].includes(String(p?.status ?? "")))
+          .map((p: any) => p?.speaker_name ?? `Speaker ${Number(p?.speaker_idx ?? 0) + 1}`);
+        const failReason = `multi_speaker_incomplete_${doneCount}_of_${totalPasses}: Sprecher ${failedSpeakers.join(", ")} konnten nicht lip-synct werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.`;
+        const costFinal = Number((freshDoneState as any)?.cost_credits ?? 0);
+        const alreadyRefundedFinal = !!(freshDoneState as any)?.refunded;
+        if (costFinal > 0 && !alreadyRefundedFinal) {
+          try {
+            const { data: row2 } = await supabase
+              .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+            const { data: proj2 } = await supabase
+              .from("composer_projects").select("user_id").eq("id", (row2 as any)?.project_id).single();
+            const uid2 = (proj2 as any)?.user_id;
+            if (uid2) {
+              const { data: w2 } = await supabase
+                .from("wallets").select("balance").eq("user_id", uid2).single();
+              await supabase
+                .from("wallets")
+                .update({ balance: Number((w2 as any)?.balance ?? 0) + costFinal, updated_at: nowIso })
+                .eq("user_id", uid2);
+            }
+          } catch (_e) { /* best-effort */ }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              ...freshDoneState,
+              passes: freshDonePasses,
+              status: "failed",
+              finished_at: nowIso,
+              refunded: costFinal > 0,
+              error: failReason,
+              partial_done_count: doneCount,
+              partial_failed_speakers: failedSpeakers,
+            },
+            lip_sync_status: "failed",
+            twoshot_stage: "failed",
+            clip_error: failReason,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.warn(
+          `[sync-so-webhook] v48 scene=${sceneId} COMPLETED-branch race — refusing partial mux (${doneCount}/${totalPasses} done, failed=${failedSpeakers.join(",")}) — refund=${costFinal}`,
+        );
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", refused: "partial_mux_3plus" });
+      }
+
       if (!allDone) {
         // Just persist this pass — let the fan-out parallel dispatches finish.
         await supabase
