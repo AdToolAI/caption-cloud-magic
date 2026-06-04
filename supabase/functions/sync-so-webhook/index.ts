@@ -352,7 +352,7 @@ serve(async (req) => {
 
   // ── v41: Official Sync.so Multi-Speaker Segments (single-call) ────────
   // 1 generation owns the whole scene. Webhook output IS the final clip.
-  if ((state as any).version === 41 && (state as any).engine === "sync-official-segments") {
+  if (((state as any).version === 41 || (state as any).version === 42) && (state as any).engine === "sync-official-segments") {
     if ((state as any).sync_job_id !== jobId) {
       console.warn(`[sync-so-webhook] v41 scene=${sceneId} job=${jobId} ORPHAN (state.sync_job_id=${(state as any).sync_job_id ?? "null"}) — cleaning up`);
       try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
