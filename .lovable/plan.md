@@ -1,89 +1,143 @@
-## Befund
+Ja. Bevor wir nochmal generieren, sollten wir die Lip-Sync-Schicht auf **eine einzige relevante Pipeline** reduzieren. Der Fehler ist inzwischen nicht mehr nur „Sync.so Payload falsch“, sondern dass zu viele alte Fallbacks, Versionen und Nebenpfade aktiv sind und sich gegenseitig überstimmen.
 
-**Do I know what the issue is?** Ja.
+## Ziel
 
-Der erneute Failure war kein Frontend-Problem. Der konkrete Sync.so-Job für Szene `e5445b67…` wurde zweimal erfolgreich an Sync.so übergeben, kam aber beide Male nach wenigen Sekunden mit `FAILED: An unknown error occurred` zurück.
+Eine klare, wartbare Pipeline:
 
-Der wichtigste Befund aus Logs + Frame-Inspektion:
+```text
+3+ Sprecher
+  → Sync.so Official Segments Single-Call
+  → Sync.so Webhook
+  → Szene fertig oder sauber fehlgeschlagen
 
-- Unsere v46-Payload nutzt zwar die offizielle Segments-Struktur (`segments[]`, `audioInput.refId`, `optionsOverride.active_speaker_detection`, `lipsync-2-pro`, `sync_mode: cut_off`).
-- Aber die ASD-Koordinaten kommen aus dem **Anchor/Identity-FaceMap** und werden nur geometrisch auf das Video skaliert.
-- Im echten Video liegen diese Punkte sichtbar zu hoch bzw. nicht sauber auf den Gesichtern. Sync.so verlangt laut Speaker-Selection-Doku: `coordinates` müssen im selben Frame-Koordinatensystem auf dem Gesicht liegen.
-- Wir haben den strikten Plate-Frame-Check für 3+ Sprecher bewusst übersprungen, sobald alle Identitäten im Anchor gematcht waren. Genau das ist hier falsch: Identity-Match ≠ plate-native Sync.so-Koordinaten.
+1–2 Sprecher
+  → bewährter einfacher Pfad
+  → keine 3-Speaker-Fallback-Vermischung
+```
 
-Zusätzlich sind kleinere Fehler sichtbar:
+Keine alten v41–v47 Experimente, kein stiller Fan-Out-Fallback, kein kaputtes Partial-Muxing, kein `sync-3`-Fallback in einer Segments-Pipeline.
 
-- v46-Dispatch-Logs schreiben fälschlich `model: "sync-3"`, obwohl real `lipsync-2-pro` geschickt wird.
-- v46 nutzt weiter alte `v41_*` Fehlernamen/Retry-Labels, was Diagnose erschwert.
-- Der 3-Sprecher-Single-Call wird mit Sprecheranzahl multipliziert bepreist, obwohl es nur ein Sync.so-Call ist.
-- Der Retry wiederholt denselben falschen Koordinaten-Payload, statt vorher plate-native Koordinaten zu reparieren.
+## Cleanup-Plan
 
-## Plan
+### 1. Relevante Ziel-Pipeline festlegen
+Für 3+ Sprecher bleibt nur noch:
 
-### 1. v47: Plate-native Face Targeting vor Sync.so-Dispatch
+```json
+{
+  "model": "lipsync-2-pro",
+  "input": [
+    { "type": "video", "url": "..." },
+    { "type": "audio", "url": "...", "refId": "speaker_1" },
+    { "type": "audio", "url": "...", "refId": "speaker_2" },
+    { "type": "audio", "url": "...", "refId": "speaker_3" }
+  ],
+  "segments": [
+    {
+      "startTime": 0,
+      "endTime": 2.3,
+      "audioInput": { "refId": "speaker_1" },
+      "optionsOverride": {
+        "active_speaker_detection": {
+          "frame_number": 12,
+          "coordinates": [385, 171]
+        }
+      }
+    }
+  ],
+  "options": { "sync_mode": "cut_off" },
+  "webhookUrl": "..."
+}
+```
 
-In `compose-dialog-segments` wird die 3+ Sprecher Segments-Route so geändert:
+Das ist die Sync.so-Dokumentation. Daran richten wir den Code aus.
 
-- Für jeden Sprecher/Turn den tatsächlichen Referenzframe aus dem Video nehmen.
-- Auf diesem Frame die vorhandene `validate-frame-face`-Logik nutzen, um echte Gesichtsboxen im **Video-Koordinatensystem** zu bekommen.
-- Gesichter links-nach-rechts sortieren und Speaker-Slot sauber auf Face-Box mappen.
-- Sync.so-Koordinate nicht mehr aus Anchor-Scaling ableiten, sondern aus der echten Plate-Face-Box:
-  - x = Box-Mitte
-  - y = Mund-/untere Gesichtszone statt Stirn/Anchor-Zentrum
-- Nur wenn genügend echte Gesichter gefunden werden, wird der offizielle Segments-Single-Call dispatched.
-- Wenn nicht genügend Gesichter gefunden werden, wird **kein kaputter Sync.so-Call** gestartet; die Szene geht in einen klaren reparierbaren Zustand oder fällt auf die stabilere per-speaker Pipeline zurück.
+### 2. Alte 3+ Sprecher-Pfade deaktivieren/entfernen
+Aus `compose-dialog-segments` werden für 3+ Sprecher entfernt oder hart blockiert:
 
-### 2. Retry-Logik reparieren
+- v5 Fan-Out-Fallback für 3+ Sprecher
+- `coords-pro-box` Bounding-Box-Retry
+- `sync3-coords` Retry
+- `auto-pro` / `auto-standard` Fallbacks für 3+ Sprecher
+- `segments_secs` für 3+ Sprecher
+- alte Version-Kommentare und Branches v41–v47, soweit sie die Zielpipeline verwirren
 
-Der Retry darf nicht denselben fehlerhaften Payload erneut senden.
+Wichtig: Wenn die Official-Segments-Pipeline nicht sicher gebaut werden kann, soll sie **vor dem Sync.so-Call klar fehlschlagen**, statt in einen alten Pfad auszuweichen.
 
-- Bei Sync.so `unknown error` in v47 zuerst Koordinaten/Frame neu validieren.
-- Retry nur mit reparierten plate-native Koordinaten.
-- Maximal ein Provider-Retry bleibt bestehen, aber mit echter Payload-Änderung.
-- Fehlertexte werden von `v41_FAILED` auf `v47_FAILED` aktualisiert.
+### 3. Einen neuen kanonischen State einführen
+Für die bereinigte Pipeline verwenden wir z. B.:
 
-### 3. Payload und Logging aufräumen
+```json
+{
+  "version": 48,
+  "engine": "sync-official-segments",
+  "status": "rendering",
+  "model": "lipsync-2-pro",
+  "sync_job_id": "...",
+  "segments": [...],
+  "speaker_refs": [...],
+  "asd_mode": "coordinates",
+  "source_clip_url": "..."
+}
+```
 
-- Dispatch-Meta schreibt künftig `model: "lipsync-2-pro"`, nicht mehr `sync-3`.
-- `webhook_url` wird entfernt; nur offizielles `webhookUrl` bleibt.
-- Audio-Inputs bleiben mit `refId` offiziell kompatibel; `ref_id` kann optional defensiv bleiben oder entfernt werden.
-- `auto_detect: false` wird nicht mehr mit `frame_number + coordinates` gemischt, wo die Doku die Varianten trennen will.
+Webhook und Watchdog akzeptieren dann gezielt diese neue Version, statt viele historische Versionen gleich zu behandeln.
 
-### 4. Kosten-/Refund-Bug korrigieren
-
-- Für die v47 Single-Call Segments-Route wird nur `ceil(duration) × 9` berechnet.
-- Die alte fan-out Route bleibt bei `speakerCount × ceil(duration) × 9`.
-- Bereits fehlgeschlagene Jobs bleiben idempotent refundiert; keine Doppel-Rückerstattung.
-
-### 5. Webhook akzeptiert v47
-
+### 4. Webhook vereinfachen und absichern
 In `sync-so-webhook`:
 
-- Versions-Gate um `47` erweitern.
-- v47-Fehler sauber klassifizieren und loggen.
-- Bestehende Refund- und Inflight-Cleanup-Pfade unverändert lassen.
+- v48 Official Segments bekommt einen eigenen, kleinen Handler.
+- `COMPLETED` setzt nur dann final auf fertig, wenn `outputUrl` vorhanden ist.
+- `FAILED` macht maximal einen sauberen Retry, danach klarer Fail + Refund.
+- Keine Vermischung mit v5/Fan-Out-Logik.
+- Alte v41–v47 Retry-Ladder wird entfernt oder nur noch legacy-lesend behandelt.
 
-### 6. Szene nach Deploy sauber zurücksetzen
+### 5. Partial-Muxing endgültig verhindern
+Der aktuell konkrete Freeze entstand, weil bei 3 Sprechern nur 1 Pass fertig war, aber trotzdem der Mux gestartet wurde.
 
-Nach Deployment:
+Daher:
 
-- Szene `e5445b67-c3c1-4d09-b7db-11187265586c` auf `pending` setzen.
-- `dialog_shots`, `lip_sync_status`, `twoshot_stage`, `replicate_prediction_id`, `clip_error` bereinigen.
-- Stale Sync.so Inflight-Jobs für diese Szene entfernen.
+- `render-sync-segments-audio-mux` darf bei Multi-Speaker nie mit unvollständigen Passes starten.
+- Wenn `expected_speakers >= 3`, aber weniger als alle Outputs vorhanden sind: sofort fail, kein `single-audio-swap`.
+- Kein finaler `done`-Status bei Teilresultaten.
 
-### 7. Validierung vor neuem Trigger
+### 6. Alte Legacy-Funktionen markieren oder stilllegen
+Wir prüfen und bereinigen diese Funktionsfamilie:
 
-Vor dem nächsten echten Trigger prüfen:
+- `compose-dialog-scene`
+- `compose-dialog-segments`
+- `poll-dialog-shots`
+- `sync-so-webhook`
+- `render-sync-segments-audio-mux`
+- `lipsync-watchdog`, falls vorhanden
+- `_shared/syncso-preflight.ts`
+- `_shared/twoshot-face-map.ts`
 
-- v47-Logs zeigen pro Sprecher echte plate-native Koordinaten, nicht Anchor-Skaling.
-- Koordinaten liegen sichtbar auf den Gesichtern im extrahierten Frame.
-- Dispatch-Log zeigt `model: lipsync-2-pro`, `segments=3`, `sync_mode=cut_off`, `version=47`.
-- Bei Sync.so-Fehlern wird automatisch refundiert und kein Retry mit identischem Payload gemacht.
+Nicht blind löschen: Nur entfernen, wenn keine aktive Pipeline mehr darauf angewiesen ist. Wo Löschen zu riskant ist, wird ein harter Guard eingebaut: „nicht für 3+ Sprecher“.
 
-## Erwartetes Ergebnis
+### 7. Datenbank-State der kaputten Szene bereinigen
+Für die betroffene Szene `61edb887-10c7-432d-b777-600707bf7d9a`:
 
-Der nächste Trigger sendet nicht mehr denselben formal richtigen, aber praktisch falschen ASD-Payload. Sync.so bekommt pro Segment einen Referenzframe und einen Punkt, der wirklich auf dem jeweiligen Gesicht im Video liegt.
+- falsches `lip_sync_applied_at` entfernen
+- falschen finalen Mux-Output entfernen
+- `dialog_shots` zurücksetzen
+- stale Sync.so Inflight-Jobs bereinigen
+- Szene wieder auf `pending` setzen
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+Damit der nächste Trigger wirklich frisch startet.
+
+### 8. Memory/Plan aktualisieren
+Die Architektur-Memory bekommt eine neue Regel:
+
+```text
+3+ Speaker Lip-Sync uses only Sync.so Official Segments v48.
+No v5 fan-out, no sync-3 fallback, no bounding-box retry, no partial mux.
+```
+
+Damit wir später nicht wieder alte Pfade reaktivieren.
+
+## Was danach anders ist
+
+- Es gibt für 3 Sprecher nur noch eine Pipeline.
+- Wenn Sync.so fehlschlägt, sieht man einen klaren Fehler statt ein eingefrorenes „fertiges“ Video.
+- Kein alter Fallback kann mehr heimlich ein falsches Resultat als erfolgreich markieren.
+- Die nächste Generierung ist sauber messbar: entweder `v48_official_segments_payload` → `COMPLETED`, oder ein eindeutiger Fail mit Refund.
