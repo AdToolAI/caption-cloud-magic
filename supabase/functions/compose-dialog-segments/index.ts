@@ -625,10 +625,61 @@ serve(async (req) => {
     if (platePrimaryUrl) {
       plateDims = await probeMp4Dims(platePrimaryUrl);
     }
+    // v33: HARD-FAIL if we can't measure the plate for 3+ speakers. The old
+    // silent fallback to 1280x720 produced face coordinates that landed off
+    // the actual frame, and Sync.so answered with the opaque
+    // "An unknown error occurred." — exactly the failure mode we have been
+    // chasing. For 1/2 speakers the fallback is still acceptable (single
+    // central face).
+    if (!plateDims && speakers.length >= 3 && !isAdvance) {
+      const alreadyRefunded = !!(existing as any)?.refunded;
+      if (!alreadyRefunded && !isRetry) {
+        const { data: w0 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({ balance: Number(w0?.balance ?? 0) + totalCost, updated_at: new Date().toISOString() })
+          .eq("user_id", userId);
+      }
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(existing ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            cost_credits: Number((existing as any)?.cost_credits ?? totalCost),
+            refunded: !alreadyRefunded,
+            error: "plate_probe_failed_3plus_speakers",
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: "plate_probe_failed_3plus_speakers: Video-Dimensionen konnten nicht ermittelt werden — Sync.so braucht echte Plate-Geometrie für 3+ Sprecher. Bitte Szene neu rendern.",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_status: "PREFLIGHT_BLOCKED", error_class: "plate_probe_failed",
+        error_message: "probeMp4Dims returned null for 3+ speaker scene",
+        meta: { plate_url: platePrimaryUrl, speaker_count: speakers.length },
+      });
+      return json(
+        {
+          error: "plate_probe_failed_3plus_speakers",
+          message: "Plate dimensions could not be measured. Re-render the scene clip.",
+          refunded: alreadyRefunded || isRetry ? 0 : totalCost,
+        },
+        422,
+      );
+    }
     const videoDims = plateDims ?? {
       width: Number((existing as any)?.video_width) || 1280,
       height: Number((existing as any)?.video_height) || 720,
     };
+
     const coordSources: string[] = [];
     const speakerCoords: Array<[number, number] | null> = speakers.map((sp, idx) => {
       const picked = pickSpeakerCoordinates({
