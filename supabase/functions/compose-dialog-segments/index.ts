@@ -1275,27 +1275,46 @@ serve(async (req) => {
 
 
 
-    // ── Build per-pass Sync.so payload (NO segments[] — single audio + ASD) ──
+    // ── Build per-pass Sync.so payload ───────────────────────────────────
+    // v38 — Per-Turn Tight-Window Lip-Sync (Sync.so-konform):
+    //   • frame_number = TURN START (not midpoint) — midpoint anchoring was
+    //     pushing speaker N's mouth animation forward into speaker N+1's
+    //     voiced window.
+    //   • segments_secs on the video input restricts Sync.so animation to
+    //     this speaker's turn windows ONLY. Outside the windows the original
+    //     plate pixels are preserved → no cross-speaker leakage, even when
+    //     the per-speaker WAV is silence-padded across the full plate.
+    //     https://sync.so/docs/api-reference/endpoints/generate
     const firstTurn = pass.segments[0];
-    const midSec = firstTurn ? (firstTurn.startTime + firstTurn.endTime) / 2 : totalSec / 2;
-    const frameNumber = Math.max(0, Math.floor(midSec * ASSUMED_FPS));
+    const turnStartSec = firstTurn ? Math.max(0, firstTurn.startTime) : 0;
+    const turnEndSec = firstTurn ? Math.min(totalSec, firstTurn.endTime) : totalSec;
+    const startFrame = Math.max(0, Math.floor(turnStartSec * ASSUMED_FPS));
     const referenceFrameNumber = Number.isFinite(pass.reference_frame_number)
       ? Math.max(0, Math.round(Number(pass.reference_frame_number)))
-      : frameNumber;
+      : startFrame;
+    // Union of all turn windows for THIS speaker (a speaker may have multiple
+    // turns; each becomes its own [start, end] entry inside segments_secs).
+    // Small 0.08s pad both sides keeps consonant onsets/offsets natural.
+    const SEG_PAD = 0.08;
+    const speakerWindowsSecs: Array<[number, number]> = (pass.segments ?? [])
+      .map((t) => {
+        const s = Math.max(0, Number(t.startTime) - SEG_PAD);
+        const e = Math.min(totalSec, Number(t.endTime) + SEG_PAD);
+        return [Number(s.toFixed(3)), Number(e.toFixed(3))] as [number, number];
+      })
+      .filter(([s, e]) => Number.isFinite(s) && Number.isFinite(e) && e > s + 0.05);
+
     const syncOptions: Record<string, unknown> = {
-      // Explicit: keep full video length. Without this, lipsync-2-pro's
-      // default trims output to the shorter input → multi-pass chains
-      // were ending after the first speaker's last turn (3rd sentence
-      // disappeared). cut_off here = "cut to shortest" but with our
-      // silence-padded per-speaker tracks (length = sceneDur) the audio
-      // matches the video, so output stays full.
+      // cut_off = "cut to shortest input length". Our per-speaker WAV is
+      // silence-padded to the full scene plate, so output stays full-length.
       sync_mode: "cut_off",
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
-      // frame_number + coordinates in the pixel space of the extracted
-      // frame. sync-3 accepts the same shape but tolerates static/occluded
+      // frame_number = a frame WHERE THE SPEAKER IS VISIBLE. We anchor on
+      // the turn-start frame so the mouth animation begins where the audio
+      // begins. sync-3 accepts the same shape but tolerates static/occluded
       // faces that lipsync-2-pro rejects with "An unknown error occurred."
       syncOptions.active_speaker_detection = {
         auto_detect: false,
@@ -1327,7 +1346,6 @@ serve(async (req) => {
         const [bx1, by1, bx2, by2] = matchedFace.bbox.map((n: any) => Number(n));
         const sx = dims.width / fmW;
         const sy = dims.height / fmH;
-        // Tight pad (~15%) around the detected face for stable ASD.
         const padX = (bx2 - bx1) * 0.15;
         const padY = (by2 - by1) * 0.15;
         const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
@@ -1372,16 +1390,27 @@ serve(async (req) => {
         : retryVariant === "auto-standard"
           ? LIPSYNC_FALLBACK_MODEL
           : LIPSYNC_MODEL;
+
+    // v38 — Restrict animation window to this speaker's turn(s) via
+    // segments_secs on the VIDEO input. Only applied for multi-speaker scenes
+    // (≥2 passes); single-speaker monologues need the full plate.
+    const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
+    if (passes.length >= 2 && speakerWindowsSecs.length > 0) {
+      videoInput.segments_secs = speakerWindowsSecs;
+    }
     const payload: Record<string, unknown> = {
       model: payloadModel,
       input: [
-        { type: "video", url: passInputUrl },
+        videoInput,
         { type: "audio", url: pass.audio_url },
       ],
       options: syncOptions,
       webhookUrl: diagnosticWebhookUrl,
       webhook_url: diagnosticWebhookUrl,
     };
+    console.log(
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v38_windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+    );
 
     // ── Length sanity log ────────────────────────────────────────────────
     // compose-twoshot-audio writes mono 16-bit WAV @ 44.1kHz → ~88200 bytes/sec
