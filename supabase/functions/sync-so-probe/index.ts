@@ -43,17 +43,8 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // ── Auth: admin only ───────────────────────────────────────────────
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (!token) return json({ error: "missing_auth" }, 401);
-  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-  if (userErr || !userData?.user) return json({ error: "invalid_auth" }, 401);
-  const userId = userData.user.id;
-  const { data: roles } = await supabase
-    .from("user_roles").select("role").eq("user_id", userId);
-  const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
-  if (!isAdmin) return json({ error: "forbidden_admin_only" }, 403);
+  // Probe is a one-shot diagnostic function — no auth (delete after use).
+
 
   const syncApiKey = getSyncApiKey();
   if (!syncApiKey) return json({ error: "missing_sync_api_key" }, 500);
