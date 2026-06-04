@@ -436,7 +436,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44
+        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -803,7 +803,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
       // v44 — ASD per segment via `frame_number + coordinates` (Sync.so's
       // official multi-speaker Segments example, /developer-guides/segments
@@ -870,9 +870,11 @@ serve(async (req) => {
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
+                sync_mode: "cut_off",
                 active_speaker_detection: {
-                  // v44: single point per segment (Sync.so official example).
-                  // Exclusive with auto_detect/v3/bounding_boxes.
+                  // v45: single point per segment (Sync.so official multi-speaker example).
+                  // Exclusive with v3/bounding_boxes. `auto_detect: false` to honor manual point.
+                  auto_detect: false,
                   frame_number: frameNumber,
                   coordinates: [cx, cy],
                 },
@@ -880,7 +882,7 @@ serve(async (req) => {
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v44 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
+            `[compose-dialog-segments] scene=${sceneId} v45 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -900,19 +902,25 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
+        // v45 — Sync.so multi-speaker official path: model `sync-3` (built-in
+        // obstruction detection + multi-speaker support per docs), top-level
+        // `sync_mode: cut_off` (no audio looping), per-segment ASD with
+        // explicit `auto_detect: false`. Coordinates are plate-pixel ints
+        // already clamped to the video frame.
+        const V45_MODEL = SYNC3_MODEL;
         const v41Payload = {
-          model: LIPSYNC_MODEL,
+          model: V45_MODEL,
           input: v41Inputs,
           segments: v41Segments,
-          options: { sync_mode: "loop" },
+          options: { sync_mode: "cut_off" },
           webhookUrl: v41Webhook,
           webhook_url: v41Webhook,
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v44_official_segments_payload model=${LIPSYNC_MODEL} asd=coords ` +
+          `[compose-dialog-segments] scene=${sceneId} v45_official_segments_payload model=${V45_MODEL} asd=coords ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} totalSec=${totalSec}`,
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
