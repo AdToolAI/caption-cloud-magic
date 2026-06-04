@@ -1271,7 +1271,12 @@ serve(async (req) => {
       // matches the video, so output stays full.
       sync_mode: "cut_off",
     };
-    if (retryVariant === "coords-pro") {
+    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords") {
+      // Sync.so canonical ActiveSpeaker DTO (per
+      // https://sync.so/docs/developer-guides/speaker-selection):
+      // frame_number + coordinates in the pixel space of the extracted
+      // frame. sync-3 accepts the same shape but tolerates static/occluded
+      // faces that lipsync-2-pro rejects with "An unknown error occurred."
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
@@ -1338,8 +1343,17 @@ serve(async (req) => {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
+    // v37 — model picked per variant. sync-3 is Sync.so's recommended model
+    // for difficult plates (static/occluded/multi-speaker); lipsync-2-pro
+    // remains the default for first-pass quality.
+    const payloadModel =
+      retryVariant === "sync3-coords"
+        ? SYNC3_MODEL
+        : retryVariant === "auto-standard"
+          ? LIPSYNC_FALLBACK_MODEL
+          : LIPSYNC_MODEL;
     const payload: Record<string, unknown> = {
-      model: retryVariant === "auto-standard" ? LIPSYNC_FALLBACK_MODEL : LIPSYNC_MODEL,
+      model: payloadModel,
       input: [
         { type: "video", url: passInputUrl },
         { type: "audio", url: pass.audio_url },
