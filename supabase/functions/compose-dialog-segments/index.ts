@@ -1063,7 +1063,7 @@ serve(async (req) => {
             scene_id: sceneId,
             sync_job_id: v41JobId,
             engine: "sync-official-segments",
-            model: "sync-3",
+            model: "lipsync-2-pro",
             segments: v41Segments.length,
             speakers: v41SpeakerRefs.length,
             cost_credits: v41State.cost_credits,
