@@ -445,23 +445,32 @@ serve(async (req) => {
     } catch { /* ignore log errors */ }
 
     if (canRetry) {
+      // v43 — escalate bbox padding on retry (0.08 → 0.18 → 0.28) so the
+      // second attempt has more slack for shoulder-to-shoulder shots where
+      // Sync.so's first run missed the face.
+      const prevPad = Number((state as any).bbox_pad_factor);
+      const nextPad = Math.min(
+        0.35,
+        Number.isFinite(prevPad) && prevPad > 0 ? prevPad + 0.10 : 0.18,
+      );
       await supabase
         .from("composer_scenes")
         .update({
           dialog_shots: {
             ...(state as any),
             status: "retrying",
+            bbox_pad_factor: nextPad,
             last_error: rawErr.slice(0, 200),
             last_error_class: errClass,
             sync_error_code: errorCode ?? null,
             updated_at: nowIso,
           },
           lip_sync_status: "running",
-          twoshot_stage: `syncso_v41_retry_${retryCount + 1}`,
+          twoshot_stage: `syncso_v43_retry_${retryCount + 1}_pad${Math.round(nextPad * 100)}`,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
-      console.warn(`[sync-so-webhook] v41 scene=${sceneId} ${status} code=${errorCode ?? "null"} → retry ${retryCount + 1}/${MAX_V41_RETRIES}`);
+      console.warn(`[sync-so-webhook] v43 scene=${sceneId} ${status} code=${errorCode ?? "null"} → retry ${retryCount + 1}/${MAX_V41_RETRIES} bbox_pad=${nextPad.toFixed(2)}`);
       fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
