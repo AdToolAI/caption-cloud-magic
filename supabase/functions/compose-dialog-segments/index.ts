@@ -436,7 +436,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41 || (existing as any).version === 42
+        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -818,13 +818,13 @@ serve(async (req) => {
       // Build inputs: 1 video + N audio (one per speaker with track_url).
       type V41Input =
         | { type: "video"; url: string }
-        | { type: "audio"; url: string; ref_id: string };
+        | { type: "audio"; url: string; refId: string };
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
       // ── v43 — Per-speaker bounding-box builder ──────────────────────────
-      // Sync.so ASD has 4 exclusive variants. v41/v42 used `frame_number+
-      // coordinates` (a single point); v43 switches to `frame_number+
-      // bounding_boxes` — more robust for shoulder-to-shoulder 3+ speaker
+      // Sync.so ASD has exclusive variants. v41/v42 used `frame_number+
+      // coordinates` (a single point); v43 switches to per-frame
+      // `bounding_boxes` — more robust for shoulder-to-shoulder 3+ speaker
       // plates where the face can drift a few pixels off the point and
       // Sync.so returns "An unknown error occurred." after 10-13 min.
       //
@@ -883,7 +883,7 @@ serve(async (req) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
         const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, ref_id: refId });
+        v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         const built = buildBoxForSpeaker(idx, sp.character_id ?? null, coords);
         v41SpeakerRefs.push({
@@ -927,6 +927,7 @@ serve(async (req) => {
         // audioInput.refId AND a per-segment optionsOverride.
         // active_speaker_detection with the speaker's bounding_boxes (v43).
         const v41Segments: Array<Record<string, unknown>> = [];
+        const totalFramesV41 = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS_V41) + 1);
         v41SpeakerRefs.forEach(({ idx, refId, bbox, bboxSource, name }) => {
           const sp = speakers[idx];
           const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
@@ -938,18 +939,21 @@ serve(async (req) => {
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
-            const midSec = (s + e) / 2;
-            const frameNumber = Math.max(0, Math.round(midSec * ASSUMED_FPS_V41));
+            const boundingBoxes = Array.from(
+              { length: totalFramesV41 },
+              () => bbox as [number, number, number, number],
+            );
             v41Segments.push({
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
                 active_speaker_detection: {
-                  // v43: { frame_number, bounding_boxes } — exclusive ASD
-                  // variant per Sync.so docs. Replaces v42 point coordinates.
-                  frame_number: frameNumber,
-                  bounding_boxes: [bbox],
+                  // v43: bounding_boxes is a per-frame array and must NOT be
+                  // combined with frame_number/coordinates per Sync.so docs.
+                  // We repeat the resolved target face box for every frame so
+                  // Sync.so always has a valid speaker detection entry.
+                  bounding_boxes: boundingBoxes,
                 },
               },
             });
@@ -1041,7 +1045,7 @@ serve(async (req) => {
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length } },
+            meta: { payload_summary: { model: LIPSYNC_MODEL, segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v41_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -1108,6 +1112,7 @@ serve(async (req) => {
             model: LIPSYNC_MODEL,
             segments_count: v41Segments.length,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
+            input_refs: v41SpeakerRefs.map((s) => s.refId),
             is_retry: isV41Retry,
             retry_count: v41RetryCount,
           },
