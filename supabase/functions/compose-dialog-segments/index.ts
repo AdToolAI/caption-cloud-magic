@@ -943,15 +943,14 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 43,
+                version: 44,
                 engine: "sync-official-segments",
-                asd_mode: "bounding_boxes",
-                bbox_pad_factor: bboxPadFactor,
+                asd_mode: "coordinates",
                 status: "failed",
                 model: LIPSYNC_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? totalCost),
                 refunded: !alreadyRefunded,
-                error: `v43_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v44_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
