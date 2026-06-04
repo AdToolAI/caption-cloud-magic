@@ -802,23 +802,91 @@ serve(async (req) => {
     // We use v41 for 3+ speaker scenes (and only on fresh dispatch or an
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
-    const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46) ? (existing as any) : null;
+    let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47) ? (existing as any) : null;
+
+    // ── v47 plate-native face repair ────────────────────────────────────
+    // The official Sync.so Segments path requires `coordinates` to land on
+    // the actual speaker's face IN THE PLATE FRAME (not in anchor-image
+    // space). v46 reused anchor-derived coords scaled by aspect-ratio and
+    // Sync.so silently returned "An unknown error occurred." because those
+    // points often missed the real faces. We now call validate-frame-face
+    // on a mid-scene frame, sort the detected face boxes left-to-right,
+    // and assign each speaker its slot's box-center-x + mouth-zone-y.
+    // If we cannot recover at least `speakers.length` boxes we fall back
+    // to the v5 per-speaker chain instead of dispatching a doomed segments
+    // call.
+    if (useV41Official && !isAdvance && plateDims) {
+      const probeFrame = Math.max(1, Math.round((totalSec / 2) * 24));
+      const v = await validateFrameFace({
+        supabaseUrl, serviceKey,
+        videoUrl: sourceClipUrl,
+        frameNumber: probeFrame, fps: 24,
+        targetCoords: null,
+      });
+      const boxes = Array.isArray(v?.faceBoxes) ? [...v.faceBoxes] : [];
+      const sorted = boxes
+        .filter((b: any) => Number(b?.w) > 0.02 && Number(b?.h) > 0.02)
+        .sort((a: any, b: any) => Number(a.x) - Number(b.x));
+      if (sorted.length >= speakers.length) {
+        for (let i = 0; i < speakers.length; i++) {
+          const b = sorted[i];
+          const cx = Math.round((Number(b.x) + Number(b.w) / 2) * plateDims.width);
+          // y = 78% down the box → mouth/chin region. Sync.so ASD docs say
+          // the point must be ON the speaker's face; the mouth is the
+          // safest landing zone for a lipsync coordinate.
+          const cy = Math.round((Number(b.y) + Number(b.h) * 0.78) * plateDims.height);
+          speakerCoords[i] = clampSyncCoords([cx, cy]);
+          coordSources[i] = "plate_native";
+        }
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v47 plate-native coords frame=${probeFrame} faces=${sorted.length} coords=${JSON.stringify(speakerCoords)}`,
+        );
+      } else {
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} v47 plate-native repair INSUFFICIENT boxes=${sorted.length} need=${speakers.length} — falling back to v5 fan-out`,
+        );
+        useV41Official = false;
+      }
+    }
+
     if (useV41Official && !isAdvance) {
-      // v46 — fully aligned with the official Sync.so Segments spec
+      // v47 — fully aligned with the official Sync.so Segments spec
       // (docs.sync.so/developer-guides/segments). Multi-speaker payload uses
       // model `lipsync-2-pro` (sync-3 silently ignores `segments[]`), per
       // segment ASD `{ frame_number, coordinates }` ONLY (no `auto_detect`
-      // — the four ASD variants are mutually exclusive per docs), and audio
-      // inputs carry both `ref_id` (REST snake_case used in docs) and
-      // `refId` (camelCase used in the audioInput child) so Sync.so accepts
-      // them regardless of which key its parser looks at first.
+      // — the four ASD variants are mutually exclusive per docs), audio
+      // inputs use the official `refId` (camelCase) key, and `coordinates`
+      // come from a plate-native face probe (see v47 block above).
       const FPS_HINT_V46 = 24;
+
+      // v47 cost correction: this branch dispatches exactly ONE Sync.so
+      // generation, so the legitimate price is computeCost(totalSec). The
+      // outer wallet debit charged `× speakerCount` for the v5 fan-out
+      // worst case; refund the difference now (idempotent — skipped on
+      // retry which never re-charged).
+      const v47Cost = computeCost(totalSec);
+      if (!isRetry && !isV41Retry && totalCost > v47Cost) {
+        try {
+          const { data: wOver } = await supabase
+            .from("wallets").select("balance").eq("user_id", userId).single();
+          await supabase
+            .from("wallets")
+            .update({
+              balance: Number(wOver?.balance ?? 0) + (totalCost - v47Cost),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", userId);
+          console.log(`[compose-dialog-segments] scene=${sceneId} v47 cost adjust refund=${totalCost - v47Cost} (charged=${totalCost} actual=${v47Cost})`);
+        } catch (e) {
+          console.warn(`[compose-dialog-segments] scene=${sceneId} v47 cost-adjust refund failed: ${(e as Error)?.message}`);
+        }
+      }
 
       // Build inputs: 1 video + N audio (one per speaker with track_url).
       type V41Input =
         | { type: "video"; url: string }
-        | { type: "audio"; url: string; ref_id: string; refId: string };
+        | { type: "audio"; url: string; refId: string };
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
       const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
@@ -826,7 +894,7 @@ serve(async (req) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
         const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, ref_id: refId, refId });
+        v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         v41SpeakerRefs.push({
           idx,
@@ -840,7 +908,7 @@ serve(async (req) => {
 
       if (v41SpeakerRefs.length < 3) {
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v46 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
+          `[compose-dialog-segments] scene=${sceneId} v47 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
         );
       } else {
         const v41Segments: Array<Record<string, unknown>> = [];
