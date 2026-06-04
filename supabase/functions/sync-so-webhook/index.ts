@@ -61,7 +61,10 @@ const MAX_SHOT_RETRIES = 4;
 const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // v30 — Added "coords-pro-box" (bounding-box targeting) as a safer fallback
 // for 3+ speaker plates BEFORE jumping to auto-* (face-swap risk).
-const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "auto-pro", "auto-standard"] as const;
+// v37 — Added "sync3-coords" as the Sync.so-recommended fallback for
+// difficult / occluded / multi-speaker plates (sync-3 has built-in
+// obstruction detection and can open closed lips; lipsync-2-pro cannot).
+const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
