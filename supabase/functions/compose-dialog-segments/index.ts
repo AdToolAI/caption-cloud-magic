@@ -927,6 +927,7 @@ serve(async (req) => {
         // audioInput.refId AND a per-segment optionsOverride.
         // active_speaker_detection with the speaker's bounding_boxes (v43).
         const v41Segments: Array<Record<string, unknown>> = [];
+        const totalFramesV41 = Math.max(1, Math.ceil(totalSec * ASSUMED_FPS_V41) + 1);
         v41SpeakerRefs.forEach(({ idx, refId, bbox, bboxSource, name }) => {
           const sp = speakers[idx];
           const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
@@ -940,16 +941,17 @@ serve(async (req) => {
             const e = Number(eRaw.toFixed(3));
             const midSec = (s + e) / 2;
             const frameNumber = Math.max(0, Math.round(midSec * ASSUMED_FPS_V41));
+            const boundingBoxes = Array.from({ length: totalFramesV41 }, () => null as [number, number, number, number] | null);
+            boundingBoxes[Math.min(totalFramesV41 - 1, frameNumber)] = bbox;
             v41Segments.push({
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
                 active_speaker_detection: {
-                  // v43: { frame_number, bounding_boxes } — exclusive ASD
-                  // variant per Sync.so docs. Replaces v42 point coordinates.
-                  frame_number: frameNumber,
-                  bounding_boxes: [bbox],
+                  // v43: bounding_boxes is a per-frame array and must NOT be
+                  // combined with frame_number/coordinates per Sync.so docs.
+                  bounding_boxes: boundingBoxes,
                 },
               },
             });
