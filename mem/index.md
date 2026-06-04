@@ -15,7 +15,7 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Multi-Speaker (v41)**: For 3+ speaker scenes, `compose-dialog-segments` now uses Sync.so's OFFICIAL top-level `segments[]` payload (one generation, `audioInput.refId` per turn + per-segment `optionsOverride.active_speaker_detection`) with `sync-3`. No more v5 fan-out / tight-WAV / `segments_secs` / bbox ladder for 3+. 1–2 speaker scenes keep v5 fan-out. State: `version: 41, engine: 'sync-official-segments'`. See `mem://architecture/lipsync/v41-official-segments-payload`.
+- **Lip-Sync Multi-Speaker (v43)**: For 3+ speaker scenes, `compose-dialog-segments` sends Sync.so's official `segments[]` with `optionsOverride.active_speaker_detection: { frame_number, bounding_boxes: [[x1,y1,x2,y2]] }` per segment against `lipsync-2-pro`. Boxes from faceMap (anchor→plate rescale + pad) or fallback square. `bbox_pad_factor` escalates on retry (0.08→0.18→0.28). Webhook accepts v41/v42/v43. 1–2 speakers keep v5 fan-out. See `mem://architecture/lipsync/v43-bounding-boxes-asd`.
 
 ## Memories
 - [v41 Official Segments Payload](mem://architecture/lipsync/v41-official-segments-payload) — Canonical Sync.so multi-speaker shape for 3+ speakers, sync-3 model, 1 transient retry then refund
