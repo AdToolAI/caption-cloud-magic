@@ -61,6 +61,7 @@ import {
   getSyncApiKey,
   inspectWav,
   logSyncDispatch,
+  normalizeWav,
   openCircuit,
   probeAsset,
   readPreferredSyncSourceKind,
@@ -1047,7 +1048,7 @@ serve(async (req) => {
                 ? `target face for ${pass.speaker_name} is not reliably visible on the final scene plate — re-render with all faces in frame`
                 : `no face for ${pass.speaker_name} in tested frames`,
               refunded: totalCost,
-              hint: targetMissing ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
+              hint: strictTargetCheck && hadFaces ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
             },
             422,
           );
