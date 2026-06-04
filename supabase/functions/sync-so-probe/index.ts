@@ -51,13 +51,31 @@ Deno.serve(async (req) => {
 
   let body: any;
   try { body = await req.json(); } catch { return json({ error: "bad_json" }, 400); }
+
+  // ── POLL mode ─────────────────────────────────────────────────────
+  if (body?.action === "poll") {
+    const jobId = String(body?.job_id ?? "");
+    if (!jobId) return json({ error: "missing_job_id" }, 400);
+    const pr = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
+      headers: { "x-api-key": syncApiKey },
+    });
+    const prJson = await pr.json().catch(() => null);
+    return json({
+      job_id: jobId,
+      http_status: pr.status,
+      status: prJson?.status ?? null,
+      output_url: prJson?.outputUrl ?? prJson?.output_url ?? null,
+      error: prJson?.error ?? prJson?.errorMessage ?? prJson?.error_message ?? null,
+      full: prJson,
+    }, 200);
+  }
+
+  // ── DISPATCH mode ─────────────────────────────────────────────────
   const sceneId: string = String(body?.scene_id ?? "");
   const variant: Variant = body?.variant;
-  const maxWaitSec: number = Math.max(60, Math.min(600, Number(body?.max_wait_sec ?? 300)));
   if (!sceneId) return json({ error: "missing_scene_id" }, 400);
   if (!variant) return json({ error: "missing_variant" }, 400);
 
-  // ── Pull scene assets ─────────────────────────────────────────────
   const { data: scene, error: sErr } = await supabase
     .from("composer_scenes")
     .select("id, lip_sync_source_clip_url, audio_plan")
@@ -83,16 +101,15 @@ Deno.serve(async (req) => {
     };
   });
 
-  // ── Build payload per variant ─────────────────────────────────────
+  const referenceFrame = (sec: number) => Math.max(0, Math.round(sec * 30));
   const buildPayload = (v: Variant): Record<string, unknown> => {
     const input: any[] = [{ type: "video", url: videoUrl }];
     for (const s of speakerRefs) {
       input.push({ type: "audio", url: s.audioUrl, ref_id: s.refId, refId: s.refId });
     }
-    const referenceFrame = (sec: number) => Math.max(0, Math.round(sec * 30));
-    if (v === "lipsync2-segments-asd") {
+    if (v === "lipsync2-segments-asd" || v === "lipsync2pro-segments-asd") {
       return {
-        model: "lipsync-2",
+        model: v === "lipsync2pro-segments-asd" ? "lipsync-2-pro" : "lipsync-2",
         input,
         segments: speakerRefs.map((s) => ({
           startTime: s.startSec,
@@ -120,25 +137,6 @@ Deno.serve(async (req) => {
         options: { sync_mode: "cut_off" },
       };
     }
-    if (v === "lipsync2pro-segments-asd") {
-      return {
-        model: "lipsync-2-pro",
-        input,
-        segments: speakerRefs.map((s) => ({
-          startTime: s.startSec,
-          endTime: s.endSec,
-          audioInput: { refId: s.refId, startTime: s.startSec, endTime: s.endSec },
-          optionsOverride: s.coords ? {
-            active_speaker_detection: {
-              frame_number: referenceFrame(s.startSec),
-              coordinates: s.coords,
-            },
-          } : undefined,
-        })),
-        options: { sync_mode: "cut_off" },
-      };
-    }
-    // lipsync2-single-asd — sanity check, only first speaker, no segments
     return {
       model: "lipsync-2",
       input: [
@@ -157,9 +155,6 @@ Deno.serve(async (req) => {
   };
 
   const payload = buildPayload(variant);
-
-  // ── Dispatch ──────────────────────────────────────────────────────
-  const t0 = Date.now();
   const dispatchResp = await fetch(`${SYNC_API_BASE}/generate`, {
     method: "POST",
     headers: { "x-api-key": syncApiKey, "Content-Type": "application/json" },
@@ -169,54 +164,17 @@ Deno.serve(async (req) => {
   let dispatchJson: any = null;
   try { dispatchJson = JSON.parse(dispatchText); } catch {}
 
-  if (!dispatchResp.ok) {
-    return json({
-      variant,
-      stage: "dispatch_failed",
-      http_status: dispatchResp.status,
-      response_body: dispatchText.slice(0, 2000),
-      payload_summary: { model: payload.model, segments: (payload as any).segments?.length, input_count: (payload as any).input?.length },
-    }, 200);
-  }
-
-  const jobId = String(dispatchJson?.id ?? "");
-  if (!jobId) {
-    return json({ variant, stage: "no_job_id", response: dispatchJson }, 200);
-  }
-
-  // ── Poll until terminal ───────────────────────────────────────────
-  const deadline = Date.now() + maxWaitSec * 1000;
-  let last: any = null;
-  let pollCount = 0;
-  while (Date.now() < deadline) {
-    pollCount++;
-    await new Promise((r) => setTimeout(r, 5000));
-    const pr = await fetch(`${SYNC_API_BASE}/generate/${jobId}`, {
-      headers: { "x-api-key": syncApiKey },
-    });
-    const prJson = await pr.json().catch(() => null);
-    last = prJson;
-    const status = String(prJson?.status ?? "").toUpperCase();
-    if (status === "COMPLETED" || status === "FAILED" || status === "REJECTED" || status === "CANCELED") {
-      break;
-    }
-  }
-
-  const elapsedSec = Math.round((Date.now() - t0) / 1000);
   return json({
     variant,
-    job_id: jobId,
-    elapsed_sec: elapsedSec,
-    poll_count: pollCount,
-    final_status: last?.status ?? "TIMEOUT",
-    output_url: last?.outputUrl ?? last?.output_url ?? null,
-    error: last?.error ?? last?.errorMessage ?? last?.error_message ?? null,
+    dispatch_http_status: dispatchResp.status,
+    dispatch_ok: dispatchResp.ok,
+    job_id: dispatchJson?.id ?? null,
+    response: dispatchJson ?? dispatchText.slice(0, 2000),
     payload_summary: {
       model: payload.model,
       segments: (payload as any).segments?.length ?? 0,
       input_count: (payload as any).input?.length ?? 0,
-      asd_mode: variant.includes("asd") ? "coordinates" : variant.includes("auto") ? "auto" : "none",
     },
-    full_response: last,
   }, 200);
 });
+
