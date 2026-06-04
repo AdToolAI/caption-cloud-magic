@@ -1,71 +1,112 @@
-## Befund aus den echten Daten (Scene `55608377…`)
+## Diagnose
 
-`dialog_shots` für die jüngste Szene zeigt:
+Der aktuelle Fehler ist nicht mehr der alte Lambda-Bundle-Seek-Fehler. Die Logs zeigen eine neue Schwachstelle in v39:
 
-- `engine: sync-segments`, `multi_pass: true`, `total_passes: 3`, `status: done`, `final_url` gesetzt.
-- Alle 3 Passes laufen **parallel** (nicht chained): `input_url` ist für Pass 1/2/3 identisch = die rohe Master-Plate. Jeder Pass animiert nur seinen Sprecher.
-- Pass-Zeiten: Samuel 0–2.37s, Matthew 2.62–3.55s, Kailee 3.80–6.68s.
-- `coords` korrekt pro Gesicht, `retry_variant: coords-pro` für alle Passes, kein Fehler-Refund.
-- Pass 3 (Kailee) brauchte 4:50 min — daher die 10-Min-Fehlermeldung (vermutlich ein zwischenzeitlicher Sync.so-Watchdog-Hit), aber er ist trotzdem `done` geworden.
+- Szene `0272076d-33db-42b9-9cd6-948289b1fce6`
+- Sprecher 1 und 2 wurden fertig.
+- Sprecher 3 `Kailee` scheitert mehrfach mit Sync.so `An unknown error occurred.`
+- Der kritische Log-Hinweis ist: `v39_tight_audio_failed: sliceWav: no valid windows`.
 
-## Warum nur Sprecher 1 Lip-Sync zeigt — die echte Schwachstelle
+**Do I know what the issue is?** Ja.
 
-v38 verlässt sich darauf, dass das Compositor-Template `DialogStitchVideo.tsx` die **neue** `startFrom`-Prop auf `FaceMaskOverlay` rendert:
+Die v39-Pipeline mutiert `pass.audio_url` von der ursprünglichen, zeitlich korrekt gepaddeten Sprecher-Spur auf eine kurze `tight`-WAV. Beim Retry wird diese kurze WAV dann erneut mit absoluten Zeitfenstern wie `3.81–7.082s` geschnitten. Das kann nicht funktionieren, weil die kurze WAV nur ca. `3.27s` lang ist. Danach fällt die Pipeline in einen hybriden Fallback zurück: kurze/verschobene Audio-Datei + Full-Plate/`segments_secs` + absoluter `frame_number`. Das ist nicht mehr Sync.so-konform stabil.
+
+Die offizielle Sync.so-Dokumentation bestätigt den besseren Weg:
+
+- Multi-Speaker soll über top-level `segments` laufen.
+- Pro Segment wird `audioInput.refId` gesetzt.
+- Pro Segment wird `optionsOverride.active_speaker_detection` gesetzt.
+- `frame_number + coordinates` sollen nur ein sichtbares Gesicht referenzieren, nicht als Timing-Anker missbraucht werden.
+
+## Plan
+
+### 1. v40: Sync.so-konformer Segment-Payload
+
+In `compose-dialog-segments` ersetze ich den fragilen v39-Hybrid für 3+ Sprecher:
+
+Aktuell problematisch:
 
 ```text
-<Sequence from={startFrame}>                  // Window startet bei Sprecher-Turn
-  <Video startFrom={startFrame} ... />        // <-- entscheidend: Seek in die Sync-Output-Zeitachse
-</Sequence>
+video input: full plate oder segments_secs
+input audio: mutierte tight wav
+options.active_speaker_detection: absoluter frame_number
+sync_mode: cut_off
 ```
 
-Sync.so liefert pro Pass eine **stille-gepaddete Volllängen-Datei**, in der die Mund-Animation nur im `segments_secs`-Fenster des jeweiligen Sprechers liegt (Matthew: Frames 76–109, Kailee: Frames 114–203). Ohne den `startFrom`-Seek spielt das `<Video>` ab Frame 0 → es zeigt nur die geschlossen-stillen ersten ~1.1s der Datei → keine Lippenbewegung sichtbar.
+Neu:
 
-**Genau das ergibt das gemeldete Bild:**
-- Sprecher 1: Window startet bei Frame 0, Animation auch bei Frame 0 → richtig (egal ob altes oder neues Bundle).
-- Sprecher 2/3: Window startet später → ohne `startFrom`-Seek nur Stille zu sehen.
+```text
+input:
+  - full video plate
+  - original full-length per-speaker wav mit refId
+segments:
+  - startTime/endTime des Sprecher-Turns
+  - audioInput: { refId, startTime, endTime }
+  - optionsOverride.active_speaker_detection für genau diesen Sprecher
+options:
+  - keine globale Timing-Hacks mehr
+```
 
-`DialogStitchVideo.tsx` wurde im Repo zwar im letzten Loop auf v38 gepatcht, aber das **deployte Remotion-Lambda-Bundle** wird mit `scripts/deploy-remotion-bundle.sh` separat gebaut. Solange dieses Script nicht läuft, rendert Lambda weiterhin die alte Template-Version. Die Pipeline ist also korrekt — die deployte Render-Engine hinkt nur hinterher.
+Damit bleibt die Audio-Zeitachse absolut korrekt, Sync.so bekommt aber trotzdem nur den relevanten Segmentbereich.
 
-Memory `mem://infrastructure/remotion/lambda-bundle-deployment-and-verification` schreibt einen Bundle-Versions-Check vor; der greift derzeit nicht für `render-sync-segments-audio-mux`.
+### 2. Canonical Audio nie wieder überschreiben
 
-## Plan v39 — zwei-stufige Härtung
+Ich trenne künftig strikt:
 
-### Stufe A — Pipeline bundle-unabhängig machen (Hauptfix)
+- `audio_url`: immer die originale, full-length, silence-padded Sprecher-Spur
+- `prepared_audio_url` / `audio_tight`: nur temporäre Diagnose oder Legacy-Fallback
+- Retry-Pfade starten immer wieder von der originalen Sprecher-Spur
 
-Per-Pass-Output **server-seitig auf das Sprecher-Fenster trimmen**, bevor wir an Lambda übergeben. Dann reicht das alte `<Video>`-Verhalten (`from={startFrame}`, kein `startFrom`-Seek nötig) — alte und neue Bundle-Versionen rendern identisch korrekt.
+Damit kann ein Retry nicht mehr versehentlich eine bereits getrimmte Datei erneut mit absoluten Fenstern schneiden.
 
-Konkret in `supabase/functions/render-sync-segments-audio-mux/index.ts`:
+### 3. Sprecher-Frame korrekt wählen
 
-1. Vor dem Lambda-Dispatch für jeden `donePass` mit Turn-Fenstern eine Remotion-Lambda-`stillRender`-Stil-Trim-Composition aufrufen (oder eine kleine neue `TrimVideo`-Composition, die `<OffthreadVideo startFrom>` nutzt und `durationInFrames = windowFrames` setzt). Output landet in `dialog-shots-trimmed/{sceneId}/pass-{idx}-turn-{i}.mp4`.
-2. Ergebnis-URLs werden im `fanoutShots`-Array statt `outputUrl: p.output_url` verwendet — jeder Shot zeigt dann ein Video, dessen Frame 0 echt die Animation enthält.
-3. Die Trim-URLs werden in `dialog_shots.passes[].trimmed_urls[]` persistiert (für Recovery/Debug).
-4. Wenn Trim fehlschlägt (Lambda-Timeout o.Ä.), Fallback auf bisherige `startFrom`-Variante mit deutlichem Log-Marker `v39_trim_skipped` — keine Schweigeflugzonen.
+Ich ändere die ASD-Logik so, dass `frame_number` wieder ein stabil sichtbarer Frame des jeweiligen Gesichts ist, idealerweise aus der bestehenden Face-Validation / Segmentmitte. Das Segment selbst übernimmt das Timing. Der Frame ist nur für Speaker Selection da.
 
-Vorteil: WYSIWYG für jede Lambda-Bundle-Version, kein manueller Deploy mehr nötig, Pass-Output bleibt unverändert nachprüfbar (wir trimmen, wir lipsyncen nicht neu).
+### 4. 3+ Sprecher: Filmreifer Qualitätsmodus
 
-Alternative wenn Lambda-Trim zu schwergewichtig wirkt: ffmpeg über eine dedizierte Container-Edge-Function (kein Edge-Runtime, da ffmpeg dort verboten ist — also via Lambda). Lambda-Trim ist der pragmatische Weg.
+Für 3+ Sprecher in einer Gruppenaufnahme nutze ich `sync-3` als Primärmodell statt erst nach zwei fehlgeschlagenen Pro-Retries. Sync.so empfiehlt `sync-3` für komplexe Multi-Person-, statische, verdeckte oder schwierige Winkel-Szenen.
 
-### Stufe B — Bundle-Drift-Wächter
+1–2 Sprecher bleiben auf `lipsync-2-pro`, außer sie fallen in bekannte Problemfälle.
 
-In `render-sync-segments-audio-mux` vor jedem Dispatch:
+### 5. Fallback-Ladder vereinfachen
 
-1. Aus `system_config.remotion.bundle` die deployte `bundleId` + Build-Hash lesen.
-2. Mit dem zur Build-Zeit eingebetteten `__BUNDLE_TEMPLATE_HASHES.DialogStitchVideo` vergleichen (kleine `scripts/deploy-remotion-bundle.sh`-Erweiterung schreibt diese Map nach jedem Build).
-3. Bei Drift: `bundle_drift_detected` in `dialog_shots.audio_mux` markieren, Status auf `failed`, Refund, klare Fehlermeldung in UI: *„Render-Bundle ist veraltet — Admin: `scripts/deploy-remotion-bundle.sh` ausführen."*
+Ich entferne für 3+ Sprecher die instabilen Misch-Fallbacks:
 
-So fällt das Problem in Zukunft sofort auf, statt sich als „nur Sprecher 1 spricht" zu tarnen.
+- keine `auto-pro` / `auto-standard` Fallbacks, die falsche Gesichter wählen können
+- keine erneute Tight-WAV-Slice-Kette auf Retry
+- kein `segments_secs`-Fallback, wenn top-level `segments` möglich ist
 
-### Stufe C — Verifikation an Live-Szene `55608377…`
+Fallbacks werden:
 
-1. Reset via `useResetLipSync` → frischer Run mit v39.
-2. Sync.so-Pass-Outputs unverändert prüfen (`dialog_shots.passes[].output_url`) — müssen weiter die 3 Volllängen-Dateien sein.
-3. Neue `passes[].trimmed_urls[]` einzeln im Browser öffnen — jede muss ab Frame 0 sofort Mundbewegung zeigen und exakt `turnDur` Sekunden lang sein.
-4. Finale `final_url` im UI prüfen: alle drei Sprecher synchron in ihren eigenen Fenstern.
-5. Memory aktualisieren: `mem://architecture/lipsync/bundle-independent-per-turn-trim-v39`.
+```text
+sync-3 + segment ASD
+→ lipsync-2-pro + segment ASD, falls sync-3 API-seitig scheitert
+→ hard fail + Refund, wenn Face/Audio/Provider ungültig ist
+```
 
-## Out of Scope
+### 6. Aktuelle Szene sauber zurücksetzen
 
-- Sync.so-Modellwahl / Retry-Ladder (v37 bleibt unverändert).
-- `compose-dialog-segments` Payload (v38 `segments_secs` + Turn-Start-Frame bleibt — wir nutzen es weiter, nur Compositor-Vertrauensbasis wird gehärtet).
-- 1- und 2-Sprecher-Pfade — werden vom Trim-Schritt nur durchgereicht, keine Verhaltensänderung.
-- Sora/Hailuo/Vidu Pipeline — nicht betroffen.
+Nach dem Code-Fix:
+
+- betroffene Szene `0272076d-33db-42b9-9cd6-948289b1fce6` zurücksetzen
+- alte mutierte `pass.audio_url`-States ignorieren/normalisieren
+- Edge Functions deployen
+- neuen Lauf starten lassen
+
+### 7. Verifikation
+
+Ich prüfe danach:
+
+- Logs enthalten `v40_official_segments_payload`
+- jeder Sprecher-Pass verwendet originale full-length Audio-Quelle mit `refId`
+- `segments[]` enthält die korrekten Sprecherfenster
+- keine `sliceWav: no valid windows` Logs mehr
+- finaler Mux startet erst, wenn alle 3 Sprecher `done` sind
+
+## Betroffene Dateien
+
+- `supabase/functions/compose-dialog-segments/index.ts`
+- `supabase/functions/sync-so-webhook/index.ts` falls Retry-Ladder angepasst werden muss
+- optional `supabase/functions/render-sync-segments-audio-mux/index.ts` nur wenn `sourceTiming` für die neue v40-Ausgabe markiert werden muss
+- Memory-Dokumentation für v40
