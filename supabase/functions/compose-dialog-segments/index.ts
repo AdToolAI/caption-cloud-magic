@@ -926,25 +926,21 @@ serve(async (req) => {
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
-            const midSec = (s + e) / 2;
-            const frameNumber = Math.max(0, Math.round(midSec * FPS_HINT_V46));
+            // v49: NO per-segment `optionsOverride.active_speaker_detection`.
+            // Live probes (June 2026) proved that `segments[]` + manual ASD
+            // coordinates is the combo that triggers Sync.so "unknown error"
+            // after 13 min, regardless of model. `segments[]` alone with
+            // `lipsync-2` is COMPLETED reliably — Sync.so auto-detects which
+            // face speaks based on the audio track per segment.
+            void cx; void cy; // coords intentionally unused in v49 payload
             v41Segments.push({
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
-              optionsOverride: {
-                // v46: docs-exact ASD shape — frame_number + coordinates only.
-                // `auto_detect` is a DIFFERENT exclusive variant; including it
-                // alongside the manual point can be rejected by Sync.so.
-                active_speaker_detection: {
-                  frame_number: frameNumber,
-                  coordinates: [cx, cy],
-                },
-              },
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v47 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
+            `[compose-dialog-segments] scene=${sceneId} v49 speaker=${refId} name=${name} segments_only (auto-ASD)`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
