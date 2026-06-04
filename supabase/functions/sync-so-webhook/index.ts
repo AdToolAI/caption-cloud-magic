@@ -61,7 +61,10 @@ const MAX_SHOT_RETRIES = 4;
 const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // v30 — Added "coords-pro-box" (bounding-box targeting) as a safer fallback
 // for 3+ speaker plates BEFORE jumping to auto-* (face-swap risk).
-const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "auto-pro", "auto-standard"] as const;
+// v37 — Added "sync3-coords" as the Sync.so-recommended fallback for
+// difficult / occluded / multi-speaker plates (sync-3 has built-in
+// obstruction detection and can open closed lips; lipsync-2-pro cannot).
+const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
@@ -641,6 +644,18 @@ serve(async (req) => {
         forceCoordsRepair = true; // also re-emit canonical WAV
         console.warn(
           `[sync-so-webhook] v30 scene=${sceneId} 3+ speakers (${speakerCount}) — coords-pro-box (bounding-box ASD) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
+        );
+      } else if (
+        // v37 — After coords-pro-box, escalate to Sync.so's recommended
+        // sync-3 model for difficult plates rather than jumping to auto-*
+        // (which carries face-swap risk for 3+ speaker scenes).
+        speakerCount >= 3 &&
+        (currentVariant === "coords-pro-box" || currentVariant === "sync3-coords") &&
+        passRetryCount < MAX_V5_RETRIES
+      ) {
+        nextVariant = "sync3-coords";
+        console.warn(
+          `[sync-so-webhook] v37 scene=${sceneId} 3+ speakers (${speakerCount}) — escalating to sync-3 (model fallback) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(

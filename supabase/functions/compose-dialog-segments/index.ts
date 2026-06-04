@@ -102,7 +102,14 @@ function json(body: unknown, status = 200) {
 const SYNC_API_BASE = "https://api.sync.so/v2";
 const LIPSYNC_MODEL = "lipsync-2-pro";
 const LIPSYNC_FALLBACK_MODEL = "lipsync-2";
-const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "auto-pro", "auto-standard"] as const;
+// v37 — `sync3-coords` added as the Sync.so-recommended fallback for
+// difficult / static / occluded / multi-speaker plates per
+// https://sync.so/docs/models/lipsync (sync-3 has built-in obstruction
+// detection and can open closed lips, which lipsync-2-pro cannot).
+// Order is intentional: try lipsync-2-pro first (better fidelity when it
+// works), then sync-3 BEFORE the auto-* face-swap-risk variants.
+const SYNC3_MODEL = "sync-3";
+const RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
 type RetryVariant = typeof RETRY_VARIANTS[number];
 
 // Pricing: Sync.so lipsync-2-pro = 9 credits/s.  ONE pass over the full clip
@@ -954,7 +961,27 @@ serve(async (req) => {
     // coordinates BEFORE paying Sync.so — otherwise Sync.so returns the
     // opaque "An unknown error occurred." and burns credits / time.
     if (!isAdvance) {
-      const strictTargetCheck = speakers.length >= 3 && !!plateDims;
+      // v37 — If the anchor faceMap returned identity matches for every
+      // speaker (i.e. Gemini Vision confidently mapped each character_id to
+      // a face box on the anchor image), trust those coordinates and skip
+      // the strict per-frame plate face-check. Sync.so's ActiveSpeaker DTO
+      // operates on `frame_number + coordinates` in plate-pixel space — it
+      // does NOT require that the same face be re-detected via Gemini at
+      // that exact frame. The strict check was producing false-negative
+      // `plate_target_face_missing_*` blocks even when all three speakers
+      // were clearly visible in the plate, because Gemini's per-frame face
+      // detection sometimes only locks onto the most prominent face. See:
+      // https://sync.so/docs/developer-guides/speaker-selection
+      const allIdentityMatched =
+        speakers.length >= 3 &&
+        coordSources.length === speakers.length &&
+        coordSources.every((s) => s === "identity");
+      const strictTargetCheck = speakers.length >= 3 && !!plateDims && !allIdentityMatched;
+      if (allIdentityMatched) {
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} face-gate SOFT-PASS — all ${speakers.length} speakers identity-matched on anchor; relying on Sync.so ASD with frame_number+coordinates`,
+        );
+      }
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
         if (!firstTurn) continue;
@@ -1264,7 +1291,12 @@ serve(async (req) => {
       // matches the video, so output stays full.
       sync_mode: "cut_off",
     };
-    if (retryVariant === "coords-pro") {
+    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords") {
+      // Sync.so canonical ActiveSpeaker DTO (per
+      // https://sync.so/docs/developer-guides/speaker-selection):
+      // frame_number + coordinates in the pixel space of the extracted
+      // frame. sync-3 accepts the same shape but tolerates static/occluded
+      // faces that lipsync-2-pro rejects with "An unknown error occurred."
       syncOptions.active_speaker_detection = {
         auto_detect: false,
         frame_number: referenceFrameNumber,
@@ -1331,8 +1363,17 @@ serve(async (req) => {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
+    // v37 — model picked per variant. sync-3 is Sync.so's recommended model
+    // for difficult plates (static/occluded/multi-speaker); lipsync-2-pro
+    // remains the default for first-pass quality.
+    const payloadModel =
+      retryVariant === "sync3-coords"
+        ? SYNC3_MODEL
+        : retryVariant === "auto-standard"
+          ? LIPSYNC_FALLBACK_MODEL
+          : LIPSYNC_MODEL;
     const payload: Record<string, unknown> = {
-      model: retryVariant === "auto-standard" ? LIPSYNC_FALLBACK_MODEL : LIPSYNC_MODEL,
+      model: payloadModel,
       input: [
         { type: "video", url: passInputUrl },
         { type: "audio", url: pass.audio_url },
