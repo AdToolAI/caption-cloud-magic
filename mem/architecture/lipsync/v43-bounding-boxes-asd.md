@@ -14,9 +14,9 @@ POST https://api.sync.so/v2/generate
   model: "lipsync-2-pro",
   input: [
     { type: "video", url: sourceClipUrl },
-    { type: "audio", url: speaker1WavUrl, ref_id: "speaker_1" },
-    { type: "audio", url: speaker2WavUrl, ref_id: "speaker_2" },
-    { type: "audio", url: speaker3WavUrl, ref_id: "speaker_3" },
+    { type: "audio", url: speaker1WavUrl, refId: "speaker_1" },
+    { type: "audio", url: speaker2WavUrl, refId: "speaker_2" },
+    { type: "audio", url: speaker3WavUrl, refId: "speaker_3" },
   ],
   segments: [
     { startTime, endTime,
