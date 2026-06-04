@@ -160,6 +160,8 @@ interface PassState {
   job_id?: string;
   diagnostic_id?: string;
   retry_variant?: RetryVariant;
+  reference_frame_number?: number;
+  face_repair?: Record<string, unknown>;
   output_url?: string;
   status: "pending" | "rendering" | "done" | "failed";
   started_at?: string;
@@ -194,6 +196,23 @@ interface SegmentsState {
   finished_at?: string;
   final_url?: string | null;
   error?: string;
+}
+
+function uniqueSortedFrames(frames: number[]): number[] {
+  return Array.from(new Set(frames.filter((n) => Number.isFinite(n)).map((n) => Math.max(0, Math.round(n))))).sort((a, b) => a - b);
+}
+
+function frameCandidatesForTurn(turn: SegmentItem, totalSec: number, fps: number): number[] {
+  const start = Math.max(0, Number(turn.startTime) || 0);
+  const end = Math.min(Math.max(start + MIN_TURN_DUR_SEC, Number(turn.endTime) || start), Math.max(totalSec, start + MIN_TURN_DUR_SEC));
+  const points = [
+    start + Math.min(0.35, Math.max(0.08, (end - start) * 0.2)),
+    (start + end) / 2,
+    Math.max(start, end - Math.min(0.35, Math.max(0.08, (end - start) * 0.2))),
+    Math.max(0, (start + end) / 2 - 1),
+    Math.min(totalSec, (start + end) / 2 + 1),
+  ];
+  return uniqueSortedFrames(points.map((sec) => sec * fps));
 }
 
 
