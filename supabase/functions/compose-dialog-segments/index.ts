@@ -957,42 +957,71 @@ serve(async (req) => {
       for (const pass of builtPasses) {
         const firstTurn = pass.segments[0];
         if (!firstTurn) continue;
-        const midSec = (firstTurn.startTime + firstTurn.endTime) / 2;
-        const frame = Math.max(0, Math.round(midSec * ASSUMED_FPS));
-        // For 3+ speakers, hand the per-speaker pixel coords as normalized
-        // [x,y] (0..1) so validate-frame-face can verify they land on a face.
-        let targetCoordsForCheck: [number, number] | null = null;
-        if (strictTargetCheck && plateDims) {
-          const c = pass.coords;
-          if (Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
-            targetCoordsForCheck = [
-              Math.min(1, Math.max(0, Number(c[0]) / plateDims.width)),
-              Math.min(1, Math.max(0, Number(c[1]) / plateDims.height)),
+        const frames = strictTargetCheck
+          ? frameCandidatesForTurn(firstTurn, totalSec, ASSUMED_FPS)
+          : uniqueSortedFrames([((firstTurn.startTime + firstTurn.endTime) / 2) * ASSUMED_FPS]);
+        let accepted = false;
+        let lastValidation: any = null;
+        for (const frame of frames) {
+          let targetCoordsForCheck: [number, number] | null = null;
+          if (strictTargetCheck && plateDims) {
+            const c = pass.coords;
+            if (Array.isArray(c) && Number.isFinite(c[0]) && Number.isFinite(c[1])) {
+              targetCoordsForCheck = [
+                Math.min(1, Math.max(0, Number(c[0]) / plateDims.width)),
+                Math.min(1, Math.max(0, Number(c[1]) / plateDims.height)),
+              ];
+            }
+          }
+          const v = await validateFrameFace({
+            supabaseUrl, serviceKey,
+            videoUrl: sourceClipUrl,
+            frameNumber: frame, fps: ASSUMED_FPS,
+            targetCoords: targetCoordsForCheck,
+          });
+          lastValidation = { ...v, frame, targetCoordsForCheck };
+          if (v.ok && !v.faceVisible) continue;
+          if (!strictTargetCheck || v.coordsMatch !== false) {
+            pass.reference_frame_number = frame;
+            accepted = true;
+            break;
+          }
+          const faceBoxes = Array.isArray(v.faceBoxes) ? [...v.faceBoxes] : [];
+          const sortedBoxes = faceBoxes
+            .filter((b: any) => Number(b?.w) > 0.02 && Number(b?.h) > 0.02)
+            .sort((a: any, b: any) => Number(a.x) - Number(b.x));
+          const slot = Math.min(Math.max(0, pass.speaker_idx), sortedBoxes.length - 1);
+          const box = sortedBoxes[slot];
+          if (box && plateDims) {
+            const repaired: [number, number] = [
+              Math.round((Number(box.x) + Number(box.w) / 2) * plateDims.width),
+              Math.round((Number(box.y) + Number(box.h) * 0.45) * plateDims.height),
             ];
+            const original = pass.coords;
+            pass.coords = clampSyncCoords(repaired);
+            pass.reference_frame_number = frame;
+            pass.face_repair = {
+              source: "plate_frame_left_to_right",
+              frame_number: frame,
+              original_coords: original,
+              repaired_coords: pass.coords,
+              face_count: sortedBoxes.length,
+              slot,
+            };
+            console.warn(
+              `[compose-dialog-segments] scene=${sceneId} FACE-GATE REPAIR pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} original=${JSON.stringify(original)} repaired=${JSON.stringify(pass.coords)} faces=${sortedBoxes.length}`,
+            );
+            accepted = true;
+            break;
           }
         }
-        const v = await validateFrameFace({
-          supabaseUrl, serviceKey,
-          videoUrl: sourceClipUrl,
-          frameNumber: frame, fps: ASSUMED_FPS,
-          targetCoords: targetCoordsForCheck,
-        });
-        // Legacy gate (unchanged for 1/2 speakers): block if frame has NO face at all.
-        const noFaceAtAll = v.ok && !v.faceVisible;
-        // 3+ speaker hard gate: target coords must overlap a face. coordsMatch=false
-        // means Gemini found face(s) but none overlap this speaker's anchor point.
-        const targetMissing =
-          strictTargetCheck &&
-          v.ok &&
-          v.faceVisible &&
-          targetCoordsForCheck !== null &&
-          v.coordsMatch === false;
-        if (noFaceAtAll || targetMissing) {
-          const reason = targetMissing
+        if (!accepted) {
+          const hadFaces = !!lastValidation?.faceVisible;
+          const reason = strictTargetCheck && hadFaces
             ? `plate_target_face_missing_pass_${pass.idx}_speaker_${pass.speaker_name}`
-            : `face_validation_failed_pass_${pass.idx}_frame_${frame}`;
+            : `face_validation_failed_pass_${pass.idx}_frame_${lastValidation?.frame ?? frames[0] ?? 0}`;
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} frame=${frame} reason=${reason}`,
+            `[compose-dialog-segments] scene=${sceneId} FACE-GATE BLOCK pass=${pass.idx} speaker=${pass.speaker_name} reason=${reason} frames=${frames.join(",")}`,
           );
           const { data: w0 } = await supabase
             .from("wallets").select("balance").eq("user_id", userId).single();
@@ -1013,10 +1042,10 @@ serve(async (req) => {
             .eq("id", sceneId);
           return json(
             {
-              error: targetMissing ? "plate_target_face_missing" : "face_validation_failed",
-              details: targetMissing
-                ? `target face for ${pass.speaker_name} not present on plate — re-render scene clip with all heads in frame`
-                : `no face for ${pass.speaker_name} at frame ${frame}`,
+              error: strictTargetCheck && hadFaces ? "plate_target_face_missing" : "face_validation_failed",
+              details: strictTargetCheck && hadFaces
+                ? `target face for ${pass.speaker_name} is not reliably visible on the final scene plate — re-render with all faces in frame`
+                : `no face for ${pass.speaker_name} in tested frames`,
               refunded: totalCost,
               hint: targetMissing ? "re_render_scene_clip" : "switch_to_cinematic_sync_engine",
             },
