@@ -15,7 +15,7 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Multi-Speaker (v38)**: Sync.so multi-speaker scenes MUST send `frame_number = turn START` and `segments_secs` on the video input per pass; compositor overlays each pass only inside its turn window. Midpoint anchor + full-scene overlay causes cross-speaker timing leakage.
+- **Lip-Sync Multi-Speaker (v39)**: Multi-speaker scenes (≥2 passes) MUST slice each per-speaker WAV down to its voiced turn windows BEFORE Sync.so dispatch (`sliceWavToWindows`); with `sync_mode=cut_off` the output naturally equals the turn duration and animation starts at t=0. Compositor tags those shots `sourceTiming:'relative'` so it works regardless of deployed Lambda bundle version. `segments_secs` on the video input is now only a fallback if slicing fails. See `mem://architecture/lipsync/per-turn-tight-audio-v39`.
 
 ## Memories
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
