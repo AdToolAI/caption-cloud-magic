@@ -161,17 +161,25 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, serviceKey);
   const syncApiKey = getSyncApiKey() || null;
 
-  // Scan a wide window: include `audio_muxing` (compositor stuck) plus any
-  // scene with deferred-pending passes that hasn't moved in a while.
-  const scanCutoff = new Date(Date.now() - 60_000).toISOString();
+  // v32: widen the scan. The previous `lip_sync_status IN ('running','audio_muxing')`
+  // filter missed scenes that compose-dialog-segments parked at
+  // `pending + twoshot_stage='circuit_open'` (or `deferred`). Those rows
+  // still have an active v5 dialog_shots state but were invisible to the
+  // watchdog, so the client kept re-triggering them in a loop.
+  // We now also include `lip_sync_status='pending'` when twoshot_stage marks
+  // a backend wait state, and we no longer use `updated_at` for the TTL —
+  // the loop refreshes updated_at constantly. Real liveness is measured
+  // against `dialog_shots.first_started_at`.
   const { data: rows, error } = await supabase
     .from("composer_scenes")
     .select(
       "id, project_id, lip_sync_status, lip_sync_applied_at, twoshot_stage, replicate_prediction_id, dialog_shots, audio_plan, updated_at",
     )
-    .in("lip_sync_status", ["running", "audio_muxing"])
+    .or(
+      "lip_sync_status.in.(running,audio_muxing)," +
+      "and(lip_sync_status.eq.pending,twoshot_stage.in.(circuit_open,deferred))",
+    )
     .is("lip_sync_applied_at", null)
-    .lt("updated_at", scanCutoff)
     .limit(200);
 
   if (error) {
@@ -187,8 +195,19 @@ serve(async (req) => {
   const advanced: Array<{ scene_id: string; pass_idx: number }> = [];
 
   for (const d of (rows ?? []) as SceneRow[]) {
-    const ageMs = now - new Date(d.updated_at).getTime();
     const ds: any = d.dialog_shots ?? {};
+    // Liveness anchor: prefer first_started_at, fall back to started_at,
+    // then earliest pass started_at, then updated_at (last resort).
+    const passStarts = Array.isArray(ds?.passes)
+      ? ds.passes.map((p: any) => p?.started_at).filter((s: any) => typeof s === "string")
+      : [];
+    const startCandidate =
+      ds?.first_started_at ??
+      ds?.started_at ??
+      (passStarts.length > 0 ? passStarts.sort()[0] : null) ??
+      d.updated_at;
+    const startedAtMs = startCandidate ? Date.parse(startCandidate) : Date.now();
+    const ageMs = now - startedAtMs;
     const isV5Fanout =
       ds?.version === 5 &&
       ds?.engine === "sync-segments" &&
@@ -205,8 +224,6 @@ serve(async (req) => {
         });
         if (r.terminal) {
           polled.push({ scene_id: d.id, job_id: p.job_id, status: r.status ?? "?" });
-          // Also free the inflight slot — webhook does this too, but doing
-          // it here unblocks dispatch in the same watchdog tick.
           await releaseInflightSyncJob(supabase, p.job_id);
         }
         void i;
@@ -214,12 +231,14 @@ serve(async (req) => {
     }
 
     // ── (2) Dispatch deferred-pending fan-out passes ─────────────────────
-    if (isV5Fanout) {
+    // Skip dispatching while we're parked on circuit_open — re-triggering
+    // compose-dialog-segments would just hit the circuit again and reset
+    // updated_at, masking the real TTL.
+    if (isV5Fanout && d.twoshot_stage !== "circuit_open") {
       const pendingIdxs = (ds.passes as any[])
         .map((p, i) => ((p?.status === "pending" || !p?.job_id) ? i : -1))
         .filter((i) => i >= 0);
       if (pendingIdxs.length > 0) {
-        // Trigger the first pending pass; webhook will chain the rest.
         const next = pendingIdxs[0];
         try {
           await fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
@@ -244,12 +263,14 @@ serve(async (req) => {
     let reason: string | null = null;
     if (ageMs > STALE_HARD_MS) {
       reason = "watchdog_hard_timeout";
+    } else if (d.twoshot_stage === "circuit_open" && ageMs > STALE_PROVIDER_MS) {
+      // v32: a scene parked on circuit_open past the 10-min provider TTL is
+      // never going to recover — the Sync.so 3-speaker plate was rejected
+      // without an error_code. Fail terminal so the user sees a real reason.
+      reason = "syncso_provider_unknown_no_code_after_retries";
     } else if (!hasJob && ageMs > STALE_PREFLIGHT_MS) {
       reason = "watchdog_preflight_aborted";
     } else if (hasJob && ageMs > STALE_PROVIDER_MS) {
-      // Only fail provider-timeout scenes when polling above didn't already
-      // forward a terminal status this tick (which will have reset
-      // updated_at when the webhook patched the scene).
       const polledThisTick = polled.some((p) => p.scene_id === d.id);
       if (!polledThisTick) reason = "watchdog_provider_timeout";
     }
