@@ -805,20 +805,20 @@ serve(async (req) => {
     const useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46) ? (existing as any) : null;
     if (useV41Official && !isAdvance) {
-      // v44 — ASD per segment via `frame_number + coordinates` (Sync.so's
-      // official multi-speaker Segments example, /developer-guides/segments
-      // "Target Different Speakers Per Segment"). Replaces the v43 per-frame
-      // `bounding_boxes` array which required the array length to match the
-      // exact total frame count of the source video — our hardcoded
-      // ASSUMED_FPS=24 silently mismatched 25/30fps Hailuo/HeyGen plates and
-      // caused Sync.so to fail with "An unknown error occurred." after
-      // accepting the dispatch.
-      const FPS_HINT_V44 = 24;
+      // v46 — fully aligned with the official Sync.so Segments spec
+      // (docs.sync.so/developer-guides/segments). Multi-speaker payload uses
+      // model `lipsync-2-pro` (sync-3 silently ignores `segments[]`), per
+      // segment ASD `{ frame_number, coordinates }` ONLY (no `auto_detect`
+      // — the four ASD variants are mutually exclusive per docs), and audio
+      // inputs carry both `ref_id` (REST snake_case used in docs) and
+      // `refId` (camelCase used in the audioInput child) so Sync.so accepts
+      // them regardless of which key its parser looks at first.
+      const FPS_HINT_V46 = 24;
 
       // Build inputs: 1 video + N audio (one per speaker with track_url).
       type V41Input =
         | { type: "video"; url: string }
-        | { type: "audio"; url: string; refId: string };
+        | { type: "audio"; url: string; ref_id: string; refId: string };
       const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
 
       const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
@@ -826,7 +826,7 @@ serve(async (req) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
         const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, refId });
+        v41Inputs.push({ type: "audio", url: audioUrl, ref_id: refId, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         v41SpeakerRefs.push({
           idx,
@@ -839,15 +839,10 @@ serve(async (req) => {
       });
 
       if (v41SpeakerRefs.length < 3) {
-        // Missing per-speaker tracks → fall through to legacy v5 path below
-        // (which has its own no-tracks refund/fail handling).
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v44 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
+          `[compose-dialog-segments] scene=${sceneId} v46 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
         );
       } else {
-        // Build segments — one per voiced turn, attaching the segment's
-        // audioInput.refId AND optionsOverride.active_speaker_detection
-        // with frame_number + coordinates pointing at the speaker's face.
         const v41Segments: Array<Record<string, unknown>> = [];
         v41SpeakerRefs.forEach(({ idx, refId, coords, name }) => {
           const sp = speakers[idx];
@@ -864,17 +859,16 @@ serve(async (req) => {
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
             const midSec = (s + e) / 2;
-            const frameNumber = Math.max(0, Math.round(midSec * FPS_HINT_V44));
+            const frameNumber = Math.max(0, Math.round(midSec * FPS_HINT_V46));
             v41Segments.push({
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
               optionsOverride: {
-                sync_mode: "cut_off",
+                // v46: docs-exact ASD shape — frame_number + coordinates only.
+                // `auto_detect` is a DIFFERENT exclusive variant; including it
+                // alongside the manual point can be rejected by Sync.so.
                 active_speaker_detection: {
-                  // v45: single point per segment (Sync.so official multi-speaker example).
-                  // Exclusive with v3/bounding_boxes. `auto_detect: false` to honor manual point.
-                  auto_detect: false,
                   frame_number: frameNumber,
                   coordinates: [cx, cy],
                 },
@@ -882,7 +876,7 @@ serve(async (req) => {
             });
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v45 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
+            `[compose-dialog-segments] scene=${sceneId} v46 speaker=${refId} name=${name} coords=[${cx},${cy}]`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -899,17 +893,34 @@ serve(async (req) => {
           return json({ error: "v41_no_segments_built" }, 422);
         }
 
+        // Pre-dispatch validation: every segment refId must exist in inputs.
+        const inputRefSet = new Set(
+          v41Inputs.filter((i) => i.type === "audio").map((i: any) => i.ref_id ?? i.refId),
+        );
+        for (const seg of v41Segments) {
+          const refId = (seg as any).audioInput?.refId;
+          if (!refId || !inputRefSet.has(refId)) {
+            console.error(
+              `[compose-dialog-segments] scene=${sceneId} v46 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
+            );
+            await supabase
+              .from("composer_scenes")
+              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v46_segment_refid_missing" })
+              .eq("id", sceneId);
+            return json({ error: "v46_segment_refid_missing", refId }, 422);
+          }
+        }
+
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v45 — Sync.so multi-speaker official path: model `sync-3` (built-in
-        // obstruction detection + multi-speaker support per docs), top-level
-        // `sync_mode: cut_off` (no audio looping), per-segment ASD with
-        // explicit `auto_detect: false`. Coordinates are plate-pixel ints
-        // already clamped to the video frame.
-        const V45_MODEL = SYNC3_MODEL;
+        // v46 — docs-exact model: lipsync-2-pro is the only model that
+        // supports `segments[]` per the official Multi-Speaker Segments
+        // example. sync-3 silently ignores segments (full-shot global model)
+        // — that was the v45 regression.
+        const V46_MODEL = LIPSYNC_MODEL; // "lipsync-2-pro"
         const v41Payload = {
-          model: V45_MODEL,
+          model: V46_MODEL,
           input: v41Inputs,
           segments: v41Segments,
           options: { sync_mode: "cut_off" },
@@ -918,9 +929,9 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v45_official_segments_payload model=${V45_MODEL} asd=coords ` +
+          `[compose-dialog-segments] scene=${sceneId} v46_official_segments_payload model=${V46_MODEL} asd=coords ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off`,
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off video=${videoDims.width}x${videoDims.height}`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
