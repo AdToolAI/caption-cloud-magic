@@ -437,9 +437,8 @@ serve(async (req) => {
         };
       }
 
-      const doneCount = freshDonePasses.filter((p: any) => p?.status === "done").length;
-      const failedCount = freshDonePasses.filter((p: any) => p?.status === "failed").length;
-      const allDone = doneCount === totalPasses && failedCount === 0;
+      const { doneCount, failedCount, allTerminal } = terminalV5Counts(freshDonePasses);
+      const allDone = allTerminal && doneCount > 0;
 
       // Find pending passes (deferred earlier or never dispatched). These
       // need an explicit advance dispatch — without this, scenes whose
@@ -465,20 +464,14 @@ serve(async (req) => {
         // Kick the next pending pass — now that we freed a slot, advance.
         if (pendingIdxs.length > 0) {
           const nextIdx = pendingIdxs[0];
-          try {
-            fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-              body: JSON.stringify({ scene_id: sceneId, advance: true, pass_idx: nextIdx }),
-            }).catch(() => {});
-            console.log(`[sync-so-webhook] v25 scene=${sceneId} advancing pending pass ${nextIdx + 1}/${totalPasses}`);
-          } catch { /* ignore */ }
+          try { triggerV5Advance(supabaseUrl, serviceKey, sceneId, nextIdx, totalPasses); } catch { /* ignore */ }
         }
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", done: doneCount, total: totalPasses });
       }
 
       // ── All passes complete ──────────────────────────────────────────
-      const finalUrl = (freshDonePasses[freshDonePasses.length - 1] as any)?.output_url ?? outputUrl;
+      const lastDonePass = [...freshDonePasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
+      const finalUrl = (lastDonePass as any)?.output_url ?? outputUrl;
 
       // Single-speaker fast path: no fan-in needed, audio already matches.
       if (totalPasses === 1) {
