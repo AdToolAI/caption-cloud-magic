@@ -16,7 +16,7 @@ Updated: today
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
 - **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
-- **Lip-Sync Multi-Speaker Model**: 3+ speaker official segments dispatch uses `sync-3`, NOT `lipsync-2-pro` (static plates → unknown error).
+- **Lip-Sync Unified Pipeline (v60)**: Every N≥2 dialog scene uses the chained per-speaker Sync.so pipeline from the first dispatch (no v56 segments[] attempt, no 2-speaker parallel fan-out). 1-speaker = single v5 pass. See `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`.
 - **Lip-Sync Pipeline FROZEN (≤4 speakers)**: Read `mem://architecture/lipsync/FROZEN-INVARIANTS` before editing `compose-dialog-segments`, `sync-so-webhook`, `compose-video-clips` (neutralTwoShotPrompt / CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE), `_shared/cast-validation.ts` (MAX_SPEAKERS=4), or `StoryboardTab` cast handling. Grep `FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md` for load-bearing sites.
 
 ## Memories
