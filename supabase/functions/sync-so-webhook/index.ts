@@ -484,7 +484,18 @@ serve(async (req) => {
     const isTransient =
       codeBucket === "retry_transient" ||
       (codeBucket === "unknown" && isTransientSyncError(errClass));
-    const canRetry = codeBucket !== "fail_fast" && isTransient && retryCount < MAX_V41_RETRIES;
+    // v56 — On the FIRST failure of the manual-ASD dispatch, retry once with
+    // ASD dropped (auto_detect default). This catches the very common case
+    // where anchor-derived coords sit off-face on the actual Hailuo plate
+    // and Sync-3 returns the opaque "An unknown error occurred."
+    const isV56Manual =
+      (state as any).version === 56 &&
+      (state as any).asd_mode === "manual_point_minimal";
+    const wantV56NoAsdRetry =
+      isV56Manual && retryCount < MAX_V41_RETRIES && !(state as any).retry_no_asd_attempted;
+    const canRetry =
+      wantV56NoAsdRetry ||
+      (codeBucket !== "fail_fast" && isTransient && retryCount < MAX_V41_RETRIES);
 
     try {
       await logSyncDispatch(supabase, {
@@ -496,15 +507,13 @@ serve(async (req) => {
           sync_error_bucket: codeBucket,
           retry_count: retryCount,
           will_retry: canRetry,
+          will_retry_no_asd: wantV56NoAsdRetry,
           webhook_payload: payload,
         },
       });
     } catch { /* ignore log errors */ }
 
     if (canRetry) {
-      // v43 — escalate bbox padding on retry (0.08 → 0.18 → 0.28) so the
-      // second attempt has more slack for shoulder-to-shoulder shots where
-      // Sync.so's first run missed the face.
       const prevPad = Number((state as any).bbox_pad_factor);
       const nextPad = Math.min(
         0.35,
@@ -517,23 +526,30 @@ serve(async (req) => {
             ...(state as any),
             status: "retrying",
             bbox_pad_factor: nextPad,
+            retry_no_asd_attempted: (state as any).retry_no_asd_attempted || wantV56NoAsdRetry,
             last_error: rawErr.slice(0, 200),
             last_error_class: errClass,
             sync_error_code: errorCode ?? null,
             updated_at: nowIso,
           },
           lip_sync_status: "running",
-          twoshot_stage: `syncso_v43_retry_${retryCount + 1}_pad${Math.round(nextPad * 100)}`,
+          twoshot_stage: wantV56NoAsdRetry
+            ? `syncso_v56_retry_no_asd_${retryCount + 1}`
+            : `syncso_v43_retry_${retryCount + 1}_pad${Math.round(nextPad * 100)}`,
           updated_at: nowIso,
         })
         .eq("id", sceneId);
-      console.warn(`[sync-so-webhook] v43 scene=${sceneId} ${status} code=${errorCode ?? "null"} → retry ${retryCount + 1}/${MAX_V41_RETRIES} bbox_pad=${nextPad.toFixed(2)}`);
+      console.warn(`[sync-so-webhook] v56 scene=${sceneId} ${status} code=${errorCode ?? "null"} → retry ${retryCount + 1}/${MAX_V41_RETRIES} no_asd=${wantV56NoAsdRetry} bbox_pad=${nextPad.toFixed(2)}`);
       fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
-        body: JSON.stringify({ scene_id: sceneId, retry_v41: true }),
+        body: JSON.stringify({
+          scene_id: sceneId,
+          retry_v41: true,
+          retry_no_asd: wantV56NoAsdRetry,
+        }),
       }).catch(() => {});
-      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, retried: true });
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, retried: true, retry_no_asd: wantV56NoAsdRetry });
     }
 
     // Refund (idempotent) + mark failed
