@@ -1,6 +1,6 @@
 ---
-name: v49 Sync.so Multi-Speaker Segments — probe-proven payload
-description: 3+ speaker dialog scenes dispatch a single Sync.so call with `model="lipsync-2"` + `segments[]` + `options.sync_mode="cut_off"` and NO per-segment `optionsOverride.active_speaker_detection`. Sync.so auto-detects which face speaks from the per-segment audio track. Face-detect gate REMOVED 2026-06-05 — v49 always runs for 3+ speaker scenes with valid per-speaker `track_url`. Webhook gate accepts v41..v49.
+name: v49 Sync.so Multi-Speaker Segments — SUPERSEDED by v50
+description: SUPERSEDED 2026-06-05 by v50 (Pro + per-segment bounding_boxes). v49 used `lipsync-2` + `segments[]` + auto-ASD; doc-conform but auto-ASD lost speaker_3 on 3-speaker plates and quality of `lipsync-2` was visibly softer than Pro. See mem://architecture/lipsync/v50-pro-bounding-boxes for current payload.
 type: architecture
 ---
 
