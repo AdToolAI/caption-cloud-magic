@@ -1144,11 +1144,11 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v50_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v51_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} with_box=${segmentsWithBox} auto_fallback=${segmentsAutoFallback} ` +
           `totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} faces=${fmFacesAll.length} ` +
-          `boxes=${JSON.stringify(v50BoxDiag)}`,
+          `plate_detected=${usePlateDetection} boxes=${JSON.stringify(v50BoxDiag)}`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
