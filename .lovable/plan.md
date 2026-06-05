@@ -1,62 +1,66 @@
-## Antwort vorab: Nein, wir sind noch NICHT 1:1 mit Sync.so
+# v50 — Speaker-3-Fix + Qualität auf Pro
 
-Die letzte Szene `57a28235…` ist nach 11 min in der **v5 Multi-Pass Fan-out**-Schleife verbrannt (`engine: "sync-segments"`, `version: 5`, `retry_variant: coords-pro → coords-pro-box → sync3-coords`), nicht im neuen v49 Single-Call. Sync.so hat in allen 7 Anläufen `"An unknown error occurred."` zurückgegeben — exakt das Symptom, das die Juni-Probes als "bounding_boxes + per-Pass-Coords" identifiziert haben.
+## Problem (aus aktuellem Render)
 
-### Warum v49 nicht gegriffen hat
-In `compose-dialog-segments/index.ts` (Zeile 805 + 819–849) ist v49 hinter zwei Gates eingesperrt:
+1. **Speaker 3 Mund bleibt zu** während er spricht → Sync.so Auto-ASD findet die 3. Person auf der Hailuo-Plate nicht zuverlässig, lippt nur Speaker 1 + 2.
+2. **Qualität nicht überzeugend** → v49 nutzt `lipsync-2` (Standard). `lipsync-2-pro` liefert sichtbar schärfere Mundregion, bessere Zahn-/Lippen-Definition, weniger Smear bei seitlichen Köpfen.
 
-1. `speakers.length >= 3` ✓ (3 Sprecher — okay)
-2. **Plate-native Face-Detect muss ≥ N Gesichter finden**, sonst `useV41Official = false` → Rückfall auf v5 Fan-out.
+## Was wir bisher belegt haben (Probes V1–V4)
 
-Die Hailuo-Plate in deinem Screenshot zeigt die Sprecher **mit abgeschnittenen Köpfen** — Gemini Face-Detect findet darin < 3 Gesichter, also greift v49 nie. Wir landen auf der v5-Schleife, die per Doku *nicht* das ist, was Sync.so vorgibt.
+| # | model | segments[] | per-segment ASD coords | Ergebnis |
+|---|---|---|---|---|
+| V1 | lipsync-2 | ✅ | ✅ coords | ❌ unknown error |
+| V2 | lipsync-2 | ✅ | ❌ (auto) | ✅ COMPLETED |
+| V3 | lipsync-2-pro | ✅ | ✅ coords | ❌ unknown error |
+| V4 | lipsync-2 | ❌ | ✅ coords | ✅ COMPLETED |
 
-### Was Sync.so wirklich vorgibt (Doku-Stand)
-```text
-POST /v2/generate
-{ model: "lipsync-2",
-  input: [ {type:"video",url}, {type:"audio",url,ref_id:"a1"}, {type:"audio",url,ref_id:"a2"}, … ],
-  segments: [ { startTime, endTime, audioInput:{ refId, startTime, endTime } }, … ],
-  options: { sync_mode: "cut_off" } }
-```
-ASD ist **optional**. Wenn man sie setzt, sind die 4 Modi *mutually exclusive*:
-`auto_detect` | `v3` | `frame_number+coordinates` | `bounding_boxes(_url)`.
+**Nicht getestet:** `lipsync-2-pro + segments[] + auto-ASD` (V5) und `lipsync-2 + segments[] + bounding_boxes` (V6 — laut Doku eigene ASD-Variante, NICHT `coordinates`).
 
-Unsere v49 ohne ASD = exakt Doku-Beispiel "Multiple Segments with Multiple Audio". ✓
-Unsere v5 mit `bounding_boxes` + `coords` zugleich = Doku-Verstoss (mutually exclusive). ✗
+## Plan
 
-### Differenzen, die wir noch haben
+### Schritt 1 — Zwei neue Live-Probes auf einer 3-Sprecher-Szene
 
-| Bereich | Sync.so Doku | Wir aktuell | Fix |
-|---|---|---|---|
-| Multi-Speaker Pfad | 1 Call, `segments[]` | v5 = N Calls, fan-out | v49 immer nehmen |
-| v49-Gate | nur Audio + Video Pflicht | wir verlangen zusätzlich N Face-Boxes auf Plate | Face-Gate entfernen |
-| Fallback ASD | `auto_detect` legal | v5 nutzt `bounding_boxes` + coords gleichzeitig | auf `auto_detect` umstellen |
-| `track_url` pro Sprecher | Pflicht für Multi-Audio | wir prüfen es ✓ | bleibt |
+- **V5**: `model: lipsync-2-pro` + `segments[]` **ohne** `optionsOverride`. Hypothese: Pro+Segments+Auto-ASD ist erlaubt (nur Pro+Segments+coords war broken). Wenn ✅ → Qualitätsboost ohne Bruch.
+- **V6**: `model: lipsync-2` + `segments[]` + pro Segment `optionsOverride.active_speaker_detection: { bounding_boxes: [[x,y,w,h]] }` (eine Box pro Segment, aus Gemini-Face-Detect der Hailuo-Plate vor dem Dispatch). Hypothese: `bounding_boxes` ist laut Doku eine eigene ASD-Mode-Variante, getrennt vom kaputten `coordinates`-Pfad.
 
-## Plan — "Wirklich 1:1 mit Sync.so"
+Beide Probes laufen parallel, max. 5 min Watchdog statt 15.
 
-### Schritt 1 — v49 Face-Gate entfernen
-In `compose-dialog-segments/index.ts` Block Z. 819–851 (`v47 plate-native face repair`) komplett deaktivieren. Coords werden in v49 sowieso nicht mehr verwendet (`void cx; void cy`), also keine Funktion mehr — der Gate killt nur Szenen mit Crop/Long-Shot-Plates.
+### Schritt 2 — v50 Payload-Entscheidung
 
-→ `useV41Official` bleibt true, sobald `speakers.length >= 3` UND jeder Sprecher ein `track_url` hat (Zeile 909-Check bleibt der einzige berechtigte Skip).
+| Probe-Ergebnis | v50-Payload |
+|---|---|
+| V5 ✅, V6 egal | `lipsync-2-pro` + `segments[]` + Auto-ASD → Qualität ↑, Speaker-3 wird via Pro-Modell-besseres ASD eher gefunden |
+| V5 ❌, V6 ✅ | `lipsync-2` + `segments[]` + per-Segment `bounding_boxes` → deterministisches Targeting, löst Speaker-3-Problem |
+| V5 ✅, V6 ✅ | **Beste Welt**: `lipsync-2-pro` + `segments[]` + per-Segment `bounding_boxes` → Pro-Qualität + deterministisches Targeting |
+| Beide ❌ | Bleibt bei v49 + dokumentieren, dass 3+ Sprecher auf dichten Plates unzuverlässig sind; Empfehlung Single-Speaker-Cinematic-Sync pro Turn |
 
-### Schritt 2 — Wenn v49 trotzdem nicht passt: Doku-konformer Fallback
-Statt v5 Fan-out (nicht doku-konform), neuer 1-Call-Fallback `v49b` mit `optionsOverride.active_speaker_detection: { auto_detect: true }` pro Segment. Das ist explizit in der Doku als legaler Modus gelistet und kombiniert NICHT mit Coordinates → kein "unknown error".
+### Schritt 3 — Implementation
 
-### Schritt 3 — v5 Fan-out abklemmen für 3+ Sprecher
-Den `bounding_boxes` / `coords-pro-box` / `sync3-coords` Retry-Ladder (Z. ~1700–2050) für `speakers.length >= 3` deaktivieren. Wenn v49 + v49b beide failen → sauber refunden + Szene als `failed` markieren statt 15 min Provider-Loops.
+In `supabase/functions/compose-dialog-segments/index.ts`:
+- v49-Block (Zeilen ~808–910) updaten auf gewählte Payload-Variante
+- Falls `bounding_boxes` gewählt: vor Dispatch `validate-frame-face` einmal auf Plate-Mid-Frame, Boxen nach Speaker-Reihenfolge an Segmente mappen (Gemini gibt N Boxen sortiert nach X-Koordinate zurück, Speaker-Reihenfolge bekannt aus `dialog_shots`).
+- `version: 50`, `engine: "sync-official-segments-v50"`, `model` + `asd_mode` reflektiert Wahl.
+- Webhook-Gate auf `41..50` erweitern.
+- Per-Pass-Cost-Update: Pro = ~2× Standard, in Credit-Reservation berücksichtigen (`ceil(totalSec) × 18` statt `× 9`).
 
-1- und 2-Sprecher-Szenen bleiben unverändert auf v5 (war stabil).
+### Schritt 4 — Reset & Re-render der aktuellen Szene
 
-### Schritt 4 — Cleanup
-- `mem://architecture/lipsync/v49-docs-exact-segments.md` aktualisieren: Face-Gate entfernt + `auto_detect`-Fallback dokumentiert.
-- Szene `57a28235…` einmalig zurücksetzen, damit der nächste Trigger über v49 läuft.
-- `compose-dialog-segments` neu deployen.
+Szene mit fehlendem Speaker-3 (ID aus aktuellem Render-Log holen) auf `pending` zurücksetzen, einmal mit v50 durchlaufen, visuell verifizieren.
 
-### Trade-off
-Ohne Coords delegieren wir die Speaker-Zuordnung komplett an Sync.so Auto-ASD. Bei sehr ähnlichen Stimmen kann es zu Vertauschungen kommen — laut Doku ist `auto_detect` aber für Multi-Speaker-Szenen der empfohlene Modus, und es liefert vorhersagbar (kein "unknown error" wie der `coords`-Pfad).
+### Schritt 5 — Memory-Update
 
-### Akzeptanz
-- Log-Marker `v49_official_segments_payload model=lipsync-2 asd=auto` erscheint für alle 3+ Sprecher Szenen.
-- Keine `engine: "sync-segments", version: 5` Zeilen mehr für 3+ Sprecher in `composer_scenes`.
-- Failure-Zeit < 4 min statt 15 min (kein Retry-Ladder).
+`mem/architecture/lipsync/v49-docs-exact-segments.md` als superseded markieren, neue `v50-...md` mit Probe-Tabelle V1–V6 + finaler Payload.
+
+## Technische Details (für Engineering)
+
+- **bounding_boxes Format laut Sync.so Doku**: `[[x, y, width, height]]` in normalisierten 0–1 Koordinaten (NICHT Pixel), eine Box pro Segment im `optionsOverride.active_speaker_detection.bounding_boxes` Array.
+- **Gemini Plate-Face-Detect** liefert bereits Boxen in `frame_face_cache` (Stage G), nur Speaker-zu-Box-Mapping nötig (Sort by `box.x` → Speaker 1, 2, 3 von links nach rechts; Override möglich via `speakers[i].plate_face_idx` falls Reihenfolge anders).
+- **Cost-Increase Pro**: Sync.so Pro-Modell laut Pricing 2× Credits/s. Memory `architecture/lipsync/sync-so-pro-model-policy` updaten (`ceil(durationSec) × 18 × passes` für Pro-Single).
+- **Refund-Pfad** unverändert (idempotente UUID aus `dialog_shot_id`).
+
+## Risiken
+
+- Pro-Modell verdoppelt Sync.so-Kosten → Marge sinkt, aber Output-Qualität rechtfertigt es für Dialog-Szenen mit Multi-Speaker.
+- `bounding_boxes` benötigt verlässliche Plate-Face-Detection; bei <3 erkannten Gesichtern Fallback auf Auto-ASD pro Segment.
+
+Soll ich so durchziehen — oder zuerst nur die zwei Probes (V5+V6) laufen lassen und dann nochmal entscheiden?
