@@ -2408,18 +2408,18 @@ serve(async (req) => {
         .eq("id", sceneId);
     }
 
-    // ── v25 Fan-Out: on fresh dispatch, kick off all remaining passes in
+    // ── v60: NO parallel fan-out for any speaker count. The webhook chains
+    //    Pass 1..N-1 serially via `pendingIdxs[0]` on COMPLETE events. This
+    //    eliminates the 2-speaker dispatch-race that v33 already removed for
+    //    N≥3 and gives every multi-speaker scene a single, uniform pipeline.
+    //    FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.9)
+    // ── v25 Fan-Out (DISABLED in v60): on fresh dispatch, kick off all remaining passes in
     //    parallel via background self-invokes. Each runs as an independent
     //    Sync.so job against the SAME original plate (no chaining). The
     //    Sync.so 3-slot concurrency guard upstream handles back-pressure.
-    // v33: For 3+ speaker scenes, do NOT fan out passes in parallel. The
-    // webhook chains the next pass on completion (pendingIdxs[0]), so the
-    // pipeline still completes — just one Sync.so job at a time per scene.
-    // This eliminates the dispatch race we saw on scene 1a9bf866…: two pass-0
-    // jobs within ms, one of which the webhook later reports as
-    // "job ... not in passes[]". Two-speaker scenes still fan out (no race
-    // reported there).
-    const fanOutAllowed = passes.length > 1 && passes.length <= 2;
+    // v33: For 3+ speaker scenes, do NOT fan out passes in parallel. v60
+    // extends this to 2-speaker scenes for the same race-elimination reasons.
+    const fanOutAllowed = false;
     if (!isAdvance && !isRetry && fanOutAllowed) {
       for (let i = 1; i < passes.length; i++) {
         const delayMs = i * 250;
