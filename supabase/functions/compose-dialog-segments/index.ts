@@ -1991,15 +1991,33 @@ serve(async (req) => {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
-    // v37 — model picked per variant. sync-3 is Sync.so's recommended model
-    // for difficult plates (static/occluded/multi-speaker); lipsync-2-pro
-    // remains the default for first-pass quality.
+    // v61 — Multi-speaker default flipped to sync-3 (Sync.so's recommended
+    // model for static / locked-camera / occluded plates per
+    // https://sync.so/docs/models/lipsync "Still Frame Limitation").
+    // The chained per-speaker pipeline feeds Sync.so a LOCKED Hailuo plate
+    // where the mouth never moves until lip-sync paints it — exactly the
+    // class of input lipsync-2-pro silently rejects with `unknown error`.
+    // sync-3 has built-in obstruction detection and can open closed lips.
+    //
+    // For single-speaker (N=1) we keep lipsync-2-pro first: those plates
+    // typically already carry natural speaking motion (HeyGen / avatar /
+    // user upload) and lipsync-2-pro has the higher fidelity ceiling.
+    //
+    // `coords-pro-lp2pro` (v61) is the new "force lipsync-2-pro on the
+    // proven coords-pro shape" retry variant — final fallback in the
+    // multi-speaker ladder before refunding.
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.10)
+    const isMultiSpeakerForModel = speakers.length >= 2;
     const payloadModel =
       retryVariant === "sync3-coords"
         ? SYNC3_MODEL
         : retryVariant === "auto-standard"
           ? LIPSYNC_FALLBACK_MODEL
-          : LIPSYNC_MODEL;
+          : retryVariant === "coords-pro-lp2pro"
+            ? LIPSYNC_MODEL
+            : (retryVariant === "coords-pro" || retryVariant === "coords-pro-box")
+              ? (isMultiSpeakerForModel ? SYNC3_MODEL : LIPSYNC_MODEL)
+              : LIPSYNC_MODEL;
 
     const failBeforeProviderDispatch = async (
       reason: string,
