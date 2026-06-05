@@ -1212,9 +1212,10 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 52,
-          engine: "sync-official-segments-v52",
+          version: 55,
+          engine: V55_ENGINE,
           asd_mode: "point_per_segment",
+          audio_input_mode: "ref_only",
           status: "rendering",
           model: V50_MODEL,
           sync_job_id: v41JobId,
@@ -1241,7 +1242,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v52_official_segments",
+            twoshot_stage: "syncso_v55_official_segments_ref_only",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1250,13 +1251,14 @@ serve(async (req) => {
           .eq("id", sceneId);
 
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
+          scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
           job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
             model: V50_MODEL,
+            audio_input_mode: "ref_only",
             segments_count: v41Segments.length,
             segments_with_box: segmentsWithBox,
             segments_auto_fallback: segmentsAutoFallback,
@@ -1276,8 +1278,9 @@ serve(async (req) => {
             status: "rendering",
             scene_id: sceneId,
             sync_job_id: v41JobId,
-            engine: "sync-official-segments-v52",
+            engine: V55_ENGINE,
             model: V50_MODEL,
+            audio_input_mode: "ref_only",
             segments: v41Segments.length,
             segments_with_box: segmentsWithBox,
             speakers: v41SpeakerRefs.length,
