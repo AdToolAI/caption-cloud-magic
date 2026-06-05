@@ -79,6 +79,16 @@ function peakNormalizeInPlace(samples: Int16Array, targetPeak = 29205): void {
   }
 }
 
+function peakDbFs(samples: Int16Array): number {
+  let peak = 0;
+  for (let i = 0; i < samples.length; i++) {
+    const v = samples[i];
+    const a = Math.abs(v) / 32768;
+    if (a > peak) peak = a;
+  }
+  return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+}
+
 function samplesToWav(samples: Int16Array): Uint8Array {
   const dataBytes = samples.byteLength;
   const buf = new ArrayBuffer(44 + dataBytes);
@@ -714,6 +724,12 @@ serve(async (req) => {
         if (voicedSec > 0 && voicedSec < 2.0) {
           peakNormalizeInPlace(track);
         }
+        const trackPeakDbfs = peakDbFs(track);
+        if (!Number.isFinite(trackPeakDbfs) || trackPeakDbfs <= -50) {
+          console.warn(
+            `[compose-twoshot-audio] scene ${scene_id} speaker=${group.speaker} silent_or_too_quiet_track peak_dbfs=${Number.isFinite(trackPeakDbfs) ? trackPeakDbfs.toFixed(2) : "-Infinity"} voicedSec=${voicedSec.toFixed(3)}`,
+          );
+        }
 
         const trackWav = samplesToWav(track);
         const trackPath = `${userId}/twoshot-vo/${scene_id}-${stamp}-char${i}-${group.speaker_slug}.wav`;
@@ -746,6 +762,7 @@ serve(async (req) => {
           endSec: Math.round(voicedEndSec * 1000) / 1000,
           voicedSec: Math.round(voicedSec * 1000) / 1000,
           normalized: voicedSec > 0 && voicedSec < 2.0,
+          peak_dbfs: Number.isFinite(trackPeakDbfs) ? Math.round(trackPeakDbfs * 1000) / 1000 : null,
           turns: turnWindows,
         };
       } catch (e) {
