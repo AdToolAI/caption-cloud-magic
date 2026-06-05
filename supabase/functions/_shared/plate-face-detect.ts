@@ -72,9 +72,9 @@ async function extractPlateFrame(params: {
   sceneId: string;
   projectId: string;
 }): Promise<string | null> {
-  const REPLICATE_API_TOKEN = Deno.env.get("REPLICATE_API_TOKEN");
-  if (!REPLICATE_API_TOKEN) {
-    console.warn("[plate-face-detect] REPLICATE_API_TOKEN missing — cannot extract frame");
+  const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
+  if (!REPLICATE_API_KEY) {
+    console.warn("[plate-face-detect] REPLICATE_API_KEY missing — cannot extract frame");
     return null;
   }
   // Pick the middle of the clip — most representative for face position
@@ -89,7 +89,7 @@ async function extractPlateFrame(params: {
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${REPLICATE_API_TOKEN}`,
+          Authorization: `Bearer ${REPLICATE_API_KEY}`,
           "Content-Type": "application/json",
           Prefer: "wait=30",
         },
@@ -114,7 +114,7 @@ async function extractPlateFrame(params: {
         await new Promise((r) => setTimeout(r, 3_000));
         const p = await fetch(
           `https://api.replicate.com/v1/predictions/${j.id}`,
-          { headers: { Authorization: `Bearer ${REPLICATE_API_TOKEN}` } },
+          { headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` } },
         );
         if (!p.ok) continue;
         const pj = await p.json();
