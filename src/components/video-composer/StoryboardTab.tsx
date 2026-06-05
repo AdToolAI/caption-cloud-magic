@@ -84,6 +84,33 @@ export default function StoryboardTab({
   isGeneratingStoryboard = false,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
+
+  // Defensive: filter out cast entries with no usable `name`.
+  // A single library asset that lost its name (e.g. legacy import,
+  // mid-edit draft, LLM-generated character row without a name) used to
+  // crash the entire Storyboard tab via deeply-nested `.name.toLowerCase()`
+  // calls — especially at 4-character casts where one entry is often empty.
+  // Single source of truth so every child gets the same sanitized list.
+  const safeCharacters = useMemo<ComposerCharacter[]>(
+    () =>
+      (characters ?? []).filter(
+        (c): c is ComposerCharacter =>
+          !!c && typeof c.name === 'string' && c.name.trim().length > 0,
+      ),
+    [characters],
+  );
+  const droppedCharacterCount = (characters?.length ?? 0) - safeCharacters.length;
+  useEffect(() => {
+    if (droppedCharacterCount > 0) {
+      // Soft warning only — no toast spam on every re-render.
+      console.warn(
+        '[StoryboardTab] ignored',
+        droppedCharacterCount,
+        'character(s) without a name to keep the storyboard renderable.',
+      );
+    }
+  }, [droppedCharacterCount]);
+
   // Master "Alle Clips generieren" — replaces the old "→ Clips generieren" tab
   // navigation. Uses the same proven pipeline as ClipsTab (extracted hook).
   const {
@@ -97,7 +124,7 @@ export default function StoryboardTab({
   } = useGenerateAllClips({
     scenes,
     projectId,
-    characters,
+    characters: safeCharacters,
     onUpdateScenes,
     onEnsurePersisted,
     language,
