@@ -822,14 +822,20 @@ serve(async (req) => {
     // even for 3+ speaker scenes. Used by sync-so-webhook to fall back when
     // the v56 segments[] call returns the opaque Sync.so unknown error.
     const stateForcesMultipass = (existing as any)?.force_multipass === true;
+    const stateMultipassAttempted = (existing as any)?.multipass_fallback_attempted === true;
+    // v59 — Once the v58 multipass fallback has fired for this scene, we MUST
+    // never re-enter the sync-3 segments[] path on a subsequent retry, even
+    // if the per-pass state lost the `force_multipass` flag. The attempted
+    // marker is sticky.
     let useV41Official =
       !forceMultipass &&
       !stateForcesMultipass &&
+      !stateMultipassAttempted &&
       speakers.length >= 3 &&
       (isV41Retry || !isAdvance);
-    if ((forceMultipass || stateForcesMultipass) && speakers.length >= 3) {
+    if ((forceMultipass || stateForcesMultipass || stateMultipassAttempted) && speakers.length >= 3) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} v58 FORCE_MULTIPASS active — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
+        `[compose-dialog-segments] scene=${sceneId} v58/v59 FORCE_MULTIPASS active (force=${forceMultipass} state=${stateForcesMultipass} attempted=${stateMultipassAttempted}) — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
       );
     }
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55 || (existing as any)?.version === 56) ? (existing as any) : null;
@@ -2244,6 +2250,18 @@ serve(async (req) => {
     passes[currentPassIdx] = pass;
 
     const nowIso = new Date().toISOString();
+    // v59 — Preserve v58 multipass markers across every state write so a
+    // pass-level retry cannot accidentally fall back into the broken
+    // sync-3 segments[] path. Source of truth is the body flag OR any
+    // previously-stored marker on the scene state.
+    const prevForceMultipass =
+      (prevState as any)?.force_multipass === true ||
+      (existing as any)?.force_multipass === true;
+    const prevMultipassAttempted =
+      (prevState as any)?.multipass_fallback_attempted === true ||
+      (existing as any)?.multipass_fallback_attempted === true;
+    const carryForceMultipass = forceMultipass || prevForceMultipass;
+    const carryMultipassAttempted = forceMultipass || prevMultipassAttempted;
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",
@@ -2270,6 +2288,12 @@ serve(async (req) => {
       // pickSpeakerCoordinates produces plate-space coords.
       video_width: videoDims.width,
       video_height: videoDims.height,
+      // v59 carry-over: keep multipass markers across retries.
+      ...(carryForceMultipass ? { force_multipass: true } : {}),
+      ...(carryMultipassAttempted ? { multipass_fallback_attempted: true } : {}),
+      ...((prevState as any)?.multipass_fallback_reason
+        ? { multipass_fallback_reason: (prevState as any).multipass_fallback_reason }
+        : {}),
     } as SegmentsState;
 
     await logSyncDispatch(supabase, {
