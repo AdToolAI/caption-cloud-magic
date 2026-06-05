@@ -805,50 +805,16 @@ serve(async (req) => {
     let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49) ? (existing as any) : null;
 
-    // ── v47 plate-native face repair ────────────────────────────────────
-    // The official Sync.so Segments path requires `coordinates` to land on
-    // the actual speaker's face IN THE PLATE FRAME (not in anchor-image
-    // space). v46 reused anchor-derived coords scaled by aspect-ratio and
-    // Sync.so silently returned "An unknown error occurred." because those
-    // points often missed the real faces. We now call validate-frame-face
-    // on a mid-scene frame, sort the detected face boxes left-to-right,
-    // and assign each speaker its slot's box-center-x + mouth-zone-y.
-    // If we cannot recover at least `speakers.length` boxes we fall back
-    // to the v5 per-speaker chain instead of dispatching a doomed segments
-    // call.
-    if (useV41Official && !isAdvance && plateDims) {
-      const probeFrame = Math.max(1, Math.round((totalSec / 2) * 24));
-      const v = await validateFrameFace({
-        supabaseUrl, serviceKey,
-        videoUrl: sourceClipUrl,
-        frameNumber: probeFrame, fps: 24,
-        targetCoords: null,
-      });
-      const boxes = Array.isArray(v?.faceBoxes) ? [...v.faceBoxes] : [];
-      const sorted = boxes
-        .filter((b: any) => Number(b?.w) > 0.02 && Number(b?.h) > 0.02)
-        .sort((a: any, b: any) => Number(a.x) - Number(b.x));
-      if (sorted.length >= speakers.length) {
-        for (let i = 0; i < speakers.length; i++) {
-          const b = sorted[i];
-          const cx = Math.round((Number(b.x) + Number(b.w) / 2) * plateDims.width);
-          // y = 78% down the box → mouth/chin region. Sync.so ASD docs say
-          // the point must be ON the speaker's face; the mouth is the
-          // safest landing zone for a lipsync coordinate.
-          const cy = Math.round((Number(b.y) + Number(b.h) * 0.78) * plateDims.height);
-          speakerCoords[i] = clampSyncCoords([cx, cy]);
-          coordSources[i] = "plate_native";
-        }
-        console.log(
-          `[compose-dialog-segments] scene=${sceneId} v47 plate-native coords frame=${probeFrame} faces=${sorted.length} coords=${JSON.stringify(speakerCoords)}`,
-        );
-      } else {
-        console.warn(
-          `[compose-dialog-segments] scene=${sceneId} v47 plate-native repair INSUFFICIENT boxes=${sorted.length} need=${speakers.length} — falling back to v5 fan-out`,
-        );
-        useV41Official = false;
-      }
-    }
+    // ── v49 face-gate REMOVED (2026-06-05) ──────────────────────────────
+    // The v49 payload no longer uses per-segment ASD coordinates (see the
+    // probe results in mem://architecture/lipsync/v49-docs-exact-segments).
+    // The previous plate-native face probe gated v49 on detecting ≥N faces
+    // and forced doomed-from-the-start v5 fan-out (bounding_boxes + coords,
+    // a doc-violating mutually-exclusive combo per the Sync.so Segments
+    // guide) whenever the plate cropped heads, producing 15-min "unknown
+    // error" loops. v49 now always runs for 3+ speaker scenes with valid
+    // per-speaker `track_url`; Sync.so's auto-ASD picks the right face per
+    // segment from the audio track.
 
     if (useV41Official && !isAdvance) {
       // v47 — fully aligned with the official Sync.so Segments spec
