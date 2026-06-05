@@ -375,7 +375,7 @@ serve(async (req) => {
       return ok({ ok: true, skipped: "v41_job_orphan", job_id: jobId });
     }
 
-    if (status !== "COMPLETED" && hasSegmentAudioInputCrop(state)) {
+    if (status !== "COMPLETED" && (state as any).version !== 56 && (state as any).audio_input_mode !== "master_audio_crop" && hasSegmentAudioInputCrop(state)) {
       const cost = Number((state as any).cost_credits ?? 0);
       const alreadyRefunded = !!(state as any).refunded;
       if (cost > 0 && !alreadyRefunded) {
