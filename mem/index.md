@@ -15,10 +15,11 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Pipeline (v51 canonical)**: 3+ speaker path = `compose-dialog-scene` → `compose-dialog-segments` (single Sync.so call, `lipsync-2-pro` + per-segment `bounding_boxes` detected on the rendered plate via Gemini Vision, cached in `plate_face_cache`) → `sync-so-webhook` → `render-sync-segments-audio-mux`. Fallback chain: plate-detect → anchor-rescale (v50) → Sync.so `auto_detect`. Engine `sync-official-segments-v51`, webhook accepts v41..v51. See `mem://architecture/lipsync/v51-plate-side-face-detection`.
+- **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
 
 ## Memories
-- [Lip-Sync v51 Plate-Side Face Detection (current)](mem://architecture/lipsync/v51-plate-side-face-detection) — Gemini Vision on rendered plate + 30d `plate_face_cache`, fallback to v50 anchor-rescale then auto_detect
+- [Lip-Sync v53 Doc Compliance Fixes](mem://architecture/lipsync/v53-doc-compliance-fixes) — Sync.so payloads must omit undocumented `segments_secs`; silent speaker audio fails before provider dispatch
+- [Lip-Sync v51 Plate-Side Face Detection (superseded)](mem://architecture/lipsync/v51-plate-side-face-detection) — Gemini Vision on rendered plate + 30d `plate_face_cache`, fallback to v50 anchor-rescale then auto_detect
 - [Lip-Sync Cleanup v48](mem://architecture/lipsync/v48-cleanup) — historical pipeline cleanup, partial-mux race fix
 - [v46 Official Segments (superseded)](mem://architecture/lipsync/v46-lipsync2pro-official-segments) — failed single-call attempt, kept for context
 - [v41–v45 Lip-Sync (superseded)](mem://architecture/lipsync/v43-bounding-boxes-asd) — historical iterations
