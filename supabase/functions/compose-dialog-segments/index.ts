@@ -1079,6 +1079,18 @@ serve(async (req) => {
           }
           if (hasForbiddenCrop) {
             console.error(`[compose-dialog-segments] scene=${sceneId} v55 forbidden audioInput crop detected before dispatch refId=${refId}`);
+            const cropAlreadyRefunded = !!(v41PrevState as any)?.refunded;
+            if (!cropAlreadyRefunded) {
+              const { data: wCrop } = await supabase
+                .from("wallets").select("balance").eq("user_id", userId).single();
+              await supabase
+                .from("wallets")
+                .update({
+                  balance: Number(wCrop?.balance ?? 0) + Number(v41PrevState?.cost_credits ?? v47Cost),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("user_id", userId);
+            }
             await supabase
               .from("composer_scenes")
               .update({
@@ -1092,7 +1104,7 @@ serve(async (req) => {
                   status: "failed",
                   audio_input_mode: "invalid_crop_blocked",
                   error: "segment_audio_input_crop_forbidden",
-                  refunded: true,
+                  refunded: !cropAlreadyRefunded,
                   finished_at: new Date().toISOString(),
                 },
                 updated_at: new Date().toISOString(),
