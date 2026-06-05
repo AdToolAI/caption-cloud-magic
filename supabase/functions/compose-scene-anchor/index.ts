@@ -35,6 +35,20 @@ interface Body {
    *  block. Used by compose-video-clips on the SECOND attempt after the
    *  first anchor showed a cloned identity or an extra person. */
   strictNoDuplicates?: boolean;
+  /** Stage A — World Assets as Visual References.
+   * Each array supplies up to N additional reference images that Nano Banana 2
+   * composes INTO the same first frame as the cast portraits.
+   *  - locationUrls: max 1 (background / environment identity)
+   *  - buildingUrls: max 1 (named architecture / landmark identity)
+   *  - propUrls    : max 3 (hand-held / on-table objects)
+   * Names are matched 1:1 with the URLs and used to label each ref in the
+   * edit prompt so the model knows what each image represents. */
+  locationUrls?: string[];
+  buildingUrls?: string[];
+  propUrls?: string[];
+  locationNames?: string[];
+  buildingNames?: string[];
+  propNames?: string[];
 }
 
 async function sha1(s: string): Promise<string> {
