@@ -1,6 +1,6 @@
 ---
 name: v49 Sync.so Multi-Speaker Segments — probe-proven payload
-description: 3+ speaker dialog scenes dispatch a single Sync.so call with `model="lipsync-2"` + `segments[]` + `options.sync_mode="cut_off"` and NO per-segment `optionsOverride.active_speaker_detection`. Sync.so auto-detects which face speaks from the per-segment audio track. Webhook gate accepts v41..v49.
+description: 3+ speaker dialog scenes dispatch a single Sync.so call with `model="lipsync-2"` + `segments[]` + `options.sync_mode="cut_off"` and NO per-segment `optionsOverride.active_speaker_detection`. Sync.so auto-detects which face speaks from the per-segment audio track. Face-detect gate REMOVED 2026-06-05 — v49 always runs for 3+ speaker scenes with valid per-speaker `track_url`. Webhook gate accepts v41..v49.
 type: architecture
 ---
 
@@ -13,7 +13,7 @@ type: architecture
 | V3 | lipsync-2-pro | ✅ | ✅ | ❌ "unknown error" after 13 min |
 | V4 | lipsync-2 | ❌ (single audio) | ✅ | ✅ COMPLETED |
 
-→ The combo `segments[] + per-segment ASD coordinates` is the **only** structurally broken combination. Model (`lipsync-2` vs `-pro`, both aliased server-side to `sync-2[-pro]`) is neutral. Segments alone and ASD alone are both green.
+→ The combo `segments[] + per-segment ASD coordinates` is the **only** structurally broken combination. Per the Sync.so Segments docs the 4 ASD modes (`auto_detect`, `v3`, `frame_number+coordinates`, `bounding_boxes(_url)`) are **mutually exclusive**, and `auto_detect` is the documented default — that is what v49 relies on.
 
 **v49 payload (single call, 3+ speakers):**
 
@@ -42,7 +42,9 @@ NO `optionsOverride`. NO `active_speaker_detection`. NO `bounding_boxes`. NO `au
 
 **Webhook:** `sync-so-webhook` version gate accepts `41..49`. Per-scene partial-mux race guard (v48) preserved.
 
-**Trade-off:** if Sync.sos auto-ASD picks the wrong mouth on dense multi-face plates, the 1–2-speaker scenes fall back to the v5 fan-out (one Sync.so call per speaker). For 3+ speakers, v49 is the canonical path; manual coordinates are no longer an option because they break the API.
+**Gate (2026-06-05):** v49 runs whenever `speakers.length >= 3` AND every speaker has a `track_url`. The previous plate-native face-detect gate (validate-frame-face → ≥N boxes required) was REMOVED — it cropped-head plates would silently route to the v5 fan-out path, which uses `bounding_boxes` + per-pass coords (a doc-violating mutually-exclusive ASD combo) and burned 15 min in `coords-pro → coords-pro-box → sync3-coords` retry loops, all returning "An unknown error occurred." For 1- and 2-speaker scenes the v5 fan-out remains the canonical path.
+
+**Trade-off:** Sync.so's auto-ASD picks the speaker face per segment from the audio track. On dense multi-face plates with similar voices this is non-deterministic, but the docs explicitly recommend `auto_detect` for multi-speaker scenes and it is the only segment-payload variant that does not produce the "unknown error" failure mode.
 
 **Cost:** still 1 Sync.so call total per scene → `ceil(totalSec) × 9` credits.
 
