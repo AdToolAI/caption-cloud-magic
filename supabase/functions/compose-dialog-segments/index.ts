@@ -2057,7 +2057,7 @@ serve(async (req) => {
       webhook_url: diagnosticWebhookUrl,
     };
     console.log(
-      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "fallback_full+segments"} windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
+      `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v53_doc_strict tight=${tightAudioInfo ? `${tightAudioInfo.durSec.toFixed(2)}s` : "none"} segments_secs=disabled windows=${JSON.stringify(speakerWindowsSecs)} turnStartFrame=${startFrame}`,
     );
 
     // ── Length sanity log ────────────────────────────────────────────────
@@ -2241,6 +2241,11 @@ serve(async (req) => {
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
         audio_probe: audioProbes[audioProbeIdx] ?? null,
+        final_audio_gate: {
+          peak_dbfs: Number.isFinite(finalPeakDbFs) ? finalPeakDbFs : null,
+          voiced_sec: Number.isFinite(finalVoicedSec) ? finalVoicedSec : 0,
+          longest_voiced_run: Number.isFinite(finalLongestRun) ? finalLongestRun : 0,
+        },
         video_probe: videoProbe,
         audio_diagnostics: audioDiagnostics.find((d) => d.pass === pass.idx) ?? null,
         payload_summary: {
