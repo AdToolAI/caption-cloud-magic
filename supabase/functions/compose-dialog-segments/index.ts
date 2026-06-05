@@ -267,6 +267,12 @@ serve(async (req) => {
     // v41 — single-call official Sync.so segments retry path (no re-charge,
     // bypasses v5 fan-out, re-dispatches the canonical segments[] payload).
     const isV41Retry = body?.retry_v41 === true;
+    // v56 — retry without manual ASD (drop optionsOverride.active_speaker_detection)
+    // so Sync.so picks the active speaker automatically per segment. Triggered
+    // by sync-so-webhook when the v56 manual-point dispatch returns the opaque
+    // "An unknown error occurred." (often caused by anchor-derived coords that
+    // sit off-face on the actual Hailuo plate).
+    const retryNoAsd = body?.retry_no_asd === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
@@ -274,7 +280,7 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
     }
     if (isV41Retry) {
-      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch)`);
+      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch, no_asd=${retryNoAsd})`);
     }
 
     // ── v33: strict single-flight lock ───────────────────────────────────
