@@ -29,9 +29,11 @@
  * ordering of plate boxes is the safest deterministic mapping).
  */
 
+import Replicate from "npm:replicate@0.25.2";
+
 const LOVABLE_GW = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const GEMINI_TIMEOUT_MS = 30_000;
-const FRAME_EXTRACT_TIMEOUT_MS = 60_000;
+const FRAME_EXTRACT_TIMEOUT_MS = 90_000;
 
 export interface PlateFaceBox {
   /** Plate pixel-space [x1, y1, x2, y2]. */
