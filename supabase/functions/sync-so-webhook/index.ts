@@ -64,7 +64,12 @@ const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // v37 — Added "sync3-coords" as the Sync.so-recommended fallback for
 // difficult / occluded / multi-speaker plates (sync-3 has built-in
 // obstruction detection and can open closed lips; lipsync-2-pro cannot).
-const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
+// v61 — Added "coords-pro-lp2pro": forces lipsync-2-pro on the proven
+// coords-pro point-ASD shape. This is the final multi-speaker fallback
+// AFTER sync-3 attempts exhaust (sync-3 is the new default for N>=2, but
+// we keep the historically-stable lipsync-2-pro chained path as last
+// resort instead of refunding).
+const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
@@ -1059,12 +1064,25 @@ serve(async (req) => {
         // sync-3 model for difficult plates rather than jumping to auto-*
         // (which carries face-swap risk for 3+ speaker scenes).
         speakerCount >= 3 &&
-        (currentVariant === "coords-pro-box" || currentVariant === "sync3-coords") &&
+        currentVariant === "coords-pro-box" &&
         passRetryCount < MAX_V5_RETRIES
       ) {
         nextVariant = "sync3-coords";
         console.warn(
           `[sync-so-webhook] v37 scene=${sceneId} 3+ speakers (${speakerCount}) — escalating to sync-3 (model fallback) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
+        );
+      } else if (
+        // v61 — After sync-3 attempts exhaust, fall back ONCE to the
+        // historically-stable lipsync-2-pro chained path (same coords-pro
+        // shape, different model). This restores the "Erfolgs-Pfad" that
+        // ran reliably in production before sync-3 was promoted to default.
+        speakerCount >= 2 &&
+        (currentVariant === "sync3-coords" || currentVariant === "coords-pro-lp2pro") &&
+        passRetryCount < MAX_V5_RETRIES
+      ) {
+        nextVariant = "coords-pro-lp2pro";
+        console.warn(
+          `[sync-so-webhook] v61 scene=${sceneId} ${speakerCount}+ speakers — falling back to lipsync-2-pro (proven chained path) retry ${passRetryCount + 1}/${MAX_V5_RETRIES}`,
         );
       } else if (speakerCount >= 3 && (nextVariant === "auto-pro" || nextVariant === "auto-standard")) {
         const allPassesFailedNoFace = passesArr.every(

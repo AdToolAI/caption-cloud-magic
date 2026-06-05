@@ -134,6 +134,32 @@ later one logged as `job ... not in passes[]`). v60 unified the rule:
 - Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2418
 - Background: `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`
 
+## I.10 — sync-3 is the default model for N≥2 chained passes (v61)
+
+The chained per-speaker pipeline feeds Sync.so a LOCKED Hailuo plate where
+the mouth never moves until lip-sync paints it. `lipsync-2-pro` requires
+natural speaking motion ("Still Frame Limitation" per
+https://sync.so/docs/models/lipsync) and silently returns
+`provider_unknown_error` on such plates. `sync-3` has built-in obstruction
+detection and can open closed lips — it is Sync.so's recommended model
+for static / multi-person / occluded inputs.
+
+Rules:
+- `speakers.length >= 2` AND `retryVariant in {coords-pro, coords-pro-box}`
+  → model MUST be `sync-3`.
+- `speakers.length === 1` AND `retryVariant === coords-pro` → model MUST
+  stay `lipsync-2-pro` (single-speaker plates carry natural motion).
+- `coords-pro-lp2pro` is the dedicated retry variant that forces
+  `lipsync-2-pro` on the proven point-coord ASD shape. It MUST stay in
+  the webhook ladder as the final fallback before refunding for N≥2,
+  preserving the historically successful chained-lipsync-2-pro path.
+- `syncOptions` MUST NOT add `temperature` or `occlusion_detection_enabled`
+  (sync-3 ignores both — see `mem://architecture/lipsync/v54-sync3-official-segments`).
+
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L1993-2020
+  (`payloadModel` picker), ~L1922 (ASD branch); `supabase/functions/sync-so-webhook/index.ts` ~L67 (`V5_RETRY_VARIANTS`), ~L1057-1083 (multi-speaker escalation ladder).
+- Background: `mem://architecture/lipsync/v61-sync3-default-multispeaker`
+
 ---
 
 ## Code annotation contract
