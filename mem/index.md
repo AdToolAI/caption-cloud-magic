@@ -19,6 +19,8 @@ Updated: today
 - **Lip-Sync Multi-Speaker Model**: 3+ speaker official segments dispatch uses `sync-3`, NOT `lipsync-2-pro` (static plates → unknown error).
 
 ## Memories
+- [Lip-Sync v57 Locked-Plate & Multi-Speaker ASD Guard](mem://architecture/lipsync/v57-locked-plate-and-multispeaker-asd-guard) — Cinematic-Sync master plates hard-block cuts/zoom/shot-changes; sync-so-webhook auto-ASD retry disabled for ≥2 speakers
+- [Lip-Sync v56 Master-Audio Crop](mem://architecture/lipsync/v56-master-audio-crop) — Single master dialog WAV + per-segment audioInput crop; manual ASD first, single-speaker auto-ASD retry
 - [Lip-Sync v55 Stale-Payload Guard](mem://architecture/lipsync/v55-stale-payload-guard) — New Sync.so segments are v55/ref_only; stale v52 crop payloads fail locally with idempotent refund
 - [Lip-Sync v54 Sync-3 Official Segments](mem://architecture/lipsync/v54-sync3-official-segments) — Multi-speaker segments dispatch in compose-dialog-segments uses `sync-3`; no `temperature`/`occlusion_detection_enabled`
 - [Lip-Sync v53 Doc Compliance Fixes](mem://architecture/lipsync/v53-doc-compliance-fixes) — Sync.so payloads must omit undocumented `segments_secs`; silent speaker audio fails before provider dispatch
