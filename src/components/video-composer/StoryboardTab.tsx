@@ -556,7 +556,7 @@ export default function StoryboardTab({
 
       {/* Cast Consistency Map — shows which character appears in which scene
           and the active continuity anchor (reference image / frame chain / prompt). */}
-      <CastConsistencyMap scenes={scenes} characters={characters || []} />
+      <CastConsistencyMap scenes={scenes} characters={safeCharacters} />
 
       {/* Scene Cards — v2 Layout: Cinematic Filmstrip (left) + persistent Studio editor (right) */}
       {scenes.length === 0 ? (
@@ -615,7 +615,7 @@ export default function StoryboardTab({
                       index={selectedIndex}
                       totalScenes={scenes.length}
                       projectId={projectId}
-                      characters={characters}
+                      characters={safeCharacters}
                       preferredAspect={preferredAspect}
                       onUpdate={(updates) => updateScene(selectedScene.id, updates)}
                       onDelete={() => deleteScene(selectedScene.id)}
@@ -653,7 +653,7 @@ export default function StoryboardTab({
                 avatarSlot={
                   <SceneAvatarMode
                     scene={selectedScene}
-                    characters={characters}
+                    characters={safeCharacters}
                     onUpdate={(updates) => updateScene(selectedScene.id, updates)}
                   />
                 }
@@ -708,7 +708,7 @@ export default function StoryboardTab({
         open={talkingHeadOpen}
         onOpenChange={setTalkingHeadOpen}
         projectId={projectId}
-        briefingCharacters={characters}
+        briefingCharacters={safeCharacters}
         onAddBriefingCharacter={onAddCharacter}
         availableScenes={scenes.map((s, i) => ({
           id: s.id,
