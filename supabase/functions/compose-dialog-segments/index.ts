@@ -1122,9 +1122,9 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 51,
+                version: 52,
                 engine: "sync-official-segments-v52",
-                asd_mode: "bounding_boxes_per_segment",
+                asd_mode: "point_per_segment",
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
@@ -1168,9 +1168,9 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 51,
+          version: 52,
           engine: "sync-official-segments-v52",
-          asd_mode: "bounding_boxes_per_segment",
+          asd_mode: "point_per_segment",
           status: "rendering",
           model: V50_MODEL,
           sync_job_id: v41JobId,
