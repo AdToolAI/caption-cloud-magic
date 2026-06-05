@@ -804,40 +804,38 @@ serve(async (req) => {
     );
 
     // ─────────────────────────────────────────────────────────────────────
-    // v41 — Official Sync.so Multi-Speaker Segments (for 3+ speakers)
+    // v60 — Unified Pipeline (one path for every N≥2)
     // ─────────────────────────────────────────────────────────────────────
-    // Sync.so's Segments Guide (https://sync.so/docs/developer-guides/segments)
-    // documents the canonical multi-speaker path: ONE generation, top-level
-    // `segments[]`, each segment with `audioInput.refId` + `optionsOverride.
-    // active_speaker_detection`. lipsync-2-pro previously rejected this in
-    // 2025 (the old MAY 2026 comment below records that history); sync-3
-    // accepts the official shape today and is the documented model for
-    // 3+ speaker / multi-person / static plates.
+    // Historical note: v41/v54/v56 sent ONE Sync.so generation with a top-
+    // level `segments[]` payload. The Sync.so `sync-3 + segments[]` path
+    // returns `An unknown error occurred.` on most real plates regardless
+    // of ASD shape (see v58/v59 memory docs). The only stable Sync.so path
+    // for multi-speaker plates is the per-speaker chained v5 fan-out
+    // (one Sync.so call per speaker, single-coord ASD, pass-N output feeds
+    // pass-N+1). v60 makes that the canonical pipeline for EVERY N≥2 and
+    // removes the v56 first attempt entirely — no more wasted retry slot,
+    // no more user-visible "provider_unknown_error" on the first try.
     //
-    // We use v41 for 3+ speaker scenes (and only on fresh dispatch or an
-    // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
-    // (it has been stable for them) so we don't regress simpler dialogs.
-    // v58 — `forceMultipass` (body flag) OR `force_multipass` set on the
-    // previous dialog_shots state forces the per-speaker chained pipeline
-    // even for 3+ speaker scenes. Used by sync-so-webhook to fall back when
-    // the v56 segments[] call returns the opaque Sync.so unknown error.
+    // The v56 block below remains as DEAD CODE for documentation /
+    // defense-in-depth. `useV41Official` is hard-pinned to `false` for
+    // every multi-speaker dispatch. 1-speaker scenes never benefit from
+    // segments[] (no concurrent speakers), so it stays off for them too.
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.1, I.2, I.9)
     const stateForcesMultipass = (existing as any)?.force_multipass === true;
     const stateMultipassAttempted = (existing as any)?.multipass_fallback_attempted === true;
-    // v59 — Once the v58 multipass fallback has fired for this scene, we MUST
-    // never re-enter the sync-3 segments[] path on a subsequent retry, even
-    // if the per-pass state lost the `force_multipass` flag. The attempted
-    // marker is sticky.
-    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.2)
-    // Do NOT relax any of these clauses without updating FROZEN-INVARIANTS.md.
-    let useV41Official =
-      !forceMultipass &&
-      !stateForcesMultipass &&
-      !stateMultipassAttempted &&
-      speakers.length >= 3 &&
-      (isV41Retry || !isAdvance);
-    if ((forceMultipass || stateForcesMultipass || stateMultipassAttempted) && speakers.length >= 3) {
+    // v60: ALL multi-speaker scenes use the chained per-speaker pipeline
+    // from the very first dispatch. `useV41Official` only stays accessible
+    // for a single-speaker explicit-debug body flag (`force_v56`) that no
+    // production codepath sets today.
+    const debugForceV56 = body?.force_v56 === true && speakers.length === 1;
+    let useV41Official = debugForceV56 && (isV41Retry || !isAdvance);
+    if (useV41Official) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} v58/v59 FORCE_MULTIPASS active (force=${forceMultipass} state=${stateForcesMultipass} attempted=${stateMultipassAttempted}) — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
+        `[compose-dialog-segments] scene=${sceneId} v56 segments[] dispatch (debug-only, single-speaker) — production code never sets force_v56`,
+      );
+    } else if (speakers.length >= 2 && (forceMultipass || stateForcesMultipass || stateMultipassAttempted)) {
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} v60 multipass markers carried (force=${forceMultipass} state=${stateForcesMultipass} attempted=${stateMultipassAttempted}) — chained per-speaker v5 pipeline`,
       );
     }
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55 || (existing as any)?.version === 56) ? (existing as any) : null;
