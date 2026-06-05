@@ -1102,7 +1102,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v54_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v55_official_segments_payload model=${V50_MODEL} asd=point_per_segment audio_input_mode=ref_only ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
