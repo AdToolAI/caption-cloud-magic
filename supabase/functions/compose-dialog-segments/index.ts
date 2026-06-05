@@ -1064,6 +1064,9 @@ serve(async (req) => {
         );
         for (const seg of v41Segments) {
           const refId = (seg as any).audioInput?.refId;
+          const hasForbiddenCrop =
+            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "startTime") ||
+            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "endTime");
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
               `[compose-dialog-segments] scene=${sceneId} v50 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
@@ -1073,6 +1076,29 @@ serve(async (req) => {
               .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v50_segment_refid_missing" })
               .eq("id", sceneId);
             return json({ error: "v50_segment_refid_missing", refId }, 422);
+          }
+          if (hasForbiddenCrop) {
+            console.error(`[compose-dialog-segments] scene=${sceneId} v55 forbidden audioInput crop detected before dispatch refId=${refId}`);
+            await supabase
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: "failed",
+                twoshot_stage: "failed",
+                clip_error: "segment_audio_input_crop_forbidden",
+                dialog_shots: {
+                  ...(v41PrevState ?? {}),
+                  version: 55,
+                  engine: "sync-official-segments-v55",
+                  status: "failed",
+                  audio_input_mode: "invalid_crop_blocked",
+                  error: "segment_audio_input_crop_forbidden",
+                  refunded: true,
+                  finished_at: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId);
+            return json({ error: "segment_audio_input_crop_forbidden", refId }, 422);
           }
         }
 
