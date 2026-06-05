@@ -1116,8 +1116,8 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 50,
-                engine: "sync-official-segments-v50",
+                version: 51,
+                engine: "sync-official-segments-v51",
                 asd_mode: "bounding_boxes_per_segment",
                 status: "failed",
                 model: V50_MODEL,
@@ -1133,7 +1133,7 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v50",
+            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v51",
             sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
@@ -1155,15 +1155,15 @@ serve(async (req) => {
         if (!v41JobId) return json({ error: "v50_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
-          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v50",
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v51",
         });
         await recordCircuitSuccess(supabase, "sync.so");
 
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 50,
-          engine: "sync-official-segments-v50",
+          version: 51,
+          engine: "sync-official-segments-v51",
           asd_mode: "bounding_boxes_per_segment",
           status: "rendering",
           model: V50_MODEL,
@@ -1189,7 +1189,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v50_official_segments",
+            twoshot_stage: "syncso_v51_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1198,7 +1198,7 @@ serve(async (req) => {
           .eq("id", sceneId);
 
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v50",
+          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v51",
           job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
@@ -1224,7 +1224,7 @@ serve(async (req) => {
             status: "rendering",
             scene_id: sceneId,
             sync_job_id: v41JobId,
-            engine: "sync-official-segments-v50",
+            engine: "sync-official-segments-v51",
             model: V50_MODEL,
             segments: v41Segments.length,
             segments_with_box: segmentsWithBox,
