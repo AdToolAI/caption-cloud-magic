@@ -603,6 +603,12 @@ serve(async (req) => {
       return hit;
     };
 
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.4)
+    // The returned string MUST contain "LOCKED static camera" verbatim and
+    // the negative prompt block CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE MUST
+    // list every framing-change keyword (cut/zoom/push/pull/dolly/pan/tilt/
+    // reframe/shot change/insert). A regression here triggers wrong-face
+    // ASD mapping on multi-speaker plates.
     const neutralTwoShotPrompt = (names: string[], fallbackCount: number) => {
       const cleanNames = names.filter(Boolean);
       // STAGE 6 (May 31 2026): allow n=1 for single-speaker cinematic-sync.

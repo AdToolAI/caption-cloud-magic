@@ -91,6 +91,8 @@ export default function StoryboardTab({
   // crash the entire Storyboard tab via deeply-nested `.name.toLowerCase()`
   // calls — especially at 4-character casts where one entry is often empty.
   // Single source of truth so every child gets the same sanitized list.
+  // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.7)
+  // Every child below MUST receive `safeCharacters`, never raw `characters`.
   const safeCharacters = useMemo<ComposerCharacter[]>(
     () =>
       (characters ?? []).filter(

@@ -504,8 +504,17 @@ serve(async (req) => {
     const isV56Manual =
       (state as any).version === 56 &&
       (state as any).asd_mode === "manual_point_minimal";
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.5)
+    // `!isMultiSpeaker` MUST stay in this expression. Auto-ASD fallback on
+    // 2+ speakers maps the wrong speaker's audio onto whichever mouth
+    // Sync.so finds in a stray close-up.
     const wantV56NoAsdRetry =
       isV56Manual && !isMultiSpeaker && retryCount < MAX_V41_RETRIES && !(state as any).retry_no_asd_attempted;
+    if (wantV56NoAsdRetry && isMultiSpeaker) {
+      console.error(
+        `INVARIANT_VIOLATION_v57_multispeaker_asd scene=${sceneId} speakerCount=${speakerCount} — see FROZEN-INVARIANTS.md I.5`,
+      );
+    }
     // v58 — Multi-speaker fallback. When the v56 single-call segments[]
     // dispatch fails on a 3+ speaker scene with the opaque Sync.so
     // `provider_unknown_error` (no error_code), there is no payload tweak
