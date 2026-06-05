@@ -10,6 +10,14 @@
 // ALL portraits are sent to compose-scene-anchor in a single Nano Banana 2
 // edit call so the resulting first-frame contains all of them positioned
 // according to the scene description.
+//
+// Stage A — World Assets as Visual References:
+// Locations, buildings and props that the user mentions in the scene
+// (via @-tag or the UnifiedAssetPicker block) are also forwarded as
+// additional reference images to compose-scene-anchor. Nano Banana 2 then
+// composes the named environment + props INTO the same first frame,
+// instead of inventing generic stand-ins. This is the Artlist-parity
+// "World assets are visual" unlock.
 
 import { supabase } from '@/integrations/supabase/client';
 import type { ComposerScene } from '@/types/video-composer';
@@ -18,11 +26,21 @@ import {
   type SceneAnchor,
 } from './resolveSceneCharacterAnchor';
 import type { ComposerCharacter } from '@/types/video-composer';
+import type { MotionStudioLocation } from '@/types/motion-studio';
+import { findMentions } from './mentionParser';
+import { readSceneAssetSlugs, slugifyAssetName } from './applySceneAssetsToPrompt';
 
 interface BrandCharLike {
   id?: string;
   name?: string;
   reference_image_url?: string;
+}
+
+/** Resolved world reference picked up from scene mentions / asset block. */
+export interface WorldRef {
+  kind: 'location' | 'building' | 'prop';
+  name: string;
+  url: string;
 }
 
 export interface PreparedAnchor {
@@ -39,6 +57,8 @@ export interface PreparedAnchor {
   composed: boolean;
   /** When true, caller should consider routing to a multi-ref provider (Vidu). */
   isMulti?: boolean;
+  /** Stage A — world refs that were composed into the first frame (audit/UI). */
+  worldRefs?: WorldRef[];
 }
 
 export interface PrepareSceneAnchorOptions {
@@ -48,6 +68,71 @@ export interface PrepareSceneAnchorOptions {
   forceCompose?: boolean;
 }
 
+/**
+ * Stage A helper — extract location / building / prop refs from a scene
+ * by inspecting BOTH the @-mentions in the prompt and the
+ * `<!--scene-assets-->` slug block left by the UnifiedAssetPicker.
+ *
+ * Hard caps mirror the edge function: 1 location, 1 building, 3 props.
+ * Returns [] when the scene opted out via `scene.ignoreWorldRefs === true`
+ * or when the world library is empty.
+ */
+export function resolveSceneWorldRefs(
+  scene: Pick<ComposerScene, 'aiPrompt' | 'ignoreWorldRefs'>,
+  worldLib: MotionStudioLocation[] | undefined,
+): WorldRef[] {
+  if (!worldLib || worldLib.length === 0) return [];
+  if (scene.ignoreWorldRefs === true) return [];
+  const prompt = scene.aiPrompt || '';
+  if (!prompt) return [];
+
+  const tagOf = (l: MotionStudioLocation): 'location' | 'building' | 'prop' => {
+    const tags = (l.tags ?? []) as string[];
+    if (tags.includes('building')) return 'building';
+    if (tags.includes('prop')) return 'prop';
+    return 'location';
+  };
+
+  // (a) @-mentions resolved against the world library (locations slot also
+  // carries buildings + props, distinguished by tag).
+  const matches = findMentions(prompt, [], worldLib);
+
+  // (b) Slugs from the UnifiedAssetPicker block at the head of the prompt.
+  const slugs = readSceneAssetSlugs(prompt);
+
+  // Merge: collect unique ids.
+  const picked = new Map<string, MotionStudioLocation>();
+  for (const m of matches) {
+    if (m.kind !== 'location') continue;
+    const l = worldLib.find((x) => x.id === m.id);
+    if (l && l.reference_image_url && !picked.has(l.id)) picked.set(l.id, l);
+  }
+  for (const slug of slugs) {
+    const l = worldLib.find((x) => slugifyAssetName(x.name) === slug);
+    if (l && l.reference_image_url && !picked.has(l.id)) picked.set(l.id, l);
+  }
+
+  // Bucketize with hard caps.
+  const result: WorldRef[] = [];
+  let locCount = 0;
+  let bldCount = 0;
+  let propCount = 0;
+  for (const l of picked.values()) {
+    const kind = tagOf(l);
+    if (kind === 'location' && locCount < 1) {
+      result.push({ kind, name: l.name, url: l.reference_image_url! });
+      locCount += 1;
+    } else if (kind === 'building' && bldCount < 1) {
+      result.push({ kind, name: l.name, url: l.reference_image_url! });
+      bldCount += 1;
+    } else if (kind === 'prop' && propCount < 3) {
+      result.push({ kind, name: l.name, url: l.reference_image_url! });
+      propCount += 1;
+    }
+  }
+  return result;
+}
+
 export async function prepareSceneAnchor(
   scene: ComposerScene,
   characters: ComposerCharacter[] | undefined,
@@ -55,43 +140,57 @@ export async function prepareSceneAnchor(
   scenePromptForCompose: string,
   aspectRatio: '16:9' | '9:16' | '1:1' = '16:9',
   options: PrepareSceneAnchorOptions = {},
+  worldLib?: MotionStudioLocation[],
 ): Promise<PreparedAnchor> {
+  const worldRefs = resolveSceneWorldRefs(scene, worldLib);
+
   // Existing manual reference always wins UNLESS the caller explicitly
   // requests a re-compose (e.g. multi-speaker two-shot).
   if (scene.referenceImageUrl && !options.forceCompose) {
-    return { firstFrameUrl: scene.referenceImageUrl, composed: false };
+    return { firstFrameUrl: scene.referenceImageUrl, composed: false, worldRefs };
   }
 
   const anchors = resolveSceneCharacterAnchorsAll(scene, characters, brandChar);
-  if (anchors.length === 0) return { composed: false };
+  if (anchors.length === 0) return { composed: false, worldRefs };
 
   const primary = anchors[0];
   const isMulti = anchors.length > 1;
 
   // Subject-reference provider (Vidu) → pass ALL portraits as separate refs.
+  // Stage A: also append world-ref URLs so Vidu Q2 receives location/prop
+  // identity (cap 7 total handled by Vidu provider; portraits ≤4 + worldRefs ≤5).
   if (primary.strategy === 'subject-reference') {
+    const portraitOnly = anchors.map((a) => a.referenceImageUrl);
+    const subjectAll = [...portraitOnly, ...worldRefs.map((w) => w.url)].slice(0, 7);
     return {
       subjectReferenceUrl: primary.referenceImageUrl,
-      subjectReferenceUrls: anchors.map((a) => a.referenceImageUrl),
+      subjectReferenceUrls: subjectAll,
       anchor: primary,
       anchors,
       composed: false,
       isMulti,
+      worldRefs,
     };
   }
 
   if (primary.strategy === 'first-frame-direct' && !isMulti) {
-    return { firstFrameUrl: primary.referenceImageUrl, anchor: primary, anchors, composed: false };
+    return { firstFrameUrl: primary.referenceImageUrl, anchor: primary, anchors, composed: false, worldRefs };
   }
 
   if (primary.strategy === 'text-only' && !isMulti) {
-    return { anchor: primary, anchors, composed: false };
+    return { anchor: primary, anchors, composed: false, worldRefs };
   }
 
   // first-frame-composed (single OR multi). Multi always lands here because
   // the resolver upgrades the strategy when >1 anchor is present.
   try {
     const portraitUrls = anchors.map((a) => a.referenceImageUrl);
+    const locationUrls = worldRefs.filter((w) => w.kind === 'location').map((w) => w.url);
+    const locationNames = worldRefs.filter((w) => w.kind === 'location').map((w) => w.name);
+    const buildingUrls = worldRefs.filter((w) => w.kind === 'building').map((w) => w.url);
+    const buildingNames = worldRefs.filter((w) => w.kind === 'building').map((w) => w.name);
+    const propUrls = worldRefs.filter((w) => w.kind === 'prop').map((w) => w.url);
+    const propNames = worldRefs.filter((w) => w.kind === 'prop').map((w) => w.name);
     // 60s race timeout — protects the UI if the edge worker dies before
     // returning. The edge function itself has a 45s internal timeout, so this
     // is just an extra safety net.
@@ -104,6 +203,12 @@ export async function prepareSceneAnchor(
         scenePrompt: scenePromptForCompose,
         aspectRatio,
         shotType: scene.characterShot?.shotType,
+        locationUrls,
+        locationNames,
+        buildingUrls,
+        buildingNames,
+        propUrls,
+        propNames,
       },
     });
     const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
@@ -121,12 +226,13 @@ export async function prepareSceneAnchor(
         anchors,
         composed: true,
         isMulti,
+        worldRefs,
       };
     }
     console.warn(`[prepareSceneAnchor] compose returned no url for ${scene.id}, falling back to text-only`);
-    return { anchor: primary, anchors, composed: false, isMulti };
+    return { anchor: primary, anchors, composed: false, isMulti, worldRefs };
   } catch (e) {
     console.error(`[prepareSceneAnchor] compose failed for ${scene.id}, text-only fallback`, e);
-    return { anchor: primary, anchors, composed: false, isMulti };
+    return { anchor: primary, anchors, composed: false, isMulti, worldRefs };
   }
 }
