@@ -933,68 +933,21 @@ serve(async (req) => {
           `cached=${plateFaceMap?.cached ?? false}`,
         );
 
-        // v51.1 — Fail-fast for 3+ speaker scenes when plate detection failed.
-        // Dispatching with anchor-rescaled boxes is what produced the
-        // "Lip-Sync abgebrochen / An unknown error occurred" loop on
-        // shoulder-to-shoulder dialog plates. Refund + clear message
-        // instead of burning credits and minutes.
-        if (!usePlateDetection && speakers.length >= 3) {
-          const alreadyRefundedFF = !!(v41PrevState as any)?.refunded;
-          if (!alreadyRefundedFF) {
-            try {
-              const { data: wFF } = await supabase
-                .from("wallets").select("balance").eq("user_id", userId).single();
-              await supabase
-                .from("wallets")
-                .update({
-                  balance: Number(wFF?.balance ?? 0) + Number(v47Cost),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", userId);
-            } catch (e) {
-              console.warn(`[compose-dialog-segments] scene=${sceneId} v51 fail-fast refund failed: ${(e as Error)?.message}`);
-            }
-          }
-          const failMsg = "Gesichter konnten im fertigen Clip nicht zuverlässig erkannt werden — bitte Szene-Plate neu rendern oder Anzahl Sprecher reduzieren.";
-          await supabase
-            .from("composer_scenes")
-            .update({
-              dialog_shots: {
-                ...(v41PrevState ?? {}),
-                version: 51,
-                engine: "sync-official-segments-v51",
-                asd_mode: "bounding_boxes_per_segment",
-                status: "failed",
-                model: "lipsync-2-pro",
-                cost_credits: Number(v47Cost),
-                refunded: !alreadyRefundedFF,
-                error: `v51_plate_face_detect_failed: ${failMsg}`,
-                last_error_class: "plate_face_detect_failed",
-                plate_faces_detected: plateFaceMap?.faces.length ?? 0,
-                finished_at: new Date().toISOString(),
-              },
-              lip_sync_status: "failed",
-              twoshot_stage: "failed",
-              clip_error: `v51_plate_face_detect_failed:${plateFaceMap?.faces.length ?? 0}_of_${speakers.length}`,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", sceneId);
-          await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v51",
-            sync_source_kind: "v51_plate_detect", video_url: sourceClipUrl,
-            sync_status: "PREFLIGHT_BLOCKED",
-            error_class: "plate_face_detect_failed",
-            error_message: failMsg,
-            meta: {
-              plate_faces: plateFaceMap?.faces.length ?? 0,
-              expected_speakers: speakers.length,
-              refunded: !alreadyRefundedFF ? v47Cost : 0,
-            },
-          });
-          return json({ error: "plate_face_detect_failed", details: failMsg, refunded: alreadyRefundedFF ? 0 : v47Cost }, 422);
+        // v51.2 — Soft fallback when plate detection fails.
+        // Anchor-rescaled boxes on shoulder-to-shoulder 3+ speaker plates
+        // landed on empty background pixels and triggered Sync.so's opaque
+        // "unknown error" loop (motionless lips → 13-min wait → failure).
+        // Falling all segments back to Sync.so's own `auto_detect` (no
+        // optionsOverride) is the v49 behaviour that reliably COMPLETED —
+        // it can occasionally swap which speaker animates, but the user
+        // gets a working lip-synced video instead of a hard failure.
+        const forceAutoDetectFallback =
+          !usePlateDetection && speakers.length >= 3;
+        if (forceAutoDetectFallback) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v51 plate-detect unavailable → AUTO_DETECT fallback (no per-segment bounding_boxes, Sync.so picks faces itself)`,
+          );
         }
-
-
 
         // Pre-compute left-to-right ordering of ANCHOR faces (fallback chain).
         const fmFacesByX = [...fmFacesAll]
@@ -1004,6 +957,8 @@ serve(async (req) => {
             const bx = (Number(b.bbox[0]) + Number(b.bbox[2])) / 2;
             return ax - bx;
           });
+
+
 
         const boxForSpeaker = (speakerIdx: number, characterId: string | null): [number, number, number, number] | null => {
           // PRIMARY: plate-side detected faces, mapped by left-to-right slot.
