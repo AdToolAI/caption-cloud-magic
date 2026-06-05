@@ -1014,10 +1014,18 @@ serve(async (req) => {
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
             const frameNumber = Math.max(0, Math.round(s * V50_FPS));
+            // v55 — `audioInput.startTime/endTime` is a crop INSIDE the
+            // referenced audio file (Sync.so docs/developer-guides/segments).
+            // Each speaker has their own short WAV (e.g. 0.88s, 2.27s, 2.97s),
+            // so passing global scene-timeline seconds (e.g. 2.479–3.454)
+            // points outside the WAV and triggered the opaque
+            // "An unknown error occurred." failure. Send `refId` only — the
+            // segment's own `startTime/endTime` already places it on the
+            // video timeline; `sync_mode: "cut_off"` handles length mismatch.
             const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
-              audioInput: { refId, startTime: s, endTime: e },
+              audioInput: { refId },
               // Per Sync.so docs (developer-guides/speaker-selection),
               // the four ASD variants are mutually exclusive. Manual
               // point selection (`frame_number` + `coordinates`) is the
