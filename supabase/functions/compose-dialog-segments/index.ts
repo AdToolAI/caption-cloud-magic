@@ -827,6 +827,8 @@ serve(async (req) => {
     // never re-enter the sync-3 segments[] path on a subsequent retry, even
     // if the per-pass state lost the `force_multipass` flag. The attempted
     // marker is sticky.
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.2)
+    // Do NOT relax any of these clauses without updating FROZEN-INVARIANTS.md.
     let useV41Official =
       !forceMultipass &&
       !stateForcesMultipass &&
@@ -2254,6 +2256,7 @@ serve(async (req) => {
     // pass-level retry cannot accidentally fall back into the broken
     // sync-3 segments[] path. Source of truth is the body flag OR any
     // previously-stored marker on the scene state.
+    // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.3)
     const prevForceMultipass =
       (prevState as any)?.force_multipass === true ||
       (existing as any)?.force_multipass === true;
@@ -2262,6 +2265,16 @@ serve(async (req) => {
       (existing as any)?.multipass_fallback_attempted === true;
     const carryForceMultipass = forceMultipass || prevForceMultipass;
     const carryMultipassAttempted = forceMultipass || prevMultipassAttempted;
+    // Soft-log invariant guard: if prev state had a marker but neither the
+    // carry nor the body flag would re-emit it, that is a regression.
+    if (
+      (prevForceMultipass && !carryForceMultipass) ||
+      (prevMultipassAttempted && !carryMultipassAttempted)
+    ) {
+      console.error(
+        `INVARIANT_VIOLATION_v59_state_carryover scene=${sceneId} prevForce=${prevForceMultipass} prevAttempted=${prevMultipassAttempted} carryForce=${carryForceMultipass} carryAttempted=${carryMultipassAttempted} — see FROZEN-INVARIANTS.md I.3`,
+      );
+    }
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",

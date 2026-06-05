@@ -34,6 +34,9 @@ export interface CastValidationResult {
   offenders?: string[];
 }
 
+// FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.6)
+// Do NOT raise without a dedicated N=5 hardening pass (multi-portrait
+// Nano Banana 2 composition + ASD face-map confidence drop above 4 faces).
 const MAX_SPEAKERS = 4;
 
 function turnsOf(sp: CastSpeakerLike): Array<[number, number]> {
