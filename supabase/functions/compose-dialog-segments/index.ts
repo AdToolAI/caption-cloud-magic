@@ -856,22 +856,31 @@ serve(async (req) => {
         }
       }
 
-      // Build inputs: 1 video + N audio (one per speaker with track_url).
+      // v56 — Build inputs with a SINGLE master-dialog audio (Sync.so docs
+      // pattern "Single audio + multiple segments"). audioInput.startTime/
+      // endTime then legitimately crops the master timeline per segment.
+      // Per-speaker WAVs are kept for diagnostics only; they are NOT shipped
+      // to Sync.so anymore because (a) the audio crop ranges we want are
+      // scene-timeline ranges, which only make sense inside the master WAV,
+      // and (b) Sync-3 has been returning opaque "An unknown error occurred."
+      // on payloads with multiple short per-speaker WAVs.
       type V41Input =
         | { type: "video"; url: string }
         | { type: "audio"; url: string; refId: string };
-      const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
+      const MASTER_AUDIO_REF = "dialog_master";
+      const v41Inputs: V41Input[] = [
+        { type: "video", url: sourceClipUrl },
+        { type: "audio", url: masterAudioUrl, refId: MASTER_AUDIO_REF },
+      ];
 
       const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
       speakers.forEach((sp, idx) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
-        const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         v41SpeakerRefs.push({
           idx,
-          refId,
+          refId: MASTER_AUDIO_REF, // every segment crops the same master
           audioUrl,
           coords,
           name: String(sp.speaker ?? `Speaker ${idx + 1}`),
