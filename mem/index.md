@@ -15,7 +15,7 @@ Updated: today
 - **Data Persistence**: Video creations go to 'video_creations' table; other media to 'content_items'.
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
-- **Lip-Sync Pipeline (v48 canonical)**: Single active 3+ speaker path = `compose-dialog-scene` → `compose-dialog-segments` (v5 multi-pass, one Sync.so call per speaker, chained) → `sync-so-webhook` → `render-sync-segments-audio-mux`. Official Sync.so single-call segments + bounding_boxes is STRUCTURALLY broken with `lipsync-2-pro` (proven repeatedly) — do not try to replace v5 multi-pass with it. Legacy two-shot stack deleted. See `mem://architecture/lipsync/v48-cleanup`.
+- **Lip-Sync Pipeline (v51 canonical)**: 3+ speaker path = `compose-dialog-scene` → `compose-dialog-segments` (single Sync.so call, `lipsync-2-pro` + per-segment `bounding_boxes` detected on the rendered plate via Gemini Vision, cached in `plate_face_cache`) → `sync-so-webhook` → `render-sync-segments-audio-mux`. Fallback chain: plate-detect → anchor-rescale (v50) → Sync.so `auto_detect`. Engine `sync-official-segments-v51`, webhook accepts v41..v51. See `mem://architecture/lipsync/v51-plate-side-face-detection`.
 
 ## Memories
 - [Lip-Sync Cleanup v48 (current)](mem://architecture/lipsync/v48-cleanup) — Single canonical pipeline, legacy two-shot deleted, partial-mux race fixed in COMPLETED webhook branch
