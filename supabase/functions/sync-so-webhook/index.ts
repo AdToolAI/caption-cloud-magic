@@ -140,6 +140,15 @@ function terminalV5Counts(passes: any[]) {
   return { doneCount, failedCount, allTerminal: doneCount + failedCount >= passes.length };
 }
 
+function hasSegmentAudioInputCrop(state: any): boolean {
+  const segments = Array.isArray(state?.segments) ? state.segments : [];
+  return segments.some((seg: any) => {
+    const audioInput = seg?.audioInput ?? {};
+    return Object.prototype.hasOwnProperty.call(audioInput, "startTime") ||
+      Object.prototype.hasOwnProperty.call(audioInput, "endTime");
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
