@@ -1029,30 +1029,29 @@ serve(async (req) => {
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
             const frameNumber = Math.max(0, Math.round(s * V50_FPS));
-            // v55 — `audioInput.startTime/endTime` is a crop INSIDE the
-            // referenced audio file (Sync.so docs/developer-guides/segments).
-            // Each speaker has their own short WAV (e.g. 0.88s, 2.27s, 2.97s),
-            // so passing global scene-timeline seconds (e.g. 2.479–3.454)
-            // points outside the WAV and triggered the opaque
-            // "An unknown error occurred." failure. Send `refId` only — the
-            // segment's own `startTime/endTime` already places it on the
-            // video timeline; `sync_mode: "cut_off"` handles length mismatch.
+            // v56 — Master-audio crop. `audioInput.startTime/endTime` now
+            // refer to the master dialog WAV which spans the full scene
+            // timeline (compose-twoshot-audio guarantees this), so the crop
+            // is finally relative to a valid audio file. Per-segment ASD
+            // sends only `frame_number + coordinates` (Sync.so docs
+            // /developer-guides/segments — example "Multi-Speaker Segments
+            // with Active Speaker Detection"); `auto_detect` defaults to
+            // false and must not be set alongside the manual point variant
+            // (the four ASD variants are mutually exclusive per
+            // /developer-guides/speaker-selection).
             const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
-              audioInput: { refId },
-              // Per Sync.so docs (developer-guides/speaker-selection),
-              // the four ASD variants are mutually exclusive. Manual
-              // point selection (`frame_number` + `coordinates`) is the
-              // recommended deterministic mode for multi-person clips.
-              optionsOverride: {
+              audioInput: { refId, startTime: s, endTime: e },
+            };
+            if (!retryNoAsd) {
+              seg.optionsOverride = {
                 active_speaker_detection: {
-                  auto_detect: false,
                   frame_number: frameNumber,
                   coordinates: point,
                 },
-              },
-            };
+              };
+            }
             v41Segments.push(seg);
           }
           console.log(
