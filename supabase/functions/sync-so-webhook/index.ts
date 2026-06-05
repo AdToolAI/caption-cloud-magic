@@ -506,8 +506,27 @@ serve(async (req) => {
       (state as any).asd_mode === "manual_point_minimal";
     const wantV56NoAsdRetry =
       isV56Manual && !isMultiSpeaker && retryCount < MAX_V41_RETRIES && !(state as any).retry_no_asd_attempted;
+    // v58 — Multi-speaker fallback. When the v56 single-call segments[]
+    // dispatch fails on a 3+ speaker scene with the opaque Sync.so
+    // `provider_unknown_error` (no error_code), there is no payload tweak
+    // that helps — Sync.so's segments[] pipeline is documented only for
+    // lipsync-2 and silently rejects this shape under sync-3 for some
+    // plates. Instead of wasting the retry slot re-sending the same payload
+    // we fall back to the proven per-speaker chained pipeline (v5 fan-out):
+    // one Sync.so call per speaker, each with single-coord ASD, output of
+    // pass N is the video input of pass N+1. This is what worked for 1-2
+    // speaker scenes for months.
+    const isProviderUnknown =
+      codeBucket === "unknown" &&
+      (errClass === "provider_unknown_error" || errClass === "unknown");
+    const wantMultipassFallback =
+      isV56Manual &&
+      isMultiSpeaker &&
+      isProviderUnknown &&
+      !(state as any).multipass_fallback_attempted;
     const canRetry =
       wantV56NoAsdRetry ||
+      wantMultipassFallback ||
       (codeBucket !== "fail_fast" && isTransient && retryCount < MAX_V41_RETRIES);
 
     try {
@@ -527,6 +546,71 @@ serve(async (req) => {
     } catch { /* ignore log errors */ }
 
     if (canRetry) {
+      // v58 multipass fallback path — refund first, then re-dispatch FRESH
+      // with `force_multipass: true` so compose-dialog-segments takes the
+      // v5 per-speaker chained pipeline (it will re-debit). This is NOT a
+      // same-payload retry; it changes the dispatch shape entirely.
+      if (wantMultipassFallback) {
+        const cost = Number((state as any).cost_credits ?? 0);
+        const alreadyRefunded = !!(state as any).refunded;
+        if (cost > 0 && !alreadyRefunded) {
+          try {
+            const { data: row } = await supabase
+              .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+            const { data: proj } = await supabase
+              .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+            const uid = (proj as any)?.user_id;
+            if (uid) {
+              const { data: w } = await supabase
+                .from("wallets").select("balance").eq("user_id", uid).single();
+              await supabase
+                .from("wallets")
+                .update({ balance: Number((w as any)?.balance ?? 0) + cost, updated_at: nowIso })
+                .eq("user_id", uid);
+            }
+          } catch (e) {
+            console.warn(`[sync-so-webhook] v58 scene=${sceneId} refund-before-fallback failed: ${(e as Error).message}`);
+          }
+        }
+        await supabase
+          .from("composer_scenes")
+          .update({
+            dialog_shots: {
+              // wipe v56 single-call state — fresh fan-out run owns this scene now
+              version: 58,
+              engine: "sync-multipass-fallback-v58",
+              status: "queued",
+              force_multipass: true,
+              multipass_fallback_attempted: true,
+              multipass_fallback_reason: "sync3_segments_provider_unknown_error",
+              previous_engine: (state as any).engine ?? null,
+              previous_model: (state as any).model ?? null,
+              previous_error: rawErr.slice(0, 200),
+              previous_error_code: errorCode ?? null,
+              refunded: true,
+              cost_credits: 0,
+              source_clip_url: (state as any).source_clip_url ?? null,
+              started_at: nowIso,
+              first_started_at: (state as any).first_started_at ?? nowIso,
+            },
+            lip_sync_status: "running",
+            twoshot_stage: "syncso_v58_multipass_fallback",
+            replicate_prediction_id: null,
+            clip_error: null,
+            updated_at: nowIso,
+          })
+          .eq("id", sceneId);
+        console.warn(
+          `[sync-so-webhook] v58 scene=${sceneId} ${status} code=${errorCode ?? "null"} → MULTIPASS FALLBACK (refunded=${cost})`,
+        );
+        fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+          body: JSON.stringify({ scene_id: sceneId, force_multipass: true }),
+        }).catch(() => {});
+        return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, fallback: "multipass" });
+      }
+
       const prevPad = Number((state as any).bbox_pad_factor);
       const nextPad = Math.min(
         0.35,
