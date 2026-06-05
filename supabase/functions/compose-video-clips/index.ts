@@ -625,7 +625,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
