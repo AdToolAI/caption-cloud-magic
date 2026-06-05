@@ -361,7 +361,7 @@ serve(async (req) => {
 
   // ── v41: Official Sync.so Multi-Speaker Segments (single-call) ────────
   // 1 generation owns the whole scene. Webhook output IS the final clip.
-  if (((state as any).version === 41 || (state as any).version === 42 || (state as any).version === 43 || (state as any).version === 44 || (state as any).version === 45 || (state as any).version === 46 || (state as any).version === 47 || (state as any).version === 48 || (state as any).version === 49 || (state as any).version === 50 || (state as any).version === 51 || (state as any).version === 52) && ((state as any).engine === "sync-official-segments" || (state as any).engine === "sync-official-segments-v50" || (state as any).engine === "sync-official-segments-v51" || (state as any).engine === "sync-official-segments-v52")) {
+  if (((state as any).version === 41 || (state as any).version === 42 || (state as any).version === 43 || (state as any).version === 44 || (state as any).version === 45 || (state as any).version === 46 || (state as any).version === 47 || (state as any).version === 48 || (state as any).version === 49 || (state as any).version === 50 || (state as any).version === 51 || (state as any).version === 52 || (state as any).version === 55) && ((state as any).engine === "sync-official-segments" || (state as any).engine === "sync-official-segments-v50" || (state as any).engine === "sync-official-segments-v51" || (state as any).engine === "sync-official-segments-v52" || (state as any).engine === "sync-official-segments-v55")) {
     if ((state as any).sync_job_id !== jobId) {
       console.warn(`[sync-so-webhook] v41 scene=${sceneId} job=${jobId} ORPHAN (state.sync_job_id=${(state as any).sync_job_id ?? "null"}) — cleaning up`);
       try { await releaseInflightSyncJob(supabase, jobId); } catch { /* ignore */ }
@@ -373,6 +373,54 @@ serve(async (req) => {
         }).catch(() => { /* best-effort */ });
       }
       return ok({ ok: true, skipped: "v41_job_orphan", job_id: jobId });
+    }
+
+    if (status !== "COMPLETED" && hasSegmentAudioInputCrop(state)) {
+      const cost = Number((state as any).cost_credits ?? 0);
+      const alreadyRefunded = !!(state as any).refunded;
+      if (cost > 0 && !alreadyRefunded) {
+        const { data: row } = await supabase
+          .from("composer_scenes").select("project_id").eq("id", sceneId).single();
+        const { data: proj } = await supabase
+          .from("composer_projects").select("user_id").eq("id", (row as any)?.project_id).single();
+        const uid = (proj as any)?.user_id;
+        if (uid) {
+          const { data: w } = await supabase
+            .from("wallets").select("balance").eq("user_id", uid).single();
+          await supabase
+            .from("wallets")
+            .update({ balance: Number((w as any)?.balance ?? 0) + cost, updated_at: nowIso })
+            .eq("user_id", uid);
+        }
+      }
+      const reason = "stale_payload_audio_crop: old Sync.so job used audioInput.startTime/endTime";
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(state as any),
+            status: "failed",
+            finished_at: nowIso,
+            refunded: cost > 0,
+            error: reason,
+            last_error_class: "stale_payload_audio_crop",
+            sync_error_code: errorCode ?? null,
+            sync_error_bucket: "stale_payload",
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed_stale_payload_audio_crop",
+          clip_error: reason,
+          updated_at: nowIso,
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, job_id: jobId, engine: String((state as any).engine ?? "sync-official-segments"),
+        sync_status: status, http_status: 200,
+        error_class: "stale_payload_audio_crop", error_message: reason,
+        meta: { sync_error_code: errorCode ?? null, webhook_payload: payload, audio_input_mode: "legacy_crop_rejected" },
+      });
+      console.warn(`[sync-so-webhook] scene=${sceneId} job=${jobId} stale_payload_audio_crop → FAILED refunded=${cost > 0 && !alreadyRefunded ? cost : 0}`);
+      return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, failed: true, stale_payload_audio_crop: true });
     }
 
     if (status === "COMPLETED" && outputUrl) {
