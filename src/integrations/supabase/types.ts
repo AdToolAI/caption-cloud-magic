@@ -9473,6 +9473,42 @@ export type Database = {
         }
         Relationships: []
       }
+      plate_face_cache: {
+        Row: {
+          created_at: string
+          detector: string
+          expires_at: string
+          faces: Json
+          frame_url: string | null
+          height: number
+          plate_url: string
+          plate_url_hash: string
+          width: number
+        }
+        Insert: {
+          created_at?: string
+          detector?: string
+          expires_at?: string
+          faces?: Json
+          frame_url?: string | null
+          height: number
+          plate_url: string
+          plate_url_hash: string
+          width: number
+        }
+        Update: {
+          created_at?: string
+          detector?: string
+          expires_at?: string
+          faces?: Json
+          frame_url?: string | null
+          height?: number
+          plate_url?: string
+          plate_url_hash?: string
+          width?: number
+        }
+        Relationships: []
+      }
       platform_announcements: {
         Row: {
           author_id: string
