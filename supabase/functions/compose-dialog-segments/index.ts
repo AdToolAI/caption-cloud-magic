@@ -822,14 +822,20 @@ serve(async (req) => {
     // even for 3+ speaker scenes. Used by sync-so-webhook to fall back when
     // the v56 segments[] call returns the opaque Sync.so unknown error.
     const stateForcesMultipass = (existing as any)?.force_multipass === true;
+    const stateMultipassAttempted = (existing as any)?.multipass_fallback_attempted === true;
+    // v59 — Once the v58 multipass fallback has fired for this scene, we MUST
+    // never re-enter the sync-3 segments[] path on a subsequent retry, even
+    // if the per-pass state lost the `force_multipass` flag. The attempted
+    // marker is sticky.
     let useV41Official =
       !forceMultipass &&
       !stateForcesMultipass &&
+      !stateMultipassAttempted &&
       speakers.length >= 3 &&
       (isV41Retry || !isAdvance);
-    if ((forceMultipass || stateForcesMultipass) && speakers.length >= 3) {
+    if ((forceMultipass || stateForcesMultipass || stateMultipassAttempted) && speakers.length >= 3) {
       console.warn(
-        `[compose-dialog-segments] scene=${sceneId} v58 FORCE_MULTIPASS active — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
+        `[compose-dialog-segments] scene=${sceneId} v58/v59 FORCE_MULTIPASS active (force=${forceMultipass} state=${stateForcesMultipass} attempted=${stateMultipassAttempted}) — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
       );
     }
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55 || (existing as any)?.version === 56) ? (existing as any) : null;
