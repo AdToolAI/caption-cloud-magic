@@ -267,6 +267,12 @@ serve(async (req) => {
     // v41 — single-call official Sync.so segments retry path (no re-charge,
     // bypasses v5 fan-out, re-dispatches the canonical segments[] payload).
     const isV41Retry = body?.retry_v41 === true;
+    // v56 — retry without manual ASD (drop optionsOverride.active_speaker_detection)
+    // so Sync.so picks the active speaker automatically per segment. Triggered
+    // by sync-so-webhook when the v56 manual-point dispatch returns the opaque
+    // "An unknown error occurred." (often caused by anchor-derived coords that
+    // sit off-face on the actual Hailuo plate).
+    const retryNoAsd = body?.retry_no_asd === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
@@ -274,7 +280,7 @@ serve(async (req) => {
       console.log(`[compose-dialog-segments] scene=${sceneId} repair_audio=true (audio re-encode requested by webhook)`);
     }
     if (isV41Retry) {
-      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch)`);
+      console.log(`[compose-dialog-segments] scene=${sceneId} v41_retry=true (single-call segments re-dispatch, no_asd=${retryNoAsd})`);
     }
 
     // ── v33: strict single-flight lock ───────────────────────────────────
@@ -437,7 +443,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45 || (existing as any).version === 46 || (existing as any).version === 47 || (existing as any).version === 48 || (existing as any).version === 49 || (existing as any).version === 50 || (existing as any).version === 51 || (existing as any).version === 52
+        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45 || (existing as any).version === 46 || (existing as any).version === 47 || (existing as any).version === 48 || (existing as any).version === 49 || (existing as any).version === 50 || (existing as any).version === 51 || (existing as any).version === 52 || (existing as any).version === 55 || (existing as any).version === 56
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -804,7 +810,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55 || (existing as any)?.version === 56) ? (existing as any) : null;
 
     // ── v49 face-gate REMOVED (2026-06-05) ──────────────────────────────
     // The v49 payload no longer uses per-segment ASD coordinates (see the
@@ -850,22 +856,31 @@ serve(async (req) => {
         }
       }
 
-      // Build inputs: 1 video + N audio (one per speaker with track_url).
+      // v56 — Build inputs with a SINGLE master-dialog audio (Sync.so docs
+      // pattern "Single audio + multiple segments"). audioInput.startTime/
+      // endTime then legitimately crops the master timeline per segment.
+      // Per-speaker WAVs are kept for diagnostics only; they are NOT shipped
+      // to Sync.so anymore because (a) the audio crop ranges we want are
+      // scene-timeline ranges, which only make sense inside the master WAV,
+      // and (b) Sync-3 has been returning opaque "An unknown error occurred."
+      // on payloads with multiple short per-speaker WAVs.
       type V41Input =
         | { type: "video"; url: string }
         | { type: "audio"; url: string; refId: string };
-      const v41Inputs: V41Input[] = [{ type: "video", url: sourceClipUrl }];
+      const MASTER_AUDIO_REF = "dialog_master";
+      const v41Inputs: V41Input[] = [
+        { type: "video", url: sourceClipUrl },
+        { type: "audio", url: masterAudioUrl, refId: MASTER_AUDIO_REF },
+      ];
 
       const v41SpeakerRefs: Array<{ idx: number; refId: string; audioUrl: string; coords: [number, number] | null; name: string; characterId: string | null }> = [];
       speakers.forEach((sp, idx) => {
         const audioUrl = String(sp.track_url ?? "").trim();
         if (!audioUrl) return;
-        const refId = `speaker_${idx + 1}`;
-        v41Inputs.push({ type: "audio", url: audioUrl, refId });
         const coords = clampSyncCoords(speakerCoords[idx]) ?? null;
         v41SpeakerRefs.push({
           idx,
-          refId,
+          refId: MASTER_AUDIO_REF, // every segment crops the same master
           audioUrl,
           coords,
           name: String(sp.speaker ?? `Speaker ${idx + 1}`),
@@ -1014,30 +1029,29 @@ serve(async (req) => {
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
             const frameNumber = Math.max(0, Math.round(s * V50_FPS));
-            // v55 — `audioInput.startTime/endTime` is a crop INSIDE the
-            // referenced audio file (Sync.so docs/developer-guides/segments).
-            // Each speaker has their own short WAV (e.g. 0.88s, 2.27s, 2.97s),
-            // so passing global scene-timeline seconds (e.g. 2.479–3.454)
-            // points outside the WAV and triggered the opaque
-            // "An unknown error occurred." failure. Send `refId` only — the
-            // segment's own `startTime/endTime` already places it on the
-            // video timeline; `sync_mode: "cut_off"` handles length mismatch.
+            // v56 — Master-audio crop. `audioInput.startTime/endTime` now
+            // refer to the master dialog WAV which spans the full scene
+            // timeline (compose-twoshot-audio guarantees this), so the crop
+            // is finally relative to a valid audio file. Per-segment ASD
+            // sends only `frame_number + coordinates` (Sync.so docs
+            // /developer-guides/segments — example "Multi-Speaker Segments
+            // with Active Speaker Detection"); `auto_detect` defaults to
+            // false and must not be set alongside the manual point variant
+            // (the four ASD variants are mutually exclusive per
+            // /developer-guides/speaker-selection).
             const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
-              audioInput: { refId },
-              // Per Sync.so docs (developer-guides/speaker-selection),
-              // the four ASD variants are mutually exclusive. Manual
-              // point selection (`frame_number` + `coordinates`) is the
-              // recommended deterministic mode for multi-person clips.
-              optionsOverride: {
+              audioInput: { refId, startTime: s, endTime: e },
+            };
+            if (!retryNoAsd) {
+              seg.optionsOverride = {
                 active_speaker_detection: {
-                  auto_detect: false,
                   frame_number: frameNumber,
                   coordinates: point,
                 },
-              },
-            };
+              };
+            }
             v41Segments.push(seg);
           }
           console.log(
@@ -1059,79 +1073,42 @@ serve(async (req) => {
         }
 
         // Pre-dispatch validation: every segment refId must exist in inputs.
+        // v56: `audioInput.startTime/endTime` is now legitimate — the input
+        // audio is the master dialog WAV spanning the full scene timeline,
+        // so the crop is doc-conform (Sync.so /developer-guides/segments
+        // example "Multi-Speaker Segments with Active Speaker Detection").
         const inputRefSet = new Set(
           v41Inputs.filter((i) => i.type === "audio").map((i: any) => i.refId),
         );
         for (const seg of v41Segments) {
           const refId = (seg as any).audioInput?.refId;
-          const hasForbiddenCrop =
-            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "startTime") ||
-            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "endTime");
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
-              `[compose-dialog-segments] scene=${sceneId} v50 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
+              `[compose-dialog-segments] scene=${sceneId} v56 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
             );
             await supabase
               .from("composer_scenes")
-              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v50_segment_refid_missing" })
+              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v56_segment_refid_missing" })
               .eq("id", sceneId);
-            return json({ error: "v50_segment_refid_missing", refId }, 422);
-          }
-          if (hasForbiddenCrop) {
-            console.error(`[compose-dialog-segments] scene=${sceneId} v55 forbidden audioInput crop detected before dispatch refId=${refId}`);
-            const cropAlreadyRefunded = !!(v41PrevState as any)?.refunded;
-            if (!cropAlreadyRefunded) {
-              const { data: wCrop } = await supabase
-                .from("wallets").select("balance").eq("user_id", userId).single();
-              await supabase
-                .from("wallets")
-                .update({
-                  balance: Number(wCrop?.balance ?? 0) + Number(v41PrevState?.cost_credits ?? v47Cost),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", userId);
-            }
-            await supabase
-              .from("composer_scenes")
-              .update({
-                lip_sync_status: "failed",
-                twoshot_stage: "failed",
-                clip_error: "segment_audio_input_crop_forbidden",
-                dialog_shots: {
-                  ...(v41PrevState ?? {}),
-                  version: 55,
-                  engine: "sync-official-segments-v55",
-                  status: "failed",
-                  audio_input_mode: "invalid_crop_blocked",
-                  error: "segment_audio_input_crop_forbidden",
-                  refunded: true,
-                  finished_at: new Date().toISOString(),
-                },
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", sceneId);
-            return json({ error: "segment_audio_input_crop_forbidden", refId }, 422);
+            return json({ error: "v56_segment_refid_missing", refId }, 422);
           }
         }
 
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v54 — Switch the official Sync.so multi-speaker segments dispatch
-        // from `lipsync-2-pro` to `sync-3`. lipsync-2-pro needs natural
-        // speaking motion in the plate (Sync.so docs/models/lipsync) and
-        // returned opaque "An unknown error occurred." on our static 3+
-        // person Hailuo plates. sync-3 is Sync.so's recommended model for
-        // multi-person / static / occluded shots, accepts the same
-        // `segments[]` + per-segment `optionsOverride.active_speaker_detection`
-        // shape (Sync.so docs/developer-guides/segments + speaker-selection),
-        // and can open silent lips. `temperature` and
-        // `occlusion_detection_enabled` are intentionally omitted — sync-3
-        // manages both natively and ignores them otherwise.
+        // v56 — Master-audio + per-segment crop. Model stays sync-3
+        // (multi-person / static / occluded shots per Sync.so docs).
+        // First attempt sends per-segment manual ASD point. On opaque
+        // failure the webhook re-dispatches with `retry_no_asd: true`
+        // which drops `optionsOverride.active_speaker_detection` so
+        // Sync-3 picks the active speaker automatically.
         const V50_MODEL = "sync-3";
-        const V55_ENGINE = "sync-official-segments-v55";
-        const segmentsWithBox = v41Segments.length; // every v54 segment carries a point
-        const segmentsAutoFallback = 0;
+        const V55_ENGINE = "sync-official-segments-v56";
+        const ASD_MODE = retryNoAsd ? "auto_asd_fallback" : "manual_point_minimal";
+        const AUDIO_INPUT_MODE = "master_audio_crop";
+        const segmentsWithBox = retryNoAsd ? 0 : v41Segments.length;
+        const segmentsAutoFallback = retryNoAsd ? v41Segments.length : 0;
         const v41Payload = {
           model: V50_MODEL,
           input: v41Inputs,
@@ -1141,8 +1118,8 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v55_official_segments_payload model=${V50_MODEL} asd=point_per_segment audio_input_mode=ref_only ` +
-          `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
+          `[compose-dialog-segments] scene=${sceneId} v56_official_segments_payload model=${V50_MODEL} asd=${ASD_MODE} audio_input_mode=${AUDIO_INPUT_MODE} ` +
+          `speakers=${v41SpeakerRefs.length} master_audio_url=${masterAudioUrl.slice(0, 80)} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
           `point_sources=${JSON.stringify(pointSourceCounts)} points=${JSON.stringify(v50BoxDiag)}`,
@@ -1177,32 +1154,32 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 55,
+                version: 56,
                 engine: V55_ENGINE,
-                asd_mode: "point_per_segment",
-                audio_input_mode: "ref_only",
+                asd_mode: ASD_MODE,
+                audio_input_mode: AUDIO_INPUT_MODE,
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
                 refunded: alreadyRefunded || (!isV41Retry && Number(v41PrevState?.cost_credits ?? v47Cost) > 0),
-                error: `v50_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v56_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v50_dispatch_${v41Resp.status}`,
+              clip_error: `v56_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
-            sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
+            sync_source_kind: "v56_master_audio_crop", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { audio_input_mode: "ref_only", payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { audio_input_mode: AUDIO_INPUT_MODE, asd_mode: ASD_MODE, payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, master_audio_url: masterAudioUrl } },
           });
-          return json({ error: "v50_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
+          return json({ error: "v56_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
 
         const v41Data = await v41Resp.json();
@@ -1224,14 +1201,15 @@ serve(async (req) => {
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 55,
+          version: 56,
           engine: V55_ENGINE,
-          asd_mode: "point_per_segment",
-          audio_input_mode: "ref_only",
+          asd_mode: ASD_MODE,
+          audio_input_mode: AUDIO_INPUT_MODE,
           status: "rendering",
           model: V50_MODEL,
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
+          master_audio_url: masterAudioUrl,
           total_sec: totalSec,
           segments: v41Segments,
           speaker_refs: v41SpeakerRefs,
@@ -1240,6 +1218,7 @@ serve(async (req) => {
           v50_segments_auto_fallback: segmentsAutoFallback,
           point_sources: pointSourceCounts,
           plate_detected: usePlateDetection,
+          retry_no_asd: retryNoAsd,
           cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
           refunded: false,
           retry_count: v41RetryCount,
@@ -1254,7 +1233,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v55_official_segments_ref_only",
+            twoshot_stage: `syncso_v56_${AUDIO_INPUT_MODE}_${ASD_MODE}`,
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1264,23 +1243,26 @@ serve(async (req) => {
 
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
-          job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
+          job_id: v41JobId, sync_source_kind: "v56_master_audio_crop",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
             model: V50_MODEL,
-            audio_input_mode: "ref_only",
+            audio_input_mode: AUDIO_INPUT_MODE,
+            asd_mode: ASD_MODE,
+            master_audio_url: masterAudioUrl,
             segments_count: v41Segments.length,
             segments_with_box: segmentsWithBox,
             segments_auto_fallback: segmentsAutoFallback,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
             box_map: v50BoxDiag,
-            input_refs: v41SpeakerRefs.map((s) => s.refId),
             is_retry: isV41Retry,
+            retry_no_asd: retryNoAsd,
             retry_count: v41RetryCount,
             plate: { width: plateW, height: plateH },
             facemap_faces: fmFacesAll.length,
+            plate_detected: usePlateDetection,
           },
         });
 
@@ -1292,7 +1274,8 @@ serve(async (req) => {
             sync_job_id: v41JobId,
             engine: V55_ENGINE,
             model: V50_MODEL,
-            audio_input_mode: "ref_only",
+            audio_input_mode: AUDIO_INPUT_MODE,
+            asd_mode: ASD_MODE,
             segments: v41Segments.length,
             segments_with_box: segmentsWithBox,
             speakers: v41SpeakerRefs.length,
