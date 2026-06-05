@@ -933,6 +933,22 @@ serve(async (req) => {
           `cached=${plateFaceMap?.cached ?? false}`,
         );
 
+        // v51.2 — Soft fallback when plate detection fails.
+        // Anchor-rescaled boxes on shoulder-to-shoulder 3+ speaker plates
+        // landed on empty background pixels and triggered Sync.so's opaque
+        // "unknown error" loop (motionless lips → 13-min wait → failure).
+        // Falling all segments back to Sync.so's own `auto_detect` (no
+        // optionsOverride) is the v49 behaviour that reliably COMPLETED —
+        // it can occasionally swap which speaker animates, but the user
+        // gets a working lip-synced video instead of a hard failure.
+        const forceAutoDetectFallback =
+          !usePlateDetection && speakers.length >= 3;
+        if (forceAutoDetectFallback) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v51 plate-detect unavailable → AUTO_DETECT fallback (no per-segment bounding_boxes, Sync.so picks faces itself)`,
+          );
+        }
+
         // Pre-compute left-to-right ordering of ANCHOR faces (fallback chain).
         const fmFacesByX = [...fmFacesAll]
           .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
@@ -941,6 +957,8 @@ serve(async (req) => {
             const bx = (Number(b.bbox[0]) + Number(b.bbox[2])) / 2;
             return ax - bx;
           });
+
+
 
         const boxForSpeaker = (speakerIdx: number, characterId: string | null): [number, number, number, number] | null => {
           // PRIMARY: plate-side detected faces, mapped by left-to-right slot.
@@ -961,6 +979,11 @@ serve(async (req) => {
               if (x2 > x1 + 4 && y2 > y1 + 4) return [x1, y1, x2, y2];
             }
           }
+          // v51.2 — when plate detection failed for a 3+ speaker scene,
+          // SUPPRESS anchor-rescale fallback entirely. The whole scene
+          // routes through Sync.so auto_detect, which is the only path
+          // proven to complete in this configuration.
+          if (forceAutoDetectFallback) return null;
           // FALLBACK: anchor face-map rescaled to plate (legacy v50 logic).
           const matched =
             (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) ||
@@ -1081,11 +1104,11 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v50_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v51_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} with_box=${segmentsWithBox} auto_fallback=${segmentsAutoFallback} ` +
           `totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} faces=${fmFacesAll.length} ` +
-          `boxes=${JSON.stringify(v50BoxDiag)}`,
+          `plate_detected=${usePlateDetection} boxes=${JSON.stringify(v50BoxDiag)}`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {

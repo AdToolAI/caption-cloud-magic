@@ -1,36 +1,49 @@
-# v50 Re-Render der zuletzt generierten Szene
+## Befund
 
-## Identifizierte Szene
+Der aktuell fehlgeschlagene Lip-Sync ist Scene `b4b40acc-c293-40fe-a40a-46b3ccd18242`.
 
-Letztes generiertes Dialog-Video (aus `composer_scenes` sortiert nach `updated_at`):
+Was passiert ist:
+- v51 wurde korrekt dispatcht: `engine=sync-official-segments-v51`, `version=51`.
+- Die neue Plate-Face-Erkennung wurde aber nicht wirklich genutzt.
+- Grund: `_shared/plate-face-detect.ts` ruft Replicate direkt über `lucataco/ffmpeg-extract-frame` auf; dieser Endpoint liefert aktuell `404`.
+- Dadurch fällt v51 zurück auf alte Anchor-Boxen (`plate_detect=fallback-anchor`). Genau dieser Fallback war der Grund für die vorherigen Motionless-Lips-/Unknown-Error-Probleme.
+- Sync.so hat danach zweimal mit `An unknown error occurred.` abgebrochen. Die 81 Credits wurden bereits automatisch refundiert.
 
-- **Scene-ID**: `57a28235-ccad-4400-8c75-fa168f18cc96`
-- **Project-ID**: `28384dfb-c0f2-48df-aa6d-5f9353ab7402`
-- **Letzter Render**: 2026-06-05 00:24 UTC (v49 — Speaker 3 Mund blieb zu)
+## Plan
 
-Das ist exakt die Szene, über die du gerade sprichst — sie wurde zuletzt mit v49 (`lipsync-2` + auto-ASD) gerendert und hat das beschriebene Problem.
+1. **Frame-Extraction in v51 reparieren**
+   - Den kaputten direkten Replicate-Endpoint in `_shared/plate-face-detect.ts` ersetzen.
+   - Stattdessen den stabileren Replicate SDK/Model-Flow verwenden, analog zu den vorhandenen Frame-Extractor-Funktionen.
+   - Zusätzlich beide Secret-Namen unterstützen: `REPLICATE_API_TOKEN` und `REPLICATE_API_KEY`.
+   - Wenn das alte `ffmpeg-extract-frame` nicht verfügbar ist, auf das verfügbare `lucataco/frame-extractor` ausweichen.
 
-## Schritte
+2. **v51 nicht mehr blind auf Anchor-Boxen zurückfallen lassen**
+   - Für 3+ Sprecher soll ein fehlgeschlagener Plate-Detect nicht automatisch mit alten Anchor-Boxen an Sync.so gehen.
+   - Besser: sauberer Preflight-Fail mit Refund und klarer Fehlermeldung, oder gezielter Fallback auf eine robustere Pipeline.
+   - Damit vermeiden wir „Sync.so unknown error“ und verbrannte Wartezeit.
 
-1. **Reset** Scene `57a28235-…` via Migration auf `clip_status = 'pending'`, `dialog_shots = []`, kein Refund nötig (idempotent über deterministische UUID, falls Sync.so noch was zurückmeldet).
-2. **Auto-Trigger** (`useTwoShotAutoTrigger`, 8s-Tick) nimmt die Szene automatisch auf und dispatcht v50:
-   - `model: lipsync-2-pro`
-   - `segments[]` mit per-Segment `optionsOverride.active_speaker_detection.bounding_boxes`
-   - Boxen aus `frame_face_cache` (Stage G) rescaled auf Plate-Space, Speaker→Box-Mapping über `characterId`/`slotIndex`/Left-to-Right-Fallback
-   - Speaker ohne erkannte Box → Auto-ASD-Fallback nur für dieses eine Segment
-3. **Monitoring**: Edge-Function-Logs `compose-dialog-segments` + `sync-so-webhook` mitlesen; Log-Marker `v50_official_segments_payload model=lipsync-2-pro asd=bounding_boxes_per_segment` muss erscheinen.
-4. **Visual-Check**: Sobald `clip_status = 'ready'` → Preview ansehen, ob Speaker 3 jetzt korrekt lippt und Qualität sichtbar besser ist.
+3. **Payload-Diagnostik verbessern**
+   - In `dialog_shots` speichern, ob Boxen wirklich `plate-detected` oder nur `anchor-*` waren.
+   - Den Log-Marker von `v50_official_segments_payload` auf v51 aktualisieren, damit Fehlersuche nicht mehr irreführend ist.
+   - Fehlertexte im UI verständlicher machen: z. B. „Gesichter konnten im fertigen Clip nicht zuverlässig erkannt werden“ statt nur „Lip-Sync abgebrochen“.
 
-## Erwartung
+4. **Fehlgeschlagene Scene neu starten**
+   - Scene `b4b40acc-c293-40fe-a40a-46b3ccd18242` nach dem Fix zurücksetzen.
+   - `lip_sync_status` wieder auf pending/running-ready setzen, alte `dialog_shots` bereinigen, ohne doppelt Credits zu ziehen.
+   - Danach den v51-Dispatch erneut starten.
 
-- **Speaker 3 spricht** → deterministisches Bounding-Box-Targeting löst das Auto-ASD-Problem.
-- **Schärfere Mundregion** → `lipsync-2-pro` statt `lipsync-2`.
-- **Kein 15-min-Timeout** mehr → v50 ist ein einziger Sync.so-Call (keine Fan-Out-Retries), Watchdog greift bei 8min.
+5. **Pipeline-Test durchführen**
+   - Edge-Function deployen.
+   - `compose-dialog-segments` direkt gegen die Scene testen.
+   - Logs prüfen auf:
+     - `plate_detect=ok`
+     - `plate_faces=3 expected=3`
+     - `source=plate-detected`
+     - Sync.so job accepted
+   - Danach Webhook/DB-Status prüfen, bis `lip_sync_status='applied'` oder ein sauberer, refundeter Fail-Fast-Grund vorliegt.
 
-## Fallback
+## Erwartetes Ergebnis
 
-Falls v50 fehlschlägt oder Speaker 3 immer noch nicht erkannt wird:
-- Logs prüfen: wieviele Boxen lieferte Stage G? (`v50_segments_with_box` vs `v50_segments_auto_fallback`)
-- Wenn <3 Boxen erkannt → Plate-Face-Detect Schwelle senken, oder Single-Speaker-Cinematic-Sync pro Turn als Fallback empfehlen (memo'd in `v50-pro-bounding-boxes.md`).
-
-Soll ich so durchziehen?
+Nach dem Fix darf v51 nicht mehr mit alten Anchor-Boxen in den Sync.so-Unknown-Error laufen. Entweder:
+- die Szene läuft mit echten Plate-Face-Boxen erfolgreich durch, oder
+- sie bricht vor Sync.so sauber ab, refundet automatisch und zeigt einen verständlichen Grund an.
