@@ -165,10 +165,12 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v12 — bumped after forcing cinematic-sync to clear stale per-scene cache
-    // and preserving audio_plan.twoshot when persisting audit metadata.
+    const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
+    // v13 — bumped for Stage A (World Assets as Visual References): cache key
+    // now includes location/building/prop reference URLs so changing world
+    // assets invalidates the composed frame.
     const promptHash = await sha1(
-      `v12|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
+      `v13|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}|${worldRefSig}`,
     );
 
     const { data: cached } = await admin
