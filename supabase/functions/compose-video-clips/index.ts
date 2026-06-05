@@ -351,7 +351,15 @@ serve(async (req) => {
     const NEGATIVE_PROMPT_I2V_EXTRA =
       ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
     const CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE =
-      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling";
+      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling" +
+      // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
+      // mid-clip camera cut or push-in when given a 3-shot start-frame plus
+      // a long dialog-style prompt. The downstream Sync.so dispatch then
+      // sees a different subject than the anchor coords describe and either
+      // maps the wrong speaker's audio onto the wrong face (auto-ASD) or
+      // returns an opaque "unknown error" (manual ASD). Hard-block every
+      // form of in-clip framing change for cinematic-sync master plates.
+      ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture";
     const POSITIVE_CLEAN_CUE =
       ", clean cinematic composition, natural environment";
     // Positive cue appended ONLY for i2v requests — biases the model toward
