@@ -2439,9 +2439,9 @@ serve(async (req) => {
       console.log(
         `[compose-dialog-segments] scene=${sceneId} FAN-OUT scheduled ${passes.length - 1} additional passes in parallel`,
       );
-    } else if (!isAdvance && !isRetry && passes.length > 2) {
+    } else if (!isAdvance && !isRetry && passes.length > 1) {
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers) — webhook will chain pass 2..N as pass 1..N-1 complete`,
+        `[compose-dialog-segments] scene=${sceneId} SERIAL mode (${passes.length} speakers, v60 unified) — webhook will chain pass 2..N as pass 1..N-1 complete`,
       );
     }
 
