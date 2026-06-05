@@ -16,8 +16,10 @@ Updated: today
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
 - **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
+- **Lip-Sync Multi-Speaker Model**: 3+ speaker official segments dispatch uses `sync-3`, NOT `lipsync-2-pro` (static plates → unknown error).
 
 ## Memories
+- [Lip-Sync v54 Sync-3 Official Segments](mem://architecture/lipsync/v54-sync3-official-segments) — Multi-speaker segments dispatch in compose-dialog-segments uses `sync-3`; no `temperature`/`occlusion_detection_enabled`
 - [Lip-Sync v53 Doc Compliance Fixes](mem://architecture/lipsync/v53-doc-compliance-fixes) — Sync.so payloads must omit undocumented `segments_secs`; silent speaker audio fails before provider dispatch
 - [Lip-Sync v51 Plate-Side Face Detection (superseded)](mem://architecture/lipsync/v51-plate-side-face-detection) — Gemini Vision on rendered plate + 30d `plate_face_cache`, fallback to v50 anchor-rescale then auto_detect
 - [Lip-Sync Cleanup v48](mem://architecture/lipsync/v48-cleanup) — historical pipeline cleanup, partial-mux race fix

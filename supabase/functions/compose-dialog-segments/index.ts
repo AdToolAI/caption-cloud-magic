@@ -1071,11 +1071,19 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v52 — Pro for fidelity + per-segment frame_number+coordinates
-        // (doc-conform POINT ASD). Replaces the malformed per-frame box
-        // payload from v50/v51.
-        const V50_MODEL = "lipsync-2-pro";
-        const segmentsWithBox = v41Segments.length; // every v52 segment carries a point
+        // v54 — Switch the official Sync.so multi-speaker segments dispatch
+        // from `lipsync-2-pro` to `sync-3`. lipsync-2-pro needs natural
+        // speaking motion in the plate (Sync.so docs/models/lipsync) and
+        // returned opaque "An unknown error occurred." on our static 3+
+        // person Hailuo plates. sync-3 is Sync.so's recommended model for
+        // multi-person / static / occluded shots, accepts the same
+        // `segments[]` + per-segment `optionsOverride.active_speaker_detection`
+        // shape (Sync.so docs/developer-guides/segments + speaker-selection),
+        // and can open silent lips. `temperature` and
+        // `occlusion_detection_enabled` are intentionally omitted — sync-3
+        // manages both natively and ignores them otherwise.
+        const V50_MODEL = "sync-3";
+        const segmentsWithBox = v41Segments.length; // every v54 segment carries a point
         const segmentsAutoFallback = 0;
         const v41Payload = {
           model: V50_MODEL,
@@ -1086,7 +1094,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v52_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v54_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
