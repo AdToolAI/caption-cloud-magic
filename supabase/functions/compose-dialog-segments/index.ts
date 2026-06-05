@@ -2244,6 +2244,18 @@ serve(async (req) => {
     passes[currentPassIdx] = pass;
 
     const nowIso = new Date().toISOString();
+    // v59 — Preserve v58 multipass markers across every state write so a
+    // pass-level retry cannot accidentally fall back into the broken
+    // sync-3 segments[] path. Source of truth is the body flag OR any
+    // previously-stored marker on the scene state.
+    const prevForceMultipass =
+      (prevState as any)?.force_multipass === true ||
+      (existing as any)?.force_multipass === true;
+    const prevMultipassAttempted =
+      (prevState as any)?.multipass_fallback_attempted === true ||
+      (existing as any)?.multipass_fallback_attempted === true;
+    const carryForceMultipass = forceMultipass || prevForceMultipass;
+    const carryMultipassAttempted = forceMultipass || prevMultipassAttempted;
     const state: SegmentsState = {
       version: 5,
       engine: "sync-segments",
@@ -2270,6 +2282,12 @@ serve(async (req) => {
       // pickSpeakerCoordinates produces plate-space coords.
       video_width: videoDims.width,
       video_height: videoDims.height,
+      // v59 carry-over: keep multipass markers across retries.
+      ...(carryForceMultipass ? { force_multipass: true } : {}),
+      ...(carryMultipassAttempted ? { multipass_fallback_attempted: true } : {}),
+      ...((prevState as any)?.multipass_fallback_reason
+        ? { multipass_fallback_reason: (prevState as any).multipass_fallback_reason }
+        : {}),
     } as SegmentsState;
 
     await logSyncDispatch(supabase, {
