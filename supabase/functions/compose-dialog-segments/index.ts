@@ -1843,8 +1843,9 @@ serve(async (req) => {
         );
       } catch (sliceErr) {
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight_audio_failed: ${(sliceErr as Error)?.message} — falling back to full-length WAV + segments_secs`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v39_tight_audio_failed: ${(sliceErr as Error)?.message} — failing safely; undocumented segments_secs fallback disabled`,
         );
+        (pass as any).tight_audio_error = (sliceErr as Error)?.message ?? String(sliceErr);
       }
     }
 
@@ -1935,14 +1936,116 @@ serve(async (req) => {
           ? LIPSYNC_FALLBACK_MODEL
           : LIPSYNC_MODEL;
 
-    // v38/v39 — Restrict animation window via segments_secs ONLY when the
-    // tight-audio slicer failed (fallback path). With v39 tight audio
-    // active, the audio itself equals the turn duration so segments_secs
-    // becomes redundant and we omit it to avoid double-cutting issues.
-    const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
+    const failBeforeProviderDispatch = async (
+      reason: string,
+      errorClass: string,
+      message: string,
+      status = 422,
+      meta: Record<string, unknown> = {},
+    ) => {
+      const costCredits = Number(prevState?.cost_credits ?? totalCost);
+      const alreadyRefunded = !!(prevState as any)?.refunded;
+      if (!alreadyRefunded) {
+        const { data: w2 } = await supabase
+          .from("wallets").select("balance").eq("user_id", userId).single();
+        await supabase
+          .from("wallets")
+          .update({
+            balance: Number(w2?.balance ?? 0) + costCredits,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", userId);
+      }
+      pass.status = "failed";
+      pass.error = reason;
+      (pass as any).last_error = reason;
+      (pass as any).last_error_class = errorClass;
+      (pass as any).sync_error_bucket = errorClass;
+      passes[currentPassIdx] = pass;
+      await supabase
+        .from("composer_scenes")
+        .update({
+          dialog_shots: {
+            ...(prevState ?? {}),
+            version: 5,
+            engine: "sync-segments",
+            status: "failed",
+            passes,
+            current_pass: currentPassIdx,
+            total_passes: passes.length,
+            multi_pass: passes.length > 1,
+            source_clip_url: sourceClipUrl,
+            total_sec: totalSec,
+            segments: pass.segments,
+            cost_credits: costCredits,
+            refunded: !alreadyRefunded,
+            error: reason,
+            finished_at: new Date().toISOString(),
+          },
+          lip_sync_status: "failed",
+          twoshot_stage: "failed",
+          clip_error: reason,
+        })
+        .eq("id", sceneId);
+      await logSyncDispatch(supabase, {
+        scene_id: sceneId, user_id: userId, engine: "sync-segments",
+        sync_source_kind: "segments", video_url: passInputUrl,
+        sync_status: "PRE_DISPATCH_FAILED", error_class: errorClass,
+        error_message: message,
+        meta: { diagnostic_id: diagnosticId, retry_variant: retryVariant, pass_idx: currentPassIdx, total_passes: passes.length, ...meta },
+      });
+      return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
+    };
+
     if (passes.length >= 2 && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
-      videoInput.segments_secs = speakerWindowsSecs;
+      return await failBeforeProviderDispatch(
+        "prepare_failed_no_tight_audio",
+        "input_audio_prepare_failed",
+        `Tight per-turn audio could not be prepared; undocumented Sync.so segments_secs fallback is disabled. ${(pass as any).tight_audio_error ?? ""}`.trim(),
+        422,
+        { tight_audio_error: (pass as any).tight_audio_error ?? null, windows_secs: speakerWindowsSecs },
+      );
     }
+
+    const finalAudioDiag = await inspectSpeakerAudio(pass.audio_url).catch((audioErr) => {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE inspect_failed: ${(audioErr as Error)?.message ?? audioErr}`,
+      );
+      return null;
+    });
+    const finalPeakDbFs = Number(finalAudioDiag?.wav?.peakDbFs);
+    const finalVoicedSec = Number(finalAudioDiag?.vad?.voicedSec ?? 0);
+    const finalLongestRun = Number(finalAudioDiag?.vad?.longestVoicedRun ?? 0);
+    const audioSilentOrInvalid =
+      !finalAudioDiag ||
+      !Number.isFinite(finalPeakDbFs) ||
+      finalPeakDbFs <= -50 ||
+      finalVoicedSec <= 0.04 ||
+      finalLongestRun <= 0.04;
+    if (audioSilentOrInvalid) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} SILENT_AUDIO_GATE peak_dbfs=${Number.isFinite(finalPeakDbFs) ? finalPeakDbFs.toFixed(2) : "invalid"} voiced=${finalVoicedSec.toFixed(3)}s longest=${finalLongestRun.toFixed(3)}s url=${pass.audio_url.slice(0, 120)}`,
+      );
+      (pass as any).audio_gate = {
+        peak_dbfs: Number.isFinite(finalPeakDbFs) ? finalPeakDbFs : null,
+        voiced_sec: Number.isFinite(finalVoicedSec) ? finalVoicedSec : 0,
+        longest_voiced_run: Number.isFinite(finalLongestRun) ? finalLongestRun : 0,
+        inspected_url: pass.audio_url,
+      };
+      return await failBeforeProviderDispatch(
+        "speaker_audio_silent_or_invalid",
+        "input_audio_silent",
+        "Speaker audio is silent or contains no detectable voiced frames; skipped Sync.so dispatch to avoid provider_unknown_error.",
+        422,
+        { audio_gate: (pass as any).audio_gate, audio_tight: (pass as any).audio_tight ?? null, audio_repair: (pass as any).audio_repair ?? null },
+      );
+    }
+
+    // v53 — Keep Sync.so payload doc-strict. `segments_secs` is not in the
+    // public Sync.so schema and broke sync-3 jobs with provider_unknown_error.
+    // Per-turn timing is now represented only by the tight audio WAV plus
+    // `sync_mode=cut_off`.
+    const videoInput: Record<string, unknown> = { type: "video", url: passInputUrl };
     const payload: Record<string, unknown> = {
       model: payloadModel,
       input: [
