@@ -122,6 +122,18 @@ Any string field arriving from `brand_characters`, `brand_locations`,
 `src/lib/motion-studio/strings.ts` before `.toLowerCase()`. Direct
 `.toLowerCase()` calls on those values are a regression.
 
+## I.9 — No parallel fan-out for any speaker count (v60)
+
+`fanOutAllowed` in `compose-dialog-segments` MUST stay `false`. Pass 1..N-1
+are chained serially by `sync-so-webhook` on each COMPLETE event via
+`pendingIdxs[0]`. The historical 2-speaker parallel fan-out caused the same
+dispatch race v33 already removed for N≥3 (two pass-0 jobs within ms, the
+later one logged as `job ... not in passes[]`). v60 unified the rule:
+**one Sync.so job per scene at any moment, regardless of N**.
+
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2418
+- Background: `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`
+
 ---
 
 ## Code annotation contract
