@@ -1073,79 +1073,42 @@ serve(async (req) => {
         }
 
         // Pre-dispatch validation: every segment refId must exist in inputs.
+        // v56: `audioInput.startTime/endTime` is now legitimate — the input
+        // audio is the master dialog WAV spanning the full scene timeline,
+        // so the crop is doc-conform (Sync.so /developer-guides/segments
+        // example "Multi-Speaker Segments with Active Speaker Detection").
         const inputRefSet = new Set(
           v41Inputs.filter((i) => i.type === "audio").map((i: any) => i.refId),
         );
         for (const seg of v41Segments) {
           const refId = (seg as any).audioInput?.refId;
-          const hasForbiddenCrop =
-            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "startTime") ||
-            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "endTime");
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
-              `[compose-dialog-segments] scene=${sceneId} v50 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
+              `[compose-dialog-segments] scene=${sceneId} v56 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
             );
             await supabase
               .from("composer_scenes")
-              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v50_segment_refid_missing" })
+              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v56_segment_refid_missing" })
               .eq("id", sceneId);
-            return json({ error: "v50_segment_refid_missing", refId }, 422);
-          }
-          if (hasForbiddenCrop) {
-            console.error(`[compose-dialog-segments] scene=${sceneId} v55 forbidden audioInput crop detected before dispatch refId=${refId}`);
-            const cropAlreadyRefunded = !!(v41PrevState as any)?.refunded;
-            if (!cropAlreadyRefunded) {
-              const { data: wCrop } = await supabase
-                .from("wallets").select("balance").eq("user_id", userId).single();
-              await supabase
-                .from("wallets")
-                .update({
-                  balance: Number(wCrop?.balance ?? 0) + Number(v41PrevState?.cost_credits ?? v47Cost),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", userId);
-            }
-            await supabase
-              .from("composer_scenes")
-              .update({
-                lip_sync_status: "failed",
-                twoshot_stage: "failed",
-                clip_error: "segment_audio_input_crop_forbidden",
-                dialog_shots: {
-                  ...(v41PrevState ?? {}),
-                  version: 55,
-                  engine: "sync-official-segments-v55",
-                  status: "failed",
-                  audio_input_mode: "invalid_crop_blocked",
-                  error: "segment_audio_input_crop_forbidden",
-                  refunded: true,
-                  finished_at: new Date().toISOString(),
-                },
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", sceneId);
-            return json({ error: "segment_audio_input_crop_forbidden", refId }, 422);
+            return json({ error: "v56_segment_refid_missing", refId }, 422);
           }
         }
 
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v54 — Switch the official Sync.so multi-speaker segments dispatch
-        // from `lipsync-2-pro` to `sync-3`. lipsync-2-pro needs natural
-        // speaking motion in the plate (Sync.so docs/models/lipsync) and
-        // returned opaque "An unknown error occurred." on our static 3+
-        // person Hailuo plates. sync-3 is Sync.so's recommended model for
-        // multi-person / static / occluded shots, accepts the same
-        // `segments[]` + per-segment `optionsOverride.active_speaker_detection`
-        // shape (Sync.so docs/developer-guides/segments + speaker-selection),
-        // and can open silent lips. `temperature` and
-        // `occlusion_detection_enabled` are intentionally omitted — sync-3
-        // manages both natively and ignores them otherwise.
+        // v56 — Master-audio + per-segment crop. Model stays sync-3
+        // (multi-person / static / occluded shots per Sync.so docs).
+        // First attempt sends per-segment manual ASD point. On opaque
+        // failure the webhook re-dispatches with `retry_no_asd: true`
+        // which drops `optionsOverride.active_speaker_detection` so
+        // Sync-3 picks the active speaker automatically.
         const V50_MODEL = "sync-3";
-        const V55_ENGINE = "sync-official-segments-v55";
-        const segmentsWithBox = v41Segments.length; // every v54 segment carries a point
-        const segmentsAutoFallback = 0;
+        const V55_ENGINE = "sync-official-segments-v56";
+        const ASD_MODE = retryNoAsd ? "auto_asd_fallback" : "manual_point_minimal";
+        const AUDIO_INPUT_MODE = "master_audio_crop";
+        const segmentsWithBox = retryNoAsd ? 0 : v41Segments.length;
+        const segmentsAutoFallback = retryNoAsd ? v41Segments.length : 0;
         const v41Payload = {
           model: V50_MODEL,
           input: v41Inputs,
@@ -1155,8 +1118,8 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v55_official_segments_payload model=${V50_MODEL} asd=point_per_segment audio_input_mode=ref_only ` +
-          `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
+          `[compose-dialog-segments] scene=${sceneId} v56_official_segments_payload model=${V50_MODEL} asd=${ASD_MODE} audio_input_mode=${AUDIO_INPUT_MODE} ` +
+          `speakers=${v41SpeakerRefs.length} master_audio_url=${masterAudioUrl.slice(0, 80)} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
           `point_sources=${JSON.stringify(pointSourceCounts)} points=${JSON.stringify(v50BoxDiag)}`,
