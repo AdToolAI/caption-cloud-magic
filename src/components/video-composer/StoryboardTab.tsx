@@ -401,7 +401,7 @@ export default function StoryboardTab({
   // Stage 18 — inline scene generation directly from the player tile
   const { generate: generateScene, generating: generatingMap } = useSceneGenerate({
     projectId,
-    characters,
+    characters: safeCharacters,
     onOptimisticPatch: (id, patch) => updateScene(id, patch),
     ensureProject: onEnsurePersisted,
   });
