@@ -803,7 +803,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50) ? (existing as any) : null;
 
     // ── v49 face-gate REMOVED (2026-06-05) ──────────────────────────────
     // The v49 payload no longer uses per-segment ASD coordinates (see the
@@ -877,36 +877,97 @@ serve(async (req) => {
           `[compose-dialog-segments] scene=${sceneId} v47 skipped — only ${v41SpeakerRefs.length} of ${speakers.length} speakers have per-speaker tracks; falling back to v5 fan-out`,
         );
       } else {
+        // ─────────────────────────────────────────────────────────────
+        // v50 — Pro + per-segment bounding_boxes from plate face-map
+        // ─────────────────────────────────────────────────────────────
+        // v49 (lipsync-2 + segments[] + auto-ASD) reliably completed but
+        // 3-speaker scenes lost speaker_3 lip-sync (auto-ASD picked only
+        // the two strongest faces). v50 keeps the doc-conform 1-call
+        // segments shape but switches the ASD variant from `auto_detect`
+        // to per-segment `bounding_boxes` — a documented mutually-exclusive
+        // ASD mode (NOT the broken `frame_number+coordinates` variant) —
+        // and lifts the model to lipsync-2-pro for sharper mouth fidelity.
+        const V50_FPS = 24;
+        const plateW = (plateDims?.width ?? videoDims.width) || 1280;
+        const plateH = (plateDims?.height ?? videoDims.height) || 720;
+        const fmFacesAll: any[] = Array.isArray((faceMap as any)?.faces) ? (faceMap as any).faces : [];
+        const fmW = Number((faceMap as any)?.width) || plateW;
+        const fmH = Number((faceMap as any)?.height) || plateH;
+        // Pre-compute left-to-right ordering as fallback when neither
+        // characterId nor slotIndex matches.
+        const fmFacesByX = [...fmFacesAll]
+          .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
+          .sort((a, b) => {
+            const ax = (Number(a.bbox[0]) + Number(a.bbox[2])) / 2;
+            const bx = (Number(b.bbox[0]) + Number(b.bbox[2])) / 2;
+            return ax - bx;
+          });
+        const boxForSpeaker = (speakerIdx: number, characterId: string | null): [number, number, number, number] | null => {
+          const matched =
+            (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) ||
+            fmFacesAll.find((f) => Number(f?.slotIndex) === Number(speakerIdx)) ||
+            fmFacesByX[speakerIdx] ||
+            null;
+          if (!matched || !Array.isArray(matched.bbox) || matched.bbox.length !== 4) return null;
+          const [bx1, by1, bx2, by2] = matched.bbox.map((n: any) => Number(n));
+          if (!Number.isFinite(bx1) || !Number.isFinite(by1) || !Number.isFinite(bx2) || !Number.isFinite(by2)) return null;
+          const sx = plateW / Math.max(1, fmW);
+          const sy = plateH / Math.max(1, fmH);
+          const padX = Math.max(0, (bx2 - bx1)) * 0.15;
+          const padY = Math.max(0, (by2 - by1)) * 0.15;
+          const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
+          const y1 = Math.max(0, Math.round((by1 - padY) * sy));
+          const x2 = Math.min(plateW, Math.round((bx2 + padX) * sx));
+          const y2 = Math.min(plateH, Math.round((by2 + padY) * sy));
+          if (x2 <= x1 + 4 || y2 <= y1 + 4) return null;
+          return [x1, y1, x2, y2];
+        };
+
         const v41Segments: Array<Record<string, unknown>> = [];
-        v41SpeakerRefs.forEach(({ idx, refId, coords, name }) => {
+        const v50BoxDiag: Array<{ refId: string; box: number[] | null; source: string }> = [];
+        v41SpeakerRefs.forEach(({ idx, refId, name, characterId }) => {
           const sp = speakers[idx];
           const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
             ? (sp!.voicedRange!.turns as Turn[])
             : [];
-          const fallbackCx = Math.round(videoDims.width / 2);
-          const fallbackCy = Math.round(videoDims.height / 2);
-          const [cx, cy] = coords ?? [fallbackCx, fallbackCy];
+          const box = boxForSpeaker(idx, characterId);
+          const boxSource = box
+            ? (characterId && fmFacesAll.some((f) => f?.characterId === characterId)
+                ? "characterId"
+                : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
+                  ? "slotIndex"
+                  : "left-to-right")
+            : "none";
+          v50BoxDiag.push({ refId, box, source: boxSource });
           for (const t of turns) {
             const sRaw = Math.max(0, Number(t.startSec));
             const eRaw = Math.min(totalSec, Math.max(sRaw + MIN_TURN_DUR_SEC, Number(t.endSec)));
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
-            // v49: NO per-segment `optionsOverride.active_speaker_detection`.
-            // Live probes (June 2026) proved that `segments[]` + manual ASD
-            // coordinates is the combo that triggers Sync.so "unknown error"
-            // after 13 min, regardless of model. `segments[]` alone with
-            // `lipsync-2` is COMPLETED reliably — Sync.so auto-detects which
-            // face speaks based on the audio track per segment.
-            void cx; void cy; // coords intentionally unused in v49 payload
-            v41Segments.push({
+            const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
-            });
+            };
+            if (box) {
+              // Per Sync.so Segments + speaker-selection docs: bounding_boxes
+              // is a frame-indexed array of [x1,y1,x2,y2] (or nulls) covering
+              // the segment's duration. The four ASD variants (auto_detect /
+              // v3 / frame_number+coordinates / bounding_boxes) are mutually
+              // exclusive, and the June 2026 probes proved only the
+              // `coordinates` combo triggers "unknown error"; bounding_boxes
+              // is the safe deterministic alternative.
+              const segFrames = Math.max(1, Math.ceil((e - s) * V50_FPS));
+              const frameBoxes: number[][] = new Array(segFrames).fill(box);
+              (seg as any).optionsOverride = {
+                active_speaker_detection: { bounding_boxes: frameBoxes },
+              };
+            }
+            v41Segments.push(seg);
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v49 speaker=${refId} name=${name} segments_only (auto-ASD)`,
+            `[compose-dialog-segments] scene=${sceneId} v50 speaker=${refId} name=${name} box=${JSON.stringify(box)} src=${boxSource}`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -917,10 +978,10 @@ serve(async (req) => {
             .update({
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: "v47_no_segments_built",
+              clip_error: "v50_no_segments_built",
             })
             .eq("id", sceneId);
-          return json({ error: "v47_no_segments_built" }, 422);
+          return json({ error: "v50_no_segments_built" }, 422);
         }
 
         // Pre-dispatch validation: every segment refId must exist in inputs.
@@ -931,38 +992,38 @@ serve(async (req) => {
           const refId = (seg as any).audioInput?.refId;
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
-              `[compose-dialog-segments] scene=${sceneId} v47 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
+              `[compose-dialog-segments] scene=${sceneId} v50 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
             );
             await supabase
               .from("composer_scenes")
-              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v47_segment_refid_missing" })
+              .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v50_segment_refid_missing" })
               .eq("id", sceneId);
-            return json({ error: "v47_segment_refid_missing", refId }, 422);
+            return json({ error: "v50_segment_refid_missing", refId }, 422);
           }
         }
 
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v49 — Sync.so probe-proven: `segments[]` works with `lipsync-2`
-        // ONLY when no per-segment ASD coordinates are attached. `lipsync-2-pro`
-        // is aliased to `sync-2-pro` server-side and also accepts segments,
-        // but the docs' multi-speaker examples all use `lipsync-2`, so we
-        // align with the canonical example for stability.
-        const V49_MODEL = "lipsync-2";
+        // v50 — Pro for fidelity + per-segment bounding_boxes for deterministic
+        // speaker targeting (auto-ASD in v49 lost speaker_3 on dense plates).
+        const V50_MODEL = "lipsync-2-pro";
+        const segmentsWithBox = v41Segments.filter((s) => (s as any).optionsOverride).length;
+        const segmentsAutoFallback = v41Segments.length - segmentsWithBox;
         const v41Payload = {
-          model: V49_MODEL,
+          model: V50_MODEL,
           input: v41Inputs,
           segments: v41Segments,
           options: { sync_mode: "cut_off" },
-          // Only the documented camelCase `webhookUrl` field.
           webhookUrl: v41Webhook,
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v49_official_segments_payload model=${V49_MODEL} asd=auto ` +
+          `[compose-dialog-segments] scene=${sceneId} v50_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off video=${videoDims.width}x${videoDims.height}`,
+          `segments=${v41Segments.length} with_box=${segmentsWithBox} auto_fallback=${segmentsAutoFallback} ` +
+          `totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} faces=${fmFacesAll.length} ` +
+          `boxes=${JSON.stringify(v50BoxDiag)}`,
         );
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -974,7 +1035,7 @@ serve(async (req) => {
         if (!v41Resp.ok) {
           const errTxt = await v41Resp.text().catch(() => "");
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v47 dispatch FAILED status=${v41Resp.status} body=${errTxt.slice(0, 600)}`,
+            `[compose-dialog-segments] scene=${sceneId} v50 dispatch FAILED status=${v41Resp.status} body=${errTxt.slice(0, 600)}`,
           );
           const alreadyRefunded = !!(v41PrevState as any)?.refunded;
           if (!alreadyRefunded && !isV41Retry) {
@@ -993,62 +1054,65 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 49,
-                engine: "sync-official-segments",
-                asd_mode: "auto",
+                version: 50,
+                engine: "sync-official-segments-v50",
+                asd_mode: "bounding_boxes_per_segment",
                 status: "failed",
-                model: "lipsync-2",
+                model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
                 refunded: !alreadyRefunded,
-                error: `v49_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v50_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v49_dispatch_${v41Resp.status}`,
+              clip_error: `v50_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-            sync_source_kind: "v49_segments", video_url: sourceClipUrl,
+            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v50",
+            sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: "lipsync-2", segments_count: v41Segments.length, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
-          return json({ error: "v49_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
+          return json({ error: "v50_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
 
         const v41Data = await v41Resp.json();
         const v41Shape = validateSyncResponseShape(v41Data);
         if (!v41Shape.ok) {
           console.error(
-            `[compose-dialog-segments] scene=${sceneId} v49 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
+            `[compose-dialog-segments] scene=${sceneId} v50 SCHEMA_DRIFT missing=${v41Shape.missingKeys.join(",")}`,
           );
-          return json({ error: "v49_schema_drift", missing: v41Shape.missingKeys }, 502);
+          return json({ error: "v50_schema_drift", missing: v41Shape.missingKeys }, 502);
         }
         const v41JobId = String(v41Data.id ?? "");
-        if (!v41JobId) return json({ error: "v49_no_job_id" }, 502);
+        if (!v41JobId) return json({ error: "v50_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
-          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments",
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v50",
         });
         await recordCircuitSuccess(supabase, "sync.so");
 
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 49,
-          engine: "sync-official-segments",
-          asd_mode: "auto",
+          version: 50,
+          engine: "sync-official-segments-v50",
+          asd_mode: "bounding_boxes_per_segment",
           status: "rendering",
-          model: "lipsync-2",
+          model: V50_MODEL,
           sync_job_id: v41JobId,
           source_clip_url: sourceClipUrl,
           total_sec: totalSec,
           segments: v41Segments,
           speaker_refs: v41SpeakerRefs,
+          v50_box_map: v50BoxDiag,
+          v50_segments_with_box: segmentsWithBox,
+          v50_segments_auto_fallback: segmentsAutoFallback,
           cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
           refunded: false,
           retry_count: v41RetryCount,
@@ -1063,7 +1127,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v49_official_segments",
+            twoshot_stage: "syncso_v50_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1072,18 +1136,23 @@ serve(async (req) => {
           .eq("id", sceneId);
 
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-official-segments",
-          job_id: v41JobId, sync_source_kind: "v49_segments",
+          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v50",
+          job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
-            model: "lipsync-2",
+            model: V50_MODEL,
             segments_count: v41Segments.length,
+            segments_with_box: segmentsWithBox,
+            segments_auto_fallback: segmentsAutoFallback,
             speakers: v41SpeakerRefs.map((s) => ({ idx: s.idx, refId: s.refId, name: s.name, coords: s.coords })),
+            box_map: v50BoxDiag,
             input_refs: v41SpeakerRefs.map((s) => s.refId),
             is_retry: isV41Retry,
             retry_count: v41RetryCount,
+            plate: { width: plateW, height: plateH },
+            facemap_faces: fmFacesAll.length,
           },
         });
 
@@ -1093,9 +1162,10 @@ serve(async (req) => {
             status: "rendering",
             scene_id: sceneId,
             sync_job_id: v41JobId,
-            engine: "sync-official-segments",
-            model: "lipsync-2-pro",
+            engine: "sync-official-segments-v50",
+            model: V50_MODEL,
             segments: v41Segments.length,
+            segments_with_box: segmentsWithBox,
             speakers: v41SpeakerRefs.length,
             cost_credits: v41State.cost_credits,
           },
@@ -1103,6 +1173,7 @@ serve(async (req) => {
         );
       }
     }
+
 
 
 

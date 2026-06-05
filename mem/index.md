@@ -32,6 +32,7 @@ Updated: today
 - [Syncso Face-Gate Stage D](mem://architecture/lipsync/syncso-face-gate-stage-d) — validate-frame-face + frame_face_cache
 - [Webhook + 8min Watchdog](mem://architecture/lipsync/sync-so-webhook-stage5) — sync-so-webhook + watchdog
 - [Lipsync Pro Pricing Policy](mem://architecture/lipsync/sync-so-pro-model-policy) — duration-based credits + refunds
+- [Sync.so v50 Pro + BBox](mem://architecture/lipsync/v50-pro-bounding-boxes) — 3+ speakers: lipsync-2-pro + segments[] + per-segment bounding_boxes from faceMap (fixes lost speaker_3, ups quality vs v49)
 - [Multi-Char Pipeline Hardening v33](mem://architecture/lipsync/multi-character-pipeline-hardening-v33) — coords-pro-box + plate-probe
 - [Plate Probe + Hailuo Fallback v34](mem://architecture/lipsync/plate-probe-hailuo-fallback-v34) — probeMp4Dims fallback
 - [Auto-Abort Single-Flight](mem://architecture/lipsync/auto-abort-single-flight-cast-validation) — cast change cancels in-flight
