@@ -96,6 +96,10 @@ serve(async (req) => {
   const cleanedTwoshot = { ...prevTwoshot };
   delete (cleanedTwoshot as any).faceMap;
   delete (cleanedTwoshot as any).anchor_face_audit;
+  delete (cleanedTwoshot as any).sync_job_id;
+  delete (cleanedTwoshot as any).segments_payload;
+  delete (cleanedTwoshot as any).last_segments;
+  delete (cleanedTwoshot as any).audio_input_mode;
   const cleanedPlan = { ...prevPlan, twoshot: cleanedTwoshot };
 
   await admin
