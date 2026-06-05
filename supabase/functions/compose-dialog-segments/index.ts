@@ -1071,11 +1071,12 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v50 — Pro for fidelity + per-segment bounding_boxes for deterministic
-        // speaker targeting (auto-ASD in v49 lost speaker_3 on dense plates).
+        // v52 — Pro for fidelity + per-segment frame_number+coordinates
+        // (doc-conform POINT ASD). Replaces the malformed per-frame box
+        // payload from v50/v51.
         const V50_MODEL = "lipsync-2-pro";
-        const segmentsWithBox = v41Segments.filter((s) => (s as any).optionsOverride).length;
-        const segmentsAutoFallback = v41Segments.length - segmentsWithBox;
+        const segmentsWithBox = v41Segments.length; // every v52 segment carries a point
+        const segmentsAutoFallback = 0;
         const v41Payload = {
           model: V50_MODEL,
           input: v41Inputs,
@@ -1085,12 +1086,13 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v51_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v52_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} with_box=${segmentsWithBox} auto_fallback=${segmentsAutoFallback} ` +
-          `totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} faces=${fmFacesAll.length} ` +
-          `plate_detected=${usePlateDetection} boxes=${JSON.stringify(v50BoxDiag)}`,
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
+          `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
+          `point_sources=${JSON.stringify(pointSourceCounts)} points=${JSON.stringify(v50BoxDiag)}`,
         );
+
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
           method: "POST",
