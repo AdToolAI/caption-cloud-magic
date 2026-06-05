@@ -328,7 +328,7 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} elapsedMs=${Date.now() - t0}`,
     );
 
     const aiJson = await aiResp.json();
