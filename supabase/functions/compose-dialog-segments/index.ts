@@ -1165,9 +1165,10 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 52,
-                engine: "sync-official-segments-v52",
+                version: 55,
+                engine: V55_ENGINE,
                 asd_mode: "point_per_segment",
+                audio_input_mode: "ref_only",
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
@@ -1182,12 +1183,12 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
+            scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
             sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { audio_input_mode: "ref_only", payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v50_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -1204,7 +1205,7 @@ serve(async (req) => {
         if (!v41JobId) return json({ error: "v50_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
-          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v52",
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: V55_ENGINE,
         });
         await recordCircuitSuccess(supabase, "sync.so");
 
