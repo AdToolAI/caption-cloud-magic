@@ -488,11 +488,24 @@ serve(async (req) => {
     // ASD dropped (auto_detect default). This catches the very common case
     // where anchor-derived coords sit off-face on the actual Hailuo plate
     // and Sync-3 returns the opaque "An unknown error occurred."
+    //
+    // v57 GUARD — For MULTI-speaker scenes (≥2 distinct speaker refs) we
+    // must NOT fall back to auto-ASD: if the underlying plate happens to
+    // contain a camera cut or close-up insert, auto-ASD will lock onto
+    // whichever mouth is visible in that window and paste the wrong
+    // speaker's audio onto the wrong character (e.g. Matthew lip-syncing
+    // Kailee's line during a stray close-up). With manual ASD we at least
+    // keep the per-turn coordinates honest. Single-speaker scenes are
+    // unaffected — there's only one face to map.
+    const speakerCount = Array.isArray((state as any).speaker_refs)
+      ? (state as any).speaker_refs.length
+      : 0;
+    const isMultiSpeaker = speakerCount >= 2;
     const isV56Manual =
       (state as any).version === 56 &&
       (state as any).asd_mode === "manual_point_minimal";
     const wantV56NoAsdRetry =
-      isV56Manual && retryCount < MAX_V41_RETRIES && !(state as any).retry_no_asd_attempted;
+      isV56Manual && !isMultiSpeaker && retryCount < MAX_V41_RETRIES && !(state as any).retry_no_asd_attempted;
     const canRetry =
       wantV56NoAsdRetry ||
       (codeBucket !== "fail_fast" && isTransient && retryCount < MAX_V41_RETRIES);

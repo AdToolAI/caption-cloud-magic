@@ -351,7 +351,15 @@ serve(async (req) => {
     const NEGATIVE_PROMPT_I2V_EXTRA =
       ", static first frame, frozen opening, still image hold at start, motionless beginning, freeze frame intro";
     const CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE =
-      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling";
+      ", talking mouth, lip movement, speaking animation, open mouth speech, mouthing words, mouth flapping, exaggerated facial talking, dialogue performance, singing, yelling" +
+      // v57 — Plate-stability guard. Hailuo/Kling/Wan i2v tend to invent a
+      // mid-clip camera cut or push-in when given a 3-shot start-frame plus
+      // a long dialog-style prompt. The downstream Sync.so dispatch then
+      // sees a different subject than the anchor coords describe and either
+      // maps the wrong speaker's audio onto the wrong face (auto-ASD) or
+      // returns an opaque "unknown error" (manual ASD). Hard-block every
+      // form of in-clip framing change for cinematic-sync master plates.
+      ", camera cut, scene change, shot change, new shot, different angle, edit cut, hard cut, jump cut, zoom in, zoom out, push in, pull out, dolly, dolly in, dolly out, crane, pan, tilt, whip pan, close-up insert, reframe, second camera, multi-camera, picture-in-picture";
     const POSITIVE_CLEAN_CUE =
       ", clean cinematic composition, natural environment";
     // Positive cue appended ONLY for i2v requests — biases the model toward
@@ -617,7 +625,7 @@ serve(async (req) => {
       // natural, lip-ready neutral expression with the mouth area clearly
       // visible (chin/jaw unobstructed). All "no speech / no mouth flap"
       // constraints live exclusively in the negative_prompt.
-      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. Stable camera, soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
+      return `${subject}${named}, ${visibility}. Lips slightly parted in a relaxed neutral resting position with a soft visible teeth gap, jaw loose but still. Natural neutral facial expressions, soft breathing, subtle eye movement and gentle posture shifts. LOCKED static camera mounted on a tripod for the entire shot — no cuts, no zoom, no push-in, no pull-out, no dolly, no pan, no tilt, no reframing, no shot change. The framing, focal length and every person's position in the frame stay identical from the first frame to the last frame. Soft cinematic lighting. No other humans, no background bystanders, no posters or screens showing people. No rendered text.`;
     };
 
     const buildCinematicSyncMasterPrompt = (scene: ClipScene): string => {
