@@ -2261,8 +2261,14 @@ serve(async (req) => {
     const prevMultipassAttempted =
       (prevState as any)?.multipass_fallback_attempted === true ||
       (existing as any)?.multipass_fallback_attempted === true;
-    const carryForceMultipass = forceMultipass || prevForceMultipass;
-    const carryMultipassAttempted = forceMultipass || prevMultipassAttempted;
+    // v60 — For every multi-speaker scene (N≥2) the chained per-speaker
+    // pipeline is the canonical path. Set the sticky markers from the
+    // very first state write so any later retry (pass-level, scene-level,
+    // webhook-triggered) cannot accidentally route back into the v56
+    // segments[] dispatch. FROZEN — see FROZEN-INVARIANTS.md (I.1, I.3)
+    const isMultiSpeakerV60 = speakers.length >= 2;
+    const carryForceMultipass = forceMultipass || prevForceMultipass || isMultiSpeakerV60;
+    const carryMultipassAttempted = forceMultipass || prevMultipassAttempted || isMultiSpeakerV60;
     // Soft-log invariant guard: if prev state had a marker but neither the
     // carry nor the body flag would re-emit it, that is a regression.
     if (
