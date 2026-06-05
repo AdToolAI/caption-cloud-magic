@@ -81,6 +81,7 @@ import {
   resolveCharacterPortraits,
   resolveSceneFaceMap,
 } from "../_shared/twoshot-face-map.ts";
+import { detectPlateFaces } from "../_shared/plate-face-detect.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
@@ -878,31 +879,89 @@ serve(async (req) => {
         );
       } else {
         // ─────────────────────────────────────────────────────────────
-        // v50 — Pro + per-segment bounding_boxes from plate face-map
+        // v51 — Pro + per-segment bounding_boxes from REAL PLATE faces
         // ─────────────────────────────────────────────────────────────
-        // v49 (lipsync-2 + segments[] + auto-ASD) reliably completed but
-        // 3-speaker scenes lost speaker_3 lip-sync (auto-ASD picked only
-        // the two strongest faces). v50 keeps the doc-conform 1-call
-        // segments shape but switches the ASD variant from `auto_detect`
-        // to per-segment `bounding_boxes` — a documented mutually-exclusive
-        // ASD mode (NOT the broken `frame_number+coordinates` variant) —
-        // and lifts the model to lipsync-2-pro for sharper mouth fidelity.
+        // v50 (lipsync-2-pro + bounding_boxes derived from ANCHOR face-map
+        // rescaled to plate dims) reliably completed but the rescaled
+        // boxes landed on empty background pixels on shoulder-to-shoulder
+        // 3+ speaker plates (Hailuo's framing drifts 5–15 % vs the still
+        // anchor). Sync.so silently no-ops segments whose bounding_box
+        // doesn't contain a face → user sees finished video with
+        // motionless lips (the exact June 5 regression).
+        //
+        // v51 fixes this end-to-end by detecting faces DIRECTLY on the
+        // rendered plate: extract a mid-frame (lucataco/ffmpeg-extract-frame),
+        // ask Gemini Vision for normalized bboxes, scale to plate pixels.
+        // Map speakers to plate-faces via left-to-right ordering (the
+        // anchor face-map already guarantees consistent l-to-r identity).
+        //
+        // Fallback chain:
+        //   1. plate-detection (≥ N faces)             → v51 boxes
+        //   2. plate-detection (< N faces) | exception → v50 anchor-rescale boxes
+        //   3. no boxes at all                          → Sync.so auto_detect
         const V50_FPS = 24;
         const plateW = (plateDims?.width ?? videoDims.width) || 1280;
         const plateH = (plateDims?.height ?? videoDims.height) || 720;
         const fmFacesAll: any[] = Array.isArray((faceMap as any)?.faces) ? (faceMap as any).faces : [];
         const fmW = Number((faceMap as any)?.width) || plateW;
         const fmH = Number((faceMap as any)?.height) || plateH;
-        // Pre-compute left-to-right ordering as fallback when neither
-        // characterId nor slotIndex matches.
+
+        // ── v51 PLATE-SIDE DETECTION ─────────────────────────────────
+        let plateFaceMap: Awaited<ReturnType<typeof detectPlateFaces>> = null;
+        try {
+          plateFaceMap = await detectPlateFaces({
+            supabase,
+            plateUrl: sourceClipUrl,
+            plateWidth: plateW,
+            plateHeight: plateH,
+            expectedCount: speakers.length,
+            sceneId,
+            projectId: String((existing as any)?.project_id ?? ""),
+            midDurationSec: totalSec,
+          });
+        } catch (e) {
+          console.warn(
+            `[compose-dialog-segments] scene=${sceneId} v51 plate-detect EXCEPTION: ${(e as Error)?.message} — falling back to anchor-rescale`,
+          );
+        }
+        const usePlateDetection =
+          !!plateFaceMap && plateFaceMap.faces.length >= speakers.length;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} v51 plate_detect=${
+            usePlateDetection ? "ok" : "fallback-anchor"
+          } plate_faces=${plateFaceMap?.faces.length ?? 0} expected=${speakers.length} ` +
+          `cached=${plateFaceMap?.cached ?? false}`,
+        );
+
+        // Pre-compute left-to-right ordering of ANCHOR faces (fallback chain).
         const fmFacesByX = [...fmFacesAll]
           .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
           .sort((a, b) => {
-            const ax = (Number(a.bbox[0]) + Number(a.bbox[2])) / 2;
+            const ax = (Number(a.bbox[0]) + Number(b.bbox[2])) / 2;
             const bx = (Number(b.bbox[0]) + Number(b.bbox[2])) / 2;
             return ax - bx;
           });
+
         const boxForSpeaker = (speakerIdx: number, characterId: string | null): [number, number, number, number] | null => {
+          // PRIMARY: plate-side detected faces, mapped by left-to-right slot.
+          // The anchor face-map already guarantees that characterId order
+          // matches left-to-right order on the anchor; Hailuo preserves
+          // relative ordering even when individual positions drift.
+          if (usePlateDetection && plateFaceMap) {
+            const plateFace = plateFaceMap.faces[speakerIdx];
+            if (plateFace && Array.isArray(plateFace.bbox) && plateFace.bbox.length === 4) {
+              const [px1, py1, px2, py2] = plateFace.bbox;
+              // Pad 20% — plate detection is precise so a smaller pad is safe.
+              const padX = Math.max(0, (px2 - px1)) * 0.20;
+              const padY = Math.max(0, (py2 - py1)) * 0.20;
+              const x1 = Math.max(0, Math.round(px1 - padX));
+              const y1 = Math.max(0, Math.round(py1 - padY));
+              const x2 = Math.min(plateW, Math.round(px2 + padX));
+              const y2 = Math.min(plateH, Math.round(py2 + padY));
+              if (x2 > x1 + 4 && y2 > y1 + 4) return [x1, y1, x2, y2];
+            }
+          }
+          // FALLBACK: anchor face-map rescaled to plate (legacy v50 logic).
           const matched =
             (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) ||
             fmFacesAll.find((f) => Number(f?.slotIndex) === Number(speakerIdx)) ||
@@ -923,6 +982,7 @@ serve(async (req) => {
           return [x1, y1, x2, y2];
         };
 
+
         const v41Segments: Array<Record<string, unknown>> = [];
         const v50BoxDiag: Array<{ refId: string; box: number[] | null; source: string }> = [];
         v41SpeakerRefs.forEach(({ idx, refId, name, characterId }) => {
@@ -932,11 +992,13 @@ serve(async (req) => {
             : [];
           const box = boxForSpeaker(idx, characterId);
           const boxSource = box
-            ? (characterId && fmFacesAll.some((f) => f?.characterId === characterId)
-                ? "characterId"
-                : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
-                  ? "slotIndex"
-                  : "left-to-right")
+            ? (usePlateDetection && plateFaceMap?.faces[idx]
+                ? "plate-detected"
+                : characterId && fmFacesAll.some((f) => f?.characterId === characterId)
+                  ? "anchor-characterId"
+                  : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
+                    ? "anchor-slotIndex"
+                    : "anchor-left-to-right")
             : "none";
           v50BoxDiag.push({ refId, box, source: boxSource });
           for (const t of turns) {
