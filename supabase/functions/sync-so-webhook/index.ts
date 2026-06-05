@@ -1153,6 +1153,14 @@ serve(async (req) => {
         // existing state (cost_credits already debited and stored) and uses
         // retry=true to skip re-charging.
         try {
+          // v59 — carry the v58 multipass markers across pass-level retries
+          // so compose-dialog-segments cannot accidentally fall back into
+          // the broken sync-3 segments[] path.
+          const carryForceMultipass =
+            (freshState as any)?.force_multipass === true ||
+            (freshState as any)?.multipass_fallback_attempted === true ||
+            (state as any)?.force_multipass === true ||
+            (state as any)?.multipass_fallback_attempted === true;
           fetch(`${supabaseUrl}/functions/v1/compose-dialog-segments`, {
             method: "POST",
             headers: {
@@ -1165,6 +1173,7 @@ serve(async (req) => {
               retry_variant: nextVariant,
               repair_audio: needsAudioRepair,
               pass_idx: currentPass,
+              ...(carryForceMultipass ? { force_multipass: true } : {}),
             }),
           }).catch(() => {});
         } catch {
