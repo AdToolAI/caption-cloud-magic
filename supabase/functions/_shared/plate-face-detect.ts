@@ -74,72 +74,73 @@ async function extractPlateFrame(params: {
   sceneId: string;
   projectId: string;
 }): Promise<string | null> {
-  const REPLICATE_API_KEY = Deno.env.get("REPLICATE_API_KEY");
-  if (!REPLICATE_API_KEY) {
-    console.warn("[plate-face-detect] REPLICATE_API_KEY missing — cannot extract frame");
+  // v51.1 — Replicate SDK + dual env var support.
+  // The previous direct POST to
+  // `https://api.replicate.com/v1/models/lucataco/ffmpeg-extract-frame/predictions`
+  // returns 404 (Replicate's model-by-name predictions endpoint expects a
+  // pinned version for some models). The SDK handles version resolution
+  // automatically and is the path already proven stable by
+  // `extract-video-frames` and `extract-video-last-frame`.
+  const REPLICATE_API_TOKEN =
+    Deno.env.get("REPLICATE_API_TOKEN") ?? Deno.env.get("REPLICATE_API_KEY");
+  if (!REPLICATE_API_TOKEN) {
+    console.warn("[plate-face-detect] REPLICATE_API_TOKEN/REPLICATE_API_KEY missing — cannot extract frame");
     return null;
   }
-  // Pick the middle of the clip — most representative for face position
-  // (start may have fade-in artefacts, end may have camera drift).
   const timestamp = Math.max(0.5, Math.min(params.midDurationSec, params.midDurationSec * 0.5));
 
+  let frameUrl: string | null = null;
   try {
+    const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), FRAME_EXTRACT_TIMEOUT_MS);
-    const resp = await fetch(
-      "https://api.replicate.com/v1/models/lucataco/ffmpeg-extract-frame/predictions",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${REPLICATE_API_KEY}`,
-          "Content-Type": "application/json",
-          Prefer: "wait=30",
-        },
-        body: JSON.stringify({
-          input: { video: params.plateUrl, timestamp },
-        }),
-        signal: ctrl.signal,
-      },
-    );
-    clearTimeout(t);
-    if (!resp.ok) {
-      console.warn(`[plate-face-detect] ffmpeg-extract-frame HTTP ${resp.status}`);
-      return null;
+    let out: any;
+    try {
+      out = await replicate.run(
+        "lucataco/ffmpeg-extract-frame" as `${string}/${string}`,
+        { input: { video: params.plateUrl, timestamp } },
+      );
+    } finally {
+      clearTimeout(t);
     }
-    const j = await resp.json();
-    let frameUrl: string | null = null;
-    if (typeof j?.output === "string") frameUrl = j.output;
-    else if (Array.isArray(j?.output) && typeof j.output[0] === "string") frameUrl = j.output[0];
-    // If still processing (Prefer: wait timeout), poll briefly.
-    if (!frameUrl && j?.id) {
-      for (let i = 0; i < 6; i++) {
-        await new Promise((r) => setTimeout(r, 3_000));
-        const p = await fetch(
-          `https://api.replicate.com/v1/predictions/${j.id}`,
-          { headers: { Authorization: `Bearer ${REPLICATE_API_KEY}` } },
-        );
-        if (!p.ok) continue;
-        const pj = await p.json();
-        if (pj?.status === "succeeded") {
-          frameUrl = typeof pj.output === "string"
-            ? pj.output
-            : Array.isArray(pj.output) ? pj.output[0] : null;
-          break;
-        }
-        if (pj?.status === "failed" || pj?.status === "canceled") break;
-      }
-    }
-    if (!frameUrl) {
-      console.warn("[plate-face-detect] no frameUrl returned from ffmpeg-extract-frame");
-      return null;
-    }
+    if (typeof out === "string") frameUrl = out;
+    else if (Array.isArray(out) && typeof out[0] === "string") frameUrl = out[0];
+    else if (out && typeof (out as any)?.url === "function") frameUrl = (out as any).url();
+    else if (out && typeof (out as any)?.url === "string") frameUrl = (out as any).url;
+  } catch (e) {
+    console.warn(`[plate-face-detect] ffmpeg-extract-frame SDK failed: ${(e as Error)?.message}`);
+  }
 
-    // Rehost into our own bucket so the URL is stable & Gemini can fetch it
-    // (Replicate URLs expire after ~1h).
+  // Fallback: lucataco/frame-extractor (different model, returns last frame by default;
+  // we ask for first frame which is close enough to mid for our face-locate purpose).
+  if (!frameUrl) {
+    try {
+      const replicate = new Replicate({ auth: REPLICATE_API_TOKEN });
+      const out: any = await replicate.run(
+        "lucataco/frame-extractor" as `${string}/${string}`,
+        { input: { video: params.plateUrl, return_first_frame: true } },
+      );
+      if (typeof out === "string") frameUrl = out;
+      else if (Array.isArray(out) && typeof out[0] === "string") frameUrl = out[0];
+      else if (out && typeof (out as any)?.url === "function") frameUrl = (out as any).url();
+      else if (out && typeof (out as any)?.url === "string") frameUrl = (out as any).url;
+    } catch (e) {
+      console.warn(`[plate-face-detect] frame-extractor fallback failed: ${(e as Error)?.message}`);
+    }
+  }
+
+  if (!frameUrl) {
+    console.warn("[plate-face-detect] no frameUrl returned from any extractor");
+    return null;
+  }
+
+  // Rehost into our own bucket so the URL is stable & Gemini can fetch it
+  // (Replicate URLs expire after ~1h).
+  try {
     const pngRes = await fetch(frameUrl);
     if (!pngRes.ok) {
       console.warn(`[plate-face-detect] fetch frame ${pngRes.status}`);
-      return null;
+      return frameUrl;
     }
     const bytes = new Uint8Array(await pngRes.arrayBuffer());
     const path = `${params.projectId}/plate-frames/${params.sceneId}-${Date.now()}.png`;
@@ -152,15 +153,15 @@ async function extractPlateFrame(params: {
       });
     if (up.error) {
       console.warn(`[plate-face-detect] storage upload failed: ${up.error.message}`);
-      return frameUrl; // Fall back to Replicate URL (short-lived but still usable for Gemini).
+      return frameUrl;
     }
     const { data: pub } = params.supabase.storage
       .from("composer-frames")
       .getPublicUrl(path);
     return pub.publicUrl;
   } catch (e) {
-    console.warn(`[plate-face-detect] extract exception: ${(e as Error)?.message}`);
-    return null;
+    console.warn(`[plate-face-detect] rehost exception: ${(e as Error)?.message}`);
+    return frameUrl;
   }
 }
 
