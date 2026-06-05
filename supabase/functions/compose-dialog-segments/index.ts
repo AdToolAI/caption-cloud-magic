@@ -437,7 +437,7 @@ serve(async (req) => {
       existing &&
       (
         (existing.version === 5 && existing.engine === "sync-segments") ||
-        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45 || (existing as any).version === 46 || (existing as any).version === 47 || (existing as any).version === 48 || (existing as any).version === 49
+        (existing as any).version === 41 || (existing as any).version === 42 || (existing as any).version === 43 || (existing as any).version === 44 || (existing as any).version === 45 || (existing as any).version === 46 || (existing as any).version === 47 || (existing as any).version === 48 || (existing as any).version === 49 || (existing as any).version === 50 || (existing as any).version === 51 || (existing as any).version === 52
       ) &&
       ["queued", "rendering", "retrying"].includes(String(existing.status))
     ) {
@@ -879,26 +879,29 @@ serve(async (req) => {
         );
       } else {
         // ─────────────────────────────────────────────────────────────
-        // v51 — Pro + per-segment bounding_boxes from REAL PLATE faces
+        // v52 — Pro + per-segment frame_number + coordinates (POINT ASD)
         // ─────────────────────────────────────────────────────────────
-        // v50 (lipsync-2-pro + bounding_boxes derived from ANCHOR face-map
-        // rescaled to plate dims) reliably completed but the rescaled
-        // boxes landed on empty background pixels on shoulder-to-shoulder
-        // 3+ speaker plates (Hailuo's framing drifts 5–15 % vs the still
-        // anchor). Sync.so silently no-ops segments whose bounding_box
-        // doesn't contain a face → user sees finished video with
-        // motionless lips (the exact June 5 regression).
+        // v50/v51 sent `bounding_boxes` per segment as a single static
+        // 4-tuple repeated for every frame. Per Sync.so docs
+        // (developer-guides/speaker-selection) `bounding_boxes` is meant
+        // as a *per-frame array across the entire video* (one entry per
+        // frame, [x1,y1,x2,y2] or null) — our shape was malformed.
         //
-        // v51 fixes this end-to-end by detecting faces DIRECTLY on the
-        // rendered plate: extract a mid-frame (lucataco/ffmpeg-extract-frame),
-        // ask Gemini Vision for normalized bboxes, scale to plate pixels.
-        // Map speakers to plate-faces via left-to-right ordering (the
-        // anchor face-map already guarantees consistent l-to-r identity).
+        // v52 switches to the doc-recommended "Manual selection" mode for
+        // multi-person clips: per-segment
+        // `optionsOverride.active_speaker_detection = { auto_detect: false,
+        // frame_number, coordinates: [cx, cy] }`. Point-based ASD is
+        // tolerant — even if the point sits 30–50 px from the real face
+        // Sync.so snaps to the closest face. This makes anchor-derived
+        // centres usable as a standalone fallback when plate detection
+        // is unavailable (which it currently is — the Replicate frame-
+        // extract models lucataco/ffmpeg-extract-frame &
+        // lucataco/frame-extractor both return 404 as of June 5, 2026).
         //
-        // Fallback chain:
-        //   1. plate-detection (≥ N faces)             → v51 boxes
-        //   2. plate-detection (< N faces) | exception → v50 anchor-rescale boxes
-        //   3. no boxes at all                          → Sync.so auto_detect
+        // Source priority for (cx, cy):
+        //   1. plate-detected face centre (if frame extraction succeeds)
+        //   2. anchor face-map face centre, rescaled to plate pixels
+        //   3. even-spaced heuristic (x = 0.2 + 0.6·i/(N-1), y = 0.5)
         const V50_FPS = 24;
         const plateW = (plateDims?.width ?? videoDims.width) || 1280;
         const plateH = (plateDims?.height ?? videoDims.height) || 720;
@@ -906,7 +909,7 @@ serve(async (req) => {
         const fmW = Number((faceMap as any)?.width) || plateW;
         const fmH = Number((faceMap as any)?.height) || plateH;
 
-        // ── v51 PLATE-SIDE DETECTION ─────────────────────────────────
+        // ── PLATE-SIDE DETECTION (best-effort, optional) ─────────────
         let plateFaceMap: Awaited<ReturnType<typeof detectPlateFaces>> = null;
         try {
           plateFaceMap = await detectPlateFaces({
@@ -921,138 +924,116 @@ serve(async (req) => {
           });
         } catch (e) {
           console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v51 plate-detect EXCEPTION: ${(e as Error)?.message} — falling back to anchor-rescale`,
+            `[compose-dialog-segments] scene=${sceneId} v52 plate-detect EXCEPTION: ${(e as Error)?.message} — degrading to anchor centres`,
           );
         }
         const usePlateDetection =
           !!plateFaceMap && plateFaceMap.faces.length >= speakers.length;
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v51 plate_detect=${
+          `[compose-dialog-segments] scene=${sceneId} v52 plate_detect=${
             usePlateDetection ? "ok" : "fallback-anchor"
           } plate_faces=${plateFaceMap?.faces.length ?? 0} expected=${speakers.length} ` +
           `cached=${plateFaceMap?.cached ?? false}`,
         );
 
-        // v51.2 — Soft fallback when plate detection fails.
-        // Anchor-rescaled boxes on shoulder-to-shoulder 3+ speaker plates
-        // landed on empty background pixels and triggered Sync.so's opaque
-        // "unknown error" loop (motionless lips → 13-min wait → failure).
-        // Falling all segments back to Sync.so's own `auto_detect` (no
-        // optionsOverride) is the v49 behaviour that reliably COMPLETED —
-        // it can occasionally swap which speaker animates, but the user
-        // gets a working lip-synced video instead of a hard failure.
-        const forceAutoDetectFallback =
-          !usePlateDetection && speakers.length >= 3;
-        if (forceAutoDetectFallback) {
-          console.warn(
-            `[compose-dialog-segments] scene=${sceneId} v51 plate-detect unavailable → AUTO_DETECT fallback (no per-segment bounding_boxes, Sync.so picks faces itself)`,
-          );
-        }
-
         // Pre-compute left-to-right ordering of ANCHOR faces (fallback chain).
         const fmFacesByX = [...fmFacesAll]
           .filter((f) => Array.isArray(f?.bbox) && f.bbox.length === 4)
           .sort((a, b) => {
-            const ax = (Number(a.bbox[0]) + Number(b.bbox[2])) / 2;
+            const ax = (Number(a.bbox[0]) + Number(a.bbox[2])) / 2;
             const bx = (Number(b.bbox[0]) + Number(b.bbox[2])) / 2;
             return ax - bx;
           });
 
+        type PointSource =
+          | "plate-detected"
+          | "anchor-characterId"
+          | "anchor-slotIndex"
+          | "anchor-left-to-right"
+          | "even-spaced";
 
-
-        const boxForSpeaker = (speakerIdx: number, characterId: string | null): [number, number, number, number] | null => {
-          // PRIMARY: plate-side detected faces, mapped by left-to-right slot.
-          // The anchor face-map already guarantees that characterId order
-          // matches left-to-right order on the anchor; Hailuo preserves
-          // relative ordering even when individual positions drift.
+        const pointForSpeaker = (
+          speakerIdx: number,
+          characterId: string | null,
+        ): { point: [number, number]; source: PointSource } => {
+          // PRIMARY: plate-detected face centre.
           if (usePlateDetection && plateFaceMap) {
-            const plateFace = plateFaceMap.faces[speakerIdx];
-            if (plateFace && Array.isArray(plateFace.bbox) && plateFace.bbox.length === 4) {
-              const [px1, py1, px2, py2] = plateFace.bbox;
-              // Pad 20% — plate detection is precise so a smaller pad is safe.
-              const padX = Math.max(0, (px2 - px1)) * 0.20;
-              const padY = Math.max(0, (py2 - py1)) * 0.20;
-              const x1 = Math.max(0, Math.round(px1 - padX));
-              const y1 = Math.max(0, Math.round(py1 - padY));
-              const x2 = Math.min(plateW, Math.round(px2 + padX));
-              const y2 = Math.min(plateH, Math.round(py2 + padY));
-              if (x2 > x1 + 4 && y2 > y1 + 4) return [x1, y1, x2, y2];
+            const pf = plateFaceMap.faces[speakerIdx];
+            if (pf && Array.isArray(pf.bbox) && pf.bbox.length === 4) {
+              const [x1, y1, x2, y2] = pf.bbox.map((n: any) => Number(n));
+              if ([x1, y1, x2, y2].every(Number.isFinite)) {
+                const cx = Math.round(Math.max(0, Math.min(plateW, (x1 + x2) / 2)));
+                const cy = Math.round(Math.max(0, Math.min(plateH, (y1 + y2) / 2)));
+                return { point: [cx, cy], source: "plate-detected" };
+              }
             }
           }
-          // v51.2 — when plate detection failed for a 3+ speaker scene,
-          // SUPPRESS anchor-rescale fallback entirely. The whole scene
-          // routes through Sync.so auto_detect, which is the only path
-          // proven to complete in this configuration.
-          if (forceAutoDetectFallback) return null;
-          // FALLBACK: anchor face-map rescaled to plate (legacy v50 logic).
-          const matched =
-            (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) ||
-            fmFacesAll.find((f) => Number(f?.slotIndex) === Number(speakerIdx)) ||
-            fmFacesByX[speakerIdx] ||
-            null;
-          if (!matched || !Array.isArray(matched.bbox) || matched.bbox.length !== 4) return null;
-          const [bx1, by1, bx2, by2] = matched.bbox.map((n: any) => Number(n));
-          if (!Number.isFinite(bx1) || !Number.isFinite(by1) || !Number.isFinite(bx2) || !Number.isFinite(by2)) return null;
-          const sx = plateW / Math.max(1, fmW);
-          const sy = plateH / Math.max(1, fmH);
-          const padX = Math.max(0, (bx2 - bx1)) * 0.15;
-          const padY = Math.max(0, (by2 - by1)) * 0.15;
-          const x1 = Math.max(0, Math.round((bx1 - padX) * sx));
-          const y1 = Math.max(0, Math.round((by1 - padY) * sy));
-          const x2 = Math.min(plateW, Math.round((bx2 + padX) * sx));
-          const y2 = Math.min(plateH, Math.round((by2 + padY) * sy));
-          if (x2 <= x1 + 4 || y2 <= y1 + 4) return null;
-          return [x1, y1, x2, y2];
+          // SECONDARY: anchor face-map centre rescaled to plate.
+          let src: PointSource = "anchor-left-to-right";
+          let matched: any =
+            (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) || null;
+          if (matched) src = "anchor-characterId";
+          if (!matched) {
+            matched = fmFacesAll.find((f) => Number(f?.slotIndex) === Number(speakerIdx)) || null;
+            if (matched) src = "anchor-slotIndex";
+          }
+          if (!matched) matched = fmFacesByX[speakerIdx] || null;
+          if (matched && Array.isArray(matched.bbox) && matched.bbox.length === 4) {
+            const [bx1, by1, bx2, by2] = matched.bbox.map((n: any) => Number(n));
+            if ([bx1, by1, bx2, by2].every(Number.isFinite)) {
+              const sx = plateW / Math.max(1, fmW);
+              const sy = plateH / Math.max(1, fmH);
+              const cx = Math.round(Math.max(0, Math.min(plateW, ((bx1 + bx2) / 2) * sx)));
+              const cy = Math.round(Math.max(0, Math.min(plateH, ((by1 + by2) / 2) * sy)));
+              return { point: [cx, cy], source: src };
+            }
+          }
+          // TERTIARY: even-spaced heuristic across the plate width.
+          const N = Math.max(1, speakers.length);
+          const t = N === 1 ? 0.5 : 0.2 + (0.6 * speakerIdx) / (N - 1);
+          const cx = Math.round(t * plateW);
+          const cy = Math.round(0.5 * plateH);
+          return { point: [cx, cy], source: "even-spaced" };
         };
 
-
         const v41Segments: Array<Record<string, unknown>> = [];
-        const v50BoxDiag: Array<{ refId: string; box: number[] | null; source: string }> = [];
+        const v50BoxDiag: Array<{ refId: string; point: number[] | null; source: string }> = [];
+        const pointSourceCounts: Record<string, number> = {};
         v41SpeakerRefs.forEach(({ idx, refId, name, characterId }) => {
           const sp = speakers[idx];
           const turns: Turn[] = Array.isArray(sp?.voicedRange?.turns)
             ? (sp!.voicedRange!.turns as Turn[])
             : [];
-          const box = boxForSpeaker(idx, characterId);
-          const boxSource = box
-            ? (usePlateDetection && plateFaceMap?.faces[idx]
-                ? "plate-detected"
-                : characterId && fmFacesAll.some((f) => f?.characterId === characterId)
-                  ? "anchor-characterId"
-                  : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
-                    ? "anchor-slotIndex"
-                    : "anchor-left-to-right")
-            : "none";
-          v50BoxDiag.push({ refId, box, source: boxSource });
+          const { point, source } = pointForSpeaker(idx, characterId);
+          pointSourceCounts[source] = (pointSourceCounts[source] ?? 0) + 1;
+          v50BoxDiag.push({ refId, point, source });
           for (const t of turns) {
             const sRaw = Math.max(0, Number(t.startSec));
             const eRaw = Math.min(totalSec, Math.max(sRaw + MIN_TURN_DUR_SEC, Number(t.endSec)));
             if (!Number.isFinite(sRaw) || !Number.isFinite(eRaw) || eRaw <= sRaw + 0.05) continue;
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
+            const frameNumber = Math.max(0, Math.round(s * V50_FPS));
             const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
               audioInput: { refId, startTime: s, endTime: e },
+              // Per Sync.so docs (developer-guides/speaker-selection),
+              // the four ASD variants are mutually exclusive. Manual
+              // point selection (`frame_number` + `coordinates`) is the
+              // recommended deterministic mode for multi-person clips.
+              optionsOverride: {
+                active_speaker_detection: {
+                  auto_detect: false,
+                  frame_number: frameNumber,
+                  coordinates: point,
+                },
+              },
             };
-            if (box) {
-              // Per Sync.so Segments + speaker-selection docs: bounding_boxes
-              // is a frame-indexed array of [x1,y1,x2,y2] (or nulls) covering
-              // the segment's duration. The four ASD variants (auto_detect /
-              // v3 / frame_number+coordinates / bounding_boxes) are mutually
-              // exclusive, and the June 2026 probes proved only the
-              // `coordinates` combo triggers "unknown error"; bounding_boxes
-              // is the safe deterministic alternative.
-              const segFrames = Math.max(1, Math.ceil((e - s) * V50_FPS));
-              const frameBoxes: number[][] = new Array(segFrames).fill(box);
-              (seg as any).optionsOverride = {
-                active_speaker_detection: { bounding_boxes: frameBoxes },
-              };
-            }
             v41Segments.push(seg);
           }
           console.log(
-            `[compose-dialog-segments] scene=${sceneId} v50 speaker=${refId} name=${name} box=${JSON.stringify(box)} src=${boxSource}`,
+            `[compose-dialog-segments] scene=${sceneId} v52 speaker=${refId} name=${name} point=${JSON.stringify(point)} src=${source}`,
           );
         });
         v41Segments.sort((a: any, b: any) => Number(a.startTime) - Number(b.startTime));
@@ -1090,11 +1071,12 @@ serve(async (req) => {
         const v41Webhook = appendWebhookToken(
           `${supabaseUrl}/functions/v1/sync-so-webhook?scene_id=${sceneId}`,
         );
-        // v50 — Pro for fidelity + per-segment bounding_boxes for deterministic
-        // speaker targeting (auto-ASD in v49 lost speaker_3 on dense plates).
+        // v52 — Pro for fidelity + per-segment frame_number+coordinates
+        // (doc-conform POINT ASD). Replaces the malformed per-frame box
+        // payload from v50/v51.
         const V50_MODEL = "lipsync-2-pro";
-        const segmentsWithBox = v41Segments.filter((s) => (s as any).optionsOverride).length;
-        const segmentsAutoFallback = v41Segments.length - segmentsWithBox;
+        const segmentsWithBox = v41Segments.length; // every v52 segment carries a point
+        const segmentsAutoFallback = 0;
         const v41Payload = {
           model: V50_MODEL,
           input: v41Inputs,
@@ -1104,12 +1086,13 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v51_official_segments_payload model=${V50_MODEL} asd=bounding_boxes_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v52_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
-          `segments=${v41Segments.length} with_box=${segmentsWithBox} auto_fallback=${segmentsAutoFallback} ` +
-          `totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} faces=${fmFacesAll.length} ` +
-          `plate_detected=${usePlateDetection} boxes=${JSON.stringify(v50BoxDiag)}`,
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
+          `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
+          `point_sources=${JSON.stringify(pointSourceCounts)} points=${JSON.stringify(v50BoxDiag)}`,
         );
+
 
         const v41Resp = await fetch(`${SYNC_API_BASE}/generate`, {
           method: "POST",
@@ -1139,9 +1122,9 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 51,
-                engine: "sync-official-segments-v51",
-                asd_mode: "bounding_boxes_per_segment",
+                version: 52,
+                engine: "sync-official-segments-v52",
+                asd_mode: "point_per_segment",
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
@@ -1156,7 +1139,7 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v51",
+            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
             sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
@@ -1178,16 +1161,16 @@ serve(async (req) => {
         if (!v41JobId) return json({ error: "v50_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
-          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v51",
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v52",
         });
         await recordCircuitSuccess(supabase, "sync.so");
 
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 51,
-          engine: "sync-official-segments-v51",
-          asd_mode: "bounding_boxes_per_segment",
+          version: 52,
+          engine: "sync-official-segments-v52",
+          asd_mode: "point_per_segment",
           status: "rendering",
           model: V50_MODEL,
           sync_job_id: v41JobId,
@@ -1198,6 +1181,8 @@ serve(async (req) => {
           v50_box_map: v50BoxDiag,
           v50_segments_with_box: segmentsWithBox,
           v50_segments_auto_fallback: segmentsAutoFallback,
+          point_sources: pointSourceCounts,
+          plate_detected: usePlateDetection,
           cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
           refunded: false,
           retry_count: v41RetryCount,
@@ -1212,7 +1197,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v51_official_segments",
+            twoshot_stage: "syncso_v52_official_segments",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1221,7 +1206,7 @@ serve(async (req) => {
           .eq("id", sceneId);
 
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v51",
+          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
           job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
@@ -1247,7 +1232,7 @@ serve(async (req) => {
             status: "rendering",
             scene_id: sceneId,
             sync_job_id: v41JobId,
-            engine: "sync-official-segments-v51",
+            engine: "sync-official-segments-v52",
             model: V50_MODEL,
             segments: v41Segments.length,
             segments_with_box: segmentsWithBox,
