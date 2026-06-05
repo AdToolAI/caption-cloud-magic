@@ -1,70 +1,58 @@
-## Ziel
+## Befund
 
-Zwei dokumentationswidrige Bugs in der Lip-Sync-Pipeline beseitigen, die in der DB- und Sync.so-Forensik klar als Ursache der `An unknown error occurred`-Failures identifiziert wurden. Keine Architekturänderung, kein Modellwechsel, kein neues Feature.
+Der neue Fehlversuch ist nicht durch die gerade behobenen `segments_secs`-/Silent-Audio-Probleme gelaufen.
 
-## Bug 1 — `segments_secs` aus dem Sync.so-Payload entfernen
+Was die Logs zeigen:
+- Szene: `234e9192-0b8b-4fad-80c4-b76a6da900c9`
+- Aktiver Engine-Pfad: `sync-official-segments-v52`
+- Modell: `lipsync-2-pro`
+- 2 Sync.so-Jobs wurden dispatcht und beide kamen nach ca. 18–20s mit `An unknown error occurred.` zurück.
+- Der Sync.so-GET-Payload enthält **kein** `segments_secs` mehr.
+- Audio wurde sauber erzeugt: Samuel ~2.276s, Matthew ~0.882s, Kailee ~2.972s.
+- Refund wurde ausgelöst: `refunded=true`, 81 Credits.
 
-**Problem (verifiziert per Sync.so GET):**
-```json
-"input": [
-  { "url": "...plate.mp4", "type": "video", "segments_secs": [[3.81, 7.082]] },
-  { "url": "...audio.wav", "type": "audio" }
-]
-```
-`segments_secs` ist in keiner Sync.so-Doku-Seite dokumentiert (Segments Guide, Speaker Selection, Modell-Seiten lipsync-2 / lipsync-2-pro / sync-3). Für sync-3 widerspricht es zusätzlich der dokumentierten Architektur ("builds a global understanding across the entire shot, generating all frames at once").
+Wichtig: Der v53-Fix saß primär im alten Fan-Out-/Per-Pass-Pfad. Diese 3-Sprecher-Szene nahm aber vorher den `v52 official segments` Single-Call-Pfad. Deshalb konnte der neue Test trotz v53 weiterhin failen.
 
-**Fix in `supabase/functions/compose-dialog-segments/index.ts`** (Stelle: Zeile 1942–1945):
+## Wahrscheinlichste Ursache
 
-- `videoInput.segments_secs = speakerWindowsSecs` komplett entfernen.
-- Bei mehreren Sprechern verlassen wir uns ausschließlich auf die bereits aktive `audio_tight`-Slicing-Logik (v39) plus `sync_mode: "cut_off"`. Das ist die dokumentierte Variante.
-- Falls `audio_tight` fehlschlägt, fallen wir nicht mehr stillschweigend auf `segments_secs` zurück, sondern markieren den Pass als `prepare_failed_no_tight_audio`, refunden und brechen sauber ab (kein blinder Doku-Verstoß mehr).
+Der aktive v52-Pfad verwendet zwar Sync.so `segments[]`, aber weiterhin `lipsync-2-pro` auf einer weitgehend statischen/posed 3-Personen-Hailuo-Szene.
 
-## Bug 2 — Silent-Audio-Gate vor jedem Sync.so-Dispatch
+Die offizielle Sync.so-Doku sagt dazu:
+- `lipsync-2`/`lipsync-2-pro` brauchen natürliche Sprechbewegung im Inputvideo.
+- Bei statischen/stillen Lippen funktioniert es schlecht oder gar nicht.
+- `sync-3` kann stille Lippen öffnen und ist für komplexe Shots/Obstructions/mehrere Personen robuster.
 
-**Problem (verifiziert per DB):** In mehreren `sync3-coords`-Failed-Passes war `audio_repair.peak_dbfs = 0`, d. h. die hochgeladene WAV-Datei war komplett stumm. Sync.so hat trotzdem den Job angenommen und nach ~20 s mit `An unknown error occurred` quittiert. Beispiel-Passes:
+Außerdem ist unser Codekommentar an der Stelle veraltet/wahrscheinlich falsch: Er behauptet, `sync-3` ignoriere `segments[]`. Die aktuelle Doku listet `active_speaker_detection` für `sync-3`, und Segments sind als Generate-API-Feature dokumentiert, nicht als `lipsync-2-pro`-only.
 
-| Scene | Speaker | peak_dbfs |
-|---|---|---|
-| 10fd0f82 | Matthew | 0 |
-| 4e7a0601 | Kailee | 0 |
-| 64b2ae86 | Matthew, Kailee | 0 |
-| 61edb887 | Samuel | 0 |
+## Plan zur Behebung
 
-**Fix in `supabase/functions/compose-dialog-segments/index.ts`**:
+1. **v52 Official-Segments-Pfad auf `sync-3` umstellen**
+   - In `compose-dialog-segments/index.ts` den 3+ Sprecher `sync-official-segments-v52` Dispatch von `lipsync-2-pro` auf `sync-3` ändern.
+   - Veraltete Kommentare entfernen/aktualisieren, damit wir nicht erneut gegen die Doku arbeiten.
+   - Payload bleibt weiter doc-strict: `input[]`, `segments[]`, `options.sync_mode`, `optionsOverride.active_speaker_detection`.
 
-- Direkt vor `fetch(SYNC_API_BASE/generate)` neue Vorab-Prüfung:
-  - Wenn der Pass `audio_repair.peak_dbfs <= -50` ODER `peak_dbfs === 0` ODER `peak_dbfs === null` UND `audio_tight` nicht vorhanden → Dispatch abbrechen.
-  - Pass-Status `failed`, `last_error = "speaker_audio_silent_or_invalid"`, `last_error_class = "input_audio_silent"`.
-  - Triggert den existierenden idempotenten Refund-Pfad, der bei `failed`-Passes mit nicht-`refunded` State greift.
-- Logzeile: `scene=… pass=… SILENT_AUDIO_GATE peak_dbfs=… url=…` für saubere Forensik.
+2. **sync-3-kompatible Optionen bereinigen**
+   - Keine `temperature`, keine `occlusion_detection_enabled`, kein unsupported Sonderkram im `sync-3`-Segments-Pfad.
+   - `active_speaker_detection` bleibt pro Segment erhalten, weil laut Sync.so-Modellvergleich auf allen LipSync-Modellen unterstützt.
 
-Sekundärer Fix im Audio-Producer `supabase/functions/compose-twoshot-audio/index.ts` (sofern dort die Repair-WAV erzeugt wird): warnen statt schweigend hochladen, wenn das Resultat `peak_dbfs <= -50` hat. Damit verschiebt sich das Problem aus der Sync.so-Phase nach vorne und ist beim Auftreten sofort lokalisierbar.
+3. **Failure-Ladder korrigieren**
+   - Wenn der offizielle Segments-Pfad bereits `sync-3` nutzt und erneut mit Provider-Unknown failed, nicht denselben `lipsync-2-pro`-Retry wiederholen.
+   - Stattdessen klar failen/refunden oder nur einen sauberen `sync-3` Retry erlauben.
+   - Ziel: keine sinnlosen 2 identischen `lipsync-2-pro` Versuche mehr.
 
-## Was bewusst NICHT geändert wird
+4. **Diagnostik sichtbar machen**
+   - Logzeile eindeutig ändern auf z. B. `v54_official_segments_payload model=sync-3`.
+   - Dispatch-Log-Meta soll `model: sync-3`, `segments_count`, `point_sources`, `plate_detected` zeigen.
 
-- Kein Modellwechsel (lipsync-2-pro bleibt Default, sync3-coords bleibt Retry-Variante wie heute in v37).
-- Kein Wechsel zu Single-Call-Segments.
-- Keine Reaktivierung des Face-Crop-Preclip-Pfads.
-- Keine Änderungen an `render-sync-segments-audio-mux`, `sync-so-webhook`, `poll-dialog-shots`.
-- Keine Schema-Migrations, keine neuen Versions-Gates.
+5. **Deploy + erneuter Test**
+   - Nur die betroffenen Edge Functions deployen: voraussichtlich `compose-dialog-segments` und ggf. `sync-so-webhook`.
+   - Danach dieselbe 3-Sprecher-Szene sauber neu starten.
+   - Erwartung in Logs: `segments_secs` weiterhin absent, aber `model=sync-3` im Sync.so Payload.
 
-## Test
+## Nicht Teil dieses Fixes
 
-1. Eine Szene mit 3 Sprechern frisch dispatchen (z. B. via Reset des bestehenden 3-Sprecher-Testfalls).
-2. In Edge-Logs nach `SILENT_AUDIO_GATE` und `segments_secs` suchen — letzteres darf nicht mehr im Payload auftauchen.
-3. Sync.so-GET auf die generierten Job-IDs (über die in `dialog_shots.passes[].job_id` gespeicherten IDs) prüfen: `input[0]` darf nur `url` und `type` enthalten.
-4. Erwartung: deutlich höhere Done-Rate; verbleibende Fehler haben einen klaren Code (`speaker_audio_silent_or_invalid`) statt `provider_unknown_error`.
-5. Wenn Done-Rate nicht mindestens das Niveau der `coords-pro`-Variante (historisch 8/9) erreicht, klares Signal, dass weitere Maßnahmen (z. B. Face-Crop oder sync-3-Default) nötig sind — die dann auf sauberer Datenbasis getroffen werden können.
-
-## Memory-Update nach Implementierung
-
-Eine kurze Memory-Notiz unter `mem://architecture/lipsync/v53-doc-compliance-fixes` mit den zwei Regeln:
-
-- Sync.so-Payload darf kein undokumentiertes `segments_secs` enthalten.
-- Vor jedem Sync.so-Dispatch muss ein Silent-Audio-Gate greifen (`peak_dbfs > -50`).
-
-## Geschätzter Umfang
-
-- 1 Datei chirurgisch geändert (`compose-dialog-segments`), ~30–50 Zeilen.
-- Optional 1 Warnlog in `compose-twoshot-audio`, ~5 Zeilen.
-- Keine DB-Migration. Kein Frontend-Change.
+- Kein Zurück zu `segments_secs`.
+- Kein Face-Crop-Preclip aktivieren.
+- Keine Änderung an der UI.
+- Keine DB-Migration.
+- Kein Wechsel auf Single-Call ohne Segments.
