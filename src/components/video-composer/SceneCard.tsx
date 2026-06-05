@@ -2107,6 +2107,60 @@ export default function SceneCard({
                   );
                 })()}
 
+              {/* Stage A — World Refs badge + per-scene opt-out.
+                  Counts come from the prompt mentions + UnifiedAssetPicker slugs
+                  via the same resolver the pipeline uses, so the badge
+                  reflects exactly what Nano Banana 2 will receive. */}
+              {secondaryOpen &&
+                scene.clipSource.startsWith("ai-") &&
+                (() => {
+                  const refs = resolveSceneWorldRefs(scene, libLocations);
+                  const counts = {
+                    loc: refs.filter((r) => r.kind === "location").length,
+                    bld: refs.filter((r) => r.kind === "building").length,
+                    prop: refs.filter((r) => r.kind === "prop").length,
+                  };
+                  const total = counts.loc + counts.bld + counts.prop;
+                  if (total === 0 && !scene.ignoreWorldRefs) return null;
+                  const ignored = scene.ignoreWorldRefs === true;
+                  return (
+                    <div
+                      className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 ${
+                        ignored
+                          ? "border-border bg-muted/30 text-muted-foreground"
+                          : "border-cyan-500/40 bg-cyan-500/10 text-cyan-200"
+                      }`}
+                      title="Welche World-Assets fließen als Bild-Referenz in die Szenen-Komposition (Nano Banana 2)?"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-semibold">
+                          {ignored
+                            ? "World-Refs: aus"
+                            : `World-Refs: 📍×${counts.loc} 🏛️×${counts.bld} 📦×${counts.prop}`}
+                        </span>
+                        <span className="text-[9px] opacity-80">
+                          {ignored
+                            ? "Locations / Buildings / Props nur als Text — keine Bild-Referenz"
+                            : "Diese World-Assets werden in die Szenen-Komposition gerendert"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onUpdate({ ignoreWorldRefs: !ignored })
+                        }
+                        className={`px-2 py-1 rounded text-[10px] font-medium transition-all whitespace-nowrap ${
+                          ignored
+                            ? "text-muted-foreground hover:text-foreground border border-border"
+                            : "bg-cyan-500/20 text-cyan-200 ring-1 ring-cyan-500/40"
+                        }`}
+                      >
+                        {ignored ? "Aktivieren" : "Ignorieren"}
+                      </button>
+                    </div>
+                  );
+                })()}
+
               {/* Lip-Sync toggle — Phase 3: hidden behind "Mehr ▾". */}
               {secondaryOpen &&
                 scene.clipSource.startsWith("ai-") &&
