@@ -90,6 +90,14 @@ serve(async (req) => {
       : (body.portraitUrl ? [body.portraitUrl] : []);
     const names = (body.characterNames ?? []).slice(0, portraits.length);
 
+    // Stage A — World refs. Hard caps: 1 location, 1 building, 3 props.
+    const locationUrls = (body.locationUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
+    const buildingUrls = (body.buildingUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
+    const propUrls = (body.propUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 3);
+    const locationNames = (body.locationNames ?? []).slice(0, locationUrls.length);
+    const buildingNames = (body.buildingNames ?? []).slice(0, buildingUrls.length);
+    const propNames = (body.propNames ?? []).slice(0, propUrls.length);
+
     if (!body.sceneId || portraits.length === 0 || !body.scenePrompt) {
       return new Response(JSON.stringify({ error: "missing fields" }), {
         status: 400,
