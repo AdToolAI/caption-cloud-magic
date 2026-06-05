@@ -47,8 +47,9 @@ const PRESET_VOICES = [
 ];
 
 function makeCharId(name: string): string {
+  const safe = typeof name === 'string' ? name : '';
   return (
-    name.toLowerCase()
+    safe.toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')

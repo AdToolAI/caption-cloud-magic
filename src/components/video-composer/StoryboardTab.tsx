@@ -84,6 +84,33 @@ export default function StoryboardTab({
   isGeneratingStoryboard = false,
 }: StoryboardTabProps) {
   const { t } = useTranslation();
+
+  // Defensive: filter out cast entries with no usable `name`.
+  // A single library asset that lost its name (e.g. legacy import,
+  // mid-edit draft, LLM-generated character row without a name) used to
+  // crash the entire Storyboard tab via deeply-nested `.name.toLowerCase()`
+  // calls — especially at 4-character casts where one entry is often empty.
+  // Single source of truth so every child gets the same sanitized list.
+  const safeCharacters = useMemo<ComposerCharacter[]>(
+    () =>
+      (characters ?? []).filter(
+        (c): c is ComposerCharacter =>
+          !!c && typeof c.name === 'string' && c.name.trim().length > 0,
+      ),
+    [characters],
+  );
+  const droppedCharacterCount = (characters?.length ?? 0) - safeCharacters.length;
+  useEffect(() => {
+    if (droppedCharacterCount > 0) {
+      // Soft warning only — no toast spam on every re-render.
+      console.warn(
+        '[StoryboardTab] ignored',
+        droppedCharacterCount,
+        'character(s) without a name to keep the storyboard renderable.',
+      );
+    }
+  }, [droppedCharacterCount]);
+
   // Master "Alle Clips generieren" — replaces the old "→ Clips generieren" tab
   // navigation. Uses the same proven pipeline as ClipsTab (extracted hook).
   const {
@@ -97,7 +124,7 @@ export default function StoryboardTab({
   } = useGenerateAllClips({
     scenes,
     projectId,
-    characters,
+    characters: safeCharacters,
     onUpdateScenes,
     onEnsurePersisted,
     language,
@@ -374,7 +401,7 @@ export default function StoryboardTab({
   // Stage 18 — inline scene generation directly from the player tile
   const { generate: generateScene, generating: generatingMap } = useSceneGenerate({
     projectId,
-    characters,
+    characters: safeCharacters,
     onOptimisticPatch: (id, patch) => updateScene(id, patch),
     ensureProject: onEnsurePersisted,
   });
@@ -529,7 +556,7 @@ export default function StoryboardTab({
 
       {/* Cast Consistency Map — shows which character appears in which scene
           and the active continuity anchor (reference image / frame chain / prompt). */}
-      <CastConsistencyMap scenes={scenes} characters={characters || []} />
+      <CastConsistencyMap scenes={scenes} characters={safeCharacters} />
 
       {/* Scene Cards — v2 Layout: Cinematic Filmstrip (left) + persistent Studio editor (right) */}
       {scenes.length === 0 ? (
@@ -588,7 +615,7 @@ export default function StoryboardTab({
                       index={selectedIndex}
                       totalScenes={scenes.length}
                       projectId={projectId}
-                      characters={characters}
+                      characters={safeCharacters}
                       preferredAspect={preferredAspect}
                       onUpdate={(updates) => updateScene(selectedScene.id, updates)}
                       onDelete={() => deleteScene(selectedScene.id)}
@@ -626,7 +653,7 @@ export default function StoryboardTab({
                 avatarSlot={
                   <SceneAvatarMode
                     scene={selectedScene}
-                    characters={characters}
+                    characters={safeCharacters}
                     onUpdate={(updates) => updateScene(selectedScene.id, updates)}
                   />
                 }
@@ -681,7 +708,7 @@ export default function StoryboardTab({
         open={talkingHeadOpen}
         onOpenChange={setTalkingHeadOpen}
         projectId={projectId}
-        briefingCharacters={characters}
+        briefingCharacters={safeCharacters}
         onAddBriefingCharacter={onAddCharacter}
         availableScenes={scenes.map((s, i) => ({
           id: s.id,

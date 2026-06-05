@@ -28,7 +28,16 @@ export class ComposerTabErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ComposerTabErrorBoundary]', this.props.label || 'unknown', error, info);
+    // Verbose log so the next crash points at a single source line.
+    // (Previously we only logged the Error object — stack was hidden behind
+    // a collapsed devtools entry which made 4-speaker bugs very hard to trace.)
+    console.error(
+      '[ComposerTabErrorBoundary]',
+      this.props.label || 'unknown',
+      '\nmessage:', error?.message,
+      '\nstack:', error?.stack,
+      '\ncomponentStack:', info?.componentStack,
+    );
   }
 
   private reset = () => this.setState({ hasError: false, error: undefined });

@@ -164,7 +164,9 @@ export function CastConsistencyMap({ scenes, characters }: Props) {
       </TooltipProvider>
 
       {(() => {
-        const orphans = characters.filter((c) =>
+        // Use the same sanitized list as the table so a nameless cast entry
+        // can never crash this render via `.name`-access in the join below.
+        const orphans = safeCharacters.filter((c) =>
           scenes.every((s, i) => getAnchor(s, c, i) === 'absent')
         );
         if (orphans.length === 0) return null;
