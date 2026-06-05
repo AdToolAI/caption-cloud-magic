@@ -1014,10 +1014,18 @@ serve(async (req) => {
             const s = Number(sRaw.toFixed(3));
             const e = Number(eRaw.toFixed(3));
             const frameNumber = Math.max(0, Math.round(s * V50_FPS));
+            // v55 — `audioInput.startTime/endTime` is a crop INSIDE the
+            // referenced audio file (Sync.so docs/developer-guides/segments).
+            // Each speaker has their own short WAV (e.g. 0.88s, 2.27s, 2.97s),
+            // so passing global scene-timeline seconds (e.g. 2.479–3.454)
+            // points outside the WAV and triggered the opaque
+            // "An unknown error occurred." failure. Send `refId` only — the
+            // segment's own `startTime/endTime` already places it on the
+            // video timeline; `sync_mode: "cut_off"` handles length mismatch.
             const seg: Record<string, unknown> = {
               startTime: s,
               endTime: e,
-              audioInput: { refId, startTime: s, endTime: e },
+              audioInput: { refId },
               // Per Sync.so docs (developer-guides/speaker-selection),
               // the four ASD variants are mutually exclusive. Manual
               // point selection (`frame_number` + `coordinates`) is the
@@ -1094,7 +1102,7 @@ serve(async (req) => {
         };
 
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} v54_official_segments_payload model=${V50_MODEL} asd=point_per_segment ` +
+          `[compose-dialog-segments] scene=${sceneId} v55_official_segments_payload model=${V50_MODEL} asd=point_per_segment audio_input_mode=ref_only ` +
           `speakers=${v41SpeakerRefs.length} audio_refs=${JSON.stringify(v41SpeakerRefs.map((s) => s.refId))} ` +
           `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
