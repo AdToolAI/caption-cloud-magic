@@ -992,11 +992,13 @@ serve(async (req) => {
             : [];
           const box = boxForSpeaker(idx, characterId);
           const boxSource = box
-            ? (characterId && fmFacesAll.some((f) => f?.characterId === characterId)
-                ? "characterId"
-                : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
-                  ? "slotIndex"
-                  : "left-to-right")
+            ? (usePlateDetection && plateFaceMap?.faces[idx]
+                ? "plate-detected"
+                : characterId && fmFacesAll.some((f) => f?.characterId === characterId)
+                  ? "anchor-characterId"
+                  : fmFacesAll.some((f) => Number(f?.slotIndex) === idx)
+                    ? "anchor-slotIndex"
+                    : "anchor-left-to-right")
             : "none";
           v50BoxDiag.push({ refId, box, source: boxSource });
           for (const t of turns) {
