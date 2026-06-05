@@ -1919,7 +1919,7 @@ serve(async (req) => {
       // per-speaker WAV equals the turn duration, so output is naturally tight.
       sync_mode: "cut_off",
     };
-    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords") {
+    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
       // frame_number = a frame WHERE THE SPEAKER IS VISIBLE. We anchor on
