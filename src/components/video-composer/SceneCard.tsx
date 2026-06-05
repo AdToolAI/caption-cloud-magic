@@ -120,6 +120,7 @@ import SceneCommentBadge from "./SceneCommentBadge";
 import SceneCommentSheet from "./SceneCommentSheet";
 import { useSceneCommentCounts } from "@/hooks/useComposerCollaboration";
 import { resolveSceneCharacterAnchor } from "@/lib/motion-studio/resolveSceneCharacterAnchor";
+import { resolveSceneWorldRefs } from "@/lib/motion-studio/prepareSceneAnchor";
 import { applyCastToPrompt } from "@/lib/motion-studio/applyCastToPrompt";
 import { syncCastFromPrompt } from "@/lib/motion-studio/syncCastFromPrompt";
 import { applyDialogToPrompt } from "@/lib/motion-studio/applyDialogToPrompt";
