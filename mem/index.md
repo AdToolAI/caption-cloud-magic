@@ -18,7 +18,8 @@ Updated: today
 - **Lip-Sync Pipeline (v51 canonical)**: 3+ speaker path = `compose-dialog-scene` → `compose-dialog-segments` (single Sync.so call, `lipsync-2-pro` + per-segment `bounding_boxes` detected on the rendered plate via Gemini Vision, cached in `plate_face_cache`) → `sync-so-webhook` → `render-sync-segments-audio-mux`. Fallback chain: plate-detect → anchor-rescale (v50) → Sync.so `auto_detect`. Engine `sync-official-segments-v51`, webhook accepts v41..v51. See `mem://architecture/lipsync/v51-plate-side-face-detection`.
 
 ## Memories
-- [Lip-Sync Cleanup v48 (current)](mem://architecture/lipsync/v48-cleanup) — Single canonical pipeline, legacy two-shot deleted, partial-mux race fixed in COMPLETED webhook branch
+- [Lip-Sync v51 Plate-Side Face Detection (current)](mem://architecture/lipsync/v51-plate-side-face-detection) — Gemini Vision on rendered plate + 30d `plate_face_cache`, fallback to v50 anchor-rescale then auto_detect
+- [Lip-Sync Cleanup v48](mem://architecture/lipsync/v48-cleanup) — historical pipeline cleanup, partial-mux race fix
 - [v46 Official Segments (superseded)](mem://architecture/lipsync/v46-lipsync2pro-official-segments) — failed single-call attempt, kept for context
 - [v41–v45 Lip-Sync (superseded)](mem://architecture/lipsync/v43-bounding-boxes-asd) — historical iterations
 - [Per-Turn Tight-Window Lip-Sync v38](mem://architecture/lipsync/per-turn-tight-window-v38) — Fix for speaker-2-talks-in-speaker-3-window bug via segments_secs + turn-start frame_number + windowed compositor
