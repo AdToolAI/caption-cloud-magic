@@ -1154,32 +1154,32 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 55,
+                version: 56,
                 engine: V55_ENGINE,
-                asd_mode: "point_per_segment",
-                audio_input_mode: "ref_only",
+                asd_mode: ASD_MODE,
+                audio_input_mode: AUDIO_INPUT_MODE,
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
                 refunded: alreadyRefunded || (!isV41Retry && Number(v41PrevState?.cost_credits ?? v47Cost) > 0),
-                error: `v50_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
+                error: `v56_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
               lip_sync_status: "failed",
               twoshot_stage: "failed",
-              clip_error: `v50_dispatch_${v41Resp.status}`,
+              clip_error: `v56_dispatch_${v41Resp.status}`,
               updated_at: new Date().toISOString(),
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
             scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
-            sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
+            sync_source_kind: "v56_master_audio_crop", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { audio_input_mode: "ref_only", payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { audio_input_mode: AUDIO_INPUT_MODE, asd_mode: ASD_MODE, payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, master_audio_url: masterAudioUrl } },
           });
-          return json({ error: "v50_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
+          return json({ error: "v56_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
 
         const v41Data = await v41Resp.json();
