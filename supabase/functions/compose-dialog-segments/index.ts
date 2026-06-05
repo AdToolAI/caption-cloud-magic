@@ -979,6 +979,11 @@ serve(async (req) => {
               if (x2 > x1 + 4 && y2 > y1 + 4) return [x1, y1, x2, y2];
             }
           }
+          // v51.2 — when plate detection failed for a 3+ speaker scene,
+          // SUPPRESS anchor-rescale fallback entirely. The whole scene
+          // routes through Sync.so auto_detect, which is the only path
+          // proven to complete in this configuration.
+          if (forceAutoDetectFallback) return null;
           // FALLBACK: anchor face-map rescaled to plate (legacy v50 logic).
           const matched =
             (characterId && fmFacesAll.find((f) => f?.characterId && f.characterId === characterId)) ||
