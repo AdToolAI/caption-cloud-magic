@@ -1,104 +1,39 @@
-## Ergebnis der Analyse
+**Befund**
 
-Ja — wir können diesmal ziemlich klar erkennen, woran es liegt, aber nicht über einen offiziellen Provider-`error_code`.
+- Ja: Ich kann es jetzt klarer erkennen.
+- Der Provider liefert weiterhin **keinen echten Errorcode**: `sync_error_code = null`, `status = FAILED`, `error = "An unknown error occurred."`.
+- Aber unsere eigenen gespeicherten Daten zeigen den eigentlichen Fehler: Der fehlgeschlagene Run wurde **noch mit dem alten Payload** gestartet.
+- In `composer_scenes.dialog_shots.segments` stehen noch diese falschen Felder:
+  - `audioInput.startTime`
+  - `audioInput.endTime`
+- Genau diese Felder sollten seit v55 entfernt sein. Der aktuelle Code macht das bereits, aber der betroffene Run/Retry war noch ein alter `sync-official-segments-v52` Job bzw. stale Scene-State.
 
-Sync.so hat erneut **keinen maschinenlesbaren Errorcode** geliefert:
+**Do I know what the issue is?**
 
-```text
-status: FAILED
-model: sync-3
-error_code: null
-error: "An unknown error occurred."
-```
+Ja. Das aktuell fehlgeschlagene Lip-Sync ist nicht der saubere v55-Run. Es ist noch ein alter/staler Sync.so-Job bzw. Scene-State mit falschem `audioInput`-Crop-Payload. Sync.so gibt dazu leider nur `error_code: null`, aber die DB beweist, dass die falschen `audioInput.startTime/endTime` noch im gesendeten/gespeicherten Segment-State stecken.
 
-Der GET-Fallback gegen den Sync.so-Job hat ebenfalls nur diesen generischen Fehler zurückgegeben. Der eigentliche Hinweis steckt deshalb im von uns gespeicherten Payload.
+**Plan**
 
-## Wahrscheinliche Ursache
+1. **Stale-State-Schutz einbauen**
+   - In `sync-so-webhook` alte v52/v54 Jobs, deren gespeicherte Segmente noch `audioInput.startTime/endTime` enthalten, nicht mehr als normalen Fehler weiterverarbeiten.
+   - Stattdessen sauber als `stale_payload_audio_crop` klassifizieren, inflight Slot freigeben und idempotent refundieren.
 
-Unsere `segments[]` sind formal vorhanden und `model=sync-3` ist aktiv. Der Fehler sitzt sehr wahrscheinlich in `audioInput.startTime/endTime`.
+2. **v55-State eindeutig versionieren**
+   - In `compose-dialog-segments` die neue Dispatch-Version auf `version: 55` und `engine: sync-official-segments-v55` setzen.
+   - In `dialog_shots` zusätzlich `audio_input_mode: "ref_only"` speichern, damit wir sofort sehen, ob wirklich der neue Payload aktiv war.
 
-Aktueller Payload der fehlgeschlagenen Szene:
+3. **Payload-Guard vor Dispatch**
+   - Direkt vor dem Sync.so-Call validieren: Bei per-speaker WAVs darf kein Segment `audioInput.startTime/endTime` enthalten.
+   - Falls doch, sofort lokal abbrechen mit eindeutigem Fehler `segment_audio_input_crop_forbidden`, statt wieder teure Provider-Fehler zu erzeugen.
 
-```text
-Segment 1:
-scene 0.000–2.229
-speaker_1 audioInput 0.000–2.229
+4. **Reset-Funktion härten**
+   - `reset-lipsync-scene` soll alte `dialog_shots.segments`, `sync_job_id`, `replicate_prediction_id` und crop-basierte Segmentdaten garantiert entfernen.
+   - Danach startet die Szene wirklich frisch mit v55.
 
-Segment 2:
-scene 2.479–3.454
-speaker_2 audioInput 2.479–3.454
-
-Segment 3:
-scene 3.704–6.630
-speaker_3 audioInput 3.704–6.630
-```
-
-Aber die Audio-Inputs sind **separate, enge Sprecher-WAVs**, nicht ein gemeinsamer Master-WAV:
-
-```text
-Samuel  ~2.276s
-Matthew ~0.882s
-Kailee  ~2.972s
-```
-
-Damit referenziert Segment 2 in Matthews WAV den Bereich `2.479–3.454s`, obwohl Matthews WAV nur ca. `0.882s` lang ist. Segment 3 referenziert in Kailees WAV `3.704–6.630s`, obwohl Kailees WAV nur ca. `2.972s` lang ist.
-
-Die Sync.so-Doku sagt: `audioInput.startTime/endTime` ist ein optionaler Crop **innerhalb des jeweiligen Audio-Inputs**. Bei separaten Audioclips pro Segment/Speaker soll man nur den `refId` übergeben, oder relativ zum Audioclip croppen. Wir übergeben aktuell versehentlich die **Video-Timeline-Zeit** als **Audio-Crop-Zeit**.
-
-## Fix-Plan
-
-1. **Payload-Korrektur in `compose-dialog-segments`**
-   - Im official `segments[]`-Pfad bei separaten Speaker-WAVs ändern von:
-
-   ```ts
-   audioInput: { refId, startTime: s, endTime: e }
-   ```
-
-   zu:
-
-   ```ts
-   audioInput: { refId }
-   ```
-
-   - Die Segment-Timeline bleibt weiter über `segment.startTime/endTime` gesteuert.
-   - `sync_mode: "cut_off"` bleibt erhalten.
-
-2. **Optionaler Sicherheits-Guard vor Dispatch**
-   - Wenn wir doch jemals `audioInput.startTime/endTime` senden, validieren wir vor Sync.so:
-     - Crop-Zeit muss innerhalb der referenzierten Audio-Datei liegen.
-     - Sonst kein Provider-Dispatch, sondern klarer interner Fehler wie `segment_audio_crop_out_of_range`.
-   - Das verhindert zukünftig wieder generische Provider-Fehler ohne Diagnose.
-
-3. **Bessere Dispatch-Diagnostik**
-   - Log ergänzen: `audio_input_mode=ref_only` oder `audio_input_mode=cropped`.
-   - In `syncso_dispatch_log.meta` speichern:
-     - Segment-Zeiten
-     - Audio-Ref
-     - ob Crop-Felder gesendet wurden
-   - So sehen wir beim nächsten Fehlschlag sofort, ob es Payload, Face-Targeting oder Provider ist.
-
-4. **Kein erneuter Modellwechsel**
-   - `sync-3` bleibt für diesen 3-Sprecher-Official-Segments-Pfad aktiv.
-   - `segments_secs` bleibt entfernt.
-   - Kein Face-Crop-Preclip und keine UI-Änderung.
-
-5. **Nach Implementierung testen**
-   - Dieselbe Szene sauber neu starten.
-   - Erwarteter neuer Payload:
-
-   ```json
-   {
-     "segments": [
-       { "startTime": 0, "endTime": 2.229, "audioInput": { "refId": "speaker_1" } },
-       { "startTime": 2.479, "endTime": 3.454, "audioInput": { "refId": "speaker_2" } },
-       { "startTime": 3.704, "endTime": 6.63, "audioInput": { "refId": "speaker_3" } }
-     ]
-   }
-   ```
-
-## Kurz gesagt
-
-Der Provider liefert leider keinen Errorcode, aber der gespeicherte Request zeigt einen sehr konkreten Bug: Wir croppen separate Sprecher-Audios mit globalen Szenenzeiten. Das ist wahrscheinlich der Grund für `An unknown error occurred.`
+5. **Danach einmal sauber neu starten**
+   - Betroffene Szene hart resetten.
+   - Neuer Run muss in der DB `engine: sync-official-segments-v55` und `audio_input_mode: ref_only` zeigen.
+   - Wenn Sync.so dann trotzdem fehlschlägt, ist es ein anderer Fehler, und wir können ihn sauber von Payload-/State-Altlasten trennen.
 
 <presentation-actions>
   <presentation-open-history>View History</presentation-open-history>

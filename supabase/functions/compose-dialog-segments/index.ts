@@ -804,7 +804,7 @@ serve(async (req) => {
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
     let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
-    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51) ? (existing as any) : null;
+    const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55) ? (existing as any) : null;
 
     // ── v49 face-gate REMOVED (2026-06-05) ──────────────────────────────
     // The v49 payload no longer uses per-segment ASD coordinates (see the
@@ -1064,6 +1064,9 @@ serve(async (req) => {
         );
         for (const seg of v41Segments) {
           const refId = (seg as any).audioInput?.refId;
+          const hasForbiddenCrop =
+            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "startTime") ||
+            Object.prototype.hasOwnProperty.call((seg as any).audioInput ?? {}, "endTime");
           if (!refId || !inputRefSet.has(refId)) {
             console.error(
               `[compose-dialog-segments] scene=${sceneId} v50 INVALID segment refId=${refId} inputs=${JSON.stringify([...inputRefSet])}`,
@@ -1073,6 +1076,41 @@ serve(async (req) => {
               .update({ lip_sync_status: "failed", twoshot_stage: "failed", clip_error: "v50_segment_refid_missing" })
               .eq("id", sceneId);
             return json({ error: "v50_segment_refid_missing", refId }, 422);
+          }
+          if (hasForbiddenCrop) {
+            console.error(`[compose-dialog-segments] scene=${sceneId} v55 forbidden audioInput crop detected before dispatch refId=${refId}`);
+            const cropAlreadyRefunded = !!(v41PrevState as any)?.refunded;
+            if (!cropAlreadyRefunded) {
+              const { data: wCrop } = await supabase
+                .from("wallets").select("balance").eq("user_id", userId).single();
+              await supabase
+                .from("wallets")
+                .update({
+                  balance: Number(wCrop?.balance ?? 0) + Number(v41PrevState?.cost_credits ?? v47Cost),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("user_id", userId);
+            }
+            await supabase
+              .from("composer_scenes")
+              .update({
+                lip_sync_status: "failed",
+                twoshot_stage: "failed",
+                clip_error: "segment_audio_input_crop_forbidden",
+                dialog_shots: {
+                  ...(v41PrevState ?? {}),
+                  version: 55,
+                  engine: "sync-official-segments-v55",
+                  status: "failed",
+                  audio_input_mode: "invalid_crop_blocked",
+                  error: "segment_audio_input_crop_forbidden",
+                  refunded: true,
+                  finished_at: new Date().toISOString(),
+                },
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", sceneId);
+            return json({ error: "segment_audio_input_crop_forbidden", refId }, 422);
           }
         }
 
@@ -1091,6 +1129,7 @@ serve(async (req) => {
         // `occlusion_detection_enabled` are intentionally omitted — sync-3
         // manages both natively and ignores them otherwise.
         const V50_MODEL = "sync-3";
+        const V55_ENGINE = "sync-official-segments-v55";
         const segmentsWithBox = v41Segments.length; // every v54 segment carries a point
         const segmentsAutoFallback = 0;
         const v41Payload = {
@@ -1138,13 +1177,14 @@ serve(async (req) => {
             .update({
               dialog_shots: {
                 ...(v41PrevState ?? {}),
-                version: 52,
-                engine: "sync-official-segments-v52",
+                version: 55,
+                engine: V55_ENGINE,
                 asd_mode: "point_per_segment",
+                audio_input_mode: "ref_only",
                 status: "failed",
                 model: V50_MODEL,
                 cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
-                refunded: !alreadyRefunded,
+                refunded: alreadyRefunded || (!isV41Retry && Number(v41PrevState?.cost_credits ?? v47Cost) > 0),
                 error: `v50_dispatch_${v41Resp.status}:${errTxt.slice(0, 200)}`,
                 finished_at: new Date().toISOString(),
               },
@@ -1155,12 +1195,12 @@ serve(async (req) => {
             })
             .eq("id", sceneId);
           await logSyncDispatch(supabase, {
-            scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
+            scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
             sync_source_kind: "v50_segments_bbox", video_url: sourceClipUrl,
             http_status: v41Resp.status, sync_status: "DISPATCH_FAILED",
             error_class: classifySyncError(errTxt),
             error_message: errTxt.slice(0, 500),
-            meta: { payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
+            meta: { audio_input_mode: "ref_only", payload_summary: { model: V50_MODEL, segments_count: v41Segments.length, with_box: segmentsWithBox, speakers: v41SpeakerRefs.length, input_refs: v41SpeakerRefs.map((s) => s.refId) } },
           });
           return json({ error: "v50_dispatch_failed", status: v41Resp.status, body: errTxt.slice(0, 400) }, 502);
         }
@@ -1177,16 +1217,17 @@ serve(async (req) => {
         if (!v41JobId) return json({ error: "v50_no_job_id" }, 502);
 
         await registerInflightSyncJob(supabase, {
-          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: "sync-official-segments-v52",
+          job_id: v41JobId, user_id: userId, scene_id: sceneId, engine: V55_ENGINE,
         });
         await recordCircuitSuccess(supabase, "sync.so");
 
         const v41NowIso = new Date().toISOString();
         const v41RetryCount = Number(v41PrevState?.retry_count ?? 0) + (isV41Retry ? 1 : 0);
         const v41State = {
-          version: 52,
-          engine: "sync-official-segments-v52",
+          version: 55,
+          engine: V55_ENGINE,
           asd_mode: "point_per_segment",
+          audio_input_mode: "ref_only",
           status: "rendering",
           model: V50_MODEL,
           sync_job_id: v41JobId,
@@ -1213,7 +1254,7 @@ serve(async (req) => {
           .update({
             dialog_shots: v41State,
             lip_sync_status: "running",
-            twoshot_stage: "syncso_v52_official_segments",
+            twoshot_stage: "syncso_v55_official_segments_ref_only",
             lip_sync_source_clip_url: sourceClipUrl,
             replicate_prediction_id: `sync:${v41JobId}`,
             clip_error: null,
@@ -1222,13 +1263,14 @@ serve(async (req) => {
           .eq("id", sceneId);
 
         await logSyncDispatch(supabase, {
-          scene_id: sceneId, user_id: userId, engine: "sync-official-segments-v52",
+          scene_id: sceneId, user_id: userId, engine: V55_ENGINE,
           job_id: v41JobId, sync_source_kind: "v50_segments_bbox",
           video_url: sourceClipUrl,
           window_start_sec: 0, window_end_sec: totalSec,
           http_status: v41Resp.status, sync_status: "DISPATCHED",
           meta: {
             model: V50_MODEL,
+            audio_input_mode: "ref_only",
             segments_count: v41Segments.length,
             segments_with_box: segmentsWithBox,
             segments_auto_fallback: segmentsAutoFallback,
@@ -1248,8 +1290,9 @@ serve(async (req) => {
             status: "rendering",
             scene_id: sceneId,
             sync_job_id: v41JobId,
-            engine: "sync-official-segments-v52",
+            engine: V55_ENGINE,
             model: V50_MODEL,
+            audio_input_mode: "ref_only",
             segments: v41Segments.length,
             segments_with_box: segmentsWithBox,
             speakers: v41SpeakerRefs.length,
