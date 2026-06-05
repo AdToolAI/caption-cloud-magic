@@ -1,102 +1,71 @@
-## Where we stand vs Artlist
+## Status quo — drei verschiedene Pipelines, je nach Sprecherzahl
 
-We already have most of Artlist's *vocabulary* — the gap is in *visual injection* and *time-based direction*.
+| Sprecher | Erster Versuch | Verhalten bei Failure |
+|----------|----------------|------------------------|
+| **1**     | v5 single-pass (1 Sync.so call)                                                                | Standard-Retry-Ladder |
+| **2**     | v5 **parallel fan-out** (2 Sync.so calls auf dieselbe Plate, gleichzeitig)                     | Standard-Retry-Ladder, **keine** v58 Multipass-Fallback-Logik |
+| **3-4**   | **v56 sync-3 `segments[]`** (1 Call) → bei `provider_unknown_error` automatisch **v58/v59 per-speaker chained multipass** (serial, 1 Call pro Sprecher, Output von Pass N speist Pass N+1) | v59 sticky markers, garantierter Refund, stabil bewiesen |
 
-**Strong today**
-- Cast & World library (characters, locations, buildings, props, outfit looks, pose/wardrobe/vibe variants) with `@-mention` autocomplete via `useUnifiedMentionLibrary`
-- Scene Director NL box (Gemini tool-call → matched assets + dialog + dropped-actions list)
-- Frame-First Studio (Nano Banana 2 still → i2v first frame)
-- Shot Director (49 framing/angle/movement/lighting tokens) + 12 Cinematic Style Presets
-- Multi-portrait scene composition (up to 4 character portraits → Nano Banana 2 → first frame)
-- Structured Prompt Builder (Subject/Action/Setting/Style/Negative)
-- Free ↔ Structured toggle, Inspire-Me, Quality Coach
+Die einzige Pipeline, die laut FROZEN-INVARIANTS und Memory-Doks **reproduzierbar stabil** ist, ist die **v58/v59 per-speaker chained multipass**. Sie wird heute aber nur bei 3-4 Sprechern erreicht — und auch dort erst **nach** einem fehlgeschlagenen v56-Versuch.
 
-**Artlist parity gaps** (ranked by impact / effort ratio)
+Bei 2 Sprechern läuft heute **paralleler v5 fan-out** — genau die Architektur, die wir bei 3+ wegen Dispatch-Race und Sync.so-`unknown error` schon abgeschafft haben (v33). Das deckt sich mit dem aktuellen Fehlerbild im Screenshot.
 
-| # | Gap | Where it hurts |
-|---|---|---|
-| 1 | **Locations / Buildings / Props arrive as TEXT ONLY at the video provider.** Only character portraits flow through `compose-scene-anchor`. A `@CoffeeShop` mention becomes `Setting: cozy café…` — the actual location photo is never sent as a visual ref. | Identity of saved World assets is lost the moment generation starts. User saves a beautiful location, gets a generic café back. |
-| 2 | **No time-coded Action Beats inside a scene.** Everything is a flat prose paragraph; the LLM guesses timing. Artlist's "Action" structured slot lets you describe what happens *in order*. | "Character picks up phone then turns to camera" — model often skips the second beat. |
-| 3 | **No End-Frame.** Artlist mandates Start Frame + optional End Frame. We only have Start Frame via Frame-First. | No control over where a shot lands → bad transitions. |
-| 4 | **No Vibe-Board image slot.** No way to drop in an external mood reference image to steer look (Style-Echo only works from a previously rendered clip). | Hard to match a brand's existing visual style. |
-| 5 | **No prop-placement / character blocking** (left/center/right, foreground/background). | Composition is a roll of the dice. |
-| 6 | **No camera keyframes** (single move token only). | Cannot direct push-in → hold → pull-out within one shot. |
-| 7 | **No prop↔character interaction schema** ("A hands Prop X to B at 3 s"). | Multi-actor staging stays vague. |
+## Vorschlag — eine einheitliche Pipeline für alle N≥2
 
-How Artlist solves it (from their Studio docs):
-1. **Library-first** — every Character, Location, *and* asset has reference images. Selecting one inserts both the `@mention` and the visual ref.
-2. **Structured prompt** with explicit slots: Subject / Location / Action / Composition / Style / Mood / Sound. Once assets are picked, only Action + Sound remain to fill.
-3. **Start + End Frames** mandatory before Direct step. End frame = visual boundary.
-4. **Auto-prompt** button that rewrites the prompt iteratively until user accepts.
-5. **Frame capture** — pull a still from any rendered clip and use it as start/end for the next.
+Nicht „die 3-4-Pipeline überall nehmen" wörtlich (denn der v56-Erstversuch *ist* der schwächste Teil), sondern: **per-speaker chained multipass als kanonischen Pfad für jedes N≥2**, ohne v56-Vorrunde und ohne 2-Sprecher-Parallel-Fan-Out.
 
----
+```text
+N = 1   →  v5 single-pass                       (unverändert)
+N ≥ 2   →  v58/v59 per-speaker chained multipass (immer, sofort)
+            ├── 1 Sync.so-Call pro Sprecher, seriell
+            ├── Output Pass K  →  Input Pass K+1
+            ├── Sticky `force_multipass` / `multipass_fallback_attempted`
+            └── Audio-Mux am Ende via render-sync-segments-audio-mux
+```
 
-## Proposed Roadmap — 4 Stages
+### Was geändert wird
 
-### Stage A — World Assets become Visual References (biggest unlock, ~1 day)
+1. **`compose-dialog-segments` — Gate vereinfachen** (FROZEN I.2 wird *strenger*, nicht laxer)
+   - `useV41Official` wird hart auf `false` gesetzt für **alle** Multi-Speaker-Fälle. Der gesamte v56-`segments[]`-Pfad wird nur noch erreichbar, wenn `speakers.length === 1` *und* der Body explizit `force_v56: true` setzt (heute nirgends genutzt — effektiv toter Code, bleibt aber vorhanden für künftige Single-Speaker-Experimente).
+   - `forceMultipass` ist neuer Default für `N ≥ 2`, ohne Body-Flag, ohne Webhook-Round-Trip.
+   - Sticky markers (`force_multipass`, `multipass_fallback_attempted`) werden für **alle** N≥2 von Anfang an gesetzt, damit Retries niemals zurück in einen anderen Pfad fallen können.
 
-Goal: When the user mentions or picks `@CoffeeShop` / `@RedMug` / `@OfficeBuilding`, the asset's `reference_image_url` reaches the i2v/t2v provider as part of the first-frame composition — not just as a text descriptor.
+2. **`compose-dialog-segments` — `fanOutAllowed` killen**
+   - Zeile 2418 `const fanOutAllowed = passes.length > 1 && passes.length <= 2;` wird zu `const fanOutAllowed = false;`.
+   - Damit läuft 2-Sprecher genau wie 3-4: nur Pass 0 wird sofort dispatched, der Webhook chained Pass 1..N-1 seriell beim COMPLETE-Event über `pendingIdxs[0]`. Eliminiert die Dispatch-Race, die v33 für N≥3 schon entschärft hat — analog für N=2.
 
-Touched code (frontend + edge function, leaves lip-sync FROZEN paths alone):
-- `prepareSceneAnchor.ts` — collect `locationRefs[]`, `buildingRefs[]`, `propRefs[]` from resolved mentions + UnifiedAssetPicker, not just `portraitUrls[]`.
-- `compose-scene-anchor/index.ts` — accept new optional arrays `locationUrls[]` (max 1), `buildingUrls[]` (max 1), `propUrls[]` (max 3). Nano Banana 2 already handles multi-image composition; we just widen the prompt to "compose the named characters in the LOCATION (image 5) with PROPS (images 6–8) visible".
-- `compose-video-clips/index.ts` — for Vidu Q2's `subjectReferenceUrls[]` (capacity 7), include locations/props as additional `reference_image`s when the provider supports it. For Hailuo/Kling/Pika, the composed Nano Banana 2 first frame is enough.
-- UI: add a small "visual refs in use" badge on SceneCard (e.g. "👤×2 🏛️×1 📦×3") so the user *sees* what's flowing into the composition.
+3. **`sync-so-webhook` — Multipass-Fallback-Branch wird zum „Härtungs-Branch"**
+   - Der v58-Fallback-Code, der heute nur bei `isV56Manual && isMultiSpeaker && unknown error` feuert, ist effektiv obsolet (kein v56-Versuch mehr → kein Trigger). Wir lassen ihn als **Defense-in-Depth** stehen (Log-Marker `INVARIANT_VIOLATION_v56_reentered`), entfernen ihn nicht. Falls je ein Codepfad versehentlich v56 reaktiviert, fängt der Branch das auf.
+   - Die multi-speaker partial-mux-Sperre (v36, kein „2/3 sind ok") bleibt unverändert.
 
-Result: `@CoffeeShop` actually renders **that** coffee shop. `@RedMug` ends up in the character's hand instead of a generic mug.
+4. **FROZEN-INVARIANTS.md aktualisieren**
+   - I.1 wird umformuliert: „v58 multipass ist die **einzige** Lip-Sync-Pipeline für **alle** Szenen mit ≥2 Sprechern" statt „für ≥3".
+   - I.2 (`useV41Official`-Gate) bekommt einen weiteren Satz: das Gate **darf** für Multi-Speaker nie wieder true werden.
+   - Neue Sektion I.9: „Kein paralleler Fan-Out für irgendeine Sprecherzahl. Webhook-gechainte Serial-Dispatches sind der einzige erlaubte Modus."
+   - Memory `mem://architecture/lipsync/multi-character-pipeline-hardening-v33` bekommt einen v60-Nachfolger, der die Vereinheitlichung dokumentiert.
 
-### Stage B — Action Beats Timeline (Artlist's "Action" slot, time-coded, ~1.5 days)
+5. **Pricing & Refunds — keine Änderung erforderlich**
+   - `ceil(durSec) × 9 × N_passes` greift bereits per N. 2-Sprecher kostet weiterhin 2× single-pass; das war schon vorher so für den v5-Pfad, nur dispatched eben jetzt seriell statt parallel. Latenz steigt minimal (~+8-12s pro zusätzlichem Sprecher).
+   - Idempotente Refunds laufen über die bestehenden v23 server-owned state hooks unverändert weiter.
 
-Goal: Structured time-coded list of what happens, like Artlist's Directing prompt — but more powerful because it's actually time-coded.
+### Was explizit **nicht** angefasst wird
 
-- New `ActionBeatsEditor` component, inline in SceneCard above the Style chip. Rows like:
-  - `0.0–2.0s  ·  Anna walks into frame from left`
-  - `2.0–4.5s  ·  Anna picks up @RedMug from @CoffeeShop counter`
-  - `4.5–7.0s  ·  Anna turns to camera, smiles`
-- Stored as `scene.actionBeats[]` (`{ startSec, endSec, text, refs?: string[] }`).
-- Compiled into the final prompt as a deterministic block (similar to how we already render `Audio plan` in `composeFinalPrompt.ts`):
-  ```
-  [4 ACTION TIMELINE]
-  0.0–2.0s: Anna walks into frame from left.
-  2.0–4.5s: Anna picks up the red ceramic mug from the counter.
-  ...
-  ```
-- Scene Director NL box gets a new tool-call output field `actionBeats[]` so the LLM emits them directly when the user writes prose like "Anna kommt rein, nimmt sich die Tasse, dreht sich zur Kamera".
-- Quality Coach validates `Σ(endSec − startSec) ≈ scene.duration` and flags overflow.
+- `MAX_SPEAKERS = 4` (FROZEN I.6) — bleibt.
+- `safeCharacters`-Filter im StoryboardTab (FROZEN I.7) — bleibt.
+- Locked-camera-Master-Plate-Prompt (FROZEN I.4) — bleibt.
+- Multi-speaker ASD-Guard (FROZEN I.5) — bleibt; betrifft Manual-ASD und ist im chained Pipeline-Pfad sowieso aktiv.
+- `compose-video-clips`, `compose-scene-anchor`, `sync-so-webhook` audio-mux Branch (`render-sync-segments-audio-mux`) — bleiben.
+- Composer Storyboard / Cast & World UI — keine UI-Änderung, einzig der Generieren-Klick führt jetzt für 2-Sprecher zum chained Pipeline statt zum parallel fan-out.
 
-Result: Provider gets explicit beat timing → far higher hit-rate on multi-action scenes.
+### Verifikation
 
-### Stage C — End-Frame + Frame Capture (~1 day)
+1. 2-Sprecher-Szene neu generieren — Logs müssen `SERIAL mode (2 speakers)` + 2 sequentielle Sync.so-Jobs zeigen, **keinen** v56-Dispatch.
+2. 3-Sprecher-Szene erneut — Logs zeigen denselben Serial-Pfad, jetzt aber sofort statt erst nach v56-Failure (keine `provider_unknown_error` mehr im Erstversuch).
+3. 1-Sprecher-Szene — unverändert, ein einziger v5-Pass, kein Multipass.
+4. Soft-Log `INVARIANT_VIOLATION_v56_reentered` bleibt in Edge-Logs leer.
 
-- Extend `SceneStillFrameStudio` with a second slot "End Frame".
-- `compose-video-clips` forwards `lastFrameUrl` where the provider supports it (Pika 2.2 Pikaframes, Vidu Q2, Kling 3 — already supported as v2v/keyframe inputs).
-- New "Capture frame from clip" action on rendered scene preview — extracts a still client-side (we already have `composer-frames` canvas extraction from the Continuity Guardian) and offers "Use as Start frame of next scene" / "Use as End frame of this scene".
+### Risiken & Mitigation
 
-Result: Predictable shot endings → clean transitions in Director's Cut.
-
-### Stage D — Vibe-Board reference slot (~0.5 day)
-
-- One image slot on SceneCard (under "Mehr ▾" drawer) labelled "Vibe reference".
-- Flows into `compose-scene-anchor` as an extra `styleReferenceUrl` with Nano Banana 2 prompt suffix "match the lighting, color grade and mood of this reference, but do not copy its content".
-- Visible at storyboard level via tiny thumbnail on the SceneCard header.
-
-Result: Brand-style scenes from a single dropped image, no Style-Echo dependency.
-
----
-
-## What is NOT in scope
-
-- No changes to the FROZEN lip-sync pipeline (compose-dialog-segments, sync-so-webhook, neutralTwoShotPrompt, MAX_SPEAKERS).
-- No camera-keyframe-path editor (Gap #6) — model support is too uneven; deferred until Veo 4 / Sora 3.
-- No spatial blocking editor (Gap #5) — would need a 2D canvas; deferred.
-- No prop↔character interaction schema (Gap #7) — Stage B Action Beats covers most of this in prose form.
-- No raising `MAX_SPEAKERS` beyond 4 (FROZEN I.6).
-- `portraitUrls[]` cap stays at 4. Stage A adds *separate* arrays for location/building/prop so we don't compete for those 4 slots.
-
----
-
-## Open questions
-
-1. **Stage order — start with A (visual refs) alone, or A+B together?** A is the bigger user-visible win in a single ship, B adds significant new UX surface that benefits more from a dedicated cycle. My recommendation: **A first, ship and validate, then B**.
-2. **Should Stage A's location/building/prop visual refs be opt-in (checkbox per asset in the picker) or always-on?** Always-on is more "Artlist-like" and zero-config; opt-in protects against composition noise when a user just wants a quick generic clip. My recommendation: **always-on with a per-scene "ignore visual refs" toggle in the Advanced drawer**.
+- **Latenz für 2 Sprecher steigt um ~Sync.so-Roundtrip-Zeit (8-12s)**, weil seriell statt parallel. Akzeptabel im Vergleich zum aktuellen Failure-Rate-Hit.
+- **Bestehende laufende 2-Sprecher-Renders** bleiben unberührt; Änderung greift nur für neue Dispatches.
+- Der v56-Code-Pfad wird zwar toter Code für Multi-Speaker, aber **nicht gelöscht** — wir wollen die Fallback-Wand behalten, falls Sync.so ihre `segments[]`-API jemals stabilisiert.
