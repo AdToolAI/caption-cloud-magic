@@ -1676,17 +1676,14 @@ serve(async (req) => {
     // sliced "tight" WAV (turn-only, ~3.27s). On retry the cloned pass
     // still pointed at that tight URL, so the v39 slicer tried to cut
     // ABSOLUTE windows like [3.81, 7.082] out of a 3.27s file → throws
-    // "sliceWav: no valid windows" → falls back to FULL-LENGTH path which
-    // then sends `segments_secs:[[3.81,7.082]]` on the video input plus
-    // the still-mutated 3.27s tight audio → Sync.so returns the opaque
-    // "An unknown error occurred" because audio length and animation
-    // window are incompatible.
+    // "sliceWav: no valid windows". v53 removes the old undocumented
+    // `segments_secs` fallback entirely, so a failed tight-slice now fails
+    // before provider dispatch instead of sending a non-doc Sync.so payload.
     //
     // Fix: ALWAYS restore the canonical full-length per-speaker WAV from
     // `audio_url_full` before re-slicing. Also clear stale `audio_tight`
-    // so the downstream slicer either rebuilds it cleanly or — if slicing
-    // fails — falls back to the genuinely full-length audio (which IS
-    // compatible with `segments_secs`).
+    // so the downstream slicer either rebuilds it cleanly or fails safely
+    // without falling back to a doc-violating video segment hint.
     const canonicalAudioUrl = String(
       (pass as any).audio_url_full ?? pass.audio_url ?? "",
     );
@@ -1777,11 +1774,9 @@ serve(async (req) => {
     //   • frame_number = TURN START (not midpoint) — midpoint anchoring was
     //     pushing speaker N's mouth animation forward into speaker N+1's
     //     voiced window.
-    //   • segments_secs on the video input restricts Sync.so animation to
-    //     this speaker's turn windows ONLY. Outside the windows the original
-    //     plate pixels are preserved → no cross-speaker leakage, even when
-    //     the per-speaker WAV is silence-padded across the full plate.
-    //     https://sync.so/docs/api-reference/endpoints/generate
+    //   • v53 removed the old undocumented `segments_secs` video hint. The
+    //     scoped turn timing now comes from the tight per-turn WAV plus
+    //     `sync_mode=cut_off`, which matches the public Sync.so schema.
     const firstTurn = pass.segments[0];
     const turnStartSec = firstTurn ? Math.max(0, firstTurn.startTime) : 0;
     const turnEndSec = firstTurn ? Math.min(totalSec, firstTurn.endTime) : totalSec;
