@@ -239,15 +239,49 @@ serve(async (req) => {
     const STRICT_RETRY_SUFFIX = strictMode && isMulti
       ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
       : "";
+    // Stage A — World reference clause. Tells the model WHICH later image
+    // indices represent the named location / building / props so it composes
+    // them faithfully INTO the scene instead of inventing generic stand-ins.
+    let worldClause = "";
+    let imgIdx = portraits.length; // next slot
+    const worldLines: string[] = [];
+    for (let i = 0; i < locationUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = LOCATION "${locationNames[i] ?? "Location"}" (use as the environment / background identity — match its architecture, materials, color palette, lighting and overall spatial layout faithfully).`);
+    }
+    for (let i = 0; i < buildingUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = ARCHITECTURE "${buildingNames[i] ?? "Building"}" (use as the named landmark / building identity — preserve its silhouette, facade, distinctive features).`);
+    }
+    for (let i = 0; i < propUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = PROP "${propNames[i] ?? "Prop"}" (this exact object must be visible in the scene — preserve its shape, color, materials, labels; place it naturally per the scene description, e.g. in a character's hand or on a surface).`);
+    }
+    if (worldLines.length > 0) {
+      worldClause =
+        ` WORLD REFERENCES — preserve these identities exactly, do NOT generalize or substitute generic alternatives:\n` +
+        worldLines.join("\n") +
+        `\nIf any world reference is inconsistent with the scene description, the IMAGE wins (visual identity outranks prose). Compose locations and buildings as the background environment; place props in plausible positions per the scene.`;
+    }
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${worldClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
 
-    // --- Call Nano Banana 2 with all portraits as separate image_url parts ---
+    // --- Call Nano Banana 2 with all portraits + world refs as separate image_url parts ---
     const userContent: any[] = [{ type: "text", text: editInstruction }];
     for (const url of portraits) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of locationUrls) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of buildingUrls) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of propUrls) {
       userContent.push({ type: "image_url", image_url: { url } });
     }
 
