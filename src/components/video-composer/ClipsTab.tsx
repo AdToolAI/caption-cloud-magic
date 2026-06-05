@@ -594,6 +594,9 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
               characters,
               activeBrandChar,
               composed?.finalPrompt || s.aiPrompt || '',
+              '16:9',
+              {},
+              libLocations,
             );
             anchorByScene.set(s.id, prepared);
             if (prepared.anchor) {
@@ -748,7 +751,7 @@ export default function ClipsTab({ scenes, projectId, visualStyle, characters, l
       });
 
       const preparedSingle = targetScene.clipSource.startsWith('ai-') && targetScene.engineOverride !== 'cinematic-sync'
-        ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt)
+        ? await prepareSceneAnchor(targetScene, characters, activeBrandChar, composedSingle.finalPrompt, '16:9', {}, libLocations)
         : undefined;
       if (preparedSingle?.anchor) {
         console.log(

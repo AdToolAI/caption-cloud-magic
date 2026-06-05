@@ -232,6 +232,9 @@ export function useGenerateAllClips({
               characters,
               activeBrandChar,
               composed?.finalPrompt || s.aiPrompt || '',
+              '16:9',
+              {},
+              libLocations,
             );
             anchorByScene.set(s.id, prepared);
           }),

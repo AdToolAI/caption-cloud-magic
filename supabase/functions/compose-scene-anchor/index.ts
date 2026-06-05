@@ -35,6 +35,20 @@ interface Body {
    *  block. Used by compose-video-clips on the SECOND attempt after the
    *  first anchor showed a cloned identity or an extra person. */
   strictNoDuplicates?: boolean;
+  /** Stage A — World Assets as Visual References.
+   * Each array supplies up to N additional reference images that Nano Banana 2
+   * composes INTO the same first frame as the cast portraits.
+   *  - locationUrls: max 1 (background / environment identity)
+   *  - buildingUrls: max 1 (named architecture / landmark identity)
+   *  - propUrls    : max 3 (hand-held / on-table objects)
+   * Names are matched 1:1 with the URLs and used to label each ref in the
+   * edit prompt so the model knows what each image represents. */
+  locationUrls?: string[];
+  buildingUrls?: string[];
+  propUrls?: string[];
+  locationNames?: string[];
+  buildingNames?: string[];
+  propNames?: string[];
 }
 
 async function sha1(s: string): Promise<string> {
@@ -75,6 +89,14 @@ serve(async (req) => {
       ? body.portraitUrls.slice(0, 4) // hard cap — 4 chars max in one frame
       : (body.portraitUrl ? [body.portraitUrl] : []);
     const names = (body.characterNames ?? []).slice(0, portraits.length);
+
+    // Stage A — World refs. Hard caps: 1 location, 1 building, 3 props.
+    const locationUrls = (body.locationUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
+    const buildingUrls = (body.buildingUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 1);
+    const propUrls = (body.propUrls ?? []).filter((u) => typeof u === "string" && u.length > 0).slice(0, 3);
+    const locationNames = (body.locationNames ?? []).slice(0, locationUrls.length);
+    const buildingNames = (body.buildingNames ?? []).slice(0, buildingUrls.length);
+    const propNames = (body.propNames ?? []).slice(0, propUrls.length);
 
     if (!body.sceneId || portraits.length === 0 || !body.scenePrompt) {
       return new Response(JSON.stringify({ error: "missing fields" }), {
@@ -143,10 +165,12 @@ serve(async (req) => {
     // --- Cache lookup ---
     const portraitHash = await sha1(portraits.join("|"));
     const strictMode = body.strictNoDuplicates === true;
-    // v12 — bumped after forcing cinematic-sync to clear stale per-scene cache
-    // and preserving audio_plan.twoshot when persisting audit metadata.
+    const worldRefSig = `loc=${locationUrls.join(',')}|bld=${buildingUrls.join(',')}|prop=${propUrls.join(',')}`;
+    // v13 — bumped for Stage A (World Assets as Visual References): cache key
+    // now includes location/building/prop reference URLs so changing world
+    // assets invalidates the composed frame.
     const promptHash = await sha1(
-      `v12|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}`,
+      `v13|${safeScenePrompt}|${body.aspectRatio ?? "16:9"}|${body.shotType ?? ""}|n=${portraits.length}|strict=${strictMode ? 1 : 0}|names=${names.join(',').toLowerCase()}|${worldRefSig}`,
     );
 
     const { data: cached } = await admin
@@ -215,15 +239,49 @@ serve(async (req) => {
     const STRICT_RETRY_SUFFIX = strictMode && isMulti
       ? ` STRICT RETRY MODE — the previous attempt FAILED because it produced either a duplicated identity, an extra human body, or a partial third person in frame. Read this carefully: there are EXACTLY ${N} reference portraits, so the output must show EXACTLY ${N} HUMAN BEINGS total — count every visible body, including profile views, partial bodies, background humans, mirror reflections, posters, screens, mannequins, statues. The total human count anywhere in the frame must equal ${N}. ISOLATE the ${N} reference people: clear or empty the rest of the environment (empty office, empty hallway, empty street). Crop/frame tight enough to physically EXCLUDE any additional humans. Do NOT add coworkers, colleagues, bystanders, passers-by, or a "third figure" to balance the composition. Do NOT repeat any reference person. Final human headcount in frame: ${N}. Repeat: exactly ${N} bodies, no more, no fewer.`
       : "";
+    // Stage A — World reference clause. Tells the model WHICH later image
+    // indices represent the named location / building / props so it composes
+    // them faithfully INTO the scene instead of inventing generic stand-ins.
+    let worldClause = "";
+    let imgIdx = portraits.length; // next slot
+    const worldLines: string[] = [];
+    for (let i = 0; i < locationUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = LOCATION "${locationNames[i] ?? "Location"}" (use as the environment / background identity — match its architecture, materials, color palette, lighting and overall spatial layout faithfully).`);
+    }
+    for (let i = 0; i < buildingUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = ARCHITECTURE "${buildingNames[i] ?? "Building"}" (use as the named landmark / building identity — preserve its silhouette, facade, distinctive features).`);
+    }
+    for (let i = 0; i < propUrls.length; i++) {
+      imgIdx += 1;
+      worldLines.push(`Image #${imgIdx} = PROP "${propNames[i] ?? "Prop"}" (this exact object must be visible in the scene — preserve its shape, color, materials, labels; place it naturally per the scene description, e.g. in a character's hand or on a surface).`);
+    }
+    if (worldLines.length > 0) {
+      worldClause =
+        ` WORLD REFERENCES — preserve these identities exactly, do NOT generalize or substitute generic alternatives:\n` +
+        worldLines.join("\n") +
+        `\nIf any world reference is inconsistent with the scene description, the IMAGE wins (visual identity outranks prose). Compose locations and buildings as the background environment; place props in plausible positions per the scene.`;
+    }
+
     const editInstruction =
-      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX} ` +
+      `Place ${peopleNoun} into the following scene without altering their facial identity, age, ethnicity, hair, or distinctive features.${nameClause}${multiClause}${HARD_LOCK_SUFFIX}${NO_TYPOGRAPHY_SUFFIX}${EXACT_COUNT_SUFFIX}${TWO_SHOT_FRAMING_SUFFIX}${TWO_SHOT_NEGATIVE}${STRICT_RETRY_SUFFIX}${worldClause} ` +
       `Match the requested framing and composition precisely — they do NOT have to be centered or facing the camera, but their faces should remain clearly recognizable. ` +
       `Aspect ratio: ${aspect}. Photorealistic, natural lighting matching the scene description.\n\n` +
       `Scene: ${safeScenePrompt}`;
 
-    // --- Call Nano Banana 2 with all portraits as separate image_url parts ---
+    // --- Call Nano Banana 2 with all portraits + world refs as separate image_url parts ---
     const userContent: any[] = [{ type: "text", text: editInstruction }];
     for (const url of portraits) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of locationUrls) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of buildingUrls) {
+      userContent.push({ type: "image_url", image_url: { url } });
+    }
+    for (const url of propUrls) {
       userContent.push({ type: "image_url", image_url: { url } });
     }
 
@@ -270,7 +328,7 @@ serve(async (req) => {
       );
     }
     console.log(
-      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} elapsedMs=${Date.now() - t0}`,
+      `[compose-scene-anchor] ok sceneId=${body.sceneId} portraits=${portraits.length} world=loc${locationUrls.length}/bld${buildingUrls.length}/prop${propUrls.length} elapsedMs=${Date.now() - t0}`,
     );
 
     const aiJson = await aiResp.json();
