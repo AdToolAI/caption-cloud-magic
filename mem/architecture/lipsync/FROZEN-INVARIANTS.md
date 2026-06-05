@@ -22,34 +22,32 @@ Grep for that string before touching the area.
 
 ---
 
-## I.1 — v58 multipass is the only stable path for ≥3 speakers
+## I.1 — Chained per-speaker multipass is the only stable path for every N≥2
 
-The Sync.so `segments[]` payload returns `provider_unknown_error` on most
-3+ speaker plates regardless of model (`sync-3` or `lipsync-2-pro`). The
-per-speaker chained v5 fan-out (one Sync.so call per speaker, audio of
+The Sync.so `segments[]` payload (model `sync-3` or `lipsync-2-pro`) returns
+`provider_unknown_error` on most real plates regardless of speaker count.
+The per-speaker chained v5 fan-out (one Sync.so call per speaker, audio of
 the others muted, output of pass N feeds pass N+1) is the only path that
-holds.
+holds. **v60 (June 2026) extends this rule from N≥3 to N≥2** — there is no
+longer a v56 first attempt and no parallel fan-out for 2-speaker scenes.
 
-- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L820–840
-- Background: `mem://architecture/lipsync/v58-multispeaker-multipass-fallback`
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` `useV41Official` gate (~L820–840) is hard-pinned `false` for every multi-speaker dispatch; `fanOutAllowed = false` (~L2418) for every passes.length.
+- Background: `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`, `mem://architecture/lipsync/v58-multispeaker-multipass-fallback`
 
-## I.2 — `useV41Official` gate
+## I.2 — `useV41Official` gate stays disabled for multi-speaker
 
 ```
-useV41Official =
-  !forceMultipass &&
-  !stateForcesMultipass &&
-  !stateMultipassAttempted &&   // v59 — sticky
-  speakers.length >= 3 &&
-  (isV41Retry || !isAdvance);
+useV41Official = debugForceV56 && (isV41Retry || !isAdvance)
+// debugForceV56 = body?.force_v56 === true && speakers.length === 1
 ```
 
-Never relax any of these clauses. In particular `!stateMultipassAttempted`
-is the v59 stickiness rule — once multipass fired for a scene, no later
-retry may re-enter the segments[] path.
+`useV41Official` MUST never be true for `speakers.length >= 2`. The
+`force_v56` body flag is a single-speaker debug hook only — no production
+codepath sets it. Re-enabling the v56 `segments[]` dispatch for multi-
+speaker scenes resurrects the `provider_unknown_error` loop v60 removed.
 
-- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L830
-- Background: `mem://architecture/lipsync/v59-multipass-state-carryover`
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L832
+- Background: `mem://architecture/lipsync/v59-multipass-state-carryover`, `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`
 
 ## I.3 — Multipass markers are sticky across state writes
 
