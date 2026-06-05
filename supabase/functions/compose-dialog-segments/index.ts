@@ -273,6 +273,14 @@ serve(async (req) => {
     // "An unknown error occurred." (often caused by anchor-derived coords that
     // sit off-face on the actual Hailuo plate).
     const retryNoAsd = body?.retry_no_asd === true;
+    // v58 — Multi-speaker fallback. Set by sync-so-webhook after a v56
+    // single-call segments dispatch fails with the opaque
+    // `provider_unknown_error` on a multi-speaker (≥3) scene. Forces this
+    // dispatcher to skip the v56 segments[] path and use the proven v5
+    // per-speaker chained-pass pipeline (each pass = ONE Sync.so call with
+    // single-coord ASD, output of pass N feeds pass N+1) — the only payload
+    // shape that Sync.so accepts reliably for multi-speaker plates.
+    const forceMultipass = body?.force_multipass === true;
     if (!sceneId || typeof sceneId !== "string") {
       return json({ error: "scene_id_required" }, 400);
     }
@@ -809,7 +817,21 @@ serve(async (req) => {
     // We use v41 for 3+ speaker scenes (and only on fresh dispatch or an
     // explicit v41 retry). 1–2 speaker scenes keep the v5 fan-out path
     // (it has been stable for them) so we don't regress simpler dialogs.
-    let useV41Official = speakers.length >= 3 && (isV41Retry || !isAdvance);
+    // v58 — `forceMultipass` (body flag) OR `force_multipass` set on the
+    // previous dialog_shots state forces the per-speaker chained pipeline
+    // even for 3+ speaker scenes. Used by sync-so-webhook to fall back when
+    // the v56 segments[] call returns the opaque Sync.so unknown error.
+    const stateForcesMultipass = (existing as any)?.force_multipass === true;
+    let useV41Official =
+      !forceMultipass &&
+      !stateForcesMultipass &&
+      speakers.length >= 3 &&
+      (isV41Retry || !isAdvance);
+    if ((forceMultipass || stateForcesMultipass) && speakers.length >= 3) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} v58 FORCE_MULTIPASS active — skipping v56 segments[] dispatch, using per-speaker chained v5 fan-out`,
+      );
+    }
     const v41PrevState = ((existing as any)?.version === 41 || (existing as any)?.version === 42 || (existing as any)?.version === 43 || (existing as any)?.version === 44 || (existing as any)?.version === 45 || (existing as any)?.version === 46 || (existing as any)?.version === 47 || (existing as any)?.version === 48 || (existing as any)?.version === 49 || (existing as any)?.version === 50 || (existing as any)?.version === 51 || (existing as any)?.version === 52 || (existing as any)?.version === 55 || (existing as any)?.version === 56) ? (existing as any) : null;
 
     // ── v49 face-gate REMOVED (2026-06-05) ──────────────────────────────
