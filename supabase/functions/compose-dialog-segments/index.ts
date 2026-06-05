@@ -1181,6 +1181,8 @@ serve(async (req) => {
           v50_box_map: v50BoxDiag,
           v50_segments_with_box: segmentsWithBox,
           v50_segments_auto_fallback: segmentsAutoFallback,
+          point_sources: pointSourceCounts,
+          plate_detected: usePlateDetection,
           cost_credits: Number(v41PrevState?.cost_credits ?? v47Cost),
           refunded: false,
           retry_count: v41RetryCount,
