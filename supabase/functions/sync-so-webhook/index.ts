@@ -64,7 +64,12 @@ const RETRY_TEMPERATURES = [0.5, 0.35, 0.7, 0.4];
 // v37 — Added "sync3-coords" as the Sync.so-recommended fallback for
 // difficult / occluded / multi-speaker plates (sync-3 has built-in
 // obstruction detection and can open closed lips; lipsync-2-pro cannot).
-const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "auto-pro", "auto-standard"] as const;
+// v61 — Added "coords-pro-lp2pro": forces lipsync-2-pro on the proven
+// coords-pro point-ASD shape. This is the final multi-speaker fallback
+// AFTER sync-3 attempts exhaust (sync-3 is the new default for N>=2, but
+// we keep the historically-stable lipsync-2-pro chained path as last
+// resort instead of refunding).
+const V5_RETRY_VARIANTS = ["coords-pro", "coords-pro-box", "sync3-coords", "coords-pro-lp2pro", "auto-pro", "auto-standard"] as const;
 
 function nextV5RetryVariant(current: unknown) {
   const idx = V5_RETRY_VARIANTS.indexOf(current as any);
