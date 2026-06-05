@@ -239,6 +239,14 @@ export interface ComposerScene {
    * wants a face-locked opening (e.g. tight close-up).
    */
   forcePortraitAsFirstFrame?: boolean;
+  /**
+   * Stage A — World Assets as Visual References.
+   * When true, prepareSceneAnchor will NOT forward location/building/prop
+   * reference images to compose-scene-anchor (Nano Banana 2). Use when a
+   * generic scene is desired and the saved World assets would over-constrain
+   * the composition. Default false (always-on world refs).
+   */
+  ignoreWorldRefs?: boolean;
   clipUrl?: string;
   clipStatus: ClipStatus;
   /**
