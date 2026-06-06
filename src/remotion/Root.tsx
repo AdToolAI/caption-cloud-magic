@@ -13,9 +13,9 @@ import { SmokeTestVideo } from './templates/SmokeTestVideo';
 import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
 import { ComposedAdVideo, ComposedAdVideoSchema } from './templates/ComposedAdVideo';
 import { DialogStitchVideo, DialogStitchVideoSchema } from './templates/DialogStitchVideo';
-// v70: DialogTurnClipVideo + DialogTurnFaceCropVideo removed with the legacy
-// per-turn lip-sync pipeline. v69 single-face preclip is rendered via
-// DialogTurnFaceCropVideo's replacement inside compose-dialog-segments.
+import { DialogTurnFaceCropVideo, DialogTurnFaceCropVideoSchema } from './templates/DialogTurnFaceCropVideo';
+// v70: DialogTurnClipVideo (legacy per-turn full clip) removed; v69 only needs
+// the single-face square preclip below.
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -509,9 +509,42 @@ export const RemotionRoot: React.FC = () => {
           shots: [],
         }}
       />
-      {/* v70: DialogTurnClipVideo & DialogTurnFaceCropVideo compositions removed
-          with the legacy per-turn lip-sync pipeline. v69 uses Lambda-rendered
-          single-face preclips spawned directly from compose-dialog-segments. */}
+      <Composition
+        id="DialogTurnFaceCropVideo"
+        component={DialogTurnFaceCropVideo}
+        durationInFrames={60}
+        fps={30}
+        width={512}
+        height={512}
+        schema={DialogTurnFaceCropVideoSchema}
+        calculateMetadata={async ({ props }) => {
+          try {
+            const fps = 30;
+            const dur = Math.max(0.1, Number((props as any).endSec) - Number((props as any).startSec));
+            const durationInFrames = Math.max(3, Math.ceil(dur * fps));
+            const even = (value: unknown, fallback: number) => {
+              const n = Number(value);
+              const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+              return safe % 2 === 0 ? safe : safe - 1;
+            };
+            const out = even((props as any).outputSize, 512);
+            return { durationInFrames, fps, width: out, height: out };
+          } catch (err) {
+            console.error('[DialogTurnFaceCropVideo calculateMetadata] fallback', err);
+            return { durationInFrames: 60, fps: 30, width: 512, height: 512 };
+          }
+        }}
+        defaultProps={{
+          masterVideoUrl: 'https://example.com/master.mp4',
+          startSec: 0,
+          endSec: 2,
+          srcWidth: 1280,
+          srcHeight: 720,
+          cropX: 384,
+          cropY: 96,
+          cropSize: 512,
+        }}
+      />
     </>
   );
 };
