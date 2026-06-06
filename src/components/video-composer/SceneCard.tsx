@@ -361,6 +361,31 @@ export default function SceneCard({
   const [splitConfirmOpen, setSplitConfirmOpen] = useState(false);
   const [autoSplitArmed, setAutoSplitArmed] = useState(false);
 
+  const cleanRestartLipSync = async (opts: { force?: boolean } = {}) => {
+    const { data, error } = await supabase.functions.invoke("reset-lipsync-scene", {
+      body: { scene_id: scene.id, force: opts.force === true },
+    });
+    if (error) throw new Error(await extractFunctionsError(error));
+    if ((data as any)?.status === "already_applied") {
+      toast({
+        title: "Lip-Sync bereits fertig",
+        description: "Für einen neuen Versuch bitte den Clip + Lip-Sync neu rendern.",
+      });
+      return;
+    }
+    onUpdate({
+      lipSyncStatus: "pending" as any,
+      lipSyncAppliedAt: null as any,
+      lipSyncSourceClipUrl: null as any,
+      twoshotStage: null as any,
+      clipError: null as any,
+    });
+    toast({
+      title: "Lip-Sync sauber neu gestartet",
+      description: "Alte Jobs und Pipeline-Daten sind entfernt. v69 startet automatisch neu.",
+    });
+  };
+
   // Studio-Set UX: collapse-by-default for already-configured scenes so the
   // storyboard reads as a scannable list. Newly-created (empty) scenes start
   // expanded so the user lands in the editor immediately.
