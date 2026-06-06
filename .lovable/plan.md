@@ -1,46 +1,116 @@
-## Problem
+## Ziel
 
-Bei jedem Sprecher gibt es am Ende seines Turns einen sichtbaren "Animorph"-Effekt — die Mimik des lipsync-Gesichts gleitet sichtbar zurück in das ruhende Anchor-Gesicht.
+Die Multi-Speaker-Lip-Sync-Pipeline wieder auf den professionellen Zustand bringen:
 
-## Ursache
+- Jeder Sprecher bewegt nur seinen eigenen Mund in seinem eigenen Dialogfenster.
+- Kein einzelner Sprecher darf den gesamten Dialog visuell übernehmen.
+- Das Ergebnis darf nicht wie ein eingefrorenes Foto wirken.
+- Die Lösung soll sich an Sync.so orientieren: klares Target Face / klares Audio-Segment / saubere Timeline-Compositing-Logik, keine Workaround-Kaskade.
 
-Mit v72 (statisches Anchor-Bild als Master) + v73 (windowed Overlays) blendet `CroppedOverlay` in `DialogStitchVideo.tsx` an jedem Segment-Ende über 6 Frames (CROSSFADE_FRAMES) von **opacity 1 → 0** aus. Darunter liegt das **statische Anchor-Foto** mit geschlossenem Mund. Weil das Sync.so-Lipsync-Gesicht und das Anchor-Gesicht leicht andere Position, Skala und Expression haben, wirkt der 6-Frame-Opacity-Crossfade wie ein Morph zurück ins Standbild.
+## Diagnose
 
-Vor v72 lag darunter das bewegte i2v-Video — die Bewegung kaschierte den Crossfade, deshalb war der Effekt vorher unsichtbar.
+Die letzten Änderungen haben zwei Regressionen ausgelöst:
 
-Zusätzlich: Sync.so erzeugt pro Pass ein Output, das (bei `sourceTiming='absolute'`) **bereits die volle Szenen-Länge hat** — wir blenden also unnötigerweise mitten in der Szene wieder aus, obwohl der Pass-Output über die gesamte Dauer ein sauberes Gesicht liefert.
+1. **Statischer Anchor als Master**
+   - v72 nutzt bei Multi-Speaker-Szenen ein Standbild als Master-Plate.
+   - Dadurch bleiben zwar alle vier Personen sichtbar, aber die Szene verliert natürliche Bewegung und wirkt wie Photoshop.
 
-## Plan (v74 — Hold-On-End Overlays, kein Morph mehr)
+2. **Hold-to-End Overlays**
+   - v74 hält pro Sprecher ein Overlay bis Szenenende.
+   - Dadurch kann ein zuletzt/oben liegender Sprecher visuell den restlichen Dialog dominieren.
+   - Besonders gefährlich, wenn `sourceTiming`/`startFrom` nicht exakt zum Sync.so-Output passt.
 
-### 1. `render-sync-segments-audio-mux/index.ts`
-Pro Pass nur **EINEN** Overlay-Shot emittieren statt mehrere windowed:
+## Plan
 
-- **Non-tight (`audio_tight=false`, sourceTiming='absolute'):**
-  Ein Shot `[0, totalSec]`. Der Pass-Output ist bereits voll-lang mit geschlossenem Mund außerhalb des Speaks → kein Morph möglich, keine Mid-Scene Fade-Outs mehr.
+### 1. Regressionspfad entfernen
 
-- **Tight (`audio_tight=true`, sourceTiming='relative'):**
-  Ein Shot `[firstSegStart, totalSec]` (statt pro Speech-Segment). Der kurze Preclip läuft natürlich ab; danach friert Remotion `<Video>` auf dem **letzten Frame ein** (geschlossener Mund) und bleibt an der Crop-Position stehen bis Szenenende. Kein Crossfade-Übergang zurück zum Anchor → kein Morph.
+In `render-sync-segments-audio-mux/index.ts`:
 
-- Fallback wie gehabt: Pass ohne Segments → ein Shot `[0, totalSec]`.
+- Static-Master als Default entfernen.
+- `masterImageUrl` nicht mehr für normale Multi-Speaker-Lip-Sync-Muxes setzen.
+- `holdToEnd: true` nicht mehr für Multi-Speaker-Pässe setzen.
+- Zurück zu bewegtem Master-Video als Basisebene.
 
-### 2. `src/remotion/templates/DialogStitchVideo.tsx`
-`CroppedOverlay` (und analog `FaceMaskOverlay` / `FullFrameOverlay`) so anpassen, dass **kein Fade-Out am Sequence-Ende** mehr passiert, wenn der Shot bis `totalSec` läuft:
+Damit verschwinden:
 
-- Neue optionale Prop `holdToEnd: boolean`.
-- Wenn `true`: nur Fade-In am Anfang, danach permanent `opacity = 1` — kein interpolierter Ausstieg.
-- Wenn `false` (Legacy): bestehendes Verhalten beibehalten (Rückwärtskompatibilität für Single-Speaker / non-static-master Pfade).
-- `holdToEnd` aus `render-sync-segments-audio-mux` setzen, wenn `endSec >= totalSec - 0.05`.
+- der starre Standbild-Look,
+- der „ein Sprecher spricht alles“-Effekt,
+- die neue Overlay-Dauer bis Szenenende.
 
-### 3. Single-Speaker / kein Anchor-Master
-Verhalten **unverändert** lassen — dort ist der Master das i2v-Video, dort braucht es weiter den Fade-Out an den Original-Segment-Rändern, weil das Bild darunter natürlich weiterläuft.
+### 2. Sync.so-konforme Sprecherfenster wiederherstellen
 
-### 4. Verifikation
-- Edge-Log: `mode=fanout-N-speakers-static shots=N` (genau ein Shot pro Pass, nicht pro Segment).
-- Render: jeder Sprecher bleibt nach seinem Turn ruhig im Frame, kein sichtbarer Übergang zurück zum Anchor.
-- Audio-Sync und Lippenbewegung während des Turns unverändert.
+Für jeden erfolgreichen Sync.so-Pass werden wieder nur die echten Sprecher-Zeitfenster gerendert:
 
-### 5. Out of Scope
-Sync.so-Pipeline, Refunds, Webhook, Preclip-Render, FaceMap, Frontend-Progress — alles unverändert. Reine Render-Composition-Änderung.
+- `startSec = segment.startTime - pad`
+- `endSec = segment.endTime + pad`
+- `sourceTiming='relative'` bei tight/preclip outputs
+- `sourceTiming='absolute'` bei szenenlangen Sync.so outputs
 
-### Lambda-Bundle
-Nach den Änderungen `bash scripts/deploy-remotion-bundle.sh` ausführen, sonst greift `holdToEnd` nicht im Lambda.
+In `DialogStitchVideo.tsx`:
+
+- Cropped overlays bekommen ebenfalls korrektes `startFrom`, nicht nur FaceMask/FullFrame.
+- Für absolute Sync.so-Ausgaben muss das Video an der absoluten Timeline starten.
+- Für relative Preclips startet es bei Frame 0 innerhalb des Segmentfensters.
+
+### 3. Animorph ohne Hold-to-End lösen
+
+Der Animorph-Effekt wird nicht mehr durch „Overlay bis Ende halten“ gelöst, sondern durch kurze, professionelle Segmentübergänge:
+
+- Fade-out nur über 2–3 Frames statt 6 Frames.
+- Optional: Segment-Ende minimal später setzen, damit der Mund in geschlossenem Zustand endet.
+- Kein Crossfade über lange sichtbare Gesichtsunterschiede.
+
+Damit bleibt der Sprecher nur während seines Parts aktiv, aber der Übergang wirkt nicht morphend.
+
+### 4. Drift-Problem sauber absichern statt Standbild-Fallback
+
+Der ursprüngliche Grund für v72 war: bewegter i2v-Master kann bei 4 Personen auf eine Einzelperson driften.
+
+Diesen Fall lösen wir nicht mehr durch ein Standbild als Master, sondern durch einen Guard:
+
+- Multi-Speaker-Szenen behalten den bewegten Master.
+- Wenn der Master später Speaker verliert, darf nicht stillschweigend ein schlechter finaler Clip entstehen.
+- Bestehende Face-/Human-Count-Gates bleiben maßgeblich.
+- Wenn nötig wird der Master-Clip als fehlerhaft klassifiziert und neu generiert/refundet, statt einen Standbild-Clip zu verstecken.
+
+### 5. Bestehende fertige Szene nicht automatisch überschreiben
+
+Code-Fix betrifft neue und neu gemuxte Szenen.
+
+Für die aktuell kaputte Szene kann danach gezielt ein Re-Mux ausgelöst werden, sobald der Fix implementiert ist. Dabei bleibt die teure Sync.so-Arbeit erhalten; nur die finale Remotion-Komposition wird neu erstellt.
+
+## Technische Änderungen
+
+Betroffene Dateien:
+
+- `supabase/functions/render-sync-segments-audio-mux/index.ts`
+- `src/remotion/templates/DialogStitchVideo.tsx`
+- `.lovable/plan.md` / Memory nur zur Dokumentation der Regression und neuen Regel
+
+Konkrete Regeln nach dem Fix:
+
+```text
+Multi-speaker default:
+  master = moving source_clip_url
+  overlays = per speaker segment windows only
+  holdToEnd = false
+  masterImageUrl = disabled for normal mux
+
+Relative tight preclip:
+  Sequence starts at speaker segment
+  Video starts at frame 0
+
+Absolute full-scene Sync.so output:
+  Sequence starts at speaker segment
+  Video startFrom = segment startFrame
+```
+
+## Verifikation
+
+Nach Implementierung prüfen:
+
+- Edge payload log zeigt wieder mehrere segment-window shots, nicht `shots=N speakers hold-to-end`.
+- Jeder Sprecher bewegt nur in seinem eigenen Zeitfenster den Mund.
+- Die Basisszene hat wieder natürliche Bewegung statt statischem Foto.
+- Merged audio bleibt unverändert erhalten.
+- Keine Änderung an Sync.so-Pricing, Refunds, Webhook, Credits oder Voiceover-Erzeugung.

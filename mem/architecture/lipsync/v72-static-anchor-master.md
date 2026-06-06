@@ -1,37 +1,39 @@
 ---
-name: v72 Static Anchor Master + Always-On Preclip Overlays
-description: For multi-speaker (N≥2) dialog scenes, render-sync-segments-audio-mux now uses the static anchor image (lock_reference_url || reference_image_url) as the master plate instead of the i2v video — the i2v plate can drift / cut to a single person mid-scene, hiding speakers 3/4. Per-pass single-face preclips overlay always-on for the full totalSec (one shot per pass) so every speaker stays visible; lip-mouth animation only happens during their voiced turn. DialogStitchVideo schema gains optional masterImageUrl; when set it renders <Img> instead of <Video> as the underlying plate. 1-speaker tight-overlay path unchanged.
+name: v72 Static Anchor Master superseded by v75 Windowed Moving Master
+description: v72/v74 static-anchor + hold-to-end overlays are superseded and must not be used as the normal multi-speaker mux path. They caused frozen Photoshop-like scenes and could make one speaker visually lip-sync the whole dialog. v75 restores moving i2v master + per-speaker windowed Sync.so overlays.
 type: architecture
 ---
 
-## Why
+## Superseded
 
-4-speaker scene (`12ea3e1b…`): lip-sync worked correctly but the final video only showed speakers 1 & 2 — the Hailuo i2v master plate started with all 4 in frame and then cut to a single person mid-scene. Our v68/v69 per-turn preclip overlays were windowed (`startSec/endSec = segment ± 0.08s`), so speakers 3 & 4 had nothing to render on top of after the plate switched.
+Do **not** use the v72/v74 static-anchor + hold-to-end approach as the default final mux path.
 
-## Change
+It was introduced to hide i2v master drift in 4-speaker scenes, but it caused worse production regressions:
 
-1. `render-sync-segments-audio-mux/index.ts`:
-   - Reads `scene.lock_reference_url || scene.reference_image_url`.
-   - `useStaticMaster = isFanout && !!anchorImageUrl` (N≥2 only).
-   - Adds `masterImageUrl` to inputProps when `useStaticMaster`.
-   - `alwaysOn = useStaticMaster` → emits exactly one shot per pass spanning `[0, totalSec]` instead of per-segment windows.
-   - Log tag now reports `fanout-N-speakers-static` vs `fanout-N-speakers` vs `single-tight-overlay`.
+- Static anchor master makes characters look frozen / Photoshopped with no breathing, blinking, or scene motion.
+- Hold-to-end overlays can visually let one cropped speaker dominate the remaining dialog.
+- Long face crossfades into a static anchor read as AI morphing.
 
-2. `src/remotion/templates/DialogStitchVideo.tsx`:
-   - Schema: optional `masterImageUrl: string().url().optional().nullable()`.
-   - Renders `<Img src={masterImageUrl}>` for full duration when set, else legacy `<Video src={masterVideoUrl} muted>`.
+## Current rule (v75)
 
-## Out of scope
+Multi-speaker dialog mux must use:
 
-- 1-speaker scene → unchanged (single-tight-overlay over video master, no drift problem).
-- v68/v69 preclip render path, FaceMap, tight audio, refunds, sync-so-webhook → unchanged.
-- Fan-out without anchor image → falls back to legacy video-master + per-segment windowed overlays.
+```text
+master = moving source_clip_url when available, else finalLipsyncUrl
+overlays = per-speaker segment windows only
+holdToEnd = false for normal mux
+masterImageUrl = not sent for normal multi-speaker mux
+relative tight preclip = Sequence at segment, Video from frame 0
+absolute full-scene output = Sequence at segment, Video startFrom = segment startFrame
+```
 
-## Lambda bundle dependency
+## Drift handling
 
-The new `masterImageUrl` prop only takes effect after `scripts/deploy-remotion-bundle.sh` is run. Older bundles ignore the field and use `masterVideoUrl` (legacy behavior). The edge function payload is forward/backward compatible — no schema break.
+If the moving master drops speakers, treat that as a plate-quality failure / regeneration case, not as a reason to silently replace the final scene with a static image.
 
 ## Verification
 
-- Edge log: `mode=fanout-4-speakers-static master=<lock_reference_url>… shots=4` (one shot per speaker, not per segment).
-- Rendered video: static 4-face anchor composition for full duration; each speaker's mouth animates only during their voiced turn; off-turn faces remain visible as closed-mouth stills.
+- Edge log should show `fanout-N-speakers-windowed`.
+- Shot count should match actual dialogue windows, not just one shot per speaker.
+- Every speaker moves only in their own time window.
+- Base scene remains a moving video, not a static anchor image.

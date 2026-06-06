@@ -81,13 +81,14 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
+    const forceRemux = body?.force === true || body?.force_remux === true;
     sceneIdForDiagnostics = sceneId;
     if (!sceneId) return json({ error: "sceneId is required" }, 400);
 
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url, lock_reference_url, reference_image_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url",
       )
       .eq("id", sceneId)
       .single();
@@ -125,7 +126,7 @@ serve(async (req) => {
     }
 
     // ── Idempotency: existing mux render still in flight ─────────────────
-    if (state.audio_mux?.render_id) {
+    if (!forceRemux && state.audio_mux?.render_id) {
       const { data: existing } = await supabase
         .from("video_renders")
         .select("status")
@@ -182,20 +183,14 @@ serve(async (req) => {
     const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
 
-    // v72 — For multi-speaker fan-out we prefer the STATIC anchor image as
-    // the background plate. The i2v master can drift / cut to a single
-    // person mid-scene, hiding speakers 3/4. The static anchor composition
-    // keeps every face in frame; per-pass single-face preclips overlay the
-    // lip-sync on top. Single-speaker tight-overlay path keeps the video
-    // master (no drift problem with only 1 face).
-    const anchorImageUrl = String(
-      (scene as any).lock_reference_url || (scene as any).reference_image_url || "",
-    );
-    const useStaticMaster = isFanout && !!anchorImageUrl;
-    const masterImageUrlForMux = useStaticMaster ? anchorImageUrl : "";
-    const masterVideoUrlForMux = useStaticMaster
-      ? sourcePlateUrl || finalLipsyncUrl  // sent but ignored when image is set
-      : (useOverlay && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl);
+    // v75 — Professional Artlist-style default: keep the moving i2v master
+    // plate underneath and composite Sync.so outputs only during each
+    // speaker's true dialogue window. The v72/v74 static-anchor + hold-to-end
+    // path made characters look frozen and could let one overlay dominate the
+    // remaining scene, so it is intentionally not used for normal muxes.
+    const masterVideoUrlForMux = useOverlay && sourcePlateUrl
+      ? sourcePlateUrl
+      : finalLipsyncUrl;
 
     const minAxis = Math.min(width, height);
     const radiusForCount =
@@ -204,24 +199,9 @@ serve(async (req) => {
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
 
-    // v74 — Eliminate the "morph" artifact at the end of every speaker
-    // turn. Previously each turn ended with a 6-frame opacity fade-out
-    // back to the static anchor face beneath; because the lipsynced face
-    // and the still anchor face have slightly different position / scale
-    // / expression, the crossfade looked like an AI morph.
-    //
-    // Fix (only when we have a static anchor master):
-    //   • Emit exactly ONE shot per pass spanning [firstSegStart, totalSec]
-    //     (or [0, totalSec] if no segments / non-tight).
-    //   • Mark holdToEnd=true so the overlay only fades IN and then stays
-    //     fully opaque until scene end — never fades back to the anchor.
-    //   • For tight (relative) preclips the underlying <Video> stops at
-    //     its natural end and Remotion freezes on its last frame (mouth
-    //     closed), so the face stays put with no visible transition.
-    //
-    // Without a static anchor master we keep the legacy per-segment
-    // windowed path with fade-out — the video master underneath is in
-    // motion there so the fade is not visible.
+    // Keep overlays windowed to the actual speaker turns. This is the
+    // Sync.so-compliant behavior: target face + target audio + exact timeline
+    // window. Do not stretch any speaker overlay to scene end.
     const SHOT_PAD = 0.08;
 
     const fanoutShots = useOverlay
@@ -251,28 +231,6 @@ serve(async (req) => {
                 },
               };
 
-          // v74 hold-to-end single shot — only when on a static anchor master.
-          if (useStaticMaster) {
-            const segStarts = passSegs
-              .map((t: any) => Number(t.startTime))
-              .filter((n: number) => Number.isFinite(n));
-            const firstStart =
-              segStarts.length > 0
-                ? Math.max(0, Math.min(...segStarts) - SHOT_PAD)
-                : 0;
-            return [{
-              startSec: firstStart,
-              endSec: totalSec,
-              outputUrl: String(p.output_url),
-              sourceTiming,
-              holdToEnd: true,
-              ...overlayPayload,
-            }];
-          }
-
-          // Legacy path: video master underneath — keep per-segment windowed
-          // overlays with the original crossfade-out (no morph because the
-          // background is in motion).
           if (passSegs.length === 0) {
             return [{
               startSec: 0,
@@ -310,12 +268,9 @@ serve(async (req) => {
       srcHeight: height,
       shots: fanoutShots,
     };
-    if (masterImageUrlForMux) {
-      inputProps.masterImageUrl = masterImageUrlForMux;
-    }
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers${useStaticMaster ? "-static" : ""}` : "single-tight-overlay") : "single-audio-swap"} master=${(masterImageUrlForMux || masterVideoUrlForMux).slice(0, 80)} shots=${fanoutShots.length}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers-windowed` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
     );
 
     const renderId = crypto.randomUUID();

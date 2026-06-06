@@ -65,11 +65,8 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
-  /** v74: when true the overlay only fades IN at the start and then stays
-   *  fully opaque until the Sequence ends — NO fade-out. Used together
-   *  with shots that run all the way to totalSec on top of a static
-   *  anchor master, so the lipsync face never visibly morphs back into
-   *  the still anchor face at the segment boundary. */
+  /** Legacy compatibility only. Normal multi-speaker muxes keep overlays
+   *  windowed to speaker turns and do not use hold-to-end. */
   holdToEnd: z.boolean().optional(),
 });
 
@@ -93,11 +90,9 @@ export const DialogStitchVideoSchema = z.object({
 
 export type DialogStitchVideoProps = z.infer<typeof DialogStitchVideoSchema>;
 
-/** v20 Smoothness: 6-frame opacity crossfade on overlay edges so the cut
- *  between master plate and lipsynced overlay (and between consecutive
- *  speaker overlays) is invisible. Previously 3 frames produced a hard
- *  visible pop at the Samuel→Matthew boundary. */
-const CROSSFADE_FRAMES = 6;
+/** v75: short overlay edge blend. Long face crossfades can read as morphing;
+ *  3 frames hides hard cuts without visibly interpolating identities. */
+const CROSSFADE_FRAMES = 3;
 
 interface FullFrameOverlayProps {
   src: string;
@@ -133,6 +128,7 @@ const FullFrameOverlay: React.FC<FullFrameOverlayProps> = ({ src, segDuration, s
 interface CroppedOverlayProps {
   src: string;
   segDuration: number;
+  startFrom?: number;
   /** Pixel rect in composition space (already mapped from source-master). */
   left: number;
   top: number;
@@ -142,6 +138,7 @@ interface CroppedOverlayProps {
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
   segDuration,
+  startFrom,
   left,
   top,
   size,
@@ -183,6 +180,7 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
           src={src}
           muted
           playbackRate={1}
+          {...(startFrom !== undefined ? { startFrom } : {})}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
         />
       </div>
@@ -354,6 +352,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               <CroppedOverlay
                 src={shot.outputUrl}
                 segDuration={segDuration}
+                startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
                 left={left}
                 top={top}
                 size={size}
