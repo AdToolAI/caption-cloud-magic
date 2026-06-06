@@ -417,17 +417,83 @@ serve(async (req) => {
       // Get current retry count
       const { data: scene } = await supabase
         .from('composer_scenes')
-        .select('retry_count')
+        .select('retry_count, clip_source, clip_quality')
         .eq('id', sceneId)
         .single();
 
-      const retryCount = (scene?.retry_count || 0) + 1;
+      const currentRetry = scene?.retry_count || 0;
+      const MAX_AUTO_RETRY = 2;
 
+      // ── Auto-retry on transient Replicate-side failures ────────────────────
+      // Re-dispatch the SAME Replicate prediction (same model, same input) so
+      // the user doesn't need to manually click "Generate" again. Only fires
+      // for known infrastructure errors (read-timeout fetching input image,
+      // upstream blip) and only while retry_count < MAX_AUTO_RETRY. Real
+      // content/policy errors fall through to the normal failed+refund path.
+      const canAutoRetry =
+        currentRetry < MAX_AUTO_RETRY &&
+        isRetryableTransientError(predError) &&
+        (payload.model || payload.version) &&
+        payload.input &&
+        typeof payload.input === 'object';
+
+      if (canAutoRetry) {
+        try {
+          const replicateKey = Deno.env.get('REPLICATE_API_KEY');
+          if (!replicateKey) throw new Error('REPLICATE_API_KEY missing');
+          const replicate = new Replicate({ auth: replicateKey });
+
+          const webhookBase = appendWebhookToken(
+            `${supabaseUrl}/functions/v1/compose-clip-webhook`,
+          );
+          const newWebhook = `${webhookBase}&scene_id=${sceneId}&project_id=${projectId}`;
+
+          const createArgs: Record<string, unknown> = {
+            input: payload.input,
+            webhook: newWebhook,
+            webhook_events_filter: ['completed'],
+          };
+          if (payload.model) createArgs.model = payload.model;
+          else createArgs.version = payload.version;
+
+          const retried = await replicate.predictions.create(
+            createArgs as Parameters<typeof replicate.predictions.create>[0],
+          );
+
+          await supabase
+            .from('composer_scenes')
+            .update({
+              clip_status: 'generating',
+              retry_count: currentRetry + 1,
+              replicate_prediction_id: retried.id,
+              clip_error: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sceneId);
+
+          console.log(
+            `[compose-clip-webhook] auto-retry ${currentRetry + 1}/${MAX_AUTO_RETRY} for scene ${sceneId} → new pred ${retried.id} (transient: "${String(predError).slice(0, 80)}")`,
+          );
+
+          return new Response(JSON.stringify({ ok: true, retried: true }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        } catch (retryErr) {
+          console.error(
+            '[compose-clip-webhook] auto-retry dispatch failed, falling through to refund:',
+            retryErr,
+          );
+          // Fall through to the normal failed+refund path below.
+        }
+      }
+
+      // ── Final failure → mark failed + refund ───────────────────────────────
       await supabase
         .from('composer_scenes')
         .update({
           clip_status: 'failed',
-          retry_count: retryCount,
+          retry_count: currentRetry + 1,
+          clip_error: String(predError ?? '').slice(0, 500) || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', sceneId);
@@ -435,7 +501,7 @@ serve(async (req) => {
       // Refund credits for failed clip
       const { data: sceneData } = await supabase
         .from('composer_scenes')
-        .select('duration_seconds, clip_source, project_id')
+        .select('duration_seconds, clip_source, clip_quality, project_id')
         .eq('id', sceneId)
         .single();
 
@@ -447,24 +513,8 @@ serve(async (req) => {
           .single();
 
         if (project) {
-          // Cost-per-second by source × quality tier — synced with compose-video-clips.
-          const CLIP_COSTS: Record<string, { standard: number; pro: number }> = {
-            'ai-hailuo':   { standard: 0.15, pro: 0.20 },
-            'ai-kling':    { standard: 0.15, pro: 0.21 },
-            'ai-sora':     { standard: 0.25, pro: 0.53 },
-            'ai-wan':      { standard: 0.10, pro: 0.18 },
-            'ai-seedance': { standard: 0.12, pro: 0.20 },
-            'ai-luma':     { standard: 0.20, pro: 0.32 },
-            'ai-veo':      { standard: 0.20, pro: 1.40 },
-            'ai-image':    { standard: 0.01, pro: 0.015 },
-          };
-          // Re-fetch quality tier for accurate refund
-          const { data: sceneFull } = await supabase
-            .from('composer_scenes')
-            .select('clip_quality')
-            .eq('id', sceneId)
-            .single();
-          const tier: 'standard' | 'pro' = sceneFull?.clip_quality === 'pro' ? 'pro' : 'standard';
+          const tier: 'standard' | 'pro' =
+            sceneData.clip_quality === 'pro' ? 'pro' : 'standard';
           const costPerSec = CLIP_COSTS[sceneData.clip_source]?.[tier] ?? 0.15;
           const refundAmount = sceneData.duration_seconds * costPerSec;
           try {
@@ -473,12 +523,15 @@ serve(async (req) => {
               p_amount_euros: refundAmount,
               p_generation_id: sceneId,
             });
-            console.log(`[compose-clip-webhook] Refunded €${refundAmount.toFixed(2)} (${sceneData.clip_source}/${tier})`);
+            console.log(
+              `[compose-clip-webhook] Refunded €${refundAmount.toFixed(2)} (${sceneData.clip_source}/${tier})`,
+            );
           } catch (refundErr) {
             console.error('[compose-clip-webhook] Refund failed:', refundErr);
           }
         }
       }
+
     } else {
       console.log(`[compose-clip-webhook] Intermediate status: ${status}, ignoring`);
       return new Response(JSON.stringify({ ok: true }), {
