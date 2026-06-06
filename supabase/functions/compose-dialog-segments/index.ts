@@ -2051,7 +2051,13 @@ serve(async (req) => {
     const syncOptions: Record<string, unknown> = {
       sync_mode: payloadSyncMode,
     };
-    if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
+    if (usePassPreclip) {
+      // v68 — Preclip is a tight single-face 512x512 crop. Sync.so sees
+      // ONE face → auto_detect is unambiguous and the most reliable mode.
+      // Coords from master pixel space don't map into the cropped frame
+      // anyway, so we drop them entirely.
+      syncOptions.active_speaker_detection = { auto_detect: true };
+    } else if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
       // https://sync.so/docs/developer-guides/speaker-selection):
       // frame_number = a frame WHERE THE SPEAKER IS VISIBLE. We anchor on
@@ -2122,6 +2128,7 @@ serve(async (req) => {
     } else {
       syncOptions.active_speaker_detection = { auto_detect: true };
     }
+
     const diagnosticWebhookUrl = `${webhookUrl}&diagnostic_id=${encodeURIComponent(diagnosticId)}`;
     // v61 — Multi-speaker default flipped to sync-3 (Sync.so's recommended
     // model for static / locked-camera / occluded plates per
