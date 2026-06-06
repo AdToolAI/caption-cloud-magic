@@ -1543,19 +1543,40 @@ serve(async (req) => {
         .every((d: any) => d?.transient === true);
       if (allBadAreTransient) {
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} AUDIO PREFLIGHT TRANSIENT — keeping pass state, will retry on next tick`,
+          `[compose-dialog-segments] scene=${sceneId} AUDIO PREFLIGHT TRANSIENT — keeping pass state, will retry on next tick (isAdvance=${isAdvance})`,
         );
         await logSyncDispatch(supabase, {
           scene_id: sceneId, user_id: userId, engine: "sync-segments",
           sync_status: "PREFLIGHT_TRANSIENT", error_class: "audio_fetch_transient",
           error_message: badAudio.error ?? "transient_audio_fetch_failure",
-          meta: { audio_diagnostics: audioDiagnostics, expected_total_sec: totalSec },
+          meta: { audio_diagnostics: audioDiagnostics, expected_total_sec: totalSec, is_advance: isAdvance },
         });
+        // v71 — when this is a webhook-driven `advance` call, the auto-trigger
+        // will NOT re-pick the scene (it only re-invokes pending scenes). Self-
+        // reschedule the same advance call after a short delay so pass N+1
+        // gets dispatched as soon as Storage settles.
+        if (isAdvance) {
+          try {
+            EdgeRuntime.waitUntil((async () => {
+              await new Promise((r) => setTimeout(r, 8_000));
+              try {
+                await supabase.functions.invoke("compose-dialog-segments", {
+                  body: { scene_id: sceneId, advance: true },
+                });
+              } catch (e) {
+                console.warn(
+                  `[compose-dialog-segments] scene=${sceneId} self-retry after transient preflight failed: ${(e as Error)?.message ?? e}`,
+                );
+              }
+            })());
+          } catch { /* EdgeRuntime not available in some test contexts */ }
+        }
         return json(
           { ok: true, status: "preflight_transient_retry_later", scene_id: sceneId, audio_diagnostics: audioDiagnostics },
           202,
         );
       }
+
 
       const reason = badAudio.error
         ? `audio_invalid_${badAudio.error}`
