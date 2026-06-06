@@ -1,11 +1,61 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { verifyWebhookRequest } from "../_shared/webhook-auth.ts";
+import Replicate from "npm:replicate@0.25.2";
+import { verifyWebhookRequest, appendWebhookToken } from "../_shared/webhook-auth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-token, x-qa-mock',
 };
+
+/**
+ * Canonical per-second cost table — MUST mirror compose-video-clips CLIP_COSTS.
+ * Used here only for refunds on failed predictions. Missing entries fall back
+ * to 0.15 €/s which produces an UNDER-refund — always add new providers to
+ * BOTH files when introducing them.
+ */
+const CLIP_COSTS: Record<string, { standard: number; pro: number }> = {
+  'ai-hailuo':     { standard: 0.15, pro: 0.20 },
+  'ai-kling':      { standard: 0.15, pro: 0.21 },
+  'ai-sora':       { standard: 0.25, pro: 0.53 },
+  'ai-wan':        { standard: 0.10, pro: 0.18 },
+  'ai-seedance':   { standard: 0.12, pro: 0.20 },
+  'ai-luma':       { standard: 0.20, pro: 0.32 },
+  'ai-veo':        { standard: 0.20, pro: 1.40 },
+  'ai-runway':     { standard: 0.15, pro: 0.15 },
+  'ai-pika':       { standard: 0.10, pro: 0.18 },
+  'ai-happyhorse': { standard: 0.28, pro: 0.56 },
+  'ai-vidu':       { standard: 0.09, pro: 0.09 },
+  'ai-grok':       { standard: 0.20, pro: 0.20 },
+  'ai-ltx':        { standard: 0.08, pro: 0.12 },
+  'ai-image':      { standard: 0.01, pro: 0.015 },
+};
+
+/**
+ * Detect Replicate-side transient failures that are safe to retry without any
+ * user-visible change (no prompt edit, no input change). These are exclusively
+ * infrastructure timeouts — Replicate failing to fetch our input image within
+ * its 10s read-timeout, or short upstream provider blips. We do NOT retry on
+ * content-policy / invalid-input / NSFW / quota errors because those would
+ * just fail identically a second time and waste another minute.
+ */
+function isRetryableTransientError(predError: unknown): boolean {
+  const s = String(predError ?? '').toLowerCase();
+  if (!s) return false;
+  return (
+    s.includes('read timed out') ||
+    s.includes('read timeout') ||
+    s.includes('connection reset') ||
+    s.includes('connection aborted') ||
+    s.includes('failed to fetch') ||
+    s.includes('httpsconnectionpool') ||
+    s.includes('upstream connect error') ||
+    s.includes('504 gateway') ||
+    s.includes('502 bad gateway') ||
+    s.includes('temporarily unavailable')
+  );
+}
+
 
 function detectSpeakerCount(dialogScript: string): number {
   const set = new Set<string>();
