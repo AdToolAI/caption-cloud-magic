@@ -235,16 +235,9 @@ serve(async (req) => {
               }).eq('id', composerSceneId);
             }
           }, { ttlSeconds: 30 });
-          // Nudge poll-dialog-shots so Sync.so dispatches immediately.
-          try {
-            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-            fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scene_id: composerSceneId }),
-            }).catch(() => {});
-          } catch { /* ignore */ }
+          // v70: poll-dialog-shots removed (legacy per-turn pipeline). v69
+          // single-face preclip is dispatched directly inside
+          // compose-dialog-segments and tracked via sync-so-webhook.
           console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} ready → ${finalOutputUrl}`);
         }
       } else if (isDialogStitch) {
@@ -616,15 +609,8 @@ serve(async (req) => {
               }).eq('id', composerSceneId);
             }
           }, { ttlSeconds: 30 });
-          try {
-            const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
-            const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-            fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scene_id: composerSceneId }),
-            }).catch(() => {});
-          } catch { /* ignore */ }
+          // v70: poll-dialog-shots removed; failure path is owned by
+          // sync-so-webhook + lipsync-watchdog.
           console.log(`🎬 [dialog-turn-preclip] scene ${composerSceneId} shot ${shotIdx} failed: ${errorMessage.slice(0, 120)}`);
         }
       } else if (isDialogStitch) {
