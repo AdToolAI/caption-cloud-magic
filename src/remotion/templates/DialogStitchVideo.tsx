@@ -137,6 +137,7 @@ interface CroppedOverlayProps {
   left: number;
   top: number;
   size: number;
+  holdToEnd?: boolean;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -144,16 +145,19 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   left,
   top,
   size,
+  holdToEnd,
 }) => {
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
-  const fadeOut = fadeIn;
-  const opacity = interpolate(
-    frame,
-    [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   // Soft circular mask — fully opaque in the center, feathered to fully
   // transparent at the edge so the cropped face blends into the master
   // plate underneath without a visible square seam.
