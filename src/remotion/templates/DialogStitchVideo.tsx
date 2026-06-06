@@ -21,6 +21,7 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
+  Img,
   Sequence,
   Video,
   interpolate,
