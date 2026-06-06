@@ -1920,9 +1920,9 @@ serve(async (req) => {
     }
 
     const syncOptions: Record<string, unknown> = {
-      // cut_off = "cut to shortest input length". With v39 tight audio the
-      // per-speaker WAV equals the turn duration, so output is naturally tight.
-      sync_mode: "cut_off",
+      // v63: loop the locked-camera plate so output length == audio length.
+      // cut_off would freeze on last frame whenever plate < audio.
+      sync_mode: "loop",
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
