@@ -256,7 +256,7 @@ serve(async (req) => {
     };
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${isFanout ? `fanout-${donePasses.length}-speakers` : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
     );
 
     const renderId = crypto.randomUUID();
