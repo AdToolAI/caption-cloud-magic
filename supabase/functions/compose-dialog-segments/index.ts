@@ -1141,7 +1141,12 @@ serve(async (req) => {
           model: V50_MODEL,
           input: v41Inputs,
           segments: v41Segments,
-          options: { sync_mode: "cut_off" },
+          // v63: sync_mode=loop. Master plate is locked-camera (v57), so looping
+          // is visually invisible AND guarantees output length == master audio
+          // length. cut_off would truncate the output to the shorter of (plate,
+          // audio) → if plate < audio the composer would freeze on the last
+          // frame while the VO track keeps playing.
+          options: { sync_mode: "loop" },
           webhookUrl: v41Webhook,
         };
 
