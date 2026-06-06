@@ -456,6 +456,26 @@ serve(async (req) => {
     // On `advance=true` (multi-pass chain) we bypass too — the previous pass
     // completed and we're now dispatching the NEXT pass on the same scene.
     const existing = (scene as any).dialog_shots as SegmentsState | null;
+    const existingStatus = String((existing as any)?.status ?? "");
+    const existingError = String((existing as any)?.error ?? (scene as any)?.clip_error ?? "");
+    const isStaleFailedState =
+      !isRetry &&
+      !isAdvance &&
+      !isV41Retry &&
+      existing &&
+      (existingStatus === "failed" || /v68|v58|v41|v56|recovery refund|provider_unknown/i.test(existingError));
+    if (isStaleFailedState) {
+      console.warn(
+        `[compose-dialog-segments] scene=${sceneId} reset_required — refusing stale failed state status=${existingStatus} error=${existingError.slice(0, 160)}`,
+      );
+      return json(
+        {
+          error: "reset_required",
+          message: "Stale lip-sync failure state detected. Use reset-lipsync-scene before v69 dispatch.",
+        },
+        409,
+      );
+    }
     if (
       !isRetry &&
       !isAdvance &&
