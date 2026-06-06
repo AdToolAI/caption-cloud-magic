@@ -1,38 +1,46 @@
-Do I know what the issue is? Yes.
+## Problem
 
-The backend logs show the new 4-speaker scene reached Sync.so pass 4/4 and the final dialog-stitch render completed successfully. The red “Lip-Sync abgebrochen” in the screenshot is therefore very likely a false frontend failure state triggered while the long multi-speaker run was still active. Separately, the v72 mux change has a real timing risk: it makes short per-speaker preclips span the whole scene, so those clips can play at the wrong time or stress Remotion. Also, the Lambda renderer log still shows the old Remotion bundle canary, so the new `masterImageUrl` behavior may not actually be active in Lambda yet.
+Bei jedem Sprecher gibt es am Ende seines Turns einen sichtbaren "Animorph"-Effekt — die Mimik des lipsync-Gesichts gleitet sichtbar zurück in das ruhende Anchor-Gesicht.
 
-Plan:
+## Ursache
 
-1. Fix the false “abgebrochen” progress state
-   - Update `usePipelineProgress.ts` so lipsync is not marked as stalled/failed while there is active backend evidence:
-     - `lipSyncStatus` is `running` or `audio_muxing`
-     - `twoshotStage` is an active stage like `master_clip`, `syncso_*`, `audio_muxing`, `preflight`, `deferred`, `circuit_open`
-     - `dialog_shots.status` is non-terminal
-     - a current Sync.so job id or mux render id exists
-   - Increase or bypass the 4-minute stall threshold for multi-speaker lipsync, because 4 speakers can legitimately take longer than 4 minutes.
-   - Ensure a completed lipsync scene clears stale frontend failure/stall state immediately.
+Mit v72 (statisches Anchor-Bild als Master) + v73 (windowed Overlays) blendet `CroppedOverlay` in `DialogStitchVideo.tsx` an jedem Segment-Ende über 6 Frames (CROSSFADE_FRAMES) von **opacity 1 → 0** aus. Darunter liegt das **statische Anchor-Foto** mit geschlossenem Mund. Weil das Sync.so-Lipsync-Gesicht und das Anchor-Gesicht leicht andere Position, Skala und Expression haben, wirkt der 6-Frame-Opacity-Crossfade wie ein Morph zurück ins Standbild.
 
-2. Correct the v72 mux logic
-   - Keep the static anchor master image for multi-speaker scenes.
-   - Revert the “always-on preclip overlay” part for tight per-speaker Sync.so clips.
-   - Use the static anchor as the always-visible resting face layer, and overlay each lipsynced crop only during its actual speaker turn.
-   - Preserve the old behavior for single-speaker scenes.
+Vor v72 lag darunter das bewegte i2v-Video — die Bewegung kaschierte den Crossfade, deshalb war der Effekt vorher unsichtbar.
 
-3. Add mux safety guards
-   - Before using `masterImageUrl`, verify the anchor URL is present and plausible; otherwise fall back to video master.
-   - Keep dispatch idempotency unchanged so no duplicate mux renders are started.
-   - Make failure messages distinguish Sync.so failure vs final mux/render failure.
+Zusätzlich: Sync.so erzeugt pro Pass ein Output, das (bei `sourceTiming='absolute'`) **bereits die volle Szenen-Länge hat** — wir blenden also unnötigerweise mitten in der Szene wieder aus, obwohl der Pass-Output über die gesamte Dauer ein sauberes Gesicht liefert.
 
-4. Refresh the final scene without rerunning Sync.so
-   - After the code change, clear only the audio-mux state for the affected scene and re-trigger the mux step.
-   - Do not rerun the 4 Sync.so speaker passes and do not charge again.
+## Plan (v74 — Hold-On-End Overlays, kein Morph mehr)
 
-5. Verify
-   - Check logs for `fanout-4-speakers-static` and one successful `dialog-stitch` webhook.
-   - Confirm the scene ends as `lip_sync_status='done'`, `twoshot_stage='done'`, no `clip_error`.
-   - Confirm the UI no longer shows “Lip-Sync abgebrochen” during an active multi-speaker run.
+### 1. `render-sync-segments-audio-mux/index.ts`
+Pro Pass nur **EINEN** Overlay-Shot emittieren statt mehrere windowed:
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- **Non-tight (`audio_tight=false`, sourceTiming='absolute'):**
+  Ein Shot `[0, totalSec]`. Der Pass-Output ist bereits voll-lang mit geschlossenem Mund außerhalb des Speaks → kein Morph möglich, keine Mid-Scene Fade-Outs mehr.
+
+- **Tight (`audio_tight=true`, sourceTiming='relative'):**
+  Ein Shot `[firstSegStart, totalSec]` (statt pro Speech-Segment). Der kurze Preclip läuft natürlich ab; danach friert Remotion `<Video>` auf dem **letzten Frame ein** (geschlossener Mund) und bleibt an der Crop-Position stehen bis Szenenende. Kein Crossfade-Übergang zurück zum Anchor → kein Morph.
+
+- Fallback wie gehabt: Pass ohne Segments → ein Shot `[0, totalSec]`.
+
+### 2. `src/remotion/templates/DialogStitchVideo.tsx`
+`CroppedOverlay` (und analog `FaceMaskOverlay` / `FullFrameOverlay`) so anpassen, dass **kein Fade-Out am Sequence-Ende** mehr passiert, wenn der Shot bis `totalSec` läuft:
+
+- Neue optionale Prop `holdToEnd: boolean`.
+- Wenn `true`: nur Fade-In am Anfang, danach permanent `opacity = 1` — kein interpolierter Ausstieg.
+- Wenn `false` (Legacy): bestehendes Verhalten beibehalten (Rückwärtskompatibilität für Single-Speaker / non-static-master Pfade).
+- `holdToEnd` aus `render-sync-segments-audio-mux` setzen, wenn `endSec >= totalSec - 0.05`.
+
+### 3. Single-Speaker / kein Anchor-Master
+Verhalten **unverändert** lassen — dort ist der Master das i2v-Video, dort braucht es weiter den Fade-Out an den Original-Segment-Rändern, weil das Bild darunter natürlich weiterläuft.
+
+### 4. Verifikation
+- Edge-Log: `mode=fanout-N-speakers-static shots=N` (genau ein Shot pro Pass, nicht pro Segment).
+- Render: jeder Sprecher bleibt nach seinem Turn ruhig im Frame, kein sichtbarer Übergang zurück zum Anchor.
+- Audio-Sync und Lippenbewegung während des Turns unverändert.
+
+### 5. Out of Scope
+Sync.so-Pipeline, Refunds, Webhook, Preclip-Render, FaceMap, Frontend-Progress — alles unverändert. Reine Render-Composition-Änderung.
+
+### Lambda-Bundle
+Nach den Änderungen `bash scripts/deploy-remotion-bundle.sh` ausführen, sonst greift `holdToEnd` nicht im Lambda.
