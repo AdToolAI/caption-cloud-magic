@@ -1141,14 +1141,19 @@ serve(async (req) => {
           model: V50_MODEL,
           input: v41Inputs,
           segments: v41Segments,
-          options: { sync_mode: "cut_off" },
+          // v63: sync_mode=loop. Master plate is locked-camera (v57), so looping
+          // is visually invisible AND guarantees output length == master audio
+          // length. cut_off would truncate the output to the shorter of (plate,
+          // audio) → if plate < audio the composer would freeze on the last
+          // frame while the VO track keeps playing.
+          options: { sync_mode: "loop" },
           webhookUrl: v41Webhook,
         };
 
         console.log(
           `[compose-dialog-segments] scene=${sceneId} v56_official_segments_payload model=${V50_MODEL} asd=${ASD_MODE} audio_input_mode=${AUDIO_INPUT_MODE} ` +
           `speakers=${v41SpeakerRefs.length} master_audio_url=${masterAudioUrl.slice(0, 80)} ` +
-          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=cut_off plate=${plateW}x${plateH} ` +
+          `segments=${v41Segments.length} totalSec=${totalSec} sync_mode=loop plate=${plateW}x${plateH} ` +
           `facemap_faces=${fmFacesAll.length} plate_detected=${usePlateDetection} ` +
           `point_sources=${JSON.stringify(pointSourceCounts)} points=${JSON.stringify(v50BoxDiag)}`,
         );
@@ -1915,9 +1920,9 @@ serve(async (req) => {
     }
 
     const syncOptions: Record<string, unknown> = {
-      // cut_off = "cut to shortest input length". With v39 tight audio the
-      // per-speaker WAV equals the turn duration, so output is naturally tight.
-      sync_mode: "cut_off",
+      // v63: loop the locked-camera plate so output length == audio length.
+      // cut_off would freeze on last frame whenever plate < audio.
+      sync_mode: "loop",
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
@@ -2174,7 +2179,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `frame=${referenceFrameNumber} sync_mode=cut_off input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=loop input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -2358,7 +2363,7 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
-        sync_mode: "cut_off",
+        sync_mode: "loop",
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,
