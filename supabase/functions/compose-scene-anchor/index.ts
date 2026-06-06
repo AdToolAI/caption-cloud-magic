@@ -349,9 +349,13 @@ serve(async (req) => {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
     const path = `${user.id}/scene-anchors/${body.sceneId}-${promptHash.slice(0, 12)}.${ext}`;
+    // cacheControl: 3600s so Cloudflare serves the anchor PNG from CDN edge on
+    // subsequent fetches. Critical because Replicate fetches `image` inputs with
+    // a 10 s read-timeout — origin RTT under load can exceed that, killing the
+    // prediction. CDN-cached responses come back in <100ms.
     const { error: upErr } = await admin.storage
       .from("composer-frames")
-      .upload(path, bytes, { contentType: mime, upsert: true });
+      .upload(path, bytes, { contentType: mime, upsert: true, cacheControl: "3600" });
     if (upErr) {
       console.error("[compose-scene-anchor] upload error", upErr);
       return new Response(
