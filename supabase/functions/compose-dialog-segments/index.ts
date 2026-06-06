@@ -85,6 +85,9 @@ import { detectPlateFaces } from "../_shared/plate-face-detect.ts";
 import { validateCast } from "../_shared/cast-validation.ts";
 import { failLipSync } from "../_shared/lipsync-fail.ts";
 import { withDialogLock } from "../_shared/dialog-lock.ts";
+import { renderPassFacePreclip } from "../_shared/pass-face-preclip.ts";
+
+
 
 
 
@@ -177,6 +180,15 @@ interface PassState {
   started_at?: string;
   finished_at?: string;
   error?: string;
+  // v68 — single-face preclip cache (3+ speaker path). When set, dispatch
+  // to Sync.so uses preclip_url as input with auto_detect:true; audio-mux
+  // overlays the lipsynced crop back at preclip_crop on the master plate.
+  preclip_url?: string;
+  preclip_render_id?: string;
+  preclip_crop?: { x: number; y: number; size: number; outputSize: number };
+  preclip_error?: string;
+  audio_url_full?: string;
+  audio_tight?: { url: string; dur_sec: number; windows_secs: Array<[number, number]> };
 }
 
 interface SegmentsState {
