@@ -65,6 +65,12 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
+  /** v74: when true the overlay only fades IN at the start and then stays
+   *  fully opaque until the Sequence ends — NO fade-out. Used together
+   *  with shots that run all the way to totalSec on top of a static
+   *  anchor master, so the lipsync face never visibly morphs back into
+   *  the still anchor face at the segment boundary. */
+  holdToEnd: z.boolean().optional(),
 });
 
 
@@ -97,17 +103,20 @@ interface FullFrameOverlayProps {
   src: string;
   segDuration: number;
   startFrom?: number;
+  holdToEnd?: boolean;
 }
-const FullFrameOverlay: React.FC<FullFrameOverlayProps> = ({ src, segDuration, startFrom }) => {
+const FullFrameOverlay: React.FC<FullFrameOverlayProps> = ({ src, segDuration, startFrom, holdToEnd }) => {
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
-  const fadeOut = fadeIn;
-  const opacity = interpolate(
-    frame,
-    [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   return (
     <AbsoluteFill style={{ opacity }}>
       <Video
@@ -128,6 +137,7 @@ interface CroppedOverlayProps {
   left: number;
   top: number;
   size: number;
+  holdToEnd?: boolean;
 }
 const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   src,
@@ -135,16 +145,19 @@ const CroppedOverlay: React.FC<CroppedOverlayProps> = ({
   left,
   top,
   size,
+  holdToEnd,
 }) => {
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
-  const fadeOut = fadeIn;
-  const opacity = interpolate(
-    frame,
-    [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   // Soft circular mask — fully opaque in the center, feathered to fully
   // transparent at the edge so the cropped face blends into the master
   // plate underneath without a visible square seam.
@@ -187,11 +200,24 @@ interface FaceMaskOverlayProps {
    *  we play it from its absolute frame (matching the window start) so the
    *  mouth animation lines up with the master plate timeline. */
   startFrom?: number;
+  segDuration: number;
+  holdToEnd?: boolean;
 }
 /** v25/v38: full-length Sync.so output shown only inside a soft circular
  *  mask around the target face — and only inside this speaker's voiced turn
  *  window(s) via the parent <Sequence>. */
-const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx, startFrom }) => {
+const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx, startFrom, segDuration, holdToEnd }) => {
+  const frame = useCurrentFrame();
+  const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   // Feathered radial mask: solid in the inner 70% of radius, fading to 0
   // at radius edge so the lipsynced face blends seamlessly into the base.
   const inner = Math.max(2, Math.round(radiusPx * 0.68));
@@ -201,6 +227,7 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
     <AbsoluteFill
       style={{
         pointerEvents: 'none',
+        opacity,
         WebkitMaskImage: mask,
         maskImage: mask,
         WebkitMaskRepeat: 'no-repeat',
@@ -299,6 +326,8 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 cyPx={cyPx}
                 radiusPx={radiusPx}
                 startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                segDuration={segDuration}
+                holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
@@ -328,6 +357,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 left={left}
                 top={top}
                 size={size}
+                holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
@@ -344,6 +374,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
               src={shot.outputUrl}
               segDuration={segDuration}
               startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+              holdToEnd={!!shot.holdToEnd}
             />
           </Sequence>
         );
