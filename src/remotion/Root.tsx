@@ -13,8 +13,9 @@ import { SmokeTestVideo } from './templates/SmokeTestVideo';
 import { AudioSmokeTest, AudioSmokeTestSchema } from './templates/AudioSmokeTest';
 import { ComposedAdVideo, ComposedAdVideoSchema } from './templates/ComposedAdVideo';
 import { DialogStitchVideo, DialogStitchVideoSchema } from './templates/DialogStitchVideo';
-import { DialogTurnClipVideo, DialogTurnClipVideoSchema } from './templates/DialogTurnClipVideo';
-import { DialogTurnFaceCropVideo, DialogTurnFaceCropVideoSchema } from './templates/DialogTurnFaceCropVideo';
+// v70: DialogTurnClipVideo + DialogTurnFaceCropVideo removed with the legacy
+// per-turn lip-sync pipeline. v69 single-face preclip is rendered via
+// DialogTurnFaceCropVideo's replacement inside compose-dialog-segments.
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -508,84 +509,9 @@ export const RemotionRoot: React.FC = () => {
           shots: [],
         }}
       />
-      <Composition
-        id="DialogTurnClipVideo"
-        component={DialogTurnClipVideo}
-        durationInFrames={60}
-        fps={30}
-        width={1280}
-        height={720}
-        schema={DialogTurnClipVideoSchema}
-        calculateMetadata={async ({ props }) => {
-          try {
-            const fps = 30;
-            const dur = Math.max(0.1, Number((props as any).endSec) - Number((props as any).startSec));
-            const durationInFrames = Math.max(3, Math.ceil(dur * fps));
-            const even = (value: unknown, fallback: number) => {
-              const n = Number(value);
-              const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
-              return safe % 2 === 0 ? safe : safe - 1;
-            };
-            return {
-              durationInFrames,
-              fps,
-              width: even((props as any).targetWidth, 1280),
-              height: even((props as any).targetHeight, 720),
-            };
-          } catch (err) {
-            console.error('[DialogTurnClipVideo calculateMetadata] fallback', err);
-            return { durationInFrames: 60, fps: 30, width: 1280, height: 720 };
-          }
-        }}
-        defaultProps={{
-          masterVideoUrl: 'https://example.com/master.mp4',
-          startSec: 0,
-          endSec: 2,
-        }}
-      />
-      <Composition
-        id="DialogTurnFaceCropVideo"
-        component={DialogTurnFaceCropVideo}
-        durationInFrames={60}
-        fps={30}
-        width={512}
-        height={512}
-        schema={DialogTurnFaceCropVideoSchema}
-        calculateMetadata={async ({ props }) => {
-          try {
-            const fps = 30;
-            const dur = Math.max(0.1, Number((props as any).endSec) - Number((props as any).startSec));
-            const durationInFrames = Math.max(3, Math.ceil(dur * fps));
-            const even = (value: unknown, fallback: number) => {
-              const n = Number(value);
-              const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
-              return safe % 2 === 0 ? safe : safe - 1;
-            };
-            // Output is a square; allow caller to override via cropSize?
-            // We fix output to 512×512 (h264-friendly, plenty for face).
-            const out = even((props as any).outputSize, 512);
-            return {
-              durationInFrames,
-              fps,
-              width: out,
-              height: out,
-            };
-          } catch (err) {
-            console.error('[DialogTurnFaceCropVideo calculateMetadata] fallback', err);
-            return { durationInFrames: 60, fps: 30, width: 512, height: 512 };
-          }
-        }}
-        defaultProps={{
-          masterVideoUrl: 'https://example.com/master.mp4',
-          startSec: 0,
-          endSec: 2,
-          srcWidth: 1280,
-          srcHeight: 720,
-          cropX: 384,
-          cropY: 96,
-          cropSize: 512,
-        }}
-      />
+      {/* v70: DialogTurnClipVideo & DialogTurnFaceCropVideo compositions removed
+          with the legacy per-turn lip-sync pipeline. v69 uses Lambda-rendered
+          single-face preclips spawned directly from compose-dialog-segments. */}
     </>
   );
 };
