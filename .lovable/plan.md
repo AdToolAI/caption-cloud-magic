@@ -1,53 +1,59 @@
-## Problem
+## Diagnose
 
-In multi-/single-speaker dialog scenes the rendered clip freezes on the last frame while the voiceover keeps playing. Cause: the master plate (Hailuo / HeyGen i2v, typically 6–12 s) is often shorter than the master VO audio. We currently send `options.sync_mode = "cut_off"` to Sync.so, which per their docs trims the output to the **shorter** of (video, audio). When `plate < audio`, the returned lipsync clip ends early. The composer then plays the master VO track over a clip whose last frame is held → "frozen scene, voice continues".
+Edge-Logs für die fehlgeschlagene 1-Sprecher-Szene (`3e499f91…`):
 
-Evidence in `supabase/functions/compose-dialog-segments/index.ts`:
-- line 1144: `options: { sync_mode: "cut_off" }` (v56 multi-speaker official segments payload)
-- line 1920: `sync_mode: "cut_off"` (single-speaker / v39 per-turn path)
-- line 2361: `sync_mode: "cut_off"` (per-turn pass dispatch)
+```
+windows=[[0, 2.216]]   ← Sprechfenster
+totalSec=10            ← Plate-Länge
+audio file: …-char0-samuel-dusatko.wav  (per-speaker, auf 10 s mit Stille gepaddet)
+3× Sync.so → "An unknown error occurred."  (sync-3 → sync-3 → lipsync-2-pro)
+```
 
-Comment block around 1918–1920 even acknowledges: *"cut_off = cut to shortest input length"*.
+Die Pipeline ist **nicht** identisch mit dem 2-Sprecher-Erfolgsfall:
 
-There is also a log line 2168 that explicitly warns *"audio < expected — Sync.so will truncate output"* — same family of bug, just inverted.
+| Fall  | Payload | Audio an Sync.so |
+|-------|---------|------------------|
+| N≥2 (funktioniert)   | Fan-out + **Tight-Slice** (`passes.length >= 2` Gate, Zeile 1884) | Per-Pass auf reine Sprechfenster geschnitten (kurz, kein Trailing-Silence) |
+| N=1 (schlägt fehl)   | Fan-out, **Tight-Slice deaktiviert** | 10 s WAV mit 0–2.2 s Stimme + 7.8 s Stille |
 
-## Fix
+Sync.so (sync-3 **und** lipsync-2-pro) wirft auf einer Locked-Camera-Plate mit überwiegend stiller Audio (Verhältnis ~22% Speech / 78% Silence) reproduzierbar `provider_unknown_error` — derselbe Fehlerkanal, der uns vor v60 bei N≥2 mit gepaddetem Audio plagte und der durch die Tight-WAV-Slice gelöst wurde.
 
-Switch the dispatched `sync_mode` from `cut_off` to **`loop`** at all 3 dispatch sites in `compose-dialog-segments/index.ts`. Per Sync.so docs `loop` repeats the source video to match the audio duration, which is exactly what we want for our **locked-camera, no-cut master plates** — looping a static plate is visually invisible while guaranteeing the output length equals the master audio length.
+## Fix-Strategie (Pfad B: "Erfolgs-Pipeline auch für N=1")
 
-Why `loop` over the alternatives:
-- `cut_off` — current bug.
-- `remap` — time-stretches the video; on a locked plate this is fine but it also stretches any subtle motion (blinks, micro-movements) which can look unnatural.
-- `bounce` — ping-pongs frames; risk of visible reversal on plates with motion.
-- `loop` — safest for our v57 locked-plate guarantee; a static plate looped is indistinguishable from a static plate held.
+Wir bringen N=1 auf **denselben Code-Pfad**, der bei N≥2 grün läuft — kein neuer Mechanismus, nur das Gate öffnen + den Composer-Replay anpassen.
 
-### Files to edit
-1. `supabase/functions/compose-dialog-segments/index.ts`
-   - line 1144 — multi-speaker v56 official segments payload
-   - line 1920 — single-speaker per-turn payload
-   - line 2361 — per-turn pass dispatch
-   - Update the surrounding log lines (1151, 2177) and the explanatory comments (1787, 1849, 1872, 1918, 2134, 2155, 2164–2168) to reference `loop` and "match audio length".
+### Änderungen
 
-2. `mem/architecture/lipsync/v63-sync-mode-loop.md` (new) — short architecture note documenting:
-   - Symptom (frozen frame + ongoing VO)
-   - Root cause (`cut_off` + plate < audio)
-   - Fix (`loop`)
-   - Why locked-plate invariant (v57) makes `loop` visually safe.
+**1. `supabase/functions/compose-dialog-segments/index.ts`**
 
-3. `mem/architecture/lipsync/FROZEN-INVARIANTS.md` — add Rule **I.11**: *"Sync.so dispatches MUST send `options.sync_mode = "loop"`. `cut_off`, `bounce`, `remap`, `silence` are forbidden. Rationale: master plate may be shorter than master audio; we require output length = audio length and our plates are locked-camera so looping is invisible."*
+- Zeile 1884: Gate von `if (passes.length >= 2 && speakerWindowsSecs.length > 0)` auf `if (speakerWindowsSecs.length > 0)` reduzieren. Damit greift v39 Tight-Slice auch für N=1.
+- Für N=1: `sync_mode` zurück auf `"cut_off"` (statt v63 `loop`), weil das Tight-Audio kurz ist und wir den Output exakt auf die Sprechdauer wollen — nicht das geloopte Plate wiederholen. `loop` bleibt für N≥2 unverändert (Master-VO ist dort lang).
+  - Konkret: `payloadSyncMode = passes.length >= 2 ? "loop" : "cut_off"` an den drei Dispatch-Stellen (1144, 1920, 2182, plus State-Metadata 2366).
+- `audio_url_full` Snapshot bleibt — Retry-Pfad funktioniert weiter, weil `canonicalAudioUrl` schon implementiert ist.
 
-4. `mem/index.md` — append the v63 entry under the lipsync block.
+**2. Composer-Replay (Scene-Stitch)**
 
-### Deploy
-- `supabase functions deploy compose-dialog-segments`
+Sync.so liefert jetzt für N=1 ein ~2.2 s Lipsync-Clip statt 10 s. Der Composer muss die Lücke füllen:
 
-### Verification
-- Re-render a known 3-speaker scene where the master VO is longer than the Hailuo plate (e.g., ~14 s VO on a 10 s plate).
-- Expected edge log: `… sync_mode=loop plate=…` and the returned `clip_url` duration should equal the master audio duration (±0.1 s), not the plate duration.
-- In the composer player, the lipsync clip should play through to the end of the VO with no freeze on the last frame.
+- Datei: `supabase/functions/compose-video-assemble/index.ts` (oder analoger Stitch-Pfad)
+- Wenn `dialog_shots.clip_url` kürzer ist als `scene.duration` → erweiterten Render: `[lipsync_clip 0–2.2s]` + `[original_plate 2.2–10s]`.
+- Alternativ: das Lambda-Stitching (`render-sync-segments-audio-mux`) bekommt für N=1 zusätzlich `tail_plate_url + tail_start_sec` und konkateniert in Remotion. Diese Route ist sauberer und idempotent.
 
-## Out of scope
-- No change to model selection (v62 `sync-3` universal default stays).
-- No change to pricing, refund, ASD, face-gate, retry ladder, watchdog.
-- No change to the per-turn dialog-shots pipeline beyond the same `sync_mode` swap.
-- No client / composer / UI changes — only the dispatched payload changes.
+**3. Memory**
+
+- `mem/architecture/lipsync/v64-n1-tight-slice-parity.md` (neu): Erklärt warum N=1 jetzt auch Tight-Slice nutzt und sync_mode `cut_off` für N=1 reaktiviert wurde.
+- `mem/architecture/lipsync/FROZEN-INVARIANTS.md`: Rule I.11 verfeinern → `sync_mode=loop` ist Default für N≥2; `cut_off` ist erlaubt **und erforderlich** für N=1 Tight-Slice, weil sonst stilles Plate-Tail die Sync.so-Engine ins Stocken bringt.
+- `mem/index.md`: v64 Eintrag.
+
+### Out of scope
+
+- v62 sync-3 Universal Default bleibt.
+- v60 Unified Multi-Speaker Pipeline bleibt unverändert.
+- Retry-Ladder, ASD, Face-Gate, Refund-Pfad, Watchdog unverändert.
+- Keine Änderung an Director Score / UI Warnungen.
+
+### Verifikation
+
+1. 1-Sprecher Cinematic-Sync Szene neu rendern → Edge-Log zeigt `tight=on windows=[[0,2.216]] sync_mode=cut_off`, Sync.so liefert 200 OK in <60s.
+2. Composer-Player zeigt 0–2.2 s Lipsync + 2.2–10 s stilles Plate (keine eingefrorene Szene, VO endet sauber).
+3. 2-Sprecher Szene weiterhin grün (Regression-Check) — Pfad unverändert.

@@ -1881,7 +1881,13 @@ serve(async (req) => {
     // `startFrom` seek — making the pipeline INDEPENDENT of the deployed
     // Lambda bundle version (v38 needed a bundle-redeploy; v39 doesn't).
     let tightAudioInfo: { url: string; durSec: number } | null = null;
-    if (passes.length >= 2 && speakerWindowsSecs.length > 0) {
+    // v64 — Tight-slice now also runs for N=1. Sync.so reproducibly throws
+    // `provider_unknown_error` when the per-speaker WAV is mostly trailing
+    // silence (the 1-speaker case where speech is e.g. 0–2.2s on a 10s plate).
+    // Slicing to the voiced window matches the N≥2 success path; the silent
+    // tail of the scene is filled back in by the audio-mux Lambda (see
+    // render-sync-segments-audio-mux, useOverlay branch).
+    if (speakerWindowsSecs.length > 0) {
       try {
         const wavResp = await fetch(pass.audio_url, { signal: AbortSignal.timeout(30_000) });
         if (!wavResp.ok) throw new Error(`fetch ${wavResp.status}`);
@@ -1919,10 +1925,15 @@ serve(async (req) => {
       }
     }
 
+    // v64 — sync_mode:
+    //   • N≥2: `loop` (v63). Master VO can outrun the plate; loop keeps the
+    //     locked-camera plate playing for the full audio duration so no freeze.
+    //   • N=1: `cut_off`. We send a tight per-turn WAV (~speech duration); we
+    //     want Sync.so to return exactly that length. The audio-mux Lambda
+    //     then overlays the lipsync clip onto the original full-length plate.
+    const payloadSyncMode = passes.length >= 2 ? "loop" : "cut_off";
     const syncOptions: Record<string, unknown> = {
-      // v63: loop the locked-camera plate so output length == audio length.
-      // cut_off would freeze on last frame whenever plate < audio.
-      sync_mode: "loop",
+      sync_mode: payloadSyncMode,
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
@@ -2089,7 +2100,7 @@ serve(async (req) => {
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
-    if (passes.length >= 2 && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
+    if (speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       return await failBeforeProviderDispatch(
         "prepare_failed_no_tight_audio",
         "input_audio_prepare_failed",
@@ -2179,7 +2190,7 @@ serve(async (req) => {
       `speaker=${pass.speaker_name} coords=${JSON.stringify(pass.coords)} ` +
       `totalSec=${totalSec} audio≈${audioApproxSec}s videoBytes=${videoBytes} ` +
       `variant=${retryVariant} model=${payload.model} diagnostic=${diagnosticId} ` +
-      `frame=${referenceFrameNumber} sync_mode=loop input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
+      `frame=${referenceFrameNumber} sync_mode=${payloadSyncMode} input=${passInputUrl.slice(0, 80)} audio=${pass.audio_url.slice(0, 80)}`,
     );
 
     const resp = await fetch(`${SYNC_API_BASE}/generate`, {
@@ -2363,7 +2374,7 @@ serve(async (req) => {
         is_retry: isRetry,
         is_advance: isAdvance,
         face_map_source: faceMap?.source ?? null,
-        sync_mode: "loop",
+        sync_mode: payloadSyncMode,
         audio_approx_sec: audioApproxSec,
         expected_total_sec: totalSec,
         length_mismatch: lengthMismatch,

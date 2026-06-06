@@ -172,14 +172,23 @@ serve(async (req) => {
         Number.isFinite(Number(p.coords[0])) &&
         Number.isFinite(Number(p.coords[1])),
     );
+    // v64 — Overlay branch now triggers for ANY done pass that used a tight
+    // per-turn WAV, not just N≥2 fan-out. Single-speaker tight scenes need
+    // the same overlay-on-master-plate compositing because Sync.so returned
+    // only the ~speech-duration clip and the rest of the scene must come
+    // from the original pristine plate.
+    const anyTight = donePasses.some((p: any) => !!p?.audio_tight);
     const isFanout = donePasses.length >= 2;
+    const useOverlay = isFanout || (donePasses.length >= 1 && anyTight);
     const sourcePlateUrl = String((state as any).source_clip_url ?? "");
-    const masterVideoUrlForMux = isFanout && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl;
+    const masterVideoUrlForMux = useOverlay && sourcePlateUrl ? sourcePlateUrl : finalLipsyncUrl;
     // Face-mask radius: smaller for crowded scenes; uses smaller plate axis
     // so the circle never exceeds the frame. ~22% of min-axis for 2 speakers,
-    // scales down for 3 (≈18%) and 4 (≈15%).
+    // scales down for 3 (≈18%) and 4 (≈15%). Single-speaker overlay uses 28%
+    // because there is no other face to compete with.
     const minAxis = Math.min(width, height);
     const radiusForCount =
+      donePasses.length === 1 ? minAxis * 0.28 :
       donePasses.length <= 2 ? minAxis * 0.22 :
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
@@ -199,7 +208,7 @@ serve(async (req) => {
     // the deployed Lambda bundle version (old bundles ignore the unknown
     // field and default to relative play; new bundles honour it).
     const SHOT_PAD = 0.08;
-    const fanoutShots = isFanout
+    const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
           const isTight = !!(p as any).audio_tight;
@@ -247,7 +256,7 @@ serve(async (req) => {
     };
 
     console.log(
-      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${isFanout ? `fanout-${donePasses.length}-speakers` : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
+      `[render-sync-segments-audio-mux] scene=${sceneId} mode=${useOverlay ? (isFanout ? `fanout-${donePasses.length}-speakers` : "single-tight-overlay") : "single-audio-swap"} master=${masterVideoUrlForMux.slice(0, 80)} shots=${fanoutShots.length}`,
     );
 
     const renderId = crypto.randomUUID();

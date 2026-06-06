@@ -16,7 +16,7 @@ Updated: today
 - **Timeouts**: Complex AI edge functions require 120s - 300s.
 - **Video Rate Limits**: Per-user hourly limit removed; wallet balance is the only spend protection.
 - **Lip-Sync Sync.so Compliance**: Never send undocumented `segments_secs`; gate silent speaker audio before Sync.so dispatch.
-- **Lip-Sync Unified Pipeline (v60+v61+v62)**: Every N≥2 dialog scene uses the chained per-speaker Sync.so pipeline from the first dispatch (no v56 segments[] attempt, no 2-speaker parallel fan-out). **Default model is `sync-3` for ALL speaker counts including N=1** (v62, locked-camera Composer/Hailuo plates trip lipsync-2-pro's Still-Frame-Limitation regardless of N); `lipsync-2-pro` is kept as final ladder fallback via `coords-pro-lp2pro` variant. See `mem://architecture/lipsync/v62-sync3-universal-default`, `mem://architecture/lipsync/v61-sync3-default-multispeaker`, `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`.
+- **Lip-Sync Unified Pipeline (v60+v61+v62+v64)**: Every dialog scene uses the chained per-speaker Sync.so pipeline. **Default model is `sync-3` for ALL speaker counts** (v62). **N=1 now also uses the tight-slice + overlay path** (v64) — same successful pipeline as N≥2; `sync_mode=cut_off` for N=1 (tight WAV), `sync_mode=loop` for N≥2 (long master VO). `lipsync-2-pro` kept as ladder fallback via `coords-pro-lp2pro` variant. See `mem://architecture/lipsync/v64-n1-tight-slice-parity`, `mem://architecture/lipsync/v62-sync3-universal-default`, `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`.
 - **Lip-Sync Pipeline FROZEN (≤4 speakers)**: Read `mem://architecture/lipsync/FROZEN-INVARIANTS` before editing `compose-dialog-segments`, `sync-so-webhook`, `compose-video-clips` (neutralTwoShotPrompt / CINEMATIC_SYNC_SILENT_MASTER_NEGATIVE), `_shared/cast-validation.ts` (MAX_SPEAKERS=4), or `StoryboardTab` cast handling. Grep `FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md` for load-bearing sites.
 
 ## Memories
@@ -51,7 +51,8 @@ Updated: today
 - [Sync Segments Multi-Speaker Audio Mux](mem://architecture/lipsync/sync-segments-multispeaker-audio-mux) — render-sync-segments-audio-mux
 - [Server-Owned State Machine v23](mem://architecture/lipsync/server-owned-state-machine-v23) — dialog_shots schema
 - [Unified Multi-Pass v6](mem://architecture/lipsync/unified-multi-pass-v6) — pass chaining
-- [v63 sync_mode=loop](mem://architecture/lipsync/v63-sync-mode-loop) — Sync.so dispatch uses `sync_mode=loop` (not cut_off) so output length == VO length; fixes frozen-frame + ongoing-VO when plate < audio
+- [v63 sync_mode=loop](mem://architecture/lipsync/v63-sync-mode-loop) — N≥2 uses `sync_mode=loop` so output length == VO length; superseded for N=1 by v64
+- [v64 N=1 Tight-Slice Parity](mem://architecture/lipsync/v64-n1-tight-slice-parity) — N=1 now uses tight-slice + audio-mux overlay (same path as N≥2 success); `sync_mode=cut_off` for N=1, `loop` for N≥2; fixes provider_unknown_error on 78%-silence WAVs
 - [No Per-User Video Rate Limit](mem://architecture/video-edge-functions/no-per-user-rate-limit) — wallet-only spend protection
 - [Composer Engine Normalization](mem://architecture/video-composer/engine-normalization-policy) — ai-sora → ai-hailuo, Kling 3 Omni for T2V
 - [James Bond 2028 Design](mem://design/james-bond-2028-comprehensive-design-system) — Deep black/gold aesthetic
