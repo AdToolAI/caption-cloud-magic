@@ -1990,7 +1990,7 @@ serve(async (req) => {
         ];
       }
       console.log(
-        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
       );
       const preclip = await renderPassFacePreclip(
         supabase,
@@ -2022,12 +2022,12 @@ serve(async (req) => {
         };
         (pass as any).preclip_error = null;
         console.log(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip_ready url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_ready url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
         );
       } else {
         (pass as any).preclip_error = preclip.error ?? "unknown";
         console.warn(
-          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip_failed ${preclip.errorClass ?? "?"}: ${preclip.error ?? "?"} — falling back to full-plate dispatch`,
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v69_preclip_unified_failed ${preclip.errorClass ?? "?"}: ${preclip.error ?? "?"} — falling back to full-plate dispatch`,
         );
       }
     }
