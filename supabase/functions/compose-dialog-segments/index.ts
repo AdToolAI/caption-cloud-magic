@@ -136,13 +136,46 @@ const clampSyncCoords = (coords: [number, number] | null | undefined): [number, 
   return [Math.max(1, Math.round(x)), Math.max(1, Math.round(y))];
 };
 
+/**
+ * v71 — transient fetch errors (Supabase Storage hiccup, edge-runtime
+ * AbortSignal timeout) used to be misclassified as "audio is invalid" and
+ * burned the entire scene. We classify these explicitly so the caller can
+ * retry the dispatch later instead of marking the run failed + refunding
+ * + wiping the already-successful Sync.so passes that came before.
+ */
+const TRANSIENT_FETCH_ERROR_RE =
+  /signal timed out|timeoutexception|aborterror|the operation was aborted|network|fetch failed|connection (reset|refused|closed)|econnreset|etimedout|eai_again|http_5\d\d/i;
+function isTransientFetchError(err: unknown): boolean {
+  const msg = (err as Error)?.message ?? String(err ?? "");
+  return TRANSIENT_FETCH_ERROR_RE.test(msg);
+}
+
 async function inspectSpeakerAudio(url: string) {
-  const resp = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  // v71 — single-attempt fetch with longer timeout (60s) so transient
+  // storage lag doesn't get reported as "audio invalid". Retries are now
+  // owned by the audio-preflight caller, which can treat repeated transient
+  // failures as "retry later" instead of a hard refund/wipe.
+  const resp = await fetch(url, { signal: AbortSignal.timeout(60_000) });
   if (!resp.ok) throw new Error(`audio_get_${resp.status}`);
   const bytes = new Uint8Array(await resp.arrayBuffer());
   const wav = inspectWav(bytes);
   const vad = detectVoicedFrames(bytes);
   return { bytes: bytes.byteLength, wav, vad };
+}
+
+async function inspectSpeakerAudioWithRetry(url: string, attempts = 3) {
+  let lastErr: unknown = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await inspectSpeakerAudio(url);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientFetchError(err)) throw err;
+      // small backoff: 250ms, 750ms
+      await new Promise((r) => setTimeout(r, 250 * (i + 1) * (i + 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr ?? "audio_fetch_failed"));
 }
 
 interface Turn { startSec: number; endSec: number }
