@@ -167,21 +167,25 @@ Rules:
 
 ---
 
-## Rule I.11 — sync_mode MUST be `loop`
+## Rule I.11 — sync_mode is dispatch-count dependent (v64, refines v63)
 
-All Sync.so `/generate` dispatches MUST set `options.sync_mode = "loop"`.
-`cut_off`, `bounce`, `remap`, `silence` are FORBIDDEN.
-
-- Rationale: Our master plate (Hailuo / HeyGen i2v, 6–12s) can be shorter
-  than the master VO audio. `cut_off` would truncate the output to the
-  shorter input → the composer freezes on the last frame while the VO
-  track keeps playing ("frozen scene, voice continues").
-- `loop` repeats the locked-camera plate so output length == audio length.
-  Per Rule I (v57 locked-plate), our plates have no cuts/zooms/pans, so
-  looping a static plate is visually indistinguishable from holding it.
-- Enforced: `compose-dialog-segments/index.ts` ~L1144 (v56 official segments
-  payload), ~L1920 (per-turn `syncOptions`).
-- Background: `mem://architecture/lipsync/v63-sync-mode-loop`.
+- **N≥2 (chained per-speaker passes)**: `options.sync_mode = "loop"`. The
+  master VO can outrun the plate; loop keeps the locked-camera plate
+  playing for the full audio duration so the composer never freezes on
+  the last frame ("frozen scene, voice continues" — v63 fix).
+- **N=1 (single-speaker tight pass)**: `options.sync_mode = "cut_off"`.
+  We slice the per-speaker WAV down to the voiced window (v64 tight-slice
+  parity); we want Sync.so to return exactly that duration. The silent
+  scene tail is then filled by the audio-mux Lambda overlaying the lipsync
+  clip onto the original full-length plate (see render-sync-segments-audio-mux
+  `useOverlay` branch). Sending the full padded WAV with mostly trailing
+  silence reproducibly triggered `provider_unknown_error` on both sync-3
+  and lipsync-2-pro.
+- `bounce`, `remap`, `silence` remain FORBIDDEN everywhere.
+- Enforced: `compose-dialog-segments/index.ts` ~L1922 (`payloadSyncMode`),
+  ~L1144 (v56 debug path remains `loop`).
+- Background: `mem://architecture/lipsync/v64-n1-tight-slice-parity`,
+  `mem://architecture/lipsync/v63-sync-mode-loop` (predecessor).
 
 ---
 
