@@ -1925,10 +1925,15 @@ serve(async (req) => {
       }
     }
 
+    // v64 — sync_mode:
+    //   • N≥2: `loop` (v63). Master VO can outrun the plate; loop keeps the
+    //     locked-camera plate playing for the full audio duration so no freeze.
+    //   • N=1: `cut_off`. We send a tight per-turn WAV (~speech duration); we
+    //     want Sync.so to return exactly that length. The audio-mux Lambda
+    //     then overlays the lipsync clip onto the original full-length plate.
+    const payloadSyncMode = passes.length >= 2 ? "loop" : "cut_off";
     const syncOptions: Record<string, unknown> = {
-      // v63: loop the locked-camera plate so output length == audio length.
-      // cut_off would freeze on last frame whenever plate < audio.
-      sync_mode: "loop",
+      sync_mode: payloadSyncMode,
     };
     if (retryVariant === "coords-pro" || retryVariant === "sync3-coords" || retryVariant === "coords-pro-lp2pro") {
       // Sync.so canonical ActiveSpeaker DTO (per
