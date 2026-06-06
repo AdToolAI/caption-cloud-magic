@@ -2100,7 +2100,7 @@ serve(async (req) => {
       return json({ error: reason, message, refunded: alreadyRefunded ? 0 : costCredits, ...meta }, status);
     };
 
-    if (passes.length >= 2 && speakerWindowsSecs.length > 0 && !tightAudioInfo) {
+    if (speakerWindowsSecs.length > 0 && !tightAudioInfo) {
       return await failBeforeProviderDispatch(
         "prepare_failed_no_tight_audio",
         "input_audio_prepare_failed",
