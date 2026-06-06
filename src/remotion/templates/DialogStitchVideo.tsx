@@ -326,6 +326,8 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 cyPx={cyPx}
                 radiusPx={radiusPx}
                 startFrom={shot.sourceTiming === 'relative' ? undefined : startFrame}
+                segDuration={segDuration}
+                holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
