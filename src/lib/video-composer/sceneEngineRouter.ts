@@ -96,15 +96,8 @@ export function recommendEngineForScene(scene: ComposerScene): EngineRecommendat
       extraCostEur: 0.05,
     };
   }
-  if (override === 'cinematic-sync-legacy') {
-    return {
-      engine: 'cinematic-sync',
-      label: speakers >= 2 ? `🐢 Legacy Dialog · ${speakers} Sprecher` : '🐢 Legacy Cinematic + Lip-Sync',
-      reason:
-        'Alte v4-Pipeline (per-turn): pro Sprecher ein eigener Sync.so-Call sequenziell. ~10–15 min pro Szene, kein Cross-Scene-Parallelismus. Nur als Fallback gedacht.',
-      extraCostEur: speakers >= 2 ? 0.55 * speakers : 0.20,
-    };
-  }
+  // v70: cinematic-sync-legacy removed. Any persisted value falls through
+  // to the sync-segments recommendation below.
   if (override === 'cinematic-sync' || override === 'sync-segments') {
     return {
       engine: 'sync-segments',
