@@ -27,13 +27,13 @@ const POLL_INTERVAL_MS = 8_000;
 /**
  * Engines that share the dialog/lip-sync auto-trigger pipeline.
  *
- * `cinematic-sync-legacy` = explicit opt-in to the old v4 per-turn chain
- * (kept for backwards-compat / debugging). Everything else (`cinematic-sync`,
- * `sync-segments`) now routes to the v5 1-call Sync.so Segments dispatcher
- * — Artlist pattern: ONE API call with all segments[] processed in parallel
- * inside Sync.so, instead of 3 sequential per-turn calls.
+ * v70: legacy `cinematic-sync-legacy` opt-in removed. All dialog scenes
+ * route through the v69 unified single-face preclip pipeline via
+ * `compose-dialog-segments`. The per-turn v4 chain (`compose-dialog-scene`
+ * forwarder, `poll-dialog-shots`, `render-dialog-turn`, `render-dialog-stitch`)
+ * is deleted.
  */
-const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'cinematic-sync-legacy']);
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
 
 function detectSpeakerCount(dialogScript: string): number {
@@ -161,22 +161,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         };
 
-        const dialogShotRows = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            (d.dialog_shots?.version === 4 ||
-              (d.dialog_shots?.version === 5 && Array.isArray(d.dialog_shots?.shots))) &&
-            !d.lip_sync_applied_at &&
-            (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching') &&
-            ['queued', 'lipsyncing', 'stitching'].includes(String(d.dialog_shots?.status)) &&
-            !inflight.current.has(`poll-dialog:${d.id}`),
-        );
-        for (const d of dialogShotRows) {
-          inflight.current.add(`poll-dialog:${d.id}`);
-          supabase.functions
-            .invoke('poll-dialog-shots', { body: { scene_id: d.id } })
-            .finally(() => setTimeout(() => inflight.current.delete(`poll-dialog:${d.id}`), 30_000));
-        }
+        // v70: legacy per-turn v4 / v5+shots[] dispatcher (poll-dialog-shots)
+        // removed. v69 multi-pass writes `dialog_shots.passes[]`, advanced
+        // entirely via sync-so-webhook → render-sync-segments-audio-mux.
 
         // v23 ARCHITECTURE: client NEVER resets running/failed scenes.
         // All stale-detection / refund / reset is owned by the server
