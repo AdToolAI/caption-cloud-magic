@@ -373,7 +373,7 @@ export default function SceneCard({
       });
       return;
     }
-    onUpdate({
+    (onUpdate as (updates: any) => void)({
       lipSyncStatus: "pending" as any,
       lipSyncAppliedAt: null as any,
       lipSyncSourceClipUrl: null as any,
