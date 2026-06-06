@@ -27,13 +27,13 @@ const POLL_INTERVAL_MS = 8_000;
 /**
  * Engines that share the dialog/lip-sync auto-trigger pipeline.
  *
- * `cinematic-sync-legacy` = explicit opt-in to the old v4 per-turn chain
- * (kept for backwards-compat / debugging). Everything else (`cinematic-sync`,
- * `sync-segments`) now routes to the v5 1-call Sync.so Segments dispatcher
- * — Artlist pattern: ONE API call with all segments[] processed in parallel
- * inside Sync.so, instead of 3 sequential per-turn calls.
+ * v70: legacy `cinematic-sync-legacy` opt-in removed. All dialog scenes
+ * route through the v69 unified single-face preclip pipeline via
+ * `compose-dialog-segments`. The per-turn v4 chain (`compose-dialog-scene`
+ * forwarder, `poll-dialog-shots`, `render-dialog-turn`, `render-dialog-stitch`)
+ * is deleted.
  */
-const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments', 'cinematic-sync-legacy']);
+const DIALOG_ENGINES = new Set(['cinematic-sync', 'sync-segments']);
 const isDialogEngine = (eo: any) => DIALOG_ENGINES.has(String(eo ?? ''));
 
 function detectSpeakerCount(dialogScript: string): number {
@@ -161,22 +161,9 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           );
         };
 
-        const dialogShotRows = (data as any[]).filter(
-          (d) =>
-            isDialogEngine(d.engine_override) &&
-            (d.dialog_shots?.version === 4 ||
-              (d.dialog_shots?.version === 5 && Array.isArray(d.dialog_shots?.shots))) &&
-            !d.lip_sync_applied_at &&
-            (d.lip_sync_status === 'running' || d.lip_sync_status === 'stitching') &&
-            ['queued', 'lipsyncing', 'stitching'].includes(String(d.dialog_shots?.status)) &&
-            !inflight.current.has(`poll-dialog:${d.id}`),
-        );
-        for (const d of dialogShotRows) {
-          inflight.current.add(`poll-dialog:${d.id}`);
-          supabase.functions
-            .invoke('poll-dialog-shots', { body: { scene_id: d.id } })
-            .finally(() => setTimeout(() => inflight.current.delete(`poll-dialog:${d.id}`), 30_000));
-        }
+        // v70: legacy per-turn v4 / v5+shots[] dispatcher (poll-dialog-shots)
+        // removed. v69 multi-pass writes `dialog_shots.passes[]`, advanced
+        // entirely via sync-so-webhook → render-sync-segments-audio-mux.
 
         // v23 ARCHITECTURE: client NEVER resets running/failed scenes.
         // All stale-detection / refund / reset is owned by the server
@@ -246,7 +233,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
-          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -269,7 +256,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
-          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -374,10 +361,8 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // simply still warming up. Skip silently until both are present.
           const planUrl = d.audio_plan?.twoshot?.url;
           const sourceClip = d.lip_sync_source_clip_url ?? d.clip_url;
-          if (d.engine_override !== 'cinematic-sync-legacy') {
-            if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
-            if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
-          }
+          if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
+          if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
           // v23: ONLY `pending` (or null) is a valid start state on the client.
           // `failed` requires explicit user reset via `reset-lipsync-scene`.
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
@@ -411,18 +396,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // v25 Fan-Out (June 2026): ALL 1–4 speaker scenes route to
-          // `compose-dialog-segments`. Segments now dispatches N parallel
-          // Sync.so jobs, each on the ORIGINAL pristine master plate, and
-          // the feathered-mask compositor in `render-sync-segments-audio-mux`
-          // fans them back in. No more chained Sync.so outputs ⇒ no more
-          // opaque "unknown error" on pass 2/3.
-          // `cinematic-sync-legacy` keeps the old per-turn forwarder as a
-          // manual escape hatch.
-          const fnName =
-            d.engine_override === 'cinematic-sync-legacy'
-              ? 'compose-dialog-scene'
-              : 'compose-dialog-segments';
+          // v70: ALL 1–4 speaker scenes route to `compose-dialog-segments`
+          // (v69 unified single-face preclip pipeline). Legacy per-turn
+          // forwarder and `cinematic-sync-legacy` escape hatch removed.
+          const fnName = 'compose-dialog-segments';
 
           // v23: `failed` candidates are no longer accepted by the candidate
           // filter — the only way back into the pipeline is a user-triggered

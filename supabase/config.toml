@@ -34,28 +34,12 @@ verify_jwt = false
 [functions.sync-so-webhook]
 verify_jwt = false
 
-[functions.sync-so-probe]
-verify_jwt = false
-timeout_sec = 600
-
 [functions.compose-video-clips]
 verify_jwt = true
 timeout_sec = 180
 
-[functions.compose-lipsync-scene]
-verify_jwt = true
-timeout_sec = 300
-
-[functions.compose-twoshot-lipsync]
-verify_jwt = true
-timeout_sec = 300
-
 [functions.compose-dialog-scene]
 verify_jwt = true
-timeout_sec = 180
-
-[functions.poll-dialog-shots]
-verify_jwt = false
 timeout_sec = 180
 
 [functions.compose-twoshot-audio]

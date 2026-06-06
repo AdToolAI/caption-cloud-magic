@@ -797,12 +797,8 @@ export default function SceneCard({
                             <SelectItem value="sync-polish" className="text-xs">
                               ✨ Sync.so Polish
                             </SelectItem>
-                            <SelectItem
-                              value="cinematic-sync-legacy"
-                              className="text-xs text-muted-foreground"
-                            >
-                              🐢 Legacy Cinematic Chain (Per-Turn)
-                            </SelectItem>
+                            {/* v70: cinematic-sync-legacy option removed — all
+                                dialog scenes use v69 unified single-face preclip. */}
                           </SelectContent>
                         </Select>
                         {/* Cinematic-Sync quick-switch lives in ClipsTab as a prominent action button — kept out of here to avoid duplication. */}
@@ -1657,7 +1653,7 @@ export default function SceneCard({
 
                         const { data, error } =
                           await supabase.functions.invoke(
-                            "compose-dialog-scene",
+                            "compose-dialog-segments",
                             { body: { scene_id: scene.id } },
                           );
                         if (error) throw error;

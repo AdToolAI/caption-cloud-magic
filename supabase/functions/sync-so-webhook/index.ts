@@ -1445,148 +1445,15 @@ serve(async (req) => {
     return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments" });
   }
 
-  // ── v4: legacy per-turn chain ─────────────────────────────────────────
-  if (state.version !== 4 || !Array.isArray(state.shots)) {
-    return ok({ ok: true, skipped: "unknown_state_version" });
-  }
-
-  // v16 race-fix: do the entire read→mutate→update inside the per-scene
-  // dispatch lock. Previously the webhook patched dialog_shots from a stale
-  // snapshot while poll-dialog-shots concurrently wrote, dropping fields
-  // (e.g. preclip_url for turn 2 in 3-speaker scenes).
-  let logLine = "";
-  await withDialogLock(supabase, sceneId, "syncso-webhook", async () => {
-    // Re-read inside the lock so we always patch the latest snapshot.
-    const { data: fresh } = await supabase
-      .from("composer_scenes")
-      .select("dialog_shots, lip_sync_applied_at")
-      .eq("id", sceneId)
-      .maybeSingle();
-    if ((fresh as any)?.lip_sync_applied_at) {
-      logLine = "already_applied";
-      return;
-    }
-    const freshState = (fresh as any)?.dialog_shots ?? state;
-    if (!Array.isArray(freshState.shots)) {
-      logLine = "no_shots";
-      return;
-    }
-    const shots = freshState.shots.map((s: any) => ({ ...s }));
-    const idx = shots.findIndex((s: any) => s.sync_job_id === jobId);
-    if (idx < 0) {
-      logLine = "shot_not_found";
-      return;
-    }
-    const shot = shots[idx];
-    const wasReady = shot.status === "ready";
-    if (status === "COMPLETED" && outputUrl) {
-      // v19 — Re-host per-turn Sync.so output to ai-videos so Remotion
-      // Lambda has a stable, public, redirect-free MP4 URL during the
-      // dialog stitch. Without this, Lambda often fails to load the
-      // auth-token `api.sync.so/v2/generations/…/result?token=…` URL and
-      // silently falls back to the muted master plate — the user sees a
-      // clip where lips don't move at all. The v5 multi-pass path already
-      // re-hosts; we mirror that behavior here for v4 per-turn shots.
-      let rehostedTurnUrl: string | null = null;
-      try {
-        const { data: row } = await supabase
-          .from("composer_scenes")
-          .select("project_id")
-          .eq("id", sceneId)
-          .maybeSingle();
-        const { data: proj } = await supabase
-          .from("composer_projects")
-          .select("user_id")
-          .eq("id", (row as any)?.project_id)
-          .maybeSingle();
-        const uid = (proj as any)?.user_id;
-        if (uid) {
-          const dl = await fetch(outputUrl, { signal: AbortSignal.timeout(60_000) });
-          if (dl.ok) {
-            const bytes = new Uint8Array(await dl.arrayBuffer());
-            const objectPath = `composer/${uid}/${sceneId}-dialog-turn-${shot.idx}.mp4`;
-            const up = await supabase.storage.from("ai-videos").upload(
-              objectPath,
-              bytes,
-              { contentType: "video/mp4", upsert: true },
-            );
-            if (!up.error) {
-              const { data: pub } = supabase.storage
-                .from("ai-videos")
-                .getPublicUrl(objectPath);
-              if (pub?.publicUrl) {
-                rehostedTurnUrl = pub.publicUrl;
-                console.log(
-                  `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-hosted ${bytes.length} bytes → ${rehostedTurnUrl}`,
-                );
-              }
-            } else {
-              console.warn(
-                `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host upload failed: ${up.error.message}`,
-              );
-            }
-          } else {
-            console.warn(
-              `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host download HTTP ${dl.status}`,
-            );
-          }
-        }
-      } catch (err) {
-        console.warn(
-          `[sync-so-webhook] v19 scene=${sceneId} turn=${shot.idx} re-host exception: ${(err as Error).message}`,
-        );
-      }
-      shot.status = "ready";
-      shot.output_url = rehostedTurnUrl ?? outputUrl;
-      shot.output_url_rehosted = !!rehostedTurnUrl;
-      shot.completed_at = nowIso;
-      shot.error = undefined;
-    } else if (!prepareRetryFromWebhook(shot, `sync_${status}`, shots)) {
-      // v17: graceful-degrade darf NIE für 3+ Sprecher passieren — ein Turn
-      // ohne output_url heißt dort: dieser Sprecher hat im Stitch keinen
-      // Lipsync. Lieber hart failen + idempotent refunden (poll-tick erkennt
-      // den Zustand und triggert den Refund-Pfad).
-      const speakerCount = new Set(shots.map((s: any) => s?.speaker_idx)).size;
-      if (speakerCount >= 3) {
-        shot.status = "failed";
-        shot.degraded = false;
-        shot.output_url = undefined;
-        shot.error = `multi_speaker_no_degrade: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
-        shot.completed_at = nowIso;
-      } else {
-        // 1/2 Sprecher: alter sicherer Degrade-Pfad bleibt.
-        shot.status = "ready";
-        shot.degraded = true;
-        shot.output_url = undefined;
-        shot.error = `degraded_to_master: sync_${status}: ${(errorMsg ?? "unknown").toString().slice(0, 200)}`;
-        shot.completed_at = nowIso;
-      }
-    }
-    await supabase
-      .from("composer_scenes")
-      .update({
-        dialog_shots: { ...freshState, shots },
-        updated_at: nowIso,
-      })
-      .eq("id", sceneId);
-    logLine = `scene=${sceneId} job=${jobId} turn=${shot.idx} ${wasReady ? "already_ready" : status}`;
-  }, { ttlSeconds: 30 });
-
-  console.log(`[sync-so-webhook] ${logLine}`);
-
-  // Fire-and-forget poll-dialog-shots so the pipeline advances immediately.
-  try {
-    fetch(`${supabaseUrl}/functions/v1/poll-dialog-shots`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({ scene_id: sceneId }),
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
-
-  return ok({ ok: true, scene_id: sceneId, job_id: jobId, status });
+  // ── v70: legacy v4 per-turn chain removed ─────────────────────────────
+  // Historical scenes with `dialog_shots.version === 4` (or v5 + shots[])
+  // are no longer dispatched. Any late-arriving webhook for them is
+  // accepted with a 200 so Sync.so stops retrying, but no state is
+  // mutated and `poll-dialog-shots` is no longer fanned out (function
+  // deleted). The user must reset such scenes via `reset-lipsync-scene`
+  // to restart on the v69 unified pipeline.
+  console.log(
+    `[sync-so-webhook] legacy_v4_ignored scene=${sceneId} job=${jobId} version=${(state as any)?.version ?? "?"}`,
+  );
+  return ok({ ok: true, skipped: "legacy_v4_ignored" });
 });

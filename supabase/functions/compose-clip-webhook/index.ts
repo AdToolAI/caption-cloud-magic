@@ -350,37 +350,12 @@ serve(async (req) => {
           !alreadyFailed &&
           !wasCanceled
         ) {
-          // Route by speaker count (mirrors src/hooks/useTwoShotAutoTrigger.ts):
-          //   • 1–2 speakers → v5 `compose-dialog-segments` (multi-pass chain on
-          //     lipsync-2-pro). Stable in this regime.
-          //   • ≥3 speakers  → v4 `compose-dialog-scene` (per-turn parallel).
-          //     v5's chain feeds Sync.so its own output for pass 2/3, which
-          //     lipsync-2-pro (diffusion model) rejects with opaque "unknown
-          //     error" — observed 2026-06-02 on 3-speaker scenes. Going
-          //     straight to v4 avoids the burn-one-attempt-then-refund-then-
-          //     auto-retry loop that surfaces a false "Fehler" banner.
-          //   • engine_override === 'cinematic-sync-legacy' forces v4.
-          const plan: any = lipScene.audio_plan ?? {};
-          const speakerCount = Math.max(
-            1,
-            Array.isArray(plan?.speakers)
-              ? plan.speakers.length
-              : Array.isArray(plan?.twoshot?.speakers)
-                ? plan.twoshot.speakers.length
-                : Array.isArray(plan?.twoshot?.segments)
-                  ? new Set(
-                      plan.twoshot.segments
-                        .map((s: any) => s?.character_id ?? s?.speaker_slug ?? s?.speaker)
-                        .filter((v: any) => typeof v === 'string' && v.length > 0),
-                    ).size
-                  : 1,
-          );
-          const fnName =
-            (lipScene as any).engine_override === 'cinematic-sync-legacy' || speakerCount >= 3
-              ? 'compose-dialog-scene'
-              : 'compose-dialog-segments';
+          // v70: All dialog scenes (1–4 speakers) route to v69 unified
+          // pipeline (`compose-dialog-segments`). Legacy `compose-dialog-scene`
+          // forwarder and per-turn v4 chain removed.
+          const fnName = 'compose-dialog-segments';
           console.log(
-            `[compose-clip-webhook] auto lipsync route: scene=${sceneId} speakers=${speakerCount} fn=${fnName}`,
+            `[compose-clip-webhook] auto lipsync route: scene=${sceneId} fn=${fnName}`,
           );
           const lipPromise = fetch(`${supabaseUrl}/functions/v1/${fnName}`, {
             method: 'POST',
