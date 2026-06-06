@@ -8,7 +8,7 @@ Updated: today
 - **Localization**: UI, scripts, and VOs in EN, DE, ES. Visual prompts for AI models MUST remain in English for output quality.
 - **Credit Reliability**: Automatic, idempotent credit refunds are mandatory for external API/render failures.
 - **Storage Constraints**: Storage buckets enforce strict RLS. User ID must be the first directory in the path.
-- **Rendering Stability**: Lambda max 5 workers (tiered by frame count); framesPerLambda=270 default, scene-aligned dynamic for composer. Use imperative DOM updates for video transforms.
+- **Rendering Stability**: Lambda max 5 workers (tiered by frame count); framesPerLambda=270 default, scene-aligned dynamic for composer. Use imperative DOM updates for video transforms. Tight-WAV slicer must be frame-exact (v67) — allocation and copy share `floor(timeSec*sr)` boundaries.
 - **Social Integration**: X requires Basic API. TikTok uses Sandbox. Meta uses Graph API v24 (media_view fallback to impressions).
 - **Audio/Video Separation**: Treat video scenes with variable durations; audio (original, VO, music) are linear tracks. Sync playback rates.
 - **Director's Cut Export**: Hard-crop for burned-in subtitles. WYSIWYG parity between Studio state and snake_case export payload.

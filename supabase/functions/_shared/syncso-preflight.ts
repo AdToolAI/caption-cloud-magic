@@ -1466,11 +1466,24 @@ export function sliceWavToWindows(
   }
 
   const gapFrames = Math.max(0, Math.round(gapSec * sampleRate));
+
+  // v67 — Frame-exact slicing. Derive integer frame boundaries ONCE and
+  // reuse them for both buffer allocation and the sample copy. Previously
+  // allocation used `round((e-s)*sr)` while the copy used
+  // `floor(e*sr) - floor(s*sr)`. For windows like [3.717, 6.71] @ 44100
+  // these disagree by 1 frame, so `out.set()` writes past the allocated
+  // buffer and throws "offset is out of bounds" — failing the whole pass
+  // for 4-speaker scenes where short turn windows hit this rounding edge.
+  const segs = merged.map((w) => {
+    const startFrame = Math.max(0, Math.min(totalFrames, Math.floor(w.s * sampleRate)));
+    const endFrame = Math.max(startFrame, Math.min(totalFrames, Math.floor(w.e * sampleRate)));
+    return { startFrame, nFrames: endFrame - startFrame };
+  });
+
   let outFrames = 0;
-  for (let i = 0; i < merged.length; i++) {
-    const w = merged[i];
-    outFrames += Math.max(1, Math.round((w.e - w.s) * sampleRate));
-    if (i < merged.length - 1) outFrames += gapFrames;
+  for (let i = 0; i < segs.length; i++) {
+    outFrames += Math.max(1, segs[i].nFrames);
+    if (i < segs.length - 1) outFrames += gapFrames;
   }
 
   const outDataLen = outFrames * bytesPerFrame;
@@ -1492,23 +1505,25 @@ export function sliceWavToWindows(
   odv.setUint32(36, 0x64617461, false); // "data"
   odv.setUint32(40, outDataLen, true);
 
-  // Copy samples
+  // Copy samples — same frame boundaries computed above, plus defensive
+  // bounds so the destination offset can never exceed `out`.
   let writeFrame = 0;
-  for (let i = 0; i < merged.length; i++) {
-    const w = merged[i];
-    const startFrame = Math.floor(w.s * sampleRate);
-    const endFrame = Math.min(totalFrames, Math.floor(w.e * sampleRate));
-    const nFrames = Math.max(0, endFrame - startFrame);
+  for (let i = 0; i < segs.length; i++) {
+    const { startFrame, nFrames } = segs[i];
     if (nFrames > 0) {
       const srcByteOff = dataOff + startFrame * bytesPerFrame;
       const dstByteOff = 44 + writeFrame * bytesPerFrame;
-      out.set(
-        wav.subarray(srcByteOff, srcByteOff + nFrames * bytesPerFrame),
-        dstByteOff,
+      const copyLen = Math.min(
+        nFrames * bytesPerFrame,
+        Math.max(0, wav.length - srcByteOff),
+        Math.max(0, out.length - dstByteOff),
       );
-      writeFrame += nFrames;
+      if (copyLen > 0) {
+        out.set(wav.subarray(srcByteOff, srcByteOff + copyLen), dstByteOff);
+        writeFrame += Math.floor(copyLen / bytesPerFrame);
+      }
     }
-    if (i < merged.length - 1) writeFrame += gapFrames; // silence gap = zeroes (already zero-initialised)
+    if (i < segs.length - 1) writeFrame += gapFrames; // silence gap = zeroes (already zero-initialised)
   }
 
   const outInfo: WavInfo = {
