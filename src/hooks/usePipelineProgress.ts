@@ -617,8 +617,18 @@ export function usePipelineProgress({
   // the pipeline stalled — the UI flips to red + offers a retry, instead of
   // pretending to load forever (observed 2026-05-31: bar stuck at 95% with
   // "Slots 0/3" for 21 min after compose-video-clips silently crashed).
-  const STALL_THRESHOLD_MS = 4 * 60 * 1000;
-  const STALL_MIN_PERCENT = 90;
+  // v73 — Multi-speaker fan-out (3–4 Sprecher) braucht legitim mehr als 4
+  // Minuten (4× Sync.so + 4× Preclip + Audio-Mux). Stall-Threshold dynamisch.
+  const lipTargetCount = (scenes ?? []).filter((s: any) =>
+    s.twoshotStage || s.engineOverride === 'cinematic-sync' ||
+    (s.dialogVoices ? Object.keys(s.dialogVoices).length : 0) > 1,
+  ).length;
+  const maxSpeakers = (scenes ?? []).reduce((m: number, s: any) => {
+    const n = s.dialogVoices ? Object.keys(s.dialogVoices).length : 0;
+    return n > m ? n : m;
+  }, 0);
+  const STALL_THRESHOLD_MS = Math.max(4, maxSpeakers * 3, lipTargetCount * 2) * 60 * 1000;
+  const STALL_MIN_PERCENT = 95;
   const realProgressRef = useRef<{ value: number; at: number }>({ value: 0, at: Date.now() });
   const realProgressSum =
     clipsReal.progress * PHASE_WEIGHTS.clips +
@@ -629,11 +639,28 @@ export function usePipelineProgress({
   if (realProgressSum > realProgressRef.current.value + 0.001) {
     realProgressRef.current = { value: realProgressSum, at: Date.now() };
   }
+  // v73 — Active backend evidence suppresses the stall flag: as long as
+  // a Sync.so job / audio-mux render / non-terminal twoshot stage is
+  // visible in the scene state, the run is NOT stalled even if the
+  // weighted progress bar hasn't moved (Sync.so passes are long).
+  const hasActiveLipsyncEvidence = (scenes ?? []).some((s: any) => {
+    if (s.lipSyncStatus === 'running' || s.lipSyncStatus === 'audio_muxing') return true;
+    const stage = s.twoshotStage;
+    if (stage && !['done', 'complete', 'failed', 'audio_mux_failed'].includes(String(stage))) return true;
+    const ds = s.dialogShots ?? s.dialog_shots ?? null;
+    if (ds && ds.status && !['done', 'failed'].includes(ds.status)) return true;
+    if (ds?.audio_mux?.render_id) return true;
+    const predId = s.replicatePredictionId;
+    if (typeof predId === 'string' && predId.startsWith('sync:')) return true;
+    return false;
+  });
   const isStalled =
     isActive &&
     !!pipelineStartRef.current &&
+    !hasActiveLipsyncEvidence &&
     runFloorRef.current >= STALL_MIN_PERCENT &&
     Date.now() - realProgressRef.current.at > STALL_THRESHOLD_MS;
+
 
   // Reset the stall baseline whenever the pipeline stops being active.
   useEffect(() => {

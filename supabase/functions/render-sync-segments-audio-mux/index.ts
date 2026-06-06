@@ -204,17 +204,16 @@ serve(async (req) => {
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
 
-    // v72 — When the master is a static anchor image, each speaker's
-    // preclip overlay must span the ENTIRE scene (otherwise off-turn
-    // speakers vanish since there is no animated background showing
-    // their face). The preclip itself only animates the mouth during
-    // that speaker's voiced turn; outside the turn it stays as a
-    // closed-mouth still that blends with the anchor underneath.
-    //
-    // Fan-out video-master mode (legacy): keep per-turn windowed overlay
-    // since the master video already shows the resting faces.
+    // v73 — With a static anchor master the resting faces are ALREADY
+    // visible for the full scene (every speaker is in the anchor image).
+    // So we go back to per-turn windowed overlays for tight preclips —
+    // that prevents short preclips from being stretched across 9s, which
+    // caused Sync.so output to play at wrong timing and looked like a
+    // failure. Only when a pass has NO segments do we fall back to a
+    // single full-scene shot.
     const SHOT_PAD = 0.08;
-    const alwaysOn = useStaticMaster;
+    const alwaysOn = false;
+
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
           const passSegs = Array.isArray(p?.segments) ? p.segments : [];
