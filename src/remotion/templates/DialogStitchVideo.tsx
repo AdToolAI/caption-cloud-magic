@@ -357,6 +357,7 @@ export const DialogStitchVideo: React.FC<DialogStitchVideoProps> = ({
                 left={left}
                 top={top}
                 size={size}
+                holdToEnd={!!shot.holdToEnd}
               />
             </Sequence>
           );
