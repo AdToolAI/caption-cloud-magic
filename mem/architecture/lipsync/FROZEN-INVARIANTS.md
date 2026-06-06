@@ -134,7 +134,7 @@ later one logged as `job ... not in passes[]`). v60 unified the rule:
 - Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2418
 - Background: `mem://architecture/lipsync/v60-unified-multispeaker-pipeline`
 
-## I.10 — sync-3 is the default model for N≥2 chained passes (v61)
+## I.10 — sync-3 is the universal default model (v62, supersedes v61 multi-speaker-only rule)
 
 The chained per-speaker pipeline feeds Sync.so a LOCKED Hailuo plate where
 the mouth never moves until lip-sync paints it. `lipsync-2-pro` requires
@@ -144,21 +144,26 @@ https://sync.so/docs/models/lipsync) and silently returns
 detection and can open closed lips — it is Sync.so's recommended model
 for static / multi-person / occluded inputs.
 
+As of v62 (June 2026) sync-3 is the default for **all** speaker counts
+(N>=1). Reason: Composer/Hailuo plates are locked even for single-speaker
+turns; the v61 carve-out that kept N=1 on lipsync-2-pro produced the same
+`provider_unknown_error` profile observed for multi-speaker pre-v61.
+
 Rules:
-- `speakers.length >= 2` AND `retryVariant in {coords-pro, coords-pro-box}`
-  → model MUST be `sync-3`.
-- `speakers.length === 1` AND `retryVariant === coords-pro` → model MUST
-  stay `lipsync-2-pro` (single-speaker plates carry natural motion).
+- `retryVariant in {coords-pro, coords-pro-box}` → model MUST be `sync-3`
+  regardless of `speakers.length`.
 - `coords-pro-lp2pro` is the dedicated retry variant that forces
   `lipsync-2-pro` on the proven point-coord ASD shape. It MUST stay in
-  the webhook ladder as the final fallback before refunding for N≥2,
-  preserving the historically successful chained-lipsync-2-pro path.
+  the webhook ladder as the final fallback before refunding (or before
+  `auto-pro` for N=1), preserving the historically successful
+  chained-lipsync-2-pro path as a last resort for true motion plates.
 - `syncOptions` MUST NOT add `temperature` or `occlusion_detection_enabled`
   (sync-3 ignores both — see `mem://architecture/lipsync/v54-sync3-official-segments`).
 
-- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L1993-2020
+- Enforced: `supabase/functions/compose-dialog-segments/index.ts` ~L2010-2024
   (`payloadModel` picker), ~L1922 (ASD branch); `supabase/functions/sync-so-webhook/index.ts` ~L67 (`V5_RETRY_VARIANTS`), ~L1057-1083 (multi-speaker escalation ladder).
-- Background: `mem://architecture/lipsync/v61-sync3-default-multispeaker`
+- Background: `mem://architecture/lipsync/v62-sync3-universal-default`,
+  `mem://architecture/lipsync/v61-sync3-default-multispeaker` (predecessor).
 
 ---
 
