@@ -70,12 +70,16 @@ const ShotSchema = z.object({
 
 export const DialogStitchVideoSchema = z.object({
   masterVideoUrl: z.string().url(),
+  /** v72: optional static anchor image used INSTEAD of masterVideoUrl
+   *  when present. For multi-speaker dialog scenes the i2v plate can
+   *  drift / cut away mid-scene; using the static anchor composition
+   *  as background guarantees every speaker remains visible while the
+   *  per-pass single-face preclips animate the lips on top. */
+  masterImageUrl: z.string().url().optional().nullable(),
   masterAudioUrl: z.string().url(),
   totalSec: z.number().positive(),
   targetWidth: z.number().positive().optional(),
   targetHeight: z.number().positive().optional(),
-  /** v21: source-master dims used to map per-shot crop into composition
-   *  pixels. Defaults to targetWidth/Height when omitted. */
   srcWidth: z.number().positive().optional(),
   srcHeight: z.number().positive().optional(),
   shots: z.array(ShotSchema),
