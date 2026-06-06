@@ -1937,22 +1937,25 @@ serve(async (req) => {
       }
     }
 
-    // ── v68 — Single-Face PRECLIP for 3+ speaker scenes ─────────────────
-    // For 3+ speaker dialog scenes Sync.so (both lipsync-2-pro and sync-3)
-    // reproducibly returns `An unknown error occurred.` when the input is
-    // the full Multi-Face plate, regardless of ASD shape (coords / bbox /
-    // bbox-per-frame). The v21 legacy pipeline already proved that sending
-    // a tight SINGLE-FACE SQUARE CROP eliminates the ambiguity: Sync.so
-    // sees ONE face → auto_detect is unambiguous → no provider_unknown_error.
+    // ── v69 — Single-Face PRECLIP for ALL speaker counts (1..4) ─────────
+    // Unified pipeline: regardless of N, we render a tight SINGLE-FACE
+    // SQUARE CROP per pass via Remotion Lambda (DialogTurnFaceCropVideo)
+    // and send THAT to Sync.so. Sync.so always sees exactly ONE face,
+    // `auto_detect:true` is unambiguous, no more `provider_unknown_error`
+    // on the full multi-face plate.
     //
-    // We render the preclip via Remotion Lambda (DialogTurnFaceCropVideo)
-    // and overlay the lipsynced result back at the original (cropX, cropY,
-    // cropSize) region in render-sync-segments-audio-mux via the existing
-    // DialogStitchVideo `crop` shot type.
+    // v68 proved this pattern stable for N≥3. v69 extends it to N=1/2,
+    // where the legacy full-plate + `coords-pro`/`active_speaker_detection`
+    // path had been an ongoing source of provider_unknown_error.
+    //
+    // The lipsynced crop is overlaid back at (cropX, cropY, cropSize) in
+    // render-sync-segments-audio-mux via DialogStitchVideo's `crop` shot
+    // type. Fallback to full-plate dispatch is preserved if the preclip
+    // Lambda fails (no regression risk).
     //
     // Idempotent: once a pass has `preclip_url`, reuse it on retries.
     const wantPassPreclip =
-      speakers.length >= 3 &&
+      speakers.length >= 1 &&
       !!plateDims &&
       Array.isArray(pass.coords) &&
       Number.isFinite(pass.coords[0]) &&
