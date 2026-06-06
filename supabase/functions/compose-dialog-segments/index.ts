@@ -1937,6 +1937,105 @@ serve(async (req) => {
       }
     }
 
+    // ── v68 — Single-Face PRECLIP for 3+ speaker scenes ─────────────────
+    // For 3+ speaker dialog scenes Sync.so (both lipsync-2-pro and sync-3)
+    // reproducibly returns `An unknown error occurred.` when the input is
+    // the full Multi-Face plate, regardless of ASD shape (coords / bbox /
+    // bbox-per-frame). The v21 legacy pipeline already proved that sending
+    // a tight SINGLE-FACE SQUARE CROP eliminates the ambiguity: Sync.so
+    // sees ONE face → auto_detect is unambiguous → no provider_unknown_error.
+    //
+    // We render the preclip via Remotion Lambda (DialogTurnFaceCropVideo)
+    // and overlay the lipsynced result back at the original (cropX, cropY,
+    // cropSize) region in render-sync-segments-audio-mux via the existing
+    // DialogStitchVideo `crop` shot type.
+    //
+    // Idempotent: once a pass has `preclip_url`, reuse it on retries.
+    const wantPassPreclip =
+      speakers.length >= 3 &&
+      !!plateDims &&
+      Array.isArray(pass.coords) &&
+      Number.isFinite(pass.coords[0]) &&
+      Number.isFinite(pass.coords[1]) &&
+      !!tightAudioInfo;
+    if (wantPassPreclip && !(pass as any).preclip_url) {
+      // Window: use the first turn for this speaker as the preclip render
+      // window. Per-pass tight audio is sliced to the same window union, so
+      // a single-turn preclip matches the lipsync output the audio-mux
+      // Lambda overlays back on top.
+      const firstTurnForPreclip = pass.segments[0];
+      const winStartSec = firstTurnForPreclip ? Math.max(0, Number(firstTurnForPreclip.startTime) - 0.08) : 0;
+      const winEndSec = firstTurnForPreclip ? Math.min(totalSec, Number(firstTurnForPreclip.endTime) + 0.08) : totalSec;
+      // Extract bbox from faceMap if available so the crop wraps the face cleanly.
+      const fmFaces2: any[] = Array.isArray((faceMap as any)?.faces) ? (faceMap as any).faces : [];
+      const fmW2 = Number((faceMap as any)?.width) || plateDims!.width;
+      const fmH2 = Number((faceMap as any)?.height) || plateDims!.height;
+      const matchedFace2 =
+        fmFaces2.find((f) => f?.characterId && f.characterId === pass.character_id) ??
+        fmFaces2.find((f) => Number(f?.slotIndex) === Number(pass.speaker_idx)) ??
+        null;
+      let bboxForCrop: [number, number, number, number] | null = null;
+      if (matchedFace2 && Array.isArray(matchedFace2.bbox) && matchedFace2.bbox.length === 4) {
+        const [bx1, by1, bx2, by2] = matchedFace2.bbox.map((n: any) => Number(n));
+        const sx = plateDims!.width / fmW2;
+        const sy = plateDims!.height / fmH2;
+        bboxForCrop = [
+          Math.round(bx1 * sx),
+          Math.round(by1 * sy),
+          Math.round(bx2 * sx),
+          Math.round(by2 * sy),
+        ];
+      }
+      console.log(
+        `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip dispatching coords=${JSON.stringify(pass.coords)} bbox=${JSON.stringify(bboxForCrop)} window=[${winStartSec.toFixed(2)},${winEndSec.toFixed(2)}]`,
+      );
+      const preclip = await renderPassFacePreclip(
+        supabase,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+        Deno.env.get("SUPABASE_URL") ?? "",
+        {
+          sceneId,
+          projectId: (scene as any).project_id,
+          userId,
+          passIdx: currentPassIdx,
+          masterVideoUrl: sourceClipUrl,
+          srcWidth: plateDims!.width,
+          srcHeight: plateDims!.height,
+          coords: pass.coords as [number, number],
+          bbox: bboxForCrop,
+          startSec: winStartSec,
+          endSec: winEndSec,
+        },
+        90_000,
+      );
+      if (preclip.ok && preclip.preclipUrl && preclip.crop) {
+        (pass as any).preclip_url = preclip.preclipUrl;
+        (pass as any).preclip_render_id = preclip.preclipRenderId ?? null;
+        (pass as any).preclip_crop = {
+          x: preclip.crop.x,
+          y: preclip.crop.y,
+          size: preclip.crop.size,
+          outputSize: preclip.crop.outputSize,
+        };
+        (pass as any).preclip_error = null;
+        console.log(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip_ready url=${preclip.preclipUrl.slice(0, 100)} crop={x:${preclip.crop.x},y:${preclip.crop.y},size:${preclip.crop.size}}`,
+        );
+      } else {
+        (pass as any).preclip_error = preclip.error ?? "unknown";
+        console.warn(
+          `[compose-dialog-segments] scene=${sceneId} pass=${currentPassIdx + 1} v68_preclip_failed ${preclip.errorClass ?? "?"}: ${preclip.error ?? "?"} — falling back to full-plate dispatch`,
+        );
+      }
+    }
+
+    // When preclip is available, swap the Sync.so video input + force
+    // auto_detect (the cropped 512x512 frame has exactly ONE face).
+    const passPreclipUrl: string | null = (pass as any).preclip_url ?? null;
+    const usePassPreclip = !!passPreclipUrl;
+
+
+
     // v66 — sync_mode is TIGHT-GATED, not count-gated:
     //   • tightAudioInfo set (per-pass tight audio, N=1 OR N≥2) → `cut_off`.
     //     The WAV equals the speaker's voiced window (~1.5–2.5s); Sync.so
