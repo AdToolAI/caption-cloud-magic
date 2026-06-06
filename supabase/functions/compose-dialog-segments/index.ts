@@ -2007,7 +2007,11 @@ serve(async (req) => {
     // proven coords-pro shape" retry variant — final fallback in the
     // multi-speaker ladder before refunding.
     // FROZEN — see mem/architecture/lipsync/FROZEN-INVARIANTS.md (I.10)
-    const isMultiSpeakerForModel = speakers.length >= 2;
+    // v62: sync-3 is now the universal default for ALL speaker counts (N>=1).
+    // Rationale: even single-speaker plates from Hailuo/Composer are locked-cam
+    // stills where lipsync-2-pro's "Still Frame Limitation" silently fails.
+    // sync-3 handles both static and motion plates natively. lipsync-2-pro
+    // remains reachable only via the explicit `coords-pro-lp2pro` fallback.
     const payloadModel =
       retryVariant === "sync3-coords"
         ? SYNC3_MODEL
@@ -2016,8 +2020,8 @@ serve(async (req) => {
           : retryVariant === "coords-pro-lp2pro"
             ? LIPSYNC_MODEL
             : (retryVariant === "coords-pro" || retryVariant === "coords-pro-box")
-              ? (isMultiSpeakerForModel ? SYNC3_MODEL : LIPSYNC_MODEL)
-              : LIPSYNC_MODEL;
+              ? SYNC3_MODEL
+              : SYNC3_MODEL;
 
     const failBeforeProviderDispatch = async (
       reason: string,
