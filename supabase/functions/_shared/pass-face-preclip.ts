@@ -1,0 +1,274 @@
+/**
+ * pass-face-preclip.ts — Per-Pass Single-Face Preclip for v5 fan-out
+ *
+ * v68 (June 2026):
+ * For 3+ speaker dialog scenes the v5 fan-out pipeline used to send the full
+ * Multi-Face scene plate to Sync.so with `active_speaker_detection.coordinates`
+ * (or `bounding_boxes`) pointing at one of N faces. Sync.so (both lipsync-2-pro
+ * AND sync-3) silently returned `An unknown error occurred.` on 4-speaker
+ * plates regardless of which retry variant we used.
+ *
+ * The v21 legacy per-turn pipeline already had a working pattern: render a
+ * tight single-face SQUARE CROP via Remotion Lambda, send THAT to Sync.so
+ * with `auto_detect:true` (no ambiguity — the crop contains exactly one
+ * face), and overlay the result back onto the master plate at the original
+ * (cropX, cropY, cropSize) region with a soft circular mask via
+ * `DialogStitchVideo.shots[].crop`.
+ *
+ * This helper wires that legacy infrastructure into the v5 fan-out pass loop.
+ * It is synchronous from the caller's perspective: dispatches the Lambda
+ * render, polls `video_renders.video_url` every 2s up to 90s, returns the
+ * preclip URL + crop region. Idempotent: if the pass already has a preclip
+ * URL stored, reuses it without re-rendering.
+ *
+ * Notes:
+ *  - We DO NOT use render-dialog-turn directly because that function writes
+ *    into `dialog_shots.shots[]` (v4 schema). Our v5 fan-out uses
+ *    `dialog_shots.passes[]`, so we drive the Lambda render directly via
+ *    invoke-remotion-render and read video_renders.video_url.
+ *  - `audio_tight.windows_secs` is the source of the preclip's render
+ *    window. The preclip duration matches the voiced turn duration; the
+ *    surrounding silence in the original plate is filled back in by the
+ *    audio-mux Lambda overlay step.
+ */
+
+import { computeFaceCrop, FaceCropRegion } from "./face-crop.ts";
+import { appendWebhookToken } from "./webhook-auth.ts";
+import { DEFAULT_BUCKET_NAME } from "./aws-lambda.ts";
+
+export interface PassPreclipInput {
+  sceneId: string;
+  projectId: string;
+  userId: string;
+  passIdx: number;
+  /** Master plate URL (full scene). */
+  masterVideoUrl: string;
+  /** Source-master pixel dims. */
+  srcWidth: number;
+  srcHeight: number;
+  /** Speaker face coords in source-master pixel space. */
+  coords: [number, number];
+  /** Optional face bbox in source-master pixel space [x1,y1,x2,y2]. */
+  bbox?: [number, number, number, number] | null;
+  /** Render window for this speaker's turn(s) in scene seconds. */
+  startSec: number;
+  endSec: number;
+}
+
+export interface PassPreclipResult {
+  ok: boolean;
+  preclipUrl?: string;
+  preclipRenderId?: string;
+  crop?: FaceCropRegion;
+  /** Window passed to Lambda (preclip plays t=0 → endSec-startSec). */
+  durationSec?: number;
+  error?: string;
+  errorClass?: "dispatch_failed" | "lambda_failed" | "poll_timeout" | "invalid_input";
+}
+
+const FPS = 30;
+const POLL_INTERVAL_MS = 2_000;
+const DEFAULT_POLL_TIMEOUT_MS = 90_000;
+
+function evenDimension(value: number, fallback: number): number {
+  const n = Number(value);
+  const safe = Number.isFinite(n) && n >= 64 ? Math.round(n) : fallback;
+  return safe % 2 === 0 ? safe : safe - 1;
+}
+
+/**
+ * Render a single-face preclip via Remotion Lambda and wait for it to finish.
+ * Caller should already have stored `preclip_url` + `preclip_crop` on the
+ * pass if a prior call succeeded (idempotency lives at the call site so we
+ * don't have to re-read composer_scenes here).
+ */
+export async function renderPassFacePreclip(
+  supabase: any,
+  serviceKey: string,
+  supabaseUrl: string,
+  input: PassPreclipInput,
+  pollTimeoutMs: number = DEFAULT_POLL_TIMEOUT_MS,
+): Promise<PassPreclipResult> {
+  const {
+    sceneId,
+    projectId,
+    userId,
+    passIdx,
+    masterVideoUrl,
+    srcWidth,
+    srcHeight,
+    coords,
+    bbox,
+    startSec,
+    endSec,
+  } = input;
+
+  if (!masterVideoUrl || !Number.isFinite(srcWidth) || !Number.isFinite(srcHeight)) {
+    return { ok: false, error: "invalid_master_dims", errorClass: "invalid_input" };
+  }
+  if (!Array.isArray(coords) || coords.length !== 2) {
+    return { ok: false, error: "missing_coords", errorClass: "invalid_input" };
+  }
+  const dur = Math.max(0.2, endSec - startSec);
+  if (!Number.isFinite(dur)) {
+    return { ok: false, error: "invalid_window", errorClass: "invalid_input" };
+  }
+
+  const sW = evenDimension(srcWidth, 1280);
+  const sH = evenDimension(srcHeight, 720);
+  const crop = computeFaceCrop(coords, bbox ?? null, sW, sH, 512);
+  const outW = crop.outputSize;
+  const outH = crop.outputSize;
+  const durationInFrames = Math.max(6, Math.ceil(dur * FPS));
+
+  const renderId = crypto.randomUUID();
+  const outName = `dialog-pass-preclip-${sceneId}-p${passIdx}-${Date.now()}.mp4`;
+
+  const inputProps = {
+    masterVideoUrl,
+    startSec,
+    endSec,
+    srcWidth: sW,
+    srcHeight: sH,
+    cropX: crop.x,
+    cropY: crop.y,
+    cropSize: crop.size,
+  };
+
+  const { error: insertErr } = await supabase
+    .from("video_renders")
+    .insert({
+      render_id: renderId,
+      project_id: projectId,
+      user_id: userId,
+      bucket_name: DEFAULT_BUCKET_NAME,
+      source: "dialog-pass-preclip",
+      status: "pending",
+      started_at: new Date().toISOString(),
+      format_config: { format: "mp4", aspect_ratio: "1:1", width: outW, height: outH, fps: FPS },
+      content_config: {
+        out_name: outName,
+        durationInFrames,
+        fps: FPS,
+        width: outW,
+        height: outH,
+        composer_scene_id: sceneId,
+        pass_idx: passIdx,
+        face_crop: { x: crop.x, y: crop.y, size: crop.size, outputSize: crop.outputSize },
+      },
+      subtitle_config: {},
+    });
+  if (insertErr) {
+    return { ok: false, error: `insert_render:${insertErr.message}`, errorClass: "dispatch_failed" };
+  }
+
+  const webhookUrl = appendWebhookToken(`${supabaseUrl}/functions/v1/remotion-webhook`);
+  const lambdaPayload: Record<string, unknown> = {
+    type: "start",
+    serveUrl: Deno.env.get("REMOTION_SERVE_URL") || "",
+    composition: "DialogTurnFaceCropVideo",
+    inputProps: { type: "payload", payload: JSON.stringify(inputProps) },
+    codec: "h264",
+    imageFormat: "jpeg",
+    maxRetries: 1,
+    privacy: "public",
+    logLevel: "warn",
+    outName,
+    bucketName: DEFAULT_BUCKET_NAME,
+    width: outW,
+    height: outH,
+    fps: FPS,
+    durationInFrames,
+    frameRange: [0, durationInFrames - 1],
+    muted: true,
+    audioCodec: "aac",
+    scale: 1,
+    envVariables: {},
+    chromiumOptions: {},
+    timeoutInMilliseconds: 180_000,
+    concurrencyPerLambda: 1,
+    downloadBehavior: { type: "play-in-browser" },
+    webhook: {
+      url: webhookUrl,
+      secret: null,
+      customData: {
+        pending_render_id: renderId,
+        out_name: outName,
+        user_id: userId,
+        // Use a distinct source so remotion-webhook does NOT try to patch
+        // v4 dialog_shots.shots[] (which doesn't exist for this scene).
+        // The webhook will still mark video_renders.completed; we poll for it.
+        source: "dialog-pass-preclip",
+        composer_scene_id: sceneId,
+        composer_project_id: projectId,
+        pass_idx: passIdx,
+      },
+    },
+  };
+
+  const invokeResp = await fetch(`${supabaseUrl}/functions/v1/invoke-remotion-render`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}` },
+    body: JSON.stringify({ lambdaPayload, pendingRenderId: renderId, userId }),
+  });
+  if (!invokeResp.ok) {
+    const t = await invokeResp.text().catch(() => "");
+    await supabase
+      .from("video_renders")
+      .update({
+        status: "failed",
+        error_message: `invoke ${invokeResp.status}: ${t}`.slice(0, 400),
+        completed_at: new Date().toISOString(),
+      })
+      .eq("render_id", renderId);
+    return {
+      ok: false,
+      error: `invoke_${invokeResp.status}:${t.slice(0, 200)}`,
+      errorClass: "dispatch_failed",
+      preclipRenderId: renderId,
+      crop,
+      durationSec: dur,
+    };
+  }
+
+  // ── Poll for completion ──────────────────────────────────────────────
+  const deadline = Date.now() + pollTimeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    const { data: row } = await supabase
+      .from("video_renders")
+      .select("status, video_url, error_message")
+      .eq("render_id", renderId)
+      .maybeSingle();
+    const status = String((row as any)?.status ?? "");
+    const url = String((row as any)?.video_url ?? "");
+    if (status === "completed" && url) {
+      return {
+        ok: true,
+        preclipUrl: url,
+        preclipRenderId: renderId,
+        crop,
+        durationSec: dur,
+      };
+    }
+    if (status === "failed") {
+      return {
+        ok: false,
+        error: `lambda:${(row as any)?.error_message ?? "unknown"}`.slice(0, 300),
+        errorClass: "lambda_failed",
+        preclipRenderId: renderId,
+        crop,
+        durationSec: dur,
+      };
+    }
+  }
+
+  return {
+    ok: false,
+    error: `poll_timeout_${Math.round(pollTimeoutMs / 1000)}s`,
+    errorClass: "poll_timeout",
+    preclipRenderId: renderId,
+    crop,
+    durationSec: dur,
+  };
+}
