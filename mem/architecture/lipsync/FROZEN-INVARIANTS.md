@@ -167,25 +167,28 @@ Rules:
 
 ---
 
-## Rule I.11 — sync_mode is dispatch-count dependent (v64, refines v63)
+## Rule I.11 — sync_mode is TIGHT-GATED, not count-gated (v66, supersedes v64)
 
-- **N≥2 (chained per-speaker passes)**: `options.sync_mode = "loop"`. The
-  master VO can outrun the plate; loop keeps the locked-camera plate
-  playing for the full audio duration so the composer never freezes on
-  the last frame ("frozen scene, voice continues" — v63 fix).
-- **N=1 (single-speaker tight pass)**: `options.sync_mode = "cut_off"`.
-  We slice the per-speaker WAV down to the voiced window (v64 tight-slice
-  parity); we want Sync.so to return exactly that duration. The silent
-  scene tail is then filled by the audio-mux Lambda overlaying the lipsync
-  clip onto the original full-length plate (see render-sync-segments-audio-mux
-  `useOverlay` branch). Sending the full padded WAV with mostly trailing
-  silence reproducibly triggered `provider_unknown_error` on both sync-3
-  and lipsync-2-pro.
+```ts
+payloadSyncMode = tightAudioInfo ? "cut_off" : "loop"
+```
+
+- **Per-pass tight audio present (N=1 OR N≥2)** → `cut_off`. The WAV
+  equals the speaker's voiced window (~1.5–3s). Sync.so returns exactly
+  that duration; `render-sync-segments-audio-mux` (overlay branch)
+  composites it onto the pristine full-length plate at the turn's absolute
+  timeline. Looping a 1.6s clip ~5× across a 9s plate reproducibly
+  triggered `provider_unknown_error` on N=4 (and intermittently on N=2).
+- **No tight audio (force_v56 master VO single-pass)** → `loop` (v63).
+  Master VO may outrun the plate; loop keeps the locked plate playing
+  for the full audio duration so the composer never freezes on the last
+  frame.
 - `bounce`, `remap`, `silence` remain FORBIDDEN everywhere.
-- Enforced: `compose-dialog-segments/index.ts` ~L1922 (`payloadSyncMode`),
-  ~L1144 (v56 debug path remains `loop`).
-- Background: `mem://architecture/lipsync/v64-n1-tight-slice-parity`,
-  `mem://architecture/lipsync/v63-sync-mode-loop` (predecessor).
+- Enforced: `compose-dialog-segments/index.ts` ~L1934 (`payloadSyncMode`),
+  ~L1144 (v56 debug path; no tight there → `loop` correct).
+- Background: `mem://architecture/lipsync/v66-sync-mode-tight-gated`,
+  `mem://architecture/lipsync/v64-n1-tight-slice-parity` (predecessor),
+  `mem://architecture/lipsync/v63-sync-mode-loop` (origin of `loop`).
 
 ---
 

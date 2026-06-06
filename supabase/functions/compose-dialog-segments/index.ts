@@ -1925,13 +1925,18 @@ serve(async (req) => {
       }
     }
 
-    // v64 — sync_mode:
-    //   • N≥2: `loop` (v63). Master VO can outrun the plate; loop keeps the
-    //     locked-camera plate playing for the full audio duration so no freeze.
-    //   • N=1: `cut_off`. We send a tight per-turn WAV (~speech duration); we
-    //     want Sync.so to return exactly that length. The audio-mux Lambda
-    //     then overlays the lipsync clip onto the original full-length plate.
-    const payloadSyncMode = passes.length >= 2 ? "loop" : "cut_off";
+    // v66 — sync_mode is TIGHT-GATED, not count-gated:
+    //   • tightAudioInfo set (per-pass tight audio, N=1 OR N≥2) → `cut_off`.
+    //     The WAV equals the speaker's voiced window (~1.5–2.5s); Sync.so
+    //     returns exactly that length and the audio-mux Lambda overlays the
+    //     short lipsync clip onto the pristine full-length plate at the
+    //     turn's absolute timeline. Using `loop` here made Sync.so try to
+    //     loop a 1.6s clip ~5× across a 9s plate → `provider_unknown_error`
+    //     reproducibly on 4-speaker scenes (and intermittently on 2-speaker).
+    //   • no tight (v56 official segments / force_v56 with master VO) → `loop`
+    //     (v63). The master VO may outrun the plate; loop keeps the locked
+    //     plate playing for the full audio duration so no freeze.
+    const payloadSyncMode = tightAudioInfo ? "cut_off" : "loop";
     const syncOptions: Record<string, unknown> = {
       sync_mode: payloadSyncMode,
     };

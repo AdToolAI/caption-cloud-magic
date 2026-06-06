@@ -64,3 +64,4 @@ Updated: today
 - [Director's Cut Boundary Stability](mem://architecture/directors-cut/playback-boundary-stability-strategy) — boundary markers
 - [Ad/Email Director, Composer, AI Video Toolkit, Marketplace, Avatars, Music, SFX, Stock Videos, Status Page, QA Agent, etc.] — see prior index for full list
 - [Composer Replicate Fetch-Timeout Resilience](mem://architecture/video-composer/replicate-fetch-timeout-resilience) — composer-frames cacheControl=3600 + CLIP_COSTS sync (+happyhorse/vidu/grok/ltx) + Auto-Retry im compose-clip-webhook bei transienten Replicate-Read-Timeouts via re-dispatch (max 2)
+- [Lipsync v66 sync_mode tight-gated](mem://architecture/lipsync/v66-sync-mode-tight-gated) — Behebt 4-Sprecher provider_unknown_error: sync_mode wird tight-gated bestimmt (`tightAudioInfo ? cut_off : loop`) statt count-gated; vorher loopte Sync.so 1.6s Tight-Audio ~5× über 9s Plate
