@@ -103,17 +103,20 @@ interface FullFrameOverlayProps {
   src: string;
   segDuration: number;
   startFrom?: number;
+  holdToEnd?: boolean;
 }
-const FullFrameOverlay: React.FC<FullFrameOverlayProps> = ({ src, segDuration, startFrom }) => {
+const FullFrameOverlay: React.FC<FullFrameOverlayProps> = ({ src, segDuration, startFrom, holdToEnd }) => {
   const frame = useCurrentFrame();
   const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
-  const fadeOut = fadeIn;
-  const opacity = interpolate(
-    frame,
-    [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
-    [0, 1, 1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   return (
     <AbsoluteFill style={{ opacity }}>
       <Video
