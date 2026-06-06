@@ -396,18 +396,10 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         for (const d of candidates) {
           const speakers = resolveSpeakerCount(d);
-          // v25 Fan-Out (June 2026): ALL 1–4 speaker scenes route to
-          // `compose-dialog-segments`. Segments now dispatches N parallel
-          // Sync.so jobs, each on the ORIGINAL pristine master plate, and
-          // the feathered-mask compositor in `render-sync-segments-audio-mux`
-          // fans them back in. No more chained Sync.so outputs ⇒ no more
-          // opaque "unknown error" on pass 2/3.
-          // `cinematic-sync-legacy` keeps the old per-turn forwarder as a
-          // manual escape hatch.
-          const fnName =
-            d.engine_override === 'cinematic-sync-legacy'
-              ? 'compose-dialog-scene'
-              : 'compose-dialog-segments';
+          // v70: ALL 1–4 speaker scenes route to `compose-dialog-segments`
+          // (v69 unified single-face preclip pipeline). Legacy per-turn
+          // forwarder and `cinematic-sync-legacy` escape hatch removed.
+          const fnName = 'compose-dialog-segments';
 
           // v23: `failed` candidates are no longer accepted by the candidate
           // filter — the only way back into the pipeline is a user-triggered
