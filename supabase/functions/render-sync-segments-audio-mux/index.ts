@@ -81,6 +81,7 @@ serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const sceneId: string | undefined = body?.sceneId ?? body?.scene_id;
+    const forceRemux = body?.force === true || body?.force_remux === true;
     sceneIdForDiagnostics = sceneId;
     if (!sceneId) return json({ error: "sceneId is required" }, 400);
 
@@ -125,7 +126,7 @@ serve(async (req) => {
     }
 
     // ── Idempotency: existing mux render still in flight ─────────────────
-    if (state.audio_mux?.render_id) {
+    if (!forceRemux && state.audio_mux?.render_id) {
       const { data: existing } = await supabase
         .from("video_renders")
         .select("status")
