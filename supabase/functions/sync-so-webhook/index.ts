@@ -890,8 +890,16 @@ serve(async (req) => {
       const lastDonePass = [...freshDonePasses].reverse().find((p: any) => p?.status === "done" && p?.output_url);
       const finalUrl = (lastDonePass as any)?.output_url ?? outputUrl;
 
-      // Single-speaker fast path: no fan-in needed, audio already matches.
-      if (totalPasses === 1) {
+      // v64 — Single-speaker path:
+      //   • If the pass was dispatched with a TIGHT per-turn WAV
+      //     (`audio_tight` set), Sync.so's output equals only the speech
+      //     duration. We must overlay it onto the original full-length plate
+      //     via the audio-mux Lambda (same shots mechanism the N≥2 fan-out
+      //     uses) so the final scene length matches `totalSec`.
+      //   • Legacy non-tight single-speaker scenes finalize directly (audio
+      //     already matches the plate length).
+      const singleTight = totalPasses === 1 && !!(lastDonePass as any)?.audio_tight;
+      if (totalPasses === 1 && !singleTight) {
         await supabase
           .from("composer_scenes")
           .update({
@@ -911,8 +919,11 @@ serve(async (req) => {
             updated_at: nowIso,
           })
           .eq("id", sceneId);
-        console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE`);
+        console.log(`[sync-so-webhook] v25 scene=${sceneId} single-speaker DONE (no tight, direct finalize)`);
         return ok({ ok: true, scene_id: sceneId, job_id: jobId, status, engine: "sync-segments", applied: true });
+      }
+      if (singleTight) {
+        console.log(`[sync-so-webhook] v64 scene=${sceneId} single-speaker TIGHT → dispatching audio-mux (overlay on master plate)`);
       }
 
       // Multi-speaker: dispatch fan-in compositor (idempotent via audio_mux.render_id).
