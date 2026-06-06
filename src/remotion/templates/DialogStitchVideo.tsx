@@ -200,11 +200,24 @@ interface FaceMaskOverlayProps {
    *  we play it from its absolute frame (matching the window start) so the
    *  mouth animation lines up with the master plate timeline. */
   startFrom?: number;
+  segDuration: number;
+  holdToEnd?: boolean;
 }
 /** v25/v38: full-length Sync.so output shown only inside a soft circular
  *  mask around the target face — and only inside this speaker's voiced turn
  *  window(s) via the parent <Sequence>. */
-const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx, startFrom }) => {
+const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radiusPx, startFrom, segDuration, holdToEnd }) => {
+  const frame = useCurrentFrame();
+  const fadeIn = Math.min(CROSSFADE_FRAMES, Math.max(1, Math.floor(segDuration / 2)));
+  const fadeOut = holdToEnd ? 0 : fadeIn;
+  const opacity = holdToEnd
+    ? interpolate(frame, [0, fadeIn], [0, 1], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
+    : interpolate(
+        frame,
+        [0, fadeIn, Math.max(fadeIn, segDuration - fadeOut), segDuration],
+        [0, 1, 1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
   // Feathered radial mask: solid in the inner 70% of radius, fading to 0
   // at radius edge so the lipsynced face blends seamlessly into the base.
   const inner = Math.max(2, Math.round(radiusPx * 0.68));
@@ -214,6 +227,7 @@ const FaceMaskOverlay: React.FC<FaceMaskOverlayProps> = ({ src, cxPx, cyPx, radi
     <AbsoluteFill
       style={{
         pointerEvents: 'none',
+        opacity,
         WebkitMaskImage: mask,
         maskImage: mask,
         WebkitMaskRepeat: 'no-repeat',
