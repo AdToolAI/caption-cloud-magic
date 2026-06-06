@@ -233,7 +233,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
         // und der Nutzer sieht nur „Audio wird vorbereitet…" auf Dauer.
         const audioReadyButNotAdvanced = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
-          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -256,7 +256,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
 
         const needsAudioPrep = (data as any[]).filter((d) => {
           if (!isDialogEngine(d.engine_override)) return false;
-          if (d.engine_override === 'cinematic-sync-legacy') return false;
+          // v70: cinematic-sync-legacy removed.
           if (d.lip_sync_applied_at) return false;
           if (typeof d.clip_url !== 'string' || d.clip_url.length === 0) return false;
           if (d.clip_status && d.clip_status !== 'ready') return false;
@@ -361,10 +361,7 @@ export function useTwoShotAutoTrigger(projectId: string | undefined) {
           // simply still warming up. Skip silently until both are present.
           const planUrl = d.audio_plan?.twoshot?.url;
           const sourceClip = d.lip_sync_source_clip_url ?? d.clip_url;
-          if (d.engine_override !== 'cinematic-sync-legacy') {
-            if (!planUrl || typeof planUrl !== 'string' || planUrl.length === 0) return false;
-            if (!sourceClip || typeof sourceClip !== 'string' || sourceClip.length === 0) return false;
-          }
+          // v70: legacy gate removed.
           // v23: ONLY `pending` (or null) is a valid start state on the client.
           // `failed` requires explicit user reset via `reset-lipsync-scene`.
           if (d.lip_sync_status === 'pending' || d.lip_sync_status == null) return true;
