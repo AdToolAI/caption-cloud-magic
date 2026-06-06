@@ -204,15 +204,25 @@ serve(async (req) => {
       donePasses.length === 3 ? minAxis * 0.18 :
       minAxis * 0.15;
 
-    // v73 — With a static anchor master the resting faces are ALREADY
-    // visible for the full scene (every speaker is in the anchor image).
-    // So we go back to per-turn windowed overlays for tight preclips —
-    // that prevents short preclips from being stretched across 9s, which
-    // caused Sync.so output to play at wrong timing and looked like a
-    // failure. Only when a pass has NO segments do we fall back to a
-    // single full-scene shot.
+    // v74 — Eliminate the "morph" artifact at the end of every speaker
+    // turn. Previously each turn ended with a 6-frame opacity fade-out
+    // back to the static anchor face beneath; because the lipsynced face
+    // and the still anchor face have slightly different position / scale
+    // / expression, the crossfade looked like an AI morph.
+    //
+    // Fix (only when we have a static anchor master):
+    //   • Emit exactly ONE shot per pass spanning [firstSegStart, totalSec]
+    //     (or [0, totalSec] if no segments / non-tight).
+    //   • Mark holdToEnd=true so the overlay only fades IN and then stays
+    //     fully opaque until scene end — never fades back to the anchor.
+    //   • For tight (relative) preclips the underlying <Video> stops at
+    //     its natural end and Remotion freezes on its last frame (mouth
+    //     closed), so the face stays put with no visible transition.
+    //
+    // Without a static anchor master we keep the legacy per-segment
+    // windowed path with fade-out — the video master underneath is in
+    // motion there so the fade is not visible.
     const SHOT_PAD = 0.08;
-    const alwaysOn = false;
 
     const fanoutShots = useOverlay
       ? donePasses.flatMap((p: any) => {
@@ -240,8 +250,30 @@ serve(async (req) => {
                   radius: radiusForCount,
                 },
               };
-          // v72 always-on overlay (one shot per speaker for full scene).
-          if (alwaysOn || passSegs.length === 0) {
+
+          // v74 hold-to-end single shot — only when on a static anchor master.
+          if (useStaticMaster) {
+            const segStarts = passSegs
+              .map((t: any) => Number(t.startTime))
+              .filter((n: number) => Number.isFinite(n));
+            const firstStart =
+              segStarts.length > 0
+                ? Math.max(0, Math.min(...segStarts) - SHOT_PAD)
+                : 0;
+            return [{
+              startSec: firstStart,
+              endSec: totalSec,
+              outputUrl: String(p.output_url),
+              sourceTiming,
+              holdToEnd: true,
+              ...overlayPayload,
+            }];
+          }
+
+          // Legacy path: video master underneath — keep per-segment windowed
+          // overlays with the original crossfade-out (no morph because the
+          // background is in motion).
+          if (passSegs.length === 0) {
             return [{
               startSec: 0,
               endSec: totalSec,
