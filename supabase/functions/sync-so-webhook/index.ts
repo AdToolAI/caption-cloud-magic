@@ -1247,14 +1247,24 @@ serve(async (req) => {
       const freshFailPasses: any[] = Array.isArray(freshFailState?.passes)
         ? freshFailState.passes
         : passesArr;
+      // v68 — A pass in `retrying` with retry_count >= MAX_V5_RETRIES has
+      // already exhausted its budget; the next failure (this one) leaves it
+      // dead-ended. Don't count it as `alive`, otherwise the scene hangs
+      // forever in lip_sync_status='running' because aliveSiblings>0 blocks
+      // the refund+failure path.
       const aliveSiblings = freshFailPasses
         .map((p: any, i: number) => ({ p, i }))
-        .filter(({ p, i }) =>
-          i !== currentPass &&
-          ["rendering", "retrying", "pending"].includes(String(p?.status ?? "")),
-        );
+        .filter(({ p, i }) => {
+          if (i === currentPass) return false;
+          const st = String(p?.status ?? "");
+          if (!["rendering", "retrying", "pending"].includes(st)) return false;
+          const rc = Number(p?.retry_count ?? 0);
+          if (st === "retrying" && rc >= MAX_V5_RETRIES) return false;
+          return true;
+        });
       const doneSiblings = freshFailPasses.filter((p: any, i: number) => i !== currentPass && p?.status === "done").length;
       const sceneWillFail = aliveSiblings.length === 0 && doneSiblings === 0;
+
 
       if (sceneWillFail && cost > 0 && !alreadyRefunded) {
         const { data: row } = await supabase
