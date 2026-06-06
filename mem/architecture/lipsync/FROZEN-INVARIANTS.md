@@ -192,6 +192,20 @@ payloadSyncMode = tightAudioInfo ? "cut_off" : "loop"
 
 ---
 
+## Rule I.12 — Tight WAV slicer must be frame-exact (v67)
+
+`sliceWavToWindows` in `supabase/functions/_shared/syncso-preflight.ts`
+MUST derive output-buffer allocation and sample copy from the SAME
+integer frame boundaries (`floor(timeSec * sampleRate)`). It is forbidden
+to allocate via `round(durSec * sampleRate)` and copy via
+`floor(end*sr) - floor(start*sr)` — for windows like `[3.717, 6.71]`
+these disagree by 1 frame and `out.set()` throws
+`RangeError: offset is out of bounds`, breaking 4-speaker scenes.
+
+Background: `mem://architecture/lipsync/v67-frame-exact-tight-slice`.
+
+---
+
 
 ## Code annotation contract
 
