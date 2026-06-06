@@ -41,17 +41,25 @@ type Quality = "standard" | "pro";
 
 // Cost per second by source × quality tier — synced with client (src/types/video-composer.ts)
 const CLIP_COSTS: Record<string, Record<Quality, number>> = {
-  "ai-hailuo": { standard: 0.15, pro: 0.2 },
-  "ai-kling": { standard: 0.15, pro: 0.21 },
-  "ai-sora": { standard: 0.25, pro: 0.53 },
-  "ai-wan": { standard: 0.1, pro: 0.18 },
-  "ai-seedance": { standard: 0.12, pro: 0.2 },
-  "ai-luma": { standard: 0.2, pro: 0.32 },
-  "ai-veo": { standard: 0.2, pro: 1.4 },
-  "ai-runway": { standard: 0.15, pro: 0.15 },
-  "ai-pika": { standard: 0.1, pro: 0.18 },
-  "ai-image": { standard: 0.01, pro: 0.015 },
+  "ai-hailuo":     { standard: 0.15, pro: 0.2 },
+  "ai-kling":      { standard: 0.15, pro: 0.21 },
+  "ai-sora":       { standard: 0.25, pro: 0.53 },
+  "ai-wan":        { standard: 0.1,  pro: 0.18 },
+  "ai-seedance":   { standard: 0.12, pro: 0.2 },
+  "ai-luma":       { standard: 0.2,  pro: 0.32 },
+  "ai-veo":        { standard: 0.2,  pro: 1.4 },
+  "ai-runway":     { standard: 0.15, pro: 0.15 },
+  "ai-pika":       { standard: 0.1,  pro: 0.18 },
+  // Providers added after the initial table — keep these in lockstep with
+  // compose-clip-webhook CLIP_COSTS (refund table). Missing entries cause
+  // under-charges here and under-refunds in the webhook.
+  "ai-happyhorse": { standard: 0.28, pro: 0.56 }, // 720p / 1080p (Replicate 50% margin)
+  "ai-vidu":       { standard: 0.09, pro: 0.09 }, // flat €0.45 / 5s
+  "ai-grok":       { standard: 0.20, pro: 0.20 }, // 1080p only
+  "ai-ltx":        { standard: 0.08, pro: 0.12 },
+  "ai-image":      { standard: 0.01, pro: 0.015 },
 };
+
 
 interface ComposerCharacter {
   id: string;
