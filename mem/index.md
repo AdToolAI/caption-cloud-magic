@@ -63,3 +63,4 @@ Updated: today
 - [Lambda Concurrency Policy](mem://infrastructure/aws-lambda/rendering-concurrency-stability-policy) — framesPerLambda 270
 - [Director's Cut Boundary Stability](mem://architecture/directors-cut/playback-boundary-stability-strategy) — boundary markers
 - [Ad/Email Director, Composer, AI Video Toolkit, Marketplace, Avatars, Music, SFX, Stock Videos, Status Page, QA Agent, etc.] — see prior index for full list
+- [Composer Replicate Fetch-Timeout Resilience](mem://architecture/video-composer/replicate-fetch-timeout-resilience) — composer-frames cacheControl=3600 + CLIP_COSTS sync (+happyhorse/vidu/grok/ltx) + Auto-Retry im compose-clip-webhook bei transienten Replicate-Read-Timeouts via re-dispatch (max 2)
