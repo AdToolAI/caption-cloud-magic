@@ -87,7 +87,7 @@ serve(async (req) => {
     const { data: scene, error: sceneErr } = await supabase
       .from("composer_scenes")
       .select(
-        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url",
+        "id, project_id, dialog_shots, audio_plan, lip_sync_applied_at, clip_url, lock_reference_url, reference_image_url",
       )
       .eq("id", sceneId)
       .single();
