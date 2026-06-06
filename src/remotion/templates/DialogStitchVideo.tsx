@@ -65,6 +65,12 @@ const ShotSchema = z.object({
    *  with only this speaker's lips moving; composite via soft circular
    *  mask around (cx,cy) with feathered radius. Spans the full scene. */
   faceMask: FaceMaskSchema.optional().nullable(),
+  /** v74: when true the overlay only fades IN at the start and then stays
+   *  fully opaque until the Sequence ends — NO fade-out. Used together
+   *  with shots that run all the way to totalSec on top of a static
+   *  anchor master, so the lipsync face never visibly morphs back into
+   *  the still anchor face at the segment boundary. */
+  holdToEnd: z.boolean().optional(),
 });
 
 
